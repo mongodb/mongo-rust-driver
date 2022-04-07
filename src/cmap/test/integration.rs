@@ -12,7 +12,7 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
-    sdam::ServerUpdateSender,
+    sdam::{ServerUpdateSender, TopologyUpdater},
     selection_criteria::ReadPreference,
     test::{
         log_uncaptured,
@@ -49,7 +49,7 @@ async fn acquire_connection_and_send_command() {
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         Default::default(),
-        ServerUpdateSender::channel().0,
+        TopologyUpdater::channel().0,
         Some(pool_options),
     );
     let mut connection = pool.check_out().await.unwrap();
@@ -125,7 +125,7 @@ async fn concurrent_connections() {
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.hosts[0].clone(),
         Default::default(),
-        ServerUpdateSender::channel().0,
+        TopologyUpdater::channel().0,
         Some(options),
     );
 
@@ -212,7 +212,7 @@ async fn connection_error_during_establishment() {
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         Default::default(),
-        ServerUpdateSender::channel().0,
+        TopologyUpdater::channel().0,
         Some(options),
     );
 

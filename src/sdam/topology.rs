@@ -22,194 +22,96 @@ use crate::{
     runtime,
     runtime::HttpClient,
     ServerInfo,
+    ServerType,
+    TopologyType,
 };
 
-use super::{HMonitor, HandshakePhase, Server, ServerDescription, TopologyDescription};
+use super::{HMonitor, HandshakePhase, Server, ServerDescription, Topology, TopologyDescription};
 
+#[derive(Debug)]
 pub(crate) struct NewTopology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
+    update_requester: UpdateRequester,
 }
 
 impl NewTopology {
     pub(crate) fn new(options: ClientOptions) -> Result<NewTopology> {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<UpdateMessage>();
+        let http_client = HttpClient::default();
+        let description = TopologyDescription::new(options.clone())?;
+        let (update_requester, update_request_receiver) = UpdateRequester::channel();
+
+        let (updater, update_receiver) = TopologyUpdater::channel();
+
+        let servers = description
+            .server_addresses()
+            .map(|address| {
+                (
+                    address.clone(),
+                    Server::new(
+                        address.clone(),
+                        options.clone(),
+                        http_client.clone(),
+                        updater.clone(),
+                    ),
+                )
+            })
+            .collect();
 
         let state = TopologyState {
-            description: TopologyDescription::new(options.clone())?,
-            servers: HashMap::new(),
+            description,
+            servers,
         };
-        // let (watch_sender, watch_receiver) = tokio::sync::watch::channel(state);
+
+        let addresses = state.servers.keys().cloned().collect::<Vec<_>>();
 
         let (watcher, broadcaster) = TopologyWatcher::channel(state);
 
-        let (updater, update_receiver) = TopologyUpdater::channel();
+        for address in addresses {
+            HMonitor::start(
+                address,
+                updater.clone(),
+                watcher.clone(),
+                update_request_receiver.clone(),
+                options.clone(),
+            );
+        }
 
         TopologyWorker {
             id: ObjectId::new(),
             update_receiver,
             broadcaster,
             options,
-            http_client: HttpClient::default(),
-
+            http_client,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
+            update_request_receiver,
         }
         .start();
 
-        Ok(NewTopology { watcher, updater })
+        Ok(NewTopology {
+            watcher,
+            updater,
+            update_requester,
+        })
+    }
+
+    pub(crate) fn watch(&self) -> TopologyWatcher {
+        self.watcher.clone()
+    }
+
+    pub(crate) fn request_update(&self) {
+        self.update_requester.request()
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct TopologyState {
-    description: TopologyDescription,
-    servers: HashMap<ServerAddress, Arc<Server>>,
-}
-impl TopologyState {
-    // /// Adds a new server to the cluster.
-    // ///
-    // /// A reference to the containing Topology is needed in order to start the monitoring task.
-    // fn add_new_server(
-    //     &mut self,
-    //     address: ServerAddress,
-    //     options: ClientOptions,
-    // ) {
-    //     if self.servers.contains_key(&address) {
-    //         return;
-    //     }
-
-    //     let (server, monitor) = Server::create(
-    //         address.clone(),
-    //         &options,
-    //         topology.clone(),
-    //         self.http_client.clone(),
-    //     );
-    //     self.servers.insert(address, server);
-
-    //     #[cfg(test)]
-    //     if options
-    //         .test_options
-    //         .map(|to| to.disable_monitoring_threads)
-    //         .unwrap_or(false)
-    //     {
-    //         return;
-    //     }
-
-    //     monitor.start();
-    // }
-
-    // /// Updates the given `command` as needed based on the `criteria`.
-    // pub(crate) fn update_command_with_read_pref<T>(
-    //     &self,
-    //     server_address: &ServerAddress,
-    //     command: &mut Command<T>,
-    //     criteria: Option<&SelectionCriteria>,
-    // ) {
-    //     let server_type = self
-    //         .description
-    //         .get_server_description(server_address)
-    //         .map(|desc| desc.server_type)
-    //         .unwrap_or(ServerType::Unknown);
-
-    //     self.description
-    //         .update_command_with_read_pref(server_type, command, criteria)
-    // }
-
-    // /// Update the topology description based on the provided server description. Also add new
-    // /// servers and remove missing ones as needed.
-    // fn update(
-    //     &mut self,
-    //     server: ServerDescription,
-    //     options: &ClientOptions,
-    //     topology: WeakTopology,
-    // ) -> std::result::Result<bool, String> {
-    //     let old_description = self.description.clone();
-    //     self.description.update(server)?;
-
-    //     let hosts: HashSet<_> = self.description.server_addresses().cloned().collect();
-    //     self.sync_hosts(&hosts, options, &topology);
-
-    //     let diff = old_description.diff(&self.description);
-    //     let topology_changed = diff.is_some();
-
-    //     if let Some(ref handler) = options.sdam_event_handler {
-    //         if let Some(diff) = diff {
-    //             for (address, (previous_description, new_description)) in diff.changed_servers {
-    //                 let event = ServerDescriptionChangedEvent {
-    //                     address: address.clone(),
-    //                     topology_id: topology.common.id,
-    //                     previous_description:
-    // ServerInfo::new_owned(previous_description.clone()),                     new_description:
-    // ServerInfo::new_owned(new_description.clone()),                 };
-    //                 handler.handle_server_description_changed_event(event);
-    //             }
-
-    //             for address in diff.removed_addresses {
-    //                 let event = ServerClosedEvent {
-    //                     address: address.clone(),
-    //                     topology_id: topology.common.id,
-    //                 };
-    //                 handler.handle_server_closed_event(event);
-    //             }
-
-    //             for address in diff.added_addresses {
-    //                 let event = ServerOpeningEvent {
-    //                     address: address.clone(),
-    //                     topology_id: topology.common.id,
-    //                 };
-    //                 handler.handle_server_opening_event(event);
-    //             }
-
-    //             let event = TopologyDescriptionChangedEvent {
-    //                 topology_id: topology.common.id,
-    //                 previous_description: old_description.clone().into(),
-    //                 new_description: self.description.clone().into(),
-    //             };
-    //             handler.handle_topology_description_changed_event(event);
-    //         }
-    //     }
-
-    //     Ok(topology_changed)
-    // }
-
-    // /// Start/stop monitoring tasks and create/destroy connection pools based on the new and
-    // /// removed servers in the topology description.
-    // fn update_hosts(
-    //     &mut self,
-    //     hosts: &HashSet<ServerAddress>,
-    //     options: &ClientOptions,
-    //     topology: WeakTopology,
-    // ) {
-    //     self.description.sync_hosts(hosts);
-    //     self.sync_hosts(hosts, options, &topology);
-    // }
-
-    // fn sync_hosts(
-    //     &mut self,
-    //     hosts: &HashSet<ServerAddress>,
-    //     options: &ClientOptions,
-    //     topology: &WeakTopology,
-    // ) {
-    //     for address in hosts.iter() {
-    //         self.add_new_server(address.clone(), options.clone(), topology);
-    //     }
-
-    //     self.servers.retain(|host, _| hosts.contains(host));
-    // }
-
-    // #[cfg(test)]
-    // async fn sync_workers(&self) {
-    //     let rxen: FuturesUnordered<_> = self
-    //         .servers
-    //         .values()
-    //         .map(|v| v.pool.sync_worker())
-    //         .collect();
-    //     let _: Vec<_> = rxen.collect().await;
-    // }
+    pub(crate) description: TopologyDescription,
+    pub(crate) servers: HashMap<ServerAddress, Arc<Server>>,
 }
 
-enum UpdateMessage {
+pub(crate) enum UpdateMessage {
     ServerUpdate(ServerDescription),
     MonitorError {
         address: ServerAddress,
@@ -231,6 +133,7 @@ struct TopologyWorker {
 
     topology_watcher: TopologyWatcher,
     topology_updater: TopologyUpdater,
+    update_request_receiver: TopologyUpdateRequestReceiver,
 }
 
 impl TopologyWorker {
@@ -241,7 +144,8 @@ impl TopologyWorker {
                     Some(update) = self.update_receiver.recv() => {
                         match update {
                             UpdateMessage::ServerUpdate(sd) => {
-                                self.update_server(sd);
+                                println!("received update for {}", sd.address);
+                                self.update_server(sd).await.unwrap();
                             },
                             UpdateMessage::MonitorError { address, error } => {
                                 todo!()
@@ -251,15 +155,15 @@ impl TopologyWorker {
                             }
                         }
                     },
-                    Some(_) = self.broadcaster.receive_check_request() => {
-                        self.update_receiver.request_monitor_checks();
-                    }
                 }
             }
         });
     }
 
-    fn update_server(&mut self, sd: ServerDescription) -> std::result::Result<bool, String> {
+    async fn update_server(&mut self, sd: ServerDescription) -> std::result::Result<bool, String> {
+        let server_type = sd.server_type;
+        let server_address = sd.address.clone();
+
         let mut latest_state = self.broadcaster.clone_latest();
         let old_description = latest_state.description.clone();
 
@@ -277,20 +181,20 @@ impl TopologyWorker {
             if latest_state.servers.contains_key(&address) {
                 continue;
             }
-            // TODO: create server, add to servers, start monitor
             let server = Server::new(
                 address.clone(),
                 self.options.clone(),
                 self.http_client.clone(),
+                self.topology_updater.clone(),
             );
             latest_state.servers.insert(address.clone(), server);
-            let mut monitor = HMonitor::new(
+            HMonitor::start(
                 address,
                 self.topology_updater.clone(),
                 self.topology_watcher.clone(),
+                self.update_request_receiver.clone(),
                 self.options.clone(),
             );
-            runtime::execute(async move { monitor.execute().await });
         }
 
         let diff = old_description.diff(&latest_state.description);
@@ -333,6 +237,18 @@ impl TopologyWorker {
             }
         }
 
+        if topology_changed {
+            if server_type.is_data_bearing()
+                || (server_type != ServerType::Unknown
+                    && latest_state.description.topology_type() == TopologyType::Single)
+            {
+                if let Some(s) = latest_state.servers.get(&server_address) {
+                    s.pool.mark_as_ready().await;
+                }
+            }
+            let _ = self.broadcaster.state_sender.send(latest_state);
+        }
+
         Ok(topology_changed)
     }
 }
@@ -340,12 +256,19 @@ impl TopologyWorker {
 #[derive(Debug, Clone)]
 pub(crate) struct TopologyUpdater {
     sender: UnboundedSender<UpdateMessage>,
-    update_request_receiver: watch::Receiver<()>,
 }
 
 impl TopologyUpdater {
-    fn channel() -> (TopologyUpdater, TopologyUpdateReceiver) {
-        todo!()
+    pub(crate) fn channel() -> (TopologyUpdater, TopologyUpdateReceiver) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let updater = TopologyUpdater { sender: tx };
+
+        let update_receiver = TopologyUpdateReceiver {
+            update_receiver: rx,
+        };
+
+        (updater, update_receiver)
     }
 
     pub(crate) fn handle_monitor_error(&self, address: ServerAddress, error: Error) {
@@ -354,32 +277,31 @@ impl TopologyUpdater {
             .send(UpdateMessage::MonitorError { address, error });
     }
 
+    pub(crate) fn handle_application_error(
+        &self,
+        address: ServerAddress,
+        error: Error,
+        phase: HandshakePhase,
+    ) {
+        let _: std::result::Result<_, _> = self.sender.send(UpdateMessage::ApplicationError {
+            address,
+            error,
+            phase,
+        });
+    }
+
     pub(crate) fn update(&self, sd: ServerDescription) {
         let _: std::result::Result<_, _> = self.sender.send(UpdateMessage::ServerUpdate(sd));
     }
-
-    pub(crate) fn clear_update_requests(&mut self) {
-        self.update_request_receiver.borrow_and_update();
-    }
-
-    pub(crate) async fn wait_for_update_request(&mut self, timeout: Duration) {
-        let _: std::result::Result<_, _> =
-            runtime::timeout(timeout, self.update_request_receiver.changed()).await;
-    }
 }
 
-struct TopologyUpdateReceiver {
+pub(crate) struct TopologyUpdateReceiver {
     update_receiver: UnboundedReceiver<UpdateMessage>,
-    check_request_sender: watch::Sender<()>,
 }
 
 impl TopologyUpdateReceiver {
-    async fn recv(&mut self) -> Option<UpdateMessage> {
+    pub(crate) async fn recv(&mut self) -> Option<UpdateMessage> {
         self.update_receiver.recv().await
-    }
-
-    fn request_monitor_checks(&mut self) {
-        let _: std::result::Result<_, _> = self.check_request_sender.send(());
     }
 }
 
@@ -390,11 +312,14 @@ pub(crate) struct TopologyWatcher {
 
 impl TopologyWatcher {
     fn channel(initial_state: TopologyState) -> (TopologyWatcher, TopologyBroadcaster) {
-        todo!()
+        let (tx, rx) = watch::channel(initial_state);
+        let watcher = TopologyWatcher { receiver: rx };
+        let broadcaster = TopologyBroadcaster { state_sender: tx };
+        (watcher, broadcaster)
     }
 
     pub(crate) fn is_alive(&self) -> bool {
-        self.receiver.has_changed().is_err()
+        self.receiver.has_changed().is_ok()
     }
 
     pub(crate) fn server_description(&self, address: &ServerAddress) -> Option<ServerDescription> {
@@ -404,6 +329,18 @@ impl TopologyWatcher {
             .get_server_description(address)
             .cloned()
     }
+
+    pub(crate) fn clone_latest_state(&mut self) -> TopologyState {
+        self.receiver.borrow_and_update().clone()
+    }
+
+    pub(crate) async fn wait_for_update(&mut self, timeout: Duration) -> bool {
+        let changed = runtime::timeout(timeout, self.receiver.changed())
+            .await
+            .is_ok();
+        self.receiver.borrow_and_update();
+        changed
+    }
 }
 
 struct TopologyBroadcaster {
@@ -411,11 +348,59 @@ struct TopologyBroadcaster {
 }
 
 impl TopologyBroadcaster {
-    async fn receive_check_request(&mut self) -> Option<()> {
-        todo!()
-    }
-
     fn clone_latest(&self) -> TopologyState {
         self.state_sender.borrow().clone()
     }
+}
+
+#[derive(Debug)]
+struct UpdateRequester {
+    sender: watch::Sender<()>,
+}
+
+impl UpdateRequester {
+    fn channel() -> (UpdateRequester, TopologyUpdateRequestReceiver) {
+        let (tx, rx) = watch::channel(());
+        (
+            UpdateRequester { sender: tx },
+            TopologyUpdateRequestReceiver { receiver: rx },
+        )
+    }
+
+    fn request(&self) {
+        let _ = self.sender.send(());
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct TopologyUpdateRequestReceiver {
+    receiver: watch::Receiver<()>,
+}
+
+impl TopologyUpdateRequestReceiver {
+    pub(crate) async fn wait_for_update_request(&mut self, timeout: Duration) {
+        let _: std::result::Result<_, _> = runtime::timeout(timeout, self.receiver.changed()).await;
+    }
+
+    pub(crate) fn clear_update_requests(&mut self) {
+        self.receiver.borrow_and_update();
+    }
+}
+
+#[tokio::test]
+async fn foo() {
+    let mut top = NewTopology::new(crate::test::CLIENT_OPTIONS.clone()).unwrap();
+
+    runtime::timeout(
+        Duration::from_secs(5),
+        runtime::spawn(async move {
+            while top.watcher.receiver.changed().await.is_ok() {
+                let state = top.watcher.receiver.borrow();
+                println!("state change");
+                println!("description: {:#?}", state.description);
+                println!("servers: {:#?}", state.servers);
+            }
+        }),
+    )
+    .await;
 }

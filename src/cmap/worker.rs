@@ -33,7 +33,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime,
-    sdam::ServerUpdateSender,
+    sdam::{ServerUpdateSender, TopologyUpdater},
 };
 
 use std::{
@@ -133,7 +133,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// A handle used to notify SDAM that a connection establishment error happened. This will
     /// allow the server to transition to Unknown and clear the pool as necessary.
-    server_updater: ServerUpdateSender,
+    server_updater: TopologyUpdater,
 }
 
 impl ConnectionPoolWorker {
@@ -143,7 +143,7 @@ impl ConnectionPoolWorker {
     pub(super) fn start(
         address: ServerAddress,
         http_client: runtime::HttpClient,
-        server_updater: ServerUpdateSender,
+        server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
         let establisher = ConnectionEstablisher::new(http_client, options.as_ref());
@@ -629,7 +629,7 @@ impl ConnectionPoolWorker {
 async fn establish_connection(
     establisher: &ConnectionEstablisher,
     pending_connection: PendingConnection,
-    server_updater: &mut ServerUpdateSender,
+    server_updater: &mut TopologyUpdater,
     manager: &PoolManager,
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
@@ -640,7 +640,11 @@ async fn establish_connection(
 
     match establish_result {
         Err(ref e) => {
-            server_updater.handle_error(e.clone()).await;
+            server_updater.handle_application_error(
+                address.clone(),
+                e.cause.clone(),
+                e.handshake_phase.clone(),
+            );
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,

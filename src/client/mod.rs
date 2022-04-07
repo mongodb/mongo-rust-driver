@@ -34,7 +34,8 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
-    sdam::{SelectedServer, SessionSupportStatus, Topology},
+    runtime,
+    sdam::{server_selection, NewTopology, SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -99,6 +100,7 @@ pub struct Client {
 #[derivative(Debug)]
 struct ClientInner {
     topology: Topology,
+    new_topology: NewTopology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
 }
@@ -127,6 +129,7 @@ impl Client {
 
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
+            new_topology: NewTopology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
         });
@@ -391,33 +394,23 @@ impl Client {
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
+        let mut watcher = self.inner.new_topology.watch();
         loop {
-            let mut topology_change_subscriber =
-                self.inner.topology.subscribe_to_topology_changes();
+            let state = watcher.clone_latest_state();
 
-            let selected_server = self
-                .inner
-                .topology
-                .attempt_to_select_server(criteria)
-                .await?;
-
-            if let Some(server) = selected_server {
+            if let Some(server) = server_selection::attempt_to_select_server(
+                criteria,
+                &state.description,
+                &state.servers,
+            )? {
                 return Ok(server);
             }
 
-            self.inner.topology.request_topology_check();
+            self.inner.new_topology.request_update();
 
-            // If the time that has passed since the start of the loop is greater than the timeout,
-            // then `time_remaining` will be 0, so no change will be found.
-            let time_passed = start_time.elapsed();
-            let time_remaining = timeout
-                .checked_sub(time_passed)
-                .unwrap_or_else(|| Duration::from_millis(0));
-
-            let change_occurred = topology_change_subscriber
-                .wait_for_message(time_remaining)
+            let change_occurred = watcher
+                .wait_for_update(timeout - start_time.elapsed())
                 .await;
-
             if !change_occurred {
                 return Err(ErrorKind::ServerSelection {
                     message: self
@@ -429,6 +422,45 @@ impl Client {
                 .into());
             }
         }
+
+        // loop {
+        //     let mut topology_change_subscriber =
+        //         self.inner.topology.subscribe_to_topology_changes();
+
+        //     let selected_server = self
+        //         .inner
+        //         .topology
+        //         .attempt_to_select_server(criteria)
+        //         .await?;
+
+        //     if let Some(server) = selected_server {
+        //         return Ok(server);
+        //     }
+
+        //     self.inner.topology.request_topology_check();
+
+        //     // If the time that has passed since the start of the loop is greater than the
+        // timeout,     // then `time_remaining` will be 0, so no change will be found.
+        //     let time_passed = start_time.elapsed();
+        //     let time_remaining = timeout
+        //         .checked_sub(time_passed)
+        //         .unwrap_or_else(|| Duration::from_millis(0));
+
+        //     let change_occurred = topology_change_subscriber
+        //         .wait_for_message(time_remaining)
+        //         .await;
+
+        //     if !change_occurred {
+        //         return Err(ErrorKind::ServerSelection {
+        //             message: self
+        //                 .inner
+        //                 .topology
+        //                 .server_selection_timeout_error_message(criteria)
+        //                 .await,
+        //         }
+        //         .into());
+        //     }
+        // }
     }
 
     #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]

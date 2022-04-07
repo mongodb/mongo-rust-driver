@@ -18,7 +18,7 @@ use crate::{
     options::TlsOptions,
     runtime,
     runtime::AsyncJoinHandle,
-    sdam::{ServerUpdate, ServerUpdateSender},
+    sdam::{ServerUpdate, ServerUpdateSender, TopologyUpdater, UpdateMessage},
     test::{
         assert_matches,
         eq_matches,
@@ -153,25 +153,26 @@ impl Executor {
     async fn execute_test(self) {
         let mut subscriber = self.state.handler.subscribe();
 
-        let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
+        // let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
+        let (updater, mut receiver) = TopologyUpdater::channel();
 
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.hosts[0].clone(),
             Default::default(),
-            update_sender,
+            updater,
             Some(self.pool_options),
         );
 
         // Mock a monitoring task responding to errors reported by the pool.
         let manager = pool.manager.clone();
         runtime::execute(async move {
-            while let Some(update) = update_receiver.recv().await {
-                match update.message() {
-                    ServerUpdate::Error { error, .. } => {
-                        manager.clear(error.cause.clone(), None).await
+            while let Some(update) = receiver.recv().await {
+                match update {
+                    UpdateMessage::ApplicationError { error, .. } => {
+                        manager.clear(error, None).await;
                     }
+                    _ => {}
                 }
-                drop(update);
             }
         });
 

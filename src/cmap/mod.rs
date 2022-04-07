@@ -35,7 +35,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime::HttpClient,
-    sdam::ServerUpdateSender,
+    sdam::{ServerUpdateSender, TopologyUpdater},
 };
 use connection_requester::ConnectionRequester;
 use manager::PoolManager;
@@ -64,7 +64,7 @@ impl ConnectionPool {
     pub(crate) fn new(
         address: ServerAddress,
         http_client: HttpClient,
-        server_updater: ServerUpdateSender,
+        server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
         let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(

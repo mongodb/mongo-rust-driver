@@ -8,6 +8,7 @@ use super::{
     state::{server::Server, Topology, WeakTopology},
     ServerUpdate,
     ServerUpdateReceiver,
+    TopologyUpdateRequestReceiver,
     TopologyUpdater,
     TopologyWatcher,
 };
@@ -85,35 +86,42 @@ pub(crate) struct HMonitor {
     handshaker: Handshaker,
     topology_updater: TopologyUpdater,
     topology_watcher: TopologyWatcher,
+    update_request_receiver: TopologyUpdateRequestReceiver,
     client_options: ClientOptions,
 }
 
 impl HMonitor {
-    pub(crate) fn new(
+    pub(crate) fn start(
         address: ServerAddress,
         topology_updater: TopologyUpdater,
         topology_watcher: TopologyWatcher,
+        update_request_receiver: TopologyUpdateRequestReceiver,
         client_options: ClientOptions,
-    ) -> Self {
+    ) {
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
-        Self {
+        let monitor = Self {
             address,
             client_options,
             handshaker,
             topology_updater,
             topology_watcher,
+            update_request_receiver,
             connection: None,
-        }
+        };
+        runtime::execute(monitor.execute())
     }
 
-    pub(crate) async fn execute(&mut self) {
+    async fn execute(mut self) {
+        println!("{}: starting monitor", self.address);
         let heartbeat_frequency = self
             .client_options
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
         while self.topology_watcher.is_alive() {
+            println!("{}: topology alive, starting check", self.address);
             self.check_server().await;
+            println!("{}: check complete", self.address);
 
             #[cfg(test)]
             let min_frequency = self
@@ -127,7 +135,7 @@ impl HMonitor {
             let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
             runtime::delay_for(min_frequency).await;
-            self.topology_updater
+            self.update_request_receiver
                 .wait_for_update_request(heartbeat_frequency - min_frequency)
                 .await;
         }
@@ -138,7 +146,7 @@ impl HMonitor {
     ///
     /// Returns true if the topology has changed and false otherwise.
     async fn check_server(&mut self) -> bool {
-        self.topology_updater.clear_update_requests();
+        self.update_request_receiver.clear_update_requests();
         let mut retried = false;
         let check_result = match self.perform_hello().await {
             Ok(reply) => Ok(reply),

@@ -8,7 +8,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, ConnectionPool, EstablishError},
     options::{ClientOptions, ServerAddress},
     runtime::{AcknowledgedMessage, HttpClient},
-    sdam::monitor::Monitor,
+    sdam::{monitor::Monitor, TopologyUpdater},
 };
 
 /// Contains the state for a given server in the topology.
@@ -41,7 +41,8 @@ impl Server {
         topology: WeakTopology,
         http_client: HttpClient,
     ) -> (Arc<Self>, Monitor) {
-        let (update_sender, update_receiver) = ServerUpdateSender::channel();
+        let (_, update_receiver) = ServerUpdateSender::channel();
+        let (update_sender, _) = TopologyUpdater::channel();
         let server = Arc::new(Self {
             pool: ConnectionPool::new(
                 address.clone(),
@@ -61,8 +62,18 @@ impl Server {
         address: ServerAddress,
         options: ClientOptions,
         http_client: HttpClient,
+        topology_updater: TopologyUpdater,
     ) -> Arc<Server> {
-        todo!()
+        Arc::new(Self {
+            pool: ConnectionPool::new(
+                address.clone(),
+                http_client,
+                topology_updater,
+                Some(ConnectionPoolOptions::from_client_options(&options)),
+            ),
+            address: address.clone(),
+            operation_count: AtomicU32::new(0),
+        })
     }
 
     pub(crate) fn increment_operation_count(&self) {
