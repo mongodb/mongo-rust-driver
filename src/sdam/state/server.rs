@@ -54,8 +54,9 @@ impl Server {
             operation_count: AtomicU32::new(0),
         });
 
-        let monitor = Monitor::new(address, &server, topology, options.clone(), update_receiver);
-        (server, monitor)
+        // let monitor = Monitor::new(address, &server, topology, options.clone(), update_receiver);
+        // (server, monitor)
+        todo!()
     }
 
     pub(crate) fn new(

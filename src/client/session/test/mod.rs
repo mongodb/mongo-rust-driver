@@ -532,7 +532,7 @@ async fn find_and_getmore_share_session() {
         assert_eq!(getmore_session_id, session_id);
     }
 
-    let topology_description = client.topology_description().await;
+    let topology_description = client.topology_description();
     for (addr, server) in topology_description.servers {
         if !server.server_type.is_data_bearing() {
             continue;

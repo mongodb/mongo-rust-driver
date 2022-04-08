@@ -164,7 +164,7 @@ impl Topology {
         #[cfg(not(test))]
         let disable_monitoring_threads = false;
         if !is_load_balanced && !disable_monitoring_threads {
-            SrvPollingMonitor::start(topology.downgrade());
+            // SrvPollingMonitor::start(topology.downgrade());
         }
 
         drop(topology_state);
@@ -246,67 +246,68 @@ impl Topology {
         self.common.message_manager.notify_topology_changed();
     }
 
-    pub(crate) async fn handle_application_error(
-        &self,
-        error: Error,
-        handshake: HandshakePhase,
-        server: &Server,
-    ) -> bool {
-        let state_lock = self.state.write().await;
-        match &handshake {
-            HandshakePhase::PreHello { generation } => {
-                match (generation, server.pool.generation()) {
-                    (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => {
-                        if *hgen < sgen {
-                            return false;
-                        }
-                    }
-                    // Pre-hello handshake errors are ignored in load-balanced mode.
-                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {
-                        return false
-                    }
-                    _ => load_balanced_mode_mismatch!(false),
-                }
-            }
-            HandshakePhase::PostHello { generation }
-            | HandshakePhase::AfterCompletion { generation, .. } => {
-                if generation.is_stale(&server.pool.generation()) {
-                    return false;
-                }
-            }
-        }
+    // pub(crate) async fn handle_application_error(
+    //     &self,
+    //     error: Error,
+    //     handshake: HandshakePhase,
+    //     server: &Server,
+    // ) -> bool {
+    // let state_lock = self.state.write().await;
+    // match &handshake {
+    //     HandshakePhase::PreHello { generation } => {
+    //         match (generation, server.pool.generation()) {
+    //             (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => {
+    //                 if *hgen < sgen {
+    //                     return false;
+    //                 }
+    //             }
+    //             // Pre-hello handshake errors are ignored in load-balanced mode.
+    //             (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {
+    //                 return false
+    //             }
+    //             _ => load_balanced_mode_mismatch!(false),
+    //         }
+    //     }
+    //     HandshakePhase::PostHello { generation }
+    //     | HandshakePhase::AfterCompletion { generation, .. } => {
+    //         if generation.is_stale(&server.pool.generation()) {
+    //             return false;
+    //         }
+    //     }
+    // }
 
-        let is_load_balanced = state_lock.description.topology_type() == TopologyType::LoadBalanced;
-        if error.is_state_change_error() {
-            let updated = is_load_balanced
-                || self
-                    .mark_server_as_unknown(error.to_string(), server, state_lock)
-                    .await;
+    // let is_load_balanced = state_lock.description.topology_type() == TopologyType::LoadBalanced;
+    // if error.is_state_change_error() {
+    //     let updated = is_load_balanced
+    //         || self
+    //             .mark_server_as_unknown(error.to_string(), server, state_lock)
+    //             .await;
 
-            if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
-                server.pool.clear(error, handshake.service_id()).await;
-            }
-            self.request_topology_check();
+    //     if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
+    //         server.pool.clear(error, handshake.service_id()).await;
+    //     }
+    //     self.request_topology_check();
 
-            updated
-        } else if error.is_non_timeout_network_error()
-            || (handshake.is_before_completion()
-                && (error.is_auth_error()
-                    || error.is_network_timeout()
-                    || error.is_command_error()))
-        {
-            let updated = is_load_balanced
-                || self
-                    .mark_server_as_unknown(error.to_string(), server, state_lock)
-                    .await;
-            if updated {
-                server.pool.clear(error, handshake.service_id()).await;
-            }
-            updated
-        } else {
-            false
-        }
-    }
+    //     updated
+    // } else if error.is_non_timeout_network_error()
+    //     || (handshake.is_before_completion()
+    //         && (error.is_auth_error()
+    //             || error.is_network_timeout()
+    //             || error.is_command_error()))
+    // {
+    //     let updated = is_load_balanced
+    //         || self
+    //             .mark_server_as_unknown(error.to_string(), server, state_lock)
+    //             .await;
+    //     if updated {
+    //         server.pool.clear(error, handshake.service_id()).await;
+    //     }
+    //     updated
+    // } else {
+    //     false
+    // }
+    //     todo!()
+    // }
 
     pub(crate) async fn handle_monitor_error(&self, error: Error, server: &Server) -> bool {
         let state_lock = self.state.write().await;
@@ -530,7 +531,7 @@ impl TopologyState {
             return;
         }
 
-        monitor.start();
+        // monitor.start();
     }
 
     /// Update the topology description based on the provided server description. Also add new
@@ -623,68 +624,5 @@ impl TopologyState {
             .map(|v| v.pool.sync_worker())
             .collect();
         let _: Vec<_> = rxen.collect().await;
-    }
-}
-
-/// Enum describing a point in time during an operation's execution relative to when the MongoDB
-/// handshake for the conection being used in that operation.
-///
-/// This is used to determine the error handling semantics for certain error types.
-#[derive(Debug, Clone)]
-pub(crate) enum HandshakePhase {
-    /// Describes a point that occurred before the initial hello completed (e.g. when opening the
-    /// socket).
-    PreHello { generation: PoolGeneration },
-
-    /// Describes a point in time after the initial hello has completed, but before the entire
-    /// handshake (e.g. including authentication) completes.
-    PostHello { generation: ConnectionGeneration },
-
-    /// Describes a point in time after the handshake completed (e.g. when the command was sent to
-    /// the server).
-    AfterCompletion {
-        generation: ConnectionGeneration,
-        max_wire_version: i32,
-    },
-}
-
-impl HandshakePhase {
-    pub(crate) fn after_completion(handshaked_connection: &Connection) -> Self {
-        Self::AfterCompletion {
-            generation: handshaked_connection.generation.clone(),
-            // given that this is a handshaked connection, the stream description should
-            // always be available, so 0 should never actually be returned here.
-            max_wire_version: handshaked_connection
-                .stream_description()
-                .ok()
-                .and_then(|sd| sd.max_wire_version)
-                .unwrap_or(0),
-        }
-    }
-
-    /// The `serviceId` reported by the server.  If the initial hello has not completed, returns
-    /// `None`.
-    pub(crate) fn service_id(&self) -> Option<ObjectId> {
-        match self {
-            HandshakePhase::PreHello { .. } => None,
-            HandshakePhase::PostHello { generation, .. } => generation.service_id(),
-            HandshakePhase::AfterCompletion { generation, .. } => generation.service_id(),
-        }
-    }
-
-    /// Whether this phase is before the handshake completed or not.
-    fn is_before_completion(&self) -> bool {
-        !matches!(self, HandshakePhase::AfterCompletion { .. })
-    }
-
-    /// The wire version of the server as reported by the handshake. If the handshake did not
-    /// complete, this returns `None`.
-    fn wire_version(&self) -> Option<i32> {
-        match self {
-            HandshakePhase::AfterCompletion {
-                max_wire_version, ..
-            } => Some(*max_wire_version),
-            _ => None,
-        }
     }
 }

@@ -8,26 +8,46 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
-        event::ChangeStreamEvent, session::SessionChangeStream, ChangeStream, ChangeStreamData,
+        event::ChangeStreamEvent,
+        session::SessionChangeStream,
+        ChangeStream,
+        ChangeStreamData,
         WatchArgs,
     },
     cmap::{
-        conn::PinnedConnectionHandle, Connection, ConnectionPool, RawCommand, RawCommandResponse,
+        conn::PinnedConnectionHandle,
+        Connection,
+        ConnectionPool,
+        RawCommand,
+        RawCommandResponse,
     },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
-        Error, ErrorKind, Result, RETRYABLE_WRITE_ERROR, TRANSIENT_TRANSACTION_ERROR,
+        Error,
+        ErrorKind,
+        Result,
+        RETRYABLE_WRITE_ERROR,
+        TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
-        AbortTransaction, AggregateTarget, ChangeStreamAggregate, CommandErrorBody,
-        CommitTransaction, Operation, Retryability,
+        AbortTransaction,
+        AggregateTarget,
+        ChangeStreamAggregate,
+        CommandErrorBody,
+        CommitTransaction,
+        Operation,
+        Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{
-        HandshakePhase, SelectedServer, ServerType, SessionSupportStatus, TopologyType,
+        HandshakePhase,
+        SelectedServer,
+        ServerType,
+        SessionSupportStatus,
+        TopologyType,
         TransactionSupportStatus,
     },
     selection_criteria::ReadPreference,
@@ -376,7 +396,7 @@ impl Client {
                 }
 
                 // TODO: acknowledged message here
-                self.inner.new_topology.handle_application_error(
+                self.inner.topology.handle_application_error(
                     server.address.clone(),
                     err.clone(),
                     HandshakePhase::after_completion(&conn),
@@ -433,7 +453,7 @@ impl Client {
                 connection: conn,
             }),
             Err(err) => {
-                self.inner.new_topology.handle_application_error(
+                self.inner.topology.handle_application_error(
                     server.address.clone(),
                     err.clone(),
                     HandshakePhase::after_completion(&conn),
@@ -465,7 +485,7 @@ impl Client {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
-        self.inner.new_topology.update_command_with_read_pref(
+        self.inner.topology.update_command_with_read_pref(
             connection.address(),
             &mut cmd,
             op.selection_criteria(),
@@ -563,7 +583,7 @@ impl Client {
         }
 
         let session_cluster_time = session.as_ref().and_then(|session| session.cluster_time());
-        let client_cluster_time = self.inner.new_topology.cluster_time();
+        let client_cluster_time = self.inner.topology.cluster_time();
         let max_cluster_time = std::cmp::max(session_cluster_time, client_cluster_time.as_ref());
         if let Some(cluster_time) = max_cluster_time {
             cmd.set_cluster_time(cluster_time);
@@ -764,7 +784,7 @@ impl Client {
     }
 
     async fn select_data_bearing_server(&self) -> Result<()> {
-        let topology_type = self.inner.new_topology.topology_type();
+        let topology_type = self.inner.topology.topology_type();
         let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
             let server_type = server_info.server_type();
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
@@ -778,14 +798,14 @@ impl Client {
     /// session timeout. If it has yet to be determined if the topology supports sessions, this
     /// method will perform a server selection that will force that determination to be made.
     pub(crate) async fn get_session_support_status(&self) -> Result<SessionSupportStatus> {
-        let initial_status = self.inner.new_topology.session_support_status();
+        let initial_status = self.inner.topology.session_support_status();
 
         // Need to guarantee that we're connected to at least one server that can determine if
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
                 self.select_data_bearing_server().await?;
-                Ok(self.inner.new_topology.session_support_status())
+                Ok(self.inner.topology.session_support_status())
             }
             _ => Ok(initial_status),
         }
@@ -795,14 +815,14 @@ impl Client {
     /// topology supports transactions, this method will perform a server selection that will force
     /// that determination to be made.
     pub(crate) async fn transaction_support_status(&self) -> Result<TransactionSupportStatus> {
-        let initial_status = self.inner.new_topology.transaction_support_status();
+        let initial_status = self.inner.topology.transaction_support_status();
 
         // Need to guarantee that we're connected to at least one server that can determine if
         // sessions are supported or not.
         match initial_status {
             TransactionSupportStatus::Undetermined => {
                 self.select_data_bearing_server().await?;
-                Ok(self.inner.new_topology.transaction_support_status())
+                Ok(self.inner.topology.transaction_support_status())
             }
             _ => Ok(initial_status),
         }
@@ -862,7 +882,7 @@ impl Client {
     ) {
         if let Some(ref cluster_time) = cluster_time {
             self.inner
-                .new_topology
+                .topology
                 .advance_cluster_time(cluster_time.clone());
             if let Some(ref mut session) = session {
                 session.advance_cluster_time(cluster_time)

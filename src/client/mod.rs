@@ -15,7 +15,9 @@ use crate::options::ServerAddress;
 use crate::{
     bson::Document,
     change_stream::{
-        event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream,
+        event::ChangeStreamEvent,
+        options::ChangeStreamOptions,
+        session::SessionChangeStream,
         ChangeStream,
     },
     concern::{ReadConcern, WriteConcern},
@@ -24,7 +26,11 @@ use crate::{
     event::command::CommandEventHandler,
     operation::{AggregateTarget, ListDatabases},
     options::{
-        ClientOptions, DatabaseOptions, ListDatabasesOptions, ReadPreference, SelectionCriteria,
+        ClientOptions,
+        DatabaseOptions,
+        ListDatabasesOptions,
+        ReadPreference,
+        SelectionCriteria,
         SessionOptions,
     },
     results::DatabaseSpecification,
@@ -93,8 +99,7 @@ pub struct Client {
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct ClientInner {
-    topology: Topology,
-    new_topology: NewTopology,
+    topology: NewTopology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
 }
@@ -116,8 +121,7 @@ impl Client {
         options.validate()?;
 
         let inner = Arc::new(ClientInner {
-            topology: Topology::new(options.clone())?,
-            new_topology: NewTopology::new(options.clone())?,
+            topology: NewTopology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
         });
@@ -314,7 +318,7 @@ impl Client {
     /// If the session is expired or dirty, or the topology no longer supports sessions, the session
     /// will be discarded.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
-        let session_support_status = self.inner.new_topology.session_support_status();
+        let session_support_status = self.inner.topology.session_support_status();
         if let SessionSupportStatus::Supported {
             logical_session_timeout,
         } = session_support_status
@@ -382,7 +386,7 @@ impl Client {
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
-        let mut watcher = self.inner.new_topology.watch();
+        let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.clone_latest_state();
 
@@ -394,7 +398,7 @@ impl Client {
                 return Ok(server);
             }
 
-            self.inner.new_topology.request_update();
+            self.inner.topology.request_update();
 
             let change_occurred = watcher
                 .wait_for_update(timeout - start_time.elapsed())
@@ -403,7 +407,7 @@ impl Client {
                 return Err(ErrorKind::ServerSelection {
                     message: self
                         .inner
-                        .new_topology
+                        .topology
                         .server_selection_timeout_error_message(criteria),
                 }
                 .into());
@@ -452,20 +456,28 @@ impl Client {
 
     #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) async fn get_hosts(&self) -> Vec<String> {
-        let servers = self.inner.topology.servers().await;
+        let watcher = self.inner.topology.watch();
+        let state = watcher.borrow_latest_state();
+
+        let servers = state.servers.keys();
         servers
-            .iter()
             .map(|stream_address| format!("{}", stream_address))
             .collect()
     }
 
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
-        self.inner.topology.sync_workers().await;
+        // self.inner.topology.sync_workers().await;
+        todo!()
     }
 
     #[cfg(test)]
-    pub(crate) async fn topology_description(&self) -> crate::sdam::TopologyDescription {
-        self.inner.topology.description().await
+    pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
+        self.inner
+            .topology
+            .watch()
+            .borrow_latest_state()
+            .description
+            .clone()
     }
 }

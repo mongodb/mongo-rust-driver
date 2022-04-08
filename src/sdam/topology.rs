@@ -12,21 +12,31 @@ use tokio::sync::{
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
-    cmap::Command,
+    cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
     error::{Error, Result},
     event::sdam::{
-        ServerClosedEvent, ServerDescriptionChangedEvent, ServerOpeningEvent,
+        ServerClosedEvent,
+        ServerDescriptionChangedEvent,
+        ServerOpeningEvent,
         TopologyDescriptionChangedEvent,
     },
     runtime,
     runtime::HttpClient,
     selection_criteria::SelectionCriteria,
-    ClusterTime, ServerInfo, ServerType, TopologyType,
+    ClusterTime,
+    ServerInfo,
+    ServerType,
+    TopologyType,
 };
 
 use super::{
-    HMonitor, HandshakePhase, Server, ServerDescription, SessionSupportStatus, Topology,
-    TopologyDescription, TransactionSupportStatus,
+    Monitor,
+    Server,
+    ServerDescription,
+    SessionSupportStatus,
+    Topology,
+    TopologyDescription,
+    TransactionSupportStatus,
 };
 
 #[derive(Debug)]
@@ -69,7 +79,7 @@ impl NewTopology {
         let (watcher, broadcaster) = TopologyWatcher::channel(state);
 
         for address in addresses {
-            HMonitor::start(
+            Monitor::start(
                 address,
                 updater.clone(),
                 watcher.clone(),
@@ -99,6 +109,11 @@ impl NewTopology {
 
     pub(crate) fn watch(&self) -> TopologyWatcher {
         self.watcher.clone()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn clone_updater(&self) -> TopologyUpdater {
+        self.updater.clone()
     }
 
     pub(crate) fn request_update(&self) {
@@ -167,6 +182,28 @@ impl NewTopology {
             .description
             .server_selection_timeout_error_message(criteria)
     }
+
+    /// Gets the addresses of the servers in the cluster.
+    #[cfg(test)]
+    pub(crate) fn server_addresses(&self) -> HashSet<ServerAddress> {
+        self.watcher
+            .borrow_latest_state()
+            .servers
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Gets the addresses of the servers in the cluster.
+    #[cfg(test)]
+    pub(crate) fn servers(&self) -> HashMap<ServerAddress, Arc<Server>> {
+        self.watcher.borrow_latest_state().servers.clone()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn description(&self) -> TopologyDescription {
+        self.watcher.borrow_latest_state().description.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -178,6 +215,7 @@ pub(crate) struct TopologyState {
 pub(crate) enum UpdateMessage {
     AdvanceClusterTime(ClusterTime),
     ServerUpdate(ServerDescription),
+    SyncHosts(HashSet<ServerAddress>),
     MonitorError {
         address: ServerAddress,
         error: Error,
@@ -204,25 +242,30 @@ struct TopologyWorker {
 impl TopologyWorker {
     fn start(mut self) {
         runtime::execute(async move {
-            loop {
-                tokio::select! {
-                    Some(update) = self.update_receiver.recv() => {
-                        match update {
-                            UpdateMessage::AdvanceClusterTime(to) => {
-
-                            }
-                            UpdateMessage::ServerUpdate(sd) => {
-                                println!("received update for {}", sd.address);
-                                self.update_server(sd).await.unwrap();
-                            },
-                            UpdateMessage::MonitorError { address, error } => {
-                                todo!()
-                            },
-                            UpdateMessage::ApplicationError { address, error, phase } => {
-                                todo!()
-                            }
-                        }
-                    },
+            while let Some(update) = self.update_receiver.recv().await {
+                match update {
+                    UpdateMessage::AdvanceClusterTime(to) => {
+                        self.advance_cluster_time(to);
+                    }
+                    UpdateMessage::SyncHosts(hosts) => {
+                        let mut state = self.broadcaster.clone_latest();
+                        self.sync_hosts(&mut state, hosts);
+                        self.broadcaster.publish_new_state(state);
+                    }
+                    UpdateMessage::ServerUpdate(sd) => {
+                        println!("received update for {}", sd.address);
+                        self.update_server(sd).await.unwrap();
+                    }
+                    UpdateMessage::MonitorError { address, error } => {
+                        todo!()
+                    }
+                    UpdateMessage::ApplicationError {
+                        address,
+                        error,
+                        phase,
+                    } => {
+                        todo!()
+                    }
                 }
             }
         });
@@ -234,6 +277,30 @@ impl TopologyWorker {
         self.broadcaster.publish_new_state(latest_state);
     }
 
+    fn sync_hosts(&self, state: &mut TopologyState, hosts: HashSet<ServerAddress>) {
+        state.servers.retain(|host, _| hosts.contains(host));
+
+        for address in hosts {
+            if state.servers.contains_key(&address) {
+                continue;
+            }
+            let server = Server::new(
+                address.clone(),
+                self.options.clone(),
+                self.http_client.clone(),
+                self.topology_updater.clone(),
+            );
+            state.servers.insert(address.clone(), server);
+            Monitor::start(
+                address,
+                self.topology_updater.clone(),
+                self.topology_watcher.clone(),
+                self.update_request_receiver.clone(),
+                self.options.clone(),
+            );
+        }
+    }
+
     async fn update_server(&mut self, sd: ServerDescription) -> std::result::Result<bool, String> {
         let server_type = sd.server_type;
         let server_address = sd.address.clone();
@@ -243,33 +310,39 @@ impl TopologyWorker {
 
         latest_state.description.update(sd)?;
 
-        let hosts: HashSet<_> = latest_state
+        let hosts = latest_state
             .description
             .server_addresses()
             .cloned()
             .collect();
+        self.sync_hosts(&mut latest_state, hosts);
+        // let hosts: HashSet<_> = latest_state
+        //     .description
+        //     .server_addresses()
+        //     .cloned()
+        //     .collect();
 
-        latest_state.servers.retain(|host, _| hosts.contains(host));
+        // latest_state.servers.retain(|host, _| hosts.contains(host));
 
-        for address in hosts {
-            if latest_state.servers.contains_key(&address) {
-                continue;
-            }
-            let server = Server::new(
-                address.clone(),
-                self.options.clone(),
-                self.http_client.clone(),
-                self.topology_updater.clone(),
-            );
-            latest_state.servers.insert(address.clone(), server);
-            HMonitor::start(
-                address,
-                self.topology_updater.clone(),
-                self.topology_watcher.clone(),
-                self.update_request_receiver.clone(),
-                self.options.clone(),
-            );
-        }
+        // for address in hosts {
+        //     if latest_state.servers.contains_key(&address) {
+        //         continue;
+        //     }
+        //     let server = Server::new(
+        //         address.clone(),
+        //         self.options.clone(),
+        //         self.http_client.clone(),
+        //         self.topology_updater.clone(),
+        //     );
+        //     latest_state.servers.insert(address.clone(), server);
+        //     Monitor::start(
+        //         address,
+        //         self.topology_updater.clone(),
+        //         self.topology_watcher.clone(),
+        //         self.update_request_receiver.clone(),
+        //         self.options.clone(),
+        //     );
+        // }
 
         let diff = old_description.diff(&latest_state.description);
         let topology_changed = diff.is_some();
@@ -371,6 +444,10 @@ impl TopologyUpdater {
     pub(crate) fn advance_cluster_time(&self, to: ClusterTime) {
         let _: std::result::Result<_, _> = self.sender.send(UpdateMessage::AdvanceClusterTime(to));
     }
+
+    pub(crate) fn sync_hosts(&self, hosts: HashSet<ServerAddress>) {
+        let _: std::result::Result<_, _> = self.sender.send(UpdateMessage::SyncHosts(hosts));
+    }
 }
 
 pub(crate) struct TopologyUpdateReceiver {
@@ -423,6 +500,10 @@ impl TopologyWatcher {
     pub(crate) fn borrow_latest_state(&self) -> Ref<TopologyState> {
         self.receiver.borrow()
     }
+
+    pub(crate) fn topology_type(&self) -> TopologyType {
+        self.borrow_latest_state().description.topology_type
+    }
 }
 
 struct TopologyBroadcaster {
@@ -473,20 +554,65 @@ impl TopologyUpdateRequestReceiver {
     }
 }
 
-#[tokio::test]
-async fn foo() {
-    let mut top = NewTopology::new(crate::test::CLIENT_OPTIONS.clone()).unwrap();
+/// Enum describing a point in time during an operation's execution relative to when the MongoDB
+/// handshake for the conection being used in that operation.
+///
+/// This is used to determine the error handling semantics for certain error types.
+#[derive(Debug, Clone)]
+pub(crate) enum HandshakePhase {
+    /// Describes a point that occurred before the initial hello completed (e.g. when opening the
+    /// socket).
+    PreHello { generation: PoolGeneration },
 
-    runtime::timeout(
-        Duration::from_secs(5),
-        runtime::spawn(async move {
-            while top.watcher.receiver.changed().await.is_ok() {
-                let state = top.watcher.receiver.borrow();
-                println!("state change");
-                println!("description: {:#?}", state.description);
-                println!("servers: {:#?}", state.servers);
-            }
-        }),
-    )
-    .await;
+    /// Describes a point in time after the initial hello has completed, but before the entire
+    /// handshake (e.g. including authentication) completes.
+    PostHello { generation: ConnectionGeneration },
+
+    /// Describes a point in time after the handshake completed (e.g. when the command was sent to
+    /// the server).
+    AfterCompletion {
+        generation: ConnectionGeneration,
+        max_wire_version: i32,
+    },
+}
+
+impl HandshakePhase {
+    pub(crate) fn after_completion(handshaked_connection: &Connection) -> Self {
+        Self::AfterCompletion {
+            generation: handshaked_connection.generation.clone(),
+            // given that this is a handshaked connection, the stream description should
+            // always be available, so 0 should never actually be returned here.
+            max_wire_version: handshaked_connection
+                .stream_description()
+                .ok()
+                .and_then(|sd| sd.max_wire_version)
+                .unwrap_or(0),
+        }
+    }
+
+    /// The `serviceId` reported by the server.  If the initial hello has not completed, returns
+    /// `None`.
+    pub(crate) fn service_id(&self) -> Option<ObjectId> {
+        match self {
+            HandshakePhase::PreHello { .. } => None,
+            HandshakePhase::PostHello { generation, .. } => generation.service_id(),
+            HandshakePhase::AfterCompletion { generation, .. } => generation.service_id(),
+        }
+    }
+
+    /// Whether this phase is before the handshake completed or not.
+    fn is_before_completion(&self) -> bool {
+        !matches!(self, HandshakePhase::AfterCompletion { .. })
+    }
+
+    /// The wire version of the server as reported by the handshake. If the handshake did not
+    /// complete, this returns `None`.
+    fn wire_version(&self) -> Option<i32> {
+        match self {
+            HandshakePhase::AfterCompletion {
+                max_wire_version, ..
+            } => Some(*max_wire_version),
+            _ => None,
+        }
+    }
 }

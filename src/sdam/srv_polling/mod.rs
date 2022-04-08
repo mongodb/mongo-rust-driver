@@ -7,6 +7,8 @@ use super::{
     description::topology::TopologyType,
     monitor::DEFAULT_HEARTBEAT_FREQUENCY,
     state::{Topology, WeakTopology},
+    TopologyUpdater,
+    TopologyWatcher,
 };
 use crate::{
     error::{Error, Result},
@@ -20,15 +22,18 @@ const MIN_RESCAN_SRV_INTERVAL: Duration = Duration::from_secs(60);
 pub(crate) struct SrvPollingMonitor {
     initial_hostname: String,
     resolver: Option<SrvResolver>,
-    topology: WeakTopology,
+    topology_updater: TopologyUpdater,
+    topology_watcher: TopologyWatcher,
     rescan_interval: Duration,
     client_options: ClientOptions,
 }
 
 impl SrvPollingMonitor {
-    pub(crate) fn new(topology: WeakTopology) -> Option<Self> {
-        let mut client_options = topology.client_options().clone();
-
+    pub(crate) fn new(
+        topology_updater: TopologyUpdater,
+        topology_watcher: TopologyWatcher,
+        mut client_options: ClientOptions,
+    ) -> Option<Self> {
         let initial_info = match client_options.original_srv_info.take() {
             Some(info) => info,
             None => return None,
@@ -37,7 +42,8 @@ impl SrvPollingMonitor {
         Some(Self {
             initial_hostname: initial_info.hostname,
             resolver: None,
-            topology,
+            topology_updater,
+            topology_watcher,
             rescan_interval: initial_info.min_ttl,
             client_options,
         })
@@ -46,9 +52,13 @@ impl SrvPollingMonitor {
     /// Starts a monitoring task that periodically performs SRV record lookups to determine if the
     /// set of mongos in the cluster have changed. A weak reference is used to ensure that the
     /// monitoring task doesn't keep the topology alive after the client has been dropped.
-    pub(super) fn start(topology: WeakTopology) {
+    pub(super) fn start(
+        topology: TopologyUpdater,
+        topology_watcher: TopologyWatcher,
+        client_options: ClientOptions,
+    ) {
         runtime::execute(async move {
-            if let Some(mut monitor) = Self::new(topology) {
+            if let Some(mut monitor) = Self::new(topology, topology_watcher, client_options) {
                 monitor.execute().await;
             }
         });
@@ -63,29 +73,22 @@ impl SrvPollingMonitor {
             matches!(tt, TopologyType::Sharded | TopologyType::Unknown)
         }
 
-        while self.topology.is_alive() {
+        while self.topology_watcher.is_alive() {
             runtime::delay_for(self.rescan_interval()).await;
 
-            let topology = match self.topology.upgrade() {
-                Some(topology) => topology,
-                None => break,
-            };
-
-            if should_poll(topology.topology_type().await) {
+            if should_poll(self.topology_watcher.topology_type()) {
                 let hosts = self.lookup_hosts().await;
 
                 // verify we should still update before updating in case the topology changed
                 // while the srv lookup was happening.
-                if should_poll(topology.topology_type().await) {
-                    self.update_hosts(hosts, topology.clone()).await;
+                if should_poll(self.topology_watcher.topology_type()) {
+                    self.update_hosts(hosts).await;
                 }
             }
-
-            std::mem::drop(topology);
         }
     }
 
-    async fn update_hosts(&mut self, lookup: Result<LookupHosts>, topology: Topology) {
+    async fn update_hosts(&mut self, lookup: Result<LookupHosts>) {
         let lookup = match lookup {
             Ok(LookupHosts { hosts, .. }) if hosts.is_empty() => {
                 self.no_valid_hosts(None);
@@ -103,12 +106,8 @@ impl SrvPollingMonitor {
         self.rescan_interval = lookup.min_ttl;
 
         // TODO: RUST-230 Log error with host that was returned.
-        topology
-            .update_hosts(
-                lookup.hosts.into_iter().filter_map(Result::ok).collect(),
-                &self.client_options,
-            )
-            .await;
+        self.topology_updater
+            .sync_hosts(lookup.hosts.into_iter().filter_map(Result::ok).collect());
     }
 
     async fn lookup_hosts(&mut self) -> Result<LookupHosts> {

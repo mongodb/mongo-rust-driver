@@ -28,13 +28,15 @@ async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
     options.test_options_mut().disable_monitoring_threads = true;
-    let topology = Topology::new(options).unwrap();
-    let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
+    let topology = Topology::new(options.clone()).unwrap();
+    let mut monitor =
+        SrvPollingMonitor::new(topology.clone_updater(), topology.watch(), options.clone())
+            .unwrap();
     monitor
-        .update_hosts(new_hosts.and_then(make_lookup_hosts), topology.clone())
+        .update_hosts(new_hosts.and_then(make_lookup_hosts))
         .await;
 
-    assert_eq!(expected_hosts, topology.servers().await);
+    assert_eq!(expected_hosts, topology.server_addresses());
 }
 
 fn make_lookup_hosts(hosts: Vec<ServerAddress>) -> Result<LookupHosts> {
@@ -123,6 +125,6 @@ async fn load_balanced_no_srv_polling() {
     runtime::delay_for(rescan_interval * 2).await;
     assert_eq!(
         hosts.into_iter().collect::<HashSet<_>>(),
-        topology.servers().await
+        topology.server_addresses()
     );
 }

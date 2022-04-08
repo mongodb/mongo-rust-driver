@@ -22,13 +22,16 @@ pub(crate) use self::{
         },
     },
     message_manager::TopologyMessageManager,
-    monitor::{HMonitor, MIN_HEARTBEAT_FREQUENCY},
-    state::{
-        server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
+    monitor::{Monitor, MIN_HEARTBEAT_FREQUENCY},
+    state::server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
+    topology::{
         HandshakePhase,
-        Topology,
+        NewTopology,
+        NewTopology as Topology,
+        TopologyUpdateRequestReceiver,
+        TopologyUpdater,
+        TopologyWatcher,
     },
-    topology::{NewTopology, TopologyUpdateRequestReceiver, TopologyUpdater, TopologyWatcher},
 };
 
 #[cfg(test)]

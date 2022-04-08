@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
@@ -272,7 +272,7 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let topology = Topology::new(options.clone()).unwrap();
-    let mut servers = topology.get_servers().await;
+    let mut servers = topology.servers();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
@@ -303,17 +303,15 @@ async fn run_test(test_file: TestFile) {
                 })
             };
 
-            // only update server if we have strong reference to it like the monitors do
-            if let Some(server) = servers.get(&address).and_then(|s| s.upgrade()) {
+            if let Some(server) = servers.get(&address) {
                 match hello_reply {
                     Ok(reply) => {
                         let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
-                        if topology.update(&server, new_sd).await {
-                            servers = topology.get_servers().await
-                        }
+                        topology.clone_updater().update(new_sd);
+                        servers = topology.servers();
                     }
                     Err(e) => {
-                        topology.handle_monitor_error(e, &server).await;
+                        topology.clone_updater().handle_monitor_error(address, e);
                     }
                 }
             }
@@ -322,10 +320,7 @@ async fn run_test(test_file: TestFile) {
         for application_error in phase.application_errors {
             // only update server if we have strong reference to it like is done as part of
             // operation execution
-            if let Some(server) = servers
-                .get(&application_error.address)
-                .and_then(|s| s.upgrade())
-            {
+            if let Some(server) = servers.get(&application_error.address) {
                 let error = application_error.to_error();
                 let pool_generation = application_error
                     .generation
@@ -348,13 +343,11 @@ async fn run_test(test_file: TestFile) {
                     }
                 };
 
-                topology
-                    .handle_application_error(error, handshake_phase, &server)
-                    .await;
+                topology.handle_application_error(server.address.clone(), error, handshake_phase);
             }
         }
 
-        let topology_description = topology.description().await;
+        let topology_description = topology.description();
         let phase_description = phase.description.unwrap_or_else(|| format!("{}", i));
 
         match phase.outcome {
@@ -725,14 +718,13 @@ async fn pool_cleared_error_does_not_mark_unknown() {
 
     // get the one server in the topology
     let server = topology
-        .get_servers()
-        .await
+        .watch()
+        .clone_latest_state()
+        .servers
         .into_iter()
         .next()
         .unwrap()
-        .1
-        .upgrade()
-        .unwrap();
+        .1;
 
     let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
         "ok": 1,
@@ -745,24 +737,20 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     .unwrap();
 
     // discover the node
-    topology
-        .update(
-            &server,
-            ServerDescription::new(
-                address.clone(),
-                Some(Ok(HelloReply {
-                    server_address: address.clone(),
-                    command_response: heartbeat_response,
-                    round_trip_time: Duration::from_secs(1),
-                    cluster_time: None,
-                })),
-            ),
-        )
-        .await;
+    topology.clone_updater().update(ServerDescription::new(
+        address.clone(),
+        Some(Ok(HelloReply {
+            server_address: address.clone(),
+            command_response: heartbeat_response,
+            round_trip_time: Duration::from_secs(1),
+            cluster_time: None,
+        })),
+    ));
     assert_eq!(
         topology
-            .get_server_description(&address)
-            .await
+            .watch()
+            .borrow()
+            .server_description(&address)
             .unwrap()
             .server_type,
         ServerType::Standalone
@@ -776,15 +764,11 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     let phase = HandshakePhase::PreHello {
         generation: server.pool.generation(),
     };
-    assert!(
-        !topology
-            .handle_application_error(error, phase, &server)
-            .await
-    );
+    topology.handle_application_error(server.address.clone(), error, phase);
     assert_eq!(
         topology
-            .get_server_description(&address)
-            .await
+            .watch()
+            .server_description(&address)
             .unwrap()
             .server_type,
         ServerType::Standalone
