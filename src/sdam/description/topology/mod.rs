@@ -211,10 +211,15 @@ impl TopologyDescription {
 
     pub(crate) fn update_command_with_read_pref<T>(
         &self,
-        server_type: ServerType,
+        address: &ServerAddress,
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
     ) {
+        let server_type = self
+            .get_server_description(address)
+            .map(|sd| sd.server_type)
+            .unwrap_or(ServerType::Unknown);
+
         match (self.topology_type, server_type) {
             (TopologyType::Sharded, ServerType::Mongos)
             | (TopologyType::Single, ServerType::Mongos)

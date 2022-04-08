@@ -414,19 +414,6 @@ impl Topology {
             .map(Clone::clone)
     }
 
-    /// Updates the given `command` as needed based on the `critiera`.
-    pub(crate) async fn update_command_with_read_pref<T>(
-        &self,
-        server_address: &ServerAddress,
-        command: &mut Command<T>,
-        criteria: Option<&SelectionCriteria>,
-    ) {
-        self.state
-            .read()
-            .await
-            .update_command_with_read_pref(server_address, command, criteria)
-    }
-
     /// Gets the latest information on whether sessions are supported or not.
     pub(crate) async fn session_support_status(&self) -> SessionSupportStatus {
         self.state.read().await.description.session_support_status()
@@ -544,23 +531,6 @@ impl TopologyState {
         }
 
         monitor.start();
-    }
-
-    /// Updates the given `command` as needed based on the `criteria`.
-    pub(crate) fn update_command_with_read_pref<T>(
-        &self,
-        server_address: &ServerAddress,
-        command: &mut Command<T>,
-        criteria: Option<&SelectionCriteria>,
-    ) {
-        let server_type = self
-            .description
-            .get_server_description(server_address)
-            .map(|desc| desc.server_type)
-            .unwrap_or(ServerType::Unknown);
-
-        self.description
-            .update_command_with_read_pref(server_type, command, criteria)
     }
 
     /// Update the topology description based on the provided server description. Also add new

@@ -15,9 +15,7 @@ use crate::options::ServerAddress;
 use crate::{
     bson::Document,
     change_stream::{
-        event::ChangeStreamEvent,
-        options::ChangeStreamOptions,
-        session::SessionChangeStream,
+        event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream,
         ChangeStream,
     },
     concern::{ReadConcern, WriteConcern},
@@ -26,11 +24,7 @@ use crate::{
     event::command::CommandEventHandler,
     operation::{AggregateTarget, ListDatabases},
     options::{
-        ClientOptions,
-        DatabaseOptions,
-        ListDatabasesOptions,
-        ReadPreference,
-        SelectionCriteria,
+        ClientOptions, DatabaseOptions, ListDatabasesOptions, ReadPreference, SelectionCriteria,
         SessionOptions,
     },
     results::DatabaseSpecification,
@@ -103,12 +97,6 @@ struct ClientInner {
     new_topology: NewTopology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-}
-
-impl Drop for ClientInner {
-    fn drop(&mut self) {
-        self.topology.close()
-    }
 }
 
 impl Client {
@@ -326,7 +314,7 @@ impl Client {
     /// If the session is expired or dirty, or the topology no longer supports sessions, the session
     /// will be discarded.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
-        let session_support_status = self.inner.topology.session_support_status().await;
+        let session_support_status = self.inner.new_topology.session_support_status();
         if let SessionSupportStatus::Supported {
             logical_session_timeout,
         } = session_support_status
@@ -415,9 +403,8 @@ impl Client {
                 return Err(ErrorKind::ServerSelection {
                     message: self
                         .inner
-                        .topology
-                        .server_selection_timeout_error_message(criteria)
-                        .await,
+                        .new_topology
+                        .server_selection_timeout_error_message(criteria),
                 }
                 .into());
             }

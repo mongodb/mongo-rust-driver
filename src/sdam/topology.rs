@@ -7,26 +7,27 @@ use std::{
 use bson::oid::ObjectId;
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
-    watch,
+    watch::{self, Ref},
 };
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
+    cmap::Command,
     error::{Error, Result},
     event::sdam::{
-        ServerClosedEvent,
-        ServerDescriptionChangedEvent,
-        ServerOpeningEvent,
+        ServerClosedEvent, ServerDescriptionChangedEvent, ServerOpeningEvent,
         TopologyDescriptionChangedEvent,
     },
     runtime,
     runtime::HttpClient,
-    ServerInfo,
-    ServerType,
-    TopologyType,
+    selection_criteria::SelectionCriteria,
+    ClusterTime, ServerInfo, ServerType, TopologyType,
 };
 
-use super::{HMonitor, HandshakePhase, Server, ServerDescription, Topology, TopologyDescription};
+use super::{
+    HMonitor, HandshakePhase, Server, ServerDescription, SessionSupportStatus, Topology,
+    TopologyDescription, TransactionSupportStatus,
+};
 
 #[derive(Debug)]
 pub(crate) struct NewTopology {
@@ -103,6 +104,69 @@ impl NewTopology {
     pub(crate) fn request_update(&self) {
         self.update_requester.request()
     }
+
+    pub(crate) fn handle_application_error(
+        &self,
+        address: ServerAddress,
+        error: Error,
+        phase: HandshakePhase,
+    ) {
+        self.updater.handle_application_error(address, error, phase);
+    }
+
+    pub(crate) fn cluster_time(&self) -> Option<ClusterTime> {
+        self.watcher
+            .borrow_latest_state()
+            .description
+            .cluster_time()
+            .cloned()
+    }
+
+    pub(crate) fn topology_type(&self) -> TopologyType {
+        self.watcher.borrow_latest_state().description.topology_type
+    }
+
+    pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
+        self.watcher
+            .borrow_latest_state()
+            .description
+            .session_support_status()
+    }
+
+    pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
+        self.watcher
+            .borrow_latest_state()
+            .description
+            .transaction_support_status()
+    }
+
+    pub(crate) fn advance_cluster_time(&self, to: ClusterTime) {
+        self.updater.advance_cluster_time(to)
+    }
+
+    /// Updates the given `command` as needed based on the `criteria`.
+    pub(crate) fn update_command_with_read_pref<T>(
+        &self,
+        server_address: &ServerAddress,
+        command: &mut Command<T>,
+        criteria: Option<&SelectionCriteria>,
+    ) {
+        self.watcher
+            .borrow_latest_state()
+            .description
+            .update_command_with_read_pref(server_address, command, criteria)
+    }
+
+    /// Creates a new server selection timeout error message given the `criteria`.
+    pub(crate) fn server_selection_timeout_error_message(
+        &self,
+        criteria: &SelectionCriteria,
+    ) -> String {
+        self.watcher
+            .borrow_latest_state()
+            .description
+            .server_selection_timeout_error_message(criteria)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +176,7 @@ pub(crate) struct TopologyState {
 }
 
 pub(crate) enum UpdateMessage {
+    AdvanceClusterTime(ClusterTime),
     ServerUpdate(ServerDescription),
     MonitorError {
         address: ServerAddress,
@@ -143,6 +208,9 @@ impl TopologyWorker {
                 tokio::select! {
                     Some(update) = self.update_receiver.recv() => {
                         match update {
+                            UpdateMessage::AdvanceClusterTime(to) => {
+
+                            }
                             UpdateMessage::ServerUpdate(sd) => {
                                 println!("received update for {}", sd.address);
                                 self.update_server(sd).await.unwrap();
@@ -158,6 +226,12 @@ impl TopologyWorker {
                 }
             }
         });
+    }
+
+    fn advance_cluster_time(&mut self, to: ClusterTime) {
+        let mut latest_state = self.broadcaster.clone_latest();
+        latest_state.description.advance_cluster_time(&to);
+        self.broadcaster.publish_new_state(latest_state);
     }
 
     async fn update_server(&mut self, sd: ServerDescription) -> std::result::Result<bool, String> {
@@ -246,7 +320,7 @@ impl TopologyWorker {
                     s.pool.mark_as_ready().await;
                 }
             }
-            let _ = self.broadcaster.state_sender.send(latest_state);
+            self.broadcaster.publish_new_state(latest_state)
         }
 
         Ok(topology_changed)
@@ -292,6 +366,10 @@ impl TopologyUpdater {
 
     pub(crate) fn update(&self, sd: ServerDescription) {
         let _: std::result::Result<_, _> = self.sender.send(UpdateMessage::ServerUpdate(sd));
+    }
+
+    pub(crate) fn advance_cluster_time(&self, to: ClusterTime) {
+        let _: std::result::Result<_, _> = self.sender.send(UpdateMessage::AdvanceClusterTime(to));
     }
 }
 
@@ -341,6 +419,10 @@ impl TopologyWatcher {
         self.receiver.borrow_and_update();
         changed
     }
+
+    pub(crate) fn borrow_latest_state(&self) -> Ref<TopologyState> {
+        self.receiver.borrow()
+    }
 }
 
 struct TopologyBroadcaster {
@@ -350,6 +432,10 @@ struct TopologyBroadcaster {
 impl TopologyBroadcaster {
     fn clone_latest(&self) -> TopologyState {
         self.state_sender.borrow().clone()
+    }
+
+    fn publish_new_state(&self, state: TopologyState) {
+        let _ = self.state_sender.send(state);
     }
 }
 
