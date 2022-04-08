@@ -304,6 +304,7 @@ async fn run_test(test_file: TestFile) {
             };
 
             if let Some(server) = servers.get(&address) {
+                let mut watcher = topology.watch();
                 match hello_reply {
                     Ok(reply) => {
                         let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
@@ -314,12 +315,13 @@ async fn run_test(test_file: TestFile) {
                         topology.clone_updater().handle_monitor_error(address, e);
                     }
                 }
+                watcher.wait_for_update(Duration::from_millis(100)).await;
             }
         }
 
         for application_error in phase.application_errors {
-            // only update server if we have strong reference to it like is done as part of
-            // operation execution
+            let mut watcher = topology.watch();
+
             if let Some(server) = servers.get(&application_error.address) {
                 let error = application_error.to_error();
                 let pool_generation = application_error
@@ -344,6 +346,8 @@ async fn run_test(test_file: TestFile) {
                 };
 
                 topology.handle_application_error(server.address.clone(), error, handshake_phase);
+
+                watcher.wait_for_update(Duration::from_millis(100)).await;
             }
         }
 
@@ -719,7 +723,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     // get the one server in the topology
     let server = topology
         .watch()
-        .clone_latest_state()
+        .clone_latest()
         .servers
         .into_iter()
         .next()

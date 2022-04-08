@@ -388,7 +388,7 @@ impl Client {
 
         let mut watcher = self.inner.topology.watch();
         loop {
-            let state = watcher.clone_latest_state();
+            let state = watcher.clone_latest();
 
             if let Some(server) = server_selection::attempt_to_select_server(
                 criteria,
@@ -458,7 +458,7 @@ impl Client {
     #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) async fn get_hosts(&self) -> Vec<String> {
         let watcher = self.inner.topology.watch();
-        let state = watcher.borrow_latest_state();
+        let state = watcher.borrow_latest();
 
         let servers = state.servers.keys();
         servers
@@ -477,7 +477,7 @@ impl Client {
         self.inner
             .topology
             .watch()
-            .borrow_latest_state()
+            .borrow_latest()
             .description
             .clone()
     }

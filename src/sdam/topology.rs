@@ -16,27 +16,17 @@ use crate::{
     cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
     error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
-        ServerClosedEvent,
-        ServerDescriptionChangedEvent,
-        ServerOpeningEvent,
+        ServerClosedEvent, ServerDescriptionChangedEvent, ServerOpeningEvent,
         TopologyDescriptionChangedEvent,
     },
     runtime,
     runtime::HttpClient,
     selection_criteria::SelectionCriteria,
-    ClusterTime,
-    ServerInfo,
-    ServerType,
-    TopologyType,
+    ClusterTime, ServerInfo, ServerType, TopologyType,
 };
 
 use super::{
-    Monitor,
-    Server,
-    ServerDescription,
-    SessionSupportStatus,
-    Topology,
-    TopologyDescription,
+    Monitor, Server, ServerDescription, SessionSupportStatus, Topology, TopologyDescription,
     TransactionSupportStatus,
 };
 
@@ -79,14 +69,24 @@ impl NewTopology {
 
         let (watcher, broadcaster) = TopologyWatcher::channel(state);
 
-        for address in addresses {
-            Monitor::start(
-                address,
-                updater.clone(),
-                watcher.clone(),
-                update_requester.subscribe(),
-                options.clone(),
-            );
+        #[cfg(test)]
+        let disable_monitoring_threads = options
+            .test_options
+            .as_ref()
+            .map(|to| to.disable_monitoring_threads)
+            .unwrap_or(false);
+        #[cfg(not(test))]
+        let disable_monitoring_threads = false;
+        if options.load_balanced != Some(true) && !disable_monitoring_threads {
+            for address in addresses {
+                Monitor::start(
+                    address,
+                    updater.clone(),
+                    watcher.clone(),
+                    update_requester.subscribe(),
+                    options.clone(),
+                );
+            }
         }
 
         TopologyWorker {
@@ -133,26 +133,26 @@ impl NewTopology {
 
     pub(crate) fn cluster_time(&self) -> Option<ClusterTime> {
         self.watcher
-            .borrow_latest_state()
+            .borrow_latest()
             .description
             .cluster_time()
             .cloned()
     }
 
     pub(crate) fn topology_type(&self) -> TopologyType {
-        self.watcher.borrow_latest_state().description.topology_type
+        self.watcher.borrow_latest().description.topology_type
     }
 
     pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
         self.watcher
-            .borrow_latest_state()
+            .borrow_latest()
             .description
             .session_support_status()
     }
 
     pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
         self.watcher
-            .borrow_latest_state()
+            .borrow_latest()
             .description
             .transaction_support_status()
     }
@@ -169,7 +169,7 @@ impl NewTopology {
         criteria: Option<&SelectionCriteria>,
     ) {
         self.watcher
-            .borrow_latest_state()
+            .borrow_latest()
             .description
             .update_command_with_read_pref(server_address, command, criteria)
     }
@@ -180,7 +180,7 @@ impl NewTopology {
         criteria: &SelectionCriteria,
     ) -> String {
         self.watcher
-            .borrow_latest_state()
+            .borrow_latest()
             .description
             .server_selection_timeout_error_message(criteria)
     }
@@ -189,7 +189,7 @@ impl NewTopology {
     #[cfg(test)]
     pub(crate) fn server_addresses(&self) -> HashSet<ServerAddress> {
         self.watcher
-            .borrow_latest_state()
+            .borrow_latest()
             .servers
             .keys()
             .cloned()
@@ -199,12 +199,12 @@ impl NewTopology {
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn servers(&self) -> HashMap<ServerAddress, Arc<Server>> {
-        self.watcher.borrow_latest_state().servers.clone()
+        self.watcher.borrow_latest().servers.clone()
     }
 
     #[cfg(test)]
     pub(crate) fn description(&self) -> TopologyDescription {
-        self.watcher.borrow_latest_state().description.clone()
+        self.watcher.borrow_latest().description.clone()
     }
 }
 
@@ -260,7 +260,7 @@ impl TopologyWorker {
                         self.update_server(sd).await.unwrap();
                     }
                     UpdateMessage::MonitorError { address, error } => {
-                        todo!("{}: {}", address, error)
+                        self.handle_monitor_error(address, error).await;
                     }
                     UpdateMessage::ApplicationError {
                         address,
@@ -450,6 +450,33 @@ impl TopologyWorker {
             false
         }
     }
+
+    pub(crate) async fn handle_monitor_error(
+        &mut self,
+        address: ServerAddress,
+        error: Error,
+    ) -> bool {
+        match self.server(&address) {
+            Some(server) => {
+                let updated = self.mark_server_as_unknown(address, error.clone()).await;
+                if updated {
+                    // The heartbeat monitor is disabled in load-balanced mode, so this will never have a
+                    // service id.
+                    server.pool.clear(error, None).await;
+                }
+                updated
+            }
+            None => false,
+        }
+    }
+
+    fn server(&self, address: &ServerAddress) -> Option<Arc<Server>> {
+        self.broadcaster
+            .borrow_latest()
+            .servers
+            .get(address)
+            .cloned()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -537,7 +564,7 @@ impl TopologyWatcher {
             .cloned()
     }
 
-    pub(crate) fn clone_latest_state(&mut self) -> TopologyState {
+    pub(crate) fn clone_latest(&mut self) -> TopologyState {
         self.receiver.borrow_and_update().clone()
     }
 
@@ -549,12 +576,12 @@ impl TopologyWatcher {
         changed
     }
 
-    pub(crate) fn borrow_latest_state(&self) -> Ref<TopologyState> {
+    pub(crate) fn borrow_latest(&self) -> Ref<TopologyState> {
         self.receiver.borrow()
     }
 
     pub(crate) fn topology_type(&self) -> TopologyType {
-        self.borrow_latest_state().description.topology_type
+        self.borrow_latest().description.topology_type
     }
 }
 
