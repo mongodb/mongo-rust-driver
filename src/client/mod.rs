@@ -400,9 +400,10 @@ impl Client {
 
             self.inner.topology.request_update();
 
-            let change_occurred = watcher
-                .wait_for_update(timeout - start_time.elapsed())
-                .await;
+            let change_occurred = start_time.elapsed() < timeout
+                && watcher
+                    .wait_for_update(timeout - start_time.elapsed())
+                    .await;
             if !change_occurred {
                 return Err(ErrorKind::ServerSelection {
                     message: self
@@ -468,7 +469,7 @@ impl Client {
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
         // self.inner.topology.sync_workers().await;
-        todo!()
+        // todo!()
     }
 
     #[cfg(test)]

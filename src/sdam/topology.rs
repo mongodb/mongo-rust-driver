@@ -6,6 +6,7 @@ use std::{
 
 use bson::oid::ObjectId;
 use tokio::sync::{
+    broadcast,
     mpsc::{UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
 };
@@ -13,7 +14,7 @@ use tokio::sync::{
 use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
-    error::{Error, Result},
+    error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
@@ -83,7 +84,7 @@ impl NewTopology {
                 address,
                 updater.clone(),
                 watcher.clone(),
-                update_request_receiver.clone(),
+                update_requester.subscribe(),
                 options.clone(),
             );
         }
@@ -97,6 +98,7 @@ impl NewTopology {
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
             update_request_receiver,
+            update_requester: update_requester.clone(),
         }
         .start();
 
@@ -231,6 +233,7 @@ struct TopologyWorker {
     id: ObjectId,
     update_receiver: TopologyUpdateReceiver,
     broadcaster: TopologyBroadcaster,
+    update_requester: UpdateRequester,
     options: ClientOptions,
     http_client: HttpClient,
 
@@ -257,14 +260,14 @@ impl TopologyWorker {
                         self.update_server(sd).await.unwrap();
                     }
                     UpdateMessage::MonitorError { address, error } => {
-                        todo!()
+                        todo!("{}: {}", address, error)
                     }
                     UpdateMessage::ApplicationError {
                         address,
                         error,
                         phase,
                     } => {
-                        todo!()
+                        self.handle_application_error(address, error, phase).await;
                     }
                 }
             }
@@ -295,7 +298,7 @@ impl TopologyWorker {
                 address,
                 self.topology_updater.clone(),
                 self.topology_watcher.clone(),
-                self.update_request_receiver.clone(),
+                self.update_requester.subscribe(),
                 self.options.clone(),
             );
         }
@@ -316,33 +319,6 @@ impl TopologyWorker {
             .cloned()
             .collect();
         self.sync_hosts(&mut latest_state, hosts);
-        // let hosts: HashSet<_> = latest_state
-        //     .description
-        //     .server_addresses()
-        //     .cloned()
-        //     .collect();
-
-        // latest_state.servers.retain(|host, _| hosts.contains(host));
-
-        // for address in hosts {
-        //     if latest_state.servers.contains_key(&address) {
-        //         continue;
-        //     }
-        //     let server = Server::new(
-        //         address.clone(),
-        //         self.options.clone(),
-        //         self.http_client.clone(),
-        //         self.topology_updater.clone(),
-        //     );
-        //     latest_state.servers.insert(address.clone(), server);
-        //     Monitor::start(
-        //         address,
-        //         self.topology_updater.clone(),
-        //         self.topology_watcher.clone(),
-        //         self.update_request_receiver.clone(),
-        //         self.options.clone(),
-        //     );
-        // }
 
         let diff = old_description.diff(&latest_state.description);
         let topology_changed = diff.is_some();
@@ -397,6 +373,82 @@ impl TopologyWorker {
         }
 
         Ok(topology_changed)
+    }
+
+    async fn mark_server_as_unknown(&mut self, address: ServerAddress, error: Error) -> bool {
+        let description = ServerDescription::new(address, Some(Err(error.to_string())));
+        self.update_server(description).await.unwrap_or(false)
+    }
+
+    pub(crate) async fn handle_application_error(
+        &mut self,
+        address: ServerAddress,
+        error: Error,
+        handshake: HandshakePhase,
+    ) -> bool {
+        let server = match self.broadcaster.borrow_latest().servers.get(&address) {
+            Some(s) => s.clone(),
+            None => return false,
+        };
+
+        match &handshake {
+            HandshakePhase::PreHello { generation } => {
+                match (generation, server.pool.generation()) {
+                    (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => {
+                        if *hgen < sgen {
+                            return false;
+                        }
+                    }
+                    // Pre-hello handshake errors are ignored in load-balanced mode.
+                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {
+                        return false
+                    }
+                    _ => load_balanced_mode_mismatch!(false),
+                }
+            }
+            HandshakePhase::PostHello { generation }
+            | HandshakePhase::AfterCompletion { generation, .. } => {
+                if generation.is_stale(&server.pool.generation()) {
+                    return false;
+                }
+            }
+        }
+
+        let is_load_balanced = self.broadcaster.borrow_latest().description.topology_type()
+            == TopologyType::LoadBalanced;
+        if error.is_state_change_error() {
+            let updated = is_load_balanced
+                || self
+                    .update_server(ServerDescription::new(
+                        server.address.clone(),
+                        Some(Err(error.to_string())),
+                    ))
+                    .await
+                    .unwrap();
+
+            if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
+                server.pool.clear(error, handshake.service_id()).await;
+            }
+            self.update_requester.request();
+
+            updated
+        } else if error.is_non_timeout_network_error()
+            || (handshake.is_before_completion()
+                && (error.is_auth_error()
+                    || error.is_network_timeout()
+                    || error.is_command_error()))
+        {
+            let updated = is_load_balanced
+                || self
+                    .mark_server_as_unknown(server.address.clone(), error.clone())
+                    .await;
+            if updated {
+                server.pool.clear(error, handshake.service_id()).await;
+            }
+            updated
+        } else {
+            false
+        }
     }
 }
 
@@ -512,7 +564,11 @@ struct TopologyBroadcaster {
 
 impl TopologyBroadcaster {
     fn clone_latest(&self) -> TopologyState {
-        self.state_sender.borrow().clone()
+        self.borrow_latest().clone()
+    }
+
+    fn borrow_latest(&self) -> Ref<TopologyState> {
+        self.state_sender.borrow()
     }
 
     fn publish_new_state(&self, state: TopologyState) {
@@ -520,14 +576,14 @@ impl TopologyBroadcaster {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct UpdateRequester {
-    sender: watch::Sender<()>,
+    sender: broadcast::Sender<()>,
 }
 
 impl UpdateRequester {
     fn channel() -> (UpdateRequester, TopologyUpdateRequestReceiver) {
-        let (tx, rx) = watch::channel(());
+        let (tx, rx) = broadcast::channel(1);
         (
             UpdateRequester { sender: tx },
             TopologyUpdateRequestReceiver { receiver: rx },
@@ -537,20 +593,25 @@ impl UpdateRequester {
     fn request(&self) {
         let _ = self.sender.send(());
     }
+
+    fn subscribe(&self) -> TopologyUpdateRequestReceiver {
+        TopologyUpdateRequestReceiver {
+            receiver: self.sender.subscribe(),
+        }
+    }
 }
 
-#[derive(Clone)]
 pub(crate) struct TopologyUpdateRequestReceiver {
-    receiver: watch::Receiver<()>,
+    receiver: broadcast::Receiver<()>,
 }
 
 impl TopologyUpdateRequestReceiver {
     pub(crate) async fn wait_for_update_request(&mut self, timeout: Duration) {
-        let _: std::result::Result<_, _> = runtime::timeout(timeout, self.receiver.changed()).await;
+        let _: std::result::Result<_, _> = runtime::timeout(timeout, self.receiver.recv()).await;
     }
 
     pub(crate) fn clear_update_requests(&mut self) {
-        self.receiver.borrow_and_update();
+        let _: std::result::Result<_, _> = self.receiver.try_recv();
     }
 }
 
