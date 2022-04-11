@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Performance</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">11.</strong> Writing Tests</div></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><a href="performance.html"><strong aria-hidden="true">6.</strong> Performance</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">11.</strong> Writing Tests</div></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -385,6 +385,133 @@ while let Some(book) = cursor.try_next().await? {
     println!(&quot;title: {}&quot;, book.title);
 }
 <span class="boring">Ok(()) }
+</span><span class="boring">}
+</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="performance"><a class="header" href="#performance">Performance</a></h1>
+<h2 id="client-best-practices"><a class="header" href="#client-best-practices"><code>Client</code> Best Practices</a></h2>
+<p>The <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html"><code>Client</code></a> handles many aspects of databse connection behind the scenes that can require manual management for other database drivers; it discovers server topology, monitors it for any changes, and maintains an internal connection pool.  This has implications for how a <code>Client</code> should be used for best performance.</p>
+<h3 id="lifetime"><a class="header" href="#lifetime">Lifetime</a></h3>
+<p>A <code>Client</code> should be as long-lived as possible.  Establishing a new <code>Client</code> is relatively slow and resource-intensive, so ideally that should only be done once at application startup.  Because <code>Client</code> is implemented using an internal <a href="https://doc.rust-lang.org/std/sync/struct.Arc.html"><code>Arc</code></a>, it can safely be shared across threads or tasks, and <code>clone</code>ing it to pass to new contexts is extremely cheap.</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">use mongodb::Client;
+</span><span class="boring">use std::error::Error;
+</span>// This will be very slow because it's constructing and tearing down a `Client`
+// with every request.
+async fn handle_request_bad() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+    let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+    // Do something with the client
+    Ok(())
+}
+
+// This will be much faster.
+async fn handle_request_good(client: &amp;Client) -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+    // Do something with the client
+    Ok(())
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>This is especially noticeable when using a framework that provides connection pooling; because <code>Client</code> does its own pooling internally, attempting to maintain a pool of <code>Client</code>s will (somewhat counter-intuitively) result in worse performance than using a single one.</p>
+<h3 id="runtime"><a class="header" href="#runtime">Runtime</a></h3>
+<p>A <code>Client</code> is implicitly bound to the instance of the <code>tokio</code> or <code>async-src</code> runtime in which it was created.  Attempting to execute operations on a different runtime instance will cause incorrect behavior and unpredictable failures.  This is easy to accidentally invoke when testing, as the <code>tokio::test</code> or <code>async_std::test</code> helper macros create a new runtime for each test.</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate once_cell;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">use mongodb::Client;
+</span><span class="boring">use std::error::Error;
+</span>use tokio::runtime::Runtime;
+use once_cell::sync::Lazy;
+
+static CLIENT: Lazy&lt;Client&gt; = Lazy::new(|| {
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async {
+        Client::with_uri_str(&quot;mongodb://example.com&quot;).await.unwrap()
+    })
+});
+
+// This will inconsistently fail.
+#[tokio::test]
+async fn test_list_dbs() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+    CLIENT.list_database_names(None, None).await?;
+    Ok(())
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>To work around this issue, either create a new <code>Client</code> for every async test, or bundle the <code>Runtime</code> along with the client and don't use the test helper macros.</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate once_cell;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">use mongodb::Client;
+</span><span class="boring">use std::error::Error;
+</span>use tokio::runtime::Runtime;
+use once_cell::sync::Lazy;
+
+static CLIENT_RUNTIME: Lazy&lt;(Client, Runtime)&gt; = Lazy::new(|| {
+    let rt = Runtime::new().unwrap();
+    let client = rt.block_on(async {
+        Client::with_uri_str(&quot;mongodb://example.com&quot;).await.unwrap()
+    });
+    (client, rt)
+});
+
+fn test_list_dbs() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+    let (client, rt) = &amp;*CLIENT_RUNTIME;
+    rt.block_on(async {
+        client.list_database_names(None, None).await
+    })?;
+    Ok(())
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>or</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">use mongodb::Client;
+</span><span class="boring">use std::error::Error;
+</span>#[tokio::test]
+async fn test_list_dbs() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+    let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+    CLIENT.list_database_names(None, None).await?;
+    Ok(())
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="parallelism"><a class="header" href="#parallelism">Parallelism</a></h2>
+<p>Where data operations are naturally parallelizable, spawning many asynchronous tasks that use the driver concurrently is often the best way to achieve maximum performance, as the driver is designed to work well in such situations.</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">use mongodb::{bson::Document, Client, error::Result};
+</span><span class="boring">use tokio::task;
+</span><span class="boring">
+</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
+</span>let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+
+for i in 0..5 {
+    let client_ref = client.clone();
+
+    task::spawn(async move {
+        let collection = client_ref.database(&quot;items&quot;).collection::&lt;Document&gt;(&amp;format!(&quot;coll{}&quot;, i));
+
+        // Do something with the collection
+    });
+}
+<span class="boring">
+</span><span class="boring">Ok(())
+</span><span class="boring">}
 </span><span class="boring">}
 </span></code></pre></pre>
 
