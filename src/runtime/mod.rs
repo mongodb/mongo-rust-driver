@@ -11,6 +11,7 @@ mod stream;
 mod tls_openssl;
 #[cfg_attr(feature = "openssl-tls", allow(unused))]
 mod tls_rustls;
+mod worker_handle;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 

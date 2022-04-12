@@ -20,7 +20,7 @@ use crate::{
         ServerDescriptionChangedEvent,
         ServerOpeningEvent,
         TopologyDescriptionChangedEvent,
-        TopologyOpeningEvent,
+        TopologyOpeningEvent, TopologyClosedEvent,
     },
     runtime::{self, AcknowledgedMessage, HttpClient},
     selection_criteria::SelectionCriteria,
@@ -342,7 +342,14 @@ impl TopologyWorker {
                 };
                 ack.acknowledge(changed);
             }
-            println!("topology shutting down");
+
+            println!("here===============================");
+
+            if let Some(handler) = self.options.sdam_event_handler {
+                handler.handle_topology_closed_event(TopologyClosedEvent {
+                    topology_id: self.id
+                });
+            }
         });
     }
 
