@@ -415,7 +415,7 @@ async fn handle_request_good(client: &amp;Client) -&gt; Result&lt;(), Box&lt;dyn
 </span></code></pre></pre>
 <p>This is especially noticeable when using a framework that provides connection pooling; because <code>Client</code> does its own pooling internally, attempting to maintain a pool of <code>Client</code>s will (somewhat counter-intuitively) result in worse performance than using a single one.</p>
 <h3 id="runtime"><a class="header" href="#runtime">Runtime</a></h3>
-<p>A <code>Client</code> is implicitly bound to the instance of the <code>tokio</code> or <code>async-src</code> runtime in which it was created.  Attempting to execute operations on a different runtime instance will cause incorrect behavior and unpredictable failures.  This is easy to accidentally invoke when testing, as the <code>tokio::test</code> or <code>async_std::test</code> helper macros create a new runtime for each test.</p>
+<p>A <code>Client</code> is implicitly bound to the instance of the <code>tokio</code> or <code>async-std</code> runtime in which it was created.  Attempting to execute operations on a different runtime instance will cause incorrect behavior and unpredictable failures.  This is easy to accidentally invoke when testing, as the <code>tokio::test</code> or <code>async_std::test</code> helper macros create a new runtime for each test.</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
