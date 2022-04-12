@@ -1,7 +1,9 @@
 use std::{
     sync::{Arc, Weak},
-    time::Duration,
+    time::{Duration, Instant},
 };
+
+use bson::{doc, Document};
 
 use super::{
     description::server::ServerDescription,
@@ -15,6 +17,12 @@ use super::{
 use crate::{
     cmap::{Connection, Handshaker},
     error::{Error, Result},
+    event::sdam::{
+        SdamEventHandler,
+        ServerHeartbeatFailedEvent,
+        ServerHeartbeatStartedEvent,
+        ServerHeartbeatSucceededEvent,
+    },
     hello::{hello_command, run_hello, HelloReply},
     options::{ClientOptions, ServerAddress},
     runtime,
@@ -102,7 +110,7 @@ impl Monitor {
                         .map(|sd| sd.is_available())
                         .unwrap_or(false)
                 {
-                    self.handle_error(e);
+                    self.handle_error(e).await;
                     retried = true;
                     self.perform_hello().await
                 } else {
@@ -115,22 +123,32 @@ impl Monitor {
             Ok(reply) => {
                 let server_description =
                     ServerDescription::new(self.address.clone(), Some(Ok(reply)));
-                self.topology_updater.update(server_description);
-                true
+                self.topology_updater.update(server_description).await
             }
-            Err(e) => self.handle_error(e) || retried,
+            Err(e) => self.handle_error(e).await || retried,
         }
     }
 
     async fn perform_hello(&mut self) -> Result<HelloReply> {
-        let result = match self.connection {
+        self.emit_event(|handler| {
+            let event = ServerHeartbeatStartedEvent {
+                server_address: self.address.clone(),
+            };
+            handler.handle_server_heartbeat_started_event(event);
+        });
+
+        let (duration, result) = match self.connection {
             Some(ref mut conn) => {
                 let command = hello_command(
                     self.client_options.server_api.as_ref(),
                     self.client_options.load_balanced,
                     Some(conn.stream_description()?.hello_ok),
                 );
-                run_hello(conn, command, None, &self.client_options.sdam_event_handler).await
+                let start = Instant::now();
+                (
+                    start.elapsed(),
+                    run_hello(conn, command, None, &self.client_options.sdam_event_handler).await,
+                )
             }
             None => {
                 let mut connection = Connection::connect_monitoring(
@@ -140,6 +158,7 @@ impl Monitor {
                 )
                 .await?;
 
+                let start = Instant::now();
                 let res = self
                     .handshaker
                     .handshake(
@@ -149,23 +168,59 @@ impl Monitor {
                     )
                     .await
                     .map(|r| r.hello_reply);
+
                 self.connection = Some(connection);
-                res
+                (start.elapsed(), res)
             }
         };
 
-        if result.is_err() {
-            self.connection.take();
+        match result {
+            Ok(ref r) => {
+                self.emit_event(|handler| {
+                    let mut reply = r
+                        .raw_command_response
+                        .to_document()
+                        .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
+                    // if this hello call is part of a handshake, remove speculative authentication
+                    // information before publishing an event
+                    reply.remove("speculativeAuthenticate");
+                    let event = ServerHeartbeatSucceededEvent {
+                        duration,
+                        reply,
+                        server_address: self.address.clone(),
+                    };
+                    handler.handle_server_heartbeat_succeeded_event(event);
+                });
+            }
+            Err(ref e) => {
+                self.connection.take();
+                self.emit_event(|handler| {
+                    let event = ServerHeartbeatFailedEvent {
+                        duration,
+                        failure: e.clone(),
+                        server_address: self.address.clone(),
+                    };
+                    handler.handle_server_heartbeat_failed_event(event);
+                });
+            }
         }
 
         result
     }
 
-    fn handle_error(&mut self, error: Error) -> bool {
-        // topology.handle_monitor_error(error, server).await
+    async fn handle_error(&mut self, error: Error) -> bool {
         self.topology_updater
-            .handle_monitor_error(self.address.clone(), error);
-        true
+            .handle_monitor_error(self.address.clone(), error)
+            .await
+    }
+
+    fn emit_event<F>(&self, emit: F)
+    where
+        F: FnOnce(&Arc<dyn SdamEventHandler>),
+    {
+        if let Some(ref handler) = self.client_options.sdam_event_handler {
+            emit(handler)
+        }
     }
 }
 

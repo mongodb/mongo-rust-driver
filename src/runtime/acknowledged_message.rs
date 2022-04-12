@@ -2,7 +2,7 @@
 /// When this is dropped or `acknowledge` is called, the sender will be notified.
 #[derive(Debug)]
 pub(crate) struct AcknowledgedMessage<M, R = ()> {
-    notifier: tokio::sync::oneshot::Sender<R>,
+    acknowledger: AcknowledgmentSender<R>,
     message: M,
 }
 
@@ -14,7 +14,7 @@ impl<M, R> AcknowledgedMessage<M, R> {
         (
             Self {
                 message,
-                notifier: sender,
+                acknowledger: AcknowledgmentSender { sender },
             },
             AcknowledgmentReceiver { receiver },
         )
@@ -28,8 +28,24 @@ impl<M, R> AcknowledgedMessage<M, R> {
     /// Send acknowledgement to the receiver.
     #[allow(dead_code)]
     pub(crate) fn acknowledge(self, result: impl Into<R>) {
+        self.acknowledger.acknowledge(result)
+    }
+
+    pub(crate) fn into_parts(self) -> (M, AcknowledgmentSender<R>) {
+        (self.message, self.acknowledger)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct AcknowledgmentSender<R> {
+    sender: tokio::sync::oneshot::Sender<R>,
+}
+
+impl<R> AcknowledgmentSender<R> {
+    /// Send acknowledgement to the receiver.
+    pub(crate) fn acknowledge(self, result: impl Into<R>) {
         // returns an error when the other end hangs up e.g. due to a timeout.
-        let _: std::result::Result<_, _> = self.notifier.send(result.into());
+        let _: std::result::Result<_, _> = self.sender.send(result.into());
     }
 }
 

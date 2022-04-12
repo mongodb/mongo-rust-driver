@@ -453,11 +453,14 @@ impl Client {
                 connection: conn,
             }),
             Err(err) => {
-                self.inner.topology.handle_application_error(
-                    server.address.clone(),
-                    err.clone(),
-                    HandshakePhase::after_completion(&conn),
-                );
+                self.inner
+                    .topology
+                    .handle_application_error(
+                        server.address.clone(),
+                        err.clone(),
+                        HandshakePhase::after_completion(&conn),
+                    )
+                    .await;
                 drop(server);
 
                 if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
@@ -883,7 +886,8 @@ impl Client {
         if let Some(ref cluster_time) = cluster_time {
             self.inner
                 .topology
-                .advance_cluster_time(cluster_time.clone());
+                .advance_cluster_time(cluster_time.clone())
+                .await;
             if let Some(ref mut session) = session {
                 session.advance_cluster_time(cluster_time)
             }

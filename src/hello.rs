@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use bson::RawDocumentBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -11,7 +12,7 @@ use crate::{
         options::{ServerAddress, ServerApi},
         ClusterTime,
     },
-    cmap::{Command, Connection},
+    cmap::{Command, Connection, RawCommandResponse},
     error::Result,
     event::sdam::{
         SdamEventHandler,
@@ -84,13 +85,14 @@ pub(crate) async fn run_hello(
     let round_trip_time = end_time.duration_since(start_time);
 
     match response_result.and_then(|raw_response| {
-        let hello_reply = raw_response.to_hello_reply(round_trip_time)?;
-        Ok((raw_response, hello_reply))
+        let hello_reply = raw_response.into_hello_reply(round_trip_time)?;
+        Ok(hello_reply)
     }) {
-        Ok((raw_response, hello_reply)) => {
+        Ok(hello_reply) => {
             emit_event(topology, handler, |handler| {
-                let mut reply = raw_response
-                    .body::<Document>()
+                let mut reply = hello_reply
+                    .raw_command_response
+                    .to_document()
                     .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
                 // if this hello call is part of a handshake, remove speculative authentication
                 // information before publishing an event
@@ -133,6 +135,7 @@ where
 pub(crate) struct HelloReply {
     pub server_address: ServerAddress,
     pub command_response: HelloCommandResponse,
+    pub raw_command_response: RawDocumentBuf,
     pub round_trip_time: Duration,
     pub cluster_time: Option<ClusterTime>,
 }

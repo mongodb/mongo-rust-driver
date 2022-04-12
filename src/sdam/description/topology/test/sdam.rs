@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
 
-use bson::Document;
+use bson::{Document, RawDocumentBuf};
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
@@ -9,7 +9,7 @@ use super::TestSdamEvent;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
-    cmap::{conn::ConnectionGeneration, PoolGeneration},
+    cmap::{conn::ConnectionGeneration, PoolGeneration, RawCommandResponse},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -300,28 +300,29 @@ async fn run_test(test_file: TestFile) {
                     command_response: command_response.into(),
                     round_trip_time: Duration::from_millis(1234), // Doesn't matter for tests.
                     cluster_time: None,
+                    raw_command_response: Default::default(), // doesn't matter for tests
                 })
             };
 
             if let Some(server) = servers.get(&address) {
-                let mut watcher = topology.watch();
                 match hello_reply {
                     Ok(reply) => {
                         let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
-                        topology.clone_updater().update(new_sd);
-                        servers = topology.servers();
+                        if topology.clone_updater().update(new_sd).await {
+                            servers = topology.servers();
+                        }
                     }
                     Err(e) => {
-                        topology.clone_updater().handle_monitor_error(address, e);
+                        topology
+                            .clone_updater()
+                            .handle_monitor_error(address, e)
+                            .await;
                     }
                 }
-                watcher.wait_for_update(Duration::from_millis(100)).await;
             }
         }
 
         for application_error in phase.application_errors {
-            let mut watcher = topology.watch();
-
             if let Some(server) = servers.get(&application_error.address) {
                 let error = application_error.to_error();
                 let pool_generation = application_error
@@ -345,9 +346,9 @@ async fn run_test(test_file: TestFile) {
                     }
                 };
 
-                topology.handle_application_error(server.address.clone(), error, handshake_phase);
-
-                watcher.wait_for_update(Duration::from_millis(100)).await;
+                topology
+                    .handle_application_error(server.address.clone(), error, handshake_phase)
+                    .await;
             }
         }
 
@@ -741,15 +742,19 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     .unwrap();
 
     // discover the node
-    topology.clone_updater().update(ServerDescription::new(
-        address.clone(),
-        Some(Ok(HelloReply {
-            server_address: address.clone(),
-            command_response: heartbeat_response,
-            round_trip_time: Duration::from_secs(1),
-            cluster_time: None,
-        })),
-    ));
+    topology
+        .clone_updater()
+        .update(ServerDescription::new(
+            address.clone(),
+            Some(Ok(HelloReply {
+                server_address: address.clone(),
+                command_response: heartbeat_response,
+                round_trip_time: Duration::from_secs(1),
+                cluster_time: None,
+                raw_command_response: Default::default(),
+            })),
+        ))
+        .await;
     assert_eq!(
         topology
             .watch()
@@ -768,7 +773,9 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     let phase = HandshakePhase::PreHello {
         generation: server.pool.generation(),
     };
-    topology.handle_application_error(server.address.clone(), error, phase);
+    topology
+        .handle_application_error(server.address.clone(), error, phase)
+        .await;
     assert_eq!(
         topology
             .watch()

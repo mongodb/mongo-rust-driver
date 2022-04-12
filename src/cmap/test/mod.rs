@@ -167,12 +167,14 @@ impl Executor {
         let manager = pool.manager.clone();
         runtime::execute(async move {
             while let Some(update) = receiver.recv().await {
+                let (update, ack) = update.into_parts();
                 match update {
                     UpdateMessage::ApplicationError { error, .. } => {
                         manager.clear(error, None).await;
                     }
                     _ => {}
                 }
+                ack.acknowledge(true);
             }
         });
 

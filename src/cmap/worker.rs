@@ -640,11 +640,13 @@ async fn establish_connection(
 
     match establish_result {
         Err(ref e) => {
-            server_updater.handle_application_error(
-                address.clone(),
-                e.cause.clone(),
-                e.handshake_phase.clone(),
-            );
+            server_updater
+                .handle_application_error(
+                    address.clone(),
+                    e.cause.clone(),
+                    e.handshake_phase.clone(),
+                )
+                .await;
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,
