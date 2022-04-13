@@ -65,16 +65,13 @@ impl Monitor {
     }
 
     async fn execute(mut self) {
-        println!("{}: starting monitor", self.address);
         let heartbeat_frequency = self
             .client_options
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
         while self.topology_watcher.is_alive() {
-            println!("{}: topology alive, starting check", self.address);
             self.check_server().await;
-            println!("{}: check complete", self.address);
 
             #[cfg(test)]
             let min_frequency = self

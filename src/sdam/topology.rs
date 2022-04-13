@@ -326,7 +326,6 @@ impl TopologyWorker {
                 tokio::select! {
                     Some(update) = self.update_receiver.recv() => {
                         let (update, ack) = update.into_parts();
-                        println!("{:#?}", update);
                         let changed = match update {
                             UpdateMessage::AdvanceClusterTime(to) => {
                                 self.advance_cluster_time(to);
@@ -356,8 +355,6 @@ impl TopologyWorker {
                 }
             }
 
-            println!("here===============================");
-
             if let Some(handler) = self.options.sdam_event_handler {
                 handler.handle_topology_closed_event(TopologyClosedEvent {
                     topology_id: self.id,
@@ -379,7 +376,6 @@ impl TopologyWorker {
             if state.servers.contains_key(&address) {
                 continue;
             }
-            println!("adding {} to servers", address);
             let server = Server::new(
                 address.clone(),
                 self.options.clone(),
@@ -411,7 +407,6 @@ impl TopologyWorker {
     }
 
     async fn update_server(&mut self, sd: ServerDescription) -> std::result::Result<bool, String> {
-        println!("updating {} to {:?}", sd.address, sd.server_type);
         let server_type = sd.server_type;
         let server_address = sd.address.clone();
 
@@ -480,8 +475,6 @@ impl TopologyWorker {
             }
             // println!("broadcasting new state {:#?}", latest_state);
             self.broadcaster.publish_new_state(latest_state)
-        } else {
-            println!("topology didn't change");
         }
 
         Ok(topology_changed)
@@ -544,8 +537,6 @@ impl TopologyWorker {
         error: Error,
         handshake: HandshakePhase,
     ) -> bool {
-        println!("handling application error {:#?} for {}", error, address);
-
         let server = match self.server(&address) {
             Some(s) => s,
             None => return false,
@@ -618,7 +609,6 @@ impl TopologyWorker {
     ) -> bool {
         match self.server(&address) {
             Some(server) => {
-                println!("handling monitor error {:#?} for {}", error, address);
                 let updated = self.mark_server_as_unknown(address, error.clone()).await;
                 if updated {
                     // The heartbeat monitor is disabled in load-balanced mode, so this will never
@@ -628,15 +618,6 @@ impl TopologyWorker {
                 updated
             }
             None => {
-                println!(
-                    "{} not in {:?}",
-                    address,
-                    self.broadcaster
-                        .borrow_latest()
-                        .servers
-                        .keys()
-                        .collect::<Vec<_>>()
-                );
                 false
             }
         }
