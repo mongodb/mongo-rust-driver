@@ -192,7 +192,7 @@ impl<'a> From<&'a OperationType> for OperationTypeWrapper<'a> {
             OperationType::Rename => Self::Known(OperationTypeHelper::Rename),
             OperationType::DropDatabase => Self::Known(OperationTypeHelper::DropDatabase),
             OperationType::Invalidate => Self::Known(OperationTypeHelper::Invalidate),
-            OperationType::Other(s) => Self::Unknown(&s),
+            OperationType::Other(s) => Self::Unknown(s),
         }
     }
 }
