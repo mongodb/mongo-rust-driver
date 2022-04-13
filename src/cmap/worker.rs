@@ -32,7 +32,7 @@ use crate::{
         PoolReadyEvent,
     },
     options::ServerAddress,
-    runtime,
+    runtime::{self, WorkerHandle, WorkerHandleListener},
     sdam::{ServerUpdateSender, TopologyUpdater},
 };
 
@@ -113,7 +113,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// Receiver used to determine if any threads hold references to this pool. If all the
     /// sender ends of this receiver drop, this worker will be notified and drop too.
-    handle_listener: HandleListener,
+    handle_listener: WorkerHandleListener,
 
     /// Receiver for incoming connection check out requests.
     request_receiver: ConnectionRequestReceiver,
@@ -169,7 +169,7 @@ impl ConnectionPoolWorker {
             .as_ref()
             .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
-        let (handle, handle_listener) = handle_channel();
+        let (handle, handle_listener) = WorkerHandleListener::channel();
         let (connection_requester, request_receiver) = connection_requester::channel(handle);
         let (manager, management_receiver) = manager::channel();
 
@@ -700,16 +700,6 @@ impl From<PoolManagementRequest> for PoolTask {
     fn from(request: PoolManagementRequest) -> Self {
         PoolTask::HandleManagementRequest(Box::new(request))
     }
-}
-
-/// Constructs a new channel for for monitoring whether this pool still has references
-/// to it.
-fn handle_channel() -> (PoolWorkerHandle, HandleListener) {
-    let (sender, receiver) = mpsc::channel(1);
-    (
-        PoolWorkerHandle { _sender: sender },
-        HandleListener { receiver },
-    )
 }
 
 #[derive(Debug, Clone)]

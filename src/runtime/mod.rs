@@ -22,6 +22,7 @@ pub(crate) use self::{
     join_handle::AsyncJoinHandle,
     resolver::AsyncResolver,
     stream::AsyncStream,
+    worker_handle::{WorkerHandle, WorkerHandleListener},
 };
 use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;

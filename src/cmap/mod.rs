@@ -42,7 +42,7 @@ use manager::PoolManager;
 use worker::ConnectionPoolWorker;
 
 #[cfg(test)]
-use self::worker::PoolWorkerHandle;
+use crate::runtime::WorkerHandle;
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 
@@ -97,7 +97,7 @@ impl ConnectionPool {
     #[cfg(test)]
     pub(crate) fn new_mocked(address: ServerAddress) -> Self {
         let (manager, _) = manager::channel();
-        let handle = PoolWorkerHandle::new_mocked();
+        let handle = WorkerHandle::new_mocked();
         let (connection_requester, _) = connection_requester::channel(handle);
         let (_, generation_subscriber) = status::channel(PoolGeneration::normal());
 

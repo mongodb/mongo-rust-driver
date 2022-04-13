@@ -1,15 +1,13 @@
 use tokio::sync::{mpsc, oneshot};
 
-use super::{worker::PoolWorkerHandle, Connection};
+use super::Connection;
 use crate::{
     error::{Error, Result},
-    runtime::AsyncJoinHandle,
+    runtime::{AsyncJoinHandle, WorkerHandle},
 };
 
 /// Returns a new requester/receiver pair.
-pub(super) fn channel(
-    handle: PoolWorkerHandle,
-) -> (ConnectionRequester, ConnectionRequestReceiver) {
+pub(super) fn channel(handle: WorkerHandle) -> (ConnectionRequester, ConnectionRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
     (
         ConnectionRequester {
@@ -26,7 +24,7 @@ pub(super) fn channel(
 #[derive(Clone, Debug)]
 pub(super) struct ConnectionRequester {
     sender: mpsc::UnboundedSender<oneshot::Sender<ConnectionRequestResult>>,
-    _handle: PoolWorkerHandle,
+    _handle: WorkerHandle,
 }
 
 impl ConnectionRequester {

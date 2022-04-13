@@ -19,10 +19,11 @@ use crate::{
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
         ServerOpeningEvent,
+        TopologyClosedEvent,
         TopologyDescriptionChangedEvent,
-        TopologyOpeningEvent, TopologyClosedEvent,
+        TopologyOpeningEvent,
     },
-    runtime::{self, AcknowledgedMessage, HttpClient},
+    runtime::{self, AcknowledgedMessage, HttpClient, WorkerHandle, WorkerHandleListener},
     selection_criteria::SelectionCriteria,
     ClusterTime,
     ServerInfo,
@@ -46,6 +47,7 @@ pub(crate) struct NewTopology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
     update_requester: UpdateRequester,
+    worker_handle: WorkerHandle,
 }
 
 impl NewTopology {
@@ -53,9 +55,10 @@ impl NewTopology {
         let http_client = HttpClient::default();
         let description = TopologyDescription::new(options.clone())?;
         let is_load_balanced = options.load_balanced == Some(true);
-        let (update_requester, update_request_receiver) = UpdateRequester::channel();
 
+        let (update_requester, update_request_receiver) = UpdateRequester::channel();
         let (updater, update_receiver) = TopologyUpdater::channel();
+        let (worker_handle, handle_listener) = WorkerHandleListener::channel();
 
         let servers = description
             .server_addresses()
@@ -111,6 +114,7 @@ impl NewTopology {
             topology_updater: updater.clone(),
             update_request_receiver,
             update_requester: update_requester.clone(),
+            handle_listener,
         };
 
         // Emit events for the initialization of the topology and the seed list.
@@ -171,6 +175,7 @@ impl NewTopology {
             watcher,
             updater,
             update_requester,
+            worker_handle,
         })
     }
 
@@ -303,6 +308,7 @@ pub(crate) enum UpdateMessage {
 struct TopologyWorker {
     id: ObjectId,
     update_receiver: TopologyUpdateReceiver,
+    handle_listener: WorkerHandleListener,
     broadcaster: TopologyBroadcaster,
     update_requester: UpdateRequester,
     options: ClientOptions,
@@ -316,38 +322,45 @@ struct TopologyWorker {
 impl TopologyWorker {
     fn start(mut self) {
         runtime::execute(async move {
-            while let Some(update) = self.update_receiver.recv().await {
-                let (update, ack) = update.into_parts();
-                println!("{:#?}", update);
-                let changed = match update {
-                    UpdateMessage::AdvanceClusterTime(to) => {
-                        self.advance_cluster_time(to);
-                        true
+            loop {
+                tokio::select! {
+                    Some(update) = self.update_receiver.recv() => {
+                        let (update, ack) = update.into_parts();
+                        println!("{:#?}", update);
+                        let changed = match update {
+                            UpdateMessage::AdvanceClusterTime(to) => {
+                                self.advance_cluster_time(to);
+                                true
+                            }
+                            UpdateMessage::SyncHosts(hosts) => {
+                                let mut state = self.broadcaster.clone_latest();
+                                self.sync_hosts(&mut state, hosts);
+                                self.broadcaster.publish_new_state(state);
+                                true
+                            }
+                            UpdateMessage::ServerUpdate(sd) => self.update_server(sd).await.unwrap(),
+                            UpdateMessage::MonitorError { address, error } => {
+                                self.handle_monitor_error(address, error).await
+                            }
+                            UpdateMessage::ApplicationError {
+                                address,
+                                error,
+                                phase,
+                            } => self.handle_application_error(address, error, phase).await,
+                        };
+                        ack.acknowledge(changed);
+                    },
+                    _ = self.handle_listener.wait_for_all_handle_drops() => {
+                        break
                     }
-                    UpdateMessage::SyncHosts(hosts) => {
-                        let mut state = self.broadcaster.clone_latest();
-                        self.sync_hosts(&mut state, hosts);
-                        self.broadcaster.publish_new_state(state);
-                        true
-                    }
-                    UpdateMessage::ServerUpdate(sd) => self.update_server(sd).await.unwrap(),
-                    UpdateMessage::MonitorError { address, error } => {
-                        self.handle_monitor_error(address, error).await
-                    }
-                    UpdateMessage::ApplicationError {
-                        address,
-                        error,
-                        phase,
-                    } => self.handle_application_error(address, error, phase).await,
-                };
-                ack.acknowledge(changed);
+                }
             }
 
             println!("here===============================");
 
             if let Some(handler) = self.options.sdam_event_handler {
                 handler.handle_topology_closed_event(TopologyClosedEvent {
-                    topology_id: self.id
+                    topology_id: self.id,
                 });
             }
         });
@@ -426,7 +439,7 @@ impl TopologyWorker {
         //                 address: address.clone(),
         //                 topology_id: self.id,
         //                 previous_description:
-        // ServerInfo::new_owned(previous_description.clone()),                 
+        // ServerInfo::new_owned(previous_description.clone()),
         // new_description: ServerInfo::new_owned(new_description.clone()),             };
         //             handler.handle_server_description_changed_event(event);
         //         }

@@ -7,25 +7,35 @@ pub(crate) struct WorkerHandle {
     _sender: mpsc::Sender<()>,
 }
 
-impl PoolWorkerHandle {
+impl WorkerHandle {
     #[cfg(test)]
-    pub(super) fn new_mocked() -> Self {
-        let (s, _) = handle_channel();
+    pub(crate) fn new_mocked() -> Self {
+        let (s, _) = WorkerHandleListener::channel();
         s
     }
 }
 
 /// Listener used to determine when all handles have been dropped.
 #[derive(Debug)]
-struct HandleListener {
+pub(crate) struct WorkerHandleListener {
     receiver: mpsc::Receiver<()>,
 }
 
-impl HandleListener {
+impl WorkerHandleListener {
     /// Listen until all handles are dropped.
     /// This will not return until all handles are dropped, so make sure to only poll this via
     /// select or with a timeout.
-    async fn wait_for_all_handle_drops(&mut self) {
+    pub(crate) async fn wait_for_all_handle_drops(&mut self) {
         self.receiver.recv().await;
+    }
+
+    /// Constructs a new channel for for monitoring whether this pool still has references
+    /// to it.
+    pub(crate) fn channel() -> (WorkerHandle, WorkerHandleListener) {
+        let (sender, receiver) = mpsc::channel(1);
+        (
+            WorkerHandle { _sender: sender },
+            WorkerHandleListener { receiver },
+        )
     }
 }
