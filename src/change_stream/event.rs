@@ -171,7 +171,7 @@ enum OperationTypeHelper {
     Drop,
     Rename,
     DropDatabase,
-    Invalidate,        
+    Invalidate,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -200,19 +200,17 @@ impl<'a> From<&'a OperationType> for OperationTypeWrapper<'a> {
 impl<'a> From<OperationTypeWrapper<'a>> for OperationType {
     fn from(src: OperationTypeWrapper) -> Self {
         match src {
-            OperationTypeWrapper::Known(h) => {
-                match h {
-                    OperationTypeHelper::Insert => Self::Insert,
-                    OperationTypeHelper::Update => Self::Update,
-                    OperationTypeHelper::Replace => Self::Replace,
-                    OperationTypeHelper::Delete => Self::Delete,
-                    OperationTypeHelper::Drop => Self::Drop,
-                    OperationTypeHelper::Rename => Self::Rename,
-                    OperationTypeHelper::DropDatabase => Self::DropDatabase,
-                    OperationTypeHelper::Invalidate => Self::Invalidate,
-                }
-            }
-            OperationTypeWrapper::Unknown(s) => Self::Other(s.to_string())
+            OperationTypeWrapper::Known(h) => match h {
+                OperationTypeHelper::Insert => Self::Insert,
+                OperationTypeHelper::Update => Self::Update,
+                OperationTypeHelper::Replace => Self::Replace,
+                OperationTypeHelper::Delete => Self::Delete,
+                OperationTypeHelper::Drop => Self::Drop,
+                OperationTypeHelper::Rename => Self::Rename,
+                OperationTypeHelper::DropDatabase => Self::DropDatabase,
+                OperationTypeHelper::Invalidate => Self::Invalidate,
+            },
+            OperationTypeWrapper::Unknown(s) => Self::Other(s.to_string()),
         }
     }
 }
@@ -220,7 +218,8 @@ impl<'a> From<OperationTypeWrapper<'a>> for OperationType {
 impl<'de> Deserialize<'de> for OperationType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de> {
+        D: serde::Deserializer<'de>,
+    {
         OperationTypeWrapper::deserialize(deserializer).map(OperationType::from)
     }
 }
@@ -228,7 +227,8 @@ impl<'de> Deserialize<'de> for OperationType {
 impl Serialize for OperationType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         OperationTypeWrapper::serialize(&self.into(), serializer)
     }
 }
