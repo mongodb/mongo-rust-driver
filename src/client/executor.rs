@@ -395,12 +395,14 @@ impl Client {
                     }
                 }
 
-                // TODO: acknowledged message here
-                self.inner.topology.handle_application_error(
-                    server.address.clone(),
-                    err.clone(),
-                    HandshakePhase::after_completion(&conn),
-                );
+                self.inner
+                    .topology
+                    .handle_application_error(
+                        server.address.clone(),
+                        err.clone(),
+                        HandshakePhase::after_completion(&conn),
+                    )
+                    .await;
                 // release the connection to be processed by the connection pool
                 drop(conn);
                 // release the selected server to decrement its operation count
