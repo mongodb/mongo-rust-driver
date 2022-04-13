@@ -35,7 +35,7 @@ struct ClientMetadata {
     application: Option<AppMetadata>,
     driver: DriverMetadata,
     os: OsMetadata,
-    platform: Option<String>,
+    platform: String,
 }
 
 #[derive(Clone, Debug)]
@@ -74,10 +74,7 @@ impl From<ClientMetadata> for Bson {
         );
 
         metadata_doc.insert("os", metadata.os);
-
-        if let Some(platform) = metadata.platform {
-            metadata_doc.insert("platform", platform);
-        }
+        metadata_doc.insert("platform", metadata.platform);
 
         Bson::Document(metadata_doc)
     }
@@ -118,7 +115,7 @@ lazy_static! {
                 name: None,
                 version: None,
             },
-            platform: None,
+            platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
         };
 
         let info = os_info::get();
@@ -129,11 +126,6 @@ lazy_static! {
             if *version != Version::Unknown {
                 metadata.os.version = Some(info.version().to_string());
             }
-        }
-
-        if let Some((version, channel, date)) = version_check::triple() {
-            metadata.platform =
-                Some(format!("rustc {} {} ({}) with {}", version, channel, date, RUNTIME_NAME));
         }
 
         metadata
@@ -181,11 +173,9 @@ impl Handshaker {
                     metadata.driver.version.push_str(version);
                 }
 
-                if let Some(ref mut platform) = metadata.platform {
-                    if let Some(ref driver_info_platform) = driver_info.platform {
-                        platform.push('|');
-                        platform.push_str(driver_info_platform);
-                    }
+                if let Some(ref driver_info_platform) = driver_info.platform {
+                    metadata.platform.push('|');
+                    metadata.platform.push_str(driver_info_platform);
                 }
             }
 
