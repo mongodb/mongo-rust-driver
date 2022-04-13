@@ -5,7 +5,7 @@
 - [Connecting to the Database](connecting.md)
 - [Reading From the Database](reading.md)
 - [Writing To the Database]()
-- [Performance]()
+- [Performance](performance.md)
 - [Serde Integration]()
 - [Sessions and Transactions]()
 - [Change Streams]()
