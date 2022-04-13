@@ -2,7 +2,7 @@
 
 ## `Client` Best Practices
 
-The [`Client`](https://docs.rs/mongodb/latest/mongodb/struct.Client.html) handles many aspects of databse connection behind the scenes that can require manual management for other database drivers; it discovers server topology, monitors it for any changes, and maintains an internal connection pool.  This has implications for how a `Client` should be used for best performance.
+The [`Client`](https://docs.rs/mongodb/latest/mongodb/struct.Client.html) handles many aspects of database connection behind the scenes that can require manual management for other database drivers; it discovers server topology, monitors it for any changes, and maintains an internal connection pool.  This has implications for how a `Client` should be used for best performance.
 
 ### Lifetime
 A `Client` should be as long-lived as possible.  Establishing a new `Client` is relatively slow and resource-intensive, so ideally that should only be done once at application startup.  Because `Client` is implemented using an internal [`Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html), it can safely be shared across threads or tasks, and `clone`ing it to pass to new contexts is extremely cheap.
