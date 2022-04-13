@@ -71,6 +71,7 @@ static CLIENT_RUNTIME: Lazy<(Client, Runtime)> = Lazy::new(|| {
     (client, rt)
 });
 
+#[test]
 fn test_list_dbs() -> Result<(), Box<dyn Error>> {
     let (client, rt) = &*CLIENT_RUNTIME;
     rt.block_on(async {
