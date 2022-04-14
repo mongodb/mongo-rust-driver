@@ -7,7 +7,7 @@ use bson::doc;
 
 use super::{
     description::server::ServerDescription,
-    TopologyUpdateRequestReceiver,
+    TopologyCheckRequestReceiver,
     TopologyUpdater,
     TopologyWatcher,
 };
@@ -36,7 +36,7 @@ pub(crate) struct Monitor {
     handshaker: Handshaker,
     topology_updater: TopologyUpdater,
     topology_watcher: TopologyWatcher,
-    update_request_receiver: TopologyUpdateRequestReceiver,
+    update_request_receiver: TopologyCheckRequestReceiver,
     client_options: ClientOptions,
 }
 
@@ -45,7 +45,7 @@ impl Monitor {
         address: ServerAddress,
         topology_updater: TopologyUpdater,
         topology_watcher: TopologyWatcher,
-        update_request_receiver: TopologyUpdateRequestReceiver,
+        update_request_receiver: TopologyCheckRequestReceiver,
         client_options: ClientOptions,
     ) {
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
@@ -83,7 +83,7 @@ impl Monitor {
 
             runtime::delay_for(min_frequency).await;
             self.update_request_receiver
-                .wait_for_update_request(heartbeat_frequency - min_frequency)
+                .wait_for_check_request(heartbeat_frequency - min_frequency)
                 .await;
         }
     }
@@ -93,7 +93,7 @@ impl Monitor {
     ///
     /// Returns true if the topology has changed and false otherwise.
     async fn check_server(&mut self) -> bool {
-        self.update_request_receiver.clear_update_requests();
+        self.update_request_receiver.clear_check_requests();
         let mut retried = false;
         let check_result = match self.perform_hello().await {
             Ok(reply) => Ok(reply),

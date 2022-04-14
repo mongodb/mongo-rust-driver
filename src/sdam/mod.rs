@@ -25,9 +25,8 @@ pub(crate) use self::{
     state::server::Server,
     topology::{
         HandshakePhase,
-        NewTopology,
-        NewTopology as Topology,
-        TopologyUpdateRequestReceiver,
+        Topology,
+        TopologyCheckRequestReceiver,
         TopologyUpdater,
         TopologyWatcher,
     },

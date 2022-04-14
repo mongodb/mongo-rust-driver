@@ -34,7 +34,7 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
-    sdam::{server_selection, NewTopology, SelectedServer, SessionSupportStatus},
+    sdam::{server_selection, SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -98,7 +98,7 @@ pub struct Client {
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct ClientInner {
-    topology: NewTopology,
+    topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
 }
@@ -120,7 +120,7 @@ impl Client {
         options.validate()?;
 
         let inner = Arc::new(ClientInner {
-            topology: NewTopology::new(options.clone())?,
+            topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
         });
