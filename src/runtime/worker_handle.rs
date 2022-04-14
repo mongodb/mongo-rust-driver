@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 
-/// Handle to the worker. Once all handles have been dropped, the worker
-/// will stop waiting for new requests and drop the pool itself.
+/// Handle to a worker. Once all handles have been dropped, the worker
+/// will stop waiting for new requests.
 #[derive(Debug, Clone)]
 pub(crate) struct WorkerHandle {
     _sender: mpsc::Sender<()>,
@@ -29,7 +29,7 @@ impl WorkerHandleListener {
         self.receiver.recv().await;
     }
 
-    /// Constructs a new channel for for monitoring whether this pool still has references
+    /// Constructs a new channel for for monitoring whether this worker still has references
     /// to it.
     pub(crate) fn channel() -> (WorkerHandle, WorkerHandleListener) {
         let (sender, receiver) = mpsc::channel(1);

@@ -352,7 +352,7 @@ impl TopologyWorker {
                                 self.broadcaster.publish_new_state(state);
                                 true
                             }
-                            UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await.unwrap(),
+                            UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await,
                             UpdateMessage::MonitorError { address, error } => {
                                 self.handle_monitor_error(address, error).await
                             }
@@ -442,14 +442,15 @@ impl TopologyWorker {
     }
 
     /// Update the topology using the provided `ServerDescription`.
-    async fn update_server(&mut self, sd: ServerDescription) -> std::result::Result<bool, String> {
+    async fn update_server(&mut self, sd: ServerDescription) -> bool {
         let server_type = sd.server_type;
         let server_address = sd.address.clone();
 
         let mut latest_state = self.borrow_latest_state().clone();
         let old_description = latest_state.description.clone();
 
-        latest_state.description.update(sd)?;
+        // TODO: RUST-1270 change this method to not return a result.
+        let _ = latest_state.description.update(sd);
 
         let hosts = latest_state
             .description
@@ -474,7 +475,7 @@ impl TopologyWorker {
             self.broadcaster.publish_new_state(latest_state)
         }
 
-        Ok(topology_changed)
+        topology_changed
     }
 
     /// Emit the appropriate SDAM monitoring events given the changes to the
@@ -528,7 +529,7 @@ impl TopologyWorker {
     /// Mark the server at the given address as Unknown using the provided error as the cause.
     async fn mark_server_as_unknown(&mut self, address: ServerAddress, error: Error) -> bool {
         let description = ServerDescription::new(address, Some(Err(error.to_string())));
-        self.update_server(description).await.unwrap_or(false)
+        self.update_server(description).await
     }
 
     /// Handle an error that occurred during opreration execution.
@@ -569,14 +570,8 @@ impl TopologyWorker {
         let is_load_balanced =
             self.borrow_latest_state().description.topology_type() == TopologyType::LoadBalanced;
         if error.is_state_change_error() {
-            let updated = is_load_balanced
-                || self
-                    .update_server(ServerDescription::new(
-                        server.address.clone(),
-                        Some(Err(error.to_string())),
-                    ))
-                    .await
-                    .unwrap();
+            let updated =
+                is_load_balanced || self.mark_server_as_unknown(address, error.clone()).await;
 
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
                 server.pool.clear(error, handshake.service_id()).await;

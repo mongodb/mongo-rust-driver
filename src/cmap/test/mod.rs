@@ -153,7 +153,6 @@ impl Executor {
     async fn execute_test(self) {
         let mut subscriber = self.state.handler.subscribe();
 
-        // let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
         let (updater, mut receiver) = TopologyUpdater::channel();
 
         let pool = ConnectionPool::new(
