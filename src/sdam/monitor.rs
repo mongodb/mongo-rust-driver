@@ -213,7 +213,9 @@ impl Monitor {
         F: FnOnce(&Arc<dyn SdamEventHandler>),
     {
         if let Some(ref handler) = self.client_options.sdam_event_handler {
-            emit(handler)
+            if self.topology_watcher.is_alive() {
+                emit(handler)
+            }
         }
     }
 }

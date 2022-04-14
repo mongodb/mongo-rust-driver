@@ -308,7 +308,11 @@ pub async fn run_v2_test(test_file: TestFile) {
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
                             let code_name = error.code_name().unwrap();
-                            assert_eq!(error_code_name, code_name);
+                            assert_eq!(
+                                error_code_name, code_name,
+                                "{}: expected error with codeName {:?}, instead got {:#?}",
+                                test.description, error_code_name, error
+                            );
                         }
                         if let Some(error_code) = operation_error.error_code {
                             let code = error.code().unwrap();
