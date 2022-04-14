@@ -381,6 +381,9 @@ impl TopologyWorker {
                 }
             }
 
+            // indicate to the topology watchers that the topology is no longer alive
+            drop(self.broadcaster);
+
             if let Some(handler) = self.options.sdam_event_handler {
                 handler.handle_topology_closed_event(TopologyClosedEvent {
                     topology_id: self.id,
