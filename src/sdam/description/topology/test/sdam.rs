@@ -603,6 +603,7 @@ async fn heartbeat_events() {
     let mut options = CLIENT_OPTIONS.clone();
     options.hosts.drain(1..);
     options.heartbeat_freq = Some(Duration::from_millis(50));
+    options.app_name = "heartbeat_events".to_string().into();
 
     let event_handler = EventHandler::new();
     let mut subscriber = event_handler.subscribe();
@@ -634,11 +635,14 @@ async fn heartbeat_events() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    if !client.supports_fail_command() {
+    if !client.supports_fail_command_appname() {
         return;
     }
 
-    let options = FailCommandOptions::builder().error_code(1234).build();
+    let options = FailCommandOptions::builder()
+        .error_code(1234)
+        .app_name("heartbeat_events".to_string())
+        .build();
     let failpoint = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(1),
