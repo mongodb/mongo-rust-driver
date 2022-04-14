@@ -164,15 +164,17 @@ pub async fn run_unified_format_test_filtered(
                             expected_value,
                             save_as_entity,
                         } => {
+                            let desc = &test_case.description;
                             let opt_entity = result.unwrap_or_else(|e| {
                                 panic!(
-                                    "{} should succeed, but failed with the following error: {}",
-                                    operation.name, e
+                                    "[{}] {} should succeed, but failed with the following error: \
+                                     {}",
+                                    desc, operation.name, e
                                 )
                             });
                             if expected_value.is_some() || save_as_entity.is_some() {
                                 let entity = opt_entity.unwrap_or_else(|| {
-                                    panic!("{} did not return an entity", operation.name)
+                                    panic!("[{}] {} did not return an entity", desc, operation.name)
                                 });
                                 if let Some(expected_bson) = expected_value {
                                     if let Entity::Bson(actual) = &entity {
@@ -183,15 +185,16 @@ pub async fn run_unified_format_test_filtered(
                                             Some(&test_runner.entities),
                                         ) {
                                             panic!(
-                                                "result mismatch, expected = {:#?}  actual = \
+                                                "[{}] result mismatch, expected = {:#?}  actual = \
                                                  {:#?}\nmismatch detail: {}",
-                                                expected_bson, actual, e
+                                                desc, expected_bson, actual, e
                                             );
                                         }
                                     } else {
                                         panic!(
-                                            "Incorrect entity type returned from {}, expected BSON",
-                                            operation.name
+                                            "[{}] Incorrect entity type returned from {}, \
+                                             expected BSON",
+                                            desc, operation.name
                                         );
                                     }
                                 }
