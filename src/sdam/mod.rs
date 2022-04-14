@@ -3,8 +3,8 @@ mod description;
 mod message_manager;
 mod monitor;
 pub mod public;
+mod server;
 mod srv_polling;
-mod state;
 #[cfg(test)]
 mod test;
 mod topology;
@@ -22,7 +22,7 @@ pub(crate) use self::{
         },
     },
     monitor::{Monitor, MIN_HEARTBEAT_FREQUENCY},
-    state::server::Server,
+    server::Server,
     topology::{
         HandshakePhase,
         Topology,
