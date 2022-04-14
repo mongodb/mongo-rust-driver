@@ -21,9 +21,8 @@ pub(crate) use self::{
             TransactionSupportStatus,
         },
     },
-    message_manager::TopologyMessageManager,
     monitor::{Monitor, MIN_HEARTBEAT_FREQUENCY},
-    state::server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
+    state::server::Server,
     topology::{
         HandshakePhase,
         NewTopology,

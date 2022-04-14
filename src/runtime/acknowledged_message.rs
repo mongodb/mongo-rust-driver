@@ -20,11 +20,6 @@ impl<M, R> AcknowledgedMessage<M, R> {
         )
     }
 
-    /// Borrow the message.
-    pub(crate) fn message(&self) -> &M {
-        &self.message
-    }
-
     /// Send acknowledgement to the receiver.
     #[allow(dead_code)]
     pub(crate) fn acknowledge(self, result: impl Into<R>) {
@@ -33,6 +28,14 @@ impl<M, R> AcknowledgedMessage<M, R> {
 
     pub(crate) fn into_parts(self) -> (M, AcknowledgmentSender<R>) {
         (self.message, self.acknowledger)
+    }
+}
+
+impl<M, R> std::ops::Deref for AcknowledgedMessage<M, R> {
+    type Target = M;
+
+    fn deref(&self) -> &Self::Target {
+        &self.message
     }
 }
 

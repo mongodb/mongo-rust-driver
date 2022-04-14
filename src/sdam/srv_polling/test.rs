@@ -9,7 +9,7 @@ use crate::{
     options::{ClientOptions, ServerAddress},
     runtime,
     sdam::Topology,
-    test::{log_uncaptured, LOCK, CLIENT_OPTIONS},
+    test::{log_uncaptured, CLIENT_OPTIONS, LOCK},
 };
 
 fn localhost_test_build_10gen(port: u16) -> ServerAddress {

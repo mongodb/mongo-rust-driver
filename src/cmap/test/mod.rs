@@ -18,7 +18,7 @@ use crate::{
     options::TlsOptions,
     runtime,
     runtime::AsyncJoinHandle,
-    sdam::{ServerUpdate, ServerUpdateSender, TopologyUpdater, UpdateMessage},
+    sdam::{TopologyUpdater, UpdateMessage},
     test::{
         assert_matches,
         eq_matches,
@@ -168,11 +168,8 @@ impl Executor {
         runtime::execute(async move {
             while let Some(update) = receiver.recv().await {
                 let (update, ack) = update.into_parts();
-                match update {
-                    UpdateMessage::ApplicationError { error, .. } => {
-                        manager.clear(error, None).await;
-                    }
-                    _ => {}
+                if let UpdateMessage::ApplicationError { error, .. } = update {
+                    manager.clear(error, None).await;
                 }
                 ack.acknowledge(true);
             }

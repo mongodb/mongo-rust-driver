@@ -12,7 +12,7 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
-    sdam::{ServerUpdateSender, TopologyUpdater},
+    sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
         log_uncaptured,

@@ -32,8 +32,8 @@ use crate::{
         PoolReadyEvent,
     },
     options::ServerAddress,
-    runtime::{self, WorkerHandle, WorkerHandleListener},
-    sdam::{ServerUpdateSender, TopologyUpdater},
+    runtime::{self, WorkerHandleListener},
+    sdam::TopologyUpdater,
 };
 
 use std::{
@@ -41,7 +41,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
 const MAINTENACE_FREQUENCY: Duration = Duration::from_millis(500);

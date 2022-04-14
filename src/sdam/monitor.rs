@@ -1,15 +1,12 @@
 use std::{
-    sync::{Arc, Weak},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
-use bson::{doc, Document};
+use bson::doc;
 
 use super::{
     description::server::ServerDescription,
-    state::{server::Server, Topology, WeakTopology},
-    ServerUpdate,
-    ServerUpdateReceiver,
     TopologyUpdateRequestReceiver,
     TopologyUpdater,
     TopologyWatcher,
@@ -218,45 +215,5 @@ impl Monitor {
         if let Some(ref handler) = self.client_options.sdam_event_handler {
             emit(handler)
         }
-    }
-}
-
-/// Monitor that listens for updates to a given server generated from operation execution.
-struct UpdateMonitor {
-    server: Weak<Server>,
-    topology: WeakTopology,
-    update_receiver: ServerUpdateReceiver,
-}
-
-impl UpdateMonitor {
-    async fn execute(mut self) {
-        todo!()
-        // // If the pool encounters an error establishing a connection, it will
-        // // notify the update receiver and need to be handled.
-        // while let Some(update) = self.update_receiver.recv().await {
-        //     let topology = match self.topology.upgrade() {
-        //         Some(it) => it,
-        //         _ => return,
-        //     };
-        //     let server = match self.server.upgrade() {
-        //         Some(it) => it,
-        //         _ => return,
-        //     };
-
-        //     // This needs to borrow the message rather than taking it so the update isn't sent
-        //     // until after the topology has processed the error.
-        //     match update.message() {
-        //         ServerUpdate::Error { error } => {
-        //             topology
-        //                 .handle_application_error(
-        //                     error.cause.clone(),
-        //                     error.handshake_phase.clone(),
-        //                     &server,
-        //                 )
-        //                 .await;
-        //         }
-        //     }
-        //     drop(update);
-        // }
     }
 }

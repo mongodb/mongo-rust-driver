@@ -6,7 +6,6 @@ use std::time::Duration;
 use super::{
     description::topology::TopologyType,
     monitor::DEFAULT_HEARTBEAT_FREQUENCY,
-    state::{Topology, WeakTopology},
     TopologyUpdater,
     TopologyWatcher,
 };
@@ -57,18 +56,16 @@ impl SrvPollingMonitor {
         topology_watcher: TopologyWatcher,
         client_options: ClientOptions,
     ) {
-        runtime::execute(async move {
-            if let Some(mut monitor) = Self::new(topology, topology_watcher, client_options) {
-                monitor.execute().await;
-            }
-        });
+        if let Some(monitor) = Self::new(topology, topology_watcher, client_options) {
+            runtime::execute(monitor.execute());
+        }
     }
 
     fn rescan_interval(&self) -> Duration {
         std::cmp::max(self.rescan_interval, MIN_RESCAN_SRV_INTERVAL)
     }
 
-    async fn execute(&mut self) {
+    async fn execute(mut self) {
         fn should_poll(tt: TopologyType) -> bool {
             matches!(tt, TopologyType::Sharded | TopologyType::Unknown)
         }

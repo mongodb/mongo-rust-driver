@@ -34,8 +34,7 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
-    runtime,
-    sdam::{server_selection, NewTopology, SelectedServer, SessionSupportStatus, Topology},
+    sdam::{server_selection, NewTopology, SelectedServer, SessionSupportStatus},
     ClientSession,
 };
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -414,45 +413,6 @@ impl Client {
                 .into());
             }
         }
-
-        // loop {
-        //     let mut topology_change_subscriber =
-        //         self.inner.topology.subscribe_to_topology_changes();
-
-        //     let selected_server = self
-        //         .inner
-        //         .topology
-        //         .attempt_to_select_server(criteria)
-        //         .await?;
-
-        //     if let Some(server) = selected_server {
-        //         return Ok(server);
-        //     }
-
-        //     self.inner.topology.request_topology_check();
-
-        //     // If the time that has passed since the start of the loop is greater than the
-        // timeout,     // then `time_remaining` will be 0, so no change will be found.
-        //     let time_passed = start_time.elapsed();
-        //     let time_remaining = timeout
-        //         .checked_sub(time_passed)
-        //         .unwrap_or_else(|| Duration::from_millis(0));
-
-        //     let change_occurred = topology_change_subscriber
-        //         .wait_for_message(time_remaining)
-        //         .await;
-
-        //     if !change_occurred {
-        //         return Err(ErrorKind::ServerSelection {
-        //             message: self
-        //                 .inner
-        //                 .topology
-        //                 .server_selection_timeout_error_message(criteria)
-        //                 .await,
-        //         }
-        //         .into());
-        //     }
-        // }
     }
 
     #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
@@ -468,8 +428,7 @@ impl Client {
 
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
-        // self.inner.topology.sync_workers().await;
-        // todo!()
+        self.inner.topology.sync_workers().await;
     }
 
     #[cfg(test)]

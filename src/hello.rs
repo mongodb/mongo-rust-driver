@@ -12,7 +12,7 @@ use crate::{
         options::{ServerAddress, ServerApi},
         ClusterTime,
     },
-    cmap::{Command, Connection, RawCommandResponse},
+    cmap::{Command, Connection},
     error::Result,
     event::sdam::{
         SdamEventHandler,

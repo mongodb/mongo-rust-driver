@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
 
-use bson::{Document, RawDocumentBuf};
+use bson::Document;
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
@@ -9,7 +9,7 @@ use super::TestSdamEvent;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
-    cmap::{conn::ConnectionGeneration, PoolGeneration, RawCommandResponse},
+    cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -304,7 +304,7 @@ async fn run_test(test_file: TestFile) {
                 })
             };
 
-            if let Some(server) = servers.get(&address) {
+            if let Some(_server) = servers.get(&address) {
                 match hello_reply {
                     Ok(reply) => {
                         let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));

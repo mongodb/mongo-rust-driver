@@ -3,12 +3,11 @@ use std::sync::{
     Arc,
 };
 
-use super::WeakTopology;
 use crate::{
-    cmap::{options::ConnectionPoolOptions, ConnectionPool, EstablishError},
+    cmap::{options::ConnectionPoolOptions, ConnectionPool},
     options::{ClientOptions, ServerAddress},
-    runtime::{AcknowledgedMessage, HttpClient},
-    sdam::{monitor::Monitor, TopologyUpdater},
+    runtime::HttpClient,
+    sdam::TopologyUpdater,
 };
 
 /// Contains the state for a given server in the topology.
@@ -33,32 +32,7 @@ impl Server {
         }
     }
 
-    /// Create a new reference counted `Server` instance and a `Monitor` for that server.
-    /// The monitor is not started as part of this; call `Monitor::execute` to start it.
-    pub(crate) fn create(
-        address: ServerAddress,
-        options: &ClientOptions,
-        topology: WeakTopology,
-        http_client: HttpClient,
-    ) -> (Arc<Self>, Monitor) {
-        let (_, update_receiver) = ServerUpdateSender::channel();
-        let (update_sender, _) = TopologyUpdater::channel();
-        let server = Arc::new(Self {
-            pool: ConnectionPool::new(
-                address.clone(),
-                http_client,
-                update_sender,
-                Some(ConnectionPoolOptions::from_client_options(options)),
-            ),
-            address: address.clone(),
-            operation_count: AtomicU32::new(0),
-        });
-
-        // let monitor = Monitor::new(address, &server, topology, options.clone(), update_receiver);
-        // (server, monitor)
-        todo!()
-    }
-
+    /// Create a new reference counted `Server`, including its connection pool.
     pub(crate) fn new(
         address: ServerAddress,
         options: ClientOptions,
@@ -72,7 +46,7 @@ impl Server {
                 topology_updater,
                 Some(ConnectionPoolOptions::from_client_options(&options)),
             ),
-            address: address.clone(),
+            address,
             operation_count: AtomicU32::new(0),
         })
     }
@@ -87,52 +61,5 @@ impl Server {
 
     pub(crate) fn operation_count(&self) -> u32 {
         self.operation_count.load(Ordering::SeqCst)
-    }
-}
-
-/// An event that could update the topology's view of a server.
-/// TODO: add success cases from application handshakes.
-#[derive(Debug)]
-pub(crate) enum ServerUpdate {
-    Error { error: EstablishError },
-}
-
-#[derive(Debug)]
-pub(crate) struct ServerUpdateReceiver {
-    receiver: tokio::sync::mpsc::Receiver<AcknowledgedMessage<ServerUpdate>>,
-}
-
-impl ServerUpdateReceiver {
-    pub(crate) async fn recv(&mut self) -> Option<AcknowledgedMessage<ServerUpdate>> {
-        self.receiver.recv().await
-    }
-}
-
-/// Struct used to update the topology's view of a given server.
-#[derive(Clone, Debug)]
-pub(crate) struct ServerUpdateSender {
-    sender: tokio::sync::mpsc::Sender<AcknowledgedMessage<ServerUpdate>>,
-}
-
-impl ServerUpdateSender {
-    /// Create a new sender/receiver pair.
-    pub(crate) fn channel() -> (Self, ServerUpdateReceiver) {
-        let (sender, receiver) = tokio::sync::mpsc::channel(1);
-        (
-            ServerUpdateSender { sender },
-            ServerUpdateReceiver { receiver },
-        )
-    }
-
-    /// Update the server based on the given error.
-    /// This will block until the topology has processed the error.
-    pub(crate) async fn handle_error(&mut self, error: EstablishError) {
-        let reason = ServerUpdate::Error { error };
-
-        let (message, callback) = AcknowledgedMessage::package(reason);
-        // These only fails if the other ends hang up, which means the monitor is
-        // stopped, so we can just discard this update.
-        let _: std::result::Result<_, _> = self.sender.send(message).await;
-        callback.wait_for_acknowledgment().await;
     }
 }

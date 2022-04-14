@@ -1682,7 +1682,9 @@ async fn run_command_examples() -> Result<()> {
 async fn index_examples() -> Result<()> {
     let client = TestClient::new().await;
     let db = client.database("index_examples");
+    println!("dropping");
     db.drop(None).await?;
+    println!("inserting records");
     db.collection::<Document>("records")
         .insert_many(
             vec![
@@ -1703,6 +1705,7 @@ async fn index_examples() -> Result<()> {
             None,
         )
         .await?;
+    println!("inserting restaurants");
     db.collection::<Document>("restaurants")
         .insert_many(
             vec![
@@ -1726,6 +1729,7 @@ async fn index_examples() -> Result<()> {
         )
         .await?;
 
+    println!("creatinging index on records");
     use crate::IndexModel;
     // Start Index Example 1
     db.collection::<Document>("records")
@@ -1736,6 +1740,7 @@ async fn index_examples() -> Result<()> {
         .await?;
     // End Index Example 1
 
+    println!("creatinging index on records 2");
     use crate::options::IndexOptions;
     // Start Index Example 2
     db.collection::<Document>("records")
@@ -1854,5 +1859,5 @@ async fn test() {
     aggregation_examples().await.unwrap();
     run_command_examples().await.unwrap();
     index_examples().await.unwrap();
-    // change_streams_examples().await.unwrap();
+    change_streams_examples().await.unwrap();
 }

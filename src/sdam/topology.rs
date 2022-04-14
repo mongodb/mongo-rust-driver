@@ -5,6 +5,8 @@ use std::{
 };
 
 use bson::oid::ObjectId;
+#[cfg(test)]
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use tokio::sync::{
     broadcast,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -32,12 +34,11 @@ use crate::{
 };
 
 use super::{
-    description::topology::TopologyDescriptionDiff,
+    srv_polling::SrvPollingMonitor,
     Monitor,
     Server,
     ServerDescription,
     SessionSupportStatus,
-    Topology,
     TopologyDescription,
     TransactionSupportStatus,
 };
@@ -47,7 +48,7 @@ pub(crate) struct NewTopology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
     update_requester: UpdateRequester,
-    worker_handle: WorkerHandle,
+    _worker_handle: WorkerHandle,
 }
 
 impl NewTopology {
@@ -56,7 +57,7 @@ impl NewTopology {
         let description = TopologyDescription::new(options.clone())?;
         let is_load_balanced = options.load_balanced == Some(true);
 
-        let (update_requester, update_request_receiver) = UpdateRequester::channel();
+        let update_requester = UpdateRequester::new();
         let (updater, update_receiver) = TopologyUpdater::channel();
         let (worker_handle, handle_listener) = WorkerHandleListener::channel();
 
@@ -102,6 +103,8 @@ impl NewTopology {
                     options.clone(),
                 );
             }
+
+            SrvPollingMonitor::start(updater.clone(), watcher.clone(), options.clone());
         }
 
         let worker = TopologyWorker {
@@ -112,7 +115,6 @@ impl NewTopology {
             http_client,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
-            update_request_receiver,
             update_requester: update_requester.clone(),
             handle_listener,
         };
@@ -175,10 +177,11 @@ impl NewTopology {
             watcher,
             updater,
             update_requester,
-            worker_handle,
+            _worker_handle: worker_handle,
         })
     }
 
+    /// Begin watching for changes in the topology.
     pub(crate) fn watch(&self) -> TopologyWatcher {
         let mut watcher = self.watcher.clone();
         // mark the latest topology as seen
@@ -191,10 +194,12 @@ impl NewTopology {
         self.updater.clone()
     }
 
+    /// Request that all server monitors perform an immediate check of the topology.
     pub(crate) fn request_update(&self) {
         self.update_requester.request()
     }
 
+    /// Handle an error that occurred during operation execution.
     pub(crate) async fn handle_application_error(
         &self,
         address: ServerAddress,
@@ -206,6 +211,7 @@ impl NewTopology {
             .await;
     }
 
+    /// Get the topology's currently highest seen cluster time.
     pub(crate) fn cluster_time(&self) -> Option<ClusterTime> {
         self.watcher
             .borrow_latest()
@@ -214,10 +220,18 @@ impl NewTopology {
             .cloned()
     }
 
+    /// Update the topology's highest seen cluster time.
+    /// If the provided cluster time is not higher than the topology's currently highest seen
+    /// cluster time, this method has no effect.
+    pub(crate) async fn advance_cluster_time(&self, to: ClusterTime) {
+        self.updater.advance_cluster_time(to).await;
+    }
+
     pub(crate) fn topology_type(&self) -> TopologyType {
         self.watcher.borrow_latest().description.topology_type
     }
 
+    /// Gets the latest information on whether sessions are supported or not.
     pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
         self.watcher
             .borrow_latest()
@@ -225,15 +239,12 @@ impl NewTopology {
             .session_support_status()
     }
 
+    /// Gets the latest information on whether transactions are support or not.
     pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
         self.watcher
             .borrow_latest()
             .description
             .transaction_support_status()
-    }
-
-    pub(crate) async fn advance_cluster_time(&self, to: ClusterTime) {
-        self.updater.advance_cluster_time(to).await;
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
@@ -281,6 +292,11 @@ impl NewTopology {
     pub(crate) fn description(&self) -> TopologyDescription {
         self.watcher.borrow_latest().description.clone()
     }
+
+    #[cfg(test)]
+    pub(crate) async fn sync_workers(&self) {
+        self.updater.sync_workers().await;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -292,7 +308,7 @@ pub(crate) struct TopologyState {
 #[derive(Debug)]
 pub(crate) enum UpdateMessage {
     AdvanceClusterTime(ClusterTime),
-    ServerUpdate(ServerDescription),
+    ServerUpdate(Box<ServerDescription>),
     SyncHosts(HashSet<ServerAddress>),
     MonitorError {
         address: ServerAddress,
@@ -303,6 +319,8 @@ pub(crate) enum UpdateMessage {
         error: Error,
         phase: HandshakePhase,
     },
+    #[cfg(test)]
+    SyncWorkers,
 }
 
 struct TopologyWorker {
@@ -310,13 +328,13 @@ struct TopologyWorker {
     update_receiver: TopologyUpdateReceiver,
     handle_listener: WorkerHandleListener,
     broadcaster: TopologyBroadcaster,
-    update_requester: UpdateRequester,
     options: ClientOptions,
     http_client: HttpClient,
 
+    // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
     topology_updater: TopologyUpdater,
-    update_request_receiver: TopologyUpdateRequestReceiver,
+    update_requester: UpdateRequester,
 }
 
 impl TopologyWorker {
@@ -337,7 +355,7 @@ impl TopologyWorker {
                                 self.broadcaster.publish_new_state(state);
                                 true
                             }
-                            UpdateMessage::ServerUpdate(sd) => self.update_server(sd).await.unwrap(),
+                            UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await.unwrap(),
                             UpdateMessage::MonitorError { address, error } => {
                                 self.handle_monitor_error(address, error).await
                             }
@@ -346,6 +364,18 @@ impl TopologyWorker {
                                 error,
                                 phase,
                             } => self.handle_application_error(address, error, phase).await,
+                            #[cfg(test)]
+                            UpdateMessage::SyncWorkers => {
+                                let rxen: FuturesUnordered<_> = self
+                                    .broadcaster
+                                    .borrow_latest()
+                                    .servers
+                                    .values()
+                                    .map(|v| v.pool.sync_worker())
+                                    .collect();
+                                let _: Vec<_> = rxen.collect().await;
+                                false
+                            }
                         };
                         ack.acknowledge(changed);
                     },
@@ -371,6 +401,7 @@ impl TopologyWorker {
 
     fn sync_hosts(&self, state: &mut TopologyState, hosts: HashSet<ServerAddress>) {
         state.servers.retain(|host, _| hosts.contains(host));
+        state.description.sync_hosts(&hosts);
 
         for address in hosts {
             if state.servers.contains_key(&address) {
@@ -617,9 +648,7 @@ impl TopologyWorker {
                 }
                 updated
             }
-            None => {
-                false
-            }
+            None => false,
         }
     }
 
@@ -660,11 +689,6 @@ impl TopologyUpdater {
     }
 
     pub(crate) async fn handle_monitor_error(&self, address: ServerAddress, error: Error) -> bool {
-        // let (message, receiver) =
-
-        // let _: std::result::Result<_, _> = self
-        //     .sender
-        //     .send(UpdateMessage::MonitorError { address, error });
         self.send_message(UpdateMessage::MonitorError { address, error })
             .await
     }
@@ -684,7 +708,8 @@ impl TopologyUpdater {
     }
 
     pub(crate) async fn update(&self, sd: ServerDescription) -> bool {
-        self.send_message(UpdateMessage::ServerUpdate(sd)).await
+        self.send_message(UpdateMessage::ServerUpdate(Box::new(sd)))
+            .await
     }
 
     pub(crate) async fn advance_cluster_time(&self, to: ClusterTime) {
@@ -694,6 +719,11 @@ impl TopologyUpdater {
 
     pub(crate) async fn sync_hosts(&self, hosts: HashSet<ServerAddress>) {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn sync_workers(&self) {
+        self.send_message(UpdateMessage::SyncWorkers).await;
     }
 }
 
@@ -777,12 +807,9 @@ struct UpdateRequester {
 }
 
 impl UpdateRequester {
-    fn channel() -> (UpdateRequester, TopologyUpdateRequestReceiver) {
-        let (tx, rx) = broadcast::channel(1);
-        (
-            UpdateRequester { sender: tx },
-            TopologyUpdateRequestReceiver { receiver: rx },
-        )
+    fn new() -> UpdateRequester {
+        let (tx, _rx) = broadcast::channel(1);
+        UpdateRequester { sender: tx }
     }
 
     fn request(&self) {
