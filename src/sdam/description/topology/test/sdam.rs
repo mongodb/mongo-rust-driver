@@ -271,7 +271,6 @@ async fn run_test(test_file: TestFile) {
     options.sdam_event_handler = Some(handler.clone());
     options.test_options_mut().disable_monitoring_threads = true;
 
-    let mut event_subscriber = handler.subscribe();
     let topology = Topology::new(options.clone()).unwrap();
     let mut servers = topology.servers();
 
@@ -366,26 +365,19 @@ async fn run_test(test_file: TestFile) {
                 );
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
-                let actual = event_subscriber
-                    .collect_events(Duration::from_millis(500), |e| matches!(e, Event::Sdam(_)))
-                    .await
-                    .into_iter()
-                    .map(|e| e.unwrap_sdam_event());
-
+                let actual = handler.get_all_sdam_events();
                 assert_eq!(
                     actual.len(),
                     expected.len(),
-                    "{}: {}: event list length mismatch:\n actual: {:#?}, expected: {:#?}",
-                    test_description,
-                    phase_description,
+                    "event list length mismatch:\n actual: {:#?}, expected: {:#?}",
                     actual,
                     expected
                 );
-                for (actual, expected) in actual.zip(expected.into_iter()) {
+                for (actual, expected) in actual.iter().zip(expected.iter()) {
                     assert_eq!(
                         actual, expected,
-                        "{}: {}: SDAM events do not match:\n actual: {:#?}, expected: {:#?}",
-                        test_description, phase_description, actual, expected
+                        "SDAM events do not match:\n actual: {:#?}, expected: {:#?}",
+                        actual, expected
                     );
                 }
             }
@@ -593,16 +585,12 @@ async fn topology_closed_event_last() {
         .expect("should see topology closed event");
 
     // no further SDAM events should be emitted after the TopologyClosedEvent
-    let event = subscriber
+    assert!(subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Sdam(_))
         })
-        .await;
-    assert!(
-        event.is_none(),
-        "expected no more SDAM events, got {:#?}",
-        event
-    );
+        .await
+        .is_none());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
