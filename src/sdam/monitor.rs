@@ -1,12 +1,10 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use bson::doc;
 
 use super::{
     description::server::ServerDescription,
+    topology::SdamEventEmitter,
     TopologyCheckRequestReceiver,
     TopologyUpdater,
     TopologyWatcher,
@@ -15,7 +13,7 @@ use crate::{
     cmap::{Connection, Handshaker},
     error::{Error, Result},
     event::sdam::{
-        SdamEventHandler,
+        SdamEvent,
         ServerHeartbeatFailedEvent,
         ServerHeartbeatStartedEvent,
         ServerHeartbeatSucceededEvent,
@@ -36,6 +34,7 @@ pub(crate) struct Monitor {
     handshaker: Handshaker,
     topology_updater: TopologyUpdater,
     topology_watcher: TopologyWatcher,
+    sdam_event_emitter: Option<SdamEventEmitter>,
     update_request_receiver: TopologyCheckRequestReceiver,
     client_options: ClientOptions,
 }
@@ -45,6 +44,7 @@ impl Monitor {
         address: ServerAddress,
         topology_updater: TopologyUpdater,
         topology_watcher: TopologyWatcher,
+        sdam_event_emitter: Option<SdamEventEmitter>,
         update_request_receiver: TopologyCheckRequestReceiver,
         client_options: ClientOptions,
     ) {
@@ -55,6 +55,7 @@ impl Monitor {
             handshaker,
             topology_updater,
             topology_watcher,
+            sdam_event_emitter,
             update_request_receiver,
             connection: None,
         };
@@ -124,11 +125,10 @@ impl Monitor {
     }
 
     async fn perform_hello(&mut self) -> Result<HelloReply> {
-        self.emit_event(|handler| {
-            let event = ServerHeartbeatStartedEvent {
+        self.emit_event(|| {
+            SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
-            };
-            handler.handle_server_heartbeat_started_event(event);
+            })
         });
 
         let (duration, result) = match self.connection {
@@ -170,7 +170,7 @@ impl Monitor {
 
         match result {
             Ok(ref r) => {
-                self.emit_event(|handler| {
+                self.emit_event(|| {
                     let mut reply = r
                         .raw_command_response
                         .to_document()
@@ -178,23 +178,21 @@ impl Monitor {
                     // if this hello call is part of a handshake, remove speculative authentication
                     // information before publishing an event
                     reply.remove("speculativeAuthenticate");
-                    let event = ServerHeartbeatSucceededEvent {
+                    SdamEvent::ServerHeartbeatSucceeded(ServerHeartbeatSucceededEvent {
                         duration,
                         reply,
                         server_address: self.address.clone(),
-                    };
-                    handler.handle_server_heartbeat_succeeded_event(event);
+                    })
                 });
             }
             Err(ref e) => {
                 self.connection.take();
-                self.emit_event(|handler| {
-                    let event = ServerHeartbeatFailedEvent {
+                self.emit_event(|| {
+                    SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
                         duration,
                         failure: e.clone(),
                         server_address: self.address.clone(),
-                    };
-                    handler.handle_server_heartbeat_failed_event(event);
+                    })
                 });
             }
         }
@@ -208,14 +206,12 @@ impl Monitor {
             .await
     }
 
-    fn emit_event<F>(&self, emit: F)
+    fn emit_event<F>(&self, event: F)
     where
-        F: FnOnce(&Arc<dyn SdamEventHandler>),
+        F: FnOnce() -> SdamEvent,
     {
-        if let Some(ref handler) = self.client_options.sdam_event_handler {
-            if self.topology_watcher.is_alive() {
-                emit(handler)
-            }
+        if let Some(ref emitter) = self.sdam_event_emitter {
+            emitter.emit(event())
         }
     }
 }
