@@ -10,6 +10,7 @@ edition = "2018"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
 categories = ["asynchronous", "database", "web-programming"]
 repository = "https://github.com/mongodb/mongo-rust-driver"
+homepage = "https://www.mongodb.com/docs/drivers/rust/"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
