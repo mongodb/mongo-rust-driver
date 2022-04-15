@@ -9,7 +9,7 @@ use bson::oid::ObjectId;
 use futures_util::stream::{FuturesUnordered, StreamExt};
 use tokio::sync::{
     broadcast,
-    mpsc::{UnboundedReceiver, UnboundedSender},
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
 };
 
@@ -18,6 +18,8 @@ use crate::{
     cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
     error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
+        handle_sdam_event,
+        SdamEvent,
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
         ServerOpeningEvent,
@@ -60,6 +62,24 @@ impl Topology {
         let is_load_balanced = options.load_balanced == Some(true);
 
         let update_requester = TopologyCheckRequester::new();
+        let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
+            let (tx, mut rx) = mpsc::unbounded_channel::<SdamEvent>();
+
+            let handler = handler.clone();
+            runtime::execute(async move {
+                while let Some(event) = rx.recv().await {
+                    let is_closed = matches!(event, SdamEvent::TopologyClosed(_));
+                    handle_sdam_event(handler.as_ref(), event);
+
+                    // no more events should be emitted after a TopologyClosedEvent
+                    if is_closed {
+                        break;
+                    };
+                }
+            });
+            SdamEventEmitter { sender: tx }
+        });
+
         let (updater, update_receiver) = TopologyUpdater::channel();
         let (worker_handle, handle_listener) = WorkerHandleListener::channel();
 
@@ -101,6 +121,7 @@ impl Topology {
                     address.clone(),
                     updater.clone(),
                     watcher.clone(),
+                    event_emitter.clone(),
                     update_requester.subscribe(),
                     options.clone(),
                 );
@@ -119,14 +140,15 @@ impl Topology {
             topology_updater: updater.clone(),
             update_requester: update_requester.clone(),
             handle_listener,
+            event_emitter,
         };
 
         // Emit events for the initialization of the topology and the seed list.
-        if let Some(ref handler) = worker.options.sdam_event_handler {
-            let event = TopologyOpeningEvent {
+        if let Some(ref emitter) = worker.event_emitter {
+            let event = SdamEvent::TopologyOpening(TopologyOpeningEvent {
                 topology_id: worker.id,
-            };
-            handler.handle_topology_opening_event(event);
+            });
+            emitter.emit(event);
 
             let new_description = worker.borrow_latest_state().description.clone().into();
             let event = TopologyDescriptionChangedEvent {
@@ -134,14 +156,14 @@ impl Topology {
                 previous_description: TopologyDescription::new_empty().into(),
                 new_description,
             };
-            handler.handle_topology_description_changed_event(event);
+            emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
 
             for server_address in worker.options.hosts.iter() {
-                let event = ServerOpeningEvent {
+                let event = SdamEvent::ServerOpening(ServerOpeningEvent {
                     topology_id: worker.id,
                     address: server_address.clone(),
-                };
-                handler.handle_server_opening_event(event);
+                });
+                emitter.emit(event);
             }
         }
 
@@ -325,6 +347,7 @@ struct TopologyWorker {
     update_receiver: TopologyUpdateReceiver,
     handle_listener: WorkerHandleListener,
     broadcaster: TopologyBroadcaster,
+    event_emitter: Option<SdamEventEmitter>,
     options: ClientOptions,
     http_client: HttpClient,
 
@@ -384,10 +407,10 @@ impl TopologyWorker {
             // indicate to the topology watchers that the topology is no longer alive
             drop(self.broadcaster);
 
-            if let Some(handler) = self.options.sdam_event_handler {
-                handler.handle_topology_closed_event(TopologyClosedEvent {
+            if let Some(emitter) = self.event_emitter {
+                emitter.emit(SdamEvent::TopologyClosed(TopologyClosedEvent {
                     topology_id: self.id,
-                });
+                }));
             }
         });
     }
@@ -437,6 +460,7 @@ impl TopologyWorker {
                     address,
                     self.topology_updater.clone(),
                     self.topology_watcher.clone(),
+                    self.event_emitter.clone(),
                     self.update_requester.subscribe(),
                     self.options.clone(),
                 );
@@ -474,7 +498,6 @@ impl TopologyWorker {
                     s.pool.mark_as_ready().await;
                 }
             }
-            // println!("broadcasting new state {:#?}", latest_state);
             self.broadcaster.publish_new_state(latest_state)
         }
 
@@ -490,7 +513,7 @@ impl TopologyWorker {
     ) -> bool {
         let diff = old_description.diff(new_description);
         let changed = diff.is_some();
-        if let Some(ref handler) = self.options.sdam_event_handler {
+        if let Some(ref emitter) = self.event_emitter {
             if let Some(diff) = diff {
                 for (address, (previous_description, new_description)) in diff.changed_servers {
                     let event = ServerDescriptionChangedEvent {
@@ -499,15 +522,15 @@ impl TopologyWorker {
                         previous_description: ServerInfo::new_owned(previous_description.clone()),
                         new_description: ServerInfo::new_owned(new_description.clone()),
                     };
-                    handler.handle_server_description_changed_event(event);
+                    emitter.emit(SdamEvent::ServerDescriptionChanged(Box::new(event)));
                 }
 
                 for address in diff.removed_addresses {
-                    let event = ServerClosedEvent {
+                    let event = SdamEvent::ServerClosed(ServerClosedEvent {
                         address: address.clone(),
                         topology_id: self.id,
-                    };
-                    handler.handle_server_closed_event(event);
+                    });
+                    emitter.emit(event);
                 }
 
                 for address in diff.added_addresses {
@@ -515,7 +538,7 @@ impl TopologyWorker {
                         address: address.clone(),
                         topology_id: self.id,
                     };
-                    handler.handle_server_opening_event(event);
+                    emitter.emit(SdamEvent::ServerOpening(event));
                 }
 
                 let event = TopologyDescriptionChangedEvent {
@@ -523,7 +546,7 @@ impl TopologyWorker {
                     previous_description: old_description.clone().into(),
                     new_description: new_description.clone().into(),
                 };
-                handler.handle_topology_description_changed_event(event);
+                emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
             }
         }
         changed
@@ -827,6 +850,23 @@ impl TopologyCheckRequestReceiver {
     /// return immediately.
     pub(crate) fn clear_check_requests(&mut self) {
         let _: std::result::Result<_, _> = self.receiver.try_recv();
+    }
+}
+
+/// Handle used to emit SDAM events.
+///
+/// If the topology has been closed, events emitted via this handle will not be sent to
+/// handlers.
+#[derive(Clone)]
+pub(crate) struct SdamEventEmitter {
+    sender: UnboundedSender<SdamEvent>,
+}
+
+impl SdamEventEmitter {
+    pub(crate) fn emit(&self, event: impl Into<SdamEvent>) {
+        // if event handler has stopped listening, no more events should be emitted,
+        // so we can safely ignore any send errors here.
+        let _ = self.sender.send(event.into());
     }
 }
 

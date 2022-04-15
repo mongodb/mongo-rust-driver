@@ -62,6 +62,16 @@ pub enum Event {
     Sdam(SdamEvent),
 }
 
+impl Event {
+    pub fn unwrap_sdam_event(self) -> SdamEvent {
+        if let Event::Sdam(e) = self {
+            e
+        } else {
+            panic!("expected SDAM event, instead got {:#?}", self)
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum SdamEvent {
     ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
@@ -210,10 +220,6 @@ impl EventHandler {
                 events
             }
         }
-    }
-
-    pub fn get_all_sdam_events(&self) -> Vec<SdamEvent> {
-        self.sdam_events.write().unwrap().drain(..).collect()
     }
 
     pub fn connections_checked_out(&self) -> u32 {
@@ -388,7 +394,7 @@ pub struct EventSubscriber<'a> {
     receiver: tokio::sync::broadcast::Receiver<Event>,
 }
 
-impl EventSubscriber<'_> {
+impl<'a> EventSubscriber<'a> {
     pub async fn wait_for_event<F>(&mut self, timeout: Duration, filter: F) -> Option<Event>
     where
         F: Fn(&Event) -> bool,
@@ -407,6 +413,17 @@ impl EventSubscriber<'_> {
         .await
         .ok()
         .flatten()
+    }
+
+    pub async fn collect_events<F>(&mut self, timeout: Duration, filter: F) -> Vec<Event>
+    where
+        F: Fn(&Event) -> bool,
+    {
+        let mut events = Vec::new();
+        while let Some(event) = self.wait_for_event(timeout, &filter).await {
+            events.push(event);
+        }
+        events
     }
 }
 
