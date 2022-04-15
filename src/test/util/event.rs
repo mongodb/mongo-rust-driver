@@ -1,16 +1,9 @@
 use std::{
     collections::VecDeque,
-    pin::Pin,
     sync::{Arc, Mutex, RwLock},
-    task::{
-        self,
-        Poll::{self, Pending},
-    },
     time::Duration,
 };
 
-use futures::FutureExt;
-use futures_util::Stream;
 use tokio::sync::{
     broadcast::error::{RecvError, SendError},
     RwLockReadGuard,
