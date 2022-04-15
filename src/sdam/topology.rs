@@ -105,7 +105,7 @@ impl Topology {
 
         let addresses = state.servers.keys().cloned().collect::<Vec<_>>();
 
-        let (watcher, broadcaster) = TopologyWatcher::channel(state);
+        let (watcher, publisher) = TopologyWatcher::channel(state);
 
         #[cfg(test)]
         let disable_monitoring_threads = options
@@ -133,7 +133,7 @@ impl Topology {
         let worker = TopologyWorker {
             id: ObjectId::new(),
             update_receiver,
-            broadcaster,
+            publisher,
             options,
             http_client,
             topology_watcher: watcher.clone(),
@@ -187,7 +187,7 @@ impl Topology {
             }
 
             worker.process_topology_diff(&old_description, &new_state.description);
-            worker.broadcaster.publish_new_state(new_state);
+            worker.publisher.publish_new_state(new_state);
         }
 
         worker.start();
@@ -346,7 +346,7 @@ struct TopologyWorker {
     id: ObjectId,
     update_receiver: TopologyUpdateReceiver,
     handle_listener: WorkerHandleListener,
-    broadcaster: TopologyBroadcaster,
+    publisher: TopologyPublisher,
     event_emitter: Option<SdamEventEmitter>,
     options: ClientOptions,
     http_client: HttpClient,
@@ -372,7 +372,7 @@ impl TopologyWorker {
                             UpdateMessage::SyncHosts(hosts) => {
                                 let mut state = self.borrow_latest_state().clone();
                                 self.sync_hosts(&mut state, hosts);
-                                self.broadcaster.publish_new_state(state);
+                                self.publisher.publish_new_state(state);
                                 true
                             }
                             UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await,
@@ -405,7 +405,7 @@ impl TopologyWorker {
             }
 
             // indicate to the topology watchers that the topology is no longer alive
-            drop(self.broadcaster);
+            drop(self.publisher);
 
             if let Some(emitter) = self.event_emitter {
                 emitter.emit(SdamEvent::TopologyClosed(TopologyClosedEvent {
@@ -426,7 +426,7 @@ impl TopologyWorker {
     fn advance_cluster_time(&mut self, to: ClusterTime) {
         let mut latest_state = self.borrow_latest_state().clone();
         latest_state.description.advance_cluster_time(&to);
-        self.broadcaster.publish_new_state(latest_state);
+        self.publisher.publish_new_state(latest_state);
     }
 
     fn sync_hosts(&self, state: &mut TopologyState, hosts: HashSet<ServerAddress>) {
@@ -498,7 +498,7 @@ impl TopologyWorker {
                     s.pool.mark_as_ready().await;
                 }
             }
-            self.broadcaster.publish_new_state(latest_state)
+            self.publisher.publish_new_state(latest_state)
         }
 
         topology_changed
@@ -743,11 +743,11 @@ pub(crate) struct TopologyWatcher {
 }
 
 impl TopologyWatcher {
-    fn channel(initial_state: TopologyState) -> (TopologyWatcher, TopologyBroadcaster) {
+    fn channel(initial_state: TopologyState) -> (TopologyWatcher, TopologyPublisher) {
         let (tx, rx) = watch::channel(initial_state);
         let watcher = TopologyWatcher { receiver: rx };
-        let broadcaster = TopologyBroadcaster { state_sender: tx };
-        (watcher, broadcaster)
+        let publisher = TopologyPublisher { state_sender: tx };
+        (watcher, publisher)
     }
 
     /// Whether the topology is still active or if all `Client` instances using it have gone
@@ -796,11 +796,11 @@ impl TopologyWatcher {
 }
 
 /// Struct used to broadcsat the latest view of the topology.
-struct TopologyBroadcaster {
+struct TopologyPublisher {
     state_sender: watch::Sender<TopologyState>,
 }
 
-impl TopologyBroadcaster {
+impl TopologyPublisher {
     /// Publish a new state, notifying all the of the outstanding `TopologyWatcher`s.
     ///
     /// Note that even if the provided state is equivalent to the previously broadcasted
