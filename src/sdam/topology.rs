@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    future::Future,
     sync::Arc,
     time::Duration,
 };
@@ -7,6 +8,7 @@ use std::{
 use bson::oid::ObjectId;
 #[cfg(test)]
 use futures_util::stream::{FuturesUnordered, StreamExt};
+use futures_util::FutureExt;
 use tokio::sync::{
     broadcast,
     mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -152,7 +154,7 @@ impl Topology {
             let event = SdamEvent::TopologyOpening(TopologyOpeningEvent {
                 topology_id: worker.id,
             });
-            emitter.emit(event);
+            let _ = emitter.emit(event);
 
             let new_description = worker.borrow_latest_state().description.clone().into();
             let event = TopologyDescriptionChangedEvent {
@@ -160,14 +162,14 @@ impl Topology {
                 previous_description: TopologyDescription::new_empty().into(),
                 new_description,
             };
-            emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
+            let _ = emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
 
             for server_address in worker.options.hosts.iter() {
                 let event = SdamEvent::ServerOpening(ServerOpeningEvent {
                     topology_id: worker.id,
                     address: server_address.clone(),
                 });
-                emitter.emit(event);
+                let _ = emitter.emit(event);
             }
         }
 
@@ -528,7 +530,7 @@ impl TopologyWorker {
                         previous_description: ServerInfo::new_owned(previous_description.clone()),
                         new_description: ServerInfo::new_owned(new_description.clone()),
                     };
-                    emitter.emit(SdamEvent::ServerDescriptionChanged(Box::new(event)));
+                    let _ = emitter.emit(SdamEvent::ServerDescriptionChanged(Box::new(event)));
                 }
 
                 for address in diff.removed_addresses {
@@ -536,7 +538,7 @@ impl TopologyWorker {
                         address: address.clone(),
                         topology_id: self.id,
                     });
-                    emitter.emit(event);
+                    let _ = emitter.emit(event);
                 }
 
                 for address in diff.added_addresses {
@@ -544,7 +546,7 @@ impl TopologyWorker {
                         address: address.clone(),
                         topology_id: self.id,
                     };
-                    emitter.emit(SdamEvent::ServerOpening(event));
+                    let _ = emitter.emit(SdamEvent::ServerOpening(event));
                 }
 
                 let event = TopologyDescriptionChangedEvent {
@@ -552,7 +554,7 @@ impl TopologyWorker {
                     previous_description: old_description.clone().into(),
                     new_description: new_description.clone().into(),
                 };
-                emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
+                let _ = emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
             }
         }
         changed
@@ -869,13 +871,17 @@ pub(crate) struct SdamEventEmitter {
 }
 
 impl SdamEventEmitter {
-    pub(crate) async fn emit(&self, event: impl Into<SdamEvent>) {
+    /// Emit an SDAM event.
+    ///
+    /// This method returns a future that can be awaited until the event has been actually emitted.
+    /// It is not necessary to await this future.
+    pub(crate) fn emit(&self, event: impl Into<SdamEvent>) -> impl Future<Output = ()> {
         let (msg, ack) = AcknowledgedMessage::package(event.into());
         // if event handler has stopped listening, no more events should be emitted,
         // so we can safely ignore any send errors here.
         let _ = self.sender.send(msg);
 
-        ack.wait_for_acknowledgment().await;
+        ack.wait_for_acknowledgment().map(|_| ())
     }
 }
 
