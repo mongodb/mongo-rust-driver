@@ -53,7 +53,7 @@ use super::{
 pub(crate) struct Topology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
-    update_requester: TopologyCheckRequester,
+    check_requester: TopologyCheckRequester,
     _worker_handle: WorkerHandle,
 }
 
@@ -201,7 +201,7 @@ impl Topology {
         Ok(Topology {
             watcher,
             updater,
-            update_requester,
+            check_requester: update_requester,
             _worker_handle: worker_handle,
         })
     }
@@ -221,7 +221,7 @@ impl Topology {
 
     /// Request that all server monitors perform an immediate check of the topology.
     pub(crate) fn request_update(&self) {
-        self.update_requester.request()
+        self.check_requester.request()
     }
 
     /// Handle an error that occurred during operation execution.
