@@ -63,13 +63,17 @@ impl Topology {
 
         let update_requester = TopologyCheckRequester::new();
         let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
-            let (tx, mut rx) = mpsc::unbounded_channel::<SdamEvent>();
+            let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
 
             let handler = handler.clone();
             runtime::execute(async move {
                 while let Some(event) = rx.recv().await {
+                    let (event, ack) = event.into_parts();
+
                     let is_closed = matches!(event, SdamEvent::TopologyClosed(_));
                     handle_sdam_event(handler.as_ref(), event);
+
+                    ack.acknowledge(());
 
                     // no more events should be emitted after a TopologyClosedEvent
                     if is_closed {
@@ -408,9 +412,11 @@ impl TopologyWorker {
             drop(self.publisher);
 
             if let Some(emitter) = self.event_emitter {
-                emitter.emit(SdamEvent::TopologyClosed(TopologyClosedEvent {
-                    topology_id: self.id,
-                }));
+                emitter
+                    .emit(SdamEvent::TopologyClosed(TopologyClosedEvent {
+                        topology_id: self.id,
+                    }))
+                    .await;
             }
         });
     }
@@ -859,14 +865,17 @@ impl TopologyCheckRequestReceiver {
 /// handlers.
 #[derive(Clone)]
 pub(crate) struct SdamEventEmitter {
-    sender: UnboundedSender<SdamEvent>,
+    sender: UnboundedSender<AcknowledgedMessage<SdamEvent>>,
 }
 
 impl SdamEventEmitter {
-    pub(crate) fn emit(&self, event: impl Into<SdamEvent>) {
+    pub(crate) async fn emit(&self, event: impl Into<SdamEvent>) {
+        let (msg, ack) = AcknowledgedMessage::package(event.into());
         // if event handler has stopped listening, no more events should be emitted,
         // so we can safely ignore any send errors here.
-        let _ = self.sender.send(event.into());
+        let _ = self.sender.send(msg);
+
+        ack.wait_for_acknowledgment().await;
     }
 }
 

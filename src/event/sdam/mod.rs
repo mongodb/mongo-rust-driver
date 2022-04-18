@@ -134,10 +134,15 @@ pub struct ServerHeartbeatFailedEvent {
 
 #[derive(Clone, Debug)]
 pub(crate) enum SdamEvent {
+    #[allow(dead_code)]
     ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
+    #[allow(dead_code)]
     ServerOpening(ServerOpeningEvent),
+    #[allow(dead_code)]
     ServerClosed(ServerClosedEvent),
+    #[allow(dead_code)]
     TopologyDescriptionChanged(Box<TopologyDescriptionChangedEvent>),
+    #[allow(dead_code)]
     TopologyOpening(TopologyOpeningEvent),
     TopologyClosed(TopologyClosedEvent),
     ServerHeartbeatStarted(ServerHeartbeatStartedEvent),

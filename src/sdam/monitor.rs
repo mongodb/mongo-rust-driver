@@ -129,7 +129,8 @@ impl Monitor {
             SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
             })
-        });
+        })
+        .await;
 
         let (duration, result) = match self.connection {
             Some(ref mut conn) => {
@@ -183,7 +184,8 @@ impl Monitor {
                         reply,
                         server_address: self.address.clone(),
                     })
-                });
+                })
+                .await;
             }
             Err(ref e) => {
                 self.connection.take();
@@ -193,7 +195,8 @@ impl Monitor {
                         failure: e.clone(),
                         server_address: self.address.clone(),
                     })
-                });
+                })
+                .await;
             }
         }
 
@@ -206,12 +209,12 @@ impl Monitor {
             .await
     }
 
-    fn emit_event<F>(&self, event: F)
+    async fn emit_event<F>(&self, event: F)
     where
         F: FnOnce() -> SdamEvent,
     {
         if let Some(ref emitter) = self.sdam_event_emitter {
-            emitter.emit(event())
+            emitter.emit(event()).await
         }
     }
 }
