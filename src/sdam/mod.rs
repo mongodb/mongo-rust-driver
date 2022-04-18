@@ -1,6 +1,4 @@
 mod description;
-#[allow(dead_code)]
-mod message_manager;
 mod monitor;
 pub mod public;
 mod server;
