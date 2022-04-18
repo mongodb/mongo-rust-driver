@@ -526,6 +526,14 @@ pub struct ClientOptions {
     /// By default, TLS is disabled.
     #[builder(default)]
     pub tls: Option<Tls>,
+    
+    /// The maximum number of bytes that the driver should include in a tracing event
+    /// or log message's extended JSON string representation of a document.
+    /// 
+    /// The default value is 1000.
+    #[cfg(feature = "tracing-unstable")]
+    #[builder(default)]
+    pub tracing_max_document_length_bytes: Option<usize>,
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
@@ -867,6 +875,8 @@ impl From<ClientOptionsParser> for ClientOptions {
             server_api: None,
             load_balanced: parser.load_balanced,
             sdam_event_handler: None,
+            #[cfg(feature = "tracing-unstable")]
+            tracing_max_document_length_bytes: None,
             #[cfg(test)]
             test_options: None,
         }

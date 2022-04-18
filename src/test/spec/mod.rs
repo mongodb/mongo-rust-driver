@@ -9,6 +9,8 @@ mod crud_v1;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
+#[cfg(feature = "tracing-unstable")]
+mod trace;
 mod ocsp;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod read_write_concern;

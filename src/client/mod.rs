@@ -23,7 +23,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
-    event::command::CommandEventHandler,
+    event::command::{CommandEvent, handle_command_event},
     operation::{AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
@@ -128,9 +128,27 @@ impl Client {
         Ok(Self { inner })
     }
 
-    pub(crate) fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
-        if let Some(ref handler) = self.inner.options.command_event_handler {
-            emit(handler);
+    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        #[cfg(feature = "tracing-unstable")]
+        let should_emit =  self.inner.options.command_event_handler.is_some() || tracing::enabled!(tracing::Level::DEBUG);
+        #[cfg(not(feature = "tracing-unstable"))]
+        let should_emit =  self.inner.options.command_event_handler.is_some();
+
+        // TODO: this is probably not ideal because we always clone the event, even if we aren't actually going to use it twice...
+        // any nice way to solve that?
+        if should_emit {
+            let event = generate_event();
+            if let Some(ref handler) = self.inner.options.command_event_handler {
+                handle_command_event(handler.as_ref(), event.clone());
+            }
+            
+            #[cfg(feature = "tracing-unstable")]
+            if tracing::enabled!(tracing::Level::DEBUG) {
+                let tracing_emitter = crate::trace::CommandTracingEventEmitter::new(
+                    self.inner.options.tracing_max_document_length_bytes
+                );
+                handle_command_event(&tracing_emitter, event.clone());
+            }
         }
     }
 

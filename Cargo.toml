@@ -46,6 +46,10 @@ bson-uuid-0_8 = ["bson/uuid-0_8"]
 # This can only be used with the tokio-runtime feature flag.
 aws-auth = ["reqwest"]
 
+# Enables support for emitting tracing events.
+# TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
+tracing-unstable = ["tracing", "log"]
+
 zstd-compression = ["zstd"]
 zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
@@ -65,6 +69,7 @@ futures-executor = "0.3.14"
 hex = "0.4.0"
 hmac = "0.12.1"
 lazy_static = "1.4.0"
+log = { version = "0.4.16", optional = true }
 md-5 = "0.10.1"
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
@@ -83,6 +88,7 @@ strsim = "0.10.0"
 take_mut = "0.2.2"
 thiserror = "1.0.24"
 tokio-openssl = { version = "0.6.3", optional = true }
+tracing = { version = "0.1.34", optional = true, features = ["log"] }
 trust-dns-proto = "0.21.1"
 trust-dns-resolver = "0.21.1"
 typed-builder = "0.10.0"
