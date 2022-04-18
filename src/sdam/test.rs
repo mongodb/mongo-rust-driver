@@ -353,7 +353,12 @@ async fn auth_error() {
     let events = subscriber
         .collect_events(Duration::from_secs(1), |event| match event {
             Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) => {
-                event.new_description.description.server_type == ServerType::Unknown
+                event
+                    .previous_description
+                    .description
+                    .server_type
+                    .is_available()
+                    && event.new_description.description.server_type == ServerType::Unknown
             }
             Event::Cmap(CmapEvent::PoolCleared(_)) => true,
             _ => false,
