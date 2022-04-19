@@ -2,7 +2,7 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/configure-rust.sh
 
 FEATURES=""
 

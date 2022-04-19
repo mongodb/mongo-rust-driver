@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/configure-rust.sh
 rustup update $RUST_VERSION
 
 if [ "$ASYNC_RUNTIME" = "tokio" ]; then

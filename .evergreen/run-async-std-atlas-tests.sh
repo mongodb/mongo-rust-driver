@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/configure-rust.sh
 RUST_BACKTRACE=1 cargo test atlas_connectivity --no-default-features --features async-std-runtime
 

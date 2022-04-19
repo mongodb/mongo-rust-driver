@@ -252,6 +252,7 @@ functions:
     - command: shell.exec
       type: test
       params:
+        shell: bash
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
@@ -265,7 +266,7 @@ functions:
 
           # compile mini test project
           cd $PROJECT_DIRECTORY/.evergreen/aws-ecs-test
-          . ~/.cargo/env
+          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
           cargo build
           cd -
 
@@ -431,6 +432,7 @@ functions:
           export MONGO_ATLAS_TLS11_URI_SRV='${MONGO_ATLAS_TLS11_URI_SRV}'
           export MONGO_ATLAS_TLS12_URI='${MONGO_ATLAS_TLS12_URI}'
           export MONGO_ATLAS_TLS12_URI_SRV='${MONGO_ATLAS_TLS12_URI_SRV}'
+          export PROJECT_DIRECTORY='${PROJECT_DIRECTORY}'
           ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-atlas-tests.sh
 
   "run ocsp test":
@@ -617,7 +619,6 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
-          rm -rf ~/.rustup
           rm -rf $DRIVERS_TOOLS || true
 
   "fix absolute paths":

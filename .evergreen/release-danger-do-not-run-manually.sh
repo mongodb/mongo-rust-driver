@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢ ☠ ☢
 # # Danger!
 #
@@ -24,6 +26,6 @@ fi
 git fetch origin tag $TAG --no-tags
 git checkout $TAG
 
-. ~/.cargo/env
+source ./.evergreen/configure-rust.sh
 
 cargo publish --token $TOKEN
