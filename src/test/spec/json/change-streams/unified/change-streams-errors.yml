@@ -1,5 +1,5 @@
-description: "change-streams errors"
-schemaVersion: "1.0"
+description: "change-streams-errors"
+schemaVersion: "1.7"
 createEntities:
   - client:
       id: &client0 client0
@@ -18,14 +18,6 @@ createEntities:
       database: *database0
       collectionName: *collection0
   - database:
-      id: &database1 database1
-      client: *client0
-      databaseName: *database1
-  - collection:
-      id: &collection1 collection1
-      database: *database1
-      collectionName: *collection1
-  - database:
       id: &globalDatabase0 globalDatabase0
       client: *globalClient
       databaseName: *database0
@@ -33,59 +25,31 @@ createEntities:
       id: &globalCollection0 globalCollection0
       database: *globalDatabase0
       collectionName: *collection0
-  - database:
-      id: &globalDatabase1 globalDatabase1
-      client: *globalClient
-      databaseName: *database1
-  - collection:
-      id: &globalCollection1 globalCollection1
-      database: *globalDatabase1
-      collectionName: *collection1
-  # Some tests run operations against db1.coll0 or db0.coll1
-  - collection:
-      id: &globalDb1Collection0 globalDb1Collection0
-      database: *globalDatabase1
-      collectionName: *collection0
-  - collection:
-      id: &globalDb0Collection1 globalDb0Collection1
-      database: *globalDatabase0
-      collectionName: *collection1
 
-initialData:
-  - collectionName: *collection0
-    databaseName: *database0
-    documents: []
 tests:
   - description: "The watch helper must not throw a custom exception when executed against a single server topology, but instead depend on a server error"
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - single
+      - minServerVersion: "3.6.0"
+        topologies: [ single ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
-        expectError:
-          errorCode: 40573
+        arguments: { pipeline: [] }
+        expectError: { errorCode: 40573 }
+
   - description: Change Stream should error when an invalid aggregation stage is passed in
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.6.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
         arguments:
-          pipeline:
-            - $unsupported: foo
-          options: {}
-        expectError:
-          errorCode: 40324
+          pipeline: [ { $unsupported: foo } ]
+        expectError: { errorCode: 40324 }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
@@ -96,64 +60,51 @@ tests:
                   - $unsupported: foo
               commandName: aggregate
               databaseName: *database0
+
   - description: Change Stream should error when _id is projected out
     runOnRequirements:
-      - minServerVersion: 4.1.11
-        topologies:
-          - replicaset
-          - sharded
-          - load-balanced
+      - minServerVersion: "4.1.11"
+        topologies: [ replicaset, sharded-replicaset, load-balanced ]
     operations:
       - name: createChangeStream
         object: *collection0
         arguments:
           pipeline:
-            - $project:
-                _id: 0
-          options: {}
+            - $project: { _id: 0 }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            z: 3
+          document: { z: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
-        expectError:
-          errorCode: 280
+        expectError: { errorCode: 280 }
+
   - description: change stream errors on ElectionInProgress
     runOnRequirements:
       - minServerVersion: "4.2"
-        topologies:
-          - replicaset
-          - sharded
-          - load-balanced
+        topologies: [ replicaset, sharded-replicaset, load-balanced ]
     operations:
       - name: failPoint
         object: testRunner
         arguments:
-          client: globalClient
+          client: *globalClient
           failPoint:
             configureFailPoint: failCommand
-            mode:
-              times: 1
+            mode: { times: 1 }
             data:
-              failCommands:
-                - getMore
+              failCommands: [ getMore ]
               errorCode: 216
               closeConnection: false
       - name: createChangeStream
         object: *collection0
         arguments:
           pipeline: []
-          options: {}
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            z: 3
+          document: { z: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
-        expectError:
-          errorCode: 216
+        expectError: { errorCode: 216 }

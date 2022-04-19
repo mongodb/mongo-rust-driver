@@ -103,9 +103,9 @@ Spec Test Runner
 Before running the tests
 
 - Create a MongoClient ``globalClient``, and connect to the server.
-When executing tests against a sharded cluster, ``globalClient`` must only connect to one mongos. This is because tests
-that set failpoints will only work consistently if both the ``configureFailPoint`` and failing commands are sent to the
-same mongos.
+  When executing tests against a sharded cluster, ``globalClient`` must only connect to one mongos. This is because tests
+  that set failpoints will only work consistently if both the ``configureFailPoint`` and failing commands are sent to the
+  same mongos.
 
 For each YAML file, for each element in ``tests``:
 

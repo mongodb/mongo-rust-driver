@@ -1,6 +1,16 @@
 {
-  "description": "change-streams errors",
-  "schemaVersion": "1.0",
+  "description": "change-streams-resume-errorlabels",
+  "schemaVersion": "1.7",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "4.3.1",
+      "topologies": [
+        "replicaset",
+        "sharded-replicaset",
+        "load-balanced"
+      ]
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -36,20 +46,6 @@
     },
     {
       "database": {
-        "id": "database1",
-        "client": "client0",
-        "databaseName": "database1"
-      }
-    },
-    {
-      "collection": {
-        "id": "collection1",
-        "database": "database1",
-        "collectionName": "collection1"
-      }
-    },
-    {
-      "database": {
         "id": "globalDatabase0",
         "client": "globalClient",
         "databaseName": "database0"
@@ -61,56 +57,11 @@
         "database": "globalDatabase0",
         "collectionName": "collection0"
       }
-    },
-    {
-      "database": {
-        "id": "globalDatabase1",
-        "client": "globalClient",
-        "databaseName": "database1"
-      }
-    },
-    {
-      "collection": {
-        "id": "globalCollection1",
-        "database": "globalDatabase1",
-        "collectionName": "collection1"
-      }
-    },
-    {
-      "collection": {
-        "id": "globalDb1Collection0",
-        "database": "globalDatabase1",
-        "collectionName": "collection0"
-      }
-    },
-    {
-      "collection": {
-        "id": "globalDb0Collection1",
-        "database": "globalDatabase0",
-        "collectionName": "collection1"
-      }
-    }
-  ],
-  "initialData": [
-    {
-      "collectionName": "collection0",
-      "databaseName": "database0",
-      "documents": []
     }
   ],
   "tests": [
     {
       "description": "change stream resumes after HostUnreachable",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -133,8 +84,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -163,9 +113,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -176,7 +124,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -232,16 +180,6 @@
     },
     {
       "description": "change stream resumes after HostNotFound",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -264,8 +202,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -294,9 +231,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -307,7 +242,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -363,16 +298,6 @@
     },
     {
       "description": "change stream resumes after NetworkTimeout",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -395,8 +320,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -425,9 +349,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -438,7 +360,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -493,16 +415,6 @@
     },
     {
       "description": "change stream resumes after ShutdownInProgress",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -525,8 +437,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -555,9 +466,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -568,7 +477,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -624,16 +533,6 @@
     },
     {
       "description": "change stream resumes after PrimarySteppedDown",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -656,8 +555,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -686,9 +584,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -699,7 +595,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -755,16 +651,6 @@
     },
     {
       "description": "change stream resumes after ExceededTimeLimit",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -787,8 +673,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -817,9 +702,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -830,7 +713,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -886,16 +769,6 @@
     },
     {
       "description": "change stream resumes after SocketException",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -918,8 +791,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -948,9 +820,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -961,7 +831,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1017,16 +887,6 @@
     },
     {
       "description": "change stream resumes after NotWritablePrimary",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1049,8 +909,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1079,9 +938,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1092,7 +949,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1148,16 +1005,6 @@
     },
     {
       "description": "change stream resumes after InterruptedAtShutdown",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1180,8 +1027,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1210,9 +1056,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1223,7 +1067,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1279,16 +1123,6 @@
     },
     {
       "description": "change stream resumes after InterruptedDueToReplStateChange",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1311,8 +1145,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1341,9 +1174,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1354,7 +1185,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1410,16 +1241,6 @@
     },
     {
       "description": "change stream resumes after NotPrimaryNoSecondaryOk",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1442,8 +1263,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1472,9 +1292,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1485,7 +1303,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1541,16 +1359,6 @@
     },
     {
       "description": "change stream resumes after NotPrimaryOrSecondary",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1573,8 +1381,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1603,9 +1410,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1616,7 +1421,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1672,16 +1477,6 @@
     },
     {
       "description": "change stream resumes after StaleShardVersion",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1704,8 +1499,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1734,9 +1528,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1747,7 +1539,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1803,16 +1595,6 @@
     },
     {
       "description": "change stream resumes after StaleEpoch",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1835,8 +1617,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1865,9 +1646,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1878,7 +1657,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1934,16 +1713,6 @@
     },
     {
       "description": "change stream resumes after RetryChangeStream",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -1966,8 +1735,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1996,9 +1764,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -2009,7 +1775,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -2065,16 +1831,6 @@
     },
     {
       "description": "change stream resumes after FailedToSatisfyReadPreference",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -2097,8 +1853,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -2127,9 +1882,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -2140,7 +1893,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -2196,16 +1949,6 @@
     },
     {
       "description": "change stream resumes if error contains ResumableChangeStreamError",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -2234,8 +1977,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -2264,9 +2006,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -2277,7 +2017,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -2333,16 +2073,6 @@
     },
     {
       "description": "change stream does not resume if error does not contain ResumableChangeStreamError",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.3.1",
-          "topologies": [
-            "replicaset",
-            "sharded",
-            "load-balanced"
-          ]
-        }
-      ],
       "operations": [
         {
           "name": "failPoint",
@@ -2368,8 +2098,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
