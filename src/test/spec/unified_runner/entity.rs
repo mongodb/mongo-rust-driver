@@ -7,7 +7,7 @@ use tokio::sync::{oneshot, Mutex};
 
 use crate::{
     bson::{Bson, Document},
-    change_stream::{event::ChangeStreamEvent, ChangeStream},
+    change_stream::ChangeStream,
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
     test::{
@@ -63,7 +63,7 @@ pub enum TestCursor {
         session_id: String,
     },
     // `ChangeStream` has the same issue with 59245 as `Cursor`.
-    ChangeStream(Mutex<ChangeStream<ChangeStreamEvent<Document>>>),
+    ChangeStream(Mutex<ChangeStream<Document>>),
     Closed,
 }
 

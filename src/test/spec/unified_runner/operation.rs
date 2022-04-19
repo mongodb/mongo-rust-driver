@@ -1876,7 +1876,7 @@ impl TestOperation for CreateChangeStream {
                 _ => panic!("Invalid entity for createChangeStream"),
             };
             Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(
-                stream,
+                stream.with_type::<Document>(),
             )))))
         }
         .boxed()
