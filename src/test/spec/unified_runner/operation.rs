@@ -1849,6 +1849,7 @@ impl TestOperation for AssertNumberConnectionsCheckedOut {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CreateChangeStream {
     pipeline: Vec<Document>,
+    #[serde(flatten)]
     options: Option<ChangeStreamOptions>,
 }
 
