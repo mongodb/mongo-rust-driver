@@ -1,6 +1,6 @@
 {
   "description": "change-streams",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.7",
   "runOnRequirements": [
     {
       "minServerVersion": "3.6",
@@ -112,10 +112,7 @@
       "description": "Test array truncation",
       "runOnRequirements": [
         {
-          "minServerVersion": "4.7",
-          "topologies": [
-            "replicaset"
-          ]
+          "minServerVersion": "4.7"
         }
       ],
       "operations": [
@@ -463,8 +460,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -493,9 +489,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -506,7 +500,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -542,8 +536,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -572,9 +565,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -598,8 +589,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -640,9 +630,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -653,7 +641,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -695,8 +683,7 @@
                   "fullDocument.z": 3
                 }
               }
-            ],
-            "options": {}
+            ]
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -728,9 +715,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -741,7 +726,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -754,9 +739,7 @@
                     },
                     {
                       "$match": {
-                        "fullDocument.z": {
-                          "$numberInt": "3"
-                        }
+                        "fullDocument.z": 3
                       }
                     }
                   ]
@@ -784,8 +767,7 @@
           "name": "createChangeStream",
           "object": "database0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -826,9 +808,7 @@
               "coll": "collection1"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -845,9 +825,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -858,14 +836,12 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
                 "command": {
-                  "aggregate": {
-                    "$numberInt": "1"
-                  },
+                  "aggregate": 1,
                   "cursor": {},
                   "pipeline": [
                     {
@@ -896,8 +872,7 @@
           "name": "createChangeStream",
           "object": "client0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -938,9 +913,7 @@
               "coll": "collection1"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -957,9 +930,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "y": {
-                "$numberInt": "2"
-              },
+              "y": 2,
               "_id": {
                 "$$exists": true
               }
@@ -976,9 +947,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -989,14 +958,12 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
                 "command": {
-                  "aggregate": {
-                    "$numberInt": "1"
-                  },
+                  "aggregate": 1,
                   "cursor": {},
                   "pipeline": [
                     {
@@ -1029,8 +996,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1088,9 +1054,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1108,9 +1072,7 @@
             },
             "updateDescription": {
               "updatedFields": {
-                "x": {
-                  "$numberInt": "2"
-                }
+                "x": 2
               },
               "removedFields": [],
               "truncatedArrays": {
@@ -1131,9 +1093,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "3"
-              },
+              "x": 3,
               "_id": {
                 "$$exists": true
               }
@@ -1155,7 +1115,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1191,8 +1151,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1236,7 +1195,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1272,8 +1231,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1306,7 +1264,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1362,9 +1320,7 @@
           "object": "collection0",
           "arguments": {
             "pipeline": [],
-            "options": {
-              "batchSize": 1
-            }
+            "batchSize": 1
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1405,9 +1361,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1424,9 +1378,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "2"
-              },
+              "x": 2,
               "_id": {
                 "$$exists": true
               }
@@ -1443,9 +1395,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "3"
-              },
+              "x": 3,
               "_id": {
                 "$$exists": true
               }
@@ -1456,7 +1406,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {

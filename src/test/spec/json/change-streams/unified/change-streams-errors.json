@@ -1,6 +1,6 @@
 {
-  "description": "change-streams errors",
-  "schemaVersion": "1.0",
+  "description": "change-streams-errors",
+  "schemaVersion": "1.7",
   "createEntities": [
     {
       "client": {
@@ -36,20 +36,6 @@
     },
     {
       "database": {
-        "id": "database1",
-        "client": "client0",
-        "databaseName": "database1"
-      }
-    },
-    {
-      "collection": {
-        "id": "collection1",
-        "database": "database1",
-        "collectionName": "collection1"
-      }
-    },
-    {
-      "database": {
         "id": "globalDatabase0",
         "client": "globalClient",
         "databaseName": "database0"
@@ -60,34 +46,6 @@
         "id": "globalCollection0",
         "database": "globalDatabase0",
         "collectionName": "collection0"
-      }
-    },
-    {
-      "database": {
-        "id": "globalDatabase1",
-        "client": "globalClient",
-        "databaseName": "database1"
-      }
-    },
-    {
-      "collection": {
-        "id": "globalCollection1",
-        "database": "globalDatabase1",
-        "collectionName": "collection1"
-      }
-    },
-    {
-      "collection": {
-        "id": "globalDb1Collection0",
-        "database": "globalDatabase1",
-        "collectionName": "collection0"
-      }
-    },
-    {
-      "collection": {
-        "id": "globalDb0Collection1",
-        "database": "globalDatabase0",
-        "collectionName": "collection1"
       }
     }
   ],
@@ -114,8 +72,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "expectError": {
             "errorCode": 40573
@@ -142,8 +99,7 @@
               {
                 "$unsupported": "foo"
               }
-            ],
-            "options": {}
+            ]
           },
           "expectError": {
             "errorCode": 40324
@@ -153,7 +109,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -184,7 +140,7 @@
           "minServerVersion": "4.1.11",
           "topologies": [
             "replicaset",
-            "sharded",
+            "sharded-replicaset",
             "load-balanced"
           ]
         }
@@ -200,8 +156,7 @@
                   "_id": 0
                 }
               }
-            ],
-            "options": {}
+            ]
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -230,7 +185,7 @@
           "minServerVersion": "4.2",
           "topologies": [
             "replicaset",
-            "sharded",
+            "sharded-replicaset",
             "load-balanced"
           ]
         }
@@ -260,8 +215,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },

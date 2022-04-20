@@ -1,5 +1,5 @@
 description: "change-streams"
-schemaVersion: "1.0"
+schemaVersion: "1.7"
 runOnRequirements:
   - minServerVersion: "3.6"
     topologies: [ replicaset, sharded-replicaset ]
@@ -58,11 +58,11 @@ initialData:
   - collectionName: *collection0
     databaseName: *database0
     documents: []
+
 tests:
   - description: "Test array truncation"
     runOnRequirements:
       - minServerVersion: "4.7"
-        topologies: [replicaset]
     operations:
       - name: insertOne
         object: *collection0
@@ -74,8 +74,7 @@ tests:
           }
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: updateOne
         object: *collection0
@@ -238,109 +237,88 @@ tests:
 
   - description: $changeStream must be the first stage in a change stream pipeline sent to the server
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.6.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            x: 1
+          document: { x: 1 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
-          _id:
-            $$exists: true
-          documentKey:
-            $$exists: true
+          _id: { $$exists: true }
+          documentKey: { $$exists: true }
           operationType: insert
           ns:
             db: *database0
             coll: *collection0
           fullDocument:
-            x:
-              $numberInt: "1"
-            _id:
-              $$exists: true
+            x: 1
+            _id: { $$exists: true }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
                 aggregate: *collection0
                 cursor: {}
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
+
   - description: The server returns change stream responses in the specified server response format
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.6.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            x: 1
+          document: { x: 1 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
-          _id:
-            $$exists: true
-          documentKey:
-            $$exists: true
+          _id: { $$exists: true }
+          documentKey: { $$exists: true }
           operationType: insert
           ns:
             db: *database0
             coll: *collection0
           fullDocument:
-            x:
-              $numberInt: "1"
-            _id:
-              $$exists: true
+            x: 1
+            _id: { $$exists: true }
+
   - description: Executing a watch helper on a Collection results in notifications for changes to the specified collection
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.6.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalDb0Collection1
         arguments:
-          document:
-            x: 1
+          document: { x: 1 }
       - name: insertOne
         object: *globalDb1Collection0
         arguments:
-          document:
-            y: 2
+          document: { y: 2 }
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            z: 3
+          document: { z: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -349,27 +327,24 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            z:
-              $numberInt: "3"
-            _id:
-              $$exists: true
+            z: 3
+            _id: { $$exists: true }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
                 aggregate: *collection0
                 cursor: {}
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
+
   - description: Change Stream should allow valid aggregate pipeline stages
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.6.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
@@ -377,18 +352,15 @@ tests:
           pipeline:
             - $match:
                 fullDocument.z: 3
-          options: {}
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            y: 2
+          document: { y: 2 }
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            z: 3
+          document: { z: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -397,13 +369,11 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            z:
-              $numberInt: "3"
-            _id:
-              $$exists: true
+            z: 3
+            _id: { $$exists: true }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
@@ -412,37 +382,31 @@ tests:
                 pipeline:
                   - $changeStream: {}
                   - $match:
-                      fullDocument.z:
-                        $numberInt: "3"
+                      fullDocument.z: 3
               commandName: aggregate
               databaseName: *database0
+
   - description: Executing a watch helper on a Database results in notifications for changes to all collections in the specified database.
     runOnRequirements:
-      - minServerVersion: 3.8.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.8.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *database0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalDb0Collection1
         arguments:
-          document:
-            x: 1
+          document: { x: 1 }
       - name: insertOne
         object: *globalDb1Collection0
         arguments:
-          document:
-            y: 2
+          document: { y: 2 }
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            z: 3
+          document: { z: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -451,10 +415,8 @@ tests:
             db: *database0
             coll: *collection1
           fullDocument:
-            x:
-              $numberInt: "1"
-            _id:
-              $$exists: true
+            x: 1
+            _id: { $$exists: true }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -463,50 +425,41 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            z:
-              $numberInt: "3"
-            _id:
-              $$exists: true
+            z: 3
+            _id: { $$exists: true }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
-                aggregate:
-                  $numberInt: "1"
+                aggregate: 1
                 cursor: {}
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
+
   - description: Executing a watch helper on a MongoClient results in notifications for changes to all collections in all databases in the cluster.
     runOnRequirements:
-      - minServerVersion: 3.8.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.8.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *client0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalDb0Collection1
         arguments:
-          document:
-            x: 1
+          document: { x: 1 }
       - name: insertOne
         object: *globalDb1Collection0
         arguments:
-          document:
-            y: 2
+          document: { y: 2 }
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            z: 3
+          document: { z: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -515,10 +468,8 @@ tests:
             db: *database0
             coll: *collection1
           fullDocument:
-            x:
-              $numberInt: "1"
-            _id:
-              $$exists: true
+            x: 1
+            _id: { $$exists: true }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -527,10 +478,8 @@ tests:
             db: *database1
             coll: *collection0
           fullDocument:
-            y:
-              $numberInt: "2"
-            _id:
-              $$exists: true
+            y: 2
+            _id: { $$exists: true }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -539,61 +488,49 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            z:
-              $numberInt: "3"
-            _id:
-              $$exists: true
+            z: 3
+            _id: { $$exists: true }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
-                aggregate:
-                  $numberInt: "1"
+                aggregate: 1
                 cursor: {}
                 pipeline:
-                  - $changeStream:
-                      allChangesForCluster: true
+                  - $changeStream: { allChangesForCluster: true }
               commandName: aggregate
               databaseName: admin
+
   - description: "Test insert, update, replace, and delete event types"
     runOnRequirements:
-      - minServerVersion: 3.6.0
-        topologies:
-          - replicaset
+      - minServerVersion: "3.6.0"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
-            x: 1
+          document: { x: 1 }
       - name: updateOne
         object: *globalCollection0
         arguments:
-          filter:
-            x: 1
+          filter: { x: 1 }
           update:
-            $set:
-              x: 2
+            $set: { x: 2 }
       - name: replaceOne
         object: *globalCollection0
         arguments:
-          filter:
-            x: 2
-          replacement:
-            x: 3
+          filter: { x: 2 }
+          replacement: { x: 3 }
       - name: deleteOne
         object: *globalCollection0
         arguments:
-          filter:
-            x: 3
+          filter: { x: 3 }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -602,10 +539,8 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            x:
-              $numberInt: "1"
-            _id:
-              $$exists: true
+            x: 1
+            _id: { $$exists: true }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -614,14 +549,9 @@ tests:
             db: *database0
             coll: *collection0
           updateDescription:
-            updatedFields:
-              x:
-                $numberInt: "2"
+            updatedFields: { x: 2 }
             removedFields: []
-            truncatedArrays:
-              $$unsetOrMatches:
-                $$exists:
-                  true
+            truncatedArrays: { $$unsetOrMatches: { $$exists: true } }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -630,10 +560,8 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            x:
-              $numberInt: "3"
-            _id:
-              $$exists: true
+            x: 3
+            _id: { $$exists: true }
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:
@@ -643,27 +571,24 @@ tests:
             coll: *collection0
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
                 aggregate: *collection0
                 cursor: {}
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
+
   - description: Test rename and invalidate event types
     runOnRequirements:
-      - minServerVersion: 4.0.1
-        topologies:
-          - replicaset
+      - minServerVersion: "4.0.1"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: dropCollection
         object: *database0
@@ -689,27 +614,24 @@ tests:
           operationType: invalidate
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
                 aggregate: *collection0
                 cursor: {}
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
+
   - description: Test drop and invalidate event types
     runOnRequirements:
-      - minServerVersion: 4.0.1
-        topologies:
-          - replicaset
+      - minServerVersion: "4.0.1"
+        topologies: [ replicaset ]
     operations:
       - name: createChangeStream
         object: *collection0
-        arguments:
-          pipeline: []
-          options: {}
+        arguments: { pipeline: [] }
         saveResultAsEntity: &changeStream0 changeStream0
       - name: dropCollection
         object: *database0
@@ -728,102 +650,90 @@ tests:
           operationType: invalidate
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
                 aggregate: *collection0
                 cursor: {}
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
+
+  # Test that resume logic works correctly even after consecutive retryable failures of a getMore command,
+  # with no intervening events.  This is ensured by setting the batch size of the change stream to 1,
   - description: Test consecutive resume
     runOnRequirements:
-      - minServerVersion: 4.1.7
-        topologies:
-          - replicaset
+      - minServerVersion: "4.1.7"
+        topologies: [ replicaset ]
     operations:
       - name: failPoint
         object: testRunner
         arguments:
-          client: globalClient
+          client: *globalClient
           failPoint:
             configureFailPoint: failCommand
-            mode:
-              times: 2
+            mode: { times: 2 }
             data:
-              failCommands:
-                - getMore
+              failCommands: [ getMore ]
               closeConnection: true
       - name: createChangeStream
         object: *collection0
         arguments:
           pipeline: []
-          options:
-            batchSize: 1
+          batchSize: 1
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document:
+          document: { x: 1 }
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document: { x: 2 }
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document: { x: 3 }
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
             x: 1
-      - name: insertOne
-        object: *globalCollection0
-        arguments:
-          document:
+            _id: { $$exists: true }
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
             x: 2
-      - name: insertOne
-        object: *globalCollection0
-        arguments:
-          document:
+            _id: { $$exists: true }
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
             x: 3
-      - name: iterateUntilDocumentOrError
-        object: *changeStream0
-        expectResult:
-          operationType: insert
-          ns:
-            db: *database0
-            coll: *collection0
-          fullDocument:
-            x:
-              $numberInt: "1"
-            _id:
-              $$exists: true
-      - name: iterateUntilDocumentOrError
-        object: *changeStream0
-        expectResult:
-          operationType: insert
-          ns:
-            db: *database0
-            coll: *collection0
-          fullDocument:
-            x:
-              $numberInt: "2"
-            _id:
-              $$exists: true
-      - name: iterateUntilDocumentOrError
-        object: *changeStream0
-        expectResult:
-          operationType: insert
-          ns:
-            db: *database0
-            coll: *collection0
-          fullDocument:
-            x:
-              $numberInt: "3"
-            _id:
-              $$exists: true
+            _id: { $$exists: true }
     expectEvents:
       - client: *client0
-        eventMatch: prefix
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               command:
                 aggregate: *collection0
                 cursor:
                   batchSize: 1
-                pipeline:
-                  - $changeStream: {}
+                pipeline: [ { $changeStream: {} } ]
               commandName: aggregate
               databaseName: *database0
