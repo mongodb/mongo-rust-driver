@@ -240,6 +240,11 @@ impl TestClient {
         version.matches(&self.server_version)
     }
 
+    pub fn supports_fail_command_appname(&self) -> bool {
+        let version = VersionReq::parse(">= 4.2.9").unwrap();
+        version.matches(&self.server_version)
+    }
+
     pub fn supports_transactions(&self) -> bool {
         self.is_replica_set() && self.server_version_gte(4, 0)
             || self.is_sharded() && self.server_version_gte(4, 2)
