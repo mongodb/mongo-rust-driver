@@ -239,7 +239,7 @@ impl Topology {
     /// Get the topology's currently highest seen cluster time.
     pub(crate) fn cluster_time(&self) -> Option<ClusterTime> {
         self.watcher
-            .borrow_latest()
+            .peek_latest()
             .description
             .cluster_time()
             .cloned()
@@ -253,13 +253,13 @@ impl Topology {
     }
 
     pub(crate) fn topology_type(&self) -> TopologyType {
-        self.watcher.borrow_latest().description.topology_type
+        self.watcher.peek_latest().description.topology_type
     }
 
     /// Gets the latest information on whether sessions are supported or not.
     pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
         self.watcher
-            .borrow_latest()
+            .peek_latest()
             .description
             .session_support_status()
     }
@@ -267,7 +267,7 @@ impl Topology {
     /// Gets the latest information on whether transactions are support or not.
     pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
         self.watcher
-            .borrow_latest()
+            .peek_latest()
             .description
             .transaction_support_status()
     }
@@ -280,7 +280,7 @@ impl Topology {
         criteria: Option<&SelectionCriteria>,
     ) {
         self.watcher
-            .borrow_latest()
+            .peek_latest()
             .description
             .update_command_with_read_pref(server_address, command, criteria)
     }
@@ -291,7 +291,7 @@ impl Topology {
         criteria: &SelectionCriteria,
     ) -> String {
         self.watcher
-            .borrow_latest()
+            .peek_latest()
             .description
             .server_selection_timeout_error_message(criteria)
     }
@@ -300,7 +300,7 @@ impl Topology {
     #[cfg(test)]
     pub(crate) fn server_addresses(&self) -> HashSet<ServerAddress> {
         self.watcher
-            .borrow_latest()
+            .peek_latest()
             .servers
             .keys()
             .cloned()
@@ -310,12 +310,12 @@ impl Topology {
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn servers(&self) -> HashMap<ServerAddress, Arc<Server>> {
-        self.watcher.borrow_latest().servers.clone()
+        self.watcher.peek_latest().servers.clone()
     }
 
     #[cfg(test)]
     pub(crate) fn description(&self) -> TopologyDescription {
-        self.watcher.borrow_latest().description.clone()
+        self.watcher.peek_latest().description.clone()
     }
 
     #[cfg(test)]
@@ -428,7 +428,7 @@ impl TopologyWorker {
     /// Note that this holds a read lock, so broadcasting a new state while an
     /// outstanding reference to the `TopologyState` is held will deadlock.
     fn borrow_latest_state(&self) -> Ref<TopologyState> {
-        self.topology_watcher.borrow_latest()
+        self.topology_watcher.peek_latest()
     }
 
     fn advance_cluster_time(&mut self, to: ClusterTime) {
@@ -774,7 +774,7 @@ impl TopologyWatcher {
     }
 
     /// Clone the latest state, marking it as seen.
-    pub(crate) fn clone_latest(&mut self) -> TopologyState {
+    pub(crate) fn observe_latest(&mut self) -> TopologyState {
         self.receiver.borrow_and_update().clone()
     }
 
@@ -793,13 +793,14 @@ impl TopologyWatcher {
     /// Borrow the latest state. This does not mark it as seen.
     ///
     /// Note: this method holds a read lock on the state, so it is best if the borrow is
-    /// short-lived. For longer use-cases, use `clone_latest` instead.
-    pub(crate) fn borrow_latest(&self) -> Ref<TopologyState> {
+    /// short-lived. For longer use-cases, clone the `TopologyState` or use `observe_latest`
+    /// instead.
+    pub(crate) fn peek_latest(&self) -> Ref<TopologyState> {
         self.receiver.borrow()
     }
 
     pub(crate) fn topology_type(&self) -> TopologyType {
-        self.borrow_latest().description.topology_type
+        self.peek_latest().description.topology_type
     }
 }
 
