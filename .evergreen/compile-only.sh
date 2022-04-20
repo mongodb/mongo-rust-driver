@@ -2,7 +2,7 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 rustup update $RUST_VERSION
 
 if [ "$ASYNC_RUNTIME" = "tokio" ]; then

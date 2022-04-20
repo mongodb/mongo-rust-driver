@@ -24,6 +24,6 @@ fi
 git fetch origin tag $TAG --no-tags
 git checkout $TAG
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 
 cargo publish --token $TOKEN

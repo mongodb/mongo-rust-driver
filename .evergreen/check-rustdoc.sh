@@ -2,7 +2,7 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 
 # docs.rs builds the driver on a read-only file system. to create a more realistic environment, we first
 # build the driver to ensure we have all the deps already in src, and then limit the permissions on that directory.
@@ -11,7 +11,8 @@ set -o errexit
 # build process.
 cargo +nightly build
 cargo clean
-chmod -R 555 ~/.cargo/registry/src
+
+chmod -R 555 ${CARGO_HOME}/registry/src
 
 cargo +nightly rustdoc -- -D warnings --cfg docsrs
 cargo +nightly rustdoc --no-default-features --features async-std-runtime -- -D warnings --cfg docsrs

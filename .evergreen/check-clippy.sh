@@ -2,7 +2,7 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 # Pin clippy to the lastest version. This should be updated when new versions of Rust are released.
 rustup default 1.59.0
 cargo clippy --all-targets -p mongodb -- -D warnings

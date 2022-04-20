@@ -2,6 +2,6 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 rustfmt +nightly --unstable-features --check src/**/*.rs
 rustfmt +nightly --unstable-features --check src/*.rs

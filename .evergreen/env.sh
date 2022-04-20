@@ -1,8 +1,18 @@
 #!/bin/bash
 
 export PATH="/opt/mongodbtoolchain/v2/bin:$PATH"
+export RUSTUP_HOME="${PROJECT_DIRECTORY}/.rustup"
+export PATH="${RUSTUP_HOME}/bin:$PATH"
+export CARGO_HOME="${PROJECT_DIRECTORY}/.cargo"
+export PATH="${CARGO_HOME}/bin:$PATH"
 
-source ~/.cargo/env
+if [ "Windows_NT" == "$OS" ]; then
+    # rustup/cargo need the native Windows paths; $PROJECT_DIRECTORY is a cygwin path
+    export RUSTUP_HOME=$(cygpath ${RUSTUP_HOME} --windows)
+    export CARGO_HOME=$(cygpath ${CARGO_HOME} --windows)
+fi
+
+source ${CARGO_HOME}/env
 
 NODE_ARTIFACTS_PATH="${PROJECT_DIRECTORY}/node-artifacts"
 export NVM_DIR="${NODE_ARTIFACTS_PATH}/nvm"
