@@ -33,6 +33,6 @@ CA_FILE=`echo "${DRIVERS_TOOLS}/.evergreen/ocsp/${OCSP_ALGORITHM}/ca.pem" | sed 
 
 export MONGODB_URI="${MONGODB_URI}tls=true&tlsCAFile=${CA_FILE}"
 
-source ./.evergreen/env.sh
+source ./.evergreen/configure-rust.sh
 
 RUST_BACKTRACE=1 cargo test spec::ocsp

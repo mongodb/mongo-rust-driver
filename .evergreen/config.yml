@@ -265,7 +265,7 @@ functions:
 
           # compile mini test project
           cd $PROJECT_DIRECTORY/.evergreen/aws-ecs-test
-          source $PROJECT_DIRECTORY/.evergreen/env.sh
+          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
           cargo build
           cd -
 

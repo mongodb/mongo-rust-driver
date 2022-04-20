@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 
-source ./.evergreen/env.sh
+source ./.evergreen/configure-rust.sh
 
 # Enable snappy, zlib unconditionally
 FEATURE_FLAGS=snappy-compression,zlib-compression

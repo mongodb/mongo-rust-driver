@@ -2,7 +2,7 @@
 
 set -o errexit
 
-source ./.evergreen/env.sh
+source ./.evergreen/configure-rust.sh
 
 FEATURES=""
 
