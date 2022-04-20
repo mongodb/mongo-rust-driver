@@ -122,7 +122,7 @@ pub enum FullDocumentType {
     /// event is available.
     WhenAvailable,
 
-    /// The same behavior as 'whenAvailable' except that an error is raised if the post-image is
+    /// The same behavior as `WhenAvailable` except that an error is raised if the post-image is
     /// not available.
     Required,
 
@@ -141,7 +141,7 @@ pub enum FullDocumentBeforeChangeType {
     /// for this event is available.
     WhenAvailable,
 
-    /// The same behavior as 'whenAvailable' except that an error is raised if the pre-image is
+    /// The same behavior as `WhenAvailable` except that an error is raised if the pre-image is
     /// not available.
     Required,
 
