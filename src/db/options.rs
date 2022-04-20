@@ -103,6 +103,9 @@ pub struct CreateCollectionOptions {
         serialize_with = "bson_util::serialize_duration_option_as_int_secs"
     )]
     pub expire_after_seconds: Option<Duration>,
+
+    /// Options for supporting change stream pre- and post-images.
+    pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -216,4 +219,14 @@ pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
     pub authorized_databases: Option<bool>,
+}
+
+/// Specifies how change stream pre- and post-images should be supported.
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct ChangeStreamPreAndPostImages {
+    /// If `true`, change streams will be able to include pre- and post-images.
+    pub enabled: bool,
 }
