@@ -299,12 +299,7 @@ impl Topology {
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn server_addresses(&self) -> HashSet<ServerAddress> {
-        self.watcher
-            .peek_latest()
-            .servers
-            .keys()
-            .cloned()
-            .collect()
+        self.watcher.peek_latest().servers.keys().cloned().collect()
     }
 
     /// Gets the addresses of the servers in the cluster.
