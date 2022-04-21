@@ -10,9 +10,9 @@ use bson::Document;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TestFile {
     #[serde(rename = "version")]
-    _version: u8,
+    _version: u8, // can ignore this field as there's only one version
     #[serde(rename = "style")]
-    _style: TestStyle,
+    _style: TestStyle, // we use the presence of fail_point / run_on to determine this
     pub description: String,
     pub(crate) pool_options: Option<ConnectionPoolOptions>,
     pub operations: Vec<ThreadedOperation>,
