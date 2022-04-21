@@ -10,9 +10,7 @@ use crate::{
 use super::{TestServerDescription, TestTopologyDescription};
 
 #[derive(Debug, Deserialize)]
-// TODO RUST-1080: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
-// ensure these tests are being fully run
-#[allow(dead_code)]
+#[serde(deny_unknown_fields)]
 struct TestFile {
     #[serde(rename = "heartbeatFrequencyMS")]
     heartbeat_frequency_ms: Option<u64>,
@@ -21,6 +19,9 @@ struct TestFile {
     suitable_servers: Option<Vec<TestServerDescription>>,
     in_latency_window: Option<Vec<TestServerDescription>>,
     error: Option<bool>,
+    #[serde(rename = "operation")]
+    // don't need this since we don't have separate server selection functions for reads/writes
+    _operation: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
