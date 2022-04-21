@@ -4,6 +4,7 @@ mod test;
 mod resolver_config;
 
 use std::{
+    cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
@@ -1119,8 +1120,8 @@ impl ClientOptions {
 
                 if max_staleness < smallest_max_staleness {
                     return Err(Error::invalid_argument(format!(
-                        "invalid maxStaleness value: must be at least {:?} seconds",
-                        smallest_max_staleness
+                        "invalid maxStaleness value: must be at least {} seconds",
+                        smallest_max_staleness.as_secs()
                     )));
                 }
             }
@@ -1675,17 +1676,24 @@ impl ClientOptionsParser {
             k @ "maxidletimems" => {
                 self.max_idle_time = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            k @ "maxstalenessseconds" => {
-                let max_staleness = Duration::from_secs(get_duration!(value, k));
+            "maxstalenessseconds" => {
+                let max_staleness_seconds = value.parse::<i64>().map_err(|e| {
+                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {}", e))
+                })?;
 
-                if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
-                {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "'maxStalenessSeconds' cannot be both positive and below 90"
-                            .into(),
+                let max_staleness = match max_staleness_seconds.cmp(&-1) {
+                    Ordering::Less => {
+                        return Err(Error::invalid_argument(format!(
+                            "maxStalenessSeconds must be -1 or positive, instead got {}",
+                            max_staleness_seconds
+                        )));
                     }
-                    .into());
-                }
+                    Ordering::Equal => {
+                        // -1 maxStaleness means no maxStaleness, which is the default
+                        return Ok(());
+                    }
+                    Ordering::Greater => Duration::from_secs(max_staleness_seconds as u64),
+                };
 
                 self.max_staleness = Some(max_staleness);
             }
