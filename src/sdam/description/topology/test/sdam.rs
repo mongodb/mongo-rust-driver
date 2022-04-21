@@ -125,6 +125,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             topology_version: None,
             compressors: None,
             hello_ok: test.hello_ok,
+            max_message_size_bytes: None,
         }
     }
 }

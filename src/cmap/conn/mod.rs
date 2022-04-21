@@ -275,7 +275,13 @@ impl Connection {
         self.error = write_result.is_err();
         write_result?;
 
-        let response_message_result = Message::read_from(&mut self.stream).await;
+        let response_message_result = Message::read_from(
+            &mut self.stream,
+            self.stream_description
+                .as_ref()
+                .and_then(|d| d.max_message_size_bytes),
+        )
+        .await;
         self.command_executing = false;
         self.error = response_message_result.is_err();
 

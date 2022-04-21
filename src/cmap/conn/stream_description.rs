@@ -35,6 +35,9 @@ pub(crate) struct StreamDescription {
 
     /// Whether the server associated with this connection supports the `hello` command.
     pub(crate) hello_ok: bool,
+
+    /// The maximum permitted size of a BSON wire protocol message.
+    pub max_message_size_bytes: Option<i32>,
 }
 
 impl StreamDescription {
@@ -53,6 +56,7 @@ impl StreamDescription {
             max_bson_object_size: reply.command_response.max_bson_object_size,
             max_write_batch_size: reply.command_response.max_write_batch_size,
             hello_ok: reply.command_response.hello_ok.unwrap_or(false),
+            max_message_size_bytes: reply.command_response.max_message_size_bytes,
         }
     }
 
@@ -82,6 +86,7 @@ impl StreamDescription {
             max_bson_object_size: 16 * 1024 * 1024,
             max_write_batch_size: 100_000,
             hello_ok: false,
+            max_message_size_bytes: Default::default(),
         }
     }
 }
