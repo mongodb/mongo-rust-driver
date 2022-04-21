@@ -10,6 +10,9 @@ source ./.evergreen/configure-rust.sh
 # https://docs.rs/about/builds#read-only-directories where we or a dependency modify source code during the
 # build process.
 cargo +nightly build
+cargo +nightly --no-default-features --features async-std-runtime
+cargo +nightly --no-default-features --features sync
+cargo +nightly --features tokio-sync
 cargo clean
 
 chmod -R 555 ${CARGO_HOME}/registry/src
