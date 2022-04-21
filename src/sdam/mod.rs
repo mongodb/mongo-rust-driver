@@ -14,14 +14,14 @@ pub(crate) use self::{
     description::{
         server::ServerDescription,
         topology::{
-            server_selection::SelectedServer,
+            server_selection::{SelectedServer, IDLE_WRITE_PERIOD},
             SessionSupportStatus,
             TopologyDescription,
             TransactionSupportStatus,
         },
     },
     message_manager::TopologyMessageManager,
-    monitor::MIN_HEARTBEAT_FREQUENCY,
+    monitor::{DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     state::{
         server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
         HandshakePhase,

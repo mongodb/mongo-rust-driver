@@ -3,6 +3,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::{
+    client::options::ClientOptions,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
     test::run_spec_test,
 };
@@ -32,25 +33,25 @@ pub struct TestReadPreference {
     pub max_staleness_seconds: Option<u64>,
 }
 
-fn convert_read_preference(test_read_pref: TestReadPreference) -> Option<ReadPreference> {
-    let max_staleness = test_read_pref
-        .max_staleness_seconds
-        .map(Duration::from_secs);
-    let options = ReadPreferenceOptions::builder()
-        .tag_sets(test_read_pref.tag_sets)
-        .max_staleness(max_staleness)
-        .build();
+impl From<TestReadPreference> for ReadPreference {
+    fn from(test_read_pref: TestReadPreference) -> Self {
+        let max_staleness = test_read_pref
+            .max_staleness_seconds
+            .map(Duration::from_secs);
+        let options = ReadPreferenceOptions::builder()
+            .tag_sets(test_read_pref.tag_sets)
+            .max_staleness(max_staleness)
+            .build();
 
-    let read_pref = match &test_read_pref.mode.as_ref()?[..] {
-        "Primary" => ReadPreference::Primary,
-        "Secondary" => ReadPreference::Secondary { options },
-        "PrimaryPreferred" => ReadPreference::PrimaryPreferred { options },
-        "SecondaryPreferred" => ReadPreference::SecondaryPreferred { options },
-        "Nearest" => ReadPreference::Nearest { options },
-        m => panic!("invalid read preference mode: {}", m),
-    };
-
-    Some(read_pref)
+        match &test_read_pref.mode.as_deref() {
+            Some("Primary") | None => ReadPreference::Primary,
+            Some("Secondary") => ReadPreference::Secondary { options },
+            Some("PrimaryPreferred") => ReadPreference::PrimaryPreferred { options },
+            Some("SecondaryPreferred") => ReadPreference::SecondaryPreferred { options },
+            Some("Nearest") => ReadPreference::Nearest { options },
+            Some(m) => panic!("invalid read preference mode: {}", m),
+        }
+    }
 }
 
 macro_rules! get_sorted_addresses {
@@ -62,17 +63,13 @@ macro_rules! get_sorted_addresses {
 }
 
 async fn run_test(test_file: TestFile) {
-    let read_pref = match convert_read_preference(test_file.read_preference) {
-        Some(read_pref) => read_pref,
-        None => return,
-    };
-
-    let topology = test_file
-        .topology_description
-        .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis));
-
     if let Some(ref expected_suitable_servers) = test_file.suitable_servers {
-        let mut actual_servers: Vec<_> = topology.suitable_servers(&read_pref).unwrap();
+        let topology = test_file
+            .topology_description
+            .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis));
+
+        let rp = test_file.read_preference.into();
+        let mut actual_servers: Vec<_> = topology.suitable_servers(&rp).unwrap();
 
         assert_eq!(
             get_sorted_addresses!(expected_suitable_servers),
@@ -87,6 +84,28 @@ async fn run_test(test_file: TestFile) {
                 get_sorted_addresses!(&actual_servers)
             );
         }
+    } else if test_file.error == Some(true) {
+        let mut options = Vec::new();
+        if let Some(ref mode) = test_file.read_preference.mode {
+            options.push(format!("readPreference={}", mode));
+        }
+        if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
+            options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
+        }
+        if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
+            options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
+        }
+
+        let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
+        ClientOptions::parse(uri_str)
+            .await
+            .err()
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected client construction to fail with read preference {:#?}",
+                    test_file.read_preference
+                )
+            });
     }
 }
 

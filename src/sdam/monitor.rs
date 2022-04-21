@@ -17,8 +17,7 @@ use crate::{
     runtime,
 };
 
-pub(super) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
-
+pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
 pub(crate) const MIN_HEARTBEAT_FREQUENCY: Duration = Duration::from_millis(500);
 
 pub(crate) struct Monitor {
