@@ -34,6 +34,13 @@ async fn metadata_sent_in_handshake() {
     let _: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
+
+    // skip on other topologies due to different currentOp behavior
+    if !client.is_standalone() || !client.is_replica_set() {
+        log_uncaptured("skipping metadata_sent_in_handshake due to unsupported topology");
+        return;
+    }
+
     let result = client
         .database("admin")
         .run_command(
