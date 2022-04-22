@@ -15,55 +15,74 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-struct Metadata {
-    #[serde(rename = "clientMetadata")]
-    pub client: ClientMetadata,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct ClientMetadata {
     pub driver: DriverMetadata,
-    pub os: OsMetadata,
+    #[serde(rename = "os")]
+    pub _os: Document, // included here to ensure it's included in the metadata
+    pub platform: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct DriverMetadata {
     pub name: String,
     pub version: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct OsMetadata {
-    #[serde(rename = "type")]
-    pub os_type: String,
-    pub architecture: String,
-}
-
-// TODO RUST-1078: fix and run this test. Once this test is fully implemented we can remove the
-// #[allow(dead_code)] tags on the above structs.
-//
-// This test currently doesn't pass on replica sets and sharded clusters consistently due to
-// `currentOp` sometimes detecting heartbeats between the server. Eventually we can test this using
-// APM or coming up with something more clever, but for now, we're just disabling it.
-//
-// #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-// #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[allow(unused)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn metadata_sent_in_handshake() {
+    let _: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
-    let db = client.database("admin");
-    let result = db.run_command(doc! { "currentOp": 1 }, None).await.unwrap();
+    let result = client
+        .database("admin")
+        .run_command(
+            doc! {
+                "currentOp": 1,
+                "command.currentOp": { "$exists": true }
+            },
+            None,
+        )
+        .await
+        .unwrap();
 
-    let in_prog = match result.get("inprog") {
-        Some(Bson::Array(in_prog)) => in_prog,
-        _ => panic!("no `inprog` array found in response to `currentOp`"),
-    };
+    let metadata_document = result.get_array("inprog").unwrap()[0]
+        .as_document()
+        .unwrap()
+        .get_document("clientMetadata")
+        .unwrap()
+        .clone();
+    let metadata: ClientMetadata = bson::from_document(metadata_document).unwrap();
 
-    let metadata: Metadata = bson::from_bson(in_prog[0].clone()).unwrap();
-    assert_eq!(metadata.client.driver.name, "mrd");
+    assert_eq!(metadata.driver.name, "mongo-rust-driver");
+    assert_eq!(metadata.driver.version, env!("CARGO_PKG_VERSION"));
+
+    #[cfg(feature = "tokio-runtime")]
+    {
+        assert!(
+            metadata.platform.contains("tokio"),
+            "platform should contain tokio: {}",
+            metadata.platform
+        );
+    }
+
+    #[cfg(feature = "async-std-runtime")]
+    {
+        assert!(
+            metadata.platform.contains("async-std"),
+            "platform should contain async-std: {}",
+            metadata.platform
+        );
+    }
+
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    {
+        assert!(
+            metadata.platform.contains("sync"),
+            "platform should contain sync: {}",
+            metadata.platform
+        );
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
