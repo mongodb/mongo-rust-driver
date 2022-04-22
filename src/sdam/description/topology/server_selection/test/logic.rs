@@ -3,7 +3,6 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::{
-    client::options::ClientOptions,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
     test::run_spec_test,
 };
@@ -85,27 +84,30 @@ async fn run_test(test_file: TestFile) {
             );
         }
     } else if test_file.error == Some(true) {
-        let mut options = Vec::new();
-        if let Some(ref mode) = test_file.read_preference.mode {
-            options.push(format!("readPreference={}", mode));
-        }
-        if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
-            options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
-        }
-        if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
-            options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
-        }
+        #[cfg(not(feature = "sync"))]
+        {
+            let mut options = Vec::new();
+            if let Some(ref mode) = test_file.read_preference.mode {
+                options.push(format!("readPreference={}", mode));
+            }
+            if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
+                options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
+            }
+            if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
+                options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
+            }
 
-        let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
-        ClientOptions::parse(uri_str)
-            .await
-            .err()
-            .unwrap_or_else(|| {
-                panic!(
-                    "expected client construction to fail with read preference {:#?}",
-                    test_file.read_preference
-                )
-            });
+            let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
+            crate::client::options::ClientOptions::parse(uri_str)
+                .await
+                .err()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "expected client construction to fail with read preference {:#?}",
+                        test_file.read_preference
+                    )
+                });
+        }
     }
 }
 
