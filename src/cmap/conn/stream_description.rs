@@ -37,7 +37,7 @@ pub(crate) struct StreamDescription {
     pub(crate) hello_ok: bool,
 
     /// The maximum permitted size of a BSON wire protocol message.
-    pub max_message_size_bytes: Option<i32>,
+    pub(crate) max_message_size_bytes: i32,
 }
 
 impl StreamDescription {

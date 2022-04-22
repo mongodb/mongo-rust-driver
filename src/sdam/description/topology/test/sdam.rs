@@ -125,7 +125,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             topology_version: None,
             compressors: None,
             hello_ok: test.hello_ok,
-            max_message_size_bytes: None,
+            max_message_size_bytes: 48 * 1024 * 1024,
         }
     }
 }
@@ -746,6 +746,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         "maxWireVersion": 6,
         "maxBsonObjectSize": 16_000,
         "maxWriteBatchSize": 10_000,
+        "maxMessageSizeBytes": 48_000_000,
     })
     .unwrap();
 

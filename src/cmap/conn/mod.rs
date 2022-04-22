@@ -279,7 +279,7 @@ impl Connection {
             &mut self.stream,
             self.stream_description
                 .as_ref()
-                .and_then(|d| d.max_message_size_bytes),
+                .map(|d| d.max_message_size_bytes),
         )
         .await;
         self.command_executing = false;
