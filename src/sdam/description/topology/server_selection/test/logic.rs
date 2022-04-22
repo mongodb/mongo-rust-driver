@@ -84,7 +84,9 @@ async fn run_test(test_file: TestFile) {
             );
         }
     } else if test_file.error == Some(true) {
-        #[cfg(not(feature = "sync"))]
+        // skip on sync to avoid compilation conflicts with the sync version of
+        // ClientOptions::parse.
+        #[cfg(not(any(feature = "sync", feature = "tokio-sync")))]
         {
             let mut options = Vec::new();
             if let Some(ref mode) = test_file.read_preference.mode {
