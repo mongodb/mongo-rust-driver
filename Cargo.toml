@@ -1,5 +1,11 @@
 [package]
-authors = ["Saghm Rossi <saghmrossi@gmail.com>", "Patrick Freed <patrick.freed@mongodb.com>", "Isabel Atkinson <isabel.atkinson@mongodb.com>"]
+authors = [
+    "Saghm Rossi <saghmrossi@gmail.com>",
+    "Patrick Freed <patrick.freed@mongodb.com>",
+    "Isabel Atkinson <isabel.atkinson@mongodb.com>",
+    "Abraham Egnor <abraham.egnor@mongodb.com>",
+    "Kaitlin Mahar <kaitlin.mahar@mongodb.com>",
+]
 description = "The official MongoDB driver for Rust"
 edition = "2018"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
@@ -8,7 +14,7 @@ repository = "https://github.com/mongodb/mongo-rust-driver"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "2.2.0"
+version = "2.2.1"
 
 exclude = [
     "etc/**",
