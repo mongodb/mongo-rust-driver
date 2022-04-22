@@ -99,6 +99,14 @@ pub struct ChangeStreamEvent<T> {
     /// represents the most current majority-committed version of the document modified by the
     /// update operation.
     pub full_document: Option<T>,
+
+    /// Contains the pre-image of the modified or deleted document if the pre-image is available
+    /// for the change event and either `Required` or `WhenAvailable` was specified for the
+    /// [`full_document_before_change`](
+    /// crate::options::ChangeStreamOptions::full_document_before_change) option when creating the
+    /// change stream. If `WhenAvailable` was specified but the pre-image is unavailable, this
+    /// will be explicitly set to `None`.
+    pub full_document_before_change: Option<T>,
 }
 
 /// Describes which fields have been updated or removed from a document.
