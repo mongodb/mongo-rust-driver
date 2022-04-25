@@ -82,9 +82,19 @@ impl Message {
     }
 
     /// Reads bytes from `reader` and deserializes them into a Message.
-    pub(crate) async fn read_from(reader: &mut AsyncStream) -> Result<Self> {
+    pub(crate) async fn read_from(
+        reader: &mut AsyncStream,
+        max_message_size_bytes: Option<i32>,
+    ) -> Result<Self> {
         let mut reader = BufReader::new(reader);
         let header = Header::read_from(&mut reader).await?;
+        let max_len = max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES);
+        if header.length > max_len {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!("Message length {} over maximum {}", header.length, max_len),
+            }
+            .into());
+        }
 
         if header.op_code == OpCode::Message {
             return Self::read_from_op_msg(reader, &header).await;
@@ -305,6 +315,8 @@ impl Message {
         Ok(())
     }
 }
+
+const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i32 = 48 * 1024 * 1024;
 
 bitflags! {
     /// Represents the bitwise flags for an OP_MSG as defined in the spec.

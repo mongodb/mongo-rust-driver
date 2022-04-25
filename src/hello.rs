@@ -231,6 +231,9 @@ pub(crate) struct HelloCommandResponse {
 
     /// For internal use.
     pub topology_version: Option<Document>,
+
+    /// The maximum permitted size of a BSON wire protocol message.
+    pub max_message_size_bytes: i32,
 }
 
 impl PartialEq for HelloCommandResponse {
@@ -251,6 +254,7 @@ impl PartialEq for HelloCommandResponse {
             && self.max_bson_object_size == other.max_bson_object_size
             && self.max_write_batch_size == other.max_write_batch_size
             && self.service_id == other.service_id
+            && self.max_message_size_bytes == other.max_message_size_bytes
     }
 }
 
