@@ -673,32 +673,132 @@ impl Serialize for ClientOptions {
     }
 }
 
+/// Contains the options that can be set via a MongoDB connection string.
+///
+/// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
 #[derive(Debug, Default, PartialEq)]
-struct ClientOptionsParser {
+#[non_exhaustive]
+pub struct ConnectionString {
+    /// The initial list of seeds that the Client should connect to.
+    ///
+    /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
+    /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
+    /// `direct_connection` field to `true`.
     pub hosts: Vec<ServerAddress>,
-    pub srv: bool,
+
+    /// The application name that the Client will send to the server as part of the handshake. This
+    /// can be used in combination with the server logs to determine which Client is connected to a
+    /// server.
     pub app_name: Option<String>,
+
+    /// The TLS configuration for the Client to use in its connections with the server.
+    ///
+    /// By default, TLS is disabled.
     pub tls: Option<Tls>,
+
+    /// The amount of time each monitoring thread should wait between performing server checks.
+    ///
+    /// The default value is 10 seconds.
     pub heartbeat_freq: Option<Duration>,
+
+    /// When running a read operation with a ReadPreference that allows selecting secondaries,
+    /// `local_threshold` is used to determine how much longer the average round trip time between
+    /// the driver and server is allowed compared to the least round trip time of all the suitable
+    /// servers. For example, if the average round trip times of the suitable servers are 5 ms, 10
+    /// ms, and 15 ms, and the local threshold is 8 ms, then the first two servers are within the
+    /// latency window and could be chosen for the operation, but the last one is not.
+    ///
+    /// A value of zero indicates that there is no latency window, so only the server with the
+    /// lowest average round trip time is eligible.
+    ///
+    /// The default value is 15 ms.
     pub local_threshold: Option<Duration>,
+
+    /// Specifies the default read concern for operations performed on the Client. See the
+    /// ReadConcern type documentation for more details.
     pub read_concern: Option<ReadConcern>,
+
+    /// The default selection criteria for operations performed on the Client. See the
+    /// SelectionCriteria type documentation for more details.
     pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The name of the replica set that the Client should connect to.
     pub repl_set_name: Option<String>,
+
+    /// Specifies the default write concern for operations performed on the Client. See the
+    /// WriteConcern type documentation for more details.
     pub write_concern: Option<WriteConcern>,
+
+    /// The amount of time the Client should attempt to select a server for an operation before
+    /// timing outs
+    ///
+    /// The default value is 30 seconds.
     pub server_selection_timeout: Option<Duration>,
+
+    /// The maximum amount of connections that the Client should allow to be created in a
+    /// connection pool for a given server. If an operation is attempted on a server while
+    /// `max_pool_size` connections are checked out, the operation will block until an in-progress
+    /// operation finishes and its connection is checked back into the pool.
+    ///
+    /// The default value is 100.
     pub max_pool_size: Option<u32>,
+
+    /// The minimum number of connections that should be available in a server's connection pool at
+    /// a given time. If fewer than `min_pool_size` connections are in the pool, connections will
+    /// be added to the pool in the background until `min_pool_size` is reached.
+    ///
+    /// The default value is 0.
     pub min_pool_size: Option<u32>,
+
+    /// The amount of time that a connection can remain idle in a connection pool before being
+    /// closed. A value of zero indicates that connections should not be closed due to being idle.
+    ///
+    /// By default, connections will not be closed due to being idle.
     pub max_idle_time: Option<Duration>,
-    pub wait_queue_timeout: Option<Duration>,
+
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
+    /// The order of compressors indicates preference of compressors.
     pub compressors: Option<Vec<Compressor>>,
+
+    /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
+    /// server.
+    ///
+    /// The default value is 10 seconds.
     pub connect_timeout: Option<Duration>,
+
+    /// Whether or not the client should retry a read operation if the operation fails.
+    ///
+    /// The default value is true.
     pub retry_reads: Option<bool>,
+
+    /// Whether or not the client should retry a write operation if the operation fails.
+    ///
+    /// The default value is true.
     pub retry_writes: Option<bool>,
-    pub socket_timeout: Option<Duration>,
-    pub zlib_compression: Option<i32>,
+
+    /// Specifies whether the Client should directly connect to a single host rather than
+    /// autodiscover all servers in the cluster.
+    ///
+    /// The default value is false.
     pub direct_connection: Option<bool>,
+
+    /// The credential to use for authenticating connections made by this client.
     pub credential: Option<Credential>,
+
+    /// Default database for this client.
+    ///
+    /// By default, no default database is specified.
     pub default_database: Option<String>,
+
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    pub load_balanced: Option<bool>,
+
+    pub(crate) srv: bool,
+    pub(crate) wait_queue_timeout: Option<Duration>,
+    pub(crate) socket_timeout: Option<Duration>,
+    pub(crate) zlib_compression: Option<i32>,
     max_staleness: Option<Duration>,
     tls_insecure: Option<bool>,
     auth_mechanism: Option<AuthMechanism>,
@@ -706,7 +806,6 @@ struct ClientOptionsParser {
     auth_mechanism_properties: Option<Document>,
     read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
-    load_balanced: Option<bool>,
     original_uri: String,
 }
 
@@ -834,8 +933,8 @@ pub struct DriverInfo {
     pub platform: Option<String>,
 }
 
-impl From<ClientOptionsParser> for ClientOptions {
-    fn from(parser: ClientOptionsParser) -> Self {
+impl From<ConnectionString> for ClientOptions {
+    fn from(parser: ConnectionString) -> Self {
         Self {
             hosts: parser.hosts,
             app_name: parser.app_name,
@@ -993,7 +1092,7 @@ impl ClientOptions {
         uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        let parser = ClientOptionsParser::parse(uri.as_ref())?;
+        let parser = ConnectionString::parse(uri.as_ref())?;
         let srv = parser.srv;
         let auth_source_present = parser.auth_source.is_some();
         let mut options: Self = parser.into();
@@ -1050,7 +1149,7 @@ impl ClientOptions {
 
     #[cfg(test)]
     pub(crate) fn parse_without_srv_resolution(s: &str) -> Result<Self> {
-        let parser = ClientOptionsParser::parse(s)?;
+        let parser = ConnectionString::parse(s)?;
         let options: Self = parser.into();
         options.validate()?;
 
@@ -1221,7 +1320,7 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     Ok(())
 }
 
-impl ClientOptionsParser {
+impl ConnectionString {
     fn parse(s: &str) -> Result<Self> {
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
@@ -1341,7 +1440,7 @@ impl ClientOptionsParser {
             }
         }
 
-        let mut options = ClientOptionsParser {
+        let mut options = ConnectionString {
             hosts,
             srv,
             original_uri: s.into(),
