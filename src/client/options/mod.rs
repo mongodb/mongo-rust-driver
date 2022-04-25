@@ -1092,10 +1092,21 @@ impl ClientOptions {
         uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        let parser = ConnectionString::parse(uri.as_ref())?;
-        let srv = parser.srv;
-        let auth_source_present = parser.auth_source.is_some();
-        let mut options: Self = parser.into();
+        Self::resolve(ConnectionString::parse(uri)?, resolver_config).await
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
+    /// provided `ResolverConfig` as part of this method.
+    pub async fn resolve(
+        conn_str: ConnectionString,
+        resolver_config: impl Into<Option<ResolverConfig>>,
+    ) -> Result<Self> {
+        let resolver_config = resolver_config.into();
+        let srv = conn_str.srv;
+        let auth_source_present = conn_str.auth_source.is_some();
+        let mut options: Self = conn_str.into();
         options.resolver_config = resolver_config.clone();
 
         if srv {
@@ -1321,7 +1332,10 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
 }
 
 impl ConnectionString {
-    fn parse(s: &str) -> Result<Self> {
+    /// Parses a MongoDB connection string into a [`ConnectionString`] struct. If the string is
+    /// malformed or one of the options has an invalid value, an error will be returned.
+    pub fn parse(s: impl AsRef<str>) -> Result<Self> {
+        let s = s.as_ref();
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
             None => {
