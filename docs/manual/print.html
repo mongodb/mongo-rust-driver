@@ -174,7 +174,7 @@ tokio::time::timeout(Duration::from_secs(5), handle).await???;
 </span><span class="boring">}
 </span></code></pre></pre>
 <h2 id="minimum-supported-rust-version-msrv"><a class="header" href="#minimum-supported-rust-version-msrv">Minimum supported Rust version (MSRV)</a></h2>
-<p>The MSRV for this crate is currently 1.51.0. This will be rarely be increased, and if it ever is,
+<p>The MSRV for this crate is currently 1.53.0. This will be rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="installation-and-features"><a class="header" href="#installation-and-features">Installation and Features</a></h1>
 <h2 id="importing"><a class="header" href="#importing">Importing</a></h2>
@@ -191,18 +191,19 @@ default-features = false
 features = [&quot;async-std-runtime&quot;]
 </code></pre>
 <h2 id="enabling-the-sync-api"><a class="header" href="#enabling-the-sync-api">Enabling the sync API</a></h2>
-<p>The driver also provides a blocking sync API. To enable this, add the <code>&quot;sync&quot;</code> feature to your <code>Cargo.toml</code>:</p>
+<p>The driver also provides a blocking sync API. To enable this, add the <code>&quot;sync&quot;</code> or <code>&quot;tokio-sync&quot;</code> feature to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies.mongodb]
 version = &quot;2.1.0&quot;
 default-features = false
 features = [&quot;sync&quot;]
 </code></pre>
-<p><strong>Note:</strong> if the sync API is enabled, the async-specific types will be privatized (e.g. <code>mongodb::Client</code>). The sync-specific types can be imported from <code>mongodb::sync</code> (e.g. <code>mongodb::sync::Client</code>).</p>
+<p><strong>Note:</strong> The sync-specific types can be imported from <code>mongodb::sync</code> (e.g. <code>mongodb::sync::Client</code>).</p>
 <h2 id="all-feature-flags"><a class="header" href="#all-feature-flags">All Feature Flags</a></h2>
 <table><thead><tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Extra dependencies</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>tokio-runtime</code></td><td style="text-align: left">Enable support for the <code>tokio</code> async runtime</td><td style="text-align: left"><code>tokio</code> 1.0 with the <code>full</code> feature</td><td style="text-align: left">yes</td></tr>
 <tr><td style="text-align: left"><code>async-std-runtime</code></td><td style="text-align: left">Enable support for the <code>async-std</code> runtime</td><td style="text-align: left"><code>async-std</code> 1.0</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>sync</code></td><td style="text-align: left">Expose the synchronous API (<code>mongodb::sync</code>). This flag cannot be used in conjunction with either of the async runtime feature flags.</td><td style="text-align: left"><code>async-std</code> 1.0</td><td style="text-align: left">no</td></tr>
+<tr><td style="text-align: left"><code>sync</code></td><td style="text-align: left">Expose the synchronous API (<code>mongodb::sync</code>), using an async-std backend. Cannot be used with the <code>tokio-runtime</code> feature flag.</td><td style="text-align: left"><code>async-std</code> 1.0</td><td style="text-align: left">no</td></tr>
+<tr><td style="text-align: left"><code>tokio-sync</code></td><td style="text-align: left">Expose the synchronous API (<code>mongodb::sync</code>), using a tokio backend. Cannot be used with the <code>async-std-runtime</code> feature flag.</td><td style="text-align: left"><code>tokio</code> 1.0 with the <code>full</code> feature</td><td style="text-align: left">no</td></tr>
 <tr><td style="text-align: left"><code>aws-auth</code></td><td style="text-align: left">Enable support for the MONGODB-AWS authentication mechanism.</td><td style="text-align: left"><code>reqwest</code> 0.11</td><td style="text-align: left">no</td></tr>
 <tr><td style="text-align: left"><code>bson-uuid-0_8</code></td><td style="text-align: left">Enable support for v0.8 of the <a href="docs.rs/uuid/0.8"><code>uuid</code></a> crate in the public API of the re-exported <code>bson</code> crate.</td><td style="text-align: left">n/a</td><td style="text-align: left">no</td></tr>
 <tr><td style="text-align: left"><code>bson-chrono-0_4</code></td><td style="text-align: left">Enable support for v0.4 of the <a href="docs.rs/chrono/0.4"><code>chrono</code></a> crate in the public API of the re-exported <code>bson</code> crate.</td><td style="text-align: left">n/a</td><td style="text-align: left">no</td></tr>
