@@ -341,16 +341,7 @@ mod test;
 #[macro_use]
 extern crate derive_more;
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 pub use crate::{
-    client::{Client, session::ClientSession},
-    coll::Collection,
-    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
-    db::Database,
-};
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-pub(crate) use crate::{
     client::{Client, session::ClientSession},
     coll::Collection,
     cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
@@ -362,26 +353,10 @@ pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam:
 #[cfg(all(
     feature = "tokio-runtime",
     feature = "async-std-runtime",
-    not(feature = "sync"),
-    not(feature = "tokio-sync"),
 ))]
 compile_error!(
     "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
-);
-
-#[cfg(all(feature = "tokio-runtime", feature = "sync"))]
-compile_error!(
-    "`tokio-runtime` and `sync` can't both be enabled; either disable `sync` and enable \
-     `tokio-sync` to use the sync API with tokio, or set `default-features = false` in \
-     your Cargo.toml to use the sync API with async-std"
-);
-
-#[cfg(all(feature = "async-std-runtime", feature = "tokio-sync"))]
-compile_error!(
-    "`async-std-runtime` and `tokio-sync` can't both be enabled; either disable `tokio-sync` \
-     and enable `sync` to use the sync API with async-std, or disable `async-std-runtime` to \
-     use the sync API with tokio"
 );
 
 #[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
