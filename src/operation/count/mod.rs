@@ -8,12 +8,10 @@ use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     operation::{append_options, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
-
-use super::{SingleCursorResult, SERVER_4_9_0_WIRE_VERSION};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -43,38 +41,15 @@ impl Operation for Count {
 
     const NAME: &'static str = "count";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        let mut name = Self::NAME.to_string();
-        let mut body = match description.max_wire_version {
-            Some(v) if v >= SERVER_4_9_0_WIRE_VERSION => {
-                name = "aggregate".to_string();
-                doc! {
-                    "aggregate": self.ns.coll.clone(),
-                    "pipeline": [
-                        {
-                            "$collStats": { "count": {} },
-                        },
-                        {
-                            "$group": {
-                                "_id": 1,
-                                "n": { "$sum": "$count" },
-                            },
-                        },
-                    ],
-                    "cursor": {},
-                }
-            }
-            _ => {
-                doc! {
-                    Self::NAME: self.ns.coll.clone(),
-                }
-            }
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+        let mut body = doc! {
+            Self::NAME: self.ns.coll.clone(),
         };
 
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
-            name,
+            Self::NAME.to_string(),
             self.ns.db.clone(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
@@ -84,27 +59,9 @@ impl Operation for Count {
     fn handle_response(
         &self,
         response: RawCommandResponse,
-        description: &StreamDescription,
+        _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let response: Response = response.body()?;
-
-        let response_body: ResponseBody = match (description.max_wire_version, response) {
-            (Some(v), Response::Aggregate(cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION => {
-                cursor_body.0.ok_or_else(|| {
-                    Error::from(ErrorKind::InvalidResponse {
-                        message: "invalid server response to count operation".into(),
-                    })
-                })?
-            }
-            (_, Response::Count(body)) => body,
-            _ => {
-                return Err(ErrorKind::InvalidResponse {
-                    message: "response from server did not match count command".to_string(),
-                }
-                .into())
-            }
-        };
-
+        let response_body: ResponseBody = response.body()?;
         Ok(response_body.n)
     }
 
@@ -130,13 +87,6 @@ impl Operation for Count {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum Response {
-    Aggregate(SingleCursorResult<ResponseBody>),
-    Count(ResponseBody),
 }
 
 #[derive(Debug, Deserialize)]

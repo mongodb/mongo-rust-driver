@@ -14,15 +14,6 @@ pub(crate) fn handle_response_test<T: Operation>(op: &T, response_doc: Document)
     op.handle_response(raw, &StreamDescription::new_testing())
 }
 
-pub(crate) fn handle_response_test_with_wire_version<T: Operation>(
-    op: &T,
-    response_doc: Document,
-    wire_version: i32,
-) -> Result<T::O> {
-    let raw = RawCommandResponse::with_document(response_doc).unwrap();
-    op.handle_response(raw, &StreamDescription::with_wire_version(wire_version))
-}
-
 pub(crate) fn op_selection_criteria<F, T>(constructor: F)
 where
     T: Operation,
