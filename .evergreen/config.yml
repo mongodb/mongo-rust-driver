@@ -1693,7 +1693,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-18.04
-  display_name: "! Check cargo deny warnings with ${async-runtime}"
+  display_name: "! Check cargo deny warnings"
   tasks:
     - "cargo-deny"
 
