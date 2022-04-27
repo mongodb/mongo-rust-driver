@@ -1,10 +1,15 @@
-use std::time::Duration;
+use std::{
+    convert::{TryFrom, TryInto},
+    time::Duration,
+};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
+    error::{Error, Result},
+    selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria, TagSet},
     test::run_spec_test,
+    Client,
 };
 
 use super::{TestServerDescription, TestTopologyDescription};
@@ -24,7 +29,7 @@ struct TestFile {
     _operation: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TestReadPreference {
     pub mode: Option<String>,
     pub tag_sets: Option<Vec<TagSet>>,
@@ -32,8 +37,10 @@ pub struct TestReadPreference {
     pub max_staleness_seconds: Option<u64>,
 }
 
-impl From<TestReadPreference> for ReadPreference {
-    fn from(test_read_pref: TestReadPreference) -> Self {
+impl TryFrom<TestReadPreference> for ReadPreference {
+    type Error = Error;
+
+    fn try_from(test_read_pref: TestReadPreference) -> Result<Self> {
         let max_staleness = test_read_pref
             .max_staleness_seconds
             .map(Duration::from_secs);
@@ -42,14 +49,27 @@ impl From<TestReadPreference> for ReadPreference {
             .max_staleness(max_staleness)
             .build();
 
-        match &test_read_pref.mode.as_deref() {
-            Some("Primary") | None => ReadPreference::Primary,
+        let rp = match &test_read_pref.mode.as_deref() {
+            Some("Primary") | None => {
+                if !options.is_default() {
+                    return Err(Error::invalid_argument(
+                        "cannot use non-default options with read preference mode primary",
+                    ));
+                }
+                ReadPreference::Primary
+            }
             Some("Secondary") => ReadPreference::Secondary { options },
             Some("PrimaryPreferred") => ReadPreference::PrimaryPreferred { options },
             Some("SecondaryPreferred") => ReadPreference::SecondaryPreferred { options },
             Some("Nearest") => ReadPreference::Nearest { options },
-            Some(m) => panic!("invalid read preference mode: {}", m),
-        }
+            Some(m) => {
+                return Err(Error::invalid_argument(
+                    format!("invalid read preference mode: {}", m).as_str(),
+                ))
+            }
+        };
+
+        Ok(rp)
     }
 }
 
@@ -67,7 +87,7 @@ async fn run_test(test_file: TestFile) {
             .topology_description
             .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis));
 
-        let rp = test_file.read_preference.into();
+        let rp: ReadPreference = test_file.read_preference.try_into().unwrap();
         let mut actual_servers: Vec<_> = topology.suitable_servers(&rp).unwrap();
 
         assert_eq!(
@@ -88,6 +108,8 @@ async fn run_test(test_file: TestFile) {
         // ClientOptions::parse.
         #[cfg(not(any(feature = "sync", feature = "tokio-sync")))]
         {
+            use crate::client::options::ClientOptions;
+
             let mut options = Vec::new();
             if let Some(ref mode) = test_file.read_preference.mode {
                 options.push(format!("readPreference={}", mode));
@@ -100,7 +122,7 @@ async fn run_test(test_file: TestFile) {
             }
 
             let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
-            crate::client::options::ClientOptions::parse(uri_str)
+            ClientOptions::parse(uri_str)
                 .await
                 .err()
                 .unwrap_or_else(|| {
@@ -109,6 +131,23 @@ async fn run_test(test_file: TestFile) {
                         test_file.read_preference
                     )
                 });
+
+            // if the options contain a read preference that is supported by the type system, ensure
+            // that it still can't be used to construct a client.
+            if let Ok(rp) = test_file.read_preference.try_into() {
+                let mut opts = ClientOptions::builder()
+                    .selection_criteria(SelectionCriteria::ReadPreference(rp))
+                    .build();
+                if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
+                    opts.heartbeat_freq = Some(Duration::from_secs(heartbeat_freq));
+                }
+                Client::with_options(opts.clone()).err().unwrap_or_else(|| {
+                    panic!(
+                        "expected client construction to fail with options: {:#?}",
+                        opts
+                    )
+                });
+            }
         }
     }
 }
