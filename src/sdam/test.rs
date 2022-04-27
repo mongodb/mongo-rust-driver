@@ -8,7 +8,7 @@ use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    error::ErrorKind,
+    error::{Error, ErrorKind},
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
     test::{
@@ -461,4 +461,32 @@ async fn hello_ok_true() {
             .await
             .expect("subsequent heartbeats should use hello");
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn repl_set_name_mismatch() -> crate::error::Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if !client.is_replica_set() {
+        log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
+        return Ok(());
+    }
+
+    let mut options = CLIENT_OPTIONS.clone();
+    options.hosts.drain(1..);
+    options.direct_connection = Some(true);
+    options.repl_set_name = Some("invalid".to_string());
+    let client = TestClient::with_options(Some(options)).await;
+    let result = client.list_database_names(None, None).await;
+    assert!(match result {
+        Err(Error { ref kind, .. }) => match **kind {
+            ErrorKind::ServerSelection { .. } => true,
+            _ => false,
+        }
+        _ => false,
+    }, "Unexpected result {:?}", result);
+
+    Ok(())
 }
