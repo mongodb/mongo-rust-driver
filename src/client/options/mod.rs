@@ -795,13 +795,17 @@ pub struct ConnectionString {
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub load_balanced: Option<bool>,
 
-    /// Amount of time spent attempting to send or receive on a socket before timing out; note that this only applies to application operations, not SDAM.
+    /// Amount of time spent attempting to send or receive on a socket before timing out; note that
+    /// this only applies to application operations, not SDAM.
     pub socket_timeout: Option<Duration>,
 
-    /// Specifies the level of compression when using zlib to compress wire protocol messages; -1 signifies the default level, 0 signifies no compression, 1 signifies the fastest speed, and 9 signifies the best compression.
+    /// Specifies the level of compression when using zlib to compress wire protocol messages; -1
+    /// signifies the default level, 0 signifies no compression, 1 signifies the fastest speed, and
+    /// 9 signifies the best compression.
     pub zlib_compression: Option<i32>,
 
-    /// The maximum replication lag, in wall clock time, that a secondary can suffer and still be eligible for server selection.
+    /// The maximum replication lag, in wall clock time, that a secondary can suffer and still be
+    /// eligible for server selection.
     pub max_staleness: Option<Duration>,
 
     /// The authentication mechanism method to use for connection to the server.
@@ -810,21 +814,26 @@ pub struct ConnectionString {
     /// The database that connections should authenticate against.
     pub auth_source: Option<String>,
 
-    /// Additional options provided for authentication (e.g. to enable hostname canonicalization for GSSAPI).
+    /// Additional options provided for authentication (e.g. to enable hostname canonicalization
+    /// for GSSAPI).
     pub auth_mechanism_properties: Option<Document>,
 
     /// Default read preference for the client (excluding tags).
     pub read_preference: Option<ReadPreference>,
 
-    /// Default read preference tags for the client; only valid if the read preference mode is not primary.
+    /// Default read preference tags for the client; only valid if the read preference mode is not
+    /// primary.
     ///
-    /// The order of the tag sets in the read preference is the same as the order they are specified in the URI.
+    /// The order of the tag sets in the read preference is the same as the order they are
+    /// specified in the URI.
     pub read_preference_tags: Option<Vec<TagSet>>,
 
-    /// Amount of time spent attempting to check out a connection from a server's connection pool before timing out.  Not supported by the Rust driver.
+    /// Amount of time spent attempting to check out a connection from a server's connection pool
+    /// before timing out.  Not supported by the Rust driver.
     pub wait_queue_timeout: Option<Duration>,
 
-    /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname mismatches).  Not supported by the Rust driver.
+    /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
+    /// mismatches).  Not supported by the Rust driver.
     pub tls_insecure: Option<bool>,
 
     pub(crate) srv: bool,
