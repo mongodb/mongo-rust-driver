@@ -795,17 +795,39 @@ pub struct ConnectionString {
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub load_balanced: Option<bool>,
 
+    /// Amount of time spent attempting to send or receive on a socket before timing out; note that this only applies to application operations, not SDAM.
+    pub socket_timeout: Option<Duration>,
+
+    /// Specifies the level of compression when using zlib to compress wire protocol messages; -1 signifies the default level, 0 signifies no compression, 1 signifies the fastest speed, and 9 signifies the best compression.
+    pub zlib_compression: Option<i32>,
+
+    /// The maximum replication lag, in wall clock time, that a secondary can suffer and still be eligible for server selection.
+    pub max_staleness: Option<Duration>,
+
+    /// The authentication mechanism method to use for connection to the server.
+    pub auth_mechanism: Option<AuthMechanism>,
+
+    /// The database that connections should authenticate against.
+    pub auth_source: Option<String>,
+
+    /// Additional options provided for authentication (e.g. to enable hostname canonicalization for GSSAPI).
+    pub auth_mechanism_properties: Option<Document>,
+
+    /// Default read preference for the client (excluding tags).
+    pub read_preference: Option<ReadPreference>,
+
+    /// Default read preference tags for the client; only valid if the read preference mode is not primary.
+    ///
+    /// The order of the tag sets in the read preference is the same as the order they are specified in the URI.
+    pub read_preference_tags: Option<Vec<TagSet>>,
+
+    /// Amount of time spent attempting to check out a connection from a server's connection pool before timing out.  Not supported by the Rust driver.
+    pub wait_queue_timeout: Option<Duration>,
+
+    /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname mismatches).  Not supported by the Rust driver.
+    pub tls_insecure: Option<bool>,
+
     pub(crate) srv: bool,
-    pub(crate) wait_queue_timeout: Option<Duration>,
-    pub(crate) socket_timeout: Option<Duration>,
-    pub(crate) zlib_compression: Option<i32>,
-    max_staleness: Option<Duration>,
-    tls_insecure: Option<bool>,
-    auth_mechanism: Option<AuthMechanism>,
-    auth_source: Option<String>,
-    auth_mechanism_properties: Option<Document>,
-    read_preference: Option<ReadPreference>,
-    read_preference_tags: Option<Vec<TagSet>>,
     original_uri: String,
 }
 
@@ -1092,14 +1114,14 @@ impl ClientOptions {
         uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        Self::resolve(ConnectionString::parse(uri)?, resolver_config).await
+        Self::resolve_from(ConnectionString::parse(uri)?, resolver_config).await
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
-    pub async fn resolve(
+    pub async fn resolve_from(
         conn_str: ConnectionString,
         resolver_config: impl Into<Option<ResolverConfig>>,
     ) -> Result<Self> {
