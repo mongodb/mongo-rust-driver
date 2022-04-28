@@ -39,7 +39,8 @@ async fn run_legacy() {
             return;
         }
         run_v2_test(file).await
-    }).await;
+    })
+    .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
