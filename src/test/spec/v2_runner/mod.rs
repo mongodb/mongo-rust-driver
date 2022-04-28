@@ -36,7 +36,6 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listCollectionObjects",
     "listDatabaseObjects",
     "mapReduce",
-    "watch",
 ];
 
 pub async fn run_v2_test(test_file: TestFile) {

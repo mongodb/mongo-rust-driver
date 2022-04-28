@@ -298,6 +298,10 @@ impl<'de> Deserialize<'de> for Operation {
                 Bson::Document(definition.arguments),
             ))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "watch" => Watch::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1466,6 +1470,49 @@ impl TestOperation for ListIndexNames {
             Ok(Some(names.into()))
         }
         .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct Watch {}
+
+impl TestOperation for Watch {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match session {
+                None => { collection.watch(None, None).await?; }
+                Some(s) => { collection.watch_with_session(None, None, s).await?; }
+            }
+            Ok(None)
+        }.boxed()
+    }
+
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match session {
+                None => { database.watch(None, None).await?; },
+                Some(s) => { database.watch_with_session(None, None, s).await?; },
+            }
+            Ok(None)
+        }.boxed()
+    }
+
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            client.watch(None, None).await?;
+            Ok(None)
+        }.boxed()
     }
 }
 
