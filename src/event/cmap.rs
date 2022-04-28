@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{bson::oid::ObjectId, bson_util, options::ServerAddress};
 
@@ -20,12 +20,12 @@ fn empty_address() -> ServerAddress {
 }
 
 /// Event emitted when a connection pool is created.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct PoolCreatedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The options used for the pool.
@@ -34,7 +34,7 @@ pub struct PoolCreatedEvent {
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
-#[derive(Clone, Default, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Default, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionPoolOptions {
@@ -62,22 +62,22 @@ pub struct ConnectionPoolOptions {
 }
 
 /// Event emitted when a connection pool becomes ready.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct PoolReadyEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 }
 
 /// Event emitted when a connection pool is cleared.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct PoolClearedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// If the connection is to a load balancer, the id of the selected backend.
@@ -85,23 +85,23 @@ pub struct PoolClearedEvent {
 }
 
 /// Event emitted when a connection pool is cleared.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct PoolClosedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 }
 
 /// Event emitted when a connection is created.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionCreatedEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
@@ -112,13 +112,13 @@ pub struct ConnectionCreatedEvent {
 
 /// Event emitted when a connection is ready to be used. This indicates that all the necessary
 /// prerequisites for using a connection (handshake, authentication, etc.) have been completed.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionReadyEvent {
     /// The address of the server that the connection is connected to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
@@ -128,13 +128,13 @@ pub struct ConnectionReadyEvent {
 }
 
 /// Event emitted when a connection is closed.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionClosedEvent {
     /// The address of the server that the connection was connected to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
@@ -147,7 +147,7 @@ pub struct ConnectionClosedEvent {
 }
 
 /// The reasons that a connection may be closed.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ConnectionClosedReason {
@@ -168,22 +168,22 @@ pub enum ConnectionClosedReason {
 }
 
 /// Event emitted when a thread begins checking out a connection to use for an operation.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct ConnectionCheckoutStartedEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 }
 
 /// Event emitted when a thread is unable to check out a connection.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The reason a connection was unable to be checked out.
@@ -191,7 +191,7 @@ pub struct ConnectionCheckoutFailedEvent {
 }
 
 /// The reasons a connection may not be able to be checked out.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ConnectionCheckoutFailedReason {
@@ -204,13 +204,13 @@ pub enum ConnectionCheckoutFailedReason {
 }
 
 /// Event emitted when a connection is successfully checked out.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionCheckedOutEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
@@ -220,13 +220,13 @@ pub struct ConnectionCheckedOutEvent {
 }
 
 /// Event emitted when a connection is checked back into a connection pool.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionCheckedInEvent {
     /// The address of the server that the connection was connected to.
     #[serde(default = "self::empty_address")]
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used

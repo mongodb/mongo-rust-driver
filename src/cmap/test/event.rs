@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use serde::{de::Unexpected, Deserialize, Deserializer};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 
 use crate::{event::cmap::*, options::ServerAddress, runtime};
 use tokio::sync::broadcast::error::{RecvError, SendError};
@@ -154,6 +154,27 @@ pub enum Event {
     ConnectionCheckedIn(ConnectionCheckedInEvent),
 }
 
+impl Serialize for Event {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::PoolCreated(event) => event.serialize(serializer),
+            Self::PoolClosed(event) => event.serialize(serializer),
+            Self::PoolReady(event) => event.serialize(serializer),
+            Self::ConnectionCreated(event) => event.serialize(serializer),
+            Self::ConnectionReady(event) => event.serialize(serializer),
+            Self::ConnectionClosed(event) => event.serialize(serializer),
+            Self::ConnectionCheckOutStarted(event) => event.serialize(serializer),
+            Self::ConnectionCheckOutFailed(event) => event.serialize(serializer),
+            Self::ConnectionCheckedOut(event) => event.serialize(serializer),
+            Self::PoolCleared(event) => event.serialize(serializer),
+            Self::ConnectionCheckedIn(event) => event.serialize(serializer),
+        }
+    }
+}
+
 impl Event {
     pub fn name(&self) -> &'static str {
         match self {
@@ -168,6 +189,24 @@ impl Event {
             Event::ConnectionCheckedOut(_) => "ConnectionCheckedOut",
             Event::PoolCleared(_) => "ConnectionPoolCleared",
             Event::ConnectionCheckedIn(_) => "ConnectionCheckedIn",
+        }
+    }
+
+    // The names in drivers-atlas-testing tests are slightly different than those used in spec
+    // tests.
+    pub fn planned_maintenance_testing_name(&self) -> &'static str {
+        match self {
+            Event::PoolCreated(_) => "PoolCreatedEvent",
+            Event::PoolReady(_) => "PoolReadyEvent",
+            Event::PoolCleared(_) => "PoolClearedEvent",
+            Event::PoolClosed(_) => "PoolClosedEvent",
+            Event::ConnectionCreated(_) => "ConnectionCreatedEvent",
+            Event::ConnectionReady(_) => "ConnectionReadyEvent",
+            Event::ConnectionClosed(_) => "ConnectionClosedEvent",
+            Event::ConnectionCheckOutStarted(_) => "ConnectionCheckOutStartedEvent",
+            Event::ConnectionCheckOutFailed(_) => "ConnectionCheckOutFailedEvent",
+            Event::ConnectionCheckedOut(_) => "ConnectionCheckedOutEvent",
+            Event::ConnectionCheckedIn(_) => "ConnectionCheckedInEvent",
         }
     }
 }

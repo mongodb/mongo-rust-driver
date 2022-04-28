@@ -1,4 +1,6 @@
 use std::{
+    fs::File,
+    io::BufWriter,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -33,6 +35,7 @@ pub enum Entity {
     Session(SessionEntity),
     Cursor(TestCursor),
     Bson(Bson),
+    EventList(EventList),
     None,
 }
 
@@ -65,6 +68,18 @@ pub enum TestCursor {
     // `ChangeStream` has the same issue with 59245 as `Cursor`.
     ChangeStream(Mutex<ChangeStream<Document>>),
     Closed,
+}
+
+#[derive(Debug)]
+pub struct EventList {
+    pub client_id: String,
+    pub event_names: Vec<String>,
+}
+
+impl From<EventList> for Entity {
+    fn from(event_list: EventList) -> Self {
+        Self::EventList(event_list)
+    }
 }
 
 impl TestCursor {
@@ -159,6 +174,11 @@ impl ClientEntity {
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
     pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.observer.get_all_command_started_events()
+    }
+
+    /// Writes all events with the given name to the given BufWriter.
+    pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
+        self.observer.write_events_list_to_file(names, writer);
     }
 
     /// Gets the count of connections currently checked out.
@@ -279,6 +299,13 @@ impl Entity {
         match self {
             Self::Cursor(cursor) => cursor,
             _ => panic!("Expected cursor, got {:?}", &self),
+        }
+    }
+
+    pub fn as_event_list(&self) -> &EventList {
+        match self {
+            Self::EventList(event_list) => event_list,
+            _ => panic!("Expected event list, got {:?}", &self),
         }
     }
 }

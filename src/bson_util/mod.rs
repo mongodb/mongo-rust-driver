@@ -9,8 +9,8 @@ use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{ErrorKind, Result},
-    runtime::SyncLittleEndianRead,
+    error::{Error, ErrorKind, Result},
+    runtime::{SyncLittleEndianRead, SyncLittleEndianWrite},
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
@@ -215,6 +215,14 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
 
     Ok(bytes)
+}
+
+/// Serializes an Error as a string.
+pub(crate) fn serialize_error_as_string<S: Serializer>(
+    val: &Error,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(&val.to_string())
 }
 
 #[cfg(test)]

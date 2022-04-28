@@ -16,7 +16,7 @@ mod retryable_reads;
 mod retryable_writes;
 mod sessions;
 mod transactions;
-mod unified_runner;
+pub mod unified_runner;
 mod v2_runner;
 mod versioned_api;
 mod write_error;

@@ -131,7 +131,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct HelloReply {
     pub server_address: ServerAddress,
     pub command_response: HelloCommandResponse,

@@ -136,6 +136,13 @@ pub enum TestFileEntity {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StoreEventsAsEntity {
+    pub id: String,
+    pub events: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Client {
     pub id: String,
     pub uri_options: Option<Document>,
@@ -146,6 +153,7 @@ pub struct Client {
     pub observe_sensitive_commands: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
     pub server_api: Option<ServerApi>,
+    pub store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
 }
 
 pub fn deserialize_server_api_test_format<'de, D>(
@@ -339,7 +347,7 @@ pub struct ExpectError {
 }
 
 impl ExpectError {
-    pub fn verify_result(&self, error: Error) {
+    pub fn verify_result(&self, error: &Error) {
         if let Some(is_client_error) = self.is_client_error {
             assert_eq!(is_client_error, !error.is_server_error());
         }
