@@ -828,16 +828,24 @@ pub struct ConnectionString {
     /// specified in the URI.
     pub read_preference_tags: Option<Vec<TagSet>>,
 
+    pub(crate) srv: bool,
+    wait_queue_timeout: Option<Duration>,
+    tls_insecure: Option<bool>,
+    original_uri: String,
+}
+
+impl ConnectionString {
     /// Amount of time spent attempting to check out a connection from a server's connection pool
     /// before timing out.  Not supported by the Rust driver.
-    pub wait_queue_timeout: Option<Duration>,
+    pub fn wait_queue_timeout(&self) -> Option<Duration> {
+        self.wait_queue_timeout
+    }
 
     /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
     /// mismatches).  Not supported by the Rust driver.
-    pub tls_insecure: Option<bool>,
-
-    pub(crate) srv: bool,
-    original_uri: String,
+    pub fn tls_insecure(&self) -> Option<bool> {
+        self.tls_insecure
+    }
 }
 
 /// Specifies whether TLS configuration should be used with the operations that the
