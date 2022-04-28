@@ -547,6 +547,9 @@ impl TestOperation for InsertMany {
 pub(super) struct InsertOne {
     document: Document,
     session: Option<String>,
+    // TODO: RUST-1071 add comment to InsertOneOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
     #[serde(flatten)]
     options: InsertOneOptions,
 }
@@ -826,6 +829,9 @@ impl TestOperation for CountDocuments {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EstimatedDocumentCount {
+    // TODO: RUST-1215 Add this field to the options struct
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
     #[serde(flatten)]
     options: EstimatedDocumentCountOptions,
 }

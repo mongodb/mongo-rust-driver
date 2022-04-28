@@ -16,7 +16,8 @@ async fn run() {
 
 fn test_predicate(test: &TestCase) -> bool {
     // The Rust driver doesn't support unacknowledged writes.
-    test.description
-        != "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected on \
-            pre-5.0 server"
+    let lower = test.description.to_lowercase();
+
+    // TODO: RUST-1071, RUST-1215: unskip comment tests
+    !lower.contains("unacknowledged") && !lower.contains("comment")
 }
