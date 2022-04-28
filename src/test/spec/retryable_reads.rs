@@ -14,6 +14,7 @@ use crate::{
     test::{
         log_uncaptured,
         run_spec_test,
+        run_spec_test_with_path,
         CmapEvent,
         Event,
         EventHandler,
@@ -32,7 +33,13 @@ use super::{run_unified_format_test, run_v2_test};
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test(&["retryable-reads", "legacy"], run_v2_test).await;
+    // dbg!
+    run_spec_test_with_path(&["retryable-reads", "legacy"], |path, file| async move {
+        if !path.to_str().unwrap().contains("changeStreams") {
+            return;
+        }
+        run_v2_test(file).await
+    }).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]

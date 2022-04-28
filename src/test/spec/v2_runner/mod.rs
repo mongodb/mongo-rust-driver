@@ -60,6 +60,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             .iter()
             .any(|operation| SKIPPED_OPERATIONS.contains(&operation.name.as_str()))
         {
+            log_uncaptured(format!("skipping {}: unsupported operation", test.description));
             continue;
         }
 
