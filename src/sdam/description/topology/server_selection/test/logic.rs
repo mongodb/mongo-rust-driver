@@ -7,9 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
-    selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria, TagSet},
+    selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
     test::run_spec_test,
-    Client,
 };
 
 use super::{TestServerDescription, TestTopologyDescription};
@@ -108,7 +107,11 @@ async fn run_test(test_file: TestFile) {
         // ClientOptions::parse.
         #[cfg(not(any(feature = "sync", feature = "tokio-sync")))]
         {
-            use crate::client::options::ClientOptions;
+            use crate::{
+                client::options::ClientOptions,
+                selection_criteria::SelectionCriteria,
+                Client,
+            };
 
             let mut options = Vec::new();
             if let Some(ref mode) = test_file.read_preference.mode {
