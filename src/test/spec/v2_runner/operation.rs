@@ -146,158 +146,55 @@ impl<'de> Deserialize<'de> for Operation {
             .map(|session| session.as_str().unwrap().to_string());
 
         let boxed_op = match definition.name.as_str() {
-            "insertOne" => {
-                InsertOne::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "insertOne" => deserialize_op::<InsertOne>(definition.arguments),
+            "insertMany" => deserialize_op::<InsertMany>(definition.arguments),
+            "updateOne" => deserialize_op::<UpdateOne>(definition.arguments),
+            "updateMany" => deserialize_op::<UpdateMany>(definition.arguments),
+            "deleteMany" => deserialize_op::<DeleteMany>(definition.arguments),
+            "deleteOne" => deserialize_op::<DeleteOne>(definition.arguments),
+            "find" => deserialize_op::<Find>(definition.arguments),
+            "aggregate" => deserialize_op::<Aggregate>(definition.arguments),
+            "distinct" => deserialize_op::<Distinct>(definition.arguments),
+            "countDocuments" => deserialize_op::<CountDocuments>(definition.arguments),
+            "estimatedDocumentCount" => {
+                deserialize_op::<EstimatedDocumentCount>(definition.arguments)
             }
-            "insertMany" => {
-                InsertMany::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "findOne" => deserialize_op::<FindOne>(definition.arguments),
+            "listCollections" => deserialize_op::<ListCollections>(definition.arguments),
+            "listCollectionNames" => deserialize_op::<ListCollectionNames>(definition.arguments),
+            "replaceOne" => deserialize_op::<ReplaceOne>(definition.arguments),
+            "findOneAndUpdate" => deserialize_op::<FindOneAndUpdate>(definition.arguments),
+            "findOneAndReplace" => deserialize_op::<FindOneAndReplace>(definition.arguments),
+            "findOneAndDelete" => deserialize_op::<FindOneAndDelete>(definition.arguments),
+            "listDatabases" => deserialize_op::<ListDatabases>(definition.arguments),
+            "targetedFailPoint" => deserialize_op::<TargetedFailPoint>(definition.arguments),
+            "assertSessionPinned" => deserialize_op::<AssertSessionPinned>(definition.arguments),
+            "assertSessionUnpinned" => {
+                deserialize_op::<AssertSessionUnpinned>(definition.arguments)
             }
-            "updateOne" => {
-                UpdateOne::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "listDatabaseNames" => deserialize_op::<ListDatabaseNames>(definition.arguments),
+            "assertSessionTransactionState" => {
+                deserialize_op::<AssertSessionTransactionState>(definition.arguments)
             }
-            "updateMany" => {
-                UpdateMany::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "startTransaction" => deserialize_op::<StartTransaction>(definition.arguments),
+            "commitTransaction" => deserialize_op::<CommitTransaction>(definition.arguments),
+            "abortTransaction" => deserialize_op::<AbortTransaction>(definition.arguments),
+            "runCommand" => deserialize_op::<RunCommand>(definition.arguments),
+            "dropCollection" => deserialize_op::<DropCollection>(definition.arguments),
+            "createCollection" => deserialize_op::<CreateCollection>(definition.arguments),
+            "assertCollectionExists" => {
+                deserialize_op::<AssertCollectionExists>(definition.arguments)
             }
-            "deleteMany" => {
-                DeleteMany::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "assertCollectionNotExists" => {
+                deserialize_op::<AssertCollectionNotExists>(definition.arguments)
             }
-            "deleteOne" => {
-                DeleteOne::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "find" => {
-                Find::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "aggregate" => {
-                Aggregate::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "distinct" => {
-                Distinct::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "countDocuments" => CountDocuments::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "estimatedDocumentCount" => EstimatedDocumentCount::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOne" => {
-                FindOne::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "listCollections" => ListCollections::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listCollectionNames" => ListCollectionNames::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "replaceOne" => {
-                ReplaceOne::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "findOneAndUpdate" => FindOneAndUpdate::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOneAndReplace" => FindOneAndReplace::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOneAndDelete" => FindOneAndDelete::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listDatabases" => ListDatabases::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "targetedFailPoint" => TargetedFailPoint::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertSessionPinned" => AssertSessionPinned::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertSessionUnpinned" => AssertSessionUnpinned::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listDatabaseNames" => ListDatabaseNames::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertSessionTransactionState" => AssertSessionTransactionState::deserialize(
-                BsonDeserializer::new(Bson::Document(definition.arguments)),
-            )
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "startTransaction" => StartTransaction::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "commitTransaction" => CommitTransaction::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "abortTransaction" => AbortTransaction::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "runCommand" => {
-                RunCommand::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "dropCollection" => DropCollection::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "createCollection" => CreateCollection::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertCollectionExists" => AssertCollectionExists::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertCollectionNotExists" => AssertCollectionNotExists::deserialize(
-                BsonDeserializer::new(Bson::Document(definition.arguments)),
-            )
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "createIndex" => CreateIndex::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "dropIndex" => {
-                DropIndex::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listIndexNames" => ListIndexNames::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertIndexExists" => AssertIndexExists::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertIndexNotExists" => AssertIndexNotExists::deserialize(BsonDeserializer::new(
-                Bson::Document(definition.arguments),
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "createIndex" => deserialize_op::<CreateIndex>(definition.arguments),
+            "dropIndex" => deserialize_op::<DropIndex>(definition.arguments),
+            "listIndexes" => deserialize_op::<ListIndexes>(definition.arguments),
+            "listIndexNames" => deserialize_op::<ListIndexNames>(definition.arguments),
+            "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
+            "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
+            "watch" => deserialize_op::<Watch>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -313,6 +210,14 @@ impl<'de> Deserialize<'de> for Operation {
             session,
         })
     }
+}
+
+fn deserialize_op<'de, 'a, Op: TestOperation + Deserialize<'de> + 'a>(
+    arguments: Document,
+) -> std::result::Result<Box<dyn TestOperation + 'a>, bson::de::Error> {
+    Ok(Box::new(Op::deserialize(BsonDeserializer::new(
+        Bson::Document(arguments),
+    ))?))
 }
 
 impl Deref for Operation {
@@ -1464,6 +1369,60 @@ impl TestOperation for ListIndexNames {
                 None => collection.list_index_names().await?,
             };
             Ok(Some(names.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct Watch {}
+
+impl TestOperation for Watch {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match session {
+                None => {
+                    collection.watch(None, None).await?;
+                }
+                Some(s) => {
+                    collection.watch_with_session(None, None, s).await?;
+                }
+            }
+            Ok(None)
+        }
+        .boxed()
+    }
+
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match session {
+                None => {
+                    database.watch(None, None).await?;
+                }
+                Some(s) => {
+                    database.watch_with_session(None, None, s).await?;
+                }
+            }
+            Ok(None)
+        }
+        .boxed()
+    }
+
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            client.watch(None, None).await?;
+            Ok(None)
         }
         .boxed()
     }
