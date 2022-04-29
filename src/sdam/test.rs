@@ -480,13 +480,17 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
     options.repl_set_name = Some("invalid".to_string());
     let client = Client::with_options(options)?;
     let result = client.list_database_names(None, None).await;
-    assert!(match result {
-        Err(Error { ref kind, .. }) => match **kind {
-            ErrorKind::ServerSelection { .. } => true,
+    assert!(
+        match result {
+            Err(Error { ref kind, .. }) => match **kind {
+                ErrorKind::ServerSelection { .. } => true,
+                _ => false,
+            },
             _ => false,
-        }
-        _ => false,
-    }, "Unexpected result {:?}", result);
+        },
+        "Unexpected result {:?}",
+        result
+    );
 
     Ok(())
 }
