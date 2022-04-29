@@ -23,13 +23,11 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         TestClient,
         CLIENT_OPTIONS,
         LOCK,
     },
     ServerInfo,
-    ServerType,
 };
 
 use super::TestTopologyDescription;
