@@ -21,6 +21,10 @@ createEntities:
       id: &collection1 collection1
       database: *database0
       collectionName: &collection1Name coll1
+  - collection:
+      id: &collection0View collection0View
+      database: *database0
+      collectionName: &collection0ViewName coll0view
 
 initialData:
   - collectionName: *collection0Name
@@ -133,5 +137,45 @@ tests:
           - commandStartedEvent:
               command:
                 count: *collection0Name
+              commandName: count
+              databaseName: *database0Name
+
+  - description: "estimatedDocumentCount works correctly on views"
+    # viewOn option was added to the create command in 3.4
+    runOnRequirements:
+      - minServerVersion: "3.4.0"
+    operations:
+      - name: dropCollection
+        object: *database0
+        arguments:
+          collection: *collection0ViewName
+      - name: createCollection
+        object: *database0
+        arguments:
+          collection: *collection0ViewName
+          viewOn: *collection0Name
+          pipeline: &pipeline
+            - { $match: { _id: { $gt: 1 } } }
+      - name: estimatedDocumentCount
+        object: *collection0View
+        expectResult: 2
+    expectEvents:
+      - client: *client0
+        events:
+          - commandStartedEvent:
+              command:
+                drop: *collection0ViewName
+              commandName: drop
+              databaseName: *database0Name
+          - commandStartedEvent:
+              command:
+                create: *collection0ViewName
+                viewOn: *collection0Name
+                pipeline: *pipeline
+              commandName: create
+              databaseName: *database0Name
+          - commandStartedEvent:
+              command:
+                count: *collection0ViewName
               commandName: count
               databaseName: *database0Name
