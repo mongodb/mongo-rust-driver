@@ -395,9 +395,9 @@ pub struct EventSubscriber<'a> {
 }
 
 impl<'a> EventSubscriber<'a> {
-    pub async fn wait_for_event<F>(&mut self, timeout: Duration, filter: F) -> Option<Event>
+    pub async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<Event>
     where
-        F: Fn(&Event) -> bool,
+        F: FnMut(&Event) -> bool,
     {
         runtime::timeout(timeout, async {
             loop {
@@ -415,12 +415,12 @@ impl<'a> EventSubscriber<'a> {
         .flatten()
     }
 
-    pub async fn collect_events<F>(&mut self, timeout: Duration, filter: F) -> Vec<Event>
+    pub async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<Event>
     where
-        F: Fn(&Event) -> bool,
+        F: FnMut(&Event) -> bool,
     {
         let mut events = Vec::new();
-        while let Some(event) = self.wait_for_event(timeout, &filter).await {
+        while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
             events.push(event);
         }
         events

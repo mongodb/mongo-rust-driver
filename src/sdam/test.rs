@@ -11,7 +11,6 @@ use crate::{
     error::ErrorKind,
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
-    sdam::ServerType,
     test::{
         log_uncaptured,
         CmapEvent,
@@ -350,23 +349,27 @@ async fn auth_error() {
     assert!(matches!(*auth_err.kind, ErrorKind::Authentication { .. }));
 
     // collect the events as the order is non-deterministic
+    let mut seen_clear = false;
+    let mut seen_mark_unknown = false;
     let events = subscriber
         .collect_events(Duration::from_secs(1), |event| match event {
-            Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) => {
-                event
-                    .previous_description
-                    .description
-                    .server_type
-                    .is_available()
-                    && event.new_description.description.server_type == ServerType::Unknown
+            Event::Sdam(SdamEvent::ServerDescriptionChanged(event))
+                if event.is_marked_unknown_event() =>
+            {
+                seen_mark_unknown = true;
+                true
             }
-            Event::Cmap(CmapEvent::PoolCleared(_)) => true,
+            Event::Cmap(CmapEvent::PoolCleared(_)) => {
+                seen_clear = true;
+                true
+            }
             _ => false,
         })
         .await;
-    assert_eq!(
-        events.len(),
-        2,
+
+    // verify we saw exactly one of both types of events
+    assert!(
+        seen_clear && seen_mark_unknown && events.len() == 2,
         "expected one marked unknown event, one pool cleared event, instead got {:#?}",
         events
     );
