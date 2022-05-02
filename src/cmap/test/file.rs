@@ -7,13 +7,12 @@ use crate::{bson_util, cmap::options::ConnectionPoolOptions, error::Result, test
 use bson::Document;
 
 #[derive(Debug, Deserialize)]
-// TODO RUST-1079: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
-// ensure these tests are being fully run
-#[allow(dead_code)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TestFile {
-    version: u8,
-    style: TestStyle,
+    #[serde(rename = "version")]
+    _version: u8, // can ignore this field as there's only one version
+    #[serde(rename = "style")]
+    _style: TestStyle, // we use the presence of fail_point / run_on to determine this
     pub description: String,
     pub(crate) pool_options: Option<ConnectionPoolOptions>,
     pub operations: Vec<ThreadedOperation>,
