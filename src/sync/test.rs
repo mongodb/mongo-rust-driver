@@ -363,3 +363,31 @@ fn borrowed_deserialization() {
         i += 1;
     }
 }
+
+#[test]
+fn mixed_sync_and_async() -> Result<()> {
+    const DB_NAME: &str = "mixed_sync_and_async";
+    const COLL_NAME: &str = "test";
+
+    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
+
+    let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
+    let async_client = runtime::block_on(async { AsyncTestClient::new().await });
+    let sync_db = sync_client.database(DB_NAME);
+    sync_db.drop(None)?;
+    sync_db
+        .collection::<Document>(COLL_NAME)
+        .insert_one(doc! { "a": 1 }, None)?;
+    let mut found = runtime::block_on(async {
+        async_client
+            .database(DB_NAME)
+            .collection::<Document>(COLL_NAME)
+            .find_one(doc! {}, None)
+            .await
+    })?
+    .unwrap();
+    found.remove("_id");
+    assert_eq!(found, doc! { "a": 1 });
+
+    Ok(())
+}
