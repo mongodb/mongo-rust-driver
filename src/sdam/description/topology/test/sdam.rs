@@ -586,7 +586,7 @@ async fn topology_closed_event_last() {
     drop(client);
 
     subscriber
-        .wait_for_event(Duration::from_millis(5000), |event| {
+        .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Sdam(SdamEvent::TopologyClosed(_)))
         })
         .await
