@@ -126,7 +126,7 @@ pub struct EventHandler {
 
 impl EventHandler {
     pub fn new() -> Self {
-        let (event_broadcaster, _) = tokio::sync::broadcast::channel(500);
+        let (event_broadcaster, _) = tokio::sync::broadcast::channel(10_000);
         Self {
             command_events: Default::default(),
             sdam_events: Default::default(),
@@ -397,8 +397,10 @@ impl EventSubscriber<'_> {
             loop {
                 match self.receiver.recv().await {
                     Ok(event) if filter(&event) => return event.into(),
-                    // the channel hit capacity and the channel will skip a few to catch up.
-                    Err(RecvError::Lagged(_)) => continue,
+                    // the channel hit capacity and missed some events.
+                    Err(RecvError::Lagged(amount_skipped)) => {
+                        panic!("receiver lagged and skipped {} events", amount_skipped)
+                    }
                     Err(_) => return None,
                     _ => continue,
                 }
