@@ -148,7 +148,16 @@ impl<'de> Deserialize<'de> for ReadPreference {
         let preference = ReadPreferenceHelper::deserialize(deserializer)?;
 
         match preference.mode.as_str() {
-            "Primary" => Ok(ReadPreference::Primary),
+            "Primary" => {
+                if !preference.options.is_default() {
+                    return Err(D::Error::custom(&format!(
+                        "no options can be specified with read preference mode = primary, but got \
+                         {:?}",
+                        preference.options
+                    )));
+                }
+                Ok(ReadPreference::Primary)
+            }
             "Secondary" => Ok(ReadPreference::Secondary {
                 options: preference.options,
             }),
@@ -241,6 +250,18 @@ pub struct ReadPreferenceOptions {
     ///
     /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
     pub hedge: Option<HedgedReadOptions>,
+}
+
+impl ReadPreferenceOptions {
+    pub(crate) fn is_default(&self) -> bool {
+        self.hedge.is_none()
+            && self.max_staleness.is_none()
+            && self
+                .tag_sets
+                .as_ref()
+                .map(|ts| ts.is_empty() || ts[..] == [HashMap::default()])
+                .unwrap_or(true)
+    }
 }
 
 /// Specifies hedging behavior for reads.

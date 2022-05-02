@@ -43,6 +43,7 @@ static SPEC_VERSIONS: &[Version] = &[
     Version::new(1, 1, 0),
     Version::new(1, 4, 0),
     Version::new(1, 5, 0),
+    Version::new(1, 7, 0),
 ];
 
 const SKIPPED_OPERATIONS: &[&str] = &[
@@ -104,17 +105,24 @@ pub async fn run_unified_format_test_filtered(
             continue;
         }
 
-        if test_case
+        if let Some(op) = test_case
             .operations
             .iter()
-            .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
+            .find(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
+            .map(|op| op.name.as_str())
         {
-            log_uncaptured(format!("Skipping {}", &test_case.description));
+            log_uncaptured(format!(
+                "Skipping {}: unsupported operation {}",
+                &test_case.description, op
+            ));
             continue;
         }
 
         if !pred(&test_case) {
-            log_uncaptured(format!("Skipping {}", test_case.description));
+            log_uncaptured(format!(
+                "Skipping {}: predicate failed",
+                test_case.description
+            ));
             continue;
         }
 
@@ -164,15 +172,17 @@ pub async fn run_unified_format_test_filtered(
                             expected_value,
                             save_as_entity,
                         } => {
+                            let desc = &test_case.description;
                             let opt_entity = result.unwrap_or_else(|e| {
                                 panic!(
-                                    "{} should succeed, but failed with the following error: {}",
-                                    operation.name, e
+                                    "[{}] {} should succeed, but failed with the following error: \
+                                     {}",
+                                    desc, operation.name, e
                                 )
                             });
                             if expected_value.is_some() || save_as_entity.is_some() {
                                 let entity = opt_entity.unwrap_or_else(|| {
-                                    panic!("{} did not return an entity", operation.name)
+                                    panic!("[{}] {} did not return an entity", desc, operation.name)
                                 });
                                 if let Some(expected_bson) = expected_value {
                                     if let Entity::Bson(actual) = &entity {
@@ -183,15 +193,16 @@ pub async fn run_unified_format_test_filtered(
                                             Some(&test_runner.entities),
                                         ) {
                                             panic!(
-                                                "result mismatch, expected = {:#?}  actual = \
+                                                "[{}] result mismatch, expected = {:#?}  actual = \
                                                  {:#?}\nmismatch detail: {}",
-                                                expected_bson, actual, e
+                                                desc, expected_bson, actual, e
                                             );
                                         }
                                     } else {
                                         panic!(
-                                            "Incorrect entity type returned from {}, expected BSON",
-                                            operation.name
+                                            "[{}] Incorrect entity type returned from {}, \
+                                             expected BSON",
+                                            desc, operation.name
                                         );
                                     }
                                 }
@@ -235,20 +246,21 @@ pub async fn run_unified_format_test_filtered(
 
                 let expected_events = &expected.events;
 
-                match expected.event_match.unwrap_or(test_file::EventMatch::Exact) {
-                    test_file::EventMatch::Exact => assert_eq!(
+                if expected.ignore_extra_events.unwrap_or(false) {
+                    assert!(
+                        actual_events.len() >= expected_events.len(),
+                        "actual:\n{:#?}\nexpected:\n{:#?}",
+                        actual_events,
+                        expected_events
+                    )
+                } else {
+                    assert_eq!(
                         actual_events.len(),
                         expected_events.len(),
                         "actual:\n{:#?}\nexpected:\n{:#?}",
                         actual_events,
                         expected_events
-                    ),
-                    test_file::EventMatch::Prefix => assert!(
-                        actual_events.len() >= expected_events.len(),
-                        "actual:\n{:#?}\nexpected:\n{:#?}",
-                        actual_events,
-                        expected_events
-                    ),
+                    )
                 }
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {

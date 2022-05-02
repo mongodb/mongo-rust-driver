@@ -4,6 +4,7 @@ mod test;
 mod resolver_config;
 
 use std::{
+    cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
@@ -16,12 +17,7 @@ use std::{
 
 use derivative::Derivative;
 use lazy_static::lazy_static;
-use serde::{
-    de::{Error, Unexpected},
-    Deserialize,
-    Deserializer,
-    Serialize,
-};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
@@ -34,10 +30,10 @@ use crate::{
     client::auth::{AuthMechanism, Credential},
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
     options::ReadConcernLevel,
-    sdam::MIN_HEARTBEAT_FREQUENCY,
+    sdam::{DEFAULT_HEARTBEAT_FREQUENCY, IDLE_WRITE_PERIOD, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
@@ -122,7 +118,8 @@ impl<'de> Deserialize<'de> for ServerAddress {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        Self::parse(s.as_str()).map_err(|e| D::Error::custom(format!("{}", e)))
+        Self::parse(s.as_str())
+            .map_err(|e| <D::Error as serde::de::Error>::custom(format!("{}", e)))
     }
 }
 
@@ -164,7 +161,7 @@ impl Hash for ServerAddress {
 }
 
 impl FromStr for ServerAddress {
-    type Err = crate::error::Error;
+    type Err = Error;
     fn from_str(address: &str) -> Result<Self> {
         ServerAddress::parse(address)
     }
@@ -280,7 +277,7 @@ pub enum ServerApiVersion {
 }
 
 impl FromStr for ServerApiVersion {
-    type Err = crate::error::Error;
+    type Err = Error;
 
     fn from_str(str: &str) -> Result<Self> {
         match str {
@@ -308,8 +305,9 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     {
         let s = String::deserialize(deserializer)?;
 
-        ServerApiVersion::from_str(&s)
-            .map_err(|_| Error::invalid_value(Unexpected::Str(&s), &"a valid version number"))
+        ServerApiVersion::from_str(&s).map_err(|_| {
+            serde::de::Error::invalid_value(Unexpected::Str(&s), &"a valid version number")
+        })
     }
 }
 
@@ -1110,9 +1108,23 @@ impl ClientOptions {
         }
 
         if let Some(0) = self.max_pool_size {
-            return Err(crate::error::Error::invalid_argument(
-                "cannot specify maxPoolSize=0",
-            ));
+            return Err(Error::invalid_argument("cannot specify maxPoolSize=0"));
+        }
+
+        if let Some(SelectionCriteria::ReadPreference(ref rp)) = self.selection_criteria {
+            if let Some(max_staleness) = rp.max_staleness() {
+                let smallest_max_staleness = std::cmp::max(
+                    Duration::from_secs(90),
+                    self.heartbeat_freq.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY) + IDLE_WRITE_PERIOD,
+                );
+
+                if max_staleness < smallest_max_staleness {
+                    return Err(Error::invalid_argument(format!(
+                        "invalid maxStaleness value: must be at least {} seconds",
+                        smallest_max_staleness.as_secs()
+                    )));
+                }
+            }
         }
 
         Ok(())
@@ -1664,17 +1676,24 @@ impl ClientOptionsParser {
             k @ "maxidletimems" => {
                 self.max_idle_time = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            k @ "maxstalenessseconds" => {
-                let max_staleness = Duration::from_secs(get_duration!(value, k));
+            "maxstalenessseconds" => {
+                let max_staleness_seconds = value.parse::<i64>().map_err(|e| {
+                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {}", e))
+                })?;
 
-                if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
-                {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "'maxStalenessSeconds' cannot be both positive and below 90"
-                            .into(),
+                let max_staleness = match max_staleness_seconds.cmp(&-1) {
+                    Ordering::Less => {
+                        return Err(Error::invalid_argument(format!(
+                            "maxStalenessSeconds must be -1 or positive, instead got {}",
+                            max_staleness_seconds
+                        )));
                     }
-                    .into());
-                }
+                    Ordering::Equal => {
+                        // -1 maxStaleness means no maxStaleness, which is the default
+                        return Ok(());
+                    }
+                    Ordering::Greater => Duration::from_secs(max_staleness_seconds as u64),
+                };
 
                 self.max_staleness = Some(max_staleness);
             }

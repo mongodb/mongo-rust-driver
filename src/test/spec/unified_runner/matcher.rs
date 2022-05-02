@@ -223,7 +223,7 @@ fn expected_err<A: std::fmt::Debug, B: std::fmt::Debug>(
     actual: &A,
     expected: &B,
 ) -> Result<(), String> {
-    Err(format!("expected {:?}, got {:?}", actual, expected))
+    Err(format!("expected {:?}, got {:?}", expected, actual))
 }
 
 fn match_eq<V: PartialEq + std::fmt::Debug>(actual: &V, expected: &V) -> Result<(), String> {

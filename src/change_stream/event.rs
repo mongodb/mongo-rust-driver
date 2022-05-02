@@ -99,6 +99,14 @@ pub struct ChangeStreamEvent<T> {
     /// represents the most current majority-committed version of the document modified by the
     /// update operation.
     pub full_document: Option<T>,
+
+    /// Contains the pre-image of the modified or deleted document if the pre-image is available
+    /// for the change event and either `Required` or `WhenAvailable` was specified for the
+    /// [`full_document_before_change`](
+    /// crate::options::ChangeStreamOptions::full_document_before_change) option when creating the
+    /// change stream. If `WhenAvailable` was specified but the pre-image is unavailable, this
+    /// will be explicitly set to `None`.
+    pub full_document_before_change: Option<T>,
 }
 
 /// Describes which fields have been updated or removed from a document.
@@ -130,8 +138,7 @@ pub struct TruncatedArray {
 }
 
 /// The operation type represented in a given change notification.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum OperationType {
     /// See [insert-event](https://docs.mongodb.com/manual/reference/change-events/#insert-event)
@@ -157,6 +164,81 @@ pub enum OperationType {
 
     /// See [invalidate-event](https://docs.mongodb.com/manual/reference/change-events/#invalidate-event)
     Invalidate,
+
+    /// A catch-all for future event types.
+    Other(String),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum OperationTypeHelper {
+    Insert,
+    Update,
+    Replace,
+    Delete,
+    Drop,
+    Rename,
+    DropDatabase,
+    Invalidate,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum OperationTypeWrapper<'a> {
+    Known(OperationTypeHelper),
+    Unknown(&'a str),
+}
+
+impl<'a> From<&'a OperationType> for OperationTypeWrapper<'a> {
+    fn from(src: &'a OperationType) -> Self {
+        match src {
+            OperationType::Insert => Self::Known(OperationTypeHelper::Insert),
+            OperationType::Update => Self::Known(OperationTypeHelper::Update),
+            OperationType::Replace => Self::Known(OperationTypeHelper::Replace),
+            OperationType::Delete => Self::Known(OperationTypeHelper::Delete),
+            OperationType::Drop => Self::Known(OperationTypeHelper::Drop),
+            OperationType::Rename => Self::Known(OperationTypeHelper::Rename),
+            OperationType::DropDatabase => Self::Known(OperationTypeHelper::DropDatabase),
+            OperationType::Invalidate => Self::Known(OperationTypeHelper::Invalidate),
+            OperationType::Other(s) => Self::Unknown(s),
+        }
+    }
+}
+
+impl<'a> From<OperationTypeWrapper<'a>> for OperationType {
+    fn from(src: OperationTypeWrapper) -> Self {
+        match src {
+            OperationTypeWrapper::Known(h) => match h {
+                OperationTypeHelper::Insert => Self::Insert,
+                OperationTypeHelper::Update => Self::Update,
+                OperationTypeHelper::Replace => Self::Replace,
+                OperationTypeHelper::Delete => Self::Delete,
+                OperationTypeHelper::Drop => Self::Drop,
+                OperationTypeHelper::Rename => Self::Rename,
+                OperationTypeHelper::DropDatabase => Self::DropDatabase,
+                OperationTypeHelper::Invalidate => Self::Invalidate,
+            },
+            OperationTypeWrapper::Unknown(s) => Self::Other(s.to_string()),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OperationType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        OperationTypeWrapper::deserialize(deserializer).map(OperationType::from)
+    }
+}
+
+impl Serialize for OperationType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        OperationTypeWrapper::serialize(&self.into(), serializer)
+    }
 }
 
 /// Identifies the collection or database on which an event occurred.

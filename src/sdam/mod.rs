@@ -13,13 +13,13 @@ pub(crate) use self::{
     description::{
         server::ServerDescription,
         topology::{
-            server_selection::{self, SelectedServer},
+            server_selection::{self, SelectedServer, IDLE_WRITE_PERIOD},
             SessionSupportStatus,
             TopologyDescription,
             TransactionSupportStatus,
         },
     },
-    monitor::{Monitor, MIN_HEARTBEAT_FREQUENCY},
+    monitor::{Monitor, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     server::Server,
     topology::{
         HandshakePhase,

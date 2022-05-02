@@ -8,7 +8,7 @@
 //! # Installation
 //!
 //! ## Requirements
-//! - Rust 1.51+
+//! - Rust 1.53+
 //! - MongoDB 3.6+
 //!
 //! ## Importing
@@ -16,7 +16,7 @@
 //! your application, simply add it to your project's `Cargo.toml`.
 //! ```toml
 //! [dependencies]
-//! mongodb = "2.0.0"
+//! mongodb = "2.2.0"
 //! ```
 //!
 //! ### Configuring the async runtime
@@ -30,7 +30,7 @@
 //! add the following to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.0.0"
+//! version = "2.2.0"
 //! default-features = false
 //! features = ["async-std-runtime"]
 //! ```
@@ -40,7 +40,7 @@
 //! `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.0.0"
+//! version = "2.2.0"
 //! default-features = false
 //! features = ["sync"]
 //! ```
@@ -283,7 +283,7 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.51.0. This will be rarely be increased, and if it ever is,
+//! The MSRV for this crate is currently 1.53.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
@@ -301,7 +301,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/2.0.0")]
+#![doc(html_root_url = "https://docs.rs/mongodb/2.2.0")]
 
 #[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
 compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");

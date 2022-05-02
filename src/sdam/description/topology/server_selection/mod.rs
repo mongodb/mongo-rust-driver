@@ -21,6 +21,7 @@ use crate::{
 };
 
 const DEFAULT_LOCAL_THRESHOLD: Duration = Duration::from_millis(15);
+pub(crate) const IDLE_WRITE_PERIOD: Duration = Duration::from_secs(10);
 
 /// Struct encapsulating a selected server that handles the opcount accounting.
 #[derive(Debug)]
@@ -133,9 +134,9 @@ impl TopologyDescription {
     }
 
     fn suitable_servers<'a>(
-        &'a self,
+        &self,
         read_preference: &'a ReadPreference,
-    ) -> Result<Vec<&'a ServerDescription>> {
+    ) -> Result<Vec<&ServerDescription>> {
         let servers = match self.topology_type {
             TopologyType::Unknown => Vec::new(),
             TopologyType::Single | TopologyType::LoadBalanced => self.servers.values().collect(),
@@ -185,9 +186,9 @@ impl TopologyDescription {
     }
 
     fn suitable_servers_in_replica_set<'a>(
-        &'a self,
+        &self,
         read_preference: &'a ReadPreference,
-    ) -> Result<Vec<&'a ServerDescription>> {
+    ) -> Result<Vec<&ServerDescription>> {
         let servers = match read_preference {
             ReadPreference::Primary => self.servers_with_type(&[ServerType::RsPrimary]).collect(),
             ReadPreference::Secondary { ref options } => self
@@ -230,11 +231,11 @@ impl TopologyDescription {
     }
 
     fn suitable_servers_for_read_preference<'a>(
-        &'a self,
-        types: &'a [ServerType],
+        &self,
+        types: &'static [ServerType],
         tag_sets: Option<&'a Vec<TagSet>>,
         max_staleness: Option<Duration>,
-    ) -> Result<Vec<&'a ServerDescription>> {
+    ) -> Result<Vec<&ServerDescription>> {
         super::verify_max_staleness(max_staleness)?;
 
         let mut servers = self.servers_with_type(types).collect();

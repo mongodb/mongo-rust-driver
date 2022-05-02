@@ -8,6 +8,7 @@ use crate::{
         options::ChangeStreamOptions,
         ChangeStream,
     },
+    db::options::{ChangeStreamPreAndPostImages, CreateCollectionOptions},
     event::command::{CommandStartedEvent, CommandSucceededEvent},
     test::{CommandEvent, FailCommandOptions, FailPoint, FailPointMode},
     Collection,
@@ -314,10 +315,10 @@ async fn resume_start_at_operation_time() -> Result<()> {
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
+        log_uncaptured(format!(
             "skipping change stream test due to server version {:?}",
             client.server_version
-        );
+        ));
         return Ok(());
     }
 
@@ -369,10 +370,10 @@ async fn batch_end_resume_token() -> Result<()> {
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
+        log_uncaptured(format!(
             "skipping change stream test due to server version {:?}",
             client.server_version
-        );
+        ));
         return Ok(());
     }
 
@@ -404,10 +405,10 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
+        log_uncaptured(format!(
             "skipping change stream test due to server version {:?}",
             client.server_version
-        );
+        ));
         return Ok(());
     }
 
@@ -533,10 +534,10 @@ async fn resume_uses_start_after() -> Result<()> {
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
+        log_uncaptured(format!(
             "skipping change stream test on unsupported version {:?}",
             client.server_version
-        );
+        ));
         return Ok(());
     }
 
@@ -599,10 +600,10 @@ async fn resume_uses_resume_after() -> Result<()> {
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
+        log_uncaptured(format!(
             "skipping change stream test on unsupported version {:?}",
             client.server_version
-        );
+        ));
         return Ok(());
     }
 
@@ -651,6 +652,36 @@ async fn resume_uses_resume_after() -> Result<()> {
         "resume mismatch: {:#?}",
         last,
     );
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)] // multi_thread required for FailPoint
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn create_coll_pre_post() -> Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if !VersionReq::parse(">=6.0")
+        .unwrap()
+        .matches(&client.server_version)
+    {
+        log_uncaptured(format!(
+            "skipping change stream test on unsupported version {:?}",
+            client.server_version
+        ));
+        return Ok(());
+    }
+
+    let db = client.database("create_coll_pre_post");
+    db.collection::<Document>("test").drop(None).await?;
+    db.create_collection(
+        "test",
+        CreateCollectionOptions::builder()
+            .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
+            .build(),
+    )
+    .await?;
 
     Ok(())
 }

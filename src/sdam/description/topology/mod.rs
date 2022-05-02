@@ -14,11 +14,12 @@ use crate::{
     client::ClusterTime,
     cmap::Command,
     options::{ClientOptions, ServerAddress},
-    sdam::description::server::{ServerDescription, ServerType},
+    sdam::{
+        description::server::{ServerDescription, ServerType},
+        DEFAULT_HEARTBEAT_FREQUENCY,
+    },
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
-
-const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
 
 /// The possible types for a topology.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]

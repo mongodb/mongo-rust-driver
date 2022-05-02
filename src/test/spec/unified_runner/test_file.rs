@@ -305,7 +305,7 @@ pub struct ExpectedEvents {
     pub client: String,
     pub events: Vec<ExpectedEvent>,
     pub event_type: Option<ExpectedEventType>,
-    pub event_match: Option<EventMatch>,
+    pub ignore_extra_events: Option<bool>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
@@ -351,7 +351,11 @@ impl ExpectError {
         }
         if let Some(error_code) = self.error_code {
             match &error.code() {
-                Some(code) => assert_eq!(*code, error_code),
+                Some(code) => assert_eq!(
+                    *code, error_code,
+                    "error {:?} did not match expected error code {}",
+                    error, error_code
+                ),
                 None => panic!("{} should include code", error),
             }
         }

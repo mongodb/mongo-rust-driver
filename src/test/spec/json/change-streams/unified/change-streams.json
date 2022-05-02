@@ -1,6 +1,15 @@
 {
   "description": "change-streams",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.7",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "3.6",
+      "topologies": [
+        "replicaset",
+        "sharded-replicaset"
+      ]
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -103,10 +112,7 @@
       "description": "Test array truncation",
       "runOnRequirements": [
         {
-          "minServerVersion": "4.7",
-          "topologies": [
-            "replicaset"
-          ]
+          "minServerVersion": "4.7"
         }
       ],
       "operations": [
@@ -182,6 +188,264 @@
       ]
     },
     {
+      "description": "Test unknown operationType MUST NOT err",
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "operationType": "addedInFutureMongoDBVersion",
+                  "ns": 1
+                }
+              }
+            ]
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "_id": 1,
+              "a": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "operationType": "addedInFutureMongoDBVersion",
+            "ns": {
+              "db": "database0",
+              "coll": "collection0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Test newField added in response MUST NOT err",
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "operationType": 1,
+                  "ns": 1,
+                  "newField": "newFieldValue"
+                }
+              }
+            ]
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "_id": 1,
+              "a": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "operationType": "insert",
+            "ns": {
+              "db": "database0",
+              "coll": "collection0"
+            },
+            "newField": "newFieldValue"
+          }
+        }
+      ]
+    },
+    {
+      "description": "Test new structure in ns document MUST NOT err",
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "operationType": "insert",
+                  "ns.viewOn": "db.coll"
+                }
+              }
+            ]
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "_id": 1,
+              "a": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "operationType": "insert",
+            "ns": {
+              "viewOn": "db.coll"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Test modified structure in ns document MUST NOT err",
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "operationType": "insert",
+                  "ns": {
+                    "db": "$ns.db",
+                    "coll": "$ns.coll",
+                    "viewOn": "db.coll"
+                  }
+                }
+              }
+            ]
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "_id": 1,
+              "a": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "operationType": "insert",
+            "ns": {
+              "db": "database0",
+              "coll": "collection0",
+              "viewOn": "db.coll"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Test server error on projecting out _id",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "4.2"
+        }
+      ],
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "_id": 0
+                }
+              }
+            ]
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "_id": 1,
+              "a": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectError": {
+            "errorCode": 280,
+            "errorCodeName": "ChangeStreamFatalError",
+            "errorLabelsContain": [
+              "NonResumableChangeStreamError"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "description": "Test projection in change stream returns expected fields",
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "optype": "$operationType",
+                  "ns": 1,
+                  "newField": "value"
+                }
+              }
+            ]
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "_id": 1,
+              "a": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "optype": "insert",
+            "ns": {
+              "db": "database0",
+              "coll": "collection0"
+            },
+            "newField": "value"
+          }
+        }
+      ]
+    },
+    {
       "description": "$changeStream must be the first stage in a change stream pipeline sent to the server",
       "runOnRequirements": [
         {
@@ -196,8 +460,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -226,9 +489,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -239,7 +500,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -275,8 +536,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -305,9 +565,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -331,8 +589,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -373,9 +630,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -386,7 +641,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -428,8 +683,7 @@
                   "fullDocument.z": 3
                 }
               }
-            ],
-            "options": {}
+            ]
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -461,9 +715,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -474,7 +726,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -487,9 +739,7 @@
                     },
                     {
                       "$match": {
-                        "fullDocument.z": {
-                          "$numberInt": "3"
-                        }
+                        "fullDocument.z": 3
                       }
                     }
                   ]
@@ -517,8 +767,7 @@
           "name": "createChangeStream",
           "object": "database0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -559,9 +808,7 @@
               "coll": "collection1"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -578,9 +825,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -591,14 +836,12 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
                 "command": {
-                  "aggregate": {
-                    "$numberInt": "1"
-                  },
+                  "aggregate": 1,
                   "cursor": {},
                   "pipeline": [
                     {
@@ -629,8 +872,7 @@
           "name": "createChangeStream",
           "object": "client0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -671,9 +913,7 @@
               "coll": "collection1"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -690,9 +930,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "y": {
-                "$numberInt": "2"
-              },
+              "y": 2,
               "_id": {
                 "$$exists": true
               }
@@ -709,9 +947,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "z": {
-                "$numberInt": "3"
-              },
+              "z": 3,
               "_id": {
                 "$$exists": true
               }
@@ -722,14 +958,12 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
                 "command": {
-                  "aggregate": {
-                    "$numberInt": "1"
-                  },
+                  "aggregate": 1,
                   "cursor": {},
                   "pipeline": [
                     {
@@ -762,8 +996,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -821,9 +1054,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -841,9 +1072,7 @@
             },
             "updateDescription": {
               "updatedFields": {
-                "x": {
-                  "$numberInt": "2"
-                }
+                "x": 2
               },
               "removedFields": [],
               "truncatedArrays": {
@@ -864,9 +1093,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "3"
-              },
+              "x": 3,
               "_id": {
                 "$$exists": true
               }
@@ -888,7 +1115,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -924,8 +1151,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -969,7 +1195,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1005,8 +1231,7 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": [],
-            "options": {}
+            "pipeline": []
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1039,7 +1264,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
@@ -1095,9 +1320,7 @@
           "object": "collection0",
           "arguments": {
             "pipeline": [],
-            "options": {
-              "batchSize": 1
-            }
+            "batchSize": 1
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -1138,9 +1361,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              },
+              "x": 1,
               "_id": {
                 "$$exists": true
               }
@@ -1157,9 +1378,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "2"
-              },
+              "x": 2,
               "_id": {
                 "$$exists": true
               }
@@ -1176,9 +1395,7 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "x": {
-                "$numberInt": "3"
-              },
+              "x": 3,
               "_id": {
                 "$$exists": true
               }
@@ -1189,7 +1406,7 @@
       "expectEvents": [
         {
           "client": "client0",
-          "eventMatch": "prefix",
+          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {

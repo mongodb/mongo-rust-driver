@@ -7,8 +7,7 @@ use crate::{
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     concern::ReadConcern,
     operation::{
-        count::SERVER_4_9_0_WIRE_VERSION,
-        test::{self, handle_response_test, handle_response_test_with_wire_version},
+        test::{self, handle_response_test},
         Count,
         Operation,
     },
@@ -88,26 +87,6 @@ fn handle_success() {
     let response = doc! { "ok": 1.0, "n": n as i32 };
 
     let actual_values = handle_response_test(&count_op, response).unwrap();
-    assert_eq!(actual_values, n);
-}
-
-#[test]
-fn handle_success_agg() {
-    let count_op = Count::empty();
-
-    let n = 26;
-    let response = doc! {
-        "ok": 1.0,
-        "cursor": {
-            "id": 0,
-            "ns": "a.b",
-            "firstBatch": [ { "n": n as i32 } ]
-        }
-    };
-
-    let actual_values =
-        handle_response_test_with_wire_version(&count_op, response, SERVER_4_9_0_WIRE_VERSION)
-            .unwrap();
     assert_eq!(actual_values, n);
 }
 

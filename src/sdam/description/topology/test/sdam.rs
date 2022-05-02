@@ -125,6 +125,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             topology_version: None,
             compressors: None,
             hello_ok: test.hello_ok,
+            max_message_size_bytes: 48 * 1024 * 1024,
         }
     }
 }
@@ -613,6 +614,7 @@ async fn heartbeat_events() {
     let mut options = CLIENT_OPTIONS.clone();
     options.hosts.drain(1..);
     options.heartbeat_freq = Some(Duration::from_millis(50));
+    options.app_name = "heartbeat_events".to_string().into();
 
     let event_handler = EventHandler::new();
     let mut subscriber = event_handler.subscribe();
@@ -644,11 +646,14 @@ async fn heartbeat_events() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    if !client.supports_fail_command() {
+    if !client.supports_fail_command_appname() {
         return;
     }
 
-    let options = FailCommandOptions::builder().error_code(1234).build();
+    let options = FailCommandOptions::builder()
+        .error_code(1234)
+        .app_name("heartbeat_events".to_string())
+        .build();
     let failpoint = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(1),
@@ -750,6 +755,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         "maxWireVersion": 6,
         "maxBsonObjectSize": 16_000,
         "maxWriteBatchSize": 10_000,
+        "maxMessageSizeBytes": 48_000_000,
     })
     .unwrap();
 
