@@ -539,7 +539,7 @@ functions:
           ${PREPARE_SHELL}
           ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
 
-  "cargo deny":
+  "check cargo deny":
     - command: shell.exec
       type: test
       params:
@@ -547,7 +547,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          .evergreen/cargo-deny.sh
+          .evergreen/check-cargo-deny.sh
 
   "check rustfmt":
     - command: shell.exec
@@ -1293,9 +1293,9 @@ tasks:
     commands:
       - func: "compile only"
 
-  - name: "cargo-deny"
+  - name: "check-cargo-deny"
     commands:
-      - func: "cargo deny"
+      - func: "check cargo deny"
 
   - name: "check-rustfmt"
     commands:
@@ -1689,14 +1689,6 @@ buildvariants:
   tasks:
     - "compile-only"
 
-- matrix_name: "cargo-deny"
-  matrix_spec:
-    os:
-      - ubuntu-18.04
-  display_name: "! Check cargo deny warnings"
-  tasks:
-    - "cargo-deny"
-
 - matrix_name: "versioned-api-tests"
   matrix_spec:
     os:
@@ -1718,4 +1710,5 @@ buildvariants:
     - name: "check-rustfmt"
     - name: "check-rustdoc"
     - name: "check-manual"
+    - name: "check-cargo-deny"
 
