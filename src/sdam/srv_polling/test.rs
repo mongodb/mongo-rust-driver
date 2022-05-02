@@ -1,6 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use pretty_assertions::assert_eq;
+use tokio::sync::RwLockReadGuard;
 
 use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
@@ -8,6 +9,7 @@ use crate::{
     options::{ClientOptions, ServerAddress},
     runtime,
     sdam::Topology,
+    test::{log_uncaptured, CLIENT_OPTIONS, LOCK},
 };
 
 fn localhost_test_build_10gen(port: u16) -> ServerAddress {
@@ -25,16 +27,20 @@ lazy_static::lazy_static! {
 }
 
 async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
     options.test_options_mut().disable_monitoring_threads = true;
-    let topology = Topology::new(options).unwrap();
-    let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
+    let topology = Topology::new(options.clone()).unwrap();
+    let mut monitor =
+        SrvPollingMonitor::new(topology.clone_updater(), topology.watch(), options.clone())
+            .unwrap();
     monitor
-        .update_hosts(new_hosts.and_then(make_lookup_hosts), topology.clone())
+        .update_hosts(new_hosts.and_then(make_lookup_hosts))
         .await;
 
-    assert_eq!(expected_hosts, topology.servers().await);
+    assert_eq!(expected_hosts, topology.server_addresses());
 }
 
 fn make_lookup_hosts(hosts: Vec<ServerAddress>) -> Result<LookupHosts> {
@@ -110,6 +116,13 @@ async fn no_results() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced_no_srv_polling() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    if CLIENT_OPTIONS.load_balanced != Some(true) {
+        log_uncaptured("skipping load_balanced_no_srv_polling due to not load balanced topology");
+        return;
+    }
+
     let hosts = vec![localhost_test_build_10gen(27017)];
     let mut options = ClientOptions::new_srv();
     let rescan_interval = options.original_srv_info.as_ref().cloned().unwrap().min_ttl;
@@ -123,6 +136,6 @@ async fn load_balanced_no_srv_polling() {
     runtime::delay_for(rescan_interval * 2).await;
     assert_eq!(
         hosts.into_iter().collect::<HashSet<_>>(),
-        topology.servers().await
+        topology.server_addresses()
     );
 }

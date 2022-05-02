@@ -34,7 +34,7 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
-    sdam::{SelectedServer, SessionSupportStatus, Topology},
+    sdam::{server_selection, SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -101,12 +101,6 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-}
-
-impl Drop for ClientInner {
-    fn drop(&mut self) {
-        self.topology.close()
-    }
 }
 
 impl Client {
@@ -323,7 +317,7 @@ impl Client {
     /// If the session is expired or dirty, or the topology no longer supports sessions, the session
     /// will be discarded.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
-        let session_support_status = self.inner.topology.session_support_status().await;
+        let session_support_status = self.inner.topology.session_support_status();
         if let SessionSupportStatus::Supported {
             logical_session_timeout,
         } = session_support_status
@@ -391,40 +385,30 @@ impl Client {
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
+        let mut watcher = self.inner.topology.watch();
         loop {
-            let mut topology_change_subscriber =
-                self.inner.topology.subscribe_to_topology_changes();
+            let state = watcher.observe_latest();
 
-            let selected_server = self
-                .inner
-                .topology
-                .attempt_to_select_server(criteria)
-                .await?;
-
-            if let Some(server) = selected_server {
+            if let Some(server) = server_selection::attempt_to_select_server(
+                criteria,
+                &state.description,
+                &state.servers,
+            )? {
                 return Ok(server);
             }
 
-            self.inner.topology.request_topology_check();
+            self.inner.topology.request_update();
 
-            // If the time that has passed since the start of the loop is greater than the timeout,
-            // then `time_remaining` will be 0, so no change will be found.
-            let time_passed = start_time.elapsed();
-            let time_remaining = timeout
-                .checked_sub(time_passed)
-                .unwrap_or_else(|| Duration::from_millis(0));
-
-            let change_occurred = topology_change_subscriber
-                .wait_for_message(time_remaining)
-                .await;
-
+            let change_occurred = start_time.elapsed() < timeout
+                && watcher
+                    .wait_for_update(timeout - start_time.elapsed())
+                    .await;
             if !change_occurred {
                 return Err(ErrorKind::ServerSelection {
                     message: self
                         .inner
                         .topology
-                        .server_selection_timeout_error_message(criteria)
-                        .await,
+                        .server_selection_timeout_error_message(criteria),
                 }
                 .into());
             }
@@ -433,9 +417,11 @@ impl Client {
 
     #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) async fn get_hosts(&self) -> Vec<String> {
-        let servers = self.inner.topology.servers().await;
+        let watcher = self.inner.topology.watch();
+        let state = watcher.peek_latest();
+
+        let servers = state.servers.keys();
         servers
-            .iter()
             .map(|stream_address| format!("{}", stream_address))
             .collect()
     }
@@ -446,7 +432,12 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub(crate) async fn topology_description(&self) -> crate::sdam::TopologyDescription {
-        self.inner.topology.description().await
+    pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
+        self.inner
+            .topology
+            .watch()
+            .peek_latest()
+            .description
+            .clone()
     }
 }

@@ -95,6 +95,7 @@ impl TestServerDescription {
                     .map(f64_ms_as_duration)
                     .unwrap_or_else(|| Duration::from_millis(1234)),
                 cluster_time: None,
+                raw_command_response: Default::default(),
             })
         });
 

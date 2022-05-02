@@ -43,7 +43,7 @@ async fn speculative_auth_test(
     );
     pool_options.tls_options = CLIENT_OPTIONS.tls_options();
 
-    let description = client.topology_description().await;
+    let description = client.topology_description();
 
     // if running against a replica set, use the primary to ensure the user creation has propagated.
     let addr = match description.topology_type {

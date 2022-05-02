@@ -11,7 +11,6 @@ use crate::{
     error::ErrorKind,
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
-    sdam::ServerType,
     test::{
         log_uncaptured,
         CmapEvent,
@@ -308,6 +307,11 @@ async fn auth_error() {
         return;
     }
 
+    if setup_client.is_load_balanced() {
+        log_uncaptured("skipping auth_error test due to load balanced topology");
+        return;
+    }
+
     setup_client
         .init_db_and_coll("auth_error", "auth_error")
         .await
@@ -344,24 +348,31 @@ async fn auth_error() {
         .expect_err("insert should fail");
     assert!(matches!(*auth_err.kind, ErrorKind::Authentication { .. }));
 
-    if !setup_client.is_load_balanced() {
-        subscriber
-            .wait_for_event(Duration::from_millis(2000), |event| match event {
-                Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) => {
-                    event.new_description.description.server_type == ServerType::Unknown
-                }
-                _ => false,
-            })
-            .await
-            .expect("should see server marked unknown");
-    }
-
-    subscriber
-        .wait_for_event(Duration::from_millis(2000), |event| {
-            matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
+    // collect the events as the order is non-deterministic
+    let mut seen_clear = false;
+    let mut seen_mark_unknown = false;
+    let events = subscriber
+        .collect_events(Duration::from_secs(1), |event| match event {
+            Event::Sdam(SdamEvent::ServerDescriptionChanged(event))
+                if event.is_marked_unknown_event() =>
+            {
+                seen_mark_unknown = true;
+                true
+            }
+            Event::Cmap(CmapEvent::PoolCleared(_)) => {
+                seen_clear = true;
+                true
+            }
+            _ => false,
         })
-        .await
-        .expect("should see pool cleared event");
+        .await;
+
+    // verify we saw exactly one of both types of events
+    assert!(
+        seen_clear && seen_mark_unknown && events.len() == 2,
+        "expected one marked unknown event, one pool cleared event, instead got {:#?}",
+        events
+    );
 
     coll.insert_many(vec![doc! { "_id": 5 }, doc! { "_id": 6 }], None)
         .await

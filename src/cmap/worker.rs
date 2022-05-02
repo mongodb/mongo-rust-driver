@@ -32,8 +32,8 @@ use crate::{
         PoolReadyEvent,
     },
     options::ServerAddress,
-    runtime,
-    sdam::ServerUpdateSender,
+    runtime::{self, WorkerHandleListener},
+    sdam::TopologyUpdater,
 };
 
 use std::{
@@ -41,7 +41,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
 const MAINTENACE_FREQUENCY: Duration = Duration::from_millis(500);
@@ -113,7 +112,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// Receiver used to determine if any threads hold references to this pool. If all the
     /// sender ends of this receiver drop, this worker will be notified and drop too.
-    handle_listener: HandleListener,
+    handle_listener: WorkerHandleListener,
 
     /// Receiver for incoming connection check out requests.
     request_receiver: ConnectionRequestReceiver,
@@ -133,7 +132,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// A handle used to notify SDAM that a connection establishment error happened. This will
     /// allow the server to transition to Unknown and clear the pool as necessary.
-    server_updater: ServerUpdateSender,
+    server_updater: TopologyUpdater,
 }
 
 impl ConnectionPoolWorker {
@@ -143,7 +142,7 @@ impl ConnectionPoolWorker {
     pub(super) fn start(
         address: ServerAddress,
         http_client: runtime::HttpClient,
-        server_updater: ServerUpdateSender,
+        server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
         let establisher = ConnectionEstablisher::new(http_client, options.as_ref());
@@ -169,7 +168,7 @@ impl ConnectionPoolWorker {
             .as_ref()
             .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
-        let (handle, handle_listener) = handle_channel();
+        let (handle, handle_listener) = WorkerHandleListener::channel();
         let (connection_requester, request_receiver) = connection_requester::channel(handle);
         let (manager, management_receiver) = manager::channel();
 
@@ -629,7 +628,7 @@ impl ConnectionPoolWorker {
 async fn establish_connection(
     establisher: &ConnectionEstablisher,
     pending_connection: PendingConnection,
-    server_updater: &mut ServerUpdateSender,
+    server_updater: &mut TopologyUpdater,
     manager: &PoolManager,
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
@@ -640,7 +639,13 @@ async fn establish_connection(
 
     match establish_result {
         Err(ref e) => {
-            server_updater.handle_error(e.clone()).await;
+            server_updater
+                .handle_application_error(
+                    address.clone(),
+                    e.cause.clone(),
+                    e.handshake_phase.clone(),
+                )
+                .await;
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,
@@ -693,46 +698,6 @@ enum PoolTask {
 impl From<PoolManagementRequest> for PoolTask {
     fn from(request: PoolManagementRequest) -> Self {
         PoolTask::HandleManagementRequest(Box::new(request))
-    }
-}
-
-/// Constructs a new channel for for monitoring whether this pool still has references
-/// to it.
-fn handle_channel() -> (PoolWorkerHandle, HandleListener) {
-    let (sender, receiver) = mpsc::channel(1);
-    (
-        PoolWorkerHandle { _sender: sender },
-        HandleListener { receiver },
-    )
-}
-
-/// Handle to the worker. Once all handles have been dropped, the worker
-/// will stop waiting for new requests and drop the pool itself.
-#[derive(Debug, Clone)]
-pub(super) struct PoolWorkerHandle {
-    _sender: mpsc::Sender<()>,
-}
-
-impl PoolWorkerHandle {
-    #[cfg(test)]
-    pub(super) fn new_mocked() -> Self {
-        let (s, _) = handle_channel();
-        s
-    }
-}
-
-/// Listener used to determine when all handles have been dropped.
-#[derive(Debug)]
-struct HandleListener {
-    receiver: mpsc::Receiver<()>,
-}
-
-impl HandleListener {
-    /// Listen until all handles are dropped.
-    /// This will not return until all handles are dropped, so make sure to only poll this via
-    /// select or with a timeout.
-    async fn wait_for_all_handle_drops(&mut self) {
-        self.receiver.recv().await;
     }
 }
 

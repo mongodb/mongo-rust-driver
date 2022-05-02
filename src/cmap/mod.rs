@@ -18,7 +18,7 @@ use tokio::sync::oneshot;
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
     conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
-    establish::{handshake::Handshaker, EstablishError},
+    establish::handshake::Handshaker,
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
 };
@@ -35,14 +35,14 @@ use crate::{
     },
     options::ServerAddress,
     runtime::HttpClient,
-    sdam::ServerUpdateSender,
+    sdam::TopologyUpdater,
 };
 use connection_requester::ConnectionRequester;
 use manager::PoolManager;
 use worker::ConnectionPoolWorker;
 
 #[cfg(test)]
-use self::worker::PoolWorkerHandle;
+use crate::runtime::WorkerHandle;
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 
@@ -64,7 +64,7 @@ impl ConnectionPool {
     pub(crate) fn new(
         address: ServerAddress,
         http_client: HttpClient,
-        server_updater: ServerUpdateSender,
+        server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
         let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
@@ -97,7 +97,7 @@ impl ConnectionPool {
     #[cfg(test)]
     pub(crate) fn new_mocked(address: ServerAddress) -> Self {
         let (manager, _) = manager::channel();
-        let handle = PoolWorkerHandle::new_mocked();
+        let handle = WorkerHandle::new_mocked();
         let (connection_requester, _) = connection_requester::channel(handle);
         let (_, generation_subscriber) = status::channel(PoolGeneration::normal());
 

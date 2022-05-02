@@ -351,19 +351,7 @@ impl Client {
 
         let retryability = self.get_retryability(&conn, &op, &session)?;
 
-        let txn_number = match session {
-            Some(ref mut session) => {
-                if session.transaction.state != TransactionState::None {
-                    Some(session.txn_number())
-                } else {
-                    match retryability {
-                        Retryability::Write => Some(session.get_and_increment_txn_number()),
-                        _ => None,
-                    }
-                }
-            }
-            None => None,
-        };
+        let txn_number = get_txn_number(&mut session, retryability);
 
         match self
             .execute_operation_on_connection(
@@ -371,7 +359,7 @@ impl Client {
                 &mut conn,
                 &mut session,
                 txn_number,
-                &retryability,
+                retryability,
             )
             .await
         {
@@ -398,9 +386,9 @@ impl Client {
                 self.inner
                     .topology
                     .handle_application_error(
+                        server.address.clone(),
                         err.clone(),
                         HandshakePhase::after_completion(&conn),
-                        &server,
                     )
                     .await;
                 // release the connection to be processed by the connection pool
@@ -424,7 +412,7 @@ impl Client {
         &self,
         op: &mut T,
         session: &mut Option<&mut ClientSession>,
-        txn_number: Option<i64>,
+        prior_txn_number: Option<i64>,
         first_error: Error,
     ) -> Result<ExecutionOutput<T>> {
         op.update_for_retry();
@@ -446,8 +434,10 @@ impl Client {
             return Err(first_error);
         }
 
+        let txn_number = prior_txn_number.or_else(|| get_txn_number(session, retryability));
+
         match self
-            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
+            .execute_operation_on_connection(op, &mut conn, session, txn_number, retryability)
             .await
         {
             Ok(operation_output) => Ok(ExecutionOutput {
@@ -458,9 +448,9 @@ impl Client {
                 self.inner
                     .topology
                     .handle_application_error(
+                        server.address.clone(),
                         err.clone(),
                         HandshakePhase::after_completion(&conn),
-                        &server,
                     )
                     .await;
                 drop(server);
@@ -481,7 +471,7 @@ impl Client {
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        retryability: &Retryability,
+        retryability: Retryability,
     ) -> Result<T::O> {
         if let Some(wc) = op.write_concern() {
             wc.validate()?;
@@ -490,10 +480,11 @@ impl Client {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
-        self.inner
-            .topology
-            .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
-            .await;
+        self.inner.topology.update_command_with_read_pref(
+            connection.address(),
+            &mut cmd,
+            op.selection_criteria(),
+        );
 
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
@@ -587,7 +578,7 @@ impl Client {
         }
 
         let session_cluster_time = session.as_ref().and_then(|session| session.cluster_time());
-        let client_cluster_time = self.inner.topology.cluster_time().await;
+        let client_cluster_time = self.inner.topology.cluster_time();
         let max_cluster_time = std::cmp::max(session_cluster_time, client_cluster_time.as_ref());
         if let Some(cluster_time) = max_cluster_time {
             cmd.set_cluster_time(cluster_time);
@@ -788,7 +779,7 @@ impl Client {
     }
 
     async fn select_data_bearing_server(&self) -> Result<()> {
-        let topology_type = self.inner.topology.topology_type().await;
+        let topology_type = self.inner.topology.topology_type();
         let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
             let server_type = server_info.server_type();
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
@@ -802,14 +793,14 @@ impl Client {
     /// session timeout. If it has yet to be determined if the topology supports sessions, this
     /// method will perform a server selection that will force that determination to be made.
     pub(crate) async fn get_session_support_status(&self) -> Result<SessionSupportStatus> {
-        let initial_status = self.inner.topology.session_support_status().await;
+        let initial_status = self.inner.topology.session_support_status();
 
         // Need to guarantee that we're connected to at least one server that can determine if
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
                 self.select_data_bearing_server().await?;
-                Ok(self.inner.topology.session_support_status().await)
+                Ok(self.inner.topology.session_support_status())
             }
             _ => Ok(initial_status),
         }
@@ -819,14 +810,14 @@ impl Client {
     /// topology supports transactions, this method will perform a server selection that will force
     /// that determination to be made.
     pub(crate) async fn transaction_support_status(&self) -> Result<TransactionSupportStatus> {
-        let initial_status = self.inner.topology.transaction_support_status().await;
+        let initial_status = self.inner.topology.transaction_support_status();
 
         // Need to guarantee that we're connected to at least one server that can determine if
         // sessions are supported or not.
         match initial_status {
             TransactionSupportStatus::Undetermined => {
                 self.select_data_bearing_server().await?;
-                Ok(self.inner.topology.transaction_support_status().await)
+                Ok(self.inner.topology.transaction_support_status())
             }
             _ => Ok(initial_status),
         }
@@ -885,7 +876,10 @@ impl Client {
         session: &mut Option<&mut ClientSession>,
     ) {
         if let Some(ref cluster_time) = cluster_time {
-            self.inner.topology.advance_cluster_time(cluster_time).await;
+            self.inner
+                .topology
+                .advance_cluster_time(cluster_time.clone())
+                .await;
             if let Some(ref mut session) = session {
                 session.advance_cluster_time(cluster_time)
             }
@@ -918,6 +912,25 @@ async fn get_connection<T: Operation>(
     }
 }
 
+fn get_txn_number(
+    session: &mut Option<&mut ClientSession>,
+    retryability: Retryability,
+) -> Option<i64> {
+    match session {
+        Some(ref mut session) => {
+            if session.transaction.state != TransactionState::None {
+                Some(session.txn_number())
+            } else {
+                match retryability {
+                    Retryability::Write => Some(session.get_and_increment_txn_number()),
+                    _ => None,
+                }
+            }
+        }
+        None => None,
+    }
+}
+
 impl Error {
     /// Adds the necessary labels to this Error, and unpins the session if needed.
     ///
@@ -936,7 +949,7 @@ impl Error {
         &mut self,
         conn: Option<&Connection>,
         session: &mut Option<&mut ClientSession>,
-        retryability: Option<&Retryability>,
+        retryability: Option<Retryability>,
     ) -> Result<()> {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
             &session.transaction.state
@@ -970,7 +983,7 @@ impl Error {
                 }
             }
             TransactionState::None => {
-                if retryability == Some(&Retryability::Write) {
+                if retryability == Some(Retryability::Write) {
                     if let Some(max_wire_version) = max_wire_version {
                         if self.should_add_retryable_write_label(max_wire_version) {
                             self.add_label(RETRYABLE_WRITE_ERROR);
