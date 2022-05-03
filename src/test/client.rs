@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, time::Duration};
+use std::{borrow::Cow, collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
@@ -7,10 +7,22 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
+    hello::LEGACY_HELLO_COMMAND_NAME,
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
-    test::{log_uncaptured, util::TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        log_uncaptured,
+        util::TestClient,
+        CmapEvent,
+        Event,
+        EventHandler,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
     Client,
 };
 
@@ -662,4 +674,78 @@ async fn plain_auth() {
             authenticated: "yeah".into()
         }
     );
+}
+
+/// Test verifies that retrying a commitTransaction operation after a checkOut
+/// failure works.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_commit_txn_check_out() {
+    let setup_client = TestClient::new().await;
+    if !setup_client.is_replica_set() {
+        log_uncaptured("skipping retry_commit_txn_check_out due to non-replicaset topology");
+        return;
+    }
+
+    let mut options = CLIENT_OPTIONS.clone();
+    let handler = Arc::new(EventHandler::new());
+    options.cmap_event_handler = Some(handler.clone());
+    options.command_event_handler = Some(handler.clone());
+    let client = Client::with_options(options).unwrap();
+
+    let mut session = client.start_session(None).await.unwrap();
+    session.start_transaction(None).await.unwrap();
+    // transition transaction to "in progress" so that the commit
+    // actually executes an operation.
+    client
+        .database("foo")
+        .collection("bar")
+        .insert_one_with_session(doc! {}, None, &mut session)
+        .await
+        .unwrap();
+
+    // enable a fail point that clears the connection pools so that
+    // commitTransaction will check out a connection
+    let fp = FailPoint::fail_command(
+        &["ping"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder().error_code(11600).build(),
+    );
+    let _guard = setup_client.enable_failpoint(fp, None).await.unwrap();
+
+    client
+        .database("foo")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .unwrap_err();
+
+    // enable a failpoint on the handshake to cause check_out
+    // to fail with a retryable error
+    let fp = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder().error_code(11600).build(),
+    );
+    let _guard2 = setup_client.enable_failpoint(fp, None).await.unwrap();
+
+    let mut subscriber = handler.subscribe();
+    // finally, attempt the commit.
+    // this should succeed due to retry
+    session.commit_transaction().await.unwrap();
+
+    // ensure the first check out attempt fails
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |e| {
+            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_)))
+        })
+        .await
+        .unwrap();
+
+    // ensure the second one succeeds
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |e| {
+            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
+        })
+        .await
+        .unwrap();
 }

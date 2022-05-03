@@ -351,19 +351,7 @@ impl Client {
 
         let retryability = self.get_retryability(&conn, &op, &session)?;
 
-        let txn_number = match session {
-            Some(ref mut session) => {
-                if session.transaction.state != TransactionState::None {
-                    Some(session.txn_number())
-                } else {
-                    match retryability {
-                        Retryability::Write => Some(session.get_and_increment_txn_number()),
-                        _ => None,
-                    }
-                }
-            }
-            None => None,
-        };
+        let txn_number = get_txn_number(&mut session, retryability);
 
         match self
             .execute_operation_on_connection(
@@ -371,7 +359,7 @@ impl Client {
                 &mut conn,
                 &mut session,
                 txn_number,
-                &retryability,
+                retryability,
             )
             .await
         {
@@ -424,7 +412,7 @@ impl Client {
         &self,
         op: &mut T,
         session: &mut Option<&mut ClientSession>,
-        txn_number: Option<i64>,
+        prior_txn_number: Option<i64>,
         first_error: Error,
     ) -> Result<ExecutionOutput<T>> {
         op.update_for_retry();
@@ -446,8 +434,10 @@ impl Client {
             return Err(first_error);
         }
 
+        let txn_number = prior_txn_number.or_else(|| get_txn_number(session, retryability));
+
         match self
-            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
+            .execute_operation_on_connection(op, &mut conn, session, txn_number, retryability)
             .await
         {
             Ok(operation_output) => Ok(ExecutionOutput {
@@ -481,7 +471,7 @@ impl Client {
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        retryability: &Retryability,
+        retryability: Retryability,
     ) -> Result<T::O> {
         if let Some(wc) = op.write_concern() {
             wc.validate()?;
@@ -918,6 +908,25 @@ async fn get_connection<T: Operation>(
     }
 }
 
+fn get_txn_number(
+    session: &mut Option<&mut ClientSession>,
+    retryability: Retryability,
+) -> Option<i64> {
+    match session {
+        Some(ref mut session) => {
+            if session.transaction.state != TransactionState::None {
+                Some(session.txn_number())
+            } else {
+                match retryability {
+                    Retryability::Write => Some(session.get_and_increment_txn_number()),
+                    _ => None,
+                }
+            }
+        }
+        None => None,
+    }
+}
+
 impl Error {
     /// Adds the necessary labels to this Error, and unpins the session if needed.
     ///
@@ -936,7 +945,7 @@ impl Error {
         &mut self,
         conn: Option<&Connection>,
         session: &mut Option<&mut ClientSession>,
-        retryability: Option<&Retryability>,
+        retryability: Option<Retryability>,
     ) -> Result<()> {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
             &session.transaction.state
@@ -970,7 +979,7 @@ impl Error {
                 }
             }
             TransactionState::None => {
-                if retryability == Some(&Retryability::Write) {
+                if retryability == Some(Retryability::Write) {
                     if let Some(max_wire_version) = max_wire_version {
                         if self.should_add_retryable_write_label(max_wire_version) {
                             self.add_label(RETRYABLE_WRITE_ERROR);

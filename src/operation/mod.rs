@@ -379,7 +379,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Retryability {
     Write,
     Read,
