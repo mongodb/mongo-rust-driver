@@ -833,20 +833,6 @@ struct ConnectionStringParts {
     read_preference_tags: Option<Vec<TagSet>>,
 }
 
-impl ConnectionString {
-    /// Amount of time spent attempting to check out a connection from a server's connection pool
-    /// before timing out.  Not supported by the Rust driver.
-    pub fn wait_queue_timeout(&self) -> Option<Duration> {
-        self.wait_queue_timeout
-    }
-
-    /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
-    /// mismatches).  Not supported by the Rust driver.
-    pub fn tls_insecure(&self) -> Option<bool> {
-        self.tls_insecure
-    }
-}
-
 /// Specifies whether TLS configuration should be used with the operations that the
 /// [`Client`](../struct.Client.html) performs.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -1588,6 +1574,18 @@ impl ConnectionString {
         }
 
         Ok(options)
+    }
+
+    /// Amount of time spent attempting to check out a connection from a server's connection pool
+    /// before timing out.  Not supported by the Rust driver.
+    pub fn wait_queue_timeout(&self) -> Option<Duration> {
+        self.wait_queue_timeout
+    }
+
+    /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
+    /// mismatches).  Not supported by the Rust driver.
+    pub fn tls_insecure(&self) -> Option<bool> {
+        self.tls_insecure
     }
 
     fn parse_options(&mut self, options: &str) -> Result<()> {
