@@ -835,7 +835,7 @@ pub enum HostInfo {
     /// A set of addresses.
     HostIdentifiers(Vec<ServerAddress>),
     /// A DNS record for SRV lookup.
-    DnsRecord(String)
+    DnsRecord(String),
 }
 
 impl Default for HostInfo {
@@ -848,7 +848,7 @@ impl Into<Vec<ServerAddress>> for HostInfo {
     fn into(self) -> Vec<ServerAddress> {
         match self {
             Self::HostIdentifiers(hosts) => hosts,
-            Self::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }]
+            Self::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }],
         }
     }
 }
@@ -1479,7 +1479,8 @@ impl ConnectionString {
             None => (None, None),
         };
 
-        let host_list: Result<Vec<_>> = hosts_section.split(',').map(ServerAddress::parse).collect();
+        let host_list: Result<Vec<_>> =
+            hosts_section.split(',').map(ServerAddress::parse).collect();
 
         let host_list = host_list?;
 
@@ -1713,7 +1714,12 @@ impl ConnectionString {
         Ok(parts)
     }
 
-    fn parse_option_pair(&mut self, parts: &mut ConnectionStringParts, key: &str, value: &str) -> Result<()> {
+    fn parse_option_pair(
+        &mut self,
+        parts: &mut ConnectionStringParts,
+        key: &str,
+        value: &str,
+    ) -> Result<()> {
         macro_rules! get_bool {
             ($value:expr, $option:expr) => {
                 match $value {
@@ -1937,7 +1943,8 @@ impl ConnectionString {
                         .collect()
                 };
 
-                parts.read_preference_tags
+                parts
+                    .read_preference_tags
                     .get_or_insert_with(Vec::new)
                     .push(tags?);
             }
@@ -2127,7 +2134,8 @@ impl ConnectionString {
 impl<'de> Deserialize<'de> for ConnectionString {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
-        D: Deserializer<'de> {
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_str(ConnectionStringVisitor)
     }
 }
@@ -2143,7 +2151,8 @@ impl<'de> serde::de::Visitor<'de> for ConnectionStringVisitor {
 
     fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
     where
-            E: serde::de::Error, {
+        E: serde::de::Error,
+    {
         ConnectionString::parse(v).map_err(serde::de::Error::custom)
     }
 }
