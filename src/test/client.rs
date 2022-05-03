@@ -681,11 +681,21 @@ async fn plain_auth() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_commit_txn_check_out() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let setup_client = TestClient::new().await;
     if !setup_client.is_replica_set() {
         log_uncaptured("skipping retry_commit_txn_check_out due to non-replicaset topology");
         return;
     }
+
+    // ensure namespace exists
+    setup_client
+        .database("retry_commit_txn_check_out")
+        .collection("retry_commit_txn_check_out")
+        .insert_one(doc! {}, None)
+        .await
+        .unwrap();
 
     let mut options = CLIENT_OPTIONS.clone();
     let handler = Arc::new(EventHandler::new());
@@ -698,8 +708,8 @@ async fn retry_commit_txn_check_out() {
     // transition transaction to "in progress" so that the commit
     // actually executes an operation.
     client
-        .database("foo")
-        .collection("bar")
+        .database("retry_commit_txn_check_out")
+        .collection("retry_commit_txn_check_out")
         .insert_one_with_session(doc! {}, None, &mut session)
         .await
         .unwrap();
