@@ -250,6 +250,12 @@ impl ServerAddress {
         }
     }
 
+    pub(crate) fn into_host(self) -> String {
+        match self {
+            Self::Tcp { host, .. } => host,
+        }
+    }
+
     pub(crate) fn port(&self) -> Option<u16> {
         match self {
             Self::Tcp { port, .. } => *port,
@@ -684,7 +690,7 @@ pub struct ConnectionString {
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
     /// `direct_connection` field to `true`.
-    pub hosts: Vec<ServerAddress>,
+    pub hosts: HostInfo,
 
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
@@ -806,7 +812,6 @@ pub struct ConnectionString {
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
 
-    pub(crate) srv: bool,
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
     original_uri: String,
@@ -819,6 +824,31 @@ struct ConnectionStringParts {
     max_staleness: Option<Duration>,
     auth_mechanism: Option<AuthMechanism>,
     auth_mechanism_properties: Option<Document>,
+}
+
+/// Specification for mongodb server connections.
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
+pub enum HostInfo {
+    /// A set of addresses.
+    HostIdentifiers(Vec<ServerAddress>),
+    /// A DNS record for SRV lookup.
+    DnsRecord(String)
+}
+
+impl Default for HostInfo {
+    fn default() -> Self {
+        Self::HostIdentifiers(vec![])
+    }
+}
+
+impl Into<Vec<ServerAddress>> for HostInfo {
+    fn into(self) -> Vec<ServerAddress> {
+        match self {
+            Self::HostIdentifiers(hosts) => hosts,
+            Self::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }]
+        }
+    }
 }
 
 /// Specifies whether TLS configuration should be used with the operations that the
@@ -946,37 +976,37 @@ pub struct DriverInfo {
 }
 
 impl From<ConnectionString> for ClientOptions {
-    fn from(parser: ConnectionString) -> Self {
+    fn from(conn_str: ConnectionString) -> Self {
         Self {
-            hosts: parser.hosts,
-            app_name: parser.app_name,
-            tls: parser.tls,
-            heartbeat_freq: parser.heartbeat_freq,
-            local_threshold: parser.local_threshold,
-            read_concern: parser.read_concern,
-            selection_criteria: parser.read_preference.map(Into::into),
-            repl_set_name: parser.repl_set_name,
-            write_concern: parser.write_concern,
-            max_pool_size: parser.max_pool_size,
-            min_pool_size: parser.min_pool_size,
-            max_idle_time: parser.max_idle_time,
-            server_selection_timeout: parser.server_selection_timeout,
-            compressors: parser.compressors,
-            connect_timeout: parser.connect_timeout,
-            retry_reads: parser.retry_reads,
-            retry_writes: parser.retry_writes,
-            socket_timeout: parser.socket_timeout,
-            direct_connection: parser.direct_connection,
-            default_database: parser.default_database,
+            hosts: conn_str.hosts.into(),
+            app_name: conn_str.app_name,
+            tls: conn_str.tls,
+            heartbeat_freq: conn_str.heartbeat_freq,
+            local_threshold: conn_str.local_threshold,
+            read_concern: conn_str.read_concern,
+            selection_criteria: conn_str.read_preference.map(Into::into),
+            repl_set_name: conn_str.repl_set_name,
+            write_concern: conn_str.write_concern,
+            max_pool_size: conn_str.max_pool_size,
+            min_pool_size: conn_str.min_pool_size,
+            max_idle_time: conn_str.max_idle_time,
+            server_selection_timeout: conn_str.server_selection_timeout,
+            compressors: conn_str.compressors,
+            connect_timeout: conn_str.connect_timeout,
+            retry_reads: conn_str.retry_reads,
+            retry_writes: conn_str.retry_writes,
+            socket_timeout: conn_str.socket_timeout,
+            direct_connection: conn_str.direct_connection,
+            default_database: conn_str.default_database,
             driver_info: None,
-            credential: parser.credential,
+            credential: conn_str.credential,
             cmap_event_handler: None,
             command_event_handler: None,
             original_srv_info: None,
-            original_uri: Some(parser.original_uri),
+            original_uri: Some(conn_str.original_uri),
             resolver_config: None,
             server_api: None,
-            load_balanced: parser.load_balanced,
+            load_balanced: conn_str.load_balanced,
             sdam_event_handler: None,
             #[cfg(test)]
             test_options: None,
@@ -1116,7 +1146,7 @@ impl ClientOptions {
         resolver_config: impl Into<Option<ResolverConfig>>,
     ) -> Result<Self> {
         let resolver_config = resolver_config.into();
-        let srv = conn_str.srv;
+        let srv = conn_str.is_srv();
         let auth_source_present = conn_str.auth_source.is_some();
         let mut options: Self = conn_str.into();
         options.resolver_config = resolver_config.clone();
@@ -1446,29 +1476,33 @@ impl ConnectionString {
             None => (None, None),
         };
 
-        let hosts: Result<Vec<_>> = hosts_section.split(',').map(ServerAddress::parse).collect();
+        let host_list: Result<Vec<_>> = hosts_section.split(',').map(ServerAddress::parse).collect();
 
-        let hosts = hosts?;
+        let host_list = host_list?;
 
-        if srv {
-            if hosts.len() != 1 {
+        let hosts = if srv {
+            if host_list.len() != 1 {
                 return Err(ErrorKind::InvalidArgument {
                     message: "exactly one host must be specified with 'mongodb+srv'".into(),
                 }
                 .into());
             }
+            // Unwrap safety: the `len` check above guarantees this can't fail.
+            let host = host_list.into_iter().next().unwrap();
 
-            if hosts[0].port().is_some() {
+            if host.port().is_some() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "a port cannot be specified with 'mongodb+srv'".into(),
                 }
                 .into());
             }
-        }
+            HostInfo::DnsRecord(host.into_host())
+        } else {
+            HostInfo::HostIdentifiers(host_list)
+        };
 
         let mut conn_str = ConnectionString {
             hosts,
-            srv,
             original_uri: s.into(),
             ..Default::default()
         };
@@ -1560,7 +1594,7 @@ impl ConnectionString {
         // set default database.
         conn_str.default_database = db;
 
-        if conn_str.tls.is_none() && conn_str.srv {
+        if conn_str.tls.is_none() && conn_str.is_srv() {
             conn_str.tls = Some(Tls::Enabled(Default::default()));
         }
 
@@ -1577,6 +1611,10 @@ impl ConnectionString {
     /// mismatches).  Not supported by the Rust driver.
     pub fn tls_insecure(&self) -> Option<bool> {
         self.tls_insecure
+    }
+
+    fn is_srv(&self) -> bool {
+        matches!(self.hosts, HostInfo::DnsRecord(_))
     }
 
     fn parse_options(&mut self, options: &str) -> Result<ConnectionStringParts> {
@@ -1650,7 +1688,7 @@ impl ConnectionString {
         }
 
         if let Some(true) = self.direct_connection {
-            if self.srv {
+            if self.is_srv() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "cannot use SRV-style URI with directConnection=true".to_string(),
                 }
