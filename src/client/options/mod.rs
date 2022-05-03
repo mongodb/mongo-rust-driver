@@ -800,15 +800,8 @@ pub struct ConnectionString {
     /// 9 signifies the best compression.
     pub zlib_compression: Option<i32>,
 
-    /// The authentication mechanism method to use for connection to the server.
-    pub auth_mechanism: Option<AuthMechanism>,
-
     /// The database that connections should authenticate against.
     pub auth_source: Option<String>,
-
-    /// Additional options provided for authentication (e.g. to enable hostname canonicalization
-    /// for GSSAPI).
-    pub auth_mechanism_properties: Option<Document>,
 
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
@@ -824,6 +817,8 @@ pub struct ConnectionString {
 struct ConnectionStringParts {
     read_preference_tags: Option<Vec<TagSet>>,
     max_staleness: Option<Duration>,
+    auth_mechanism: Option<AuthMechanism>,
+    auth_mechanism_properties: Option<Document>,
 }
 
 /// Specifies whether TLS configuration should be used with the operations that the
@@ -1471,20 +1466,23 @@ impl ConnectionString {
             }
         }
 
-        let mut options = ConnectionString {
+        let mut conn_str = ConnectionString {
             hosts,
             srv,
             original_uri: s.into(),
             ..Default::default()
         };
 
+        let mut parts;
         if let Some(opts) = options_section {
-            options.parse_options(opts)?;
+            parts = conn_str.parse_options(opts)?;
+        } else {
+            parts = ConnectionStringParts::default();
         }
 
         // Set username and password.
         if let Some(u) = username {
-            let mut credential = options.credential.get_or_insert_with(Default::default);
+            let mut credential = conn_str.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
 
@@ -1497,7 +1495,7 @@ impl ConnectionString {
             }
         }
 
-        if options.auth_source.as_deref() == Some("") {
+        if conn_str.auth_source.as_deref() == Some("") {
             return Err(ErrorKind::InvalidArgument {
                 message: "empty authSource provided".to_string(),
             }
@@ -1506,16 +1504,16 @@ impl ConnectionString {
 
         let db_str = db.as_deref();
 
-        match options.auth_mechanism {
+        match parts.auth_mechanism {
             Some(ref mechanism) => {
-                let mut credential = options.credential.get_or_insert_with(Default::default);
+                let mut credential = conn_str.credential.get_or_insert_with(Default::default);
 
-                credential.source = options
+                credential.source = conn_str
                     .auth_source
                     .clone()
                     .or_else(|| Some(mechanism.default_source(db_str).into()));
 
-                if let Some(mut doc) = options.auth_mechanism_properties.take() {
+                if let Some(mut doc) = parts.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
                         Some(Bson::String(s)) => {
                             let val = match &s.to_lowercase()[..] {
@@ -1535,15 +1533,15 @@ impl ConnectionString {
                 }
 
                 mechanism.validate_credential(credential)?;
-                credential.mechanism = options.auth_mechanism.take();
+                credential.mechanism = parts.auth_mechanism.take();
             }
             None => {
-                if let Some(ref mut credential) = options.credential {
+                if let Some(ref mut credential) = conn_str.credential {
                     // If credentials exist (i.e. username is specified) but no mechanism, the
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = options
+                    credential.source = conn_str
                         .auth_source
                         .clone()
                         .or_else(|| db.clone())
@@ -1560,13 +1558,13 @@ impl ConnectionString {
         };
 
         // set default database.
-        options.default_database = db;
+        conn_str.default_database = db;
 
-        if options.tls.is_none() && options.srv {
-            options.tls = Some(Tls::Enabled(Default::default()));
+        if conn_str.tls.is_none() && conn_str.srv {
+            conn_str.tls = Some(Tls::Enabled(Default::default()));
         }
 
-        Ok(options)
+        Ok(conn_str)
     }
 
     /// Amount of time spent attempting to check out a connection from a server's connection pool
@@ -1581,13 +1579,13 @@ impl ConnectionString {
         self.tls_insecure
     }
 
-    fn parse_options(&mut self, options: &str) -> Result<()> {
+    fn parse_options(&mut self, options: &str) -> Result<ConnectionStringParts> {
+        let mut parts = ConnectionStringParts::default();
         if options.is_empty() {
-            return Ok(());
+            return Ok(parts);
         }
 
         let mut keys: Vec<&str> = Vec::new();
-        let mut parts = ConnectionStringParts::default();
 
         for option_pair in options.split('&') {
             let (key, value) = match option_pair.find('=') {
@@ -1623,7 +1621,7 @@ impl ConnectionString {
             )?;
         }
 
-        if let Some(tags) = parts.read_preference_tags {
+        if let Some(tags) = parts.read_preference_tags.take() {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_tags(tags)?),
                 None => {
@@ -1637,7 +1635,7 @@ impl ConnectionString {
             };
         }
 
-        if let Some(max_staleness) = parts.max_staleness {
+        if let Some(max_staleness) = parts.max_staleness.take() {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_max_staleness(max_staleness)?),
                 None => {
@@ -1670,7 +1668,7 @@ impl ConnectionString {
             }
         }
 
-        Ok(())
+        Ok(parts)
     }
 
     fn parse_option_pair(&mut self, parts: &mut ConnectionStringParts, key: &str, value: &str) -> Result<()> {
@@ -1748,7 +1746,7 @@ impl ConnectionString {
                 self.app_name = Some(value.into());
             }
             "authmechanism" => {
-                self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
+                parts.auth_mechanism = Some(AuthMechanism::from_str(value)?);
             }
             "authsource" => self.auth_source = Some(value.to_string()),
             "authmechanismproperties" => {
@@ -1771,7 +1769,7 @@ impl ConnectionString {
                         None => return Err(err_func()),
                     };
                 }
-                self.auth_mechanism_properties = Some(doc);
+                parts.auth_mechanism_properties = Some(doc);
             }
             "compressors" => {
                 let compressors = value
