@@ -2124,6 +2124,30 @@ impl ConnectionString {
     }
 }
 
+impl<'de> Deserialize<'de> for ConnectionString {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de> {
+        deserializer.deserialize_str(ConnectionStringVisitor)
+    }
+}
+
+struct ConnectionStringVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ConnectionStringVisitor {
+    type Value = ConnectionString;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a MongoDB connection string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+    where
+            E: serde::de::Error, {
+        ConnectionString::parse(v).map_err(serde::de::Error::custom)
+    }
+}
+
 #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
 mod tests {
     use std::time::Duration;
