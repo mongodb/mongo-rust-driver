@@ -544,6 +544,7 @@ pub struct ClientOptions {
     #[derivative(Debug = "ignore")]
     pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
+    #[cfg(test)]
     #[builder(default, setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) original_uri: Option<String>,
@@ -705,7 +706,7 @@ pub struct ConnectionString {
     /// The amount of time each monitoring thread should wait between performing server checks.
     ///
     /// The default value is 10 seconds.
-    pub heartbeat_freq: Option<Duration>,
+    pub heartbeat_frequency: Option<Duration>,
 
     /// When running a read operation with a ReadPreference that allows selecting secondaries,
     /// `local_threshold` is used to determine how much longer the average round trip time between
@@ -814,6 +815,7 @@ pub struct ConnectionString {
 
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
+    #[cfg(test)]
     original_uri: String,
 }
 
@@ -981,7 +983,7 @@ impl From<ConnectionString> for ClientOptions {
             hosts: conn_str.hosts.into(),
             app_name: conn_str.app_name,
             tls: conn_str.tls,
-            heartbeat_freq: conn_str.heartbeat_freq,
+            heartbeat_freq: conn_str.heartbeat_frequency,
             local_threshold: conn_str.local_threshold,
             read_concern: conn_str.read_concern,
             selection_criteria: conn_str.read_preference.map(Into::into),
@@ -1003,6 +1005,7 @@ impl From<ConnectionString> for ClientOptions {
             cmap_event_handler: None,
             command_event_handler: None,
             original_srv_info: None,
+            #[cfg(test)]
             original_uri: Some(conn_str.original_uri),
             resolver_config: None,
             server_api: None,
@@ -1503,6 +1506,7 @@ impl ConnectionString {
 
         let mut conn_str = ConnectionString {
             hosts,
+            #[cfg(test)]
             original_uri: s.into(),
             ..Default::default()
         };
@@ -1839,7 +1843,7 @@ impl ConnectionString {
                     .into());
                 }
 
-                self.heartbeat_freq = Some(Duration::from_millis(duration));
+                self.heartbeat_frequency = Some(Duration::from_millis(duration));
             }
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
