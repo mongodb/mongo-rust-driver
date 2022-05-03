@@ -818,20 +818,19 @@ pub struct ConnectionString {
     /// for GSSAPI).
     pub auth_mechanism_properties: Option<Document>,
 
-    /// Default read preference for the client (excluding tags).
+    /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
-
-    /// Default read preference tags for the client; only valid if the read preference mode is not
-    /// primary.
-    ///
-    /// The order of the tag sets in the read preference is the same as the order they are
-    /// specified in the URI.
-    pub read_preference_tags: Option<Vec<TagSet>>,
 
     pub(crate) srv: bool,
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
     original_uri: String,
+}
+
+/// Elements from the connection string that are not top-level fields in `ConnectionString`.
+#[derive(Default)]
+struct ConnectionStringParts {
+    read_preference_tags: Option<Vec<TagSet>>,
 }
 
 impl ConnectionString {
@@ -1597,6 +1596,7 @@ impl ConnectionString {
         }
 
         let mut keys: Vec<&str> = Vec::new();
+        let mut parts = ConnectionStringParts::default();
 
         for option_pair in options.split('&') {
             let (key, value) = match option_pair.find('=') {
@@ -1624,6 +1624,7 @@ impl ConnectionString {
 
             // Skip leading '=' in value.
             self.parse_option_pair(
+                &mut parts,
                 &key.to_lowercase(),
                 percent_encoding::percent_decode(&value.as_bytes()[1..])
                     .decode_utf8_lossy()
@@ -1631,7 +1632,7 @@ impl ConnectionString {
             )?;
         }
 
-        if let Some(tags) = self.read_preference_tags.take() {
+        if let Some(tags) = parts.read_preference_tags {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_tags(tags)?),
                 None => {
@@ -1683,7 +1684,7 @@ impl ConnectionString {
         Ok(())
     }
 
-    fn parse_option_pair(&mut self, key: &str, value: &str) -> Result<()> {
+    fn parse_option_pair(&mut self, parts: &mut ConnectionStringParts, key: &str, value: &str) -> Result<()> {
         macro_rules! get_bool {
             ($value:expr, $option:expr) => {
                 match $value {
@@ -1907,7 +1908,7 @@ impl ConnectionString {
                         .collect()
                 };
 
-                self.read_preference_tags
+                parts.read_preference_tags
                     .get_or_insert_with(Vec::new)
                     .push(tags?);
             }
