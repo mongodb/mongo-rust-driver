@@ -718,10 +718,6 @@ pub struct ConnectionString {
     /// ReadConcern type documentation for more details.
     pub read_concern: Option<ReadConcern>,
 
-    /// The default selection criteria for operations performed on the Client. See the
-    /// SelectionCriteria type documentation for more details.
-    pub selection_criteria: Option<SelectionCriteria>,
-
     /// The name of the replica set that the Client should connect to.
     pub repl_set_name: Option<String>,
 
@@ -804,10 +800,6 @@ pub struct ConnectionString {
     /// 9 signifies the best compression.
     pub zlib_compression: Option<i32>,
 
-    /// The maximum replication lag, in wall clock time, that a secondary can suffer and still be
-    /// eligible for server selection.
-    pub max_staleness: Option<Duration>,
-
     /// The authentication mechanism method to use for connection to the server.
     pub auth_mechanism: Option<AuthMechanism>,
 
@@ -831,6 +823,7 @@ pub struct ConnectionString {
 #[derive(Default)]
 struct ConnectionStringParts {
     read_preference_tags: Option<Vec<TagSet>>,
+    max_staleness: Option<Duration>,
 }
 
 /// Specifies whether TLS configuration should be used with the operations that the
@@ -966,7 +959,7 @@ impl From<ConnectionString> for ClientOptions {
             heartbeat_freq: parser.heartbeat_freq,
             local_threshold: parser.local_threshold,
             read_concern: parser.read_concern,
-            selection_criteria: parser.selection_criteria,
+            selection_criteria: parser.read_preference.map(Into::into),
             repl_set_name: parser.repl_set_name,
             write_concern: parser.write_concern,
             max_pool_size: parser.max_pool_size,
@@ -1644,7 +1637,7 @@ impl ConnectionString {
             };
         }
 
-        if let Some(max_staleness) = self.max_staleness.take() {
+        if let Some(max_staleness) = parts.max_staleness {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_max_staleness(max_staleness)?),
                 None => {
@@ -1657,8 +1650,6 @@ impl ConnectionString {
                 }
             };
         }
-
-        self.selection_criteria = self.read_preference.take().map(Into::into);
 
         if let Some(true) = self.direct_connection {
             if self.srv {
@@ -1846,7 +1837,7 @@ impl ConnectionString {
                     Ordering::Greater => Duration::from_secs(max_staleness_seconds as u64),
                 };
 
-                self.max_staleness = Some(max_staleness);
+                parts.max_staleness = Some(max_staleness);
             }
             k @ "maxpoolsize" => {
                 self.max_pool_size = Some(get_u32!(value, k));
