@@ -844,8 +844,8 @@ impl Default for HostInfo {
     }
 }
 
-impl Into<Vec<ServerAddress>> for HostInfo {
-    fn into(self) -> Vec<ServerAddress> {
+impl HostInfo {
+    fn into_addresses(self) -> Vec<ServerAddress> {
         match self {
             Self::HostIdentifiers(hosts) => hosts,
             Self::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }],
@@ -980,7 +980,7 @@ pub struct DriverInfo {
 impl From<ConnectionString> for ClientOptions {
     fn from(conn_str: ConnectionString) -> Self {
         Self {
-            hosts: conn_str.hosts.into(),
+            hosts: conn_str.hosts.into_addresses(),
             app_name: conn_str.app_name,
             tls: conn_str.tls,
             heartbeat_freq: conn_str.heartbeat_frequency,
@@ -1512,12 +1512,11 @@ impl ConnectionString {
             ..Default::default()
         };
 
-        let mut parts;
-        if let Some(opts) = options_section {
-            parts = conn_str.parse_options(opts)?;
+        let mut parts = if let Some(opts) = options_section {
+            conn_str.parse_options(opts)?
         } else {
-            parts = ConnectionStringParts::default();
-        }
+            ConnectionStringParts::default()
+        };
 
         // Set username and password.
         if let Some(u) = username {
