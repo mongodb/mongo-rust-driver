@@ -20,6 +20,7 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
+        SdamEvent,
         CLIENT_OPTIONS,
         LOCK,
     },
@@ -689,6 +690,11 @@ async fn retry_commit_txn_check_out() {
         return;
     }
 
+    if !setup_client.supports_transactions() {
+        log_uncaptured("skipping retry_commit_txn_check_out due to lack of transaction support");
+        return;
+    }
+
     // ensure namespace exists
     setup_client
         .database("retry_commit_txn_check_out")
@@ -700,7 +706,8 @@ async fn retry_commit_txn_check_out() {
     let mut options = CLIENT_OPTIONS.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone());
-    options.command_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone());
+    options.heartbeat_freq = Some(Duration::from_secs(120));
     let client = Client::with_options(options).unwrap();
 
     let mut session = client.start_session(None).await.unwrap();
@@ -723,11 +730,30 @@ async fn retry_commit_txn_check_out() {
     );
     let _guard = setup_client.enable_failpoint(fp, None).await.unwrap();
 
+    let mut subscriber = handler.subscribe();
+
     client
         .database("foo")
         .run_command(doc! { "ping": 1 }, None)
         .await
         .unwrap_err();
+
+    // failing with a state change error will request an immediate check
+    // wait for the mark unknown and subsequent succeeded heartbeat
+    subscriber
+        .wait_for_event(Duration::from_secs(1), |e| {
+            matches!(e, Event::Sdam(SdamEvent::ServerDescriptionChanged(event))
+                    if event.is_marked_unknown_event())
+        })
+        .await
+        .expect("should see marked unknown event");
+
+    subscriber
+        .wait_for_event(Duration::from_secs(1), |e| {
+            matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
+        })
+        .await
+        .expect("should see heartbeat succeeded event");
 
     // enable a failpoint on the handshake to cause check_out
     // to fail with a retryable error
@@ -738,7 +764,6 @@ async fn retry_commit_txn_check_out() {
     );
     let _guard2 = setup_client.enable_failpoint(fp, None).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
     // finally, attempt the commit.
     // this should succeed due to retry
     session.commit_transaction().await.unwrap();
@@ -749,7 +774,7 @@ async fn retry_commit_txn_check_out() {
             matches!(e, Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_)))
         })
         .await
-        .unwrap();
+        .expect("should see check out failed event");
 
     // ensure the second one succeeds
     subscriber
@@ -757,5 +782,5 @@ async fn retry_commit_txn_check_out() {
             matches!(e, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
         })
         .await
-        .unwrap();
+        .expect("should see checked out event");
 }
