@@ -472,12 +472,33 @@ impl TopologyWorker {
     }
 
     /// Update the topology using the provided `ServerDescription`.
-    async fn update_server(&mut self, sd: ServerDescription) -> bool {
-        let server_type = sd.server_type;
-        let server_address = sd.address.clone();
-
+    async fn update_server(&mut self, mut sd: ServerDescription) -> bool {
         let mut latest_state = self.borrow_latest_state().clone();
         let old_description = latest_state.description.clone();
+
+        if let Some(expected_name) = &self.options.repl_set_name {
+            let got_name = sd.set_name();
+            if latest_state.description.topology_type() == TopologyType::Single
+                && got_name.as_ref().map(|opt| opt.as_ref()) != Ok(Some(expected_name))
+            {
+                let got_display = match got_name {
+                    Ok(Some(s)) => format!("{:?}", s),
+                    Ok(None) => "<none>".to_string(),
+                    Err(s) => format!("<error: {}>", s),
+                };
+                // Mark server as unknown.
+                sd = ServerDescription::new(
+                    sd.address,
+                    Some(Err(format!(
+                        "Connection string replicaSet name {:?} does not match actual name {}",
+                        expected_name, got_display,
+                    ))),
+                );
+            }
+        }
+
+        let server_type = sd.server_type;
+        let server_address = sd.address.clone();
 
         // TODO: RUST-1270 change this method to not return a result.
         let _ = latest_state.description.update(sd);
