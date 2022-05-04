@@ -482,10 +482,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
     let result = client.list_database_names(None, None).await;
     assert!(
         match result {
-            Err(Error { ref kind, .. }) => match **kind {
-                ErrorKind::ServerSelection { .. } => true,
-                _ => false,
-            },
+            Err(Error { ref kind, .. }) => matches!(**kind, ErrorKind::ServerSelection { .. }),
             _ => false,
         },
         "Unexpected result {:?}",
