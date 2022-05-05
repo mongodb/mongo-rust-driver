@@ -254,14 +254,20 @@ impl ConnectionPoolWorker {
 
         loop {
             let task = tokio::select! {
-                Some(request) = self.request_receiver.recv() => {
-                    PoolTask::CheckOut(request)
-                },
+                // This marker indicates that the futures will be polled in order from top to
+                // bottom in this select! macro. We use this to ensure checkIn, clear,
+                // and ready always have priority over checkout requests. The pool
+                // exiting also has priority.
+                biased;
+
                 Some(request) = self.management_receiver.recv() => request.into(),
                 _ = self.handle_listener.wait_for_all_handle_drops() => {
                     // all worker handles have been dropped meaning this
                     // pool has no more references and can be dropped itself.
                     break
+                },
+                Some(request) = self.request_receiver.recv() => {
+                    PoolTask::CheckOut(request)
                 },
                 _ = maintenance_interval.tick() => {
                     PoolTask::Maintenance

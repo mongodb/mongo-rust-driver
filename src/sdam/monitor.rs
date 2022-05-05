@@ -1,26 +1,23 @@
 use std::time::{Duration, Instant};
 
 use bson::doc;
+use tokio::sync::watch;
 
 use super::{
-    description::server::ServerDescription,
+    description::server::{ServerDescription, TopologyVersion},
     topology::SdamEventEmitter,
-    TopologyCheckRequestReceiver,
-    TopologyUpdater,
-    TopologyWatcher,
+    TopologyCheckRequestReceiver, TopologyUpdater, TopologyWatcher,
 };
 use crate::{
     cmap::{Connection, Handshaker},
     error::{Error, Result},
     event::sdam::{
-        SdamEvent,
-        ServerHeartbeatFailedEvent,
-        ServerHeartbeatStartedEvent,
+        SdamEvent, ServerHeartbeatFailedEvent, ServerHeartbeatStartedEvent,
         ServerHeartbeatSucceededEvent,
     },
-    hello::{hello_command, run_hello, HelloReply},
+    hello::{hello_command, run_hello, AwaitableHelloOptions, HelloReply},
     options::{ClientOptions, ServerAddress},
-    runtime,
+    runtime::{self, WorkerHandleListener},
 };
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -36,6 +33,9 @@ pub(crate) struct Monitor {
     sdam_event_emitter: Option<SdamEventEmitter>,
     update_request_receiver: TopologyCheckRequestReceiver,
     client_options: ClientOptions,
+    topology_version: Option<TopologyVersion>,
+    rtt_monitor_handle: watch::Receiver<RttInfo>,
+    server_handle_listener: WorkerHandleListener,
 }
 
 impl Monitor {
@@ -45,9 +45,18 @@ impl Monitor {
         topology_watcher: TopologyWatcher,
         sdam_event_emitter: Option<SdamEventEmitter>,
         update_request_receiver: TopologyCheckRequestReceiver,
+        handle_listener: WorkerHandleListener,
         client_options: ClientOptions,
     ) {
+        println!("starting monitor for {}", address);
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
+
+        let (rtt_monitor, rtt_monitor_handle) = RttMonitor::new(
+            address.clone(),
+            topology_watcher.clone(),
+            handshaker.clone(),
+            client_options.clone(),
+        );
         let monitor = Self {
             address,
             client_options,
@@ -56,9 +65,14 @@ impl Monitor {
             topology_watcher,
             sdam_event_emitter,
             update_request_receiver,
+            rtt_monitor_handle,
+            server_handle_listener: handle_listener,
             connection: None,
+            topology_version: None,
         };
-        runtime::execute(monitor.execute())
+
+        runtime::execute(monitor.execute());
+        // runtime::execute(rtt_monitor.execute());
     }
 
     async fn execute(mut self) {
@@ -67,37 +81,43 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while self.topology_watcher.is_alive() {
-            self.check_server().await;
+        while self.server_handle_listener.is_alive() {
+            let check_succeeded = self.check_server().await;
 
-            #[cfg(test)]
-            let min_frequency = self
-                .client_options
-                .test_options
-                .as_ref()
-                .and_then(|to| to.heartbeat_freq)
-                .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
+            // in the streaming protocol, we just read from the socket continuously
+            // rather than polling at specific intervals, unless the most recent check
+            // failed.
+            if self.topology_version.is_none() || !check_succeeded {
+                println!("tv is none");
+                #[cfg(test)]
+                let min_frequency = self
+                    .client_options
+                    .test_options
+                    .as_ref()
+                    .and_then(|to| to.heartbeat_freq)
+                    .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
 
-            #[cfg(not(test))]
-            let min_frequency = MIN_HEARTBEAT_FREQUENCY;
+                #[cfg(not(test))]
+                let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-            runtime::delay_for(min_frequency).await;
-            self.update_request_receiver
-                .wait_for_check_request(heartbeat_frequency - min_frequency)
-                .await;
+                runtime::delay_for(min_frequency).await;
+                self.update_request_receiver
+                    .wait_for_check_request(heartbeat_frequency - min_frequency)
+                    .await;
+            }
         }
+
+        println!("monitor closing");
     }
 
     /// Checks the the server by running a hello command. If an I/O error occurs, the
     /// connection will replaced with a new one.
     ///
-    /// Returns true if the topology has changed and false otherwise.
+    /// Returns whether the check succeeded or not.
     async fn check_server(&mut self) -> bool {
-        self.update_request_receiver.clear_check_requests();
-        let mut retried = false;
+        self.update_request_receiver.clear_all_requests();
         let check_result = match self.perform_hello().await {
-            Ok(reply) => Ok(reply),
-            Err(e) => {
+            HelloResult::Err(e) => {
                 let previous_description = self.topology_watcher.server_description(&self.address);
                 if e.is_network_error()
                     && previous_description
@@ -105,25 +125,33 @@ impl Monitor {
                         .unwrap_or(false)
                 {
                     self.handle_error(e).await;
-                    retried = true;
                     self.perform_hello().await
                 } else {
-                    Err(e)
+                    HelloResult::Err(e)
                 }
             }
+            other => other,
         };
 
         match check_result {
-            Ok(reply) => {
-                let server_description =
-                    ServerDescription::new(self.address.clone(), Some(Ok(reply)));
-                self.topology_updater.update(server_description).await
+            HelloResult::Ok(reply) => {
+                let server_description = ServerDescription::new(
+                    self.address.clone(),
+                    Some(Ok(reply)),
+                    self.rtt_monitor_handle.borrow().average,
+                );
+                self.topology_updater.update(server_description).await;
+                true
             }
-            Err(e) => self.handle_error(e).await || retried,
+            HelloResult::Err(e) => {
+                self.handle_error(e).await;
+                false
+            }
+            HelloResult::Cancelled { .. } => false,
         }
     }
 
-    async fn perform_hello(&mut self) -> Result<HelloReply> {
+    async fn perform_hello(&mut self) -> HelloResult {
         self.emit_event(|| {
             SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
@@ -131,45 +159,68 @@ impl Monitor {
         })
         .await;
 
-        let (duration, result) = match self.connection {
-            Some(ref mut conn) => {
-                let command = hello_command(
-                    self.client_options.server_api.as_ref(),
-                    self.client_options.load_balanced,
-                    Some(conn.stream_description()?.hello_ok),
-                );
-                let start = Instant::now();
-                (
-                    start.elapsed(),
-                    run_hello(conn, command, None, &self.client_options.sdam_event_handler).await,
-                )
-            }
-            None => {
-                let mut connection = Connection::connect_monitoring(
-                    self.address.clone(),
-                    self.client_options.connect_timeout,
-                    self.client_options.tls_options(),
-                )
-                .await?;
+        let start = Instant::now();
+        let execute_hello = async {
+            match self.connection {
+                Some(ref mut conn) => {
+                    if conn.is_streaming() {
+                        println!("{}: receiving streamed message", self.address);
+                        conn.receive_message()
+                            .await
+                            .and_then(|r| r.into_hello_reply(None))
+                    } else {
+                        println!("{}: starting new hello", self.address);
+                        let heartbeat_frequency = self
+                            .client_options
+                            .heartbeat_freq
+                            .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
+                        let opts = self.topology_version.map(|tv| AwaitableHelloOptions {
+                            topology_version: tv,
+                            max_await_time: heartbeat_frequency,
+                        });
 
-                let start = Instant::now();
-                let res = self
-                    .handshaker
-                    .handshake(
-                        &mut connection,
-                        None,
-                        &self.client_options.sdam_event_handler,
+                        let command = hello_command(
+                            self.client_options.server_api.as_ref(),
+                            self.client_options.load_balanced,
+                            Some(conn.stream_description()?.hello_ok),
+                            opts,
+                        );
+
+                        run_hello(conn, command).await
+                    }
+                }
+                None => {
+                    println!("{}: new conn", self.address);
+                    let mut connection = Connection::connect_monitoring(
+                        self.address.clone(),
+                        self.client_options.connect_timeout,
+                        self.client_options.tls_options(),
                     )
-                    .await
-                    .map(|r| r.hello_reply);
+                    .await?;
 
-                self.connection = Some(connection);
-                (start.elapsed(), res)
+                    let res = self
+                        .handshaker
+                        .handshake(&mut connection)
+                        .await
+                        .map(|r| r.hello_reply);
+
+                    self.connection = Some(connection);
+
+                    res
+                }
             }
         };
+        let result = tokio::select! {
+            result = execute_hello => match result {
+                Ok(reply) => HelloResult::Ok(reply),
+                Err(e) => HelloResult::Err(e)
+            },
+            Some(err) = self.update_request_receiver.listen_for_cancellation() => HelloResult::Cancelled { reason: err }
+        };
+        let duration = start.elapsed();
 
         match result {
-            Ok(ref r) => {
+            HelloResult::Ok(ref r) => {
                 self.emit_event(|| {
                     let mut reply = r
                         .raw_command_response
@@ -185,8 +236,14 @@ impl Monitor {
                     })
                 })
                 .await;
+
+                println!(
+                    "{}: setting topology version to {:?}",
+                    self.address, r.command_response.topology_version
+                );
+                self.topology_version = r.command_response.topology_version;
             }
-            Err(ref e) => {
+            HelloResult::Err(ref e) | HelloResult::Cancelled { reason: ref e } => {
                 self.connection.take();
                 self.emit_event(|| {
                     SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
@@ -216,4 +273,100 @@ impl Monitor {
             emitter.emit(event()).await
         }
     }
+}
+
+struct RttMonitor {
+    sender: watch::Sender<RttInfo>,
+    connection: Option<Connection>,
+    watcher: TopologyWatcher,
+    address: ServerAddress,
+    client_options: ClientOptions,
+    handshaker: Handshaker,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RttInfo {
+    average: Option<Duration>,
+}
+
+impl RttMonitor {
+    fn new(
+        address: ServerAddress,
+        watcher: TopologyWatcher,
+        handshaker: Handshaker,
+        client_options: ClientOptions,
+    ) -> (Self, watch::Receiver<RttInfo>) {
+        let (sender, receiver) = watch::channel(RttInfo { average: None });
+        let monitor = Self {
+            address,
+            connection: None,
+            watcher,
+            client_options,
+            handshaker,
+            sender,
+        };
+        (monitor, receiver)
+    }
+
+    async fn execute(mut self) {
+        while self.watcher.is_alive() && !self.sender.is_closed() {
+            let start = Instant::now();
+            let result = async {
+                match self.connection {
+                    Some(ref mut conn) => {
+                        let command = hello_command(
+                            self.client_options.server_api.as_ref(),
+                            self.client_options.load_balanced,
+                            Some(conn.stream_description()?.hello_ok),
+                            None,
+                        );
+                        conn.send_command(command, None).await?;
+                    }
+                    None => {
+                        let mut connection = Connection::connect_monitoring(
+                            self.address.clone(),
+                            self.client_options.connect_timeout,
+                            self.client_options.tls_options(),
+                        )
+                        .await?;
+                        self.handshaker.handshake(&mut connection).await?;
+                        self.connection = Some(connection);
+                    }
+                };
+                Result::Ok(())
+            }
+            .await;
+            let rtt = start.elapsed();
+
+            match result {
+                Ok(_) => {
+                    let new_rtt = match self.sender.borrow().average {
+                        Some(old_rtt) => RttInfo {
+                            average: Some((rtt / 5) + (old_rtt * 4 / 5)),
+                        },
+                        None => RttInfo { average: Some(rtt) },
+                    };
+
+                    let _ = self.sender.send(new_rtt);
+                }
+                _ => {
+                    self.connection.take();
+                }
+            };
+
+            runtime::delay_for(
+                self.client_options
+                    .heartbeat_freq
+                    .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
+            )
+            .await;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum HelloResult {
+    Ok(HelloReply),
+    Err(Error),
+    Cancelled { reason: Error },
 }

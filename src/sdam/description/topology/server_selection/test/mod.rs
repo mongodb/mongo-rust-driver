@@ -91,15 +91,14 @@ impl TestServerDescription {
             Ok(HelloReply {
                 server_address: server_address.clone(),
                 command_response,
-                round_trip_time: avg_rtt_ms
-                    .map(f64_ms_as_duration)
-                    .unwrap_or_else(|| Duration::from_millis(1234)),
+                round_trip_time: None,
                 cluster_time: None,
                 raw_command_response: Default::default(),
             })
         });
 
-        let mut server_desc = ServerDescription::new(server_address, reply);
+        let mut server_desc =
+            ServerDescription::new(server_address, reply, avg_rtt_ms.map(f64_ms_as_duration));
         server_desc.last_update_time = self
             .last_update_time
             .map(|i| DateTime::from_millis(i.into()));

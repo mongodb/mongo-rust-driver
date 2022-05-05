@@ -100,7 +100,7 @@ lazy_static! {
 ///
 /// Currently this just supports addresses that can be connected to over TCP, but alternative
 /// address types may be supported in the future (e.g. Unix Domain Socket paths).
-#[derive(Clone, Debug, Eq, Serialize)]
+#[derive(Clone, Debug, Eq, Serialize, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum ServerAddress {
     /// A TCP/IP host and port combination.

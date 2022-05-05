@@ -1,12 +1,13 @@
 use std::time::Duration;
 
+use bson::{bson, Bson};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, DateTime},
     bson_util,
     client::ClusterTime,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     hello::HelloReply,
     options::ServerAddress,
     selection_criteria::TagSet,
@@ -82,6 +83,28 @@ impl Default for ServerType {
     }
 }
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TopologyVersion {
+    pub(crate) process_id: ObjectId,
+    pub(crate) counter: i64,
+}
+
+impl TopologyVersion {
+    pub(crate) fn is_more_recent_than(&self, existing_tv: TopologyVersion) -> bool {
+        self.process_id != existing_tv.process_id || self.counter > existing_tv.counter
+    }
+}
+
+impl From<TopologyVersion> for Bson {
+    fn from(tv: TopologyVersion) -> Self {
+        bson!({
+            "processId": tv.process_id,
+            "counter": tv.counter
+        })
+    }
+}
+
 /// A description of the most up-to-date information known about a server.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ServerDescription {
@@ -140,7 +163,11 @@ impl PartialEq for ServerDescription {
 }
 
 impl ServerDescription {
-    pub(crate) fn new(mut address: ServerAddress, hello_reply: Option<Result<HelloReply>>) -> Self {
+    pub(crate) fn new(
+        mut address: ServerAddress,
+        hello_reply: Option<Result<HelloReply>>,
+        average_round_trip_time: Option<Duration>,
+    ) -> Self {
         address = ServerAddress::Tcp {
             host: address.host().to_lowercase(),
             port: address.port(),
@@ -151,7 +178,7 @@ impl ServerDescription {
             server_type: Default::default(),
             last_update_time: None,
             reply: hello_reply.transpose(),
-            average_round_trip_time: None,
+            average_round_trip_time,
         };
 
         // We want to set last_update_time if we got any sort of response from the server.
@@ -164,10 +191,11 @@ impl ServerDescription {
             // Infer the server type from the hello response.
             description.server_type = reply.command_response.server_type();
 
-            // Initialize the average round trip time. If a previous value is present for the
-            // server, this will be updated before the server description is added to the topology
-            // description.
-            description.average_round_trip_time = Some(reply.round_trip_time);
+            // if the RTT monitor hasn't had enough samples yet, just use the RTT from the
+            // initial handshake.
+            if description.average_round_trip_time.is_none() {
+                description.average_round_trip_time = reply.round_trip_time;
+            }
 
             // Normalize all instances of hostnames to lowercase.
             if let Some(ref mut hosts) = reply.command_response.hosts {
@@ -349,6 +377,14 @@ impl ServerDescription {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply.cluster_time.clone()),
             Err(ref e) => Err(e.clone()),
+        }
+    }
+
+    pub(crate) fn topology_version(&self) -> Option<TopologyVersion> {
+        match self.reply {
+            Ok(None) => None,
+            Ok(Some(ref reply)) => reply.command_response.topology_version,
+            Err(ref e) => e.topology_version(),
         }
     }
 

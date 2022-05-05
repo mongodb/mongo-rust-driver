@@ -6,7 +6,7 @@ use std::sync::{
 use crate::{
     cmap::{options::ConnectionPoolOptions, ConnectionPool},
     options::{ClientOptions, ServerAddress},
-    runtime::HttpClient,
+    runtime::{HttpClient, WorkerHandle},
     sdam::TopologyUpdater,
 };
 
@@ -20,21 +20,30 @@ pub(crate) struct Server {
 
     /// Number of operations currently using this server.
     operation_count: AtomicU32,
+
+    /// Handle to the monitor for this server. Once this is dropped, the
+    /// monitor will stop.
+    _monitor_handle: WorkerHandle,
 }
 
 impl Server {
     #[cfg(test)]
     pub(crate) fn new_mocked(address: ServerAddress, operation_count: u32) -> Self {
+        use crate::runtime::WorkerHandleListener;
+
+        let (_monitor_handle, _) = WorkerHandleListener::channel();
         Self {
             address: address.clone(),
             pool: ConnectionPool::new_mocked(address),
             operation_count: AtomicU32::new(operation_count),
+            _monitor_handle,
         }
     }
 
     /// Create a new reference counted `Server`, including its connection pool.
     pub(crate) fn new(
         address: ServerAddress,
+        monitor_handle: WorkerHandle,
         options: ClientOptions,
         http_client: HttpClient,
         topology_updater: TopologyUpdater,
@@ -47,6 +56,7 @@ impl Server {
                 Some(ConnectionPoolOptions::from_client_options(&options)),
             ),
             address,
+            _monitor_handle: monitor_handle,
             operation_count: AtomicU32::new(0),
         })
     }

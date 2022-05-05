@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use bson::RawDocumentBuf;
 use serde::{Deserialize, Serialize};
@@ -14,13 +11,7 @@ use crate::{
     },
     cmap::{Command, Connection},
     error::Result,
-    event::sdam::{
-        SdamEventHandler,
-        ServerHeartbeatFailedEvent,
-        ServerHeartbeatStartedEvent,
-        ServerHeartbeatSucceededEvent,
-    },
-    sdam::{ServerType, Topology},
+    sdam::{ServerType, TopologyVersion},
     selection_criteria::TagSet,
 };
 
@@ -29,6 +20,12 @@ use crate::{
 /// wherever possible.
 pub(crate) const LEGACY_HELLO_COMMAND_NAME: &str = "isMaster";
 pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &str = "ismaster";
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AwaitableHelloOptions {
+    pub(crate) topology_version: TopologyVersion,
+    pub(crate) max_await_time: Duration,
+}
 
 /// Construct a hello or legacy hello command, depending on the circumstances.
 ///
@@ -40,8 +37,9 @@ pub(crate) fn hello_command(
     server_api: Option<&ServerApi>,
     load_balanced: Option<bool>,
     hello_ok: Option<bool>,
+    awaitable_options: Option<AwaitableHelloOptions>,
 ) -> Command {
-    let (command, command_name) = if server_api.is_some()
+    let (mut command, command_name) = if server_api.is_some()
         || matches!(load_balanced, Some(true))
         || matches!(hello_ok, Some(true))
     {
@@ -53,82 +51,25 @@ pub(crate) fn hello_command(
         }
         (cmd, LEGACY_HELLO_COMMAND_NAME)
     };
+
+    if let Some(opts) = awaitable_options {
+        command.insert("topologyVersion", opts.topology_version);
+        command.insert("maxAwaitTimeMS", opts.max_await_time.as_millis() as i64);
+    }
+
     let mut command = Command::new(command_name.into(), "admin".into(), command);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }
+    command.exhaust_allowed = awaitable_options.is_some();
     command
 }
 
-/// Execute a hello or legacy hello command, emiting events if a reference to the topology and a
-/// handler are provided.
-///
-/// A strong reference to the topology is used here to ensure it is still in scope and has not yet
-/// emitted a `TopologyClosedEvent`.
-pub(crate) async fn run_hello(
-    conn: &mut Connection,
-    command: Command,
-    topology: Option<&Topology>,
-    handler: &Option<Arc<dyn SdamEventHandler>>,
-) -> Result<HelloReply> {
-    emit_event(topology, handler, |handler| {
-        let event = ServerHeartbeatStartedEvent {
-            server_address: conn.address.clone(),
-        };
-        handler.handle_server_heartbeat_started_event(event);
-    });
-
-    let start_time = Instant::now();
+/// Execute a hello or legacy hello command, recording the rtt.
+pub(crate) async fn run_hello(conn: &mut Connection, command: Command) -> Result<HelloReply> {
+    let start = Instant::now();
     let response_result = conn.send_command(command, None).await;
-    let end_time = Instant::now();
-
-    let round_trip_time = end_time.duration_since(start_time);
-
-    match response_result.and_then(|raw_response| {
-        let hello_reply = raw_response.into_hello_reply(round_trip_time)?;
-        Ok(hello_reply)
-    }) {
-        Ok(hello_reply) => {
-            emit_event(topology, handler, |handler| {
-                let mut reply = hello_reply
-                    .raw_command_response
-                    .to_document()
-                    .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
-                // if this hello call is part of a handshake, remove speculative authentication
-                // information before publishing an event
-                reply.remove("speculativeAuthenticate");
-                let event = ServerHeartbeatSucceededEvent {
-                    duration: round_trip_time,
-                    reply,
-                    server_address: conn.address.clone(),
-                };
-                handler.handle_server_heartbeat_succeeded_event(event);
-            });
-            Ok(hello_reply)
-        }
-        Err(err) => {
-            emit_event(topology, handler, |handler| {
-                let event = ServerHeartbeatFailedEvent {
-                    duration: round_trip_time,
-                    failure: err.clone(),
-                    server_address: conn.address.clone(),
-                };
-                handler.handle_server_heartbeat_failed_event(event);
-            });
-            Err(err)
-        }
-    }
-}
-
-fn emit_event<F>(topology: Option<&Topology>, handler: &Option<Arc<dyn SdamEventHandler>>, emit: F)
-where
-    F: FnOnce(&Arc<dyn SdamEventHandler>),
-{
-    if let Some(handler) = handler {
-        if topology.is_some() {
-            emit(handler);
-        }
-    }
+    response_result.and_then(|raw_response| raw_response.into_hello_reply(Some(start.elapsed())))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -136,7 +77,9 @@ pub(crate) struct HelloReply {
     pub server_address: ServerAddress,
     pub command_response: HelloCommandResponse,
     pub raw_command_response: RawDocumentBuf,
-    pub round_trip_time: Duration,
+    /// The time it took to send the initial hello command and receive this reply.
+    /// `None` if this reply was awaited.
+    pub round_trip_time: Option<Duration>,
     pub cluster_time: Option<ClusterTime>,
 }
 
@@ -233,7 +176,7 @@ pub(crate) struct HelloCommandResponse {
     pub service_id: Option<ObjectId>,
 
     /// For internal use.
-    pub topology_version: Option<Document>,
+    pub topology_version: Option<TopologyVersion>,
 
     /// The maximum permitted size of a BSON wire protocol message.
     pub max_message_size_bytes: i32,
@@ -262,6 +205,7 @@ impl PartialEq for HelloCommandResponse {
             && self.max_write_batch_size == other.max_write_batch_size
             && self.service_id == other.service_id
             && self.max_message_size_bytes == other.max_message_size_bytes
+            && self.topology_version == other.topology_version
     }
 }
 

@@ -11,7 +11,7 @@ pub use self::public::{ServerInfo, ServerType, TopologyType};
 
 pub(crate) use self::{
     description::{
-        server::ServerDescription,
+        server::{ServerDescription, TopologyVersion},
         topology::{
             server_selection::{self, SelectedServer, IDLE_WRITE_PERIOD},
             SessionSupportStatus,

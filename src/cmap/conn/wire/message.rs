@@ -37,6 +37,7 @@ impl Message {
                 bytes,
                 target_db: command.target_db,
                 name: command.name,
+                exhaust_allowed: command.exhaust_allowed,
             },
             request_id,
         ))
@@ -46,9 +47,14 @@ impl Message {
     ///
     /// Note that `response_to` will need to be set manually.
     pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Self {
+        let mut flags = MessageFlags::empty();
+        if command.exhaust_allowed {
+            flags = flags | MessageFlags::EXHAUST_ALLOWED;
+        }
+
         Self {
             response_to: 0,
-            flags: MessageFlags::empty(),
+            flags,
             sections: vec![MessageSection::Document(command.bytes)],
             checksum: None,
             request_id,

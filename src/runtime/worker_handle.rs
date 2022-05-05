@@ -29,6 +29,14 @@ impl WorkerHandleListener {
         self.receiver.recv().await;
     }
 
+    /// Returns whether there are handles that have not been dropped yet.
+    pub(crate) fn is_alive(&mut self) -> bool {
+        match self.receiver.try_recv() {
+            Err(mpsc::error::TryRecvError::Disconnected) => false,
+            _ => true,
+        }
+    }
+
     /// Constructs a new channel for for monitoring whether this worker still has references
     /// to it.
     pub(crate) fn channel() -> (WorkerHandle, WorkerHandleListener) {

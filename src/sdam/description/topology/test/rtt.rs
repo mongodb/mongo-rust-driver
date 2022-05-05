@@ -34,7 +34,7 @@ async fn run_test(test_file: TestFile) {
     };
 
     // The address is not used, so it doesn't matter.
-    let mut old_server_desc = ServerDescription::new(Default::default(), None);
+    let mut old_server_desc = ServerDescription::new(Default::default(), None, None);
     let mut new_server_desc = old_server_desc.clone();
 
     old_server_desc.average_round_trip_time = avg_rtt_ms.map(f64_ms_as_duration);

@@ -297,7 +297,7 @@ impl Operation {
             }
             Operation::Ready => {
                 if let Some(pool) = state.pool.read().await.deref() {
-                    pool.mark_as_ready().await;
+                    pool.mark_as_ready();
                 }
             }
             Operation::Close => {

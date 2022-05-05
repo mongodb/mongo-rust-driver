@@ -10,7 +10,7 @@ use bson::Bson;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::{bson::Document, options::ServerAddress};
+use crate::{bson::Document, options::ServerAddress, sdam::TopologyVersion};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -354,6 +354,13 @@ impl Error {
         self.source = source.into().map(Box::new);
         self
     }
+
+    pub(crate) fn topology_version(&self) -> Option<TopologyVersion> {
+        match self.kind.as_ref() {
+            ErrorKind::Command(c) => c.topology_version,
+            _ => None,
+        }
+    }
 }
 
 impl<E> From<E> for Error
@@ -527,6 +534,9 @@ pub struct CommandError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
+
+    #[serde(rename = "topologyVersion")]
+    pub(crate) topology_version: Option<TopologyVersion>,
 }
 
 impl fmt::Display for CommandError {

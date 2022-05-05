@@ -601,6 +601,7 @@ impl Client {
         let raw_cmd = RawCommand {
             name: cmd_name.clone(),
             target_db,
+            exhaust_allowed: false,
             bytes: serialized,
         };
 

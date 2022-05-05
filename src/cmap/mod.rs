@@ -166,9 +166,9 @@ impl ConnectionPool {
         self.manager.clear(cause, service_id).await
     }
 
-    /// Mark the pool as "ready", allowing connections to be created and checked out.
-    pub(crate) async fn mark_as_ready(&self) {
-        self.manager.mark_as_ready().await;
+    /// Mark the pool as "ready" as per the CMAP specification.
+    pub(crate) fn mark_as_ready(&self) {
+        self.manager.mark_as_ready()
     }
 
     pub(crate) fn generation(&self) -> PoolGeneration {

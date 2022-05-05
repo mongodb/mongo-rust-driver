@@ -11,7 +11,7 @@ use derivative::Derivative;
 use serde::Serialize;
 use tokio::sync::{mpsc, Mutex};
 
-use self::wire::Message;
+use self::wire::{Message, MessageFlags};
 use super::manager::PoolManager;
 use crate::{
     bson::oid::ObjectId,
@@ -86,6 +86,12 @@ pub(crate) struct Connection {
     /// into a pool.
     error: bool,
 
+    /// If the most recently received message included the moreToCome flag, indicating the server
+    /// may send more responses without any additional requests. Attempting to send new messages
+    /// on this connection while this value is true will return an error. This value will remain
+    /// true until a server response does not include the moreToComeFlag.
+    more_to_come: bool,
+
     stream: AsyncStream,
 
     /// Compressor that the client will use before sending messages.
@@ -131,6 +137,7 @@ impl Connection {
             error: false,
             pinned_sender: None,
             compressor: None,
+            more_to_come: false,
         };
 
         Ok(conn)
@@ -298,7 +305,11 @@ impl Connection {
         self.command_executing = false;
         self.error = response_message_result.is_err();
 
-        RawCommandResponse::new(self.address.clone(), response_message_result?)
+        let response_message = response_message_result?;
+        self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
+        println!("more to come: {}", self.more_to_come);
+
+        RawCommandResponse::new(self.address.clone(), response_message)
     }
 
     /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
@@ -330,6 +341,32 @@ impl Connection {
         let to_compress = command.should_compress();
         let message = Message::with_raw_command(command, request_id.into());
         self.send_message(message, to_compress).await
+    }
+
+    /// Receive the next message from the connection.
+    /// This will return an error if the previous response on this connection did not include the
+    /// moreToCome flag.
+    pub(crate) async fn receive_message(&mut self) -> Result<RawCommandResponse> {
+        if !self.more_to_come {
+            todo!("return error here")
+        }
+
+        println!("reading here");
+        let response_message_result = Message::read_from(
+            &mut self.stream,
+            self.stream_description
+                .as_ref()
+                .map(|d| d.max_message_size_bytes),
+        )
+        .await;
+        self.command_executing = false;
+        self.error = response_message_result.is_err();
+
+        let response_message = response_message_result?;
+        self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
+        println!("more to come? {}", self.more_to_come);
+
+        RawCommandResponse::new(self.address.clone(), response_message)
     }
 
     /// Gets the connection's StreamDescription.
@@ -394,7 +431,14 @@ impl Connection {
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
+            more_to_come: false,
         }
+    }
+
+    /// Whether or not the previous command response indicated that the server may send
+    /// more responses without another request.
+    pub(crate) fn is_streaming(&self) -> bool {
+        self.more_to_come
     }
 }
 

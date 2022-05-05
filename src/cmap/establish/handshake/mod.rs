@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod test;
 
-use std::sync::Arc;
-
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
@@ -12,10 +10,8 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
     compression::Compressor,
     error::{ErrorKind, Result},
-    event::sdam::SdamEventHandler,
     hello::{hello_command, run_hello, HelloReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
-    sdam::Topology,
 };
 
 #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
@@ -158,6 +154,7 @@ impl Handshaker {
             options.as_ref().and_then(|opts| opts.server_api.as_ref()),
             options.as_ref().and_then(|opts| opts.load_balanced.into()),
             None,
+            None,
         );
 
         if let Some(options) = options {
@@ -214,17 +211,12 @@ impl Handshaker {
     }
 
     /// Handshakes a connection.
-    pub(crate) async fn handshake(
-        &self,
-        conn: &mut Connection,
-        topology: Option<&Topology>,
-        handler: &Option<Arc<dyn SdamEventHandler>>,
-    ) -> Result<HandshakeResult> {
+    pub(crate) async fn handshake(&self, conn: &mut Connection) -> Result<HandshakeResult> {
         let mut command = self.command.clone();
 
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
-        let mut hello_reply = run_hello(conn, command, topology, handler).await?;
+        let mut hello_reply = run_hello(conn, command).await?;
 
         if self.command.body.contains_key("loadBalanced")
             && hello_reply.command_response.service_id.is_none()

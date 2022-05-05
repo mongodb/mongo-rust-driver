@@ -62,11 +62,7 @@ async fn speculative_auth_test(
         .await
         .unwrap();
 
-    let first_round = handshaker
-        .handshake(&mut conn, None, &None)
-        .await
-        .unwrap()
-        .first_round;
+    let first_round = handshaker.handshake(&mut conn).await.unwrap().first_round;
 
     // We expect that the server will return a response with the `speculativeAuthenticate` field if
     // and only if it's new enough to support it.

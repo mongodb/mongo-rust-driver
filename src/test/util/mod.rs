@@ -87,7 +87,12 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let hello_cmd = hello_command(options.server_api.as_ref(), options.load_balanced, None);
+        let hello_cmd = hello_command(
+            options.server_api.as_ref(),
+            options.load_balanced,
+            None,
+            None,
+        );
         let hello = RunCommand::new("admin".into(), hello_cmd.body, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(

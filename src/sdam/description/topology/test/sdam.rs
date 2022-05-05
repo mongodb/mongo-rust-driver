@@ -21,6 +21,7 @@ use crate::{
         HandshakePhase,
         Topology,
         TopologyDescription,
+        TopologyVersion,
     },
     selection_criteria::TagSet,
     test::{
@@ -92,6 +93,7 @@ pub(crate) struct TestHelloCommandResponse {
     pub max_bson_object_size: Option<i64>,
     pub max_write_batch_size: Option<i64>,
     pub service_id: Option<ObjectId>,
+    pub topology_version: Option<TopologyVersion>,
 }
 
 impl From<TestHelloCommandResponse> for HelloCommandResponse {
@@ -122,7 +124,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
             service_id: test.service_id,
-            topology_version: None,
+            topology_version: test.topology_version,
             compressors: None,
             hello_ok: test.hello_ok,
             max_message_size_bytes: 48 * 1024 * 1024,
@@ -221,6 +223,7 @@ pub struct Server {
     logical_session_timeout_minutes: Option<i32>,
     min_wire_version: Option<i32>,
     max_wire_version: Option<i32>,
+    topology_version: Option<TopologyVersion>,
 }
 
 fn server_type_from_str(s: &str) -> Option<ServerType> {
@@ -243,11 +246,9 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 async fn run_test(test_file: TestFile) {
     let test_description = &test_file.description;
 
-    // TODO: RUST-360 unskip tests that rely on topology version
     // TODO: RUST-358 unskip tests
     // TODO: RUST-1081 unskip tests
     let skip_keywords = doc! {
-        "topologyVersion": "(RUST-360)",
         "wrong set name": "(RUST-358)",
         "election Id": "(RUST-1081)",
         "electionId": "(RUST-1081)",
@@ -292,6 +293,7 @@ async fn run_test(test_file: TestFile) {
                     code: 1234,
                     code_name: "dummy error".to_string(),
                     message: "dummy".to_string(),
+                    topology_version: None,
                 })))
             } else if command_response == Default::default() {
                 Err(Error::from(ErrorKind::Io(Arc::new(
@@ -301,7 +303,7 @@ async fn run_test(test_file: TestFile) {
                 Ok(HelloReply {
                     server_address: address.clone(),
                     command_response: command_response.into(),
-                    round_trip_time: Duration::from_millis(1234), // Doesn't matter for tests.
+                    round_trip_time: None, // Doesn't matter for tests.
                     cluster_time: None,
                     raw_command_response: Default::default(), // doesn't matter for tests
                 })
@@ -310,7 +312,7 @@ async fn run_test(test_file: TestFile) {
             if let Some(_server) = servers.get(&address) {
                 match hello_reply {
                     Ok(reply) => {
-                        let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
+                        let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)), None);
                         if topology.clone_updater().update(new_sd).await {
                             servers = topology.servers();
                         }
@@ -519,6 +521,16 @@ fn verify_description_outcome(
                 test_description,
                 phase_description
             );
+        }
+
+        if let Some(topology_version) = server.topology_version {
+            assert_eq!(
+                actual_server.topology_version(),
+                Some(topology_version),
+                "{} (phase {})",
+                test_description,
+                phase_description
+            )
         }
     }
 }
@@ -768,10 +780,11 @@ async fn pool_cleared_error_does_not_mark_unknown() {
             Some(Ok(HelloReply {
                 server_address: address.clone(),
                 command_response: heartbeat_response,
-                round_trip_time: Duration::from_secs(1),
+                round_trip_time: Some(Duration::from_secs(1)),
                 cluster_time: None,
                 raw_command_response: Default::default(),
             })),
+            None,
         ))
         .await;
     assert_eq!(

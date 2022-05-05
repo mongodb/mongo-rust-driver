@@ -126,8 +126,32 @@ impl PartialEq for TopologyDescription {
     }
 }
 
+impl Default for TopologyDescription {
+    fn default() -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: Default::default(),
+            max_set_version: Default::default(),
+            max_election_id: Default::default(),
+            compatibility_error: Default::default(),
+            session_support_status: SessionSupportStatus::Undetermined,
+            transaction_support_status: TransactionSupportStatus::Undetermined,
+            cluster_time: Default::default(),
+            local_threshold: Default::default(),
+            heartbeat_freq: Default::default(),
+            servers: Default::default(),
+        }
+    }
+}
+
 impl TopologyDescription {
-    pub(crate) fn new(options: ClientOptions) -> crate::error::Result<Self> {
+    pub(crate) fn initialize(&mut self, options: &ClientOptions) -> Result<()> {
+        debug_assert!(
+            self.servers.is_empty() && self.topology_type == TopologyType::Unknown,
+            "new TopologyDescriptions should start empty"
+        );
+
         verify_max_staleness(
             options
                 .selection_criteria
@@ -135,7 +159,7 @@ impl TopologyDescription {
                 .and_then(|criteria| criteria.max_staleness()),
         )?;
 
-        let topology_type = if let Some(true) = options.direct_connection {
+        self.topology_type = if let Some(true) = options.direct_connection {
             TopologyType::Single
         } else if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
@@ -145,56 +169,31 @@ impl TopologyDescription {
             TopologyType::Unknown
         };
 
-        let servers: HashMap<_, _> = options
-            .hosts
-            .into_iter()
-            .map(|address| (address.clone(), ServerDescription::new(address, None)))
-            .collect();
-
-        let session_support_status = if topology_type == TopologyType::LoadBalanced {
+        self.session_support_status = if self.topology_type == TopologyType::LoadBalanced {
             SessionSupportStatus::Supported {
                 logical_session_timeout: None,
             }
         } else {
             SessionSupportStatus::Undetermined
         };
-        let transaction_support_status = if topology_type == TopologyType::LoadBalanced {
+
+        self.transaction_support_status = if self.topology_type == TopologyType::LoadBalanced {
             TransactionSupportStatus::Supported
         } else {
             TransactionSupportStatus::Undetermined
         };
 
-        Ok(Self {
-            single_seed: servers.len() == 1,
-            topology_type,
-            set_name: options.repl_set_name,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status,
-            transaction_support_status,
-            cluster_time: None,
-            local_threshold: options.local_threshold,
-            heartbeat_freq: options.heartbeat_freq,
-            servers,
-        })
-    }
-
-    pub(crate) fn new_empty() -> Self {
-        Self {
-            single_seed: false,
-            topology_type: TopologyType::Unknown,
-            set_name: None,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status: SessionSupportStatus::Undetermined,
-            transaction_support_status: TransactionSupportStatus::Undetermined,
-            cluster_time: None,
-            local_threshold: None,
-            heartbeat_freq: None,
-            servers: HashMap::new(),
+        for address in options.hosts.iter() {
+            let description = ServerDescription::new(address.clone(), None, None);
+            self.servers.insert(address.to_owned(), description);
         }
+
+        self.single_seed = self.servers.len() == 1;
+        self.set_name = options.repl_set_name.clone();
+        self.local_threshold = options.local_threshold;
+        self.heartbeat_freq = options.heartbeat_freq;
+
+        Ok(())
     }
 
     /// Gets the topology type of the cluster.
@@ -436,11 +435,28 @@ impl TopologyDescription {
                 _ => None,
             });
 
-        Some(TopologyDescriptionDiff {
+        #[allow(unused_mut)]
+        let mut diff = TopologyDescriptionDiff {
             removed_addresses: addresses.difference(&other_addresses).cloned().collect(),
             added_addresses: other_addresses.difference(&addresses).cloned().collect(),
             changed_servers: changed_servers.collect(),
-        })
+        };
+
+        // For ordering of events in tests, sort the addresses.
+        #[cfg(test)]
+        {
+            diff.removed_addresses.sort_by_key(|addr| match addr {
+                ServerAddress::Tcp { host, port } => (host, port),
+            });
+            diff.added_addresses.sort_by_key(|addr| match addr {
+                ServerAddress::Tcp { host, port } => (host, port),
+            });
+            diff.changed_servers.sort_by_key(|(addr, _)| match addr {
+                ServerAddress::Tcp { host, port } => (host, port),
+            });
+        }
+
+        Some(diff)
     }
 
     /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
@@ -462,9 +478,20 @@ impl TopologyDescription {
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
     pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
-        // Ignore updates from servers not currently in the cluster.
-        if !self.servers.contains_key(&server_description.address) {
-            return Ok(());
+        match self.servers.get(&server_description.address) {
+            None => return Ok(()),
+            Some(existing_sd) => {
+                // Ignore updates from outdated topology versions.
+                if let Some(existing_tv) = existing_sd.topology_version() {
+                    if let Some(new_tv) = server_description.topology_version() {
+                        if existing_tv.process_id == new_tv.process_id
+                            && new_tv.counter < existing_tv.counter
+                        {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
         }
 
         // Update the round trip time on the server description to the weighted average as described
@@ -676,7 +703,7 @@ impl TopologyDescription {
                         {
                             self.servers.insert(
                                 server_description.address.clone(),
-                                ServerDescription::new(server_description.address, None),
+                                ServerDescription::new(server_description.address, None, None),
                             );
                             self.record_primary_state();
                             return Ok(());
@@ -710,7 +737,7 @@ impl TopologyDescription {
 
             if let ServerType::RsPrimary = self.servers.get(&address).unwrap().server_type {
                 self.servers
-                    .insert(address.clone(), ServerDescription::new(address, None));
+                    .insert(address.clone(), ServerDescription::new(address, None, None));
             }
         }
 
@@ -759,8 +786,10 @@ impl TopologyDescription {
     ) {
         for server in servers {
             if !self.servers.contains_key(server) {
-                self.servers
-                    .insert(server.clone(), ServerDescription::new(server.clone(), None));
+                self.servers.insert(
+                    server.clone(),
+                    ServerDescription::new(server.clone(), None, None),
+                );
             }
         }
     }
