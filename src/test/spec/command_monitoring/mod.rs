@@ -5,13 +5,12 @@ use std::convert::Into;
 
 use semver::VersionReq;
 use serde::Deserialize;
-use tokio::sync::RwLockWriteGuard;
 
 use self::{event::TestEvent, operation::*};
 use crate::{
     bson::{Bson, Document},
     options::ClientOptions,
-    test::{assert_matches, log_uncaptured, util::TestClient, EventClient, CLIENT_OPTIONS, LOCK},
+    test::{assert_matches, log_uncaptured, util::TestClient, EventClient, CLIENT_OPTIONS},
 };
 
 #[derive(Deserialize)]
@@ -34,8 +33,6 @@ struct TestCase {
 }
 
 async fn run_command_monitoring_test(test_file: TestFile) {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     let skipped_tests = vec![

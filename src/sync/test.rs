@@ -8,17 +8,12 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     options::{
-        Acknowledgment,
-        ClientOptions,
-        CollectionOptions,
-        DatabaseOptions,
-        FindOptions,
-        ServerAddress,
-        WriteConcern,
+        Acknowledgment, ClientOptions, CollectionOptions, DatabaseOptions, FindOptions,
+        ServerAddress, WriteConcern,
     },
     runtime,
     sync::{Client, Collection},
-    test::{TestClient as AsyncTestClient, CLIENT_OPTIONS, LOCK},
+    test::{TestClient as AsyncTestClient, CLIENT_OPTIONS},
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
@@ -35,8 +30,6 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
 
 #[test]
 fn client_options() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let mut options = ClientOptions::parse("mongodb://localhost:27017/").unwrap();
 
     options.original_uri.take();
@@ -55,8 +48,6 @@ fn client_options() {
 #[test]
 #[function_name::named]
 fn client() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
 
@@ -76,8 +67,6 @@ fn client() {
 fn default_database() {
     // here we just test default database name matched, the database interactive logic
     // is tested in `database`.
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let default_db = client.default_database();
@@ -104,8 +93,6 @@ fn default_database() {
 #[test]
 #[function_name::named]
 fn database() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let db = client.database(function_name!());
@@ -149,8 +136,6 @@ fn database() {
 #[test]
 #[function_name::named]
 fn collection() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let coll = init_db_and_coll(&client, function_name!(), function_name!());
@@ -202,8 +187,6 @@ fn collection() {
 #[test]
 #[function_name::named]
 fn typed_collection() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
@@ -224,8 +207,6 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let should_skip = runtime::block_on(async {
         let test_client = AsyncTestClient::new().await;
         !test_client.supports_transactions()
@@ -268,8 +249,6 @@ fn transactions() {
 #[test]
 #[function_name::named]
 fn collection_generic_bounds() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     #[derive(Deserialize)]
     struct Foo;
 
@@ -297,8 +276,6 @@ fn collection_generic_bounds() {
 
 #[test]
 fn borrowed_deserialization() {
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
-
     let client =
         Client::with_options(CLIENT_OPTIONS.clone()).expect("client creation should succeed");
 
@@ -368,8 +345,6 @@ fn borrowed_deserialization() {
 fn mixed_sync_and_async() -> Result<()> {
     const DB_NAME: &str = "mixed_sync_and_async";
     const COLL_NAME: &str = "test";
-
-    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
 
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
     let async_client = runtime::block_on(async { AsyncTestClient::new().await });

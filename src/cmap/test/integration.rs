@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use super::{
     event::{Event, EventHandler},
@@ -15,13 +14,7 @@ use crate::{
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
-        log_uncaptured,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        log_uncaptured, FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS,
     },
 };
 use semver::VersionReq;
@@ -40,8 +33,6 @@ struct DatabaseEntry {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn acquire_connection_and_send_command() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client_options = CLIENT_OPTIONS.clone();
     let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
     pool_options.ready = Some(true);
@@ -84,8 +75,6 @@ async fn acquire_connection_and_send_command() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn concurrent_connections() {
-    let _guard = LOCK.run_exclusively().await;
-
     let mut options = CLIENT_OPTIONS.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping concurrent_connections test due to load-balanced topology");
@@ -172,8 +161,6 @@ async fn concurrent_connections() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn connection_error_during_establishment() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut client_options = CLIENT_OPTIONS.clone();
     if client_options.load_balanced.unwrap_or(false) {
         log_uncaptured(
@@ -233,8 +220,6 @@ async fn connection_error_during_establishment() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn connection_error_during_operation() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut options = CLIENT_OPTIONS.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);

@@ -2,13 +2,12 @@ use std::time::Duration;
 
 use futures::{future::Either, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
-    test::{log_uncaptured, util::EventClient, TestClient, LOCK, SERVERLESS},
+    test::{log_uncaptured, util::EventClient, TestClient, SERVERLESS},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -21,8 +20,6 @@ async fn tailable_cursor() {
         );
         return;
     }
-
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client
@@ -91,8 +88,6 @@ async fn tailable_cursor() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn session_cursor_next() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let mut session = client.start_session(None).await.unwrap();
 
@@ -121,7 +116,6 @@ async fn session_cursor_next() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn batch_exhaustion() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
     let coll = client
@@ -168,7 +162,6 @@ async fn batch_exhaustion() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn borrowed_deserialization() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]

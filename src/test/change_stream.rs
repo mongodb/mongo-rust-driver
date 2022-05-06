@@ -14,7 +14,7 @@ use crate::{
     Collection,
 };
 
-use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
+use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -56,8 +56,6 @@ async fn init_stream(
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn tracks_resume_token() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (client, coll, mut stream) = match init_stream("track_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -128,8 +126,6 @@ fn expected_tokens(events: &[CommandSucceededEvent]) -> Result<Vec<Bson>> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn errors_on_missing_token() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (_, coll, _) = match init_stream("errors_on_missing_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -148,8 +144,6 @@ async fn errors_on_missing_token() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resumes_on_error() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let (client, coll, mut stream) = match init_stream("resumes_on_error", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -193,8 +187,6 @@ async fn resumes_on_error() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn does_not_resume_aggregate() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let (client, coll, _) = match init_stream("does_not_resume_aggregate", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -224,8 +216,6 @@ async fn does_not_resume_aggregate() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn empty_batch_not_closed() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (client, coll, mut stream) = match init_stream("empty_batch_not_closed", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -257,8 +247,6 @@ async fn empty_batch_not_closed() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resume_kill_cursor_error_suppressed() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let (client, coll, mut stream) =
         match init_stream("resume_kill_cursor_error_suppressed", true).await? {
             Some(t) => t,
@@ -304,8 +292,6 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resume_start_at_operation_time() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let (client, coll, mut stream) =
         match init_stream("resume_start_at_operation_time", true).await? {
             Some(t) => t,
@@ -360,8 +346,6 @@ async fn resume_start_at_operation_time() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn batch_end_resume_token() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -394,8 +378,6 @@ async fn batch_end_resume_token() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn batch_end_resume_token_legacy() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (client, coll, mut stream) =
         match init_stream("batch_end_resume_token_legacy", false).await? {
             Some(t) => t,
@@ -441,8 +423,6 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn batch_mid_resume_token() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (_, coll, mut stream) = match init_stream("batch_mid_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -462,8 +442,6 @@ async fn batch_mid_resume_token() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn aggregate_batch() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let (client, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -524,8 +502,6 @@ async fn aggregate_batch() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resume_uses_start_after() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -590,8 +566,6 @@ async fn resume_uses_start_after() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resume_uses_resume_after() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -659,8 +633,6 @@ async fn resume_uses_resume_after() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn create_coll_pre_post() -> Result<()> {
-    let _guard = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     if !VersionReq::parse(">=6.0")
         .unwrap()

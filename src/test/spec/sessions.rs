@@ -1,10 +1,8 @@
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
-
 use crate::{
     bson::doc,
     error::ErrorKind,
     options::SessionOptions,
-    test::{run_spec_test, TestClient, LOCK},
+    test::{run_spec_test, TestClient},
 };
 
 use super::run_unified_format_test;
@@ -12,7 +10,6 @@ use super::run_unified_format_test;
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test(&["sessions"], run_unified_format_test).await;
 }
 
@@ -32,8 +29,6 @@ async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn explicit_session_created_on_same_client() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let client0 = TestClient::new().await;
     let client1 = TestClient::new().await;
 

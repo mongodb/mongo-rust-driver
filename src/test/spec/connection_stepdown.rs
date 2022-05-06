@@ -1,32 +1,23 @@
 use std::{future::Future, time::Duration};
 
 use futures::stream::StreamExt;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
     options::{
-        Acknowledgment,
-        ClientOptions,
-        CreateCollectionOptions,
-        DropCollectionOptions,
-        FindOptions,
-        InsertManyOptions,
-        WriteConcern,
+        Acknowledgment, ClientOptions, CreateCollectionOptions, DropCollectionOptions, FindOptions,
+        InsertManyOptions, WriteConcern,
     },
     runtime,
-    test::{log_uncaptured, util::EventClient, CLIENT_OPTIONS, LOCK},
-    Collection,
-    Database,
+    test::{log_uncaptured, util::EventClient, CLIENT_OPTIONS},
+    Collection, Database,
 };
 
 async fn run_test<F: Future>(
     name: &str,
     test: impl Fn(EventClient, Database, Collection<Document>) -> F,
 ) {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let options = ClientOptions::builder()
         .hosts(CLIENT_OPTIONS.hosts.clone())
         .retry_writes(false)

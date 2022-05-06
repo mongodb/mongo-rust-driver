@@ -1,11 +1,10 @@
 use serde::Deserialize;
-use tokio::sync::RwLockReadGuard;
 
 use super::{run_crud_v1_test, Outcome, TestFile};
 use crate::{
     bson::{Bson, Document},
     options::{Collation, DistinctOptions},
-    test::{util::TestClient, LOCK},
+    test::util::TestClient,
 };
 
 #[derive(Debug, Deserialize)]
@@ -18,8 +17,6 @@ struct Arguments {
 
 #[function_name::named]
 async fn run_distinct_test(test_file: TestFile) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let data = test_file.data;
 

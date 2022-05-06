@@ -9,13 +9,12 @@ use std::{convert::TryFrom, ffi::OsStr, fs::read_dir, path::PathBuf, time::Durat
 
 use futures::{future::FutureExt, stream::TryStreamExt};
 use semver::Version;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     runtime,
-    test::{log_uncaptured, run_single_test, run_spec_test, LOCK},
+    test::{log_uncaptured, run_single_test, run_spec_test},
 };
 
 pub use self::{
@@ -24,14 +23,8 @@ pub use self::{
     operation::{Operation, OperationObject},
     test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
     test_file::{
-        merge_uri_options,
-        CollectionData,
-        ExpectError,
-        ExpectedEventType,
-        TestCase,
-        TestFile,
-        TestFileEntity,
-        Topology,
+        merge_uri_options, CollectionData, ExpectError, ExpectedEventType, TestCase, TestFile,
+        TestFileEntity, Topology,
     },
     test_runner::{EntityMap, TestRunner},
 };
@@ -313,7 +306,6 @@ pub async fn run_unified_format_test_filtered(
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_examples() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_spec_test(
         &["unified-test-format", "examples"],
         run_unified_format_test,
@@ -324,8 +316,6 @@ async fn test_examples() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_fail() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "src",
@@ -353,7 +343,6 @@ async fn valid_fail() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_spec_test(
         &["unified-test-format", "valid-pass"],
         run_unified_format_test,
@@ -371,8 +360,6 @@ const SKIPPED_INVALID_TESTS: &[&str] = &[
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "src",

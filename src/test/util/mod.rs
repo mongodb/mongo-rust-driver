@@ -1,12 +1,10 @@
 mod event;
 mod failpoint;
-mod lock;
 mod matchable;
 
 pub use self::{
     event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
-    lock::TestLock,
     matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
 };
 
@@ -27,13 +25,9 @@ use crate::{
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     test::{
-        update_options_for_testing,
-        Topology,
-        LOAD_BALANCED_MULTIPLE_URI,
-        LOAD_BALANCED_SINGLE_URI,
+        update_options_for_testing, Topology, LOAD_BALANCED_MULTIPLE_URI, LOAD_BALANCED_SINGLE_URI,
     },
-    Client,
-    Collection,
+    Client, Collection,
 };
 
 #[derive(Clone, Debug)]

@@ -16,11 +16,7 @@ elif [ "$ASYNC_RUNTIME" != "tokio" ]; then
     exit 1
 fi
 
-OPTIONS="-- -Z unstable-options --format json --report-time"
-
-if [ "$SINGLE_THREAD" = true ]; then
-	OPTIONS="$OPTIONS --test-threads=1"
-fi
+OPTIONS="-- -Z unstable-options --format json --report-time --test-threads 1"
 
 FEATURE_FLAGS=${FEATURE_FLAGS},${TLS_FEATURE}
 

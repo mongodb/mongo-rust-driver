@@ -1,12 +1,10 @@
-use tokio::sync::RwLockWriteGuard;
-
 use crate::{
     bson::{doc, Bson, Document},
     cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
     operation::CommandResponse,
     options::{AuthMechanism, ClientOptions, Credential, ReadPreference},
     sdam::{ServerType, TopologyType},
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
+    test::{TestClient, CLIENT_OPTIONS},
 };
 
 async fn speculative_auth_test(
@@ -98,8 +96,6 @@ async fn speculative_auth_test(
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_default() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     let credential = Credential::builder()
@@ -114,8 +110,6 @@ async fn speculative_auth_default() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_scram_sha_1() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     let credential = Credential::builder()
@@ -131,8 +125,6 @@ async fn speculative_auth_scram_sha_1() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_scram_sha_256() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
@@ -152,10 +144,6 @@ async fn speculative_auth_scram_sha_256() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_x509() {
-    // Since this test drops and creates the same user as our other X.509 test, we run it
-    // exclusively.
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     let username = match std::env::var("MONGO_X509_USER") {

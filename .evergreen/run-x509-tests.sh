@@ -23,7 +23,7 @@ else
     exit 1
 fi
 
-OPTIONS="--no-default-features --features ${RUNTIME_FEATURE},${TLS_FEATURE} -- -Z unstable-options --format json --report-time"
+OPTIONS="--no-default-features --features ${RUNTIME_FEATURE},${TLS_FEATURE} -- -Z unstable-options --format json --report-time --test-threads 1"
 
 set +o errexit
 RUST_BACKTRACE=1 MONGO_X509_USER="$SUBJECT" cargo test x509 $OPTIONS | tee results.json

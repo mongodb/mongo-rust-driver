@@ -4,7 +4,7 @@ mod integration;
 
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
-use tokio::sync::{Mutex, RwLock, RwLockWriteGuard};
+use tokio::sync::{Mutex, RwLock};
 
 use self::{
     event::{Event, EventHandler},
@@ -20,16 +20,8 @@ use crate::{
     runtime::AsyncJoinHandle,
     sdam::{TopologyUpdater, UpdateMessage},
     test::{
-        assert_matches,
-        eq_matches,
-        log_uncaptured,
-        run_spec_test,
-        EventClient,
-        MatchErrExt,
-        Matchable,
-        CLIENT_OPTIONS,
-        LOCK,
-        SERVER_API,
+        assert_matches, eq_matches, log_uncaptured, run_spec_test, EventClient, MatchErrExt,
+        Matchable, CLIENT_OPTIONS, SERVER_API,
     },
 };
 use bson::doc;
@@ -423,8 +415,6 @@ async fn cmap_spec_tests() {
         if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
             return;
         }
-
-        let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
         let mut options = CLIENT_OPTIONS.clone();
         if options.load_balanced.unwrap_or(false) {

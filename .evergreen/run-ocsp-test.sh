@@ -35,4 +35,4 @@ export MONGODB_URI="${MONGODB_URI}tls=true&tlsCAFile=${CA_FILE}"
 
 . ~/.cargo/env
 
-RUST_BACKTRACE=1 cargo test spec::ocsp
+RUST_BACKTRACE=1 cargo test spec::ocsp -- --test-threads 1

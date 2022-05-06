@@ -4,7 +4,6 @@ use approx::abs_diff_eq;
 use bson::{doc, Document};
 use semver::VersionReq;
 use serde::Deserialize;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     coll::options::FindOptions,
@@ -15,17 +14,8 @@ use crate::{
     sdam::{description::topology::server_selection, Server},
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
-        log_uncaptured,
-        run_spec_test,
-        CmapEvent,
-        Event,
-        EventHandler,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        log_uncaptured, run_spec_test, CmapEvent, Event, EventHandler, FailCommandOptions,
+        FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS,
     },
     ServerInfo,
 };
@@ -116,8 +106,6 @@ async fn select_in_window() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balancing_test() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut setup_client_options = CLIENT_OPTIONS.clone();
 
     if setup_client_options.load_balanced.unwrap_or(false) {

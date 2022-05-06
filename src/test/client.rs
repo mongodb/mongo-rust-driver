@@ -2,7 +2,6 @@ use std::{borrow::Cow, collections::HashMap, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, Bson},
@@ -10,7 +9,7 @@ use crate::{
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
-    test::{log_uncaptured, util::TestClient, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, util::TestClient, CLIENT_OPTIONS},
     Client,
 };
 
@@ -31,8 +30,6 @@ struct DriverMetadata {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn metadata_sent_in_handshake() {
-    let _: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     // skip on other topologies due to different currentOp behavior
@@ -96,8 +93,6 @@ async fn metadata_sent_in_handshake() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn connection_drop_during_read() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let mut options = CLIENT_OPTIONS.clone();
     options.max_pool_size = Some(1);
 
@@ -134,8 +129,6 @@ async fn connection_drop_during_read() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_timeout_message() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     if CLIENT_OPTIONS.repl_set_name.is_none() {
         log_uncaptured("skipping server_selection_timeout_message due to missing replica set name");
         return;
@@ -173,8 +166,6 @@ async fn server_selection_timeout_message() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_databases() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let expected_dbs = &[
         format!("{}1", function_name!()),
         format!("{}2", function_name!()),
@@ -221,8 +212,6 @@ async fn list_databases() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_database_names() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
 
     let expected_dbs = &[
@@ -259,8 +248,6 @@ async fn list_database_names() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_authorized_databases() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping list_authorized_databases due to test configuration");
@@ -450,8 +437,6 @@ async fn scram_test(
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha1() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
     if !client.auth_enabled() {
         log_uncaptured("skipping scram_sha1 due to missing authentication");
@@ -474,8 +459,6 @@ async fn scram_sha1() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha256() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping scram_sha256 due to test configuration");
@@ -497,8 +480,6 @@ async fn scram_sha256() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_both() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping scram_both due to test configuration");
@@ -526,8 +507,6 @@ async fn scram_both() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_uri() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
     if !client.auth_enabled() {
         log_uncaptured("skipping scram_missing_user_uri due to missing authentication");
@@ -539,8 +518,6 @@ async fn scram_missing_user_uri() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_options() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
     if !client.auth_enabled() {
         log_uncaptured("skipping scram_missing_user_options due to missing authentication");
@@ -552,8 +529,6 @@ async fn scram_missing_user_options() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -597,8 +572,6 @@ async fn saslprep() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn x509_auth() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let username = match std::env::var("MONGO_X509_USER") {
         Ok(user) => user,
         Err(_) => return,
@@ -647,8 +620,6 @@ async fn x509_auth() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn plain_auth() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
         log_uncaptured("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
         return;

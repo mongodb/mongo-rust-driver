@@ -1,15 +1,11 @@
 use std::path::PathBuf;
 
-use tokio::sync::RwLockWriteGuard;
-
 use crate::test::{
-    log_uncaptured,
-    run_spec_test_with_path,
+    log_uncaptured, run_spec_test_with_path,
     spec::{
         unified_runner::{ExpectedCmapEvent, ExpectedEvent, TestFile},
         ExpectedEventType,
     },
-    LOCK,
 };
 
 use super::run_unified_format_test_filtered;
@@ -52,6 +48,5 @@ async fn run() {
         })
         .await;
     }
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test_with_path(&["load-balancers"], run_test).await;
 }

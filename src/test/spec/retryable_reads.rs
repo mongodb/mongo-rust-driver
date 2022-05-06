@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use bson::doc;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     error::Result,
@@ -12,17 +11,8 @@ use crate::{
     runtime,
     runtime::AsyncJoinHandle,
     test::{
-        log_uncaptured,
-        run_spec_test,
-        CmapEvent,
-        Event,
-        EventHandler,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        log_uncaptured, run_spec_test, CmapEvent, Event, EventHandler, FailCommandOptions,
+        FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS,
     },
 };
 
@@ -31,14 +21,12 @@ use super::{run_unified_format_test, run_v2_test};
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test(&["retryable-reads", "legacy"], run_v2_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test(&["retryable-reads", "unified"], run_unified_format_test).await;
 }
 
@@ -47,8 +35,6 @@ async fn run_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_releases_connection() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let mut client_options = CLIENT_OPTIONS.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
@@ -79,8 +65,6 @@ async fn retry_releases_connection() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_read_pool_cleared() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let handler = Arc::new(EventHandler::new());
 
     let mut client_options = CLIENT_OPTIONS.clone();

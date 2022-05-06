@@ -5,11 +5,7 @@ set -o pipefail
 
 source ./.evergreen/env.sh
 
-OPTIONS="-- -Z unstable-options --format json --report-time"
-
-if [ "$SINGLE_THREAD" = true ]; then
-	OPTIONS="$OPTIONS --test-threads=1"
-fi
+OPTIONS="-- -Z unstable-options --format json --report-time --test-threads 1"
 
 FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression,${TLS_FEATURE}"
 

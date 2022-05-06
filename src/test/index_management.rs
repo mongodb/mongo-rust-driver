@@ -1,5 +1,4 @@
 use futures::stream::TryStreamExt;
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
@@ -8,7 +7,6 @@ use crate::{
     test::{
         log_uncaptured,
         util::{EventClient, TestClient},
-        LOCK,
     },
     IndexModel,
 };
@@ -18,7 +16,6 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn index_management_creates() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -72,7 +69,6 @@ async fn index_management_creates() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn index_management_handles_duplicates() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -116,7 +112,6 @@ async fn index_management_handles_duplicates() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn index_management_lists() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -179,7 +174,6 @@ async fn index_management_lists() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn index_management_drops() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -228,7 +222,6 @@ async fn index_management_drops() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn index_management_executes_commands() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -283,8 +276,6 @@ async fn index_management_executes_commands() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn commit_quorum_error() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     if client.is_standalone() {
         log_uncaptured("skipping commit_quorum_error due to standalone topology");

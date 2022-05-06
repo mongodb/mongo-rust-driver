@@ -15,28 +15,15 @@ mod util;
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
     util::{
-        assert_matches,
-        eq_matches,
-        log_uncaptured,
-        CmapEvent,
-        CommandEvent,
-        Event,
-        EventClient,
-        EventHandler,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        MatchErrExt,
-        Matchable,
-        SdamEvent,
-        TestClient,
+        assert_matches, eq_matches, log_uncaptured, CmapEvent, CommandEvent, Event, EventClient,
+        EventHandler, FailCommandOptions, FailPoint, FailPointMode, MatchErrExt, Matchable,
+        SdamEvent, TestClient,
     },
 };
 
 use home::home_dir;
 use lazy_static::lazy_static;
 
-use self::util::TestLock;
 use crate::{
     client::{
         auth::Credential,
@@ -54,7 +41,6 @@ lazy_static! {
         update_options_for_testing(&mut options);
         options
     };
-    pub(crate) static ref LOCK: TestLock = TestLock::new();
     pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
     {

@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, serde_helpers::serialize_u64_as_i32, Document},
     client::session::TransactionState,
-    test::{log_uncaptured, run_spec_test, TestClient, LOCK},
+    test::{log_uncaptured, run_spec_test, TestClient},
     Collection,
 };
 
@@ -13,16 +12,12 @@ use super::{run_unified_format_test, run_v2_test};
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     run_spec_test(&["transactions", "legacy"], run_v2_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     // TODO RUST-902: Reduce transactionLifetimeLimitSeconds.
     run_spec_test(&["transactions", "unified"], run_unified_format_test).await;
 }
@@ -33,8 +28,6 @@ async fn run_unified() {
 /// This test replicates the test cases in errors-client.json as we do not have the document
 /// validation required to trigger client-side errors in those tests.
 async fn client_errors() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     #[derive(Debug, Deserialize, Serialize)]
     struct A {
         #[serde(serialize_with = "serialize_u64_as_i32")]
@@ -92,8 +85,6 @@ async fn client_errors() {
 #[function_name::named]
 // This test checks that deserializing an operation correctly still retrieves the recovery token.
 async fn deserialize_recovery_token() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     #[derive(Debug, Serialize)]
     struct A {
         num: i32,

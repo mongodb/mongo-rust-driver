@@ -4,51 +4,31 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{
-    broadcast::error::{RecvError, SendError},
-    RwLockReadGuard,
-};
+use tokio::sync::broadcast::error::{RecvError, SendError};
 
 use super::TestClient;
 use crate::{
     bson::doc,
     event::{
         cmap::{
-            CmapEventHandler,
-            ConnectionCheckedInEvent,
-            ConnectionCheckedOutEvent,
-            ConnectionCheckoutFailedEvent,
-            ConnectionCheckoutStartedEvent,
-            ConnectionClosedEvent,
-            ConnectionCreatedEvent,
-            ConnectionReadyEvent,
-            PoolClearedEvent,
-            PoolClosedEvent,
-            PoolCreatedEvent,
-            PoolReadyEvent,
+            CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+            ConnectionCheckoutFailedEvent, ConnectionCheckoutStartedEvent, ConnectionClosedEvent,
+            ConnectionCreatedEvent, ConnectionReadyEvent, PoolClearedEvent, PoolClosedEvent,
+            PoolCreatedEvent, PoolReadyEvent,
         },
         command::{
-            CommandEventHandler,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
+            CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
         },
         sdam::{
-            SdamEventHandler,
-            ServerClosedEvent,
-            ServerDescriptionChangedEvent,
-            ServerHeartbeatFailedEvent,
-            ServerHeartbeatStartedEvent,
-            ServerHeartbeatSucceededEvent,
-            ServerOpeningEvent,
-            TopologyClosedEvent,
-            TopologyDescriptionChangedEvent,
+            SdamEventHandler, ServerClosedEvent, ServerDescriptionChangedEvent,
+            ServerHeartbeatFailedEvent, ServerHeartbeatStartedEvent, ServerHeartbeatSucceededEvent,
+            ServerOpeningEvent, TopologyClosedEvent, TopologyDescriptionChangedEvent,
             TopologyOpeningEvent,
         },
     },
     options::ClientOptions,
     runtime,
-    test::{spec::ExpectedEventType, LOCK},
+    test::spec::ExpectedEventType,
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
@@ -569,8 +549,6 @@ impl EventClient {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_started_event_count() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     let coll = client.database("foo").collection("bar");
 

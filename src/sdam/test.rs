@@ -5,25 +5,14 @@ use std::{
 
 use bson::{bson, doc};
 use semver::VersionReq;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     error::ErrorKind,
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
     test::{
-        log_uncaptured,
-        CmapEvent,
-        Event,
-        EventClient,
-        EventHandler,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        SdamEvent,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        log_uncaptured, CmapEvent, Event, EventClient, EventHandler, FailCommandOptions, FailPoint,
+        FailPointMode, SdamEvent, TestClient, CLIENT_OPTIONS,
     },
     Client,
 };
@@ -31,8 +20,6 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn min_heartbeat_frequency() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping min_heartbeat_frequency test due to load-balanced topology");
@@ -100,8 +87,6 @@ async fn min_heartbeat_frequency() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_pool_management() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut options = CLIENT_OPTIONS.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping sdam_pool_management test due to load-balanced topology");
@@ -196,8 +181,6 @@ async fn sdam_pool_management() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_min_pool_size_error() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping sdam_min_pool_size_error test due to load-balanced topology");
@@ -289,8 +272,6 @@ async fn sdam_min_pool_size_error() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn auth_error() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     setup_client_options.hosts.drain(1..);
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
@@ -400,8 +381,6 @@ async fn auth_error() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn hello_ok_true() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     setup_client_options.hosts.drain(1..);
 

@@ -1,18 +1,11 @@
 use std::path::PathBuf;
 
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
-
 use crate::{
     bson::doc,
     options::{ServerApi, ServerApiVersion},
     test::{
-        log_uncaptured,
-        run_single_test,
-        run_spec_test_with_path,
-        spec::unified_runner::TestFile,
-        EventClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        log_uncaptured, run_single_test, run_spec_test_with_path, spec::unified_runner::TestFile,
+        EventClient, CLIENT_OPTIONS,
     },
 };
 
@@ -21,14 +14,12 @@ use super::run_unified_format_test;
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_spec_test_with_path(&["versioned-api"], run_non_transaction_handling_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_transaction_handling_spec_test() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "src",
@@ -57,8 +48,6 @@ async fn run_non_transaction_handling_test(path: PathBuf, file: TestFile) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_handling() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let version = ServerApi::builder().version(ServerApiVersion::V1).build();
 
     let mut options = CLIENT_OPTIONS.clone();
