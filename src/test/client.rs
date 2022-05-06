@@ -731,7 +731,7 @@ async fn retry_commit_txn_check_out() {
         .unwrap();
 
     // enable a fail point that clears the connection pools so that
-    // commitTransaction will check out a connection
+    // commitTransaction will create a new connection during check out.
     let fp = FailPoint::fail_command(
         &["ping"],
         FailPointMode::Times(1),
