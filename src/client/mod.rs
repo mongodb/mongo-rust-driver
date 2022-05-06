@@ -12,6 +12,8 @@ use derivative::Derivative;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
+#[cfg(feature = "tracing-unstable")]
+use crate::trace::{debug_tracing_or_log_enabled, CommandTracingEventEmitter};
 use crate::{
     bson::Document,
     change_stream::{
@@ -130,7 +132,7 @@ impl Client {
 
     pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
         #[cfg(feature = "tracing-unstable")]
-        let should_emit =  self.inner.options.command_event_handler.is_some() || tracing::enabled!(tracing::Level::DEBUG);
+        let should_emit =  self.inner.options.command_event_handler.is_some() || debug_tracing_or_log_enabled!();
         #[cfg(not(feature = "tracing-unstable"))]
         let should_emit =  self.inner.options.command_event_handler.is_some();
 
@@ -143,8 +145,8 @@ impl Client {
             }
             
             #[cfg(feature = "tracing-unstable")]
-            if tracing::enabled!(tracing::Level::DEBUG) {
-                let tracing_emitter = crate::trace::CommandTracingEventEmitter::new(
+            if debug_tracing_or_log_enabled!() {
+                let tracing_emitter = CommandTracingEventEmitter::new(
                     self.inner.options.tracing_max_document_length_bytes
                 );
                 handle_command_event(&tracing_emitter, event.clone());

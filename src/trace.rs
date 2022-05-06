@@ -23,7 +23,7 @@ impl CommandTracingEventEmitter {
 impl CommandEventHandler for CommandTracingEventEmitter {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
         tracing::debug!(
-            target: COMMAND_EVENT_TARGET,
+            target: COMMAND_TRACING_EVENT_TARGET,
             command = self.serialize_command_or_reply(event.command).as_str(),
             database_name = event.db.as_str(),
             command_name = event.command_name.as_str(),
@@ -38,7 +38,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
 
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
         tracing::debug!(
-            target: COMMAND_EVENT_TARGET,
+            target: COMMAND_TRACING_EVENT_TARGET,
             reply = self.serialize_command_or_reply(event.reply).as_str(),
             command_name = event.command_name.as_str(),
             request_id = event.request_id,
@@ -53,7 +53,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
 
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
         tracing::debug!(
-            target: COMMAND_EVENT_TARGET,
+            target: COMMAND_TRACING_EVENT_TARGET,
             failure = event.failure.tracing_representation().as_str(),
             command_name = event.command_name.as_str(),
             request_id = event.request_id,
@@ -67,7 +67,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
     }
 }
 
-const COMMAND_EVENT_TARGET: &str = "mongodb::command";
+pub(crate) const COMMAND_TRACING_EVENT_TARGET: &str = "mongodb::command";
 
 trait TracingRepresentation {
     fn tracing_representation(self) -> String;
@@ -117,7 +117,7 @@ pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {
     }
 }
 
-// macro_rules! debug_tracing_or_log_enabled {
-//     () => { tracing::enabled!(tracing::Level::DEBUG) || log::log_enabled!(log::Level::Debug) }
-// }
-// pub(crate) use debug_tracing_or_log_enabled;
+macro_rules! debug_tracing_or_log_enabled {
+    () => { tracing::enabled!(tracing::Level::DEBUG) || log::log_enabled!(log::Level::Debug) }
+}
+pub(crate) use debug_tracing_or_log_enabled;

@@ -150,6 +150,7 @@ home = "0.5"
 pretty_assertions = "1.1.0"
 serde_json = "1.0.64"
 semver = "1.0.0"
+tracing-subscriber = "0.2"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
