@@ -226,8 +226,10 @@ fn get_resume_token(
                 None => return Err(ErrorKind::MissingResumeToken.into()),
             };
             if *is_last && batch_token.is_some() {
+                println!("using post batch token");
                 batch_token.cloned()
             } else {
+                println!("using doc token");
                 Some(doc_token)
             }
         }

@@ -449,8 +449,9 @@ async fn batch_mid_resume_token() -> Result<()> {
     };
 
     coll.insert_one(doc! {}, None).await?;
-    coll.insert_one(doc! {}, None).await?;
+    // coll.insert_one(doc! {}, None).await?;
 
+    let event = stream.next().await.transpose()?.unwrap();
     let mid_id = stream.next().await.transpose()?.unwrap().id;
     assert_eq!(stream.resume_token(), Some(mid_id));
 
