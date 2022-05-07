@@ -526,10 +526,10 @@ pub struct ClientOptions {
     /// By default, TLS is disabled.
     #[builder(default)]
     pub tls: Option<Tls>,
-    
+
     /// The maximum number of bytes that the driver should include in a tracing event
     /// or log message's extended JSON string representation of a document.
-    /// 
+    ///
     /// The default value is 1000.
     #[cfg(feature = "tracing-unstable")]
     #[builder(default)]

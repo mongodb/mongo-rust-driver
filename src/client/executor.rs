@@ -30,7 +30,12 @@ use crate::{
         TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
-    event::command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+    event::command::{
+        CommandEvent,
+        CommandFailedEvent,
+        CommandStartedEvent,
+        CommandSucceededEvent,
+    },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         AbortTransaction,
@@ -604,7 +609,7 @@ impl Client {
             bytes: serialized,
         };
 
-        self.emit_command_event( ||{
+        self.emit_command_event(|| {
             let command_body = if should_redact {
                 Document::new()
             } else {

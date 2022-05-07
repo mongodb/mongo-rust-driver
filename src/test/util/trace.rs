@@ -1,7 +1,8 @@
-use std::collections::{VecDeque, HashMap};
-use std::sync::{Arc, RwLock};
-use tracing::field::Field;
-use tracing::{Event, Subscriber, Level, span, Metadata};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{Arc, RwLock},
+};
+use tracing::{field::Field, span, Event, Level, Metadata, Subscriber};
 
 /// Models the data reported in a tracing event.
 
@@ -52,7 +53,7 @@ impl TracingSubscriber {
             events: Default::default(),
         }
     }
-    
+
     /// Retrieves all of the tracing events collected by the subscriber.
     pub fn get_all_events(&self) -> Vec<TracingEvent> {
         let events = self.events.read().unwrap();
@@ -82,7 +83,9 @@ impl Subscriber for TracingSubscriber {
 
     /// These methods all relate to spans. Since we don't create any spans ourselves or need
     /// to make any assertions about them, we do not need real implementations.
-    fn new_span(&self, _span: &span::Attributes<'_>) -> span::Id { span::Id::from_u64(1) }
+    fn new_span(&self, _span: &span::Attributes<'_>) -> span::Id {
+        span::Id::from_u64(1)
+    }
     fn record(&self, _span: &span::Id, _values: &span::Record<'_>) {}
     fn record_follows_from(&self, _span: &span::Id, _follows: &span::Id) {}
     fn enter(&self, _span: &span::Id) {}
@@ -95,39 +98,33 @@ struct TracingEventVisitor<'a> {
 
 impl TracingEventVisitor<'_> {
     fn new(event: &mut TracingEvent) -> TracingEventVisitor {
-        TracingEventVisitor {
-            event
-        }
+        TracingEventVisitor { event }
     }
 }
 
 impl tracing::field::Visit for TracingEventVisitor<'_> {
     fn record_f64(&mut self, field: &Field, value: f64) {
-        self.event.fields.insert(
-            field.name().to_string(),
-            TracingEventValue::F64(value),
-        );
+        self.event
+            .fields
+            .insert(field.name().to_string(), TracingEventValue::F64(value));
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.event.fields.insert(
-            field.name().to_string(),
-            TracingEventValue::I64(value),
-        );
+        self.event
+            .fields
+            .insert(field.name().to_string(), TracingEventValue::I64(value));
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        self.event.fields.insert(
-            field.name().to_string(),
-            TracingEventValue::U64(value),
-        );
+        self.event
+            .fields
+            .insert(field.name().to_string(), TracingEventValue::U64(value));
     }
 
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.event.fields.insert(
-            field.name().to_string(),
-            TracingEventValue::Bool(value),
-        );
+        self.event
+            .fields
+            .insert(field.name().to_string(), TracingEventValue::Bool(value));
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {

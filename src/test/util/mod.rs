@@ -5,7 +5,7 @@ mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 #[cfg(feature = "tracing-unstable")]
-pub use self::trace::{TracingSubscriber, TracingEvent, TracingEventValue};
+pub use self::trace::{TracingEvent, TracingEventValue, TracingSubscriber};
 
 pub use self::{
     event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},

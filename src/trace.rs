@@ -1,5 +1,10 @@
+use crate::event::command::{
+    CommandEventHandler,
+    CommandFailedEvent,
+    CommandStartedEvent,
+    CommandSucceededEvent,
+};
 use bson::Bson;
-use crate::event::command::{CommandEventHandler, CommandStartedEvent, CommandSucceededEvent, CommandFailedEvent};
 
 pub(crate) struct CommandTracingEventEmitter {
     max_document_length_bytes: usize,
@@ -8,7 +13,7 @@ pub(crate) struct CommandTracingEventEmitter {
 impl CommandTracingEventEmitter {
     pub(crate) fn new(max_document_length_bytes: Option<usize>) -> CommandTracingEventEmitter {
         CommandTracingEventEmitter {
-            max_document_length_bytes: max_document_length_bytes.unwrap_or(1000)
+            max_document_length_bytes: max_document_length_bytes.unwrap_or(1000),
         }
     }
 
@@ -16,9 +21,8 @@ impl CommandTracingEventEmitter {
         let mut ext_json = doc.tracing_representation();
         truncate_on_char_boundary(&mut ext_json, self.max_document_length_bytes);
         ext_json
-    } 
+    }
 }
-
 
 impl CommandEventHandler for CommandTracingEventEmitter {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
@@ -31,7 +35,10 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             driver_connection_id = event.connection.id,
             server_host = event.connection.address.host(),
             server_port = event.connection.address.port(),
-            service_id = event.service_id.map(|id| id.tracing_representation()).as_deref(),
+            service_id = event
+                .service_id
+                .map(|id| id.tracing_representation())
+                .as_deref(),
             "Command started"
         );
     }
@@ -45,7 +52,10 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             driver_connection_id = event.connection.id,
             server_host = event.connection.address.host(),
             server_port = event.connection.address.port(),
-            service_id = event.service_id.map(|id| id.tracing_representation()).as_deref(),
+            service_id = event
+                .service_id
+                .map(|id| id.tracing_representation())
+                .as_deref(),
             duration_ms = event.duration.as_millis().tracing_representation().as_str(),
             "Command succeeded"
         );
@@ -60,7 +70,10 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             driver_connection_id = event.connection.id,
             server_host = event.connection.address.host(),
             server_port = event.connection.address.port(),
-            service_id = event.service_id.map(|id| id.tracing_representation()).as_deref(),
+            service_id = event
+                .service_id
+                .map(|id| id.tracing_representation())
+                .as_deref(),
             duration_ms = event.duration.as_millis().tracing_representation().as_str(),
             "Command failed"
         );
@@ -87,9 +100,7 @@ impl TracingRepresentation for u128 {
 
 impl TracingRepresentation for bson::Document {
     fn tracing_representation(self) -> String {
-        Bson::Document(self)
-            .into_canonical_extjson()
-            .to_string()
+        Bson::Document(self).into_canonical_extjson().to_string()
     }
 }
 
@@ -118,6 +129,8 @@ pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {
 }
 
 macro_rules! debug_tracing_or_log_enabled {
-    () => { tracing::enabled!(tracing::Level::DEBUG) || log::log_enabled!(log::Level::Debug) }
+    () => {
+        tracing::enabled!(tracing::Level::DEBUG) || log::log_enabled!(log::Level::Debug)
+    };
 }
 pub(crate) use debug_tracing_or_log_enabled;
