@@ -150,7 +150,7 @@ impl Client {
                 let tracing_emitter = CommandTracingEventEmitter::new(
                     self.inner.options.tracing_max_document_length_bytes,
                 );
-                handle_command_event(&tracing_emitter, event.clone());
+                handle_command_event(&tracing_emitter, event);
             }
         }
     }
