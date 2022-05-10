@@ -53,10 +53,9 @@ impl TracingSubscriber {
         }
     }
 
-    /// Retrieves all of the tracing events collected by the subscriber.
-    pub fn get_all_events(&self) -> Vec<TracingEvent> {
+    pub fn get_events_with_target(&self, component_name: &str) -> Vec<TracingEvent> {
         let events = self.events.read().unwrap();
-        events.iter().cloned().collect()
+        events.iter().filter(|e| e.target == component_name).cloned().collect()
     }
 
     /// Installs this subscriber as the default until the returned guard is dropped.
