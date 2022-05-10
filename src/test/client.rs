@@ -779,7 +779,7 @@ async fn retry_commit_txn_check_out() {
     // enable a failpoint on the handshake to cause check_out
     // to fail with a retryable error
     let fp = FailPoint::fail_command(
-        &[LEGACY_HELLO_COMMAND_NAME],
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(1),
         FailCommandOptions::builder()
             .error_code(11600)
