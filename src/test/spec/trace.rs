@@ -89,11 +89,3 @@ async fn command_tracing() {
         _ => panic!("event unexpectedly missing command event message"),
     }
 }
-
-#[cfg(feature = "tracing-unstable")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn command_tracing_2() {
-    let my_subscriber = TracingSubscriber::new(tracing::Level::DEBUG);
-    let _guard = my_subscriber.set_as_default();
-}

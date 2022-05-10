@@ -5,7 +5,6 @@ use std::{
 use tracing::{field::Field, span, Event, Level, Metadata, Subscriber};
 
 /// Models the data reported in a tracing event.
-
 #[derive(Debug, Clone)]
 pub struct TracingEvent {
     /// The verbosity level.
@@ -92,6 +91,7 @@ impl Subscriber for TracingSubscriber {
     fn exit(&self, _span: &span::Id) {}
 }
 
+/// A visitor which traverses each value in a tracing event and stores it in the underlying `TracingEvent`.
 struct TracingEventVisitor<'a> {
     event: &'a mut TracingEvent,
 }
