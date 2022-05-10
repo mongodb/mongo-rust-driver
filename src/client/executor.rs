@@ -713,10 +713,10 @@ impl Client {
                 self.emit_command_event(|| {
                     CommandEvent::Failed(CommandFailedEvent {
                         duration,
-                        command_name: cmd_name,
+                        command_name: cmd_name.clone(),
                         failure: err.clone(),
                         request_id,
-                        connection: connection_info,
+                        connection: connection_info.clone(),
                         service_id,
                     })
                 });
@@ -745,7 +745,7 @@ impl Client {
                         reply,
                         command_name: cmd_name.clone(),
                         request_id,
-                        connection: connection_info,
+                        connection: connection_info.clone(),
                         service_id,
                     })
                 });

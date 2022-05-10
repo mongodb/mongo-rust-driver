@@ -91,7 +91,8 @@ impl Subscriber for TracingSubscriber {
     fn exit(&self, _span: &span::Id) {}
 }
 
-/// A visitor which traverses each value in a tracing event and stores it in the underlying `TracingEvent`.
+/// A visitor which traverses each value in a tracing event and stores it in the underlying
+/// `TracingEvent`.
 struct TracingEventVisitor<'a> {
     event: &'a mut TracingEvent,
 }

@@ -130,28 +130,19 @@ impl Client {
         Ok(Self { inner })
     }
 
-    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
-        #[cfg(feature = "tracing-unstable")]
-        let should_emit =
-            self.inner.options.command_event_handler.is_some() || debug_tracing_or_log_enabled!();
-        #[cfg(not(feature = "tracing-unstable"))]
-        let should_emit = self.inner.options.command_event_handler.is_some();
-
-        // TODO: this is probably not ideal because we always clone the event, even if we aren't
-        // actually going to use it twice... any nice way to solve that?
-        if should_emit {
+    pub(crate) fn emit_command_event(&self, generate_event: impl Fn() -> CommandEvent) {
+        if let Some(ref handler) = self.inner.options.command_event_handler {
             let event = generate_event();
-            if let Some(ref handler) = self.inner.options.command_event_handler {
-                handle_command_event(handler.as_ref(), event.clone());
-            }
+            handle_command_event(handler.as_ref(), event);
+        }
 
-            #[cfg(feature = "tracing-unstable")]
-            if debug_tracing_or_log_enabled!() {
-                let tracing_emitter = CommandTracingEventEmitter::new(
-                    self.inner.options.tracing_max_document_length_bytes,
-                );
-                handle_command_event(&tracing_emitter, event);
-            }
+        #[cfg(feature = "tracing-unstable")]
+        if debug_tracing_or_log_enabled!() {
+            let tracing_emitter = CommandTracingEventEmitter::new(
+                self.inner.options.tracing_max_document_length_bytes,
+            );
+            let event = generate_event();
+            handle_command_event(&tracing_emitter, event);
         }
     }
 
