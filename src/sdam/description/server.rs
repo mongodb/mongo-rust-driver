@@ -122,6 +122,7 @@ impl PartialEq for ServerDescription {
 
                 self_response == other_response
             }
+            (Err(self_err), Err(other_err)) => self_err == other_err,
             _ => false,
         }
     }
