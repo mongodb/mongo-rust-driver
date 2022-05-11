@@ -7,7 +7,8 @@ use crate::{
     error::Result,
     options::ReadConcern,
     test::{log_uncaptured, CommandEvent, EventClient},
-    ClientSession, Collection,
+    ClientSession,
+    Collection,
 };
 
 /// Strunct encapsulating an operation that takes a session in, as well as some associated

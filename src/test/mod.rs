@@ -15,9 +15,21 @@ mod util;
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
     util::{
-        assert_matches, eq_matches, log_uncaptured, CmapEvent, CommandEvent, Event, EventClient,
-        EventHandler, FailCommandOptions, FailPoint, FailPointMode, MatchErrExt, Matchable,
-        SdamEvent, TestClient,
+        assert_matches,
+        eq_matches,
+        log_uncaptured,
+        CmapEvent,
+        CommandEvent,
+        Event,
+        EventClient,
+        EventHandler,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        MatchErrExt,
+        Matchable,
+        SdamEvent,
+        TestClient,
     },
 };
 

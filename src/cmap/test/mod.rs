@@ -20,8 +20,15 @@ use crate::{
     runtime::AsyncJoinHandle,
     sdam::{TopologyUpdater, UpdateMessage},
     test::{
-        assert_matches, eq_matches, log_uncaptured, run_spec_test, EventClient, MatchErrExt,
-        Matchable, CLIENT_OPTIONS, SERVER_API,
+        assert_matches,
+        eq_matches,
+        log_uncaptured,
+        run_spec_test,
+        EventClient,
+        MatchErrExt,
+        Matchable,
+        CLIENT_OPTIONS,
+        SERVER_API,
     },
 };
 use bson::doc;

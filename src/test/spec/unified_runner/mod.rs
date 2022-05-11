@@ -23,8 +23,14 @@ pub use self::{
     operation::{Operation, OperationObject},
     test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
     test_file::{
-        merge_uri_options, CollectionData, ExpectError, ExpectedEventType, TestCase, TestFile,
-        TestFileEntity, Topology,
+        merge_uri_options,
+        CollectionData,
+        ExpectError,
+        ExpectedEventType,
+        TestCase,
+        TestFile,
+        TestFileEntity,
+        Topology,
     },
     test_runner::{EntityMap, TestRunner},
 };

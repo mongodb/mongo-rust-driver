@@ -9,7 +9,8 @@ use crate::{
     error::Result,
     options::{ClientOptions, FindOptions, ServerApi, ServerApiVersion},
     test::{log_uncaptured, TestClient, DEFAULT_URI},
-    Client, Collection,
+    Client,
+    Collection,
 };
 
 macro_rules! assert_coll_count {

@@ -12,8 +12,6 @@ use crate::{
     test::{TestClient, CLIENT_OPTIONS},
 };
 
-use tokio::sync::RwLockReadGuard;
-
 #[cfg(feature = "zlib-compression")]
 #[test]
 fn test_zlib_compressor() {

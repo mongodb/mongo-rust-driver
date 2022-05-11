@@ -6,12 +6,18 @@ use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
     options::{
-        Acknowledgment, ClientOptions, CreateCollectionOptions, DropCollectionOptions, FindOptions,
-        InsertManyOptions, WriteConcern,
+        Acknowledgment,
+        ClientOptions,
+        CreateCollectionOptions,
+        DropCollectionOptions,
+        FindOptions,
+        InsertManyOptions,
+        WriteConcern,
     },
     runtime,
     test::{log_uncaptured, util::EventClient, CLIENT_OPTIONS},
-    Collection, Database,
+    Collection,
+    Database,
 };
 
 async fn run_test<F: Future>(

@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use crate::test::{
-    log_uncaptured, run_spec_test_with_path,
+    log_uncaptured,
+    run_spec_test_with_path,
     spec::{
         unified_runner::{ExpectedCmapEvent, ExpectedEvent, TestFile},
         ExpectedEventType,

@@ -11,8 +11,16 @@ use crate::{
     runtime,
     runtime::AsyncJoinHandle,
     test::{
-        log_uncaptured, run_spec_test, CmapEvent, Event, EventHandler, FailCommandOptions,
-        FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS,
+        log_uncaptured,
+        run_spec_test,
+        CmapEvent,
+        Event,
+        EventHandler,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
     },
 };
 

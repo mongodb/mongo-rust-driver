@@ -25,9 +25,13 @@ use crate::{
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     test::{
-        update_options_for_testing, Topology, LOAD_BALANCED_MULTIPLE_URI, LOAD_BALANCED_SINGLE_URI,
+        update_options_for_testing,
+        Topology,
+        LOAD_BALANCED_MULTIPLE_URI,
+        LOAD_BALANCED_SINGLE_URI,
     },
-    Client, Collection,
+    Client,
+    Collection,
 };
 
 #[derive(Clone, Debug)]

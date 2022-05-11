@@ -2,14 +2,18 @@ use std::fmt::Debug;
 
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Document},
     error::Result,
     options::{
-        Acknowledgment, ClientOptions, CollectionOptions, DatabaseOptions, FindOptions,
-        ServerAddress, WriteConcern,
+        Acknowledgment,
+        ClientOptions,
+        CollectionOptions,
+        DatabaseOptions,
+        FindOptions,
+        ServerAddress,
+        WriteConcern,
     },
     runtime,
     sync::{Client, Collection},

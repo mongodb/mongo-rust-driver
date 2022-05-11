@@ -4,8 +4,12 @@ use crate::{
     bson::doc,
     options::{ServerApi, ServerApiVersion},
     test::{
-        log_uncaptured, run_single_test, run_spec_test_with_path, spec::unified_runner::TestFile,
-        EventClient, CLIENT_OPTIONS,
+        log_uncaptured,
+        run_single_test,
+        run_spec_test_with_path,
+        spec::unified_runner::TestFile,
+        EventClient,
+        CLIENT_OPTIONS,
     },
 };
 
