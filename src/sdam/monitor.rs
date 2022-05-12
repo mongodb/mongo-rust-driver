@@ -127,9 +127,8 @@ impl HeartbeatMonitor {
             let mut topology_check_requests_subscriber =
                 topology.subscribe_to_topology_check_requests();
 
-            if self.check_server(&topology, &server).await {
-                topology.notify_topology_changed();
-            }
+            self.check_server(&topology, &server).await;
+            topology.notify_topology_changed();
 
             // drop strong reference to topology before going back to sleep in case it drops off
             // in between checks.
