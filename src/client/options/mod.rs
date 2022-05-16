@@ -680,7 +680,8 @@ impl Serialize for ClientOptions {
 #[derive(Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct ConnectionString {
-    /// The initial list of seeds that the Client should connect to, or a DNS name used for SRV lookup of the initial seed list.
+    /// The initial list of seeds that the Client should connect to, or a DNS name used for SRV
+    /// lookup of the initial seed list.
     ///
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
@@ -839,10 +840,9 @@ impl HostInfo {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver = SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
-                let config = resolver
-                    .resolve_client_options(&hostname)
-                    .await?;
+                let mut resolver =
+                    SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
+                let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
         })
@@ -854,7 +854,7 @@ enum ResolvedHostInfo {
     DnsRecord {
         hostname: String,
         config: crate::srv::ResolvedConfig,
-    }
+    },
 }
 
 /// Specifies whether TLS configuration should be used with the operations that the
@@ -1121,22 +1121,25 @@ impl ClientOptions {
         let resolved = host_info.resolve(resolver_config).await?;
         options.hosts = match resolved {
             ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
-            ResolvedHostInfo::DnsRecord { hostname, mut config } => {    
+            ResolvedHostInfo::DnsRecord {
+                hostname,
+                mut config,
+            } => {
                 // Save the original SRV info to allow mongos polling.
                 options.original_srv_info = OriginalSrvInfo {
                     hostname,
                     min_ttl: config.min_ttl,
                 }
                 .into();
-    
+
                 // Enable TLS unless the user explicitly disabled it.
                 if options.tls.is_none() {
                     options.tls = Some(Tls::Enabled(Default::default()));
                 }
-    
-                // Set the authSource TXT option found during SRV lookup unless the user already set it.
-                // Note that this _does_ override the default database specified in the URI, since it is
-                // supposed to be overriden by authSource.
+
+                // Set the authSource TXT option found during SRV lookup unless the user already set
+                // it. Note that this _does_ override the default database specified
+                // in the URI, since it is supposed to be overriden by authSource.
                 if !auth_source_present {
                     if let Some(auth_source) = config.auth_source.take() {
                         if let Some(ref mut credential) = options.credential {
@@ -1144,15 +1147,15 @@ impl ClientOptions {
                         }
                     }
                 }
-    
-                // Set the replica set name TXT option found during SRV lookup unless the user already
-                // set it.
+
+                // Set the replica set name TXT option found during SRV lookup unless the user
+                // already set it.
                 if options.repl_set_name.is_none() {
                     if let Some(replica_set) = config.replica_set.take() {
                         options.repl_set_name = Some(replica_set);
                     }
                 }
-    
+
                 if options.load_balanced.is_none() {
                     options.load_balanced = config.load_balanced;
                 }
