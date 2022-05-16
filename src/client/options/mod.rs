@@ -686,12 +686,12 @@ impl Serialize for ClientOptions {
 #[derive(Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct ConnectionString {
-    /// The initial list of seeds that the Client should connect to.
+    /// The initial list of seeds that the Client should connect to, or a DNS name used for SRV lookup of the initial seed list.
     ///
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
     /// `direct_connection` field to `true`.
-    pub hosts: HostInfo,
+    pub host_info: HostInfo,
 
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
@@ -726,7 +726,7 @@ pub struct ConnectionString {
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
-    pub repl_set_name: Option<String>,
+    pub replica_set: Option<String>,
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
@@ -802,19 +802,13 @@ pub struct ConnectionString {
     /// this only applies to application operations, not SDAM.
     pub socket_timeout: Option<Duration>,
 
-    /// Specifies the level of compression when using zlib to compress wire protocol messages; -1
-    /// signifies the default level, 0 signifies no compression, 1 signifies the fastest speed, and
-    /// 9 signifies the best compression.
-    pub zlib_compression: Option<i32>,
-
-    /// The database that connections should authenticate against.
-    pub auth_source: Option<String>,
-
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
 
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
+    auth_source_present: bool,
+
     #[cfg(test)]
     original_uri: String,
 }
@@ -826,6 +820,8 @@ struct ConnectionStringParts {
     max_staleness: Option<Duration>,
     auth_mechanism: Option<AuthMechanism>,
     auth_mechanism_properties: Option<Document>,
+    zlib_compression: Option<i32>,
+    auth_source: Option<String>,
 }
 
 /// Specification for mongodb server connections.
@@ -980,14 +976,14 @@ pub struct DriverInfo {
 impl From<ConnectionString> for ClientOptions {
     fn from(conn_str: ConnectionString) -> Self {
         Self {
-            hosts: conn_str.hosts.into_addresses(),
+            hosts: conn_str.host_info.into_addresses(),
             app_name: conn_str.app_name,
             tls: conn_str.tls,
             heartbeat_freq: conn_str.heartbeat_frequency,
             local_threshold: conn_str.local_threshold,
             read_concern: conn_str.read_concern,
             selection_criteria: conn_str.read_preference.map(Into::into),
-            repl_set_name: conn_str.repl_set_name,
+            repl_set_name: conn_str.replica_set,
             write_concern: conn_str.write_concern,
             max_pool_size: conn_str.max_pool_size,
             min_pool_size: conn_str.min_pool_size,
@@ -1137,20 +1133,20 @@ impl ClientOptions {
         uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        Self::resolve_from(ConnectionString::parse(uri)?, resolver_config).await
+        Self::parse_connection_string(ConnectionString::parse(uri)?, resolver_config).await
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
-    pub async fn resolve_from(
+    pub async fn parse_connection_string(
         conn_str: ConnectionString,
         resolver_config: impl Into<Option<ResolverConfig>>,
     ) -> Result<Self> {
         let resolver_config = resolver_config.into();
         let srv = conn_str.is_srv();
-        let auth_source_present = conn_str.auth_source.is_some();
+        let auth_source_present = conn_str.auth_source_present;
         let mut options: Self = conn_str.into();
         options.resolver_config = resolver_config.clone();
 
@@ -1506,7 +1502,7 @@ impl ConnectionString {
         };
 
         let mut conn_str = ConnectionString {
-            hosts,
+            host_info: hosts,
             #[cfg(test)]
             original_uri: s.into(),
             ..Default::default()
@@ -1533,7 +1529,8 @@ impl ConnectionString {
             }
         }
 
-        if conn_str.auth_source.as_deref() == Some("") {
+        conn_str.auth_source_present = parts.auth_source.is_some();
+        if parts.auth_source.as_deref() == Some("") {
             return Err(ErrorKind::InvalidArgument {
                 message: "empty authSource provided".to_string(),
             }
@@ -1546,7 +1543,7 @@ impl ConnectionString {
             Some(ref mechanism) => {
                 let mut credential = conn_str.credential.get_or_insert_with(Default::default);
 
-                credential.source = conn_str
+                credential.source = parts
                     .auth_source
                     .clone()
                     .or_else(|| Some(mechanism.default_source(db_str).into()));
@@ -1579,7 +1576,7 @@ impl ConnectionString {
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = conn_str
+                    credential.source = parts
                         .auth_source
                         .clone()
                         .or_else(|| db.clone())
@@ -1618,7 +1615,7 @@ impl ConnectionString {
     }
 
     fn is_srv(&self) -> bool {
-        matches!(self.hosts, HostInfo::DnsRecord(_))
+        matches!(self.host_info, HostInfo::DnsRecord(_))
     }
 
     fn parse_options(&mut self, options: &str) -> Result<ConnectionStringParts> {
@@ -1703,7 +1700,7 @@ impl ConnectionString {
         // If zlib and zlib_compression_level are specified then write zlib_compression_level into
         // zlib enum
         if let (Some(compressors), Some(zlib_compression_level)) =
-            (self.compressors.as_mut(), self.zlib_compression)
+            (self.compressors.as_mut(), parts.zlib_compression)
         {
             for compressor in compressors {
                 compressor.write_zlib_level(zlib_compression_level)
@@ -1795,7 +1792,7 @@ impl ConnectionString {
             "authmechanism" => {
                 parts.auth_mechanism = Some(AuthMechanism::from_str(value)?);
             }
-            "authsource" => self.auth_source = Some(value.to_string()),
+            "authsource" => parts.auth_source = Some(value.to_string()),
             "authmechanismproperties" => {
                 let mut doc = Document::new();
                 let err_func = || {
@@ -1948,7 +1945,7 @@ impl ConnectionString {
                     .push(tags?);
             }
             "replicaset" => {
-                self.repl_set_name = Some(value.to_string());
+                self.replica_set = Some(value.to_string());
             }
             k @ "retrywrites" => {
                 self.retry_writes = Some(get_bool!(value, k));
@@ -2104,7 +2101,7 @@ impl ConnectionString {
                     .into());
                 }
 
-                self.zlib_compression = Some(i);
+                parts.zlib_compression = Some(i);
             }
 
             other => {
