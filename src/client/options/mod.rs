@@ -250,12 +250,6 @@ impl ServerAddress {
         }
     }
 
-    pub(crate) fn into_host(self) -> String {
-        match self {
-            Self::Tcp { host, .. } => host,
-        }
-    }
-
     pub(crate) fn port(&self) -> Option<u16> {
         match self {
             Self::Tcp { port, .. } => *port,
@@ -825,7 +819,7 @@ struct ConnectionStringParts {
 }
 
 /// Specification for mongodb server connections.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[non_exhaustive]
 pub enum HostInfo {
     /// A set of addresses.
@@ -841,11 +835,25 @@ impl Default for HostInfo {
 }
 
 impl HostInfo {
-    fn into_addresses(self) -> Vec<ServerAddress> {
-        match self {
-            Self::HostIdentifiers(hosts) => hosts,
-            Self::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }],
-        }
+    async fn resolve(self, resolver_config: Option<ResolverConfig>) -> Result<ResolvedHostInfo> {
+        Ok(match self {
+            Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
+            Self::DnsRecord(hostname) => {
+                let mut resolver = SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
+                let config = resolver
+                    .resolve_client_options(&hostname)
+                    .await?;
+                ResolvedHostInfo::DnsRecord { hostname, config }
+            }
+        })
+    }
+}
+
+enum ResolvedHostInfo {
+    HostIdentifiers(Vec<ServerAddress>),
+    DnsRecord {
+        hostname: String,
+        config: crate::srv::ResolvedConfig,
     }
 }
 
@@ -971,46 +979,6 @@ pub struct DriverInfo {
     /// Optional platform information for the wrapping driver.
     #[builder(default)]
     pub platform: Option<String>,
-}
-
-impl From<ConnectionString> for ClientOptions {
-    fn from(conn_str: ConnectionString) -> Self {
-        Self {
-            hosts: conn_str.host_info.into_addresses(),
-            app_name: conn_str.app_name,
-            tls: conn_str.tls,
-            heartbeat_freq: conn_str.heartbeat_frequency,
-            local_threshold: conn_str.local_threshold,
-            read_concern: conn_str.read_concern,
-            selection_criteria: conn_str.read_preference.map(Into::into),
-            repl_set_name: conn_str.replica_set,
-            write_concern: conn_str.write_concern,
-            max_pool_size: conn_str.max_pool_size,
-            min_pool_size: conn_str.min_pool_size,
-            max_idle_time: conn_str.max_idle_time,
-            server_selection_timeout: conn_str.server_selection_timeout,
-            compressors: conn_str.compressors,
-            connect_timeout: conn_str.connect_timeout,
-            retry_reads: conn_str.retry_reads,
-            retry_writes: conn_str.retry_writes,
-            socket_timeout: conn_str.socket_timeout,
-            direct_connection: conn_str.direct_connection,
-            default_database: conn_str.default_database,
-            driver_info: None,
-            credential: conn_str.credential,
-            cmap_event_handler: None,
-            command_event_handler: None,
-            original_srv_info: None,
-            #[cfg(test)]
-            original_uri: Some(conn_str.original_uri),
-            resolver_config: None,
-            server_api: None,
-            load_balanced: conn_str.load_balanced,
-            sdam_event_handler: None,
-            #[cfg(test)]
-            test_options: None,
-        }
-    }
 }
 
 impl ClientOptions {
@@ -1141,59 +1109,58 @@ impl ClientOptions {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
     pub async fn parse_connection_string(
-        conn_str: ConnectionString,
+        mut conn_str: ConnectionString,
         resolver_config: impl Into<Option<ResolverConfig>>,
     ) -> Result<Self> {
         let resolver_config = resolver_config.into();
-        let srv = conn_str.is_srv();
         let auth_source_present = conn_str.auth_source_present;
-        let mut options: Self = conn_str.into();
+        let host_info = std::mem::take(&mut conn_str.host_info);
+        let mut options = Self::from_connection_string(conn_str);
         options.resolver_config = resolver_config.clone();
 
-        if srv {
-            let mut resolver = SrvResolver::new(resolver_config.map(|config| config.inner)).await?;
-            let mut config = resolver
-                .resolve_client_options(options.hosts[0].host())
-                .await?;
-
-            // Save the original SRV info to allow mongos polling.
-            options.original_srv_info = OriginalSrvInfo {
-                hostname: options.hosts[0].host().to_string(),
-                min_ttl: config.min_ttl,
-            }
-            .into();
-
-            // Set the ClientOptions hosts to those found during the SRV lookup.
-            options.hosts = config.hosts;
-
-            // Enable TLS unless the user explicitly disabled it.
-            if options.tls.is_none() {
-                options.tls = Some(Tls::Enabled(Default::default()));
-            }
-
-            // Set the authSource TXT option found during SRV lookup unless the user already set it.
-            // Note that this _does_ override the default database specified in the URI, since it is
-            // supposed to be overriden by authSource.
-            if !auth_source_present {
-                if let Some(auth_source) = config.auth_source.take() {
-                    if let Some(ref mut credential) = options.credential {
-                        credential.source = Some(auth_source);
+        let resolved = host_info.resolve(resolver_config).await?;
+        options.hosts = match resolved {
+            ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
+            ResolvedHostInfo::DnsRecord { hostname, mut config } => {    
+                // Save the original SRV info to allow mongos polling.
+                options.original_srv_info = OriginalSrvInfo {
+                    hostname,
+                    min_ttl: config.min_ttl,
+                }
+                .into();
+    
+                // Enable TLS unless the user explicitly disabled it.
+                if options.tls.is_none() {
+                    options.tls = Some(Tls::Enabled(Default::default()));
+                }
+    
+                // Set the authSource TXT option found during SRV lookup unless the user already set it.
+                // Note that this _does_ override the default database specified in the URI, since it is
+                // supposed to be overriden by authSource.
+                if !auth_source_present {
+                    if let Some(auth_source) = config.auth_source.take() {
+                        if let Some(ref mut credential) = options.credential {
+                            credential.source = Some(auth_source);
+                        }
                     }
                 }
-            }
-
-            // Set the replica set name TXT option found during SRV lookup unless the user already
-            // set it.
-            if options.repl_set_name.is_none() {
-                if let Some(replica_set) = config.replica_set.take() {
-                    options.repl_set_name = Some(replica_set);
+    
+                // Set the replica set name TXT option found during SRV lookup unless the user already
+                // set it.
+                if options.repl_set_name.is_none() {
+                    if let Some(replica_set) = config.replica_set.take() {
+                        options.repl_set_name = Some(replica_set);
+                    }
                 }
-            }
+    
+                if options.load_balanced.is_none() {
+                    options.load_balanced = config.load_balanced;
+                }
 
-            if options.load_balanced.is_none() {
-                options.load_balanced = config.load_balanced;
+                // Set the ClientOptions hosts to those found during the SRV lookup.
+                config.hosts
             }
-        }
+        };
 
         options.validate()?;
         Ok(options)
@@ -1201,11 +1168,54 @@ impl ClientOptions {
 
     #[cfg(test)]
     pub(crate) fn parse_without_srv_resolution(s: &str) -> Result<Self> {
-        let parser = ConnectionString::parse(s)?;
-        let options: Self = parser.into();
+        let mut conn_str = ConnectionString::parse(s)?;
+        let host_info = std::mem::take(&mut conn_str.host_info);
+        let mut options = Self::from_connection_string(conn_str);
+        options.hosts = match host_info {
+            HostInfo::HostIdentifiers(hosts) => hosts,
+            HostInfo::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }],
+        };
         options.validate()?;
 
         Ok(options)
+    }
+
+    fn from_connection_string(conn_str: ConnectionString) -> Self {
+        Self {
+            hosts: vec![],
+            app_name: conn_str.app_name,
+            tls: conn_str.tls,
+            heartbeat_freq: conn_str.heartbeat_frequency,
+            local_threshold: conn_str.local_threshold,
+            read_concern: conn_str.read_concern,
+            selection_criteria: conn_str.read_preference.map(Into::into),
+            repl_set_name: conn_str.replica_set,
+            write_concern: conn_str.write_concern,
+            max_pool_size: conn_str.max_pool_size,
+            min_pool_size: conn_str.min_pool_size,
+            max_idle_time: conn_str.max_idle_time,
+            server_selection_timeout: conn_str.server_selection_timeout,
+            compressors: conn_str.compressors,
+            connect_timeout: conn_str.connect_timeout,
+            retry_reads: conn_str.retry_reads,
+            retry_writes: conn_str.retry_writes,
+            socket_timeout: conn_str.socket_timeout,
+            direct_connection: conn_str.direct_connection,
+            default_database: conn_str.default_database,
+            driver_info: None,
+            credential: conn_str.credential,
+            cmap_event_handler: None,
+            command_event_handler: None,
+            original_srv_info: None,
+            #[cfg(test)]
+            original_uri: Some(conn_str.original_uri),
+            resolver_config: None,
+            server_api: None,
+            load_balanced: conn_str.load_balanced,
+            sdam_event_handler: None,
+            #[cfg(test)]
+            test_options: None,
+        }
     }
 
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
@@ -1488,15 +1498,15 @@ impl ConnectionString {
                 .into());
             }
             // Unwrap safety: the `len` check above guarantees this can't fail.
-            let host = host_list.into_iter().next().unwrap();
+            let ServerAddress::Tcp { host, port } = host_list.into_iter().next().unwrap();
 
-            if host.port().is_some() {
+            if port.is_some() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "a port cannot be specified with 'mongodb+srv'".into(),
                 }
                 .into());
             }
-            HostInfo::DnsRecord(host.into_host())
+            HostInfo::DnsRecord(host)
         } else {
             HostInfo::HostIdentifiers(host_list)
         };
