@@ -8,8 +8,10 @@ use crate::{
         options::ChangeStreamOptions,
         ChangeStream,
     },
+    coll::options::CollectionOptions,
     db::options::{ChangeStreamPreAndPostImages, CreateCollectionOptions},
     event::command::{CommandStartedEvent, CommandSucceededEvent},
+    options::{Acknowledgment, WriteConcern},
     test::{CommandEvent, FailCommandOptions, FailPoint, FailPointMode},
     Collection,
 };
@@ -46,7 +48,12 @@ async fn init_stream(
     }
     let client = EventClient::with_options(options).await;
     let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>(coll_name);
+    let coll = db.collection_with_options::<Document>(
+        coll_name,
+        CollectionOptions::builder()
+            .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
+            .build(),
+    );
     coll.drop(None).await?;
     let stream = coll.watch(None, None).await?;
     Ok(Some((client, coll, stream)))
@@ -448,8 +455,8 @@ async fn batch_mid_resume_token() -> Result<()> {
         None => return Ok(()),
     };
 
-    coll.insert_one(doc! {}, None).await?;
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_many((0..2).map(|i| doc! { "_id": i as i32 }), None)
+        .await?;
 
     let mid_id = stream.next().await.transpose()?.unwrap().id;
     assert_eq!(stream.resume_token(), Some(mid_id));
