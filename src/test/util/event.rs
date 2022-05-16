@@ -394,7 +394,7 @@ pub struct EventSubscriber<'a> {
     receiver: tokio::sync::broadcast::Receiver<Event>,
 }
 
-impl<'a> EventSubscriber<'a> {
+impl EventSubscriber<'_> {
     pub async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<Event>
     where
         F: FnMut(&Event) -> bool,

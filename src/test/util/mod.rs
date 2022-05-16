@@ -244,9 +244,19 @@ impl TestClient {
         version.matches(&self.server_version)
     }
 
-    pub fn supports_fail_command_appname(&self) -> bool {
-        let version = VersionReq::parse(">= 4.2.9").unwrap();
-        version.matches(&self.server_version)
+    /// Whether the deployment supports failing the initial handshake
+    /// only when it uses a specified appName.
+    ///
+    /// See SERVER-49336 for more info.
+    pub fn supports_fail_command_appname_initial_handshake(&self) -> bool {
+        let requirements = [
+            VersionReq::parse(">= 4.2.15, < 4.3.0").unwrap(),
+            VersionReq::parse(">= 4.4.7, < 4.5.0").unwrap(),
+            VersionReq::parse(">= 4.9.0").unwrap(),
+        ];
+        requirements
+            .iter()
+            .any(|req| req.matches(&self.server_version))
     }
 
     pub fn supports_transactions(&self) -> bool {
