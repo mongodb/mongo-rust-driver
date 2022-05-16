@@ -35,10 +35,10 @@ pub enum TracingEventValue {
 }
 
 /// A type for use in tests that need to consume tracing events. To use this type, initialize
-/// a new instance with `TracingHandler::new()` and register it via `set_as_default_handler`.
+/// a new instance with `TracingHandler::new()` and register it via `set_as_default`.
 /// The type will then listen for tracing events published by the driver and its dependencies
 /// and broadcast them to a channel. To receive the broadcasted events, call `subscribe` to
-/// create a new `TracingEventSubscriber`.
+/// create a new `TracingSubscriber`.
 #[derive(Clone)]
 pub struct TracingHandler {
     /// The maximum verbosity level which this handler will process and broadcast events for.
