@@ -389,9 +389,9 @@ pub struct EventSubscriber<'a> {
 }
 
 impl EventSubscriber<'_> {
-    pub async fn wait_for_event<F>(&mut self, timeout: Duration, filter: F) -> Option<Event>
+    pub async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<Event>
     where
-        F: Fn(&Event) -> bool,
+        F: FnMut(&Event) -> bool,
     {
         runtime::timeout(timeout, async {
             loop {
