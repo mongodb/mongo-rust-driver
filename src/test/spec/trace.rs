@@ -1,15 +1,16 @@
 use crate::{
     bson::doc,
     test::{
+        util::{TracingEvent, TracingEventValue, TracingHandler},
+        FailCommandOptions,
         FailPoint,
         FailPointMode,
-        FailCommandOptions,
-        LOCK,
-        util::{TracingEvent, TracingEventValue, TracingSubscriber},
         TestClient,
+        LOCK,
     },
     trace::{truncate_on_char_boundary, COMMAND_TRACING_EVENT_TARGET},
 };
+use std::time::Duration;
 use tokio::sync::RwLockWriteGuard;
 
 #[cfg(feature = "tracing-unstable")]
@@ -57,16 +58,22 @@ fn tracing_truncation() {
 async fn command_tracing_command_success() {
     let _lock_guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let subscriber = TracingSubscriber::new(tracing::Level::DEBUG);
-    let _subscriber_guard = subscriber.set_as_default();
+    let handler = TracingHandler::new(tracing::Level::DEBUG);
+    let _handler_guard = handler.set_as_default();
 
     let client = TestClient::new().await;
+    let mut subscriber = handler.subscribe();
+
     let coll = client.database("tracing").collection("test");
     coll.insert_one(doc! { "x" : 1 }, None)
         .await
         .expect("insert_one should succeed");
 
-    let events = subscriber.get_events_with_target(COMMAND_TRACING_EVENT_TARGET);
+    let events = subscriber
+        .collect_events(Duration::from_millis(500), |e| {
+            e.target == COMMAND_TRACING_EVENT_TARGET
+        })
+        .await;
     for event in events.iter() {
         assert_eq!(event.level, tracing::Level::DEBUG);
         assert_eq!(event.target, COMMAND_TRACING_EVENT_TARGET);
@@ -97,15 +104,11 @@ async fn command_tracing_command_success() {
     }
 }
 
-
 #[cfg(feature = "tracing-unstable")]
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_tracing_command_failed() {
     let _lock_guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
-    let subscriber = TracingSubscriber::new(tracing::Level::DEBUG);
-    let _subscriber_guard = subscriber.set_as_default();
 
     let client = TestClient::new().await;
     let fp = FailPoint::fail_command(
@@ -118,12 +121,20 @@ async fn command_tracing_command_failed() {
         .await
         .expect("enabling failpoint should succeed");
 
+    let handler = TracingHandler::new(tracing::Level::DEBUG);
+    let _handler_guard = handler.set_as_default();
+    let mut subscriber = handler.subscribe();
+
     let coll = client.database("tracing").collection("test");
     coll.insert_one(doc! { "x" : 1 }, None)
         .await
         .expect_err("insert_one should fail due to failpoint");
 
-    let events = subscriber.get_events_with_target(COMMAND_TRACING_EVENT_TARGET);
+    let events = subscriber
+        .collect_events(Duration::from_millis(500), |e| {
+            e.target == COMMAND_TRACING_EVENT_TARGET
+        })
+        .await;
     let insert_events: Vec<&TracingEvent> = events
         .iter()
         .filter(|e| match e.fields.get("command_name") {
@@ -154,5 +165,5 @@ async fn command_tracing_command_failed() {
             crate::test::log_uncaptured(failure);
         }
         _ => panic!("event unexpectedly missing command failure description"),
-    }    
+    }
 }
