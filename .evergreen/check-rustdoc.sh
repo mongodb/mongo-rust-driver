@@ -10,15 +10,18 @@ source ./.evergreen/configure-rust.sh
 # this is to help us avoid introducing problems like those described here 
 # https://docs.rs/about/builds#read-only-directories where we or a dependency modify source code during the
 # build process.
-cargo +nightly build
-cargo +nightly build --no-default-features --features async-std-runtime
-cargo +nightly build --no-default-features --features sync
-cargo +nightly build --features tokio-sync
+
+source ./.evergreen/feature-combinations.sh
+
+# build with all available features to ensure all optional dependencies are brought in too.
+for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
+    cargo +nightly build ${FEATURE_COMBINATIONS[$i]}
+done
 cargo clean
 
 chmod -R 555 ${CARGO_HOME}/registry/src
 
-cargo +nightly rustdoc -- -D warnings --cfg docsrs
-cargo +nightly rustdoc --no-default-features --features async-std-runtime -- -D warnings --cfg docsrs
-cargo +nightly rustdoc --no-default-features --features sync -- -D warnings --cfg docsrs
-cargo +nightly rustdoc --features tokio-sync -- -D warnings --cfg docsrs
+for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
+    cargo +nightly rustdoc ${FEATURE_COMBINATIONS[$i]} -- -D warnings --cfg docsrs
+done
+
