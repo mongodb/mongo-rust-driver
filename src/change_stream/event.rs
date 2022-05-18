@@ -6,7 +6,7 @@ use crate::{cursor::CursorSpecification, options::ChangeStreamOptions};
 
 #[cfg(test)]
 use bson::Bson;
-use bson::{Document, RawBson, RawDocumentBuf, Timestamp};
+use bson::{Document, RawBson, RawDocumentBuf, Timestamp, DateTime};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
@@ -86,6 +86,9 @@ pub struct ChangeStreamEvent<T> {
 
     /// The cluster time at which the change occurred.
     pub cluster_time: Option<Timestamp>,
+
+    /// The wall time from the mongod that the change event originated from.
+    pub wall_time: Option<DateTime>,
 
     /// The `Document` created or modified by the `insert`, `replace`, `delete`, `update`
     /// operations (i.e. CRUD operations).
