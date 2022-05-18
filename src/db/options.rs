@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bson::doc;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -106,6 +107,9 @@ pub struct CreateCollectionOptions {
 
     /// Options for supporting change stream pre- and post-images.
     pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
+
+    /// Options for clustered connections.
+    pub clustered_index: Option<ClusteredIndex>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -133,6 +137,37 @@ pub enum ValidationAction {
     Error,
     /// Raise a warning if inserted documents do not pass the validation.
     Warn,
+}
+
+/// Specifies options for a clustered connection.  Some fields have required values; the `Default`
+/// impl uses those values.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ClusteredIndex {
+    /// Key pattern; currently required to be `{_id: 1}`.
+    pub key: Document,
+
+    /// Currently required to be `true`.
+    pub unique: bool,
+
+    /// Optional; will be automatically generated if not provided.
+    pub name: Option<String>,
+
+    /// Optional; currently must be `2` if provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub v: Option<i32>,
+}
+
+impl Default for ClusteredIndex {
+    fn default() -> Self {
+        Self {
+            key: doc! { "_id": 1 },
+            unique: true,
+            name: None,
+            v: None,
+        }
+    }
 }
 
 /// Specifies default configuration for indexes created on a collection, including the _id index.
