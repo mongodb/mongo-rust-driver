@@ -6,7 +6,7 @@ use crate::{cursor::CursorSpecification, options::ChangeStreamOptions};
 
 #[cfg(test)]
 use bson::Bson;
-use bson::{Document, RawBson, RawDocumentBuf, Timestamp, DateTime};
+use bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
