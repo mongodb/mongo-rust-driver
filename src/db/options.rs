@@ -108,7 +108,7 @@ pub struct CreateCollectionOptions {
     /// Options for supporting change stream pre- and post-images.
     pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
 
-    /// Options for clustered connections.
+    /// Options for clustered collections.
     pub clustered_index: Option<ClusteredIndex>,
 }
 
@@ -139,7 +139,7 @@ pub enum ValidationAction {
     Warn,
 }
 
-/// Specifies options for a clustered connection.  Some fields have required values; the `Default`
+/// Specifies options for a clustered collection.  Some fields have required values; the `Default`
 /// impl uses those values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
