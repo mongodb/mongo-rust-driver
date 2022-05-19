@@ -2145,6 +2145,13 @@ impl ConnectionString {
     }
 }
 
+impl FromStr for ConnectionString {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        ConnectionString::parse(s)
+    }
+}
+
 impl<'de> Deserialize<'de> for ConnectionString {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
