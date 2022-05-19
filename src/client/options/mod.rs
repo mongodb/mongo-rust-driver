@@ -802,7 +802,6 @@ pub struct ConnectionString {
 
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
-    auth_source_present: bool,
 
     #[cfg(test)]
     original_uri: String,
@@ -1113,7 +1112,11 @@ impl ClientOptions {
         resolver_config: impl Into<Option<ResolverConfig>>,
     ) -> Result<Self> {
         let resolver_config = resolver_config.into();
-        let auth_source_present = conn_str.auth_source_present;
+        let auth_source_present = conn_str
+            .credential
+            .as_ref()
+            .and_then(|cred| cred.source.as_ref())
+            .is_some();
         let host_info = std::mem::take(&mut conn_str.host_info);
         let mut options = Self::from_connection_string(conn_str);
         options.resolver_config = resolver_config.clone();
@@ -1184,6 +1187,25 @@ impl ClientOptions {
     }
 
     fn from_connection_string(conn_str: ConnectionString) -> Self {
+        let mut credential = conn_str.credential;
+        // Populate default auth source, if needed.
+        let db = &conn_str.default_database;
+        if let Some(credential) = credential.as_mut() {
+            if credential.source.is_none() {
+                credential.source = match &credential.mechanism {
+                    Some(mechanism) => {
+                        Some(mechanism.default_source(db.as_deref()).into())
+                    }
+                    None => {
+                        // If credentials exist (i.e. username is specified) but no mechanism, the
+                        // default source is chosen from the following list in
+                        // order (skipping null ones): authSource option, connection string db,
+                        // SCRAM default (i.e. "admin").
+                        db.clone().or_else(|| Some("admin".into()))
+                    }
+                };
+            }
+        }
         Self {
             hosts: vec![],
             app_name: conn_str.app_name,
@@ -1206,7 +1228,7 @@ impl ClientOptions {
             direct_connection: conn_str.direct_connection,
             default_database: conn_str.default_database,
             driver_info: None,
-            credential: conn_str.credential,
+            credential: credential,
             cmap_event_handler: None,
             command_event_handler: None,
             original_srv_info: None,
@@ -1542,7 +1564,6 @@ impl ConnectionString {
             }
         }
 
-        conn_str.auth_source_present = parts.auth_source.is_some();
         if parts.auth_source.as_deref() == Some("") {
             return Err(ErrorKind::InvalidArgument {
                 message: "empty authSource provided".to_string(),
@@ -1550,16 +1571,10 @@ impl ConnectionString {
             .into());
         }
 
-        let db_str = db.as_deref();
-
         match parts.auth_mechanism {
             Some(ref mechanism) => {
                 let mut credential = conn_str.credential.get_or_insert_with(Default::default);
-
-                credential.source = parts
-                    .auth_source
-                    .clone()
-                    .or_else(|| Some(mechanism.default_source(db_str).into()));
+                credential.source = parts.auth_source;
 
                 if let Some(mut doc) = parts.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
@@ -1585,15 +1600,7 @@ impl ConnectionString {
             }
             None => {
                 if let Some(ref mut credential) = conn_str.credential {
-                    // If credentials exist (i.e. username is specified) but no mechanism, the
-                    // default source is chosen from the following list in
-                    // order (skipping null ones): authSource option, connection string db,
-                    // SCRAM default (i.e. "admin").
-                    credential.source = parts
-                        .auth_source
-                        .clone()
-                        .or_else(|| db.clone())
-                        .or_else(|| Some("admin".into()));
+                    credential.source = parts.auth_source;
                 } else if authentication_requested {
                     return Err(ErrorKind::InvalidArgument {
                         message: "username and mechanism both not provided, but authentication \
