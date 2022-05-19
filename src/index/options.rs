@@ -111,6 +111,20 @@ pub struct IndexOptions {
     /// A flag that determines whether the index is hidden from the query planner. A
     /// hidden index is not evaluated as part of the query plan selection.
     pub hidden: Option<bool>,
+
+    #[builder(default, setter(skip))]
+    clustered: Option<bool>,
+}
+
+impl IndexOptions {
+    /// Optionally specifies that this index is clustered.  This is not a valid option to provide to
+    /// 'create_indexes', but can appear in the options returned for an index via 'list_indexes'.
+    /// To create a clustered index, create a new collection using the 'clustered_index' option.
+    ///
+    /// This options is only supported by servers >= 6.0.
+    pub fn clustered(&self) -> Option<bool> {
+        self.clustered
+    }
 }
 
 /// The version of the index. Version 0 Indexes are disallowed as of MongoDB 3.2.
