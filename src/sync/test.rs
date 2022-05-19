@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use lazy_static::lazy_static;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLockReadGuard;
@@ -18,7 +19,7 @@ use crate::{
     },
     runtime,
     sync::{Client, Collection},
-    test::{TestClient as AsyncTestClient, CLIENT_OPTIONS, LOCK},
+    test::{TestClient as AsyncTestClient, LOCK},
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
@@ -31,6 +32,11 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
     let coll = client.database(db_name).collection(coll_name);
     coll.drop(None).unwrap();
     coll
+}
+
+lazy_static! {
+    static ref CLIENT_OPTIONS: ClientOptions =
+        runtime::block_on(async { crate::test::CLIENT_OPTIONS.get().await.clone() });
 }
 
 #[test]

@@ -41,7 +41,7 @@ async fn speculative_auth_test(
             .credential(credential.clone())
             .build(),
     );
-    pool_options.tls_options = CLIENT_OPTIONS.tls_options();
+    pool_options.tls_options = CLIENT_OPTIONS.get().await.tls_options();
 
     let description = client.topology_description();
 
