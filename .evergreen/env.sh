@@ -1,8 +1,6 @@
 #!/bin/bash
 
-export PATH="/opt/mongodbtoolchain/v2/bin:$PATH"
-
-source ~/.cargo/env
+source ./.evergreen/configure-rust.sh
 
 NODE_ARTIFACTS_PATH="${PROJECT_DIRECTORY}/node-artifacts"
 export NVM_DIR="${NODE_ARTIFACTS_PATH}/nvm"

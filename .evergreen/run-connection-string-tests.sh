@@ -3,7 +3,7 @@
 set -o errexit
 set -o xtrace
 
-. ~/.cargo/env
+source ./.evergreen/configure-rust.sh
 
 RUST_BACKTRACE=1 cargo test --features aws-auth spec::auth
 RUST_BACKTRACE=1 cargo test --features aws-auth uri_options
