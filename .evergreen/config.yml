@@ -541,6 +541,16 @@ functions:
           ${PREPARE_SHELL}
           ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
 
+  "check cargo deny":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          .evergreen/check-cargo-deny.sh
+
   "check rustfmt":
     - command: shell.exec
       type: test
@@ -1284,6 +1294,10 @@ tasks:
     commands:
       - func: "compile only"
 
+  - name: "check-cargo-deny"
+    commands:
+      - func: "check cargo deny"
+
   - name: "check-rustfmt"
     commands:
       - func: "check rustfmt"
@@ -1697,4 +1711,5 @@ buildvariants:
     - name: "check-rustfmt"
     - name: "check-rustdoc"
     - name: "check-manual"
+    - name: "check-cargo-deny"
 

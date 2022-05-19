@@ -138,7 +138,7 @@ features = ["v4"]
 [dev-dependencies]
 approx = "0.5.1"
 derive_more = "0.99.13"
-function_name = "0.2.0"
+function_name = "0.2.1"
 futures = "0.3"
 home = "0.5"
 pretty_assertions = "1.1.0"
