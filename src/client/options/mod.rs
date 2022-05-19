@@ -1179,7 +1179,7 @@ impl ClientOptions {
         let mut options = Self::from_connection_string(conn_str);
         options.hosts = match host_info {
             HostInfo::HostIdentifiers(hosts) => hosts,
-            HostInfo::DnsRecord(host) => vec![ServerAddress::Tcp { host, port: None }],
+            HostInfo::DnsRecord(_) => panic!("Expected non-SRV URI, got {:?}", s),
         };
         options.validate()?;
 
