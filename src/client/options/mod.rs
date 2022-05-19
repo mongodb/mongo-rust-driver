@@ -1193,9 +1193,7 @@ impl ClientOptions {
         if let Some(credential) = credential.as_mut() {
             if credential.source.is_none() {
                 credential.source = match &credential.mechanism {
-                    Some(mechanism) => {
-                        Some(mechanism.default_source(db.as_deref()).into())
-                    }
+                    Some(mechanism) => Some(mechanism.default_source(db.as_deref()).into()),
                     None => {
                         // If credentials exist (i.e. username is specified) but no mechanism, the
                         // default source is chosen from the following list in
