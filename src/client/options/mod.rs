@@ -1226,7 +1226,7 @@ impl ClientOptions {
             direct_connection: conn_str.direct_connection,
             default_database: conn_str.default_database,
             driver_info: None,
-            credential: credential,
+            credential,
             cmap_event_handler: None,
             command_event_handler: None,
             original_srv_info: None,
