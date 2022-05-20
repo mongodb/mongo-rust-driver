@@ -760,7 +760,7 @@ pub struct ConnectionString {
     /// The order of compressors indicates preference of compressors.
     pub compressors: Option<Vec<Compressor>>,
 
-    /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
+    /// The connect timeout passed to each underlying TcpStream when attempting to connect to the
     /// server.
     ///
     /// The default value is 10 seconds.
