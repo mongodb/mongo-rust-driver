@@ -794,7 +794,7 @@ pub struct ConnectionString {
     pub load_balanced: Option<bool>,
 
     /// Amount of time spent attempting to send or receive on a socket before timing out; note that
-    /// this only applies to application operations, not SDAM.
+    /// this only applies to application operations, not server discovery and monitoring.
     pub socket_timeout: Option<Duration>,
 
     /// Default read preference for the client.
