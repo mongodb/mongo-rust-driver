@@ -366,3 +366,5 @@ it will only happen in a minor or major version release.
 ## License
 
 This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/main/LICENSE).
+
+This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/).
