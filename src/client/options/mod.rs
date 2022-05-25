@@ -1172,6 +1172,18 @@ impl ClientOptions {
         Ok(options)
     }
 
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
+    /// provided `ResolverConfig` as part of this method.
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    pub fn parse_connection_string_sync(
+        conn_str: ConnectionString,
+        resolver_config: impl Into<Option<ResolverConfig>>,
+    ) -> Result<Self> {
+        crate::runtime::block_on(Self::parse_connection_string(conn_str, resolver_config))
+    }
+
     #[cfg(test)]
     pub(crate) fn parse_without_srv_resolution(s: &str) -> Result<Self> {
         let mut conn_str = ConnectionString::parse(s)?;
