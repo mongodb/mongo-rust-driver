@@ -11,13 +11,11 @@ use std::{
 use futures_io::{AsyncRead, AsyncWrite};
 use rustls::{
     client::{ClientConfig, ServerCertVerified, ServerCertVerifier, ServerName},
-    Certificate,
-    Error as TlsError,
-    OwnedTrustAnchor,
-    RootCertStore,
+    Certificate, Error as TlsError, OwnedTrustAnchor, RootCertStore,
 };
 use rustls_pemfile::{certs, read_one, Item};
 use tokio::io::AsyncWrite as TokioAsyncWrite;
+use tokio::io::AsyncRead as TokioAsyncRead;
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -46,19 +44,23 @@ impl AsyncTlsStream {
         tls_config.enable_sni = true;
 
         let connector: TlsConnector = Arc::new(tls_config).into();
-        Ok(Self {
-            inner: connector.connect(name, tcp_stream).await?,
-        })
+        let conn = connector
+            .connect_with(name, tcp_stream, |c| {
+                c.set_buffer_limit(None);
+            })
+            .await?;
+        Ok(Self { inner: conn })
     }
 }
 
-impl AsyncRead for AsyncTlsStream {
+impl TokioAsyncRead for AsyncTlsStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        mut buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
-        tokio_util::io::poll_read_buf(Pin::new(&mut self.inner), cx, &mut buf)
+        mut buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        // tokio_util::io::poll_read_buf(Pin::new(&mut self.inner), cx, &mut buf)
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 

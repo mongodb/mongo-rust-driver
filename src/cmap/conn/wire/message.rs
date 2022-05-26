@@ -3,10 +3,12 @@ use std::io::Read;
 use bitflags::bitflags;
 use futures_io::AsyncWrite;
 use futures_util::{
-    io::{BufReader, BufWriter},
-    AsyncReadExt,
+    io::{BufReader as OldBufReader, BufWriter},
+    // AsyncReadExt,
     AsyncWriteExt,
 };
+use tokio::io::BufReader;
+use tokio::io::AsyncReadExt;
 
 use super::header::{Header, OpCode};
 use crate::{
@@ -139,7 +141,7 @@ impl Message {
         let mut reader = buf.as_slice();
 
         // Read original opcode (should be OP_MSG)
-        let original_opcode = reader.read_i32()?;
+        let original_opcode = reader.read_i32().await?;
         if original_opcode != OpCode::Message as i32 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -152,10 +154,10 @@ impl Message {
         }
 
         // Read uncompressed size
-        let uncompressed_size = reader.read_i32()?;
+        let uncompressed_size = reader.read_i32().await?;
 
         // Read compressor id
-        let compressor_id: u8 = reader.read_u8()?;
+        let compressor_id: u8 = reader.read_u8().await?;
 
         // Get decoder
         let decoder = Decoder::from_u8(compressor_id)?;
@@ -188,7 +190,7 @@ impl Message {
         mut length_remaining: i32,
         header: &Header,
     ) -> Result<Self> {
-        let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
+        let flags = MessageFlags::from_bits_truncate(reader.read_u32_sync()?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
         let mut count_reader = SyncCountReader::new(&mut reader);
@@ -203,7 +205,7 @@ impl Message {
         let mut checksum = None;
 
         if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
-            checksum = Some(reader.read_u32()?);
+            checksum = Some(reader.read_u32_sync()?);
         } else if length_remaining != 0 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -341,7 +343,7 @@ pub(crate) enum MessageSection {
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
     fn read<R: Read>(reader: &mut R) -> Result<Self> {
-        let payload_type = reader.read_u8()?;
+        let payload_type = reader.read_u8_sync()?;
 
         if payload_type == 0 {
             return Ok(MessageSection::Document(bson_util::read_document_bytes(
@@ -349,7 +351,7 @@ impl MessageSection {
             )?));
         }
 
-        let size = reader.read_i32()?;
+        let size = reader.read_i32_sync()?;
         let mut length_remaining = size - std::mem::size_of::<i32>() as i32;
 
         let mut identifier = String::new();

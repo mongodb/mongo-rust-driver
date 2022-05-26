@@ -203,7 +203,7 @@ fn num_decimal_digits(mut n: usize) -> u64 {
 
 /// Read a document's raw BSON bytes from the provided reader.
 pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
-    let length = reader.read_i32()?;
+    let length = reader.read_i32_sync()?;
 
     let mut bytes = Vec::with_capacity(length as usize);
     bytes.write_i32(length)?;

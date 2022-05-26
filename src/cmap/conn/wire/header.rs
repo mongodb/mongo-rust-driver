@@ -54,7 +54,7 @@ impl Header {
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) async fn read_from<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+    pub(crate) async fn read_from<R: tokio::io::AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
         let length = reader.read_i32().await?;
         let request_id = reader.read_i32().await?;
         let response_to = reader.read_i32().await?;

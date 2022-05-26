@@ -157,16 +157,17 @@ impl AsyncStream {
     }
 }
 
-impl AsyncRead for AsyncStream {
+impl tokio::io::AsyncRead for AsyncStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
-            Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
+            Self::Null => Poll::Ready(Ok(())),
+            Self::Tcp(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            // _ => todo!(),
+            Self::Tls(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
         }
     }
 }
