@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{Bson, Document},
-    client::options::{ClientOptions, ClientOptionsParser, ServerAddress},
+    client::options::{ClientOptions, ConnectionString, ServerAddress},
     error::ErrorKind,
     options::Compressor,
     test::run_spec_test,
@@ -201,7 +201,7 @@ async fn run_connection_string_spec_tests() {
 }
 
 async fn parse_uri(option: &str, suggestion: Option<&str>) {
-    match ClientOptionsParser::parse(&format!("mongodb://host:27017/?{}=test", option))
+    match ConnectionString::parse(&format!("mongodb://host:27017/?{}=test", option))
         .map_err(|e| *e.kind)
     {
         Ok(_) => panic!("expected error for option {}", option),
