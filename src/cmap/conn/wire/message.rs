@@ -1,14 +1,7 @@
 use std::io::Read;
 
 use bitflags::bitflags;
-use futures_io::AsyncWrite;
-use futures_util::{
-    io::{BufReader as OldBufReader, BufWriter},
-    // AsyncReadExt,
-    AsyncWriteExt,
-};
-use tokio::io::BufReader;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
 
 use super::header::{Header, OpCode};
 use crate::{
@@ -141,7 +134,7 @@ impl Message {
         let mut reader = buf.as_slice();
 
         // Read original opcode (should be OP_MSG)
-        let original_opcode = reader.read_i32().await?;
+        let original_opcode = reader.read_i32_sync()?;
         if original_opcode != OpCode::Message as i32 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -154,10 +147,10 @@ impl Message {
         }
 
         // Read uncompressed size
-        let uncompressed_size = reader.read_i32().await?;
+        let uncompressed_size = reader.read_i32_sync()?;
 
         // Read compressor id
-        let compressor_id: u8 = reader.read_u8().await?;
+        let compressor_id: u8 = reader.read_u8_sync()?;
 
         // Get decoder
         let decoder = Decoder::from_u8(compressor_id)?;

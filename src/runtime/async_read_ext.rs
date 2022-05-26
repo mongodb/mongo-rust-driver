@@ -1,7 +1,6 @@
 use std::io::Read;
 
 use async_trait::async_trait;
-use futures_io::AsyncRead;
 
 use crate::error::Result;
 

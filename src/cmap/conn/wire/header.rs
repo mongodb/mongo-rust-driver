@@ -1,5 +1,4 @@
-use futures_io::{AsyncRead, AsyncWrite};
-use futures_util::AsyncWriteExt;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use crate::{
     error::{ErrorKind, Result},
