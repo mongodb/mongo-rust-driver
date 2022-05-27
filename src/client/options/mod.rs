@@ -1184,20 +1184,6 @@ impl ClientOptions {
         crate::runtime::block_on(Self::parse_connection_string(conn_str, resolver_config))
     }
 
-    #[cfg(test)]
-    pub(crate) fn parse_without_srv_resolution(s: &str) -> Result<Self> {
-        let mut conn_str = ConnectionString::parse(s)?;
-        let host_info = std::mem::take(&mut conn_str.host_info);
-        let mut options = Self::from_connection_string(conn_str);
-        options.hosts = match host_info {
-            HostInfo::HostIdentifiers(hosts) => hosts,
-            HostInfo::DnsRecord(_) => panic!("Expected non-SRV URI, got {:?}", s),
-        };
-        options.validate()?;
-
-        Ok(options)
-    }
-
     fn from_connection_string(conn_str: ConnectionString) -> Self {
         let mut credential = conn_str.credential;
         // Populate default auth source, if needed.
