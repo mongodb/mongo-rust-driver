@@ -34,7 +34,7 @@ use crate::{
 async fn min_heartbeat_frequency() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping min_heartbeat_frequency test due to load-balanced topology");
         return;
@@ -103,7 +103,7 @@ async fn min_heartbeat_frequency() {
 async fn sdam_pool_management() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping sdam_pool_management test due to load-balanced topology");
         return;
@@ -199,7 +199,7 @@ async fn sdam_pool_management() {
 async fn sdam_min_pool_size_error() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping sdam_min_pool_size_error test due to load-balanced topology");
         return;
@@ -292,7 +292,7 @@ async fn sdam_min_pool_size_error() {
 async fn auth_error() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
     setup_client_options.hosts.drain(1..);
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
     if !VersionReq::parse(">= 4.4.0")
@@ -391,7 +391,7 @@ async fn auth_error() {
 async fn hello_ok_true() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 
-    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
     setup_client_options.hosts.drain(1..);
 
     if setup_client_options.server_api.is_some() {

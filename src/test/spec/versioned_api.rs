@@ -61,7 +61,7 @@ async fn transaction_handling() {
 
     let version = ServerApi::builder().version(ServerApiVersion::V1).build();
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.server_api = Some(version);
     let client = EventClient::with_options(options).await;
     if !client.is_replica_set() || client.server_version_lt(5, 0) {

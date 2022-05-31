@@ -956,7 +956,7 @@ async fn typed_returns() {
 async fn count_documents_with_wc() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.write_concern = WriteConcern::builder()
         .w(Acknowledgment::Majority)
         .journal(true)

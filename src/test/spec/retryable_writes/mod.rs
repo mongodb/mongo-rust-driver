@@ -53,9 +53,9 @@ async fn run_legacy() {
             if test_case.operation.name == "bulkWrite" {
                 continue;
             }
-
+            let hosts = &CLIENT_OPTIONS.get().await.hosts;
             let options = test_case.client_options.map(|mut opts| {
-                opts.hosts = CLIENT_OPTIONS.hosts.clone();
+                opts.hosts = hosts.clone();
                 opts
             });
             let client = EventClient::with_additional_options(
@@ -414,7 +414,7 @@ async fn retry_write_pool_cleared() {
 
     let handler = Arc::new(EventHandler::new());
 
-    let mut client_options = CLIENT_OPTIONS.clone();
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);

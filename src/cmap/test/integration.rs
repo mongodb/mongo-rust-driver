@@ -42,7 +42,7 @@ struct DatabaseEntry {
 async fn acquire_connection_and_send_command() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    let client_options = CLIENT_OPTIONS.clone();
+    let client_options = CLIENT_OPTIONS.get().await.clone();
     let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
     pool_options.ready = Some(true);
 
@@ -86,7 +86,7 @@ async fn acquire_connection_and_send_command() {
 async fn concurrent_connections() {
     let _guard = LOCK.run_exclusively().await;
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping concurrent_connections test due to load-balanced topology");
         return;
@@ -117,13 +117,13 @@ async fn concurrent_connections() {
         .expect("failpoint should succeed");
 
     let handler = Arc::new(EventHandler::new());
-    let client_options = CLIENT_OPTIONS.clone();
+    let client_options = CLIENT_OPTIONS.get().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
-        CLIENT_OPTIONS.hosts[0].clone(),
+        CLIENT_OPTIONS.get().await.hosts[0].clone(),
         Default::default(),
         ServerUpdateSender::channel().0,
         Some(options),
@@ -174,7 +174,7 @@ async fn concurrent_connections() {
 async fn connection_error_during_establishment() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut client_options = CLIENT_OPTIONS.clone();
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
     if client_options.load_balanced.unwrap_or(false) {
         log_uncaptured(
             "skipping connection_error_during_establishment test due to load-balanced topology",
@@ -235,7 +235,7 @@ async fn connection_error_during_establishment() {
 async fn connection_error_during_operation() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
     options.hosts.drain(1..);

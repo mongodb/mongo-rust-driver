@@ -45,7 +45,8 @@ cargo_test test::spec::sessions > sessions.xml
 cargo_test test::spec::transactions > transactions.xml
 cargo_test test::spec::load_balancers > load_balancers.xml
 cargo_test test::cursor > cursor.xml
+cargo_test test::spec::collection_management > coll.xml
 
-junit-report-merger results.xml crud.xml retryable_reads.xml retryable_writes.xml versioned_api.xml sessions.xml transactions.xml load_balancers.xml cursor.xml
+junit-report-merger results.xml crud.xml retryable_reads.xml retryable_writes.xml versioned_api.xml sessions.xml transactions.xml load_balancers.xml cursor.xml coll.xml
 
 exit $CARGO_RESULT

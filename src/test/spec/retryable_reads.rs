@@ -49,7 +49,7 @@ async fn run_unified() {
 async fn retry_releases_connection() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    let mut client_options = CLIENT_OPTIONS.clone();
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
@@ -83,7 +83,7 @@ async fn retry_read_pool_cleared() {
 
     let handler = Arc::new(EventHandler::new());
 
-    let mut client_options = CLIENT_OPTIONS.clone();
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);

@@ -1050,15 +1050,6 @@ impl ClientOptions {
         Ok(options)
     }
 
-    #[cfg(test)]
-    pub(crate) fn parse_without_srv_resolution(s: &str) -> Result<Self> {
-        let parser = ClientOptionsParser::parse(s)?;
-        let options: Self = parser.into();
-        options.validate()?;
-
-        Ok(options)
-    }
-
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
         match self.tls {
             Some(Tls::Enabled(ref opts)) => Some(opts.clone()),

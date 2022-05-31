@@ -248,7 +248,7 @@ async fn cluster_time_in_commands() {
         F: Fn(EventClient) -> G,
         G: Future<Output = Result<R>>,
     {
-        let mut options = CLIENT_OPTIONS.clone();
+        let mut options = CLIENT_OPTIONS.get().await.clone();
         options.heartbeat_freq = Some(Duration::from_secs(1000));
         let client = EventClient::with_options(options).await;
 
