@@ -12,6 +12,7 @@ use super::{Entity, ExpectError, TestCursor, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
+    bson_util,
     change_stream::options::ChangeStreamOptions,
     client::session::{ClientSession, TransactionState},
     coll::options::Hint,
@@ -329,7 +330,11 @@ pub(super) struct Find {
     limit: Option<i64>,
     max: Option<Document>,
     max_scan: Option<u64>,
-    #[serde(rename = "maxTimeMS")]
+    #[serde(
+        default,
+        rename = "maxTimeMS",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
     max_time: Option<Duration>,
     min: Option<Document>,
     no_cursor_timeout: Option<bool>,
