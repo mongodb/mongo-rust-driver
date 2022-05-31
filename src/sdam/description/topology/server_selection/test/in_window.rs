@@ -118,7 +118,7 @@ async fn select_in_window() {
 async fn load_balancing_test() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
 
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping load_balancing_test test due to load-balanced topology");
@@ -148,7 +148,7 @@ async fn load_balancing_test() {
         return;
     }
 
-    if CLIENT_OPTIONS.hosts.len() != 2 {
+    if CLIENT_OPTIONS.get().await.hosts.len() != 2 {
         log_uncaptured("skipping load_balancing_test test due to topology not having 2 mongoses");
         return;
     }
@@ -215,7 +215,7 @@ async fn load_balancing_test() {
 
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     let max_pool_size = 10;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
@@ -260,7 +260,7 @@ async fn load_balancing_test() {
         .build();
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
 
-    let slow_host = CLIENT_OPTIONS.hosts[0].clone();
+    let slow_host = CLIENT_OPTIONS.get().await.hosts[0].clone();
     let criteria = SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
     let fp_guard = setup_client
         .enable_failpoint(failpoint, criteria)

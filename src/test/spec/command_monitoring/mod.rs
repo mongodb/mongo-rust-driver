@@ -86,7 +86,7 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
         let options = ClientOptions::builder()
             .retry_writes(false)
-            .hosts(CLIENT_OPTIONS.hosts.clone())
+            .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
             .build();
         let client =
             EventClient::with_additional_options(Some(options), None, Some(false), None).await;

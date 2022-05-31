@@ -611,7 +611,7 @@ async fn topology_closed_event_last() {
 async fn heartbeat_events() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.hosts.drain(1..);
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
@@ -692,7 +692,7 @@ async fn direct_connection() {
         .await
         .expect("failed to select secondary");
 
-    let mut secondary_options = CLIENT_OPTIONS.clone();
+    let mut secondary_options = CLIENT_OPTIONS.get().await.clone();
     secondary_options.hosts = vec![secondary_address];
 
     let mut direct_false_options = secondary_options.clone();

@@ -31,6 +31,7 @@ use crate::{
         Topology,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
+        SERVERLESS,
     },
     Client,
     Collection,
@@ -66,7 +67,10 @@ impl TestClient {
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
     ) -> Self {
-        let mut options = options.into().unwrap_or_else(|| CLIENT_OPTIONS.clone());
+        let mut options = match options.into() {
+            Some(options) => options,
+            None => CLIENT_OPTIONS.get().await.clone(),
+        };
 
         if let Some(handler) = event_handler {
             options.command_event_handler = Some(handler.clone());
@@ -361,10 +365,11 @@ impl TestClient {
         let is_load_balanced = options
             .as_ref()
             .and_then(|o| o.load_balanced)
-            .or(CLIENT_OPTIONS.load_balanced)
+            .or(CLIENT_OPTIONS.get().await.load_balanced)
             .unwrap_or(false);
         let default_options = if is_load_balanced {
-            let uri = if use_multiple_mongoses {
+            // for serverless testing, ignore use_multiple_mongoses.
+            let uri = if use_multiple_mongoses && !*SERVERLESS {
                 LOAD_BALANCED_MULTIPLE_URI
                     .as_ref()
                     .expect("MULTI_MONGOS_LB_URI is required")
@@ -377,7 +382,7 @@ impl TestClient {
             update_options_for_testing(&mut o);
             o
         } else {
-            CLIENT_OPTIONS.clone()
+            CLIENT_OPTIONS.get().await.clone()
         };
         let mut options = match options {
             Some(mut options) => {

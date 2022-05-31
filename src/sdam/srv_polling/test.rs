@@ -118,7 +118,7 @@ async fn no_results() {
 async fn load_balanced_no_srv_polling() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    if CLIENT_OPTIONS.load_balanced != Some(true) {
+    if CLIENT_OPTIONS.get().await.load_balanced != Some(true) {
         log_uncaptured("skipping load_balanced_no_srv_polling due to not load balanced topology");
         return;
     }

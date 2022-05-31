@@ -28,7 +28,7 @@ async fn run_test<F: Future>(
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let options = ClientOptions::builder()
-        .hosts(CLIENT_OPTIONS.hosts.clone())
+        .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
         .retry_writes(false)
         .build();
     let client = EventClient::with_additional_options(Some(options), None, None, None).await;

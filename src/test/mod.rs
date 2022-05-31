@@ -33,6 +33,7 @@ pub(crate) use self::{
     },
 };
 
+use async_once::AsyncOnce;
 use home::home_dir;
 use lazy_static::lazy_static;
 
@@ -49,11 +50,11 @@ use std::{fs::read_to_string, str::FromStr};
 const MAX_POOL_SIZE: u32 = 100;
 
 lazy_static! {
-    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = {
-        let mut options = ClientOptions::parse_without_srv_resolution(&DEFAULT_URI).unwrap();
+    pub(crate) static ref CLIENT_OPTIONS: AsyncOnce<ClientOptions> = AsyncOnce::new(async {
+        let mut options = ClientOptions::parse_uri(&*DEFAULT_URI, None).await.unwrap();
         update_options_for_testing(&mut options);
         options
-    };
+    });
     pub(crate) static ref LOCK: TestLock = TestLock::new();
     pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")

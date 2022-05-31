@@ -40,7 +40,7 @@ async fn init_stream(
         return Ok(None);
     }
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     // Direct connection is needed for reliable behavior with fail points.
     if direct_connection && init_client.is_sharded() {
         options.direct_connection = Some(true);
