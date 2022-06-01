@@ -1,4 +1,8 @@
-use std::{convert::TryFrom, io::Read, time::Duration};
+use std::{
+    convert::TryFrom,
+    io::{Read, Write},
+    time::Duration,
+};
 
 use bson::RawBsonRef;
 use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize, Serializer};
@@ -6,7 +10,7 @@ use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize
 use crate::{
     bson::{doc, Bson, Document},
     error::{ErrorKind, Result},
-    runtime::{SyncLittleEndianRead, SyncLittleEndianWrite},
+    runtime::SyncLittleEndianRead,
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
@@ -203,10 +207,10 @@ fn num_decimal_digits(mut n: usize) -> u64 {
 
 /// Read a document's raw BSON bytes from the provided reader.
 pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
-    let length = reader.read_i32()?;
+    let length = reader.read_i32_sync()?;
 
     let mut bytes = Vec::with_capacity(length as usize);
-    bytes.write_i32(length)?;
+    bytes.write_all(&length.to_le_bytes())?;
 
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
 

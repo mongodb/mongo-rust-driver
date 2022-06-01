@@ -6,8 +6,7 @@ use std::{
     time::Duration,
 };
 
-use futures_io::{AsyncRead, AsyncWrite};
-use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::{
     cmap::options::StreamOptions,
@@ -157,16 +156,16 @@ impl AsyncStream {
     }
 }
 
-impl AsyncRead for AsyncStream {
+impl tokio::io::AsyncRead for AsyncStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
-            Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
+            Self::Null => Poll::Ready(Ok(())),
+            Self::Tcp(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Tls(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
         }
     }
 }
@@ -192,86 +191,16 @@ impl AsyncWrite for AsyncStream {
         }
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_close(cx),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_close(cx),
+            Self::Tcp(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
         }
     }
 }
 
 impl AsyncRead for AsyncTcpStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        // We need `mut` here for the tokio impl, but it isn't used by the async-std version, so we
-        // suppress the warning.
-        #[allow(unused_mut)] mut buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
-        match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => {
-                tokio_util::io::poll_read_buf(Pin::new(stream), cx, &mut buf)
-            }
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_read(cx, buf),
-        }
-    }
-}
-
-impl AsyncWrite for AsyncTcpStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => {
-                use tokio::io::AsyncWrite;
-
-                Pin::new(stream).poll_write(cx, buf)
-            }
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_write(cx, buf),
-        }
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => {
-                use tokio::io::AsyncWrite;
-
-                Pin::new(stream).poll_flush(cx)
-            }
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_flush(cx),
-        }
-    }
-
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => {
-                use tokio::io::AsyncWrite;
-
-                Pin::new(stream).poll_shutdown(cx)
-            }
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_close(cx),
-        }
-    }
-}
-
-// These trait implementations are required to interface with tokio-rustls.
-
-impl TokioAsyncRead for AsyncTcpStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -291,20 +220,50 @@ impl TokioAsyncRead for AsyncTcpStream {
     }
 }
 
-impl TokioAsyncWrite for AsyncTcpStream {
+impl AsyncWrite for AsyncTcpStream {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<tokio::io::Result<usize>> {
-        AsyncWrite::poll_write(self, cx, buf)
+        match self.deref_mut() {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut inner) => {
+                use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+                Pin::new(&mut inner.compat()).poll_write(cx, buf)
+            }
+        }
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
-        AsyncWrite::poll_flush(self, cx)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
+        match self.deref_mut() {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref mut inner) => Pin::new(inner).poll_flush(cx),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut inner) => {
+                use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+                Pin::new(&mut inner.compat()).poll_flush(cx)
+            }
+        }
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
-        AsyncWrite::poll_close(self, cx)
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
+        match self.deref_mut() {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut inner) => {
+                use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+                Pin::new(&mut inner.compat()).poll_shutdown(cx)
+            }
+        }
     }
 }
