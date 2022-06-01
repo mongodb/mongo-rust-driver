@@ -10,7 +10,7 @@ pub(crate) trait SyncLittleEndianRead: Read {
         Ok(i32::from_le_bytes(buf))
     }
 
-    /// Read a `u32` in little-endian orer.
+    /// Read a `u32` in little-endian order.
     fn read_u32_sync(&mut self) -> Result<u32> {
         let mut buf: [u8; 4] = [0; 4];
         self.read_exact(&mut buf)?;
