@@ -1,12 +1,7 @@
 use std::io::Read;
 
 use bitflags::bitflags;
-use futures_io::AsyncWrite;
-use futures_util::{
-    io::{BufReader, BufWriter},
-    AsyncReadExt,
-    AsyncWriteExt,
-};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
 
 use super::header::{Header, OpCode};
 use crate::{
@@ -16,7 +11,7 @@ use crate::{
         Command,
     },
     error::{Error, ErrorKind, Result},
-    runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
+    runtime::{AsyncStream, SyncLittleEndianRead},
 };
 
 use crate::compression::{Compressor, Decoder};
@@ -139,7 +134,7 @@ impl Message {
         let mut reader = buf.as_slice();
 
         // Read original opcode (should be OP_MSG)
-        let original_opcode = reader.read_i32()?;
+        let original_opcode = reader.read_i32_sync()?;
         if original_opcode != OpCode::Message as i32 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -152,10 +147,10 @@ impl Message {
         }
 
         // Read uncompressed size
-        let uncompressed_size = reader.read_i32()?;
+        let uncompressed_size = reader.read_i32_sync()?;
 
         // Read compressor id
-        let compressor_id: u8 = reader.read_u8()?;
+        let compressor_id: u8 = reader.read_u8_sync()?;
 
         // Get decoder
         let decoder = Decoder::from_u8(compressor_id)?;
@@ -188,7 +183,7 @@ impl Message {
         mut length_remaining: i32,
         header: &Header,
     ) -> Result<Self> {
-        let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
+        let flags = MessageFlags::from_bits_truncate(reader.read_u32_sync()?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
         let mut count_reader = SyncCountReader::new(&mut reader);
@@ -203,7 +198,7 @@ impl Message {
         let mut checksum = None;
 
         if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
-            checksum = Some(reader.read_u32()?);
+            checksum = Some(reader.read_u32_sync()?);
         } else if length_remaining != 0 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -251,11 +246,11 @@ impl Message {
         };
 
         header.write_to(&mut writer).await?;
-        writer.write_u32(self.flags.bits()).await?;
+        writer.write_u32_le(self.flags.bits()).await?;
         writer.write_all(&sections_bytes).await?;
 
         if let Some(checksum) = self.checksum {
-            writer.write_u32(checksum).await?;
+            writer.write_u32_le(checksum).await?;
         }
 
         writer.flush().await?;
@@ -302,9 +297,9 @@ impl Message {
         // Write header
         header.write_to(&mut writer).await?;
         // Write original (pre-compressed) opcode (always OP_MSG)
-        writer.write_i32(OpCode::Message as i32).await?;
+        writer.write_i32_le(OpCode::Message as i32).await?;
         // Write uncompressed size
-        writer.write_i32(uncompressed_len as i32).await?;
+        writer.write_i32_le(uncompressed_len as i32).await?;
         // Write compressor id
         writer.write_u8(compressor_id).await?;
         // Write compressed message
@@ -341,7 +336,7 @@ pub(crate) enum MessageSection {
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
     fn read<R: Read>(reader: &mut R) -> Result<Self> {
-        let payload_type = reader.read_u8()?;
+        let payload_type = reader.read_u8_sync()?;
 
         if payload_type == 0 {
             return Ok(MessageSection::Document(bson_util::read_document_bytes(
@@ -349,7 +344,7 @@ impl MessageSection {
             )?));
         }
 
-        let size = reader.read_i32()?;
+        let size = reader.read_i32_sync()?;
         let mut length_remaining = size - std::mem::size_of::<i32>() as i32;
 
         let mut identifier = String::new();
@@ -397,7 +392,7 @@ impl MessageSection {
                 // Write payload type.
                 writer.write_u8(1).await?;
 
-                writer.write_i32(*size).await?;
+                writer.write_i32_le(*size).await?;
                 super::util::write_cstring(writer, identifier).await?;
 
                 for doc in documents {
