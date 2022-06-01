@@ -713,7 +713,7 @@ async fn retry_commit_txn_check_out() {
         .await
         .unwrap();
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone());
     options.sdam_event_handler = Some(handler.clone());
