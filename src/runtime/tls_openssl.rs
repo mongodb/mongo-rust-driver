@@ -8,7 +8,7 @@ use openssl::{
     error::ErrorStack,
     ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
 };
-use tokio::io::{AsyncWrite, AsyncRead};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_openssl::SslStream;
 
 use crate::{
