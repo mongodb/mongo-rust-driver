@@ -8,7 +8,6 @@ use std::{
     time::SystemTime,
 };
 
-use futures_io::{AsyncRead, AsyncWrite};
 use rustls::{
     client::{ClientConfig, ServerCertVerified, ServerCertVerifier, ServerName},
     Certificate,
@@ -17,7 +16,7 @@ use rustls::{
     RootCertStore,
 };
 use rustls_pemfile::{certs, read_one, Item};
-use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -55,13 +54,12 @@ impl AsyncTlsStream {
     }
 }
 
-impl TokioAsyncRead for AsyncTlsStream {
+impl AsyncRead for AsyncTlsStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        mut buf: &mut tokio::io::ReadBuf<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        // tokio_util::io::poll_read_buf(Pin::new(&mut self.inner), cx, &mut buf)
         Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
@@ -79,7 +77,7 @@ impl AsyncWrite for AsyncTlsStream {
         Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }

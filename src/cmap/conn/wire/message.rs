@@ -11,7 +11,7 @@ use crate::{
         Command,
     },
     error::{Error, ErrorKind, Result},
-    runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
+    runtime::{AsyncStream, SyncLittleEndianRead},
 };
 
 use crate::compression::{Compressor, Decoder};
@@ -246,11 +246,11 @@ impl Message {
         };
 
         header.write_to(&mut writer).await?;
-        writer.write_u32(self.flags.bits()).await?;
+        writer.write_u32_le(self.flags.bits()).await?;
         writer.write_all(&sections_bytes).await?;
 
         if let Some(checksum) = self.checksum {
-            writer.write_u32(checksum).await?;
+            writer.write_u32_le(checksum).await?;
         }
 
         writer.flush().await?;
@@ -297,9 +297,9 @@ impl Message {
         // Write header
         header.write_to(&mut writer).await?;
         // Write original (pre-compressed) opcode (always OP_MSG)
-        writer.write_i32(OpCode::Message as i32).await?;
+        writer.write_i32_le(OpCode::Message as i32).await?;
         // Write uncompressed size
-        writer.write_i32(uncompressed_len as i32).await?;
+        writer.write_i32_le(uncompressed_len as i32).await?;
         // Write compressor id
         writer.write_u8(compressor_id).await?;
         // Write compressed message
@@ -392,7 +392,7 @@ impl MessageSection {
                 // Write payload type.
                 writer.write_u8(1).await?;
 
-                writer.write_i32(*size).await?;
+                writer.write_i32_le(*size).await?;
                 super::util::write_cstring(writer, identifier).await?;
 
                 for doc in documents {

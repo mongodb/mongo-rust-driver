@@ -4,12 +4,11 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures_io::{AsyncRead, AsyncWrite};
 use openssl::{
     error::ErrorStack,
     ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
 };
-use tokio::io::AsyncWrite as TokioAsyncWrite;
+use tokio::io::{AsyncWrite, AsyncRead};
 use tokio_openssl::SslStream;
 
 use crate::{
@@ -52,9 +51,9 @@ impl AsyncRead for AsyncTlsStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        mut buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
-        tokio_util::io::poll_read_buf(Pin::new(&mut self.inner), cx, &mut buf)
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
@@ -71,7 +70,7 @@ impl AsyncWrite for AsyncTlsStream {
         Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
