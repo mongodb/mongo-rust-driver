@@ -3,9 +3,8 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use futures_io::{self, AsyncWrite};
-use futures_util::AsyncWriteExt;
 use lazy_static::lazy_static;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use crate::error::Result;
 

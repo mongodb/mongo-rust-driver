@@ -1,12 +1,11 @@
 mod acknowledged_message;
-mod async_read_ext;
-mod async_write_ext;
 mod http;
 #[cfg(feature = "async-std-runtime")]
 mod interval;
 mod join_handle;
 mod resolver;
 mod stream;
+mod sync_read_ext;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
 #[cfg_attr(feature = "openssl-tls", allow(unused))]
@@ -16,11 +15,10 @@ use std::{future::Future, net::SocketAddr, time::Duration};
 
 pub(crate) use self::{
     acknowledged_message::AcknowledgedMessage,
-    async_read_ext::{AsyncLittleEndianRead, SyncLittleEndianRead},
-    async_write_ext::{AsyncLittleEndianWrite, SyncLittleEndianWrite},
     join_handle::AsyncJoinHandle,
     resolver::AsyncResolver,
     stream::AsyncStream,
+    sync_read_ext::SyncLittleEndianRead,
 };
 use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;
