@@ -394,10 +394,8 @@ functions:
           export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
           export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
 
-          export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
-          export SINGLE_MONGOS_LB_URI="${SINGLE_ATLASPROXY_SERVERLESS_URI}"
-          export MULTI_MONGOS_LB_URI="${MULTI_ATLASPROXY_SERVERLESS_URI}"
+          export SINGLE_MONGOS_LB_URI="${SERVERLESS_URI}"
           . .evergreen/generate-uri.sh
 
           SNAPPY_COMPRESSION_ENABLED="true" \

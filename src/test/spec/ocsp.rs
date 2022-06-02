@@ -22,7 +22,7 @@ async fn run() {
         .unwrap()
         .to_lowercase();
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     let mut tls_options = options.tls_options().unwrap();
     options.server_selection_timeout = Duration::from_millis(200).into();
 

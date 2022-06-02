@@ -122,12 +122,12 @@ impl CmapThread {
 }
 
 impl Executor {
-    fn new(test_file: TestFile) -> Self {
+    async fn new(test_file: TestFile) -> Self {
         let handler = Arc::new(EventHandler::new());
         let error = test_file.error;
 
         let mut pool_options = test_file.pool_options.unwrap_or_default();
-        pool_options.tls_options = CLIENT_OPTIONS.tls_options();
+        pool_options.tls_options = CLIENT_OPTIONS.get().await.tls_options();
         pool_options.cmap_event_handler = Some(handler.clone());
         pool_options.server_api = SERVER_API.clone();
 
@@ -156,7 +156,7 @@ impl Executor {
         let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
 
         let pool = ConnectionPool::new(
-            CLIENT_OPTIONS.hosts[0].clone(),
+            CLIENT_OPTIONS.get().await.hosts[0].clone(),
             Default::default(),
             update_sender,
             Some(self.pool_options),
@@ -427,7 +427,7 @@ async fn cmap_spec_tests() {
 
         let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-        let mut options = CLIENT_OPTIONS.clone();
+        let mut options = CLIENT_OPTIONS.get().await.clone();
         if options.load_balanced.unwrap_or(false) {
             log_uncaptured(format!(
                 "skipping {:?} due to load balanced topology",
@@ -455,7 +455,7 @@ async fn cmap_spec_tests() {
                 .unwrap();
         }
 
-        let executor = Executor::new(test_file);
+        let executor = Executor::new(test_file).await;
         executor.execute_test().await;
 
         if should_disable_fp {

@@ -86,7 +86,7 @@ async fn metadata_sent_in_handshake() {
 async fn connection_drop_during_read() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.max_pool_size = Some(1);
 
     let client = Client::with_options(options.clone()).unwrap();
@@ -124,7 +124,7 @@ async fn connection_drop_during_read() {
 async fn server_selection_timeout_message() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    if CLIENT_OPTIONS.repl_set_name.is_none() {
+    if CLIENT_OPTIONS.get().await.repl_set_name.is_none() {
         log_uncaptured("skipping server_selection_timeout_message due to missing replica set name");
         return;
     }
@@ -138,7 +138,7 @@ async fn server_selection_timeout_message() {
             .build(),
     };
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.server_selection_timeout = Some(Duration::from_millis(500));
 
     let client = Client::with_options(options.clone()).unwrap();
@@ -279,7 +279,7 @@ async fn list_authorized_databases() {
     }
 
     for name in dbs {
-        let mut options = CLIENT_OPTIONS.clone();
+        let mut options = CLIENT_OPTIONS.get().await.clone();
         let credential = Credential::builder()
             .username(format!("user_{}", name))
             .password(String::from("pwd"))
@@ -326,7 +326,7 @@ async fn auth_test_options(
     mechanism: Option<AuthMechanism>,
     success: bool,
 ) {
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.max_pool_size = Some(1);
     options.credential = Credential {
         username: Some(user.to_string()),
@@ -350,6 +350,8 @@ async fn auth_test_uri(
     should_succeed: bool,
 ) {
     let host = CLIENT_OPTIONS
+        .get()
+        .await
         .hosts
         .iter()
         .map(ToString::to_string)
@@ -367,7 +369,7 @@ async fn auth_test_uri(
         mechanism_str.as_ref()
     );
 
-    if let Some(ref tls_options) = CLIENT_OPTIONS.tls_options() {
+    if let Some(ref tls_options) = CLIENT_OPTIONS.get().await.tls_options() {
         if let Some(true) = tls_options.allow_invalid_certificates {
             uri.push_str("&tlsAllowInvalidCertificates=true");
         }
@@ -395,7 +397,7 @@ async fn auth_test_uri(
         }
     }
 
-    if let Some(true) = CLIENT_OPTIONS.load_balanced {
+    if let Some(true) = CLIENT_OPTIONS.get().await.load_balanced {
         uri.push_str("&loadBalanced=true");
     }
 
@@ -616,7 +618,7 @@ async fn x509_auth() {
         .await
         .unwrap();
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     options.credential = Some(
         Credential::builder()
             .mechanism(AuthMechanism::MongoDbX509)
@@ -711,7 +713,7 @@ async fn retry_commit_txn_check_out() {
         .await
         .unwrap();
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.get().await.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone());
     options.sdam_event_handler = Some(handler.clone());
