@@ -1100,18 +1100,29 @@ impl ClientOptions {
         uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        Self::parse_connection_string(ConnectionString::parse(uri)?, resolver_config).await
+        Self::parse_connection_string_internal(ConnectionString::parse(uri)?, resolver_config).await
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
-    pub async fn parse_connection_string(
-        mut conn_str: ConnectionString,
-        resolver_config: impl Into<Option<ResolverConfig>>,
+    pub async fn parse_connection_string_with_resolver_config(
+        conn_str: ConnectionString,
+        resolver_config: ResolverConfig,
     ) -> Result<Self> {
-        let resolver_config = resolver_config.into();
+        Self::parse_connection_string_internal(conn_str, Some(resolver_config)).await
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    pub async fn parse_connection_string(conn_str: ConnectionString) -> Result<Self> {
+        Self::parse_connection_string_internal(conn_str, None).await
+    }
+
+    async fn parse_connection_string_internal(
+        mut conn_str: ConnectionString,
+        resolver_config: Option<ResolverConfig>,
+    ) -> Result<Self> {
         let auth_source_present = conn_str
             .credential
             .as_ref()
@@ -1173,15 +1184,24 @@ impl ClientOptions {
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    pub fn parse_connection_string_sync(conn_str: ConnectionString) -> Result<Self> {
+        crate::runtime::block_on(Self::parse_connection_string_internal(conn_str, None))
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
     #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-    pub fn parse_connection_string_sync(
+    pub fn parse_connection_string_with_resolver_config_sync(
         conn_str: ConnectionString,
-        resolver_config: impl Into<Option<ResolverConfig>>,
+        resolver_config: ResolverConfig,
     ) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string(conn_str, resolver_config))
+        crate::runtime::block_on(Self::parse_connection_string_internal(
+            conn_str,
+            Some(resolver_config),
+        ))
     }
 
     fn from_connection_string(conn_str: ConnectionString) -> Self {
