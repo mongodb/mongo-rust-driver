@@ -537,7 +537,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} MSRV=${MSRV} .evergreen/compile-only.sh
 
   "check cargo deny":
     - command: shell.exec
@@ -1321,6 +1321,7 @@ axes:
         display_name: "1.53 (minimum supported version)"
         variables:
           RUST_VERSION: "1.53.0"
+          MSRV: true
       - id: "nightly"
         display_name: "nightly"
         variables:
