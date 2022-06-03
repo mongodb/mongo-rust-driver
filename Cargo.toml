@@ -14,7 +14,7 @@ repository = "https://github.com/mongodb/mongo-rust-driver"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "2.2.1"
+version = "2.2.2"
 
 exclude = [
     "etc/**",
