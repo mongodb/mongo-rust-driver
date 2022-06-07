@@ -4,6 +4,7 @@ authors = [
     "Patrick Freed <patrick.freed@mongodb.com>",
     "Isabel Atkinson <isabel.atkinson@mongodb.com>",
     "Abraham Egnor <abraham.egnor@mongodb.com>",
+    "Kaitlin Mahar <kaitlin.mahar@mongodb.com>",
 ]
 description = "The official MongoDB driver for Rust"
 edition = "2018"
@@ -14,7 +15,7 @@ homepage = "https://www.mongodb.com/docs/drivers/rust/"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "2.3.0"
+version = "2.3.0-beta"
 
 exclude = [
     "etc/**",
@@ -54,7 +55,7 @@ snappy-compression = ["snap"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = { git = "https://github.com/mongodb/bson-rust", branch = "main" }
+bson = "2.3.0"
 chrono = "0.4.7"
 derivative = "2.1.1"
 flate2 = { version = "1.0", optional = true }
