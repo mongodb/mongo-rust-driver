@@ -49,7 +49,7 @@ impl ResumeToken {
 }
 
 /// A `ChangeStreamEvent` represents a
-/// [change event](https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.
+/// [change event](https://www.mongodb.com/docs/manual/reference/change-events/) in the associated change stream.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -57,11 +57,11 @@ pub struct ChangeStreamEvent<T> {
     /// An opaque token for use when resuming an interrupted `ChangeStream`.
     ///
     /// See the documentation
-    /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for
+    /// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for
     /// more information on resume tokens.
     ///
     /// Also see the documentation on [resuming a change
-    /// stream](https://docs.mongodb.com/manual/changeStreams/#resume-a-change-stream).
+    /// stream](https://www.mongodb.com/docs/manual/changeStreams/#resume-a-change-stream).
     #[serde(rename = "_id")]
     pub id: ResumeToken,
 
@@ -144,28 +144,28 @@ pub struct TruncatedArray {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum OperationType {
-    /// See [insert-event](https://docs.mongodb.com/manual/reference/change-events/#insert-event)
+    /// See [insert-event](https://www.mongodb.com/docs/manual/reference/change-events/#insert-event)
     Insert,
 
-    /// See [update-event](https://docs.mongodb.com/manual/reference/change-events/#update-event)
+    /// See [update-event](https://www.mongodb.com/docs/manual/reference/change-events/#update-event)
     Update,
 
-    /// See [replace-event](https://docs.mongodb.com/manual/reference/change-events/#replace-event)
+    /// See [replace-event](https://www.mongodb.com/docs/manual/reference/change-events/#replace-event)
     Replace,
 
-    /// See [delete-event](https://docs.mongodb.com/manual/reference/change-events/#delete-event)
+    /// See [delete-event](https://www.mongodb.com/docs/manual/reference/change-events/#delete-event)
     Delete,
 
-    /// See [drop-event](https://docs.mongodb.com/manual/reference/change-events/#drop-event)
+    /// See [drop-event](https://www.mongodb.com/docs/manual/reference/change-events/#drop-event)
     Drop,
 
-    /// See [rename-event](https://docs.mongodb.com/manual/reference/change-events/#rename-event)
+    /// See [rename-event](https://www.mongodb.com/docs/manual/reference/change-events/#rename-event)
     Rename,
 
-    /// See [dropdatabase-event](https://docs.mongodb.com/manual/reference/change-events/#dropdatabase-event)
+    /// See [dropdatabase-event](https://www.mongodb.com/docs/manual/reference/change-events/#dropdatabase-event)
     DropDatabase,
 
-    /// See [invalidate-event](https://docs.mongodb.com/manual/reference/change-events/#invalidate-event)
+    /// See [invalidate-event](https://www.mongodb.com/docs/manual/reference/change-events/#invalidate-event)
     Invalidate,
 
     /// A catch-all for future event types.

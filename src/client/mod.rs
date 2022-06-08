@@ -88,7 +88,7 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// ## TCP Keepalive
 /// TCP keepalive is enabled by default with ``tcp_keepalive_time`` set to 120 seconds. The
 /// driver does not set ``tcp_keepalive_intvl``. See the
-/// [MongoDB Diagnostics FAQ keepalive section](https://docs.mongodb.com/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
+/// [MongoDB Diagnostics FAQ keepalive section](https://www.mongodb.com/docs/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
 /// for instructions on setting these values at the system level.
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -267,7 +267,7 @@ impl Client {
     /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
     /// MongoDB 4.0 or greater.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.
     ///
     /// Change streams require either a "majority" read concern or no read
