@@ -248,7 +248,7 @@ impl<T> Collection<T> {
 
     /// Runs an aggregation operation.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     pub async fn aggregate(
         &self,
@@ -269,7 +269,7 @@ impl<T> Collection<T> {
 
     /// Runs an aggregation operation using the provided `ClientSession`.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     pub async fn aggregate_with_session(
         &self,
@@ -476,7 +476,7 @@ impl<T> Collection<T> {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn delete_one(
         &self,
@@ -490,7 +490,7 @@ impl<T> Collection<T> {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn delete_one_with_session(
         &self,
@@ -691,7 +691,7 @@ impl<T> Collection<T> {
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported
     /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     pub async fn update_many(
         &self,
         query: Document,
@@ -706,7 +706,7 @@ impl<T> Collection<T> {
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported
     /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     pub async fn update_many_with_session(
         &self,
         query: Document,
@@ -744,11 +744,11 @@ impl<T> Collection<T> {
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported
     /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn update_one(
         &self,
@@ -765,11 +765,11 @@ impl<T> Collection<T> {
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported
     /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn update_one_with_session(
         &self,
@@ -811,7 +811,7 @@ impl<T> Collection<T> {
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
     /// collections.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
@@ -955,7 +955,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_delete(
         &self,
@@ -970,7 +970,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_delete_with_session(
         &self,
@@ -1007,7 +1007,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_update(
         &self,
@@ -1026,7 +1026,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_update_with_session(
         &self,
@@ -1067,7 +1067,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_replace(
         &self,
@@ -1084,7 +1084,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_replace_with_session(
         &self,
@@ -1214,7 +1214,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn insert_many(
         &self,
@@ -1231,7 +1231,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn insert_many_with_session(
         &self,
@@ -1272,7 +1272,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn insert_one(
         &self,
@@ -1289,7 +1289,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn insert_one_with_session(
         &self,
@@ -1330,7 +1330,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn replace_one(
         &self,
@@ -1347,7 +1347,7 @@ where
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn replace_one_with_session(
         &self,

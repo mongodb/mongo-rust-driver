@@ -312,7 +312,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 }
 
 /// Options used to declare a stable server API.  For more information, see the [Stable API](
-/// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
+/// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]

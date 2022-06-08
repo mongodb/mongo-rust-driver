@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 /// with instances of `ResumeToken`.
 ///
 /// See the documentation
-/// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
+/// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ResumeToken(pub(crate) RawBson);

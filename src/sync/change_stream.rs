@@ -48,8 +48,8 @@ use super::ClientSession;
 /// # }
 /// ```
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/changeStreams) for more
-/// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
+/// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams) for more
+/// details. Also see the documentation on [usage recommendations](https://www.mongodb.com/docs/manual/administration/change-streams-production-recommendations/).
 pub struct ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
@@ -69,7 +69,7 @@ where
     /// change.
     ///
     /// See the documentation
-    /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
+    /// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<ResumeToken> {
         self.async_stream.resume_token()
@@ -165,7 +165,7 @@ where
     /// change.
     ///
     /// See the documentation
-    /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
+    /// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<ResumeToken> {
         self.async_stream.resume_token()

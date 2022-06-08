@@ -141,7 +141,7 @@ impl InsertManyOptions {
 
 /// Enum modeling the modifications to apply during an update.
 /// For details, see the official MongoDB
-/// [documentation](https://docs.mongodb.com/manual/reference/command/update/#update-command-behaviors)
+/// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#update-command-behaviors)
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 #[non_exhaustive]
@@ -187,7 +187,7 @@ impl From<Vec<Document>> for UpdateModifications {
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/command/update/) for
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/reference/command/update/) for
     /// more information on array filters.
     pub array_filters: Option<Vec<Document>>,
 
@@ -199,14 +199,14 @@ pub struct UpdateOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
+    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
@@ -241,14 +241,14 @@ pub struct ReplaceOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
+    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
@@ -266,7 +266,7 @@ pub struct ReplaceOptions {
 pub struct DeleteOptions {
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -303,7 +303,7 @@ pub struct FindOneAndDeleteOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -346,7 +346,7 @@ pub struct FindOneAndReplaceOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -365,7 +365,7 @@ pub struct FindOneAndReplaceOptions {
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/command/update/) for
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/reference/command/update/) for
     /// more information on array filters.
     pub array_filters: Option<Vec<Document>>,
 
@@ -395,7 +395,7 @@ pub struct FindOneAndUpdateOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -433,7 +433,7 @@ pub struct AggregateOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -526,7 +526,7 @@ pub struct CountOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -608,7 +608,7 @@ pub struct DistinctOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 }
@@ -717,7 +717,7 @@ pub struct FindOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 }
@@ -777,7 +777,7 @@ pub struct FindOneOptions {
 
     /// The collation to use for the operation.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
@@ -840,7 +840,7 @@ pub struct FindOneOptions {
 /// [`Collection::create_index`](../struct.Collection.html#method.create_index) or [`Collection::
 /// create_indexes`](../struct.Collection.html#method.create_indexes) operation.
 ///
-/// For more information, see [`createIndexes`](https://docs.mongodb.com/manual/reference/command/createIndexes/).
+/// For more information, see [`createIndexes`](https://www.mongodb.com/docs/manual/reference/command/createIndexes/).
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[builder(field_defaults(default, setter(into)))]
@@ -932,7 +932,7 @@ pub struct ListIndexesOptions {
 /// the primary, that must report a successful index build before the primary marks the indexes as
 /// ready.
 ///
-/// For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#definition)
+/// For more information, see the [documentation](https://www.mongodb.com/docs/manual/reference/command/createIndexes/#definition)
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum CommitQuorum {
