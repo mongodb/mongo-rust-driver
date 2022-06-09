@@ -574,6 +574,8 @@ pub struct EstimatedDocumentCountOptions {
     /// The level of the read concern.
     #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
+
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a [`Collection::distinct`](../struct.Collection.html#method.distinct)
