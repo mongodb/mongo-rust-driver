@@ -515,16 +515,16 @@ impl TopologyWorker {
         let topology_changed =
             self.process_topology_diff(&old_description, &latest_state.description);
 
-        if topology_changed {
-            if server_type.is_data_bearing()
+        if topology_changed
+            && (server_type.is_data_bearing()
                 || (server_type != ServerType::Unknown
-                    && latest_state.description.topology_type() == TopologyType::Single)
-            {
-                if let Some(s) = latest_state.servers.get(&server_address) {
-                    s.pool.mark_as_ready().await;
-                }
+                    && latest_state.description.topology_type() == TopologyType::Single))
+        {
+            if let Some(s) = latest_state.servers.get(&server_address) {
+                s.pool.mark_as_ready().await;
             }
         }
+
         self.publisher.publish_new_state(latest_state);
 
         topology_changed
