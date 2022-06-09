@@ -97,7 +97,7 @@ impl ClientSession {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https:/www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub fn commit_transaction(&mut self) -> Result<()> {
         runtime::block_on(self.async_client_session.commit_transaction())
@@ -130,7 +130,7 @@ impl ClientSession {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https:/www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub fn abort_transaction(&mut self) -> Result<()> {
         runtime::block_on(self.async_client_session.abort_transaction())

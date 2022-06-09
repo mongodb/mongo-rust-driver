@@ -142,7 +142,7 @@ pub(crate) struct HelloReply {
 
 /// The response to a `hello` command.
 ///
-/// See the documentation [here](https:/www.mongodb.com/docs/manual/reference/command/hello/) for more details.
+/// See the documentation [here](https://www.mongodb.com/docs/manual/reference/command/hello/) for more details.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HelloCommandResponse {

@@ -1476,7 +1476,7 @@ async fn stable_api_examples() -> GenericResult<()> {
         //     CommandError {
         //         code: 323,
         //         code_name: "APIStrictError",
-        //         message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https:/www.mongodb.com/docs/v5.0/reference/stable-api/",
+        //         message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https://www.mongodb.com/docs/v5.0/reference/stable-api/",
         //     },
         // )
     }

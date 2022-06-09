@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use typed_builder::TypedBuilder;
 
-/// Specifies the fields and options for an index. For more information, see the [documentation](https:/www.mongodb.com/docs/manual/indexes/).
+/// Specifies the fields and options for an index. For more information, see the [documentation](https://www.mongodb.com/docs/manual/indexes/).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]

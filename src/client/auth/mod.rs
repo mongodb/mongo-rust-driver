@@ -46,23 +46,23 @@ pub enum AuthMechanism {
 
     /// The SCRAM-SHA-1 mechanism as defined in [RFC 5802](http://tools.ietf.org/html/rfc5802).
     ///
-    /// See the [MongoDB documentation](https:/www.mongodb.com/docs/manual/core/security-scram/) for more information.
+    /// See the [MongoDB documentation](https://www.mongodb.com/docs/manual/core/security-scram/) for more information.
     ScramSha1,
 
     /// The SCRAM-SHA-256 mechanism which extends [RFC 5802](http://tools.ietf.org/html/rfc5802) and is formally defined in [RFC 7677](https://tools.ietf.org/html/rfc7677).
     ///
-    /// See the [MongoDB documentation](https:/www.mongodb.com/docs/manual/core/security-scram/) for more information.
+    /// See the [MongoDB documentation](https://www.mongodb.com/docs/manual/core/security-scram/) for more information.
     ScramSha256,
 
     /// The MONGODB-X509 mechanism based on the usage of X.509 certificates to validate a client
     /// where the distinguished subject name of the client certificate acts as the username.
     ///
-    /// See the [MongoDB documentation](https:/www.mongodb.com/docs/manual/core/security-x.509/) for more information.
+    /// See the [MongoDB documentation](https://www.mongodb.com/docs/manual/core/security-x.509/) for more information.
     MongoDbX509,
 
     /// Kerberos authentication mechanism as defined in [RFC 4752](http://tools.ietf.org/html/rfc4752).
     ///
-    /// See the [MongoDB documentation](https:/www.mongodb.com/docs/manual/core/kerberos/) for more information.
+    /// See the [MongoDB documentation](https://www.mongodb.com/docs/manual/core/kerberos/) for more information.
     ///
     /// Note: This mechanism is not currently supported by this driver but will be in the future.
     Gssapi,
@@ -72,7 +72,7 @@ pub enum AuthMechanism {
     /// Since the credentials are stored outside of MongoDB, the "$external" database must be used
     /// for authentication.
     ///
-    /// See the [MongoDB documentation](https:/www.mongodb.com/docs/manual/core/security-ldap/#ldap-proxy-authentication) for more information on LDAP authentication.
+    /// See the [MongoDB documentation](https://www.mongodb.com/docs/manual/core/security-ldap/#ldap-proxy-authentication) for more information on LDAP authentication.
     Plain,
 
     /// MONGODB-AWS authenticates using AWS IAM credentials (an access key ID and a secret access

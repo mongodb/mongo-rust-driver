@@ -38,7 +38,7 @@ pub struct ChangeStreamOptions {
     /// collection is dropped and recreated or newly renamed, `start_after` should be set instead.
     /// `resume_after` and `start_after` cannot be set simultaneously.
     ///
-    /// For more information on resuming a change stream see the documentation [here](https:/www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-after)
+    /// For more information on resuming a change stream see the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-after)
     #[builder(default)]
     pub resume_after: Option<ResumeToken>,
 
@@ -54,7 +54,7 @@ pub struct ChangeStreamOptions {
     ///
     /// This feature is only available on MongoDB 4.2+.
     ///
-    /// See the documentation [here](https:/www.mongodb.com/docs/master/changeStreams/#change-stream-start-after) for more
+    /// See the documentation [here](https://www.mongodb.com/docs/master/changeStreams/#change-stream-start-after) for more
     /// information.
     #[builder(default)]
     pub start_after: Option<ResumeToken>,

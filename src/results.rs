@@ -127,7 +127,7 @@ pub enum CollectionType {
 /// specification returned from
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
 ///
-/// See the MongoDB [manual](https:/www.mongodb.com/docs/manual/reference/command/listCollections/#listCollections.cursor)
+/// See the MongoDB [manual](https://www.mongodb.com/docs/manual/reference/command/listCollections/#listCollections.cursor)
 /// for more information.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
