@@ -403,7 +403,7 @@ impl Database {
 
     /// Runs an aggregation operation.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     pub async fn aggregate(
         &self,
@@ -424,7 +424,7 @@ impl Database {
 
     /// Runs an aggregation operation with the provided `ClientSession`.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     pub async fn aggregate_with_session(
         &self,
@@ -450,7 +450,7 @@ impl Database {
     /// for all changes in this database. The stream does not observe changes from system
     /// collections and cannot be started on "config", "local" or "admin" databases.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.
     ///
     /// Change streams require either a "majority" read concern or no read
