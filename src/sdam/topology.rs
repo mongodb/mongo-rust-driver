@@ -477,23 +477,25 @@ impl TopologyWorker {
         let old_description = latest_state.description.clone();
 
         if let Some(expected_name) = &self.options.repl_set_name {
-            let got_name = sd.set_name();
-            if latest_state.description.topology_type() == TopologyType::Single
-                && got_name.as_ref().map(|opt| opt.as_ref()) != Ok(Some(expected_name))
-            {
-                let got_display = match got_name {
-                    Ok(Some(s)) => format!("{:?}", s),
-                    Ok(None) => "<none>".to_string(),
-                    Err(s) => format!("<error: {}>", s),
-                };
-                // Mark server as unknown.
-                sd = ServerDescription::new(
-                    sd.address,
-                    Some(Err(format!(
-                        "Connection string replicaSet name {:?} does not match actual name {}",
-                        expected_name, got_display,
-                    ))),
-                );
+            if sd.is_available() {
+                let got_name = sd.set_name();
+                if latest_state.description.topology_type() == TopologyType::Single
+                    && got_name.as_ref().map(|opt| opt.as_ref()) != Ok(Some(expected_name))
+                {
+                    let got_display = match got_name {
+                        Ok(Some(s)) => format!("{:?}", s),
+                        Ok(None) => "<none>".to_string(),
+                        Err(s) => format!("<error: {}>", s),
+                    };
+                    // Mark server as unknown.
+                    sd = ServerDescription::new(
+                        sd.address,
+                        Some(Err(format!(
+                            "Connection string replicaSet name {:?} does not match actual name {}",
+                            expected_name, got_display,
+                        ))),
+                    );
+                }
             }
         }
 
@@ -522,8 +524,8 @@ impl TopologyWorker {
                     s.pool.mark_as_ready().await;
                 }
             }
-            self.publisher.publish_new_state(latest_state)
         }
+        self.publisher.publish_new_state(latest_state);
 
         topology_changed
     }
