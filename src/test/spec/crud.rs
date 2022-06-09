@@ -18,6 +18,7 @@ fn test_predicate(test: &TestCase) -> bool {
     // The Rust driver doesn't support unacknowledged writes.
     let lower = test.description.to_lowercase();
 
-    // TODO: RUST-1071, RUST-1215: unskip comment tests
+    // TODO: RUST-1071: unskip comment tests
+    // RUST-1215: unskipped comment tests for estimatedDocumentCount
     !lower.contains("unacknowledged") && (!lower.contains("comment") || lower.starts_with("estimatedDocumentCount"))
 }
