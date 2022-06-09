@@ -19,11 +19,11 @@ fn test_predicate(test: &TestCase) -> bool {
     let lower = test.description.to_lowercase();
 
     // TODO: RUST-1071: unskip comment tests
-    // RUST-1215: unskipped comment tests for estimatedDocumentCount
-    println!("{}", lower);
+    // TODO: RUST-663: unskip aggregate $out and $merge tests
     !lower.contains("unacknowledged")
         && (!lower.contains("comment")
             || (lower.contains("estimated")
                 && lower.contains("document")
                 && lower.contains("count")))
+        && !(lower.contains("aggregate") && lower.contains("preference"))
 }
