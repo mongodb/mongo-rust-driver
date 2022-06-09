@@ -19,5 +19,5 @@ fn test_predicate(test: &TestCase) -> bool {
     let lower = test.description.to_lowercase();
 
     // TODO: RUST-1071, RUST-1215: unskip comment tests
-    !lower.contains("unacknowledged") && !lower.contains("comment")
+    !lower.contains("unacknowledged") && (!lower.contains("comment") || lower.starts_with("estimatedDocumentCount"))
 }
