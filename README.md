@@ -302,7 +302,7 @@ We encourage and would happily accept contributions in the form of GitHub pull r
 
 ## Running the tests
 ### Integration and unit tests
-In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://docs.mongodb.com/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
+In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https:/www.mongodb.com/docs/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
 
 **Note:** The integration tests will clear out the databases/collections they need to use, but they do not clean up after themselves.
 

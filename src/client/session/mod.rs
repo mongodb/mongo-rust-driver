@@ -46,7 +46,7 @@ lazy_static! {
 /// ## Transactions
 /// Transactions are used to execute a series of operations across multiple documents and
 /// collections atomically. For more information about when and how to use transactions in MongoDB,
-/// see the [manual](https://docs.mongodb.com/manual/core/transactions/).
+/// see the [manual](https:/www.mongodb.com/docs/manual/core/transactions/).
 ///
 /// Replica set transactions are supported on MongoDB 4.0+. Sharded transactions are supported on
 /// MongoDDB 4.2+. Transactions are associated with a `ClientSession`. To begin a transaction, call
@@ -452,7 +452,7 @@ impl ClientSession {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https:/www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn commit_transaction(&mut self) -> Result<()> {
         match &mut self.transaction.state {
@@ -520,7 +520,7 @@ impl ClientSession {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// [here](https:/www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn abort_transaction(&mut self) -> Result<()> {
         match self.transaction.state {

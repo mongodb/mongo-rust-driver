@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 /// These are the valid options for specifying an [`IndexModel`](../struct.IndexModel.html).
-/// For more information on these properties, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#definition).
+/// For more information on these properties, see the [documentation](https:/www.mongodb.com/docs/manual/reference/command/createIndexes/#definition).
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -24,7 +24,7 @@ pub struct IndexOptions {
     /// Specifies a TTL to control how long MongoDB retains
     /// documents in this collection.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/core/index-ttl/)
+    /// See the [documentation](https:/www.mongodb.com/docs/manual/core/index-ttl/)
     /// for more information on how to use this option.
     #[serde(
         rename = "expireAfterSeconds",
@@ -40,7 +40,7 @@ pub struct IndexOptions {
     /// If true, the index only references documents with the specified field. The
     /// default value is false.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/core/index-sparse/)
+    /// See the [documentation](https:/www.mongodb.com/docs/manual/core/index-sparse/)
     /// for more information on how to use this option.
     pub sparse: Option<bool>,
 
@@ -129,7 +129,7 @@ impl IndexOptions {
 
 /// The version of the index. Version 0 Indexes are disallowed as of MongoDB 3.2.
 ///
-/// See [Version 0 Indexes](https://docs.mongodb.com/manual/release-notes/3.2-compatibility/#std-label-3.2-version-0-indexes) for more information.
+/// See [Version 0 Indexes](https:/www.mongodb.com/docs/manual/release-notes/3.2-compatibility/#std-label-3.2-version-0-indexes) for more information.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum IndexVersion {
@@ -178,7 +178,7 @@ impl<'de> Deserialize<'de> for IndexVersion {
     }
 }
 
-/// Specify the version for a `text` index. For more information, see [Versions](https://docs.mongodb.com/manual/core/index-text/#versions).
+/// Specify the version for a `text` index. For more information, see [Versions](https:/www.mongodb.com/docs/manual/core/index-text/#versions).
 #[derive(Clone, Debug)]
 pub enum TextIndexVersion {
     /// Version 1.
@@ -223,7 +223,7 @@ impl<'de> Deserialize<'de> for TextIndexVersion {
     }
 }
 
-/// Specify the version for a `2dsphere` index. For more information, see [Versions](https://docs.mongodb.com/manual/core/2dsphere/#versions).
+/// Specify the version for a `2dsphere` index. For more information, see [Versions](https:/www.mongodb.com/docs/manual/core/2dsphere/#versions).
 #[derive(Clone, Debug)]
 pub enum Sphere2DIndexVersion {
     /// Version 2.

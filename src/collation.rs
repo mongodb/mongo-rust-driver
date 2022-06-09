@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 use crate::error::{Error, ErrorKind};
 
 /// A collation configuration. See the official MongoDB
-/// [documentation](https://docs.mongodb.com/manual/reference/collation/) for more information on
+/// [documentation](https:/www.mongodb.com/docs/manual/reference/collation/) for more information on
 /// each of the fields.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder)]
@@ -16,7 +16,7 @@ use crate::error::{Error, ErrorKind};
 pub struct Collation {
     /// The ICU locale.
     ///
-    /// See the list of supported languages and locales [here](https://docs.mongodb.com/manual/reference/collation-locales-defaults/#collation-languages-locales).
+    /// See the list of supported languages and locales [here](https:/www.mongodb.com/docs/manual/reference/collation-locales-defaults/#collation-languages-locales).
     pub locale: String,
 
     /// The level of comparison to perform. Corresponds to [ICU Comparison Levels](http://userguide.icu-project.org/collation/concepts#TOC-Comparison-Levels).

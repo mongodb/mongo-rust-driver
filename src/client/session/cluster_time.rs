@@ -5,7 +5,7 @@ use crate::bson::{Document, Timestamp};
 
 /// Struct modeling a cluster time reported by the server.
 ///
-/// See [the MongoDB documentation](https://docs.mongodb.com/manual/core/read-isolation-consistency-recency/)
+/// See [the MongoDB documentation](https:/www.mongodb.com/docs/manual/core/read-isolation-consistency-recency/)
 /// for more information.
 #[derive(Debug, Deserialize, Clone, Serialize, Derivative)]
 #[derivative(PartialEq, Eq)]

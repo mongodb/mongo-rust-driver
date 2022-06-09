@@ -18,7 +18,7 @@ use crate::{
 /// Specifies the consistency and isolation properties of read operations from replica sets and
 /// replica set shards.
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
+/// See the documentation [here](https:/www.mongodb.com/docs/manual/reference/read-concern/) for more
 /// information about read concerns.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -49,31 +49,31 @@ pub(crate) struct ReadConcernInternal {
 
 impl ReadConcern {
     /// Creates a read concern with level "majority".
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-majority/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-majority/).
     pub fn majority() -> Self {
         ReadConcernLevel::Majority.into()
     }
 
     /// Creates a read concern with level "local".
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-local/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-local/).
     pub fn local() -> Self {
         ReadConcernLevel::Local.into()
     }
 
     /// Creates a read concern with level "linearizable".
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-linearizable/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-linearizable/).
     pub fn linearizable() -> Self {
         ReadConcernLevel::Linearizable.into()
     }
 
     /// Creates a read concern with level "available".
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-available/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-available/).
     pub fn available() -> Self {
         ReadConcernLevel::Available.into()
     }
 
     /// Creates a read concern with level "snapshot".
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-snapshot/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-snapshot/).
     pub fn snapshot() -> Self {
         ReadConcernLevel::Snapshot.into()
     }
@@ -123,24 +123,24 @@ impl From<ReadConcernLevel> for ReadConcern {
 
 /// Specifies the level consistency and isolation properties of a given `ReadCocnern`.
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
+/// See the documentation [here](https:/www.mongodb.com/docs/manual/reference/read-concern/) for more
 /// information about read concerns.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ReadConcernLevel {
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-local/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-local/).
     Local,
 
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-majority/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-majority/).
     Majority,
 
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-linearizable/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-linearizable/).
     Linearizable,
 
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-available/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-available/).
     Available,
 
-    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-snapshot/).
+    /// See the specific documentation for this read concern level [here](https:/www.mongodb.com/docs/manual/reference/read-concern-snapshot/).
     Snapshot,
 
     /// Specify a custom read concern level. This is present to provide forwards compatibility with
@@ -191,7 +191,7 @@ impl Serialize for ReadConcernLevel {
 
 /// Specifies the level of acknowledgement requested from the server for write operations.
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/reference/write-concern/) for more
+/// See the documentation [here](https:/www.mongodb.com/docs/manual/reference/write-concern/) for more
 /// information about write concerns.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize, Deserialize)]
@@ -232,7 +232,7 @@ pub enum Acknowledgment {
     /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,
 
-    /// Requires acknowledgement according to the given custom write concern. See [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
+    /// Requires acknowledgement according to the given custom write concern. See [here](https:/www.mongodb.com/docs/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
     /// for more information.
     Custom(String),
 }
