@@ -20,5 +20,9 @@ fn test_predicate(test: &TestCase) -> bool {
 
     // TODO: RUST-1071: unskip comment tests
     // RUST-1215: unskipped comment tests for estimatedDocumentCount
+<<<<<<< HEAD
     !lower.contains("unacknowledged") && (!lower.contains("comment") || lower.contains("estimateddocumentcount"))
+=======
+    !lower.contains("unacknowledged") && (!lower.contains("comment") || lower.starts_with("estimatedDocumentCount"))
+>>>>>>> 07006e2 (update TODO in crud.rs)
 }
