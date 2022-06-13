@@ -139,7 +139,6 @@ impl FindAndModifyOptions {
         modify_opts.hint = opts.hint;
         modify_opts.let_vars = opts.let_vars;
 
-
         modify_opts
     }
 }
