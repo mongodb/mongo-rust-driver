@@ -266,11 +266,7 @@ pub struct ReplaceOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
@@ -301,11 +297,7 @@ pub struct DeleteOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
@@ -347,11 +339,7 @@ pub struct FindOneAndDeleteOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
@@ -402,11 +390,7 @@ pub struct FindOneAndReplaceOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
@@ -463,11 +447,7 @@ pub struct FindOneAndUpdateOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
@@ -799,11 +779,7 @@ pub struct FindOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
@@ -926,11 +902,7 @@ pub struct FindOneOptions {
     /// Map of parameter names and values. Values must be constant or closed
     /// expressions that do not reference document fields. Parameters can then be
     /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
-<<<<<<< HEAD
-    ///
-=======
     /// 
->>>>>>> b0ee7f1 (add comment for failing operations)
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
