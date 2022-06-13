@@ -258,6 +258,8 @@ pub(super) struct DeleteMany {
     filter: Document,
     #[serde(flatten)]
     options: DeleteOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for DeleteMany {
@@ -327,7 +329,7 @@ pub(super) struct Find {
     allow_disk_use: Option<bool>,
     allow_partial_results: Option<bool>,
     batch_size: Option<u32>,
-    comment: Option<String>,
+    comment: Option<Bson>,
     hint: Option<Hint>,
     limit: Option<i64>,
     max: Option<Document>,
@@ -347,6 +349,7 @@ pub(super) struct Find {
     skip: Option<u64>,
     sort: Option<Document>,
     collation: Option<Collation>,
+    #[serde(rename = "let")]
     let_vars: Option<Document>,
 }
 
@@ -447,7 +450,7 @@ pub(super) struct CreateFindCursor {
     allow_disk_use: Option<bool>,
     allow_partial_results: Option<bool>,
     batch_size: Option<u32>,
-    comment: Option<String>,
+    comment: Option<Bson>,
     hint: Option<Hint>,
     limit: Option<i64>,
     max: Option<Document>,
@@ -463,6 +466,7 @@ pub(super) struct CreateFindCursor {
     skip: Option<u64>,
     sort: Option<Document>,
     collation: Option<Collation>,
+    #[serde(rename = "let")]
     let_vars: Option<Document>,
 }
 
@@ -686,6 +690,8 @@ pub(super) struct Aggregate {
     session: Option<String>,
     #[serde(flatten)]
     options: AggregateOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for Aggregate {
@@ -1075,6 +1081,8 @@ pub(super) struct FindOneAndUpdate {
     session: Option<String>,
     #[serde(flatten)]
     options: FindOneAndUpdateOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndUpdate {
@@ -1154,6 +1162,8 @@ pub(super) struct FindOneAndDelete {
     filter: Document,
     #[serde(flatten)]
     options: FindOneAndDeleteOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndDelete {

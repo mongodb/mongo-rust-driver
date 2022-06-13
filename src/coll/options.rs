@@ -212,6 +212,11 @@ pub struct UpdateOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -258,6 +263,11 @@ pub struct ReplaceOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -284,6 +294,11 @@ pub struct DeleteOptions {
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -321,6 +336,11 @@ pub struct FindOneAndDeleteOptions {
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -367,6 +387,11 @@ pub struct FindOneAndReplaceOptions {
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -419,6 +444,11 @@ pub struct FindOneAndUpdateOptions {
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -666,7 +696,7 @@ pub struct FindOptions {
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    pub comment: Option<String>,
+    pub comment: Option<Bson>,
 
     /// The type of cursor to return.
     #[serde(skip)]
@@ -746,6 +776,11 @@ pub struct FindOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
@@ -812,7 +847,7 @@ pub struct FindOneOptions {
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    pub comment: Option<String>,
+    pub comment: Option<Bson>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,
@@ -864,6 +899,11 @@ pub struct FindOneOptions {
     /// The order of the documents for the purposes of the operation.
     pub sort: Option<Document>,
 
+    /// Map of parameter names and values. Values must be constant or closed
+    /// expressions that do not reference document fields. Parameters can then be
+    /// accessed as varaibles in an aggregate expression context (e.g. "$$var").
+    /// 
+    /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
 }
