@@ -211,6 +211,9 @@ pub struct UpdateOptions {
 
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 impl UpdateOptions {
@@ -221,6 +224,7 @@ impl UpdateOptions {
             hint: options.hint,
             write_concern: options.write_concern,
             collation: options.collation,
+            let_vars: options.let_vars,
             ..Default::default()
         }
     }
@@ -253,6 +257,9 @@ pub struct ReplaceOptions {
 
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a
@@ -276,6 +283,9 @@ pub struct DeleteOptions {
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a
@@ -310,6 +320,9 @@ pub struct FindOneAndDeleteOptions {
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a
@@ -353,6 +366,9 @@ pub struct FindOneAndReplaceOptions {
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a
@@ -402,6 +418,9 @@ pub struct FindOneAndUpdateOptions {
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a [`Collection::aggregate`](../struct.Collection.html#method.aggregate)
@@ -726,6 +745,9 @@ pub struct FindOptions {
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 impl From<FindOneOptions> for FindOptions {
@@ -752,6 +774,7 @@ impl From<FindOneOptions> for FindOptions {
             max_await_time: None,
             no_cursor_timeout: None,
             sort: options.sort,
+            let_vars: options.let_vars,
         }
     }
 }
@@ -840,6 +863,9 @@ pub struct FindOneOptions {
 
     /// The order of the documents for the purposes of the operation.
     pub sort: Option<Document>,
+
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a

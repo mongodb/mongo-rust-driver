@@ -97,6 +97,10 @@ impl Operation for Update {
                     body.insert("writeConcern", bson::to_bson(write_concern)?);
                 }
             }
+
+            if let Some(ref let_vars) = options.let_vars {
+                body.insert("let", let_vars);
+            }
         };
 
         if let Some(multi) = self.multi {

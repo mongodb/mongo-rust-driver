@@ -285,6 +285,8 @@ pub(super) struct DeleteOne {
     session: Option<String>,
     #[serde(flatten)]
     options: DeleteOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for DeleteOne {
@@ -345,6 +347,7 @@ pub(super) struct Find {
     skip: Option<u64>,
     sort: Option<Document>,
     collation: Option<Collation>,
+    let_vars: Option<Document>,
 }
 
 impl Find {
@@ -378,6 +381,7 @@ impl Find {
             cursor_type: None,
             max_await_time: None,
             selection_criteria: None,
+            let_vars: self.let_vars.clone(),
         };
         match &self.session {
             Some(session_id) => {
@@ -459,6 +463,7 @@ pub(super) struct CreateFindCursor {
     skip: Option<u64>,
     sort: Option<Document>,
     collation: Option<Collation>,
+    let_vars: Option<Document>,
 }
 
 impl TestOperation for CreateFindCursor {
@@ -489,6 +494,7 @@ impl TestOperation for CreateFindCursor {
                 skip: self.skip,
                 sort: self.sort.clone(),
                 collation: self.collation.clone(),
+                let_vars: self.let_vars.clone(),
             };
             let cursor = find.get_cursor(id, test_runner).await?;
             Ok(Some(Entity::Cursor(cursor)))
@@ -508,6 +514,8 @@ pub(super) struct InsertMany {
     session: Option<String>,
     #[serde(flatten)]
     options: InsertManyOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for InsertMany {
@@ -597,6 +605,8 @@ pub(super) struct UpdateMany {
     update: UpdateModifications,
     #[serde(flatten)]
     options: UpdateOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for UpdateMany {
@@ -1111,6 +1121,8 @@ pub(super) struct FindOneAndReplace {
     replacement: Document,
     #[serde(flatten)]
     options: FindOneAndReplaceOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndReplace {
@@ -1129,6 +1141,7 @@ impl TestOperation for FindOneAndReplace {
                 )
                 .await?;
             let result = to_bson(&result)?;
+
             Ok(Some(result.into()))
         }
         .boxed()
