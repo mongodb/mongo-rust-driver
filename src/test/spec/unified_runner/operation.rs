@@ -629,6 +629,8 @@ pub(super) struct UpdateOne {
     #[serde(flatten)]
     options: UpdateOptions,
     session: Option<String>,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for UpdateOne {
@@ -796,6 +798,8 @@ impl TestOperation for Distinct {
 pub(super) struct CountDocuments {
     filter: Document,
     session: Option<String>,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -835,8 +839,8 @@ impl TestOperation for CountDocuments {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EstimatedDocumentCount {
     // TODO: RUST-1215 Add this field to the options struct
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
+    // #[serde(rename = "comment")]
+    // _comment: Option<Bson>,
     #[serde(flatten)]
     options: EstimatedDocumentCountOptions,
 }
@@ -1027,6 +1031,8 @@ pub(super) struct ReplaceOne {
     replacement: Document,
     #[serde(flatten)]
     options: ReplaceOptions,
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for ReplaceOne {

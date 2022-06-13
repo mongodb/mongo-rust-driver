@@ -20,6 +20,7 @@ fn test_predicate(test: &TestCase) -> bool {
 
     // TODO: RUST-1071: unskip comment tests
     // RUST-1215: unskipped comment tests for estimatedDocumentCount
+    println!("{}", lower);
     !lower.contains("unacknowledged")
         && (!lower.contains("comment")
             || (lower.contains("estimated")
