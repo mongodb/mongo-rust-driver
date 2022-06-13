@@ -646,7 +646,7 @@ async fn heartbeat_events() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    if !client.supports_fail_command_appname() {
+    if !client.supports_fail_command_appname_initial_handshake() {
         return;
     }
 
