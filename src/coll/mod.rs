@@ -1056,6 +1056,7 @@ where
         let session = session.into();
 
         let mut options = options.into();
+
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
@@ -1315,7 +1316,6 @@ where
 
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
         let update = Update::new(
             self.namespace(),
             query,
@@ -1323,6 +1323,7 @@ where
             false,
             options.map(UpdateOptions::from_replace_options),
         );
+
         self.client().execute_operation(update, session).await
     }
 
