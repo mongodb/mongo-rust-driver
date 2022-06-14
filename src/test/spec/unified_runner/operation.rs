@@ -362,11 +362,16 @@ impl Find {
         let collection = test_runner.get_collection(id).clone();
         // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
         // compile-time that any new fields added there need to be considered here.
+        let comment = if let Some(Bson::String(s)) = &self.comment {
+            Some(s.clone())
+        } else {
+            None
+        };
         let options = FindOptions {
             allow_disk_use: self.allow_disk_use,
             allow_partial_results: self.allow_partial_results,
             batch_size: self.batch_size,
-            comment: self.comment.clone(),
+            comment,
             hint: self.hint.clone(),
             limit: self.limit,
             max: self.max.clone(),
@@ -476,6 +481,7 @@ impl TestOperation for CreateFindCursor {
         id: &'a str,
         test_runner: &'a mut TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
+
         async move {
             let find = Find {
                 filter: self.filter.clone(),

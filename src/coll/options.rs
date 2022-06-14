@@ -696,7 +696,7 @@ pub struct FindOptions {
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    pub comment: Option<Bson>,
+    pub comment: Option<String>,
 
     /// The type of cursor to return.
     #[serde(skip)]
@@ -847,7 +847,7 @@ pub struct FindOneOptions {
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    pub comment: Option<Bson>,
+    pub comment: Option<String>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,
