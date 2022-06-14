@@ -402,7 +402,7 @@ impl TestClient {
             None => default_options,
         };
         if Self::new().await.is_sharded() && !use_multiple_mongoses {
-            options.hosts = options.hosts.iter().cloned().take(1).collect();
+            options.hosts = options.hosts.iter().take(1).cloned().collect();
         }
         options
     }
