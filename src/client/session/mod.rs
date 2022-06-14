@@ -382,7 +382,7 @@ impl ClientSession {
                         if let Some(defaults) = self.default_transaction_options() {
                             merge_options!(
                                 defaults,
-                                &mut options,
+                                options,
                                 [
                                     read_concern,
                                     write_concern,

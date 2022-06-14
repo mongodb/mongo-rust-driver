@@ -4,7 +4,7 @@ set -o errexit
 
 source ./.evergreen/configure-rust.sh
 # Pin clippy to the lastest version. This should be updated when new versions of Rust are released.
-rustup default 1.59.0
+rustup default 1.61.0
 
 source ./.evergreen/feature-combinations.sh
 
