@@ -860,9 +860,6 @@ impl TestOperation for CountDocuments {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EstimatedDocumentCount {
-    // TODO: RUST-1215 Add this field to the options struct
-    // #[serde(rename = "comment")]
-    // _comment: Option<Bson>,
     #[serde(flatten)]
     options: EstimatedDocumentCountOptions,
 }
