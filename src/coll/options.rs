@@ -575,8 +575,10 @@ pub struct EstimatedDocumentCountOptions {
     #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
-    /// Tags the query with an arbitrary BSON object to help trace the operation through the database
-    /// profiler, currentOp and logs.
+    /// Tags the query with an arbitrary BSON object to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
