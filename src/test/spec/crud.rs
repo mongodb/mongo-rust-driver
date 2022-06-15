@@ -18,7 +18,7 @@ fn test_predicate(test: &TestCase) -> bool {
     // The Rust driver doesn't support unacknowledged writes.
     let lower = test.description.to_lowercase();
 
-    // TODO: RUST-1071, RUST-663: unskip comment tests 
+    // TODO: RUST-1071, RUST-663: unskip comment tests
     // and aggregate $out and $merge tests
     !lower.contains("unacknowledged")
         && (!lower.contains("comment")

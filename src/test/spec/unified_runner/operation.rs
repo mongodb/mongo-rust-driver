@@ -481,7 +481,6 @@ impl TestOperation for CreateFindCursor {
         id: &'a str,
         test_runner: &'a mut TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
-
         async move {
             let find = Find {
                 filter: self.filter.clone(),
