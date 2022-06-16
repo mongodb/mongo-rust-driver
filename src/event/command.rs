@@ -8,9 +8,10 @@ use serde::Serialize;
 use crate::{
     bson::{oid::ObjectId, Document},
     bson_util::serialize_error_as_string,
-    cmap::ConnectionInfo,
     error::Error,
 };
+
+pub use crate::cmap::ConnectionInfo;
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug, Serialize)]

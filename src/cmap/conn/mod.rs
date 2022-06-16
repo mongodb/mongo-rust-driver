@@ -39,9 +39,14 @@ pub(crate) use wire::next_request_id;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct ConnectionInfo {
     /// A driver-generated identifier that uniquely identifies the connection.
     pub id: u32,
+
+    /// A server-generated identifier that uniquely identifies the connection. Available on server
+    /// versions 4.2+. This may be used to correlate driver connections with server logs.
+    pub server_id: Option<i32>,
 
     /// The address that the connection is connected to.
     pub address: ServerAddress,
@@ -51,7 +56,11 @@ pub struct ConnectionInfo {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct Connection {
+    /// Driver-generated ID for the connection.
     pub(super) id: u32,
+    /// Server-generated ID for the connection.
+    pub(crate) server_id: Option<i32>,
+
     pub(crate) address: ServerAddress,
     pub(crate) generation: ConnectionGeneration,
 
@@ -109,6 +118,7 @@ impl Connection {
 
         let conn = Self {
             id,
+            server_id: None,
             generation: ConnectionGeneration::Normal(generation),
             pool_manager: None,
             command_executing: false,
@@ -174,6 +184,7 @@ impl Connection {
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
+            server_id: self.server_id,
             address: self.address.clone(),
         }
     }
@@ -370,6 +381,7 @@ impl Connection {
     fn take(&mut self) -> Connection {
         Connection {
             id: self.id,
+            server_id: self.server_id,
             address: self.address.clone(),
             generation: self.generation.clone(),
             stream: std::mem::replace(&mut self.stream, AsyncStream::Null),

@@ -237,6 +237,10 @@ pub(crate) struct HelloCommandResponse {
 
     /// The maximum permitted size of a BSON wire protocol message.
     pub max_message_size_bytes: i32,
+
+    /// The server-generated ID for the connection the "hello" command was run on.
+    /// Present on server versions 4.2+.
+    pub connection_id: Option<i32>,
 }
 
 impl PartialEq for HelloCommandResponse {

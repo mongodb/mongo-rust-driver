@@ -269,6 +269,8 @@ impl Handshaker {
             }
         }
 
+        conn.server_id = hello_reply.command_response.connection_id;
+
         Ok(HandshakeResult {
             hello_reply,
             first_round,

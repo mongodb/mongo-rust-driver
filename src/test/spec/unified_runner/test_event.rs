@@ -22,17 +22,20 @@ pub enum ExpectedCommandEvent {
         database_name: Option<String>,
         command: Option<Document>,
         has_service_id: Option<bool>,
+        has_server_connection_id: Option<bool>,
     },
     #[serde(rename = "commandSucceededEvent", rename_all = "camelCase")]
     Succeeded {
         command_name: Option<String>,
         reply: Option<Document>,
         has_service_id: Option<bool>,
+        has_server_connection_id: Option<bool>,
     },
     #[serde(rename = "commandFailedEvent", rename_all = "camelCase")]
     Failed {
         command_name: Option<String>,
         has_service_id: Option<bool>,
+        has_server_connection_id: Option<bool>,
     },
 }
 
