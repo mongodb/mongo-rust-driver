@@ -23,8 +23,8 @@ fn test_predicate(test: &TestCase) -> bool {
         && (!lower.contains("comment")
             || lower.contains("estimateddocumentcount"))
     // TODO: RUST-663: unskip aggregate $out and $merge tests
-        && !(lower == "aggregate with $out includes read preference for 5.0+ server")
-        && !(lower == "aggregate with $out omits read preference for pre-5.0 server")
-        && !(lower == "aggregate with $merge includes read preference for 5.0+ server")
-        && !(lower == "aggregate with $merge omits read preference for pre-5.0 server")
+        && !(lower.contains("aggregate with $out includes read preference for 5.0+ server"))
+        && !(lower.contains("aggregate with $out omits read preference for pre-5.0 server"))
+        && !(lower.contains("aggregate with $merge includes read preference for 5.0+ server"))
+        && !(lower.contains("aggregate with $merge omits read preference for pre-5.0 server"))
 }
