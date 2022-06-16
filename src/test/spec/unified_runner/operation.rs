@@ -258,6 +258,7 @@ pub(super) struct DeleteMany {
     filter: Document,
     #[serde(flatten)]
     options: DeleteOptions,
+    // TODO: RUST-1071 add comment to DeleteOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -287,6 +288,7 @@ pub(super) struct DeleteOne {
     session: Option<String>,
     #[serde(flatten)]
     options: DeleteOptions,
+    // TODO: RUST-1071 add comment to DeleteOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -523,6 +525,7 @@ pub(super) struct InsertMany {
     session: Option<String>,
     #[serde(flatten)]
     options: InsertManyOptions,
+    // TODO: RUST-1071 add comment to InsertManyOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -614,6 +617,7 @@ pub(super) struct UpdateMany {
     update: UpdateModifications,
     #[serde(flatten)]
     options: UpdateOptions,
+    // TODO: RUST-1071 add comment to UpdateOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -648,6 +652,7 @@ pub(super) struct UpdateOne {
     #[serde(flatten)]
     options: UpdateOptions,
     session: Option<String>,
+    // TODO: RUST-1071 add comment to UpdateOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -695,6 +700,7 @@ pub(super) struct Aggregate {
     session: Option<String>,
     #[serde(flatten)]
     options: AggregateOptions,
+    // TODO: RUST-1071 add comment to AggregateOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -819,6 +825,7 @@ impl TestOperation for Distinct {
 pub(super) struct CountDocuments {
     filter: Document,
     session: Option<String>,
+    // TODO: RUST-1071 add comment to CountOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
     #[serde(flatten)]
@@ -1049,6 +1056,7 @@ pub(super) struct ReplaceOne {
     replacement: Document,
     #[serde(flatten)]
     options: ReplaceOptions,
+    // TODO: RUST-1071 add comment to ReplaceOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -1083,6 +1091,7 @@ pub(super) struct FindOneAndUpdate {
     session: Option<String>,
     #[serde(flatten)]
     options: FindOneAndUpdateOptions,
+    // TODO: RUST-1071 add comment to FindOneAndUpdateOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -1131,6 +1140,7 @@ pub(super) struct FindOneAndReplace {
     replacement: Document,
     #[serde(flatten)]
     options: FindOneAndReplaceOptions,
+    // TODO: RUST-1071 add comment to FindOneandReplaceOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }
@@ -1164,6 +1174,7 @@ pub(super) struct FindOneAndDelete {
     filter: Document,
     #[serde(flatten)]
     options: FindOneAndDeleteOptions,
+    // TODO: RUST-1071 add comment to FindOneAndDeleteOptions.
     #[serde(rename = "comment")]
     _comment: Option<Bson>,
 }

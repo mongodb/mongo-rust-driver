@@ -18,12 +18,13 @@ fn test_predicate(test: &TestCase) -> bool {
     // The Rust driver doesn't support unacknowledged writes.
     let lower = test.description.to_lowercase();
 
-    // TODO: RUST-1071, RUST-663: unskip comment tests
-    // and aggregate $out and $merge tests
     !lower.contains("unacknowledged")
+    // TODO: RUST-1071: unskip comment tests
         && (!lower.contains("comment")
-            || (lower.contains("estimated")
-                && lower.contains("document")
-                && lower.contains("count")))
-        && !(lower.contains("aggregate") && lower.contains("preference"))
+            || lower.contains("estimateddocumentcount"))
+    // TODO: RUST-663: unskip aggregate $out and $merge tests
+        && !(lower == "aggregate with $out includes read preference for 5.0+ server")
+        && !(lower == "aggregate with $out omits read preference for pre-5.0 server")
+        && !(lower == "aggregate with $merge includes read preference for 5.0+ server")
+        && !(lower == "aggregate with $merge omits read preference for pre-5.0 server")
 }
