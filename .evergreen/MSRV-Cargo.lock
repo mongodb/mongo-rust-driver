@@ -1,6 +1,6 @@
-# pin async-global-executor to 2.0.4 for 1.53 support.
 version = 3
 
+# pin async-global-executor to 2.0.4 for 1.53..<1.59 support.
 [[package]]
 name = "async-global-executor"
 version = "2.0.4"
@@ -15,4 +15,15 @@ dependencies = [
  "futures-lite",
  "num_cpus",
  "once_cell",
+]
+
+# pin indexmap to 1.8.2 for 1.53..<1.56 support.
+[[package]]
+name = "indexmap"
+version = "1.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
+dependencies = [
+ "autocfg",
+ "hashbrown",
 ]
