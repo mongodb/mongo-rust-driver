@@ -258,6 +258,9 @@ pub(super) struct DeleteMany {
     filter: Document,
     #[serde(flatten)]
     options: DeleteOptions,
+    // TODO: RUST-1071 add comment to DeleteOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for DeleteMany {
@@ -285,6 +288,9 @@ pub(super) struct DeleteOne {
     session: Option<String>,
     #[serde(flatten)]
     options: DeleteOptions,
+    // TODO: RUST-1071 add comment to DeleteOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for DeleteOne {
@@ -325,7 +331,7 @@ pub(super) struct Find {
     allow_disk_use: Option<bool>,
     allow_partial_results: Option<bool>,
     batch_size: Option<u32>,
-    comment: Option<String>,
+    comment: Option<Bson>,
     hint: Option<Hint>,
     limit: Option<i64>,
     max: Option<Document>,
@@ -345,6 +351,8 @@ pub(super) struct Find {
     skip: Option<u64>,
     sort: Option<Document>,
     collation: Option<Collation>,
+    #[serde(rename = "let")]
+    let_vars: Option<Document>,
 }
 
 impl Find {
@@ -356,11 +364,16 @@ impl Find {
         let collection = test_runner.get_collection(id).clone();
         // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
         // compile-time that any new fields added there need to be considered here.
+        let comment = if let Some(Bson::String(s)) = &self.comment {
+            Some(s.clone())
+        } else {
+            None
+        };
         let options = FindOptions {
             allow_disk_use: self.allow_disk_use,
             allow_partial_results: self.allow_partial_results,
             batch_size: self.batch_size,
-            comment: self.comment.clone(),
+            comment,
             hint: self.hint.clone(),
             limit: self.limit,
             max: self.max.clone(),
@@ -378,6 +391,7 @@ impl Find {
             cursor_type: None,
             max_await_time: None,
             selection_criteria: None,
+            let_vars: self.let_vars.clone(),
         };
         match &self.session {
             Some(session_id) => {
@@ -443,7 +457,7 @@ pub(super) struct CreateFindCursor {
     allow_disk_use: Option<bool>,
     allow_partial_results: Option<bool>,
     batch_size: Option<u32>,
-    comment: Option<String>,
+    comment: Option<Bson>,
     hint: Option<Hint>,
     limit: Option<i64>,
     max: Option<Document>,
@@ -459,6 +473,8 @@ pub(super) struct CreateFindCursor {
     skip: Option<u64>,
     sort: Option<Document>,
     collation: Option<Collation>,
+    #[serde(rename = "let")]
+    let_vars: Option<Document>,
 }
 
 impl TestOperation for CreateFindCursor {
@@ -489,6 +505,7 @@ impl TestOperation for CreateFindCursor {
                 skip: self.skip,
                 sort: self.sort.clone(),
                 collation: self.collation.clone(),
+                let_vars: self.let_vars.clone(),
             };
             let cursor = find.get_cursor(id, test_runner).await?;
             Ok(Some(Entity::Cursor(cursor)))
@@ -508,6 +525,9 @@ pub(super) struct InsertMany {
     session: Option<String>,
     #[serde(flatten)]
     options: InsertManyOptions,
+    // TODO: RUST-1071 add comment to InsertManyOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for InsertMany {
@@ -597,6 +617,9 @@ pub(super) struct UpdateMany {
     update: UpdateModifications,
     #[serde(flatten)]
     options: UpdateOptions,
+    // TODO: RUST-1071 add comment to UpdateOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for UpdateMany {
@@ -629,6 +652,9 @@ pub(super) struct UpdateOne {
     #[serde(flatten)]
     options: UpdateOptions,
     session: Option<String>,
+    // TODO: RUST-1071 add comment to UpdateOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for UpdateOne {
@@ -674,6 +700,9 @@ pub(super) struct Aggregate {
     session: Option<String>,
     #[serde(flatten)]
     options: AggregateOptions,
+    // TODO: RUST-1071 add comment to AggregateOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for Aggregate {
@@ -796,6 +825,9 @@ impl TestOperation for Distinct {
 pub(super) struct CountDocuments {
     filter: Document,
     session: Option<String>,
+    // TODO: RUST-1071 add comment to CountOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -834,9 +866,6 @@ impl TestOperation for CountDocuments {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EstimatedDocumentCount {
-    // TODO: RUST-1215 Add this field to the options struct
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
     #[serde(flatten)]
     options: EstimatedDocumentCountOptions,
 }
@@ -1027,6 +1056,9 @@ pub(super) struct ReplaceOne {
     replacement: Document,
     #[serde(flatten)]
     options: ReplaceOptions,
+    // TODO: RUST-1071 add comment to ReplaceOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for ReplaceOne {
@@ -1059,6 +1091,9 @@ pub(super) struct FindOneAndUpdate {
     session: Option<String>,
     #[serde(flatten)]
     options: FindOneAndUpdateOptions,
+    // TODO: RUST-1071 add comment to FindOneAndUpdateOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndUpdate {
@@ -1105,6 +1140,9 @@ pub(super) struct FindOneAndReplace {
     replacement: Document,
     #[serde(flatten)]
     options: FindOneAndReplaceOptions,
+    // TODO: RUST-1071 add comment to FindOneandReplaceOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndReplace {
@@ -1123,6 +1161,7 @@ impl TestOperation for FindOneAndReplace {
                 )
                 .await?;
             let result = to_bson(&result)?;
+
             Ok(Some(result.into()))
         }
         .boxed()
@@ -1135,6 +1174,9 @@ pub(super) struct FindOneAndDelete {
     filter: Document,
     #[serde(flatten)]
     options: FindOneAndDeleteOptions,
+    // TODO: RUST-1071 add comment to FindOneAndDeleteOptions.
+    #[serde(rename = "comment")]
+    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndDelete {
