@@ -10,7 +10,7 @@ use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize
 use crate::{
     bson::{doc, Bson, Document},
     error::{Error, ErrorKind, Result},
-    runtime::{SyncLittleEndianRead, SyncLittleEndianWrite},
+    runtime::SyncLittleEndianRead,
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
