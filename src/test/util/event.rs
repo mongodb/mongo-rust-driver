@@ -1,9 +1,13 @@
 use std::{
     collections::VecDeque,
+    fs::File,
+    io::{BufWriter, Write},
     sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
+use serde::Serialize;
+use time::OffsetDateTime;
 use tokio::sync::{
     broadcast::error::{RecvError, SendError},
     RwLockReadGuard,
@@ -11,7 +15,7 @@ use tokio::sync::{
 
 use super::TestClient;
 use crate::{
-    bson::doc,
+    bson::{doc, to_document, Document},
     event::{
         cmap::{
             CmapEventHandler,
@@ -51,8 +55,15 @@ use crate::{
     test::{spec::ExpectedEventType, LOCK},
 };
 
-pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
+pub type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
 pub type CmapEvent = crate::cmap::test::event::Event;
+
+fn add_event_to_queue<T>(event_queue: &EventQueue<T>, event: T) {
+    event_queue
+        .write()
+        .unwrap()
+        .push_back((event, OffsetDateTime::now_utc()))
+}
 
 #[derive(Clone, Debug, From)]
 #[allow(clippy::large_enum_variant)]
@@ -72,7 +83,8 @@ impl Event {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
 pub enum SdamEvent {
     ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
     ServerOpening(ServerOpeningEvent),
@@ -85,8 +97,25 @@ pub enum SdamEvent {
     ServerHeartbeatFailed(ServerHeartbeatFailedEvent),
 }
 
-#[derive(Clone, Debug)]
+impl SdamEvent {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::ServerDescriptionChanged(_) => "ServerDescriptionChangedEvent",
+            Self::ServerOpening(_) => "ServerOpeningEvent",
+            Self::ServerClosed(_) => "ServerClosedEvent",
+            Self::TopologyDescriptionChanged(_) => "TopologyDescriptionChanged",
+            Self::TopologyOpening(_) => "TopologyOpeningEvent",
+            Self::TopologyClosed(_) => "TopologyClosedEvent",
+            Self::ServerHeartbeatStarted(_) => "ServerHeartbeatStartedEvent",
+            Self::ServerHeartbeatSucceeded(_) => "ServerHeartbeatSucceededEvent",
+            Self::ServerHeartbeatFailed(_) => "ServerHeartbeatFailedEvent",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[allow(clippy::large_enum_variant)]
+#[serde(untagged)]
 pub enum CommandEvent {
     Started(CommandStartedEvent),
     Succeeded(CommandSucceededEvent),
@@ -94,6 +123,14 @@ pub enum CommandEvent {
 }
 
 impl CommandEvent {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Started(_) => "CommandStartedEvent",
+            Self::Succeeded(_) => "CommandSucceededEvent",
+            Self::Failed(_) => "CommandFailedEvent",
+        }
+    }
+
     pub fn command_name(&self) -> &str {
         match self {
             CommandEvent::Started(event) => event.command_name.as_str(),
@@ -164,7 +201,7 @@ impl EventHandler {
         let events = self.command_events.read().unwrap();
         events
             .iter()
-            .filter_map(|event| match event {
+            .filter_map(|(event, _)| match event {
                 CommandEvent::Started(event) => {
                     if command_names.contains(&event.command_name.as_str()) {
                         Some(event.clone())
@@ -182,7 +219,7 @@ impl EventHandler {
         let events = self.command_events.read().unwrap();
         events
             .iter()
-            .filter_map(|event| match event {
+            .filter_map(|(event, _)| match event {
                 CommandEvent::Started(event) if event.command_name != "configureFailPoint" => {
                     Some(event.clone())
                 }
@@ -201,7 +238,7 @@ impl EventHandler {
                 events
                     .iter()
                     .cloned()
-                    .map(Event::Command)
+                    .map(|(event, _)| Event::Command(event))
                     .filter(|e| filter(e))
                     .collect()
             }
@@ -210,7 +247,7 @@ impl EventHandler {
                 events
                     .iter()
                     .cloned()
-                    .map(Event::Cmap)
+                    .map(|(event, _)| Event::Cmap(event))
                     .filter(|e| filter(e))
                     .collect()
             }
@@ -218,6 +255,43 @@ impl EventHandler {
                 let mut events = self.get_filtered_events(ExpectedEventType::Cmap, filter);
                 events.retain(|ev| !matches!(ev, Event::Cmap(CmapEvent::ConnectionReady(_))));
                 events
+            }
+        }
+    }
+
+    pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
+        let mut add_comma = false;
+        let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
+            event.insert("name", name);
+            event.insert("observedAt", time.unix_timestamp());
+            let mut json_string = serde_json::to_string(&event).unwrap();
+            if add_comma {
+                json_string.insert(0, ',');
+            } else {
+                add_comma = true;
+            }
+            write!(writer, "{}", json_string).unwrap();
+        };
+
+        for (command_event, time) in self.command_events.read().unwrap().iter() {
+            let name = command_event.name();
+            if names.contains(&name) {
+                let event = to_document(&command_event).unwrap();
+                write_json(event, name, time);
+            }
+        }
+        for (sdam_event, time) in self.sdam_events.read().unwrap().iter() {
+            let name = sdam_event.name();
+            if names.contains(&name) {
+                let event = to_document(&sdam_event).unwrap();
+                write_json(event, name, time);
+            }
+        }
+        for (cmap_event, time) in self.cmap_events.read().unwrap().iter() {
+            let name = cmap_event.planned_maintenance_testing_name();
+            if names.contains(&name) {
+                let event = to_document(&cmap_event).unwrap();
+                write_json(event, name, time);
             }
         }
     }
@@ -238,68 +312,68 @@ impl CmapEventHandler for EventHandler {
         *self.connections_checked_out.lock().unwrap() += 1;
         let event = CmapEvent::ConnectionCheckedOut(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
         let event = CmapEvent::ConnectionCheckOutFailed(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_pool_cleared_event(&self, pool_cleared_event: PoolClearedEvent) {
         let event = CmapEvent::PoolCleared(pool_cleared_event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
         let event = CmapEvent::PoolReady(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
         let event = CmapEvent::PoolCreated(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
         let event = CmapEvent::PoolClosed(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
         let event = CmapEvent::ConnectionCreated(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
         let event = CmapEvent::ConnectionReady(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
         let event = CmapEvent::ConnectionClosed(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
         let event = CmapEvent::ConnectionCheckOutStarted(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 
     fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
         *self.connections_checked_out.lock().unwrap() -= 1;
         let event = CmapEvent::ConnectionCheckedIn(event);
         self.handle(event.clone());
-        self.cmap_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.cmap_events, event);
     }
 }
 
@@ -307,81 +381,75 @@ impl SdamEventHandler for EventHandler {
     fn handle_server_description_changed_event(&self, event: ServerDescriptionChangedEvent) {
         let event = SdamEvent::ServerDescriptionChanged(Box::new(event));
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_server_opening_event(&self, event: ServerOpeningEvent) {
         let event = SdamEvent::ServerOpening(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_server_closed_event(&self, event: ServerClosedEvent) {
         let event = SdamEvent::ServerClosed(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_topology_description_changed_event(&self, event: TopologyDescriptionChangedEvent) {
         let event = SdamEvent::TopologyDescriptionChanged(Box::new(event));
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_topology_opening_event(&self, event: TopologyOpeningEvent) {
         let event = SdamEvent::TopologyOpening(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_topology_closed_event(&self, event: TopologyClosedEvent) {
         let event = SdamEvent::TopologyClosed(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_server_heartbeat_started_event(&self, event: ServerHeartbeatStartedEvent) {
         let event = SdamEvent::ServerHeartbeatStarted(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_server_heartbeat_succeeded_event(&self, event: ServerHeartbeatSucceededEvent) {
         let event = SdamEvent::ServerHeartbeatSucceeded(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 
     fn handle_server_heartbeat_failed_event(&self, event: ServerHeartbeatFailedEvent) {
         let event = SdamEvent::ServerHeartbeatFailed(event);
         self.handle(event.clone());
-        self.sdam_events.write().unwrap().push_back(event);
+        add_event_to_queue(&self.sdam_events, event);
     }
 }
 
 impl CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
-        self.handle(CommandEvent::Started(event.clone()));
-        self.command_events
-            .write()
-            .unwrap()
-            .push_back(CommandEvent::Started(event))
+        let event = CommandEvent::Started(event);
+        self.handle(event.clone());
+        add_event_to_queue(&self.command_events, event);
     }
 
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
-        self.handle(CommandEvent::Failed(event.clone()));
-        self.command_events
-            .write()
-            .unwrap()
-            .push_back(CommandEvent::Failed(event))
+        let event = CommandEvent::Failed(event);
+        self.handle(event.clone());
+        add_event_to_queue(&self.command_events, event);
     }
 
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        self.handle(CommandEvent::Succeeded(event.clone()));
-        self.command_events
-            .write()
-            .unwrap()
-            .push_back(CommandEvent::Succeeded(event))
+        let event = CommandEvent::Succeeded(event);
+        self.handle(event.clone());
+        add_event_to_queue(&self.command_events, event);
     }
 }
 
@@ -498,7 +566,7 @@ impl EventClient {
 
         let mut started: Option<CommandStartedEvent> = None;
 
-        while let Some(event) = command_events.pop_front() {
+        while let Some((event, _)) = command_events.pop_front() {
             if event.command_name() == command_name {
                 match started {
                     None => {
@@ -542,13 +610,14 @@ impl EventClient {
             .write()
             .unwrap()
             .drain(..)
+            .map(|(event, _)| event)
             .filter(|event| command_names.contains(&event.command_name()))
             .collect()
     }
 
     pub fn count_pool_cleared_events(&self) -> usize {
         let mut out = 0;
-        for event in self.handler.cmap_events.read().unwrap().iter() {
+        for (event, _) in self.handler.cmap_events.read().unwrap().iter() {
             if matches!(event, CmapEvent::PoolCleared(_)) {
                 out += 1;
             }

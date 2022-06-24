@@ -1,4 +1,15 @@
-use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref, time::Duration};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    fmt::Debug,
+    ops::Deref,
+    panic::{catch_unwind, AssertUnwindSafe},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use futures::{
     future::BoxFuture,
@@ -6,6 +17,7 @@ use futures::{
     FutureExt,
 };
 use serde::{de::Deserializer, Deserialize};
+use time::OffsetDateTime;
 use tokio::sync::Mutex;
 
 use super::{Entity, ExpectError, TestCursor, TestRunner};
@@ -17,7 +29,7 @@ use crate::{
     client::session::{ClientSession, TransactionState},
     coll::options::Hint,
     collation::Collation,
-    error::Result,
+    error::{ErrorKind, Result},
     options::{
         AggregateOptions,
         CountOptions,
@@ -45,13 +57,13 @@ use crate::{
     },
     runtime,
     selection_criteria::ReadPreference,
-    test::FailPoint,
+    test::{spec::unified_runner::matcher::results_match, FailPoint},
     Collection,
     Database,
     IndexModel,
 };
 
-pub trait TestOperation: Debug {
+pub trait TestOperation: Debug + Send + Sync {
     fn execute_test_runner_operation<'a>(
         &'a self,
         _test_runner: &'a mut TestRunner,
@@ -64,7 +76,13 @@ pub trait TestOperation: Debug {
         _id: &'a str,
         _test_runner: &'a mut TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
-        todo!()
+        async move {
+            Err(ErrorKind::InvalidArgument {
+                message: "execute_entity_operation called on unsupported operation".into(),
+            }
+            .into())
+        }
+        .boxed()
     }
 
     /// Whether or not this operation returns an array of root documents. This information is
@@ -206,6 +224,7 @@ impl<'de> Deserialize<'de> for Operation {
             "close" => deserialize_op::<Close>(definition.arguments),
             "createChangeStream" => deserialize_op::<CreateChangeStream>(definition.arguments),
             "rename" => deserialize_op::<RenameCollection>(definition.arguments),
+            "loop" => deserialize_op::<Loop>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1966,6 +1985,215 @@ impl TestOperation for RenameCollection {
     }
 }
 
+macro_rules! report_error {
+    ($loop:expr, $error:expr, $test_runner:expr) => {{
+        let error = format!("{:?}", $error);
+        report_error_or_failure!(
+            $loop.store_errors_as_entity,
+            $loop.store_failures_as_entity,
+            error,
+            $test_runner
+        );
+    }};
+}
+
+macro_rules! report_failure {
+    ($loop:expr, $name:expr, $actual:expr, $expected:expr, $test_runner:expr) => {{
+        let error = format!(
+            "{} error: got {:?}, expected {:?}",
+            $name, $actual, $expected
+        );
+        report_error_or_failure!(
+            $loop.store_failures_as_entity,
+            $loop.store_errors_as_entity,
+            error,
+            $test_runner
+        );
+    }};
+}
+
+macro_rules! report_error_or_failure {
+    ($first_option:expr, $second_option:expr, $error:expr, $test_runner:expr) => {{
+        let id = if let Some(ref id) = $first_option {
+            id
+        } else if let Some(ref id) = $second_option {
+            id
+        } else {
+            panic!(
+                "At least one of storeErrorsAsEntity and storeFailuresAsEntity must be specified \
+                 for a loop operation"
+            );
+        };
+
+        match $test_runner.entities.get_mut(id) {
+            Some(Entity::Bson(Bson::Array(array))) => {
+                let doc = doc! {
+                    "error": $error,
+                    "time": OffsetDateTime::now_utc().unix_timestamp(),
+                };
+                array.push(doc.into());
+            }
+            _ => panic!("Test runner should contain a Bson::Array entity for {}", id),
+        };
+
+        // The current iteration should end if an error or failure is encountered.
+        break;
+    }};
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Loop {
+    operations: Vec<Operation>,
+    store_errors_as_entity: Option<String>,
+    store_failures_as_entity: Option<String>,
+    store_successes_as_entity: Option<String>,
+    store_iterations_as_entity: Option<String>,
+}
+
+impl TestOperation for Loop {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            if let Some(id) = &self.store_errors_as_entity {
+                let errors = Bson::Array(vec![]);
+                test_runner.insert_entity(id, errors.into());
+            }
+            if let Some(id) = &self.store_failures_as_entity {
+                let failures = Bson::Array(vec![]);
+                test_runner.insert_entity(id, failures.into());
+            }
+            if let Some(id) = &self.store_successes_as_entity {
+                let successes = Bson::Int64(0);
+                test_runner.insert_entity(id, successes.into());
+            }
+            if let Some(id) = &self.store_iterations_as_entity {
+                let iterations = Bson::Int64(0);
+                test_runner.insert_entity(id, iterations.into());
+            }
+
+            let continue_looping = Arc::new(AtomicBool::new(true));
+            let continue_looping_handle = continue_looping.clone();
+            ctrlc::set_handler(move || {
+                continue_looping_handle.store(false, Ordering::SeqCst);
+            })
+            .expect("Failed to set ctrl-c handler");
+
+            while continue_looping.load(Ordering::SeqCst) {
+                for operation in &self.operations {
+                    let result = match operation.object {
+                        OperationObject::TestRunner => {
+                            panic!("Operations within a loop must be entity operations")
+                        }
+                        OperationObject::Entity(ref id) => {
+                            operation.execute_entity_operation(id, test_runner).await
+                        }
+                    };
+                    match (result, &operation.expectation) {
+                        (
+                            Ok(entity),
+                            Expectation::Result {
+                                expected_value,
+                                save_as_entity,
+                            },
+                        ) => {
+                            if let Some(expected_value) = expected_value {
+                                let actual_value = match entity {
+                                    Some(Entity::Bson(ref actual_value)) => Some(actual_value),
+                                    None => None,
+                                    _ => {
+                                        report_failure!(
+                                            self,
+                                            &operation.name,
+                                            entity,
+                                            expected_value,
+                                            test_runner
+                                        );
+                                    }
+                                };
+                                if results_match(
+                                    actual_value,
+                                    expected_value,
+                                    operation.returns_root_documents(),
+                                    Some(&test_runner.entities),
+                                )
+                                .is_ok()
+                                {
+                                    self.report_success(test_runner);
+                                } else {
+                                    report_failure!(
+                                        self,
+                                        &operation.name,
+                                        actual_value,
+                                        expected_value,
+                                        test_runner
+                                    );
+                                }
+                            } else {
+                                self.report_success(test_runner);
+                            }
+                            if let (Some(entity), Some(id)) = (entity, save_as_entity) {
+                                test_runner.insert_entity(id, entity);
+                            }
+                        }
+                        (Ok(result), Expectation::Error(ref expected_error)) => {
+                            report_failure!(
+                                self,
+                                &operation.name,
+                                result,
+                                expected_error,
+                                test_runner
+                            );
+                        }
+                        (Ok(_), Expectation::Ignore) => {
+                            self.report_success(test_runner);
+                        }
+                        (Err(error), Expectation::Error(ref expected_error)) => {
+                            match catch_unwind(AssertUnwindSafe(|| {
+                                expected_error.verify_result(&error);
+                            })) {
+                                Ok(_) => self.report_success(test_runner),
+                                Err(_) => report_failure!(
+                                    self,
+                                    &operation.name,
+                                    error,
+                                    expected_error,
+                                    test_runner
+                                ),
+                            }
+                        }
+                        (Err(error), Expectation::Result { .. } | Expectation::Ignore) => {
+                            report_error!(self, error, test_runner);
+                        }
+                    }
+                }
+                self.report_iteration(test_runner);
+            }
+        }
+        .boxed()
+    }
+}
+
+impl Loop {
+    fn report_iteration(&self, test_runner: &mut TestRunner) {
+        Self::increment_count(self.store_iterations_as_entity.as_ref(), test_runner);
+    }
+
+    fn report_success(&self, test_runner: &mut TestRunner) {
+        Self::increment_count(self.store_successes_as_entity.as_ref(), test_runner);
+    }
+
+    fn increment_count(id: Option<&String>, test_runner: &mut TestRunner) {
+        if let Some(id) = id {
+            match test_runner.entities.get_mut(id) {
+                Some(Entity::Bson(Bson::Int64(count))) => *count += 1,
+                _ => panic!("Test runner should contain a Bson::Int64 entity for {}", id),
+            }
+        }
+    }
+}
 #[derive(Debug, Deserialize)]
 pub(super) struct UnimplementedOperation;
 

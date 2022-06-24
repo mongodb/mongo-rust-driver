@@ -4,10 +4,11 @@ mod topology_description;
 
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, Document},
+    bson_util::serialize_error_as_string,
     error::Error,
     options::ServerAddress,
 };
@@ -20,7 +21,8 @@ pub use topology_description::TopologyDescription;
 pub type ServerDescription = crate::sdam::public::ServerInfo<'static>;
 
 /// Published when a server description changes.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerDescriptionChangedEvent {
     /// The address of the server.
@@ -48,7 +50,8 @@ impl ServerDescriptionChangedEvent {
 }
 
 /// Published when a server is initialized.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerOpeningEvent {
     /// The address of the server.
@@ -60,7 +63,8 @@ pub struct ServerOpeningEvent {
 }
 
 /// Published when a server is closed.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerClosedEvent {
     /// The address of the server.
@@ -72,7 +76,8 @@ pub struct ServerClosedEvent {
 }
 
 /// Published when a topology description changes.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TopologyDescriptionChangedEvent {
     /// The ID of the topology.
@@ -86,7 +91,8 @@ pub struct TopologyDescriptionChangedEvent {
 }
 
 /// Published when a topology is initialized.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TopologyOpeningEvent {
     /// The unique ID of the topology.
@@ -96,7 +102,8 @@ pub struct TopologyOpeningEvent {
 
 /// Published when a topology is closed. Note that this event will not be published until the client
 /// associated with the topology is dropped.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TopologyClosedEvent {
     /// The unique ID of the topology.
@@ -105,7 +112,8 @@ pub struct TopologyClosedEvent {
 }
 
 /// Published when a server monitor's `hello` or legacy hello command is started.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerHeartbeatStartedEvent {
     /// The address of the server.
@@ -114,7 +122,8 @@ pub struct ServerHeartbeatStartedEvent {
 }
 
 /// Published when a server monitor's `hello` or legacy hello command succeeds.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerHeartbeatSucceededEvent {
     /// The execution time of the event.
@@ -129,13 +138,15 @@ pub struct ServerHeartbeatSucceededEvent {
 }
 
 /// Published when a server monitor's `hello` or legacy hello command fails.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerHeartbeatFailedEvent {
     /// The execution time of the event.
     pub duration: Duration,
 
     /// The failure that occurred.
+    #[serde(serialize_with = "serialize_error_as_string")]
     pub failure: Error,
 
     /// The address of the server.

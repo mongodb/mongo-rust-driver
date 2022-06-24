@@ -1,5 +1,7 @@
 use std::{borrow::Cow, fmt, time::Duration};
 
+use serde::Serialize;
+
 pub use crate::sdam::description::{server::ServerType, topology::TopologyType};
 use crate::{
     bson::DateTime,
@@ -14,6 +16,15 @@ use crate::{
 #[derive(Clone)]
 pub struct ServerInfo<'a> {
     pub(crate) description: Cow<'a, ServerDescription>,
+}
+
+impl<'a> Serialize for ServerInfo<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.description.serialize(serializer)
+    }
 }
 
 impl<'a> ServerInfo<'a> {

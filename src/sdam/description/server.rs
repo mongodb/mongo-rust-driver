@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, DateTime},
@@ -15,7 +15,7 @@ const DRIVER_MIN_WIRE_VERSION: i32 = 6;
 const DRIVER_MAX_WIRE_VERSION: i32 = 17;
 
 /// Enum representing the possible types of servers that the driver can connect to.
-#[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq, Serialize)]
 #[non_exhaustive]
 pub enum ServerType {
     /// A single, non-replica set mongod.
@@ -81,7 +81,7 @@ impl Default for ServerType {
 }
 
 /// A description of the most up-to-date information known about a server.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct ServerDescription {
     /// The address of this server.
     pub(crate) address: ServerAddress,

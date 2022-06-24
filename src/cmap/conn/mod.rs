@@ -8,6 +8,7 @@ use std::{
 };
 
 use derivative::Derivative;
+use serde::Serialize;
 use tokio::sync::{mpsc, Mutex};
 
 use self::wire::Message;
@@ -37,7 +38,7 @@ pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
 
 /// User-facing information about a connection to the database.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ConnectionInfo {
     /// A driver-generated identifier that uniquely identifies the connection.
     pub id: u32,
