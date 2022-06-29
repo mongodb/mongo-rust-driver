@@ -126,6 +126,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             compressors: None,
             hello_ok: test.hello_ok,
             max_message_size_bytes: 48 * 1024 * 1024,
+            connection_id: None,
         }
     }
 }

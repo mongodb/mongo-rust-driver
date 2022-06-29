@@ -31,13 +31,8 @@ pub use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-static SPEC_VERSIONS: &[Version] = &[
-    Version::new(1, 0, 0),
-    Version::new(1, 1, 0),
-    Version::new(1, 4, 0),
-    Version::new(1, 5, 0),
-    Version::new(1, 7, 0),
-];
+static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 7, 0);
 
 pub async fn run_unified_format_test(test_file: TestFile) {
     run_unified_format_test_filtered(test_file, |_| true).await
@@ -47,18 +42,9 @@ pub async fn run_unified_format_test_filtered(
     test_file: TestFile,
     pred: impl Fn(&TestCase) -> bool,
 ) {
-    let version_matches = SPEC_VERSIONS.iter().any(|req| {
-        if req.major != test_file.schema_version.major {
-            return false;
-        }
-        if req.minor < test_file.schema_version.minor {
-            return false;
-        }
-        // patch versions do not affect the test file format
-        true
-    });
     assert!(
-        version_matches,
+        test_file.schema_version >= MIN_SPEC_VERSION
+            && test_file.schema_version <= MAX_SPEC_VERSION,
         "Test runner not compatible with specification version {}",
         &test_file.schema_version
     );

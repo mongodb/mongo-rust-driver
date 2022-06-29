@@ -68,11 +68,16 @@ fn command_events_match(
                 database_name: expected_database_name,
                 command: expected_command,
                 has_service_id: expected_has_service_id,
+                has_server_connection_id: expected_has_server_connection_id,
             },
         ) => {
             match_opt(&actual.command_name, expected_command_name)?;
             match_opt(&actual.db, expected_database_name)?;
             match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(
+                &actual.connection.server_id.is_some(),
+                expected_has_server_connection_id,
+            )?;
             match_results_opt(&actual.command, expected_command, entities)?;
             Ok(())
         }
@@ -82,10 +87,15 @@ fn command_events_match(
                 command_name: expected_command_name,
                 reply: expected_reply,
                 has_service_id: expected_has_service_id,
+                has_server_connection_id: expected_has_server_connection_id,
             },
         ) => {
             match_opt(&actual.command_name, expected_command_name)?;
             match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(
+                &actual.connection.server_id.is_some(),
+                expected_has_server_connection_id,
+            )?;
             match_results_opt(&actual.reply, expected_reply, None)?;
             Ok(())
         }
@@ -94,9 +104,14 @@ fn command_events_match(
             ExpectedCommandEvent::Failed {
                 command_name: expected_command_name,
                 has_service_id: expected_has_service_id,
+                has_server_connection_id: expected_has_server_connection_id,
             },
         ) => {
             match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(
+                &actual.connection.server_id.is_some(),
+                expected_has_server_connection_id,
+            )?;
             match_opt(&actual.command_name, expected_command_name)?;
             Ok(())
         }

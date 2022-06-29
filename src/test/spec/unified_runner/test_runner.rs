@@ -98,15 +98,20 @@ impl TestRunner {
                 }
             }
             if !can_run_on {
-                log_uncaptured("Client topology not compatible with test");
+                log_uncaptured(format!(
+                    "Skipping file {}; client topology not compatible with test",
+                    test_file.description
+                ));
                 return;
             }
         }
 
+        log_uncaptured(format!("Running file {}", test_file.description));
+
         for test_case in test_file.tests {
             if let Some(skip_reason) = test_case.skip_reason {
                 log_uncaptured(format!(
-                    "Skipping {}: {}",
+                    "Skipping test case {}: {}",
                     &test_case.description, skip_reason
                 ));
                 continue;
@@ -119,7 +124,7 @@ impl TestRunner {
                 .map(|op| op.name.as_str())
             {
                 log_uncaptured(format!(
-                    "Skipping {}: unsupported operation {}",
+                    "Skipping test case {}: unsupported operation {}",
                     &test_case.description, op
                 ));
                 continue;
@@ -127,13 +132,11 @@ impl TestRunner {
 
             if !pred(&test_case) {
                 log_uncaptured(format!(
-                    "Skipping {}: predicate failed",
+                    "Skipping test case {}: predicate failed",
                     test_case.description
                 ));
                 continue;
             }
-
-            log_uncaptured(format!("Running {}", &test_case.description));
 
             if let Some(requirements) = test_case.run_on_requirements {
                 let mut can_run_on = false;
@@ -144,12 +147,14 @@ impl TestRunner {
                 }
                 if !can_run_on {
                     log_uncaptured(format!(
-                        "{}: client topology not compatible with test",
+                        "Skipping test case {}: client topology not compatible with test",
                         &test_case.description
                     ));
                     continue;
                 }
             }
+
+            log_uncaptured(format!("Running {}", &test_case.description));
 
             if let Some(ref initial_data) = test_file.initial_data {
                 for data in initial_data {
