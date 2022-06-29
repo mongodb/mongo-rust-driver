@@ -39,6 +39,7 @@ pub(crate) use wire::next_request_id;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionInfo {
     /// A driver-generated identifier that uniquely identifies the connection.
