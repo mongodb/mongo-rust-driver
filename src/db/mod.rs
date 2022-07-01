@@ -19,6 +19,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
+    gridfs::{GridFSBucket, GridFSBucketOptions},
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -563,5 +564,15 @@ impl Database {
         self.client()
             .execute_watch_with_session(pipeline, options, target, None, session)
             .await
+    }
+
+    pub fn new_gridfs_bucket(
+        &self,
+        options: impl Into<Option<GridFSBucketOptions>>,
+    ) -> GridFSBucket {
+        GridFSBucket {
+            db: self.clone(),
+            options: options.into(),
+        }
     }
 }
