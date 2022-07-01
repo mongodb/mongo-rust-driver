@@ -455,11 +455,28 @@ async fn batch_mid_resume_token() -> Result<()> {
         None => return Ok(()),
     };
 
-    coll.insert_many((0..2).map(|i| doc! { "_id": i as i32 }), None)
-        .await?;
+    // This loop gets the stream to a point where it has been iterated up to but nt including
+    // the last event in its batch.
+    let mut event_id = None;
+    loop {
+        match stream.next_if_any().await? {
+            Some(event) => {
+                event_id = Some(event.id);
+            }
+            // If we're out of events, make some more.
+            None => {
+                coll.insert_many((0..3).map(|_| doc! {}), None).await?;
+            }
+        };
 
-    let mid_id = stream.next().await.transpose()?.unwrap().id;
-    assert_eq!(stream.resume_token(), Some(mid_id));
+        // if after iterating the stream last time there's one document left,
+        // then we're done here and can continue to the assertions.
+        if stream.current_batch().len() == 1 {
+            break;
+        }
+    }
+
+    assert_eq!(stream.resume_token().unwrap(), event_id.unwrap());
 
     Ok(())
 }
