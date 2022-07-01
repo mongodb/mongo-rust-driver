@@ -321,6 +321,7 @@ mod compression;
 mod concern;
 mod cursor;
 mod db;
+pub mod gridfs;
 pub mod error;
 pub mod event;
 mod index;
