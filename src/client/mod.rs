@@ -4,7 +4,7 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -101,6 +101,8 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
+    #[cfg(feature = "fle")]
+    fle: Mutex<Option<FleState>>,
 }
 
 impl Client {
@@ -122,10 +124,16 @@ impl Client {
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
+            #[cfg(feature = "fle")]
+            fle: Mutex::new(None),
             options,
         });
-
-        Ok(Self { inner })
+        let client = Self { inner };
+        #[cfg(feature = "fle")]
+        {
+            *client.inner.fle.lock().unwrap() = FleState::new(&client)?;
+        }
+        Ok(client)
     }
 
     pub(crate) fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
@@ -439,5 +447,60 @@ impl Client {
             .peek_latest()
             .description
             .clone()
+    }
+}
+
+#[cfg(feature = "fle")]
+#[derive(Debug)]
+struct FleState {
+    // TODO: mongocrypt handle
+    mongocryptd_client: Option<Client>,
+    key_vault_client: Client,
+    metadata_client: Option<Client>,
+    internal_client: Option<Client>,
+}
+
+#[cfg(feature = "fle")]
+impl FleState {
+    fn new(client: &Client) -> Result<Option<Self>> {
+        let auto_enc_opts = match client.inner.options.auto_encryption_opts.as_ref() {
+            Some(o) => o,
+            None => return Ok(None),
+        };
+
+        let mut internal_client: Option<Client> = None;
+        let mut get_internal_client = || -> Result<Client> {
+            if let Some(c) = internal_client.clone() {
+                return Ok(c);
+            }
+            let mut internal_opts = client.inner.options.clone();
+            internal_opts.auto_encryption_opts = None;
+            internal_opts.min_pool_size = Some(0);
+            let c = Client::with_options(internal_opts)?;
+            internal_client = Some(c.clone());
+            Ok(c)
+        };
+
+        let key_vault_client = if let Some(c) = &auto_enc_opts.key_vault_client {
+            c.clone()
+        } else if Some(0) == client.inner.options.max_pool_size {
+            client.clone()
+        } else {
+            get_internal_client()?
+        };
+        let metadata_client = if Some(true) == auto_enc_opts.bypass_auto_encryption {
+            None
+        } else if Some(0) == client.inner.options.max_pool_size {
+            Some(client.clone())
+        } else {
+            Some(get_internal_client()?)
+        };
+
+        Ok(Some(FleState {
+            mongocryptd_client: None,
+            key_vault_client,
+            metadata_client,
+            internal_client,
+        }))
     }
 }
