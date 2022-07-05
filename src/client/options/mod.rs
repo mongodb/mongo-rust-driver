@@ -5,7 +5,7 @@ mod resolver_config;
 
 use std::{
     cmp::Ordering,
-    collections::{HashSet, HashMap},
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
@@ -2662,17 +2662,43 @@ pub struct TransactionOptions {
 /// AutoEncryptionOpts.
 #[cfg(feature = "fle")]
 #[derive(Debug, Default, TypedBuilder, Clone)]
+#[non_exhaustive]
 pub struct AutoEncryptionOpts {
+    /// Used for data key queries.  Will default to an internal client if not set.
     pub key_vault_client: Option<crate::Client>,
+    /// A collection that contains all data keys used for encryption and decryption (aka the key
+    /// vault collection).
     pub key_vault_namespace: String,
+    /// Options individual to each KMS provider.
     pub kms_providers: KmsProviders,
+    /// Specify a JSONSchema locally.
+    ///
+    /// Supplying a `schema_map` provides more security than relying on JSON Schemas obtained from
+    /// the server. It protects against a malicious server advertising a false JSON Schema, which
+    /// could trick the client into sending unencrypted data that should be encrypted.
+    ///
+    /// Schemas supplied in the `schema_map` only apply to configuring automatic encryption for
+    /// client side encryption. Other validation rules in the JSON schema will not be enforced by
+    /// the driver and will result in an error.
     pub schema_map: Option<HashMap<String, Document>>,
+    /// Disable automatic encryption and do not spawn mongocryptd.  Defaults to false.
     pub bypass_auto_encryption: Option<bool>,
-    pub extra_options: Option<HashMap<String, Bson>>,
+    /// Options related to mongocryptd.
+    pub extra_options: Option<Document>,
+    /// Configure TLS for connections to KMS providers.
     pub tls_options: Option<KmsProvidersTlsOptions>,
+    /// Maps namespace to encrypted fields.
+    ///
+    /// Supplying an `encrypted_fields_map` provides more security than relying on an
+    /// encryptedFields obtained from the server. It protects against a malicious server
+    /// advertising a false encryptedFields.
     pub encrypted_fields_map: Option<HashMap<String, Document>>,
+    /// Disable serverside processing of encrypte indexed fields, allowing use of explicit
+    /// encryption with queryable encryption.
     pub bypass_query_analysis: Option<bool>,
 }
 
+/// Options specific to each KMS provider.
 pub type KmsProviders = HashMap<KmsProvider, Document>;
+/// TLS options for connections to each KMS provider.
 pub type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
