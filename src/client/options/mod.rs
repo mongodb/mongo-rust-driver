@@ -5,7 +5,7 @@ mod resolver_config;
 
 use std::{
     cmp::Ordering,
-    collections::HashSet,
+    collections::{HashSet, HashMap},
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
@@ -17,6 +17,7 @@ use std::{
 
 use derivative::Derivative;
 use lazy_static::lazy_static;
+use mongocrypt::ctx::KmsProvider;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
@@ -531,6 +532,13 @@ pub struct ClientOptions {
     /// WriteConcern type documentation for more details.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// Options related to automatic encryption.
+    #[cfg(feature = "fle")]
+    #[builder(default)]
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[serde(skip)]
+    pub auto_encryption_opts: Option<AutoEncryptionOpts>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
@@ -1256,6 +1264,8 @@ impl ClientOptions {
             sdam_event_handler: None,
             #[cfg(test)]
             test_options: None,
+            #[cfg(feature = "fle")]
+            auto_encryption_opts: None,
         }
     }
 
@@ -2642,3 +2652,27 @@ pub struct TransactionOptions {
     )]
     pub max_commit_time: Option<Duration>,
 }
+
+/// Options related to automatic encryption.
+///
+/// Automatic encryption is an enterprise only feature that only applies to operations on a
+/// collection. Automatic encryption is not supported for operations on a database or view, and
+/// operations that are not bypassed will result in error (see [libmongocrypt: Auto Encryption
+/// Allow-List](https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list)). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
+/// AutoEncryptionOpts.
+#[cfg(feature = "fle")]
+#[derive(Debug, Default, TypedBuilder, Clone)]
+pub struct AutoEncryptionOpts {
+    pub key_vault_client: Option<crate::Client>,
+    pub key_vault_namespace: String,
+    pub kms_providers: KmsProviders,
+    pub schema_map: Option<HashMap<String, Document>>,
+    pub bypass_auto_encryption: Option<bool>,
+    pub extra_options: Option<HashMap<String, Bson>>,
+    pub tls_options: Option<KmsProvidersTlsOptions>,
+    pub encrypted_fields_map: Option<HashMap<String, Document>>,
+    pub bypass_query_analysis: Option<bool>,
+}
+
+pub type KmsProviders = HashMap<KmsProvider, Document>;
+pub type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
