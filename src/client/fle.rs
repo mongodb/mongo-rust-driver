@@ -1,10 +1,14 @@
+use std::{
+    path::Path,
+    process::{Command, Stdio},
+};
+
 use derivative::Derivative;
 use mongocrypt::Crypt;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 
-use super::options::AutoEncryptionOpts;
-use super::Client;
+use super::{options::AutoEncryptionOpts, Client};
 
 #[cfg(feature = "fle")]
 #[derive(Derivative)]
@@ -27,14 +31,14 @@ struct AuxClients {
 #[cfg(feature = "fle")]
 impl ClientState {
     pub(super) fn new(client: &Client) -> Result<Option<Self>> {
-        let auto_enc_opts = match client.inner.options.auto_encryption_opts.as_ref() {
+        let opts = match client.inner.options.auto_encryption_opts.as_ref() {
             Some(o) => o,
             None => return Ok(None),
         };
 
-        let crypt = Self::make_crypt(auto_enc_opts)?;
-        let mongocryptd_client = Self::spawn_mongocryptd(&crypt)?;
-        let aux_clients = Self::make_aux_clients(client, auto_enc_opts)?;
+        let crypt = Self::make_crypt(opts)?;
+        let mongocryptd_client = Self::spawn_mongocryptd(opts, &crypt)?;
+        let aux_clients = Self::make_aux_clients(client, opts)?;
 
         Ok(Some(Self {
             crypt,
@@ -43,18 +47,12 @@ impl ClientState {
         }))
     }
 
-    fn spawn_mongocryptd(crypt: &Crypt) -> Result<Option<Client>> {
-
-        todo!()
-    }
-
-    fn make_crypt(auto_enc_opts: &AutoEncryptionOpts) -> Result<Crypt> {
-        use std::path::Path;
+    fn make_crypt(opts: &AutoEncryptionOpts) -> Result<Crypt> {
         let mut builder = Crypt::builder();
-        if Some(true) != auto_enc_opts.bypass_auto_encryption {
+        if Some(true) != opts.bypass_auto_encryption {
             builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
         }
-        if let Some(p) = auto_enc_opts
+        if let Some(p) = opts
             .extra_options
             .as_ref()
             .and_then(|o| o.get_str("cryptSharedLibPath").ok())
@@ -63,7 +61,7 @@ impl ClientState {
         }
         let crypt = builder.build()?;
         if Some(true)
-            == auto_enc_opts
+            == opts
                 .extra_options
                 .as_ref()
                 .and_then(|o| o.get_bool("cryptSharedRequired").ok())
@@ -75,6 +73,52 @@ impl ClientState {
             }
         }
         Ok(crypt)
+    }
+
+    fn spawn_mongocryptd(opts: &AutoEncryptionOpts, crypt: &Crypt) -> Result<Option<Client>> {
+        let extra_opts = opts.extra_options.as_ref();
+        if opts.bypass_auto_encryption == Some(true)
+            || extra_opts.and_then(|o| o.get_bool("mongocryptdBypassSpawn").ok()) == Some(true)
+            || crypt.shared_lib_version().is_some()
+            || extra_opts.and_then(|o| o.get_bool("cryptSharedRequired").ok()) == Some(true)
+        {
+            return Ok(None);
+        }
+        let which_path;
+        let bin_path = match extra_opts.and_then(|o| o.get_str("mongocryptdSpawnPath").ok()) {
+            Some(s) => Path::new(s),
+            None => {
+                which_path = which::which("mongocryptd")
+                    .map_err(|e| Error::invalid_argument(format!("{}", e)))?;
+                &which_path
+            }
+        };
+        let mut args: Vec<&str> = vec![];
+        let has_idle = if let Some(spawn_args) =
+            extra_opts.and_then(|o| o.get_array("mongocryptdSpawnArgs").ok())
+        {
+            let mut has_idle = false;
+            for arg in spawn_args {
+                let str_arg = arg.as_str().ok_or_else(|| {
+                    Error::invalid_argument("non-string entry in mongocryptdSpawnArgs")
+                })?;
+                has_idle |= str_arg.starts_with("--idleShutdownTimeoutSecs");
+                args.push(str_arg);
+            }
+            has_idle
+        } else {
+            false
+        };
+        if !has_idle {
+            args.push("--idleShutdownTimeoutSecs=60");
+        }
+        Command::new(bin_path)
+            .args(&args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+
+        todo!()
     }
 
     fn make_aux_clients(client: &Client, auto_enc_opts: &AutoEncryptionOpts) -> Result<AuxClients> {
