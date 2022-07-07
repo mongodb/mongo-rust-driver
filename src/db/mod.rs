@@ -17,7 +17,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-    gridfs::{GridFSBucket, GridFSBucketOptions},
+    gridfs::{GridFsBucket, GridFsBucketOptions},
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -494,11 +494,12 @@ impl Database {
             .await
     }
 
+    /// Creates a new [`GridFsBucket`] in the database with the given options.
     pub fn new_gridfs_bucket(
         &self,
-        options: impl Into<Option<GridFSBucketOptions>>,
-    ) -> GridFSBucket {
-        GridFSBucket {
+        options: impl Into<Option<GridFsBucketOptions>>,
+    ) -> GridFsBucket {
+        GridFsBucket {
             db: self.clone(),
             options: options.into(),
         }

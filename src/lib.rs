@@ -321,11 +321,11 @@ mod compression;
 mod concern;
 mod cursor;
 mod db;
-pub mod gridfs;
 pub mod error;
 pub mod event;
-mod index;
+mod gridfs;
 mod hello;
+mod index;
 mod operation;
 pub mod results;
 pub(crate) mod runtime;
@@ -343,18 +343,18 @@ mod test;
 extern crate derive_more;
 
 pub use crate::{
-    client::{Client, session::ClientSession},
+    client::{session::ClientSession, Client},
     coll::Collection,
-    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
+    cursor::{
+        session::{SessionCursor, SessionCursorStream},
+        Cursor,
+    },
     db::Database,
 };
 
-pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam::public::*};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
-#[cfg(all(
-    feature = "tokio-runtime",
-    feature = "async-std-runtime",
-))]
+#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime",))]
 compile_error!(
     "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
