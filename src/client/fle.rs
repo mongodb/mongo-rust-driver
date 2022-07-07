@@ -8,7 +8,7 @@ use mongocrypt::Crypt;
 
 use crate::error::{Error, Result};
 
-use super::{options::AutoEncryptionOpts, Client};
+use super::{options::{AutoEncryptionOpts, EO_CRYPT_SHARED_LIB_PATH, EO_CRYPT_SHARED_REQUIRED, EO_MONGOCRYPTD_BYPASS_SPAWN, EO_MONGOCRYPTD_SPAWN_PATH, EO_MONGOCRYPTD_URI, EO_MONGOCRYPTD_SPAWN_ARGS}, Client};
 
 #[cfg(feature = "fle")]
 #[derive(Derivative)]
@@ -52,20 +52,11 @@ impl ClientState {
         if Some(true) != opts.bypass_auto_encryption {
             builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
         }
-        if let Some(p) = opts
-            .extra_options
-            .as_ref()
-            .and_then(|o| o.get_str("cryptSharedLibPath").ok())
-        {
+        if let Some(p) = opts.extra_option(&EO_CRYPT_SHARED_LIB_PATH)? {
             builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
         }
         let crypt = builder.build()?;
-        if Some(true)
-            == opts
-                .extra_options
-                .as_ref()
-                .and_then(|o| o.get_bool("cryptSharedRequired").ok())
-        {
+        if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true) {
             if crypt.shared_lib_version().is_none() {
                 return Err(crate::error::Error::invalid_argument(
                     "cryptSharedRequired is set but crypt_shared is not available",
@@ -76,16 +67,15 @@ impl ClientState {
     }
 
     fn spawn_mongocryptd(opts: &AutoEncryptionOpts, crypt: &Crypt) -> Result<Option<Client>> {
-        let extra_opts = opts.extra_options.as_ref();
         if opts.bypass_auto_encryption == Some(true)
-            || extra_opts.and_then(|o| o.get_bool("mongocryptdBypassSpawn").ok()) == Some(true)
+            || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
-            || extra_opts.and_then(|o| o.get_bool("cryptSharedRequired").ok()) == Some(true)
+            || opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)
         {
             return Ok(None);
         }
         let which_path;
-        let bin_path = match extra_opts.and_then(|o| o.get_str("mongocryptdSpawnPath").ok()) {
+        let bin_path = match opts.extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)? {
             Some(s) => Path::new(s),
             None => {
                 which_path = which::which("mongocryptd")
@@ -95,7 +85,7 @@ impl ClientState {
         };
         let mut args: Vec<&str> = vec![];
         let has_idle = if let Some(spawn_args) =
-            extra_opts.and_then(|o| o.get_array("mongocryptdSpawnArgs").ok())
+            opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)?
         {
             let mut has_idle = false;
             for arg in spawn_args {
@@ -117,6 +107,11 @@ impl ClientState {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()?;
+
+        let uri = match opts.extra_option(&EO_MONGOCRYPTD_URI)? {
+            Some(s) => s,
+            None => "mongodb://localhost:27020",
+        };
 
         todo!()
     }

@@ -15,6 +15,7 @@ use std::{
     time::Duration,
 };
 
+use bson::Array;
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::KmsProvider;
@@ -2702,3 +2703,68 @@ pub struct AutoEncryptionOpts {
 pub type KmsProviders = HashMap<KmsProvider, Document>;
 /// TLS options for connections to each KMS provider.
 pub type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
+
+#[cfg(feature = "fle")]
+impl AutoEncryptionOpts {
+    pub(crate) fn extra_option<'a, Opt: ExtraOption<'a, Bson>>(&'a self, opt: &Opt) -> Result<Option<Opt::Output>> {
+        let key = opt.key();
+        match self.extra_options.as_ref().and_then(|o| o.get(key)) {
+            None => Ok(None),
+            Some(b) => match Opt::as_type(b) {
+                Some(v) => Ok(Some(v)),
+                None => Err(Error::invalid_argument(format!("unexpected type for extra option {:?}: {:?}", key, b))),
+            }
+        }
+    }
+}
+
+// `Input` will always be `Bson`; it's present as a parameter to bring the lifetime into scope so that `Output` can be bound by it.
+// GATs would make this unnecessary.
+pub(crate) trait ExtraOption<'a, Input> {
+    type Output;
+    fn key(&self) -> &'static str;
+    fn as_type(input: &'a Input) -> Option<Self::Output>;
+}
+
+pub(crate) struct ExtraOptionStr(&'static str);
+
+impl<'a> ExtraOption<'a, Bson> for ExtraOptionStr {
+    type Output = &'a str;
+    fn key(&self) -> &'static str {
+        self.0
+    }
+    fn as_type(input: &'a Bson) -> Option<&'a str> {
+        input.as_str()
+    }
+}
+
+pub(crate) struct ExtraOptionBool(&'static str);
+
+impl<'a> ExtraOption<'a, Bson> for ExtraOptionBool {
+    type Output = bool;
+    fn key(&self) -> &'static str {
+        self.0
+    }
+    fn as_type(input: &'a Bson) -> Option<bool> {
+        input.as_bool()
+    }
+}
+
+pub(crate) struct ExtraOptionArray(&'static str);
+
+impl<'a> ExtraOption<'a, Bson> for ExtraOptionArray {
+    type Output = &'a Array;
+    fn key(&self) -> &'static str {
+        self.0
+    }
+    fn as_type(input: &'a Bson) -> Option<&'a Array> {
+        input.as_array()
+    }
+}
+
+pub(crate) const EO_MONGOCRYPTD_URI: ExtraOptionStr = ExtraOptionStr("mongocryptdURI");
+pub(crate) const EO_MONGOCRYPTD_BYPASS_SPAWN: ExtraOptionBool = ExtraOptionBool("mongocryptdBypassSpawn");
+pub(crate) const EO_MONGOCRYPTD_SPAWN_PATH: ExtraOptionStr = ExtraOptionStr("mongocryptdSpawnPath");
+pub(crate) const EO_MONGOCRYPTD_SPAWN_ARGS: ExtraOptionArray = ExtraOptionArray("mongocryptdSpawnArgs");
+pub(crate) const EO_CRYPT_SHARED_LIB_PATH: ExtraOptionStr = ExtraOptionStr("cryptSharedLibPath");
+pub(crate) const EO_CRYPT_SHARED_REQUIRED: ExtraOptionBool = ExtraOptionBool("cryptSharedRequired");
