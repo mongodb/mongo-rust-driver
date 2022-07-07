@@ -15,6 +15,7 @@ use super::{options::{AutoEncryptionOpts, EO_CRYPT_SHARED_LIB_PATH, EO_CRYPT_SHA
 #[derivative(Debug)]
 pub(super) struct ClientState {
     #[derivative(Debug = "ignore")]
+    #[allow(dead_code)]
     crypt: Crypt,
     mongocryptd_client: Option<Client>,
     aux_clients: AuxClients,
@@ -23,21 +24,19 @@ pub(super) struct ClientState {
 #[cfg(feature = "fle")]
 #[derive(Debug)]
 struct AuxClients {
+    #[allow(dead_code)]
     key_vault_client: Client,
+    #[allow(dead_code)]
     metadata_client: Option<Client>,
+    #[allow(dead_code)]
     internal_client: Option<Client>,
 }
 
 #[cfg(feature = "fle")]
 impl ClientState {
-    pub(super) fn new(client: &Client) -> Result<Option<Self>> {
-        let opts = match client.inner.options.auto_encryption_opts.as_ref() {
-            Some(o) => o,
-            None => return Ok(None),
-        };
-
+    pub(super) async fn new(client: &Client, opts: &AutoEncryptionOpts) -> Result<Option<Self>> {
         let crypt = Self::make_crypt(opts)?;
-        let mongocryptd_client = Self::spawn_mongocryptd(opts, &crypt)?;
+        let mongocryptd_client = Self::spawn_mongocryptd(opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, opts)?;
 
         Ok(Some(Self {
@@ -66,7 +65,7 @@ impl ClientState {
         Ok(crypt)
     }
 
-    fn spawn_mongocryptd(opts: &AutoEncryptionOpts, crypt: &Crypt) -> Result<Option<Client>> {
+    async fn spawn_mongocryptd(opts: &AutoEncryptionOpts, crypt: &Crypt) -> Result<Option<Client>> {
         if opts.bypass_auto_encryption == Some(true)
             || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
@@ -112,18 +111,16 @@ impl ClientState {
             Some(s) => s,
             None => "mongodb://localhost:27020",
         };
-
-        todo!()
+        Ok(Some(Client::with_uri_str(uri).await?))
     }
 
     fn make_aux_clients(client: &Client, auto_enc_opts: &AutoEncryptionOpts) -> Result<AuxClients> {
         let mut internal_client: Option<Client> = None;
         let mut get_internal_client = || -> Result<Client> {
-            if let Some(c) = internal_client.clone() {
-                return Ok(c);
+            if let Some(c) = &internal_client {
+                return Ok(c.clone());
             }
             let mut internal_opts = client.inner.options.clone();
-            internal_opts.auto_encryption_opts = None;
             internal_opts.min_pool_size = Some(0);
             let c = Client::with_options(internal_opts)?;
             internal_client = Some(c.clone());

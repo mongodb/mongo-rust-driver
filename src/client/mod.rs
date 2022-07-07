@@ -130,11 +130,14 @@ impl Client {
             fle: Mutex::new(None),
             options,
         });
-        let client = Self { inner };
-        #[cfg(feature = "fle")]
-        {
-            *client.inner.fle.lock().unwrap() = fle::ClientState::new(&client)?;
-        }
+        Ok(Self { inner })
+    }
+
+    /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption enabled.
+    #[cfg(feature = "fle")]
+    pub async fn with_fle_options(options: ClientOptions, auto_enc: options::AutoEncryptionOpts) -> Result<Self> {
+        let client = Self::with_options(options)?;
+        *client.inner.fle.lock().unwrap() = fle::ClientState::new(&client, &auto_enc).await?;
         Ok(client)
     }
 

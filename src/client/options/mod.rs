@@ -534,13 +534,6 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
-    /// Options related to automatic encryption.
-    #[cfg(feature = "fle")]
-    #[builder(default)]
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[serde(skip)]
-    pub auto_encryption_opts: Option<AutoEncryptionOpts>,
-
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
     #[serde(skip)]
@@ -1265,8 +1258,6 @@ impl ClientOptions {
             sdam_event_handler: None,
             #[cfg(test)]
             test_options: None,
-            #[cfg(feature = "fle")]
-            auto_encryption_opts: None,
         }
     }
 
