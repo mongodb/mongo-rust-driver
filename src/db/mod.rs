@@ -20,6 +20,7 @@ use crate::{
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
 <<<<<<< HEAD
+<<<<<<< HEAD
     gridfs::{
         options::GridFsBucketOptions,
         GridFsBucket,
@@ -29,6 +30,9 @@ use crate::{
 =======
     gridfs::{GridFSBucket, GridFSBucketOptions},
 >>>>>>> 5780428 (push public api skeleton)
+=======
+    gridfs::{GridFsBucket, GridFsBucketOptions},
+>>>>>>> d77c8b0 (add public api documentation)
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -576,6 +580,7 @@ impl Database {
     }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     /// Creates a new GridFsBucket in the database with the given options.
     pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
         let mut options = options.into().unwrap_or_default();
@@ -596,11 +601,14 @@ impl Database {
             db: self.clone(),
             options,
 =======
+=======
+    /// Creates a new [`GridFsBucket`] in the database with the given options.
+>>>>>>> d77c8b0 (add public api documentation)
     pub fn new_gridfs_bucket(
         &self,
-        options: impl Into<Option<GridFSBucketOptions>>,
-    ) -> GridFSBucket {
-        GridFSBucket {
+        options: impl Into<Option<GridFsBucketOptions>>,
+    ) -> GridFsBucket {
+        GridFsBucket {
             db: self.clone(),
             options: options.into(),
 >>>>>>> 5780428 (push public api skeleton)
