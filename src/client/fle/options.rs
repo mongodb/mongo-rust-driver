@@ -1,6 +1,4 @@
-use std::{
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 use bson::Array;
 use mongocrypt::ctx::KmsProvider;
@@ -8,7 +6,8 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{Error, Result}, client::options::TlsOptions,
+    client::options::TlsOptions,
+    error::{Error, Result},
 };
 
 /// Options related to automatic encryption.

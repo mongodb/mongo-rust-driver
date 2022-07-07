@@ -8,17 +8,20 @@ use std::{
 use derivative::Derivative;
 use mongocrypt::Crypt;
 
-use crate::{error::{Error, Result}, Client};
+use crate::{
+    error::{Error, Result},
+    Client,
+};
 
 use options::{
-        AutoEncryptionOpts,
-        EO_CRYPT_SHARED_LIB_PATH,
-        EO_CRYPT_SHARED_REQUIRED,
-        EO_MONGOCRYPTD_BYPASS_SPAWN,
-        EO_MONGOCRYPTD_SPAWN_ARGS,
-        EO_MONGOCRYPTD_SPAWN_PATH,
-        EO_MONGOCRYPTD_URI,
-    };
+    AutoEncryptionOpts,
+    EO_CRYPT_SHARED_LIB_PATH,
+    EO_CRYPT_SHARED_REQUIRED,
+    EO_MONGOCRYPTD_BYPASS_SPAWN,
+    EO_MONGOCRYPTD_SPAWN_ARGS,
+    EO_MONGOCRYPTD_SPAWN_PATH,
+    EO_MONGOCRYPTD_URI,
+};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
