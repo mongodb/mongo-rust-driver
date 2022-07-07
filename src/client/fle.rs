@@ -1,3 +1,5 @@
+pub mod options;
+
 use std::{
     path::Path,
     process::{Command, Stdio},
@@ -6,11 +8,18 @@ use std::{
 use derivative::Derivative;
 use mongocrypt::Crypt;
 
-use crate::error::{Error, Result};
+use crate::{error::{Error, Result}, Client};
 
-use super::{options::{AutoEncryptionOpts, EO_CRYPT_SHARED_LIB_PATH, EO_CRYPT_SHARED_REQUIRED, EO_MONGOCRYPTD_BYPASS_SPAWN, EO_MONGOCRYPTD_SPAWN_PATH, EO_MONGOCRYPTD_URI, EO_MONGOCRYPTD_SPAWN_ARGS}, Client};
+use options::{
+        AutoEncryptionOpts,
+        EO_CRYPT_SHARED_LIB_PATH,
+        EO_CRYPT_SHARED_REQUIRED,
+        EO_MONGOCRYPTD_BYPASS_SPAWN,
+        EO_MONGOCRYPTD_SPAWN_ARGS,
+        EO_MONGOCRYPTD_SPAWN_PATH,
+        EO_MONGOCRYPTD_URI,
+    };
 
-#[cfg(feature = "fle")]
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(super) struct ClientState {
@@ -21,7 +30,6 @@ pub(super) struct ClientState {
     aux_clients: AuxClients,
 }
 
-#[cfg(feature = "fle")]
 #[derive(Debug)]
 struct AuxClients {
     #[allow(dead_code)]
@@ -32,7 +40,6 @@ struct AuxClients {
     internal_client: Option<Client>,
 }
 
-#[cfg(feature = "fle")]
 impl ClientState {
     pub(super) async fn new(client: &Client, opts: &AutoEncryptionOpts) -> Result<Option<Self>> {
         let crypt = Self::make_crypt(opts)?;
@@ -83,9 +90,7 @@ impl ClientState {
             }
         };
         let mut args: Vec<&str> = vec![];
-        let has_idle = if let Some(spawn_args) =
-            opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)?
-        {
+        let has_idle = if let Some(spawn_args) = opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)? {
             let mut has_idle = false;
             for arg in spawn_args {
                 let str_arg = arg.as_str().ok_or_else(|| {

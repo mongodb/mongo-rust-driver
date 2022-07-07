@@ -6,7 +6,7 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -104,7 +104,7 @@ struct ClientInner {
     options: ClientOptions,
     session_pool: ServerSessionPool,
     #[cfg(feature = "fle")]
-    fle: Mutex<Option<fle::ClientState>>,
+    fle: std::sync::Mutex<Option<fle::ClientState>>,
 }
 
 impl Client {
@@ -127,15 +127,19 @@ impl Client {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             #[cfg(feature = "fle")]
-            fle: Mutex::new(None),
+            fle: Default::default(),
             options,
         });
         Ok(Self { inner })
     }
 
-    /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption enabled.
+    /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption
+    /// enabled.
     #[cfg(feature = "fle")]
-    pub async fn with_fle_options(options: ClientOptions, auto_enc: options::AutoEncryptionOpts) -> Result<Self> {
+    pub async fn with_fle_options(
+        options: ClientOptions,
+        auto_enc: options::AutoEncryptionOpts,
+    ) -> Result<Self> {
         let client = Self::with_options(options)?;
         *client.inner.fle.lock().unwrap() = fle::ClientState::new(&client, &auto_enc).await?;
         Ok(client)

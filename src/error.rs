@@ -492,6 +492,7 @@ pub enum ErrorKind {
     MissingResumeToken,
 
     /// An error occurred during encryption or decryption.
+    #[cfg(feature = "fle")]
     #[error("An error occurred during client-side encryption: {0}")]
     Crypt(mongocrypt::error::Error),
 }
