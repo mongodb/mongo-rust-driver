@@ -62,7 +62,7 @@ zstd-compression = ["zstd"]
 zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
 
-# Enable support for field-level encryption.
+# DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of FLE support in the Rust driver.
 fle = ["mongocrypt", "which"]
 
 [dependencies]
