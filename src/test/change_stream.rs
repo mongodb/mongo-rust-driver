@@ -455,7 +455,7 @@ async fn batch_mid_resume_token() -> Result<()> {
         None => return Ok(()),
     };
 
-    // This loop gets the stream to a point where it has been iterated up to but nt including
+    // This loop gets the stream to a point where it has been iterated up to but not including
     // the last event in its batch.
     let mut event_id = None;
     loop {
