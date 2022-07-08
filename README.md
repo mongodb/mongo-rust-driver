@@ -19,7 +19,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
         - [Inserting documents into a collection](#inserting-documents-into-a-collection)
         - [Finding documents in a collection](#finding-documents-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
-- [Web Frameworks](#web-frameworks)
+- [Web Framework Examples](#web-framework-examples)
 - [Platforms](#platforms)
 - [Note on connecting to Atlas deployments](#note-on-connecting-to-atlas-deployments)
 - [Windows DNS note](#windows-dns-note)
