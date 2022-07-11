@@ -333,13 +333,21 @@ functions:
           git clone https://github.com/mongodb-labs/drivers-evergreen-tools.git $DRIVERS_TOOLS
           echo "{ \"releases\": { \"default\": \"$MONGODB_BINARIES\" }}" > $MONGO_ORCHESTRATION_HOME/orchestration.config
 
-  "install dependencies":
+  "install rust":
     command: shell.exec
     params:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh
+        .evergreen/install-dependencies.sh rust
+  
+  "install junit dependencies":
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/install-dependencies.sh junit-dependencies
 
   "bootstrap mongo-orchestration":
     - command: shell.exec
@@ -557,6 +565,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
+          .evergreen/install-dependencies.sh rustfmt
           .evergreen/check-rustfmt.sh
 
   "check clippy":
@@ -587,6 +596,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
+          .evergreen/install-dependencies.sh mdbook
           manual/test.sh
 
   "upload-mo-artifacts":
@@ -700,7 +710,7 @@ pre:
   - func: "fix absolute paths"
   - func: "init test-results"
   - func: "make files executable"
-  - func: "install dependencies"
+  - func: "install rust"
 
 post:
   - func: "stop load balancer"
@@ -713,6 +723,7 @@ tasks:
   - name: "test-3.6-standalone"
     tags: ["3.6", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "3.6"
@@ -722,6 +733,7 @@ tasks:
   - name: "test-3.6-replica_set"
     tags: ["3.6", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "3.6"
@@ -731,6 +743,7 @@ tasks:
   - name: "test-3.6-sharded_cluster"
     tags: ["3.6", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "3.6"
@@ -740,6 +753,7 @@ tasks:
   - name: "test-4.0-standalone"
     tags: ["4.0", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.0"
@@ -749,6 +763,7 @@ tasks:
   - name: "test-4.0-replica_set"
     tags: ["4.0", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.0"
@@ -758,6 +773,7 @@ tasks:
   - name: "test-4.0-sharded_cluster"
     tags: ["4.0", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.0"
@@ -767,6 +783,7 @@ tasks:
   - name: "test-4.2-standalone"
     tags: ["4.2", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.2"
@@ -776,6 +793,7 @@ tasks:
   - name: "test-4.2-replica_set"
     tags: ["4.2", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.2"
@@ -785,6 +803,7 @@ tasks:
   - name: "test-4.2-sharded_cluster"
     tags: ["4.2", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.2"
@@ -794,6 +813,7 @@ tasks:
   - name: "test-4.4-standalone"
     tags: ["4.4", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.4"
@@ -803,6 +823,7 @@ tasks:
   - name: "test-4.4-replica_set"
     tags: ["4.4", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.4"
@@ -812,6 +833,7 @@ tasks:
   - name: "test-4.4-sharded_cluster"
     tags: ["4.4", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.4"
@@ -839,6 +861,7 @@ tasks:
   - name: "test-5.0-standalone"
     tags: ["5.0", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "5.0"
@@ -848,6 +871,7 @@ tasks:
   - name: "test-5.0-replica_set"
     tags: ["5.0", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "5.0"
@@ -857,6 +881,7 @@ tasks:
   - name: "test-5.0-sharded_cluster"
     tags: ["5.0", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "5.0"
@@ -866,6 +891,7 @@ tasks:
   - name: "test-5.0-load_balancer"
     tags: ["5.0", "load_balancer"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "5.0"
@@ -895,6 +921,7 @@ tasks:
   - name: "test-6.0-standalone"
     tags: ["6.0", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "6.0"
@@ -904,6 +931,7 @@ tasks:
   - name: "test-6.0-replica_set"
     tags: ["6.0", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "6.0"
@@ -913,6 +941,7 @@ tasks:
   - name: "test-6.0-sharded_cluster"
     tags: ["6.0", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "6.0"
@@ -922,6 +951,7 @@ tasks:
   - name: "test-6.0-load_balancer"
     tags: ["6.0", "load_balancer"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "6.0"
@@ -951,6 +981,7 @@ tasks:
   - name: "test-rapid-standalone"
     tags: ["rapid", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "rapid"
@@ -960,6 +991,7 @@ tasks:
   - name: "test-rapid-replica_set"
     tags: ["rapid", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "rapid"
@@ -969,6 +1001,7 @@ tasks:
   - name: "test-rapid-sharded_cluster"
     tags: ["rapid", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "rapid"
@@ -978,6 +1011,7 @@ tasks:
   - name: "test-rapid-load_balancer"
     tags: ["rapid", "load_balancer"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "rapid"
@@ -1007,6 +1041,7 @@ tasks:
   - name: "test-latest-standalone"
     tags: ["latest", "standalone"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "latest"
@@ -1016,6 +1051,7 @@ tasks:
   - name: "test-latest-replica_set"
     tags: ["latest", "replica_set"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "latest"
@@ -1025,6 +1061,7 @@ tasks:
   - name: "test-latest-sharded_cluster"
     tags: ["latest", "sharded_cluster"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "latest"
@@ -1034,6 +1071,7 @@ tasks:
   - name: "test-latest-load_balancer"
     tags: ["latest", "load_balancer"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "latest"
@@ -1068,6 +1106,7 @@ tasks:
   - name: "test-serverless"
     tags: ["serverless"]
     commands:
+      - func: "install junit dependencies"
       - func: "run serverless tests"
 
   - name: "test-atlas-connectivity"
@@ -1077,6 +1116,7 @@ tasks:
 
   - name: "test-x509-auth"
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "4.4"
@@ -1612,7 +1652,7 @@ task_groups:
       - func: "fix absolute paths"
       - func: "init test-results"
       - func: "make files executable"
-      - func: "install dependencies"
+      - func: "install rust"
       - command: shell.exec
         params:
           shell: "bash"

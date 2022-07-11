@@ -37,7 +37,7 @@ functions:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh
+        .evergreen/install-dependencies.sh rust
 
   "publish release":
     - command: shell.exec
