@@ -25,6 +25,7 @@ for arg; do
         echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >> ${CARGO_HOME}/env
         echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ${CARGO_HOME}/env
 
+        ./.evergreen/configure-rust.sh
         rustup toolchain install nightly -c rustfmt
     elif [ $arg == "mdbook" ]; then
         source ${CARGO_HOME}/env
