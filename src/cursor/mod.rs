@@ -1,12 +1,17 @@
 mod common;
 pub(crate) mod session;
 
+#[cfg(test)]
+use std::collections::VecDeque;
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
 
 use bson::RawDocument;
+
+#[cfg(test)]
+use bson::RawDocumentBuf;
 use futures_core::{future::BoxFuture, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
@@ -268,6 +273,11 @@ impl<T> Cursor<T> {
             "cursor already has a kill_watcher"
         );
         self.kill_watcher = Some(tx);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
+        self.wrapped_cursor.as_ref().unwrap().current_batch()
     }
 }
 

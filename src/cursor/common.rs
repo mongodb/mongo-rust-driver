@@ -87,6 +87,11 @@ where
         self.state().buffer.current()
     }
 
+    #[cfg(test)]
+    pub(super) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
+        self.state().buffer.as_ref()
+    }
+
     fn state_mut(&mut self) -> &mut CursorState {
         self.state.as_mut().unwrap()
     }
@@ -529,5 +534,11 @@ impl CursorBuffer {
 
     pub(crate) fn current(&self) -> Option<&RawDocument> {
         self.docs.front().map(|d| d.as_ref())
+    }
+}
+
+impl AsRef<VecDeque<RawDocumentBuf>> for CursorBuffer {
+    fn as_ref(&self) -> &VecDeque<RawDocumentBuf> {
+        &self.docs
     }
 }
