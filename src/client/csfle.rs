@@ -65,12 +65,12 @@ impl ClientState {
             builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
         }
         let crypt = builder.build()?;
-        if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true) {
-            if crypt.shared_lib_version().is_none() {
-                return Err(crate::error::Error::invalid_argument(
-                    "cryptSharedRequired is set but crypt_shared is not available",
-                ));
-            }
+        if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)
+            && crypt.shared_lib_version().is_none()
+        {
+            return Err(crate::error::Error::invalid_argument(
+                "cryptSharedRequired is set but crypt_shared is not available",
+            ));
         }
         Ok(crypt)
     }
@@ -115,10 +115,9 @@ impl ClientState {
             .stderr(Stdio::null())
             .spawn()?;
 
-        let uri = match opts.extra_option(&EO_MONGOCRYPTD_URI)? {
-            Some(s) => s,
-            None => "mongodb://localhost:27020",
-        };
+        let uri = opts
+            .extra_option(&EO_MONGOCRYPTD_URI)?
+            .unwrap_or("mongodb://localhost:27020");
         Ok(Some(Client::with_uri_str(uri).await?))
     }
 

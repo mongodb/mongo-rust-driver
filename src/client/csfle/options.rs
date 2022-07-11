@@ -15,12 +15,16 @@ use crate::{
 /// Automatic encryption is an enterprise only feature that only applies to operations on a
 /// collection. Automatic encryption is not supported for operations on a database or view, and
 /// operations that are not bypassed will result in error (see [libmongocrypt: Auto Encryption
-/// Allow-List](https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list)). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
+/// Allow-List](
+/// https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list
+/// )). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
 /// AutoEncryptionOpts.
 #[derive(Debug, Default, TypedBuilder, Clone)]
 #[non_exhaustive]
+#[builder(field_defaults(setter(into)))]
 pub struct AutoEncryptionOpts {
     /// Used for data key queries.  Will default to an internal client if not set.
+    #[builder(default)]
     pub key_vault_client: Option<crate::Client>,
     /// A collection that contains all data keys used for encryption and decryption (aka the key
     /// vault collection).
@@ -36,21 +40,27 @@ pub struct AutoEncryptionOpts {
     /// Schemas supplied in the `schema_map` only apply to configuring automatic encryption for
     /// client side encryption. Other validation rules in the JSON schema will not be enforced by
     /// the driver and will result in an error.
+    #[builder(default)]
     pub schema_map: Option<HashMap<String, Document>>,
     /// Disable automatic encryption and do not spawn mongocryptd.  Defaults to false.
+    #[builder(default)]
     pub bypass_auto_encryption: Option<bool>,
     /// Options related to mongocryptd.
+    #[builder(default)]
     pub extra_options: Option<Document>,
     /// Configure TLS for connections to KMS providers.
+    #[builder(default)]
     pub tls_options: Option<KmsProvidersTlsOptions>,
     /// Maps namespace to encrypted fields.
     ///
     /// Supplying an `encrypted_fields_map` provides more security than relying on an
     /// encryptedFields obtained from the server. It protects against a malicious server
     /// advertising a false encryptedFields.
+    #[builder(default)]
     pub encrypted_fields_map: Option<HashMap<String, Document>>,
-    /// Disable serverside processing of encrypte indexed fields, allowing use of explicit
+    /// Disable serverside processing of encrypted indexed fields, allowing use of explicit
     /// encryption with queryable encryption.
+    #[builder(default)]
     pub bypass_query_analysis: Option<bool>,
 }
 
@@ -60,7 +70,7 @@ pub type KmsProviders = HashMap<KmsProvider, Document>;
 pub type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
 
 impl AutoEncryptionOpts {
-    pub(crate) fn extra_option<'a, Opt: ExtraOption<'a, Bson>>(
+    pub(crate) fn extra_option<'a, Opt: ExtraOption<'a>>(
         &'a self,
         opt: &Opt,
     ) -> Result<Option<Opt::Output>> {
@@ -78,17 +88,15 @@ impl AutoEncryptionOpts {
     }
 }
 
-// `Input` will always be `Bson`; it's present as a parameter to bring the lifetime into scope so
-// that `Output` can be bound by it. GATs would make this unnecessary.
-pub(crate) trait ExtraOption<'a, Input> {
+pub(crate) trait ExtraOption<'a> {
     type Output;
     fn key(&self) -> &'static str;
-    fn as_type(input: &'a Input) -> Option<Self::Output>;
+    fn as_type(input: &'a Bson) -> Option<Self::Output>;
 }
 
 pub(crate) struct ExtraOptionStr(&'static str);
 
-impl<'a> ExtraOption<'a, Bson> for ExtraOptionStr {
+impl<'a> ExtraOption<'a> for ExtraOptionStr {
     type Output = &'a str;
     fn key(&self) -> &'static str {
         self.0
@@ -100,7 +108,7 @@ impl<'a> ExtraOption<'a, Bson> for ExtraOptionStr {
 
 pub(crate) struct ExtraOptionBool(&'static str);
 
-impl<'a> ExtraOption<'a, Bson> for ExtraOptionBool {
+impl<'a> ExtraOption<'a> for ExtraOptionBool {
     type Output = bool;
     fn key(&self) -> &'static str {
         self.0
@@ -112,7 +120,7 @@ impl<'a> ExtraOption<'a, Bson> for ExtraOptionBool {
 
 pub(crate) struct ExtraOptionArray(&'static str);
 
-impl<'a> ExtraOption<'a, Bson> for ExtraOptionArray {
+impl<'a> ExtraOption<'a> for ExtraOptionArray {
     type Output = &'a Array;
     fn key(&self) -> &'static str {
         self.0

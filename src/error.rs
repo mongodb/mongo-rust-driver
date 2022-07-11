@@ -397,10 +397,10 @@ impl From<std::io::ErrorKind> for ErrorKind {
     }
 }
 
-#[cfg(feature = "fle")]
+#[cfg(feature = "csfle")]
 impl From<mongocrypt::error::Error> for ErrorKind {
     fn from(err: mongocrypt::error::Error) -> Self {
-        Self::Crypt(err)
+        Self::Csfle(err)
     }
 }
 
@@ -492,9 +492,9 @@ pub enum ErrorKind {
     MissingResumeToken,
 
     /// An error occurred during encryption or decryption.
-    #[cfg(feature = "fle")]
+    #[cfg(feature = "csfle")]
     #[error("An error occurred during client-side encryption: {0}")]
-    Crypt(mongocrypt::error::Error),
+    Csfle(mongocrypt::error::Error),
 }
 
 impl ErrorKind {

@@ -62,8 +62,8 @@ zstd-compression = ["zstd"]
 zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
 
-# DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of FLE support in the Rust driver.
-fle = ["mongocrypt", "which"]
+# DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of CSFLE support in the Rust driver.
+csfle = ["mongocrypt", "which"]
 
 [dependencies]
 async-trait = "0.1.42"

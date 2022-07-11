@@ -1,7 +1,7 @@
 pub mod auth;
+#[cfg(feature = "csfle")]
+mod csfle;
 mod executor;
-#[cfg(feature = "fle")]
-mod fle;
 pub mod options;
 pub mod session;
 
@@ -103,8 +103,8 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    #[cfg(feature = "fle")]
-    fle: std::sync::Mutex<Option<fle::ClientState>>,
+    #[cfg(feature = "csfle")]
+    csfle: tokio::sync::Mutex<Option<csfle::ClientState>>,
 }
 
 impl Client {
@@ -126,8 +126,8 @@ impl Client {
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
-            #[cfg(feature = "fle")]
-            fle: Default::default(),
+            #[cfg(feature = "csfle")]
+            csfle: Default::default(),
             options,
         });
         Ok(Self { inner })
@@ -135,13 +135,13 @@ impl Client {
 
     /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption
     /// enabled.
-    #[cfg(feature = "fle")]
-    pub async fn with_fle_options(
+    #[cfg(feature = "csfle")]
+    pub async fn with_encryption_opts(
         options: ClientOptions,
         auto_enc: options::AutoEncryptionOpts,
     ) -> Result<Self> {
         let client = Self::with_options(options)?;
-        *client.inner.fle.lock().unwrap() = fle::ClientState::new(&client, &auto_enc).await?;
+        *client.inner.csfle.lock().await = csfle::ClientState::new(&client, &auto_enc).await?;
         Ok(client)
     }
 
