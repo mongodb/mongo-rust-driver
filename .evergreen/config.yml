@@ -565,7 +565,6 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          .evergreen/install-dependencies.sh rustfmt
           .evergreen/check-rustfmt.sh
 
   "check clippy":

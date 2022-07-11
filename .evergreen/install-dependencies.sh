@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# this script accepts one or more of the following arguments: `rust`, `rustfmt`, `mdbook`, `junit-dependencies`.
+# this script accepts one or more of the following arguments: `rust`, `mdbook`, `junit-dependencies`.
 # the corresponding dependencies will be installed in the order they are specified.
 
 set -o xtrace
@@ -24,9 +24,7 @@ for arg; do
         # This file is not created by default on Windows
         echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >> ${CARGO_HOME}/env
         echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ${CARGO_HOME}/env
-    elif [ $arg == "rustfmt" ]; then
-        source ${CARGO_HOME}/env
-        # Install nightly rustfmt
+
         rustup toolchain install nightly -c rustfmt
     elif [ $arg == "mdbook" ]; then
         source ${CARGO_HOME}/env
