@@ -38,6 +38,7 @@ use crate::{
     coll::options::Hint,
     collation::Collation,
     error::{ErrorKind, Result},
+    gridfs::GridFsDownloadByNameOptions,
     options::{
         AggregateOptions,
         CountOptions,
@@ -327,6 +328,7 @@ impl<'de> Deserialize<'de> for Operation {
             "createChangeStream" => deserialize_op::<CreateChangeStream>(definition.arguments),
             "rename" => deserialize_op::<RenameCollection>(definition.arguments),
             "loop" => deserialize_op::<Loop>(definition.arguments),
+<<<<<<< HEAD
             "waitForEvent" => deserialize_op::<WaitForEvent>(definition.arguments),
             "assertEventCount" => deserialize_op::<AssertEventCount>(definition.arguments),
             "runOnThread" => deserialize_op::<RunOnThread>(definition.arguments),
@@ -338,6 +340,10 @@ impl<'de> Deserialize<'de> for Operation {
             "waitForPrimaryChange" => deserialize_op::<WaitForPrimaryChange>(definition.arguments),
             "wait" => deserialize_op::<Wait>(definition.arguments),
             "createEntities" => deserialize_op::<CreateEntities>(definition.arguments),
+=======
+            "download" => deserialize_op::<Download>(definition.arguments),
+            "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
+>>>>>>> 2ab95e9 (Added test support for gridfs)
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -2399,6 +2405,7 @@ impl Loop {
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+<<<<<<< HEAD
 pub(super) struct RunOnThread {
     thread: String,
     operation: Arc<Operation>,
@@ -2534,6 +2541,24 @@ impl TestOperation for AssertTopologyType {
                 .get_topology_description(&self.topology_description)
                 .await;
             assert_eq!(td.topology_type, self.topology_type);
+=======
+pub(super) struct Download {
+    id: Document,
+}
+
+impl TestOperation for Download {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id);
+            let mut stream = bucket.open_download_stream(self.id.get_object_id("$oid").unwrap());
+            let mut buf = String::new();
+            stream.read_to_string(&mut buf).await?;
+            Ok(Some(Bson::String(buf).into()))
+>>>>>>> 2ab95e9 (Added test support for gridfs)
         }
         .boxed()
     }
@@ -2541,6 +2566,7 @@ impl TestOperation for AssertTopologyType {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+<<<<<<< HEAD
 pub(super) struct WaitForPrimaryChange {
     client: String,
     prior_topology_description: String,
@@ -2576,12 +2602,34 @@ impl TestOperation for WaitForPrimaryChange {
             })
             .await
             .unwrap();
+=======
+pub(super) struct DownloadByName {
+    filename: String,
+    #[serde(flatten)]
+    options: GridFsDownloadByNameOptions,
+}
+
+impl TestOperation for DownloadByName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id);
+            let mut stream =
+                bucket.open_download_stream_by_name(self.filename.clone(), self.options.clone());
+            let mut buf = String::new();
+            stream.read_to_string(&mut buf).await?;
+            Ok(Some(Bson::String(buf).into()))
+>>>>>>> 2ab95e9 (Added test support for gridfs)
         }
         .boxed()
     }
 }
 
 #[derive(Debug, Deserialize)]
+<<<<<<< HEAD
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Wait {
     ms: u64,
@@ -2614,6 +2662,8 @@ impl TestOperation for CreateEntities {
 }
 
 #[derive(Debug, Deserialize)]
+=======
+>>>>>>> 2ab95e9 (Added test support for gridfs)
 pub(super) struct UnimplementedOperation;
 
 impl TestOperation for UnimplementedOperation {}

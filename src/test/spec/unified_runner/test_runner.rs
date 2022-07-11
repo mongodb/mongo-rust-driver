@@ -17,7 +17,11 @@ use crate::{
         SelectionCriteria,
     },
     runtime,
+<<<<<<< HEAD
     sdam::TopologyDescription,
+=======
+    gridfs::GridFsBucket,
+>>>>>>> 2ab95e9 (Added test support for gridfs)
     test::{
         log_uncaptured,
         spec::unified_runner::{
@@ -426,8 +430,13 @@ impl TestRunner {
                         .unwrap();
                     (id, Entity::Session(SessionEntity::new(client_session)))
                 }
-                TestFileEntity::Bucket(_) => {
-                    panic!("GridFS not implemented");
+                TestFileEntity::Bucket(bucket) => {
+                    let id = bucket.id.clone();
+                    let database = self.entities.get(&bucket.database).unwrap().as_database();
+                    (
+                        id,
+                        Entity::Bucket(database.new_gridfs_bucket(bucket.bucket_options.clone())),
+                    )
                 }
                 TestFileEntity::Thread(thread) => {
                     let (sender, mut receiver) = mpsc::unbounded_channel::<ThreadMessage>();
@@ -501,6 +510,7 @@ impl TestRunner {
             .clone()
     }
 
+<<<<<<< HEAD
     pub(crate) async fn get_collection(&self, id: &str) -> Collection<Document> {
         self.entities
             .read()
@@ -509,6 +519,14 @@ impl TestRunner {
             .unwrap()
             .as_collection()
             .clone()
+=======
+    pub fn get_bucket(&self, id: &str) -> &GridFsBucket {
+        self.entities.get(id).unwrap().as_bucket_entity()
+    }
+
+    pub fn get_mut_session(&mut self, id: &str) -> &mut SessionEntity {
+        self.entities.get_mut(id).unwrap().as_mut_session_entity()
+>>>>>>> 2ab95e9 (Added test support for gridfs)
     }
 
     pub(crate) async fn get_thread(&self, id: &str) -> ThreadEntity {
