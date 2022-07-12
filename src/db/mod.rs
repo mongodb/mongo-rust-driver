@@ -19,24 +19,12 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     gridfs::{
         options::GridFsBucketOptions,
         GridFsBucket,
         DEFAULT_BUCKET_NAME,
         DEFAULT_CHUNK_SIZE_BYTES,
     },
-=======
-    gridfs::{GridFSBucket, GridFSBucketOptions},
->>>>>>> 5780428 (push public api skeleton)
-=======
-    gridfs::{GridFsBucket, GridFsBucketOptions},
->>>>>>> d77c8b0 (add public api documentation)
-=======
-    gridfs::{GridFsBucket, options::GridFsBucketOptions},
->>>>>>> e88913b (convert generic tfileid to bson)
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -583,8 +571,6 @@ impl Database {
             .await
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
     /// Creates a new GridFsBucket in the database with the given options.
     pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
         let mut options = options.into().unwrap_or_default();
@@ -604,18 +590,6 @@ impl Database {
         GridFsBucket {
             db: self.clone(),
             options,
-=======
-=======
-    /// Creates a new [`GridFsBucket`] in the database with the given options.
->>>>>>> d77c8b0 (add public api documentation)
-    pub fn new_gridfs_bucket(
-        &self,
-        options: impl Into<Option<GridFsBucketOptions>>,
-    ) -> GridFsBucket {
-        GridFsBucket {
-            db: self.clone(),
-            options: options.into(),
->>>>>>> 5780428 (push public api skeleton)
         }
     }
 }
