@@ -21,6 +21,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     gridfs::{
         options::GridFsBucketOptions,
         GridFsBucket,
@@ -33,6 +34,9 @@ use crate::{
 =======
     gridfs::{GridFsBucket, GridFsBucketOptions},
 >>>>>>> d77c8b0 (add public api documentation)
+=======
+    gridfs::{GridFsBucket, options::GridFsBucketOptions},
+>>>>>>> e88913b (convert generic tfileid to bson)
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
