@@ -16,6 +16,10 @@ use typed_builder::TypedBuilder;
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+pub trait GridFsError {
+
+}
+
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -42,6 +46,7 @@ pub struct GridFsBucketOptions {
 /// Contains the options for creating a [`GridFsStream`] to upload a file to a
 /// [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct GridFsUploadOptions {
@@ -111,11 +116,19 @@ struct Chunk<T: Eq + Copy> {
     data: Vec<u8>,
 }
 
+<<<<<<< HEAD
 /// A collection in which information about stored files is stored. There will be one files
 /// collection document per stored file.
 #[derive(Serialize, Deserialize)]
 pub struct FilesCollectionDocument {
     id: Bson,
+=======
+// A collection in which information about stored files is stored. There will be one files
+// collection document per stored file.
+#[derive(Clone, Debug, Deserialize)]
+struct FilesCollectionDocument<T: Eq + Copy> {
+    id: T,
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
     length: i64,
     chunk_size: u32,
     upload_date: DateTime,
@@ -130,9 +143,14 @@ pub struct GridFsBucket {
     pub(crate) options: GridFsBucketOptions,
 }
 
+<<<<<<< HEAD
 // TODO: RUST-1399 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
     files_id: Bson,
+=======
+#[derive(Debug)]
+pub struct GridFsStream {
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
 }
 
 impl GridFsUploadStream {
@@ -390,7 +408,11 @@ impl GridFsBucket {
 
     /// Given an `id`, deletes the stored file's files collection document and
     /// associated chunks from a [`GridFsBucket`].
+<<<<<<< HEAD
     pub async fn delete(&self, id: Bson) {
+=======
+    pub fn delete<T>(&self, id: T) -> Result<()> {
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
         todo!()
     }
 
@@ -404,7 +426,11 @@ impl GridFsBucket {
     }
 
     /// Renames the stored file with the specified `id`.
+<<<<<<< HEAD
     pub async fn rename(&self, id: Bson, new_filename: String) {
+=======
+    pub fn rename<T>(&self, id: T, new_filename: String) -> Result<()> {
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
         todo!()
     }
 

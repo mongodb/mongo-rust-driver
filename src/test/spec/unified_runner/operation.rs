@@ -38,7 +38,7 @@ use crate::{
     coll::options::Hint,
     collation::Collation,
     error::{ErrorKind, Result},
-    gridfs::GridFsDownloadByNameOptions,
+    gridfs::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{
         AggregateOptions,
         CountOptions,
@@ -343,7 +343,12 @@ impl<'de> Deserialize<'de> for Operation {
 =======
             "download" => deserialize_op::<Download>(definition.arguments),
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
+<<<<<<< HEAD
 >>>>>>> 2ab95e9 (Added test support for gridfs)
+=======
+            "delete" => deserialize_op::<Delete>(definition.arguments),
+            "upload" => deserialize_op::<Upload>(definition.arguments),
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -2543,7 +2548,7 @@ impl TestOperation for AssertTopologyType {
             assert_eq!(td.topology_type, self.topology_type);
 =======
 pub(super) struct Download {
-    id: Document,
+    id: ObjectId,
 }
 
 impl TestOperation for Download {
@@ -2554,7 +2559,7 @@ impl TestOperation for Download {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let bucket = test_runner.get_bucket(id);
-            let mut stream = bucket.open_download_stream(self.id.get_object_id("$oid").unwrap());
+            let mut stream = bucket.open_download_stream(self.id.clone());
             let mut buf = String::new();
             stream.read_to_string(&mut buf).await?;
             Ok(Some(Bson::String(buf).into()))
@@ -2630,6 +2635,7 @@ impl TestOperation for DownloadByName {
 
 #[derive(Debug, Deserialize)]
 <<<<<<< HEAD
+<<<<<<< HEAD
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Wait {
     ms: u64,
@@ -2641,11 +2647,31 @@ impl TestOperation for Wait {
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
         runtime::delay_for(Duration::from_millis(self.ms)).boxed()
+=======
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Delete {
+    id: ObjectId,
+}
+
+impl TestOperation for Delete {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id);
+            let mut result = bucket.delete(self.id.clone());
+            Ok(None)
+        }
+        .boxed()
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
     }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+<<<<<<< HEAD
 pub(super) struct CreateEntities {
     entities: Vec<TestFileEntity>,
 }
@@ -2658,12 +2684,46 @@ impl TestOperation for CreateEntities {
         test_runner
             .populate_entity_map(&self.entities[..], "createEntities operation")
             .boxed()
+=======
+pub(super) struct Upload {
+    source: Document,
+    filename: String,
+    // content_type is deprecated and no longer supported.
+    // Option included for deserialization.
+    #[serde(rename = "contentType")]
+    _content_type: Option<String>,
+    #[serde(rename = "disableMD5")]
+    _disable_md5: Option<bool>,
+    #[serde(flatten)]
+    options: GridFsUploadOptions,
+    
+}
+
+impl TestOperation for Upload {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id);
+            let hex_bytes = self.source.get("hexBytes").unwrap();
+            let hex_string = hex_bytes.as_str().unwrap().as_bytes().chunks(2).map(std::str::from_utf8).collect::<std::result::Result<Vec<&str>, _>>().unwrap();
+            dbg!(&hex_bytes);
+            let mut result = bucket.upload_from_stream_with_id(ObjectId::new(), self.filename.clone(), GridFsStream {}, self.options.clone());
+            Ok(None)
+        }
+        .boxed()
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
     }
 }
 
 #[derive(Debug, Deserialize)]
+<<<<<<< HEAD
 =======
 >>>>>>> 2ab95e9 (Added test support for gridfs)
+=======
+>>>>>>> 23f5ef4 (add deserialization support for upload and delete)
 pub(super) struct UnimplementedOperation;
 
 impl TestOperation for UnimplementedOperation {}

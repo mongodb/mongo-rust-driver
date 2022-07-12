@@ -19,16 +19,12 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-<<<<<<< HEAD
     gridfs::{
         options::GridFsBucketOptions,
         GridFsBucket,
         DEFAULT_BUCKET_NAME,
         DEFAULT_CHUNK_SIZE_BYTES,
     },
-=======
-    gridfs::{GridFsBucket, GridFsBucketOptions},
->>>>>>> 2ab95e9 (Added test support for gridfs)
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
