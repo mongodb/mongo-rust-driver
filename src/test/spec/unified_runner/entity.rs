@@ -14,12 +14,9 @@ use crate::{
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::Error,
     event::command::CommandStartedEvent,
-<<<<<<< HEAD
     runtime,
     sdam::TopologyDescription,
-=======
     gridfs::GridFsBucket,
->>>>>>> 2ab95e9 (Added test support for gridfs)
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
         CommandEvent,
@@ -255,15 +252,15 @@ impl From<Bson> for Entity {
     }
 }
 
-<<<<<<< HEAD
 impl From<TopologyDescription> for Entity {
     fn from(td: TopologyDescription) -> Self {
         Self::TopologyDescription(td)
-=======
+    }
+}
+
 impl From<GridFsBucket> for Entity {
     fn from(bucket: GridFsBucket) -> Self {
         Self::Bucket(bucket)
->>>>>>> 2ab95e9 (Added test support for gridfs)
     }
 }
 
@@ -331,9 +328,6 @@ impl Entity {
         }
     }
 
-<<<<<<< HEAD
-    pub(crate) fn as_mut_session_entity(&mut self) -> &mut SessionEntity {
-=======
     pub fn as_bucket_entity(&self) -> &GridFsBucket {
         match self {
             Self::Bucket(gridfs_bucket) => gridfs_bucket,
@@ -342,7 +336,6 @@ impl Entity {
     }
 
     pub fn as_mut_session_entity(&mut self) -> &mut SessionEntity {
->>>>>>> 2ab95e9 (Added test support for gridfs)
         match self {
             Self::Session(client_session) => client_session,
             _ => panic!("Expected mutable client session entity, got {:?}", &self),

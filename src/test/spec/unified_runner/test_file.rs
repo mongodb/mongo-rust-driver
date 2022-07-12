@@ -248,21 +248,12 @@ pub(crate) struct Session {
     pub(crate) session_options: Option<SessionOptions>,
 }
 
-// TODO: RUST-527 remove the unused annotation
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-<<<<<<< HEAD
-#[allow(unused)]
 pub(crate) struct Bucket {
     pub(crate) id: String,
     pub(crate) database: String,
     pub(crate) bucket_options: Option<Document>,
-=======
-pub struct Bucket {
-    pub id: String,
-    pub database: String,
-    pub bucket_options: Option<GridFsBucketOptions>,
->>>>>>> 2ab95e9 (Added test support for gridfs)
 }
 
 #[derive(Debug, Deserialize)]
