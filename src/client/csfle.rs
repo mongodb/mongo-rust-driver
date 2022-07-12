@@ -23,6 +23,8 @@ use options::{
     EO_MONGOCRYPTD_URI,
 };
 
+use super::WeakClient;
+
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(super) struct ClientState {
@@ -36,9 +38,9 @@ pub(super) struct ClientState {
 #[derive(Debug)]
 struct AuxClients {
     #[allow(dead_code)]
-    key_vault_client: Client,
+    key_vault_client: WeakClient,
     #[allow(dead_code)]
-    metadata_client: Option<Client>,
+    metadata_client: Option<WeakClient>,
     #[allow(dead_code)]
     internal_client: Option<Client>,
 }
@@ -123,28 +125,28 @@ impl ClientState {
 
     fn make_aux_clients(client: &Client, auto_enc_opts: &AutoEncryptionOpts) -> Result<AuxClients> {
         let mut internal_client: Option<Client> = None;
-        let mut get_internal_client = || -> Result<Client> {
+        let mut get_internal_client = || -> Result<WeakClient> {
             if let Some(c) = &internal_client {
-                return Ok(c.clone());
+                return Ok(c.weak());
             }
             let mut internal_opts = client.inner.options.clone();
             internal_opts.min_pool_size = Some(0);
             let c = Client::with_options(internal_opts)?;
             internal_client = Some(c.clone());
-            Ok(c)
+            Ok(c.weak())
         };
 
         let key_vault_client = if let Some(c) = &auto_enc_opts.key_vault_client {
-            c.clone()
+            c.weak()
         } else if Some(0) == client.inner.options.max_pool_size {
-            client.clone()
+            client.weak()
         } else {
             get_internal_client()?
         };
         let metadata_client = if Some(true) == auto_enc_opts.bypass_auto_encryption {
             None
         } else if Some(0) == client.inner.options.max_pool_size {
-            Some(client.clone())
+            Some(client.weak())
         } else {
             Some(get_internal_client()?)
         };

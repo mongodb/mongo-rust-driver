@@ -457,4 +457,26 @@ impl Client {
             .description
             .clone()
     }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) fn weak(&self) -> WeakClient {
+        WeakClient {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Clone, Debug)]
+pub(crate) struct WeakClient {
+    #[allow(dead_code)]
+    inner: std::sync::Weak<ClientInner>,
+}
+
+#[cfg(feature = "csfle")]
+impl WeakClient {
+    #[allow(dead_code)]
+    pub(crate) fn upgrade(&self) -> Option<Client> {
+        self.inner.upgrade().map(|inner| Client { inner })
+    }
 }
