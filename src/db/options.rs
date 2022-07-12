@@ -110,6 +110,10 @@ pub struct CreateCollectionOptions {
 
     /// Options for clustered collections.
     pub clustered_index: Option<ClusteredIndex>,
+
+    /// Map of encrypted fields for the created collection.
+    #[cfg(feature = "csfle")]
+    pub encrypted_fields: Option<Document>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
