@@ -16,9 +16,7 @@ use typed_builder::TypedBuilder;
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-pub trait GridFsError {
-
-}
+pub trait GridFsError {}
 
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
@@ -149,9 +147,13 @@ pub struct GridFsUploadStream {
     files_id: Bson,
 =======
 #[derive(Debug)]
+<<<<<<< HEAD
 pub struct GridFsStream {
 >>>>>>> 23f5ef4 (add deserialization support for upload and delete)
 }
+=======
+pub struct GridFsStream {}
+>>>>>>> a72d9b5 (make clippy fix)
 
 impl GridFsUploadStream {
     /// Gets the file `id` for the stream.

@@ -8,6 +8,7 @@ use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
     concern::{Acknowledgment, WriteConcern},
+    gridfs::GridFsBucket,
     options::{
         CollectionOptions,
         CreateCollectionOptions,
@@ -17,8 +18,11 @@ use crate::{
         SelectionCriteria,
     },
     runtime,
+<<<<<<< HEAD
     sdam::TopologyDescription,
     gridfs::GridFsBucket,
+=======
+>>>>>>> a72d9b5 (make clippy fix)
     test::{
         log_uncaptured,
         spec::unified_runner::{

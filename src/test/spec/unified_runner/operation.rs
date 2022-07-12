@@ -17,7 +17,7 @@ use futures::{
 };
 use serde::{de::Deserializer, Deserialize};
 use time::OffsetDateTime;
-use tokio::sync::Mutex;
+use tokio::{io::AsyncReadExt, sync::Mutex};
 
 use super::{
     results_match,
@@ -31,18 +31,14 @@ use super::{
 };
 
 use crate::{
-    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document, oid::ObjectId},
+    bson::{doc, oid::ObjectId, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     bson_util,
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
     error::{ErrorKind, Result},
-<<<<<<< HEAD
-    gridfs::{GridFsDownloadByNameOptions, GridFsUploadOptions},
-=======
-    gridfs::{GridFsDownloadByNameOptions, GridFsUploadOptions, GridFsStream},
->>>>>>> d13a371 (fix test_runner imports)
+    gridfs::{GridFsDownloadByNameOptions, GridFsStream, GridFsUploadOptions},
     options::{
         AggregateOptions,
         CountOptions,
@@ -2700,7 +2696,6 @@ pub(super) struct Upload {
     _disable_md5: Option<bool>,
     #[serde(flatten)]
     options: GridFsUploadOptions,
-    
 }
 
 impl TestOperation for Upload {
@@ -2712,9 +2707,21 @@ impl TestOperation for Upload {
         async move {
             let bucket = test_runner.get_bucket(id);
             let hex_bytes = self.source.get("hexBytes").unwrap();
-            let hex_string = hex_bytes.as_str().unwrap().as_bytes().chunks(2).map(std::str::from_utf8).collect::<std::result::Result<Vec<&str>, _>>().unwrap();
+            let hex_string = hex_bytes
+                .as_str()
+                .unwrap()
+                .as_bytes()
+                .chunks(2)
+                .map(std::str::from_utf8)
+                .collect::<std::result::Result<Vec<&str>, _>>()
+                .unwrap();
             dbg!(&hex_bytes);
-            let mut result = bucket.upload_from_stream_with_id(ObjectId::new(), self.filename.clone(), GridFsStream {}, self.options.clone());
+            let mut result = bucket.upload_from_stream_with_id(
+                ObjectId::new(),
+                self.filename.clone(),
+                GridFsStream {},
+                self.options.clone(),
+            );
             Ok(None)
         }
         .boxed()
