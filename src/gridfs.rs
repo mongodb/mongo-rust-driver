@@ -16,7 +16,7 @@ use crate::{
 
 use options::*;
 
-use bson::{oid::ObjectId, DateTime, Document, Bson};
+use bson::{oid::ObjectId, Bson, DateTime, Document};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 // Contained in a "chunks" collection for each user file
@@ -143,7 +143,8 @@ impl GridFsBucket {
         todo!()
     }
 
-    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for the file id.
+    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
+    /// the file id.
     pub fn upload_from_stream(
         &self,
         filename: String,
@@ -195,7 +196,11 @@ impl GridFsBucket {
     }
 
     /// Finds and returns the files collection documents that match the filter.
-    pub fn find(&self, filter: Document, options: impl Into<GridFsBucketOptions>) -> Result<Cursor<FilesCollectionDocument>> {
+    pub fn find(
+        &self,
+        filter: Document,
+        options: impl Into<GridFsBucketOptions>,
+    ) -> Result<Cursor<FilesCollectionDocument>> {
         todo!()
     }
 

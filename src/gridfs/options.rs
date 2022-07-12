@@ -1,12 +1,11 @@
-use serde::Deserialize;
-use typed_builder::TypedBuilder;
 use crate::{
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
+use serde::Deserialize;
+use typed_builder::TypedBuilder;
 
 use bson::Document;
-
 
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]

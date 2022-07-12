@@ -17,7 +17,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-    gridfs::{GridFsBucket, options::GridFsBucketOptions},
+    gridfs::{options::GridFsBucketOptions, GridFsBucket},
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
