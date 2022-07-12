@@ -104,7 +104,7 @@ struct ClientInner {
     options: ClientOptions,
     session_pool: ServerSessionPool,
     #[cfg(feature = "csfle")]
-    csfle: tokio::sync::Mutex<Option<csfle::ClientState>>,
+    csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
 }
 
 impl Client {
@@ -141,7 +141,7 @@ impl Client {
         auto_enc: options::AutoEncryptionOpts,
     ) -> Result<Self> {
         let client = Self::with_options(options)?;
-        *client.inner.csfle.lock().await = csfle::ClientState::new(&client, &auto_enc).await?;
+        *client.inner.csfle.write().await = csfle::ClientState::new(&client, auto_enc).await?;
         Ok(client)
     }
 
@@ -464,12 +464,22 @@ impl Client {
             inner: Arc::downgrade(&self.inner),
         }
     }
+
+    #[cfg(feature = "csfle")]
+    #[allow(dead_code)]
+    pub(crate) async fn auto_encryption_opts(
+        &self,
+    ) -> Option<tokio::sync::RwLockReadGuard<'_, options::AutoEncryptionOpts>> {
+        tokio::sync::RwLockReadGuard::try_map(self.inner.csfle.read().await, |csfle| {
+            csfle.as_ref().map(|cs| cs.opts())
+        })
+        .ok()
+    }
 }
 
 #[cfg(feature = "csfle")]
 #[derive(Clone, Debug)]
 pub(crate) struct WeakClient {
-    #[allow(dead_code)]
     inner: std::sync::Weak<ClientInner>,
 }
 

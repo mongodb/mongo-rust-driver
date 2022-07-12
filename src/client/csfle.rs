@@ -33,6 +33,7 @@ pub(super) struct ClientState {
     crypt: Crypt,
     mongocryptd_client: Option<Client>,
     aux_clients: AuxClients,
+    opts: AutoEncryptionOpts,
 }
 
 #[derive(Debug)]
@@ -46,16 +47,21 @@ struct AuxClients {
 }
 
 impl ClientState {
-    pub(super) async fn new(client: &Client, opts: &AutoEncryptionOpts) -> Result<Option<Self>> {
-        let crypt = Self::make_crypt(opts)?;
-        let mongocryptd_client = Self::spawn_mongocryptd(opts, &crypt).await?;
-        let aux_clients = Self::make_aux_clients(client, opts)?;
+    pub(super) async fn new(client: &Client, opts: AutoEncryptionOpts) -> Result<Option<Self>> {
+        let crypt = Self::make_crypt(&opts)?;
+        let mongocryptd_client = Self::spawn_mongocryptd(&opts, &crypt).await?;
+        let aux_clients = Self::make_aux_clients(client, &opts)?;
 
         Ok(Some(Self {
             crypt,
             mongocryptd_client,
             aux_clients,
+            opts,
         }))
+    }
+
+    pub(super) fn opts(&self) -> &AutoEncryptionOpts {
+        &self.opts
     }
 
     fn make_crypt(opts: &AutoEncryptionOpts) -> Result<Crypt> {
