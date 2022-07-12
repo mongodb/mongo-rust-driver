@@ -325,10 +325,6 @@ mod db;
 pub mod error;
 pub mod event;
 mod gridfs;
-<<<<<<< HEAD
-=======
-mod index;
->>>>>>> 2ab95e9 (Added test support for gridfs)
 mod hello;
 mod index;
 mod operation;

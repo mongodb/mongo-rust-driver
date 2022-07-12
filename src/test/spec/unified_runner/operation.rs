@@ -31,14 +31,18 @@ use super::{
 };
 
 use crate::{
-    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
+    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document, oid::ObjectId},
     bson_util,
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
     error::{ErrorKind, Result},
+<<<<<<< HEAD
     gridfs::{GridFsDownloadByNameOptions, GridFsUploadOptions},
+=======
+    gridfs::{GridFsDownloadByNameOptions, GridFsUploadOptions, GridFsStream},
+>>>>>>> d13a371 (fix test_runner imports)
     options::{
         AggregateOptions,
         CountOptions,
