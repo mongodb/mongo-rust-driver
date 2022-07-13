@@ -293,13 +293,13 @@ impl Database {
     ) -> Result<()> {
         let mut options: Option<CreateCollectionOptions> = options.into();
         resolve_options!(self, options, [write_concern]);
-        let session = session.into();
+        let mut session = session.into();
 
         let db = self.name().to_string();
         let coll = name.as_ref().to_string();
 
         #[cfg(feature = "csfle")]
-        let session = {
+        {
             let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
             let use_enc_fields_map = options.as_ref().and_then(|o| o.use_encrypted_fields_map).unwrap_or(true);
             if !has_encrypted_fields && use_enc_fields_map {
@@ -315,21 +315,8 @@ impl Database {
 
             if let Some(opts) = options.as_ref() {
                 if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                    match session {
-                        Some(s) => {
-                            self.create_aux_collection(&coll, opts, Some(s), enc_fields, "esc").await?;
-                            Some(s)
-                        }
-                        None => {
-                            self.create_aux_collection(&coll, opts, None, enc_fields, "esc").await?;
-                            None
-                        }
-                    }
-                } else {
-                    session
+                    self.create_aux_collections(&coll, opts, &mut session, enc_fields).await?;
                 }
-            } else {
-                session
             }
         };
 
@@ -351,7 +338,8 @@ impl Database {
     }
 
     #[cfg(feature = "csfle")]
-    async fn create_aux_collection(&self,
+    async fn create_aux_collection(
+        &self,
         base_name: &str,
         base_opts: &CreateCollectionOptions,
         session: Option<&mut ClientSession>,
@@ -376,6 +364,29 @@ impl Database {
         });
 
         self.execute_create_collection(name, Some(opts), session).await
+    }
+
+    #[cfg(feature = "csfle")]
+    async fn create_aux_collections(
+        &self,
+        base_name: &str,
+        base_opts: &CreateCollectionOptions,
+        session: &mut Option<&mut ClientSession>,
+        enc_fields: &Document,
+    ) -> Result<()> {
+        for &key in &["esc", "ecc", "ecoc"] {
+            *session = match session.take() {
+                Some(s) => {
+                    self.create_aux_collection(base_name, base_opts, Some(s), enc_fields, key).await?;
+                    Some(s)
+                },
+                None => {
+                    self.create_aux_collection(base_name, base_opts, None, enc_fields, key).await?;
+                    None
+                },
+            };
+        }
+        Ok(())
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.
