@@ -299,7 +299,7 @@ impl Database {
         let coll = name.as_ref().to_string();
 
         #[cfg(feature = "csfle")]
-        {
+        let session = {
             let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
             let use_enc_fields_map = options.as_ref().and_then(|o| o.use_encrypted_fields_map).unwrap_or(true);
             if !has_encrypted_fields && use_enc_fields_map {
@@ -315,11 +315,34 @@ impl Database {
 
             if let Some(opts) = options.as_ref() {
                 if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                    self.create_aux_collection(&coll, opts, &mut session, enc_fields, "esc").await?;
+                    match session {
+                        Some(s) => {
+                            self.create_aux_collection(&coll, opts, Some(s), enc_fields, "esc").await?;
+                            Some(s)
+                        }
+                        None => {
+                            self.create_aux_collection(&coll, opts, None, enc_fields, "esc").await?;
+                            None
+                        }
+                    }
+                } else {
+                    session
                 }
+            } else {
+                session
             }
-        }
+        };
 
+        self.execute_create_collection(coll, options, session).await
+    }
+
+    async fn execute_create_collection(
+        &self,
+        coll: String,
+        options: Option<CreateCollectionOptions>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<()> {
+        let db = self.name().to_string();
         let create = Create::new(
             Namespace { db, coll, },
             options,
@@ -331,20 +354,16 @@ impl Database {
     async fn create_aux_collection(&self,
         base_name: &str,
         base_opts: &CreateCollectionOptions,
-        session: &mut Option<&mut ClientSession>,
+        session: Option<&mut ClientSession>,
         enc_fields: &Document,
         key: &str,
     ) -> Result<()> {
         use bson::doc;
         use self::options::ClusteredIndex;
 
-        let default_name;
         let name = match enc_fields.get_str(format!("{}Collection", key)) {
-            Ok(s) => s,
-            Err(_) => {
-                default_name = format!("enxcol_.{}.{}", base_name, key);
-                &default_name
-            }
+            Ok(s) => s.to_string(),
+            Err(_) => format!("enxcol_.{}.{}", base_name, key),
         };
 
         let mut opts = base_opts.clone();
@@ -356,9 +375,7 @@ impl Database {
             v: None,
         });
 
-        let session = session.map(|s| *s);
-
-        self.create_collection_common(name, opts, *session).await
+        self.execute_create_collection(name, Some(opts), session).await
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.
