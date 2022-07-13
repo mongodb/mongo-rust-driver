@@ -114,6 +114,11 @@ pub struct CreateCollectionOptions {
     /// Map of encrypted fields for the created collection.
     #[cfg(feature = "csfle")]
     pub encrypted_fields: Option<Document>,
+
+    /// Allow lookup of the collection in `AutoEncryptionOpts.encrypted_fields_map`.
+    #[cfg(feature = "csfle")]
+    #[serde(skip)]
+    pub(crate) use_encrypted_fields_map: Option<bool>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during

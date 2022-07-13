@@ -291,17 +291,74 @@ impl Database {
         options: impl Into<Option<CreateCollectionOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
-        let mut options = options.into();
+        let mut options: Option<CreateCollectionOptions> = options.into();
         resolve_options!(self, options, [write_concern]);
+        let session = session.into();
+
+        let db = self.name().to_string();
+        let coll = name.as_ref().to_string();
+
+        #[cfg(feature = "csfle")]
+        {
+            let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
+            let use_enc_fields_map = options.as_ref().and_then(|o| o.use_encrypted_fields_map).unwrap_or(true);
+            if !has_encrypted_fields && use_enc_fields_map {
+                let enc_opts = self.client().auto_encryption_opts().await;
+                if let Some(enc_opts_fields) = enc_opts
+                    .as_ref()
+                    .and_then(|eo| eo.encrypted_fields_map.as_ref())
+                    .and_then(|efm| efm.get(&format!("{}.{}", db, coll)))
+                {
+                    options.get_or_insert_with(Default::default).encrypted_fields = Some(enc_opts_fields.clone());
+                }
+            }
+
+            if let Some(opts) = options.as_ref() {
+                if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
+                    self.create_aux_collection(&coll, opts, &mut session, enc_fields, "esc").await?;
+                }
+            }
+        }
 
         let create = Create::new(
-            Namespace {
-                db: self.name().to_string(),
-                coll: name.as_ref().to_string(),
-            },
+            Namespace { db, coll, },
             options,
         );
         self.client().execute_operation(create, session).await
+    }
+
+    #[cfg(feature = "csfle")]
+    async fn create_aux_collection(&self,
+        base_name: &str,
+        base_opts: &CreateCollectionOptions,
+        session: &mut Option<&mut ClientSession>,
+        enc_fields: &Document,
+        key: &str,
+    ) -> Result<()> {
+        use bson::doc;
+        use self::options::ClusteredIndex;
+
+        let default_name;
+        let name = match enc_fields.get_str(format!("{}Collection", key)) {
+            Ok(s) => s,
+            Err(_) => {
+                default_name = format!("enxcol_.{}.{}", base_name, key);
+                &default_name
+            }
+        };
+
+        let mut opts = base_opts.clone();
+        opts.use_encrypted_fields_map = Some(false);
+        opts.clustered_index = Some(ClusteredIndex {
+            key: doc! { "_id": 1 },
+            unique: true,
+            name: None,
+            v: None,
+        });
+
+        let session = session.map(|s| *s);
+
+        self.create_collection_common(name, opts, *session).await
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.
