@@ -387,7 +387,7 @@ impl<T> Collection<T> {
             .await
     }
 
-    async fn create_index_common(
+    pub(crate) async fn create_index_common(
         &self,
         index: IndexModel,
         options: impl Into<Option<CreateIndexOptions>>,

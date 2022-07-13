@@ -2,6 +2,7 @@ pub mod options;
 
 use std::{fmt::Debug, sync::Arc};
 
+use bson::doc;
 use futures_util::stream::TryStreamExt;
 
 use crate::{
@@ -315,12 +316,22 @@ impl Database {
 
             if let Some(opts) = options.as_ref() {
                 if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                    self.create_aux_collections(&coll, opts, &mut session, enc_fields).await?;
+                    for &key in &["esc", "ecc", "ecoc"] {
+                        self.create_aux_collection(&coll, opts, session.as_deref_mut(), enc_fields, key).await?;
+                    }
                 }
             }
         };
 
-        self.execute_create_collection(coll, options, session).await
+        self.execute_create_collection(coll.clone(), options, session.as_deref_mut()).await?;
+
+        #[cfg(feature = "csfle")]
+        {
+            let coll = self.collection::<Document>(&coll);
+            coll.create_index_common(crate::IndexModel { keys: doc! {"__safeContent__": 1}, options: None }, None, session.as_deref_mut()).await?;
+        }
+
+        Ok(())
     }
 
     async fn execute_create_collection(
@@ -346,9 +357,6 @@ impl Database {
         enc_fields: &Document,
         key: &str,
     ) -> Result<()> {
-        use bson::doc;
-        use self::options::ClusteredIndex;
-
         let name = match enc_fields.get_str(format!("{}Collection", key)) {
             Ok(s) => s.to_string(),
             Err(_) => format!("enxcol_.{}.{}", base_name, key),
@@ -356,7 +364,7 @@ impl Database {
 
         let mut opts = base_opts.clone();
         opts.use_encrypted_fields_map = Some(false);
-        opts.clustered_index = Some(ClusteredIndex {
+        opts.clustered_index = Some(self::options::ClusteredIndex {
             key: doc! { "_id": 1 },
             unique: true,
             name: None,
@@ -364,29 +372,6 @@ impl Database {
         });
 
         self.execute_create_collection(name, Some(opts), session).await
-    }
-
-    #[cfg(feature = "csfle")]
-    async fn create_aux_collections(
-        &self,
-        base_name: &str,
-        base_opts: &CreateCollectionOptions,
-        session: &mut Option<&mut ClientSession>,
-        enc_fields: &Document,
-    ) -> Result<()> {
-        for &key in &["esc", "ecc", "ecoc"] {
-            *session = match session.take() {
-                Some(s) => {
-                    self.create_aux_collection(base_name, base_opts, Some(s), enc_fields, key).await?;
-                    Some(s)
-                },
-                None => {
-                    self.create_aux_collection(base_name, base_opts, None, enc_fields, key).await?;
-                    None
-                },
-            };
-        }
-        Ok(())
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.
