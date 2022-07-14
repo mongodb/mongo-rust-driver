@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::TryStreamExt;
 
@@ -43,6 +43,7 @@ use crate::{
 
 use super::{
     entity::ThreadEntity,
+    file_level_log,
     merge_uri_options,
     test_file::ThreadMessage,
     ClientEntity,
@@ -93,8 +94,18 @@ impl TestRunner {
         }
     }
 
-    pub(crate) async fn run_test(&self, test_file: TestFile, pred: impl Fn(&TestCase) -> bool) {
+    pub(crate) async fn run_test(
+        &self,
+        path: impl Into<Option<PathBuf>>,
+        test_file: TestFile,
+        pred: impl Fn(&TestCase) -> bool,
+    ) {
         let test_runner = TestRunner::new().await;
+        let path = path.into();
+        let file_title = path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| test_file.description.clone());
 
         if let Some(requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
@@ -104,20 +115,23 @@ impl TestRunner {
                 }
             }
             if !can_run_on {
-                log_uncaptured(format!(
-                    "Skipping file {}; client topology not compatible with test",
-                    test_file.description
+                file_level_log(format!(
+                    "Skipping file {}: client topology not compatible with test",
+                    file_title
                 ));
                 return;
             }
         }
 
-        log_uncaptured(format!("Running file {}", test_file.description));
+        log_uncaptured(format!(
+            "\n------------\nRunning tests from {}\n",
+            file_title
+        ));
 
         for test_case in test_file.tests {
             if let Some(skip_reason) = test_case.skip_reason {
                 log_uncaptured(format!(
-                    "Skipping test case {}: {}",
+                    "Skipping test case \"{}\": {}",
                     &test_case.description, skip_reason
                 ));
                 continue;
@@ -130,7 +144,7 @@ impl TestRunner {
                 .map(|op| op.name.as_str())
             {
                 log_uncaptured(format!(
-                    "Skipping test case {}: unsupported operation {}",
+                    "Skipping test case \"{}\": unsupported operation {}",
                     &test_case.description, op
                 ));
                 continue;
@@ -138,7 +152,7 @@ impl TestRunner {
 
             if !pred(&test_case) {
                 log_uncaptured(format!(
-                    "Skipping test case {}: predicate failed",
+                    "Skipping test case \"{}\": predicate failed",
                     test_case.description
                 ));
                 continue;
@@ -153,14 +167,14 @@ impl TestRunner {
                 }
                 if !can_run_on {
                     log_uncaptured(format!(
-                        "Skipping test case {}: client topology not compatible with test",
+                        "Skipping test case \"{}\": client topology not compatible with test",
                         &test_case.description
                     ));
                     continue;
                 }
             }
 
-            log_uncaptured(format!("Running {}", &test_case.description));
+            log_uncaptured(format!("Executing \"{}\"", &test_case.description));
 
             if let Some(ref initial_data) = test_file.initial_data {
                 for data in initial_data {
@@ -263,8 +277,6 @@ impl TestRunner {
                     assert_eq!(expected_data.documents, actual_data);
                 }
             }
-
-            println!("{} succeeded", &test_case.description);
         }
     }
 

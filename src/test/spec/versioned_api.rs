@@ -48,7 +48,7 @@ async fn run_non_transaction_handling_test(path: PathBuf, file: TestFile) {
         log_uncaptured("skipping run_non_transaction_handling_test");
         return;
     }
-    run_unified_format_test(file).await
+    run_unified_format_test(path, file).await
 }
 
 // TODO RUST-817 Remove this test in favor of transaction-handling.json versioned API spec test when

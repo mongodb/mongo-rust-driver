@@ -32,14 +32,21 @@ pub(crate) use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
+use super::run_spec_test_with_path;
+
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
 static MAX_SPEC_VERSION: Version = Version::new(1, 10, 0);
 
-pub(crate) async fn run_unified_format_test(test_file: TestFile) {
-    run_unified_format_test_filtered(test_file, |_| true).await
+fn file_level_log(message: impl AsRef<str>) {
+    log_uncaptured(format!("\n------------\n{}\n", message.as_ref()));
+}
+
+pub(crate) async fn run_unified_format_test(path: PathBuf, test_file: TestFile) {
+    run_unified_format_test_filtered(path, test_file, |_| true).await
 }
 
 pub(crate) async fn run_unified_format_test_filtered(
+    path: PathBuf,
     test_file: TestFile,
     pred: impl Fn(&TestCase) -> bool,
 ) {
@@ -51,14 +58,14 @@ pub(crate) async fn run_unified_format_test_filtered(
     );
 
     let test_runner = TestRunner::new().await;
-    test_runner.run_test(test_file, pred).await;
+    test_runner.run_test(path, test_file, pred).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_examples() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_spec_test(
+    run_spec_test_with_path(
         &["unified-test-format", "examples"],
         run_unified_format_test,
     )
@@ -98,7 +105,7 @@ async fn valid_fail() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_spec_test(
+    run_spec_test_with_path(
         &["unified-test-format", "valid-pass"],
         run_unified_format_test,
     )
@@ -143,7 +150,7 @@ async fn invalid() {
             .iter()
             .any(|skip| *skip == test_file_str)
         {
-            log_uncaptured(format!("Skipping {}", test_file_str));
+            file_level_log(format!("Skipping {}", test_file_str));
             continue;
         }
         let path = path.join(&test_file_path);
