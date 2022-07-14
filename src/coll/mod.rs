@@ -217,6 +217,7 @@ impl<T> Collection<T> {
         self.inner.write_concern.as_ref()
     }
 
+    #[allow(clippy::needless_option_as_deref)]
     async fn drop_common(
         &self,
         options: impl Into<Option<DropCollectionOptions>>,
@@ -228,10 +229,13 @@ impl<T> Collection<T> {
         resolve_options!(self, options, [write_concern]);
 
         #[cfg(feature = "csfle")]
-        self.drop_aux_collections(options.as_ref(), session.as_deref_mut()).await?;
+        self.drop_aux_collections(options.as_ref(), session.as_deref_mut())
+            .await?;
 
         let drop = DropCollection::new(self.namespace(), options);
-        self.client().execute_operation(drop, session).await
+        self.client()
+            .execute_operation(drop, session.as_deref_mut())
+            .await
     }
 
     /// Drops the collection, deleting all data and indexes stored in it.
@@ -250,6 +254,7 @@ impl<T> Collection<T> {
     }
 
     #[cfg(feature = "csfle")]
+    #[allow(clippy::needless_option_as_deref)]
     async fn drop_aux_collections(
         &self,
         options: Option<&DropCollectionOptions>,
@@ -257,19 +262,15 @@ impl<T> Collection<T> {
     ) -> Result<()> {
         // Find associated `encrypted_fields`:
         // * from options to this call
-        let mut enc_fields = options
-            .and_then(|o| o.encrypted_fields.as_ref());
-        let enc_opts = self
-            .client()
-            .auto_encryption_opts()
-            .await;
+        let mut enc_fields = options.and_then(|o| o.encrypted_fields.as_ref());
+        let enc_opts = self.client().auto_encryption_opts().await;
         // * from client-wide `encrypted_fields_map`:
         let client_enc_fields = enc_opts
             .as_ref()
             .and_then(|eo| eo.encrypted_fields_map.as_ref());
         if enc_fields.is_none() {
-            enc_fields = client_enc_fields
-                .and_then(|efm| efm.get(&format!("{}", self.namespace())));
+            enc_fields =
+                client_enc_fields.and_then(|efm| efm.get(&format!("{}", self.namespace())));
         }
         // * from a `list_collections` call:
         let found;
@@ -277,10 +278,21 @@ impl<T> Collection<T> {
             let filter = doc! { "name": self.name() };
             let specs: Vec<_> = match session.as_deref_mut() {
                 Some(s) => {
-                    let mut cursor = self.inner.db.list_collections_with_session(filter, None, s).await?;
+                    let mut cursor = self
+                        .inner
+                        .db
+                        .list_collections_with_session(filter, None, s)
+                        .await?;
                     cursor.stream(s).try_collect().await?
-                },
-                None => self.inner.db.list_collections(filter, None).await?.try_collect().await?,
+                }
+                None => {
+                    self.inner
+                        .db
+                        .list_collections(filter, None)
+                        .await?
+                        .try_collect()
+                        .await?
+                }
             };
             for spec in specs {
                 if let Some(enc) = spec.options.encrypted_fields {
@@ -295,7 +307,9 @@ impl<T> Collection<T> {
         if let Some(enc_fields) = enc_fields {
             for ns in crate::client::csfle::aux_collections(self.name(), enc_fields)? {
                 let drop = DropCollection::new(ns, options.cloned());
-                self.client().execute_operation(drop, session.as_deref_mut()).await?;
+                self.client()
+                    .execute_operation(drop, session.as_deref_mut())
+                    .await?;
             }
         }
         Ok(())
@@ -1463,7 +1477,8 @@ impl<'de> Deserialize<'de> for Namespace {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s).ok_or_else(|| D::Error::custom("Missing one or more fields in namespace"))
+        Self::from_str(&s)
+            .ok_or_else(|| D::Error::custom("Missing one or more fields in namespace"))
     }
 }
 

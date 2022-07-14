@@ -2,6 +2,7 @@ pub mod options;
 
 use std::{fmt::Debug, sync::Arc};
 
+#[cfg(feature = "csfle")]
 use bson::doc;
 use futures_util::stream::TryStreamExt;
 
@@ -286,6 +287,7 @@ impl Database {
             .await
     }
 
+    #[allow(clippy::needless_option_as_deref)]
     async fn create_collection_common(
         &self,
         name: impl AsRef<str>,
@@ -299,33 +301,52 @@ impl Database {
         let coll = name.as_ref().to_string();
 
         #[cfg(feature = "csfle")]
-        self.create_aux_collections(&coll, &mut options, session.as_deref_mut()).await?;
+        self.create_aux_collections(&coll, &mut options, session.as_deref_mut())
+            .await?;
 
         let db = self.name().to_string();
         let create = Create::new(
-            Namespace { db, coll: coll.clone(), },
+            Namespace {
+                db,
+                coll: coll.clone(),
+            },
             options,
         );
-        self.client().execute_operation(create, session.as_deref_mut()).await?;
+        self.client()
+            .execute_operation(create, session.as_deref_mut())
+            .await?;
 
         #[cfg(feature = "csfle")]
         {
             let coll = self.collection::<Document>(&coll);
-            coll.create_index_common(crate::IndexModel { keys: doc! {"__safeContent__": 1}, options: None }, None, session.as_deref_mut()).await?;
+            coll.create_index_common(
+                crate::IndexModel {
+                    keys: doc! {"__safeContent__": 1},
+                    options: None,
+                },
+                None,
+                session.as_deref_mut(),
+            )
+            .await?;
         }
 
         Ok(())
     }
 
     #[cfg(feature = "csfle")]
+    #[allow(clippy::needless_option_as_deref)]
     async fn create_aux_collections(
         &self,
         base_name: &str,
         options: &mut Option<CreateCollectionOptions>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<()> {
-        let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
-        // If options does not have `associated_fields`, populate it from client-wide `encrypted_fields_map`:
+        let has_encrypted_fields = options
+            .as_ref()
+            .and_then(|o| o.encrypted_fields.as_ref())
+            .is_some();
+        // If options does not have `associated_fields`, populate it from client-wide
+        // `encrypted_fields_map`:
         if !has_encrypted_fields {
             let enc_opts = self.client().auto_encryption_opts().await;
             if let Some(enc_opts_fields) = enc_opts
@@ -333,7 +354,9 @@ impl Database {
                 .and_then(|eo| eo.encrypted_fields_map.as_ref())
                 .and_then(|efm| efm.get(&format!("{}.{}", self.name(), base_name)))
             {
-                options.get_or_insert_with(Default::default).encrypted_fields = Some(enc_opts_fields.clone());
+                options
+                    .get_or_insert_with(Default::default)
+                    .encrypted_fields = Some(enc_opts_fields.clone());
             }
         }
 
@@ -348,7 +371,9 @@ impl Database {
                         v: None,
                     });
                     let create = Create::new(ns, Some(sub_opts));
-                    self.client().execute_operation(create, session.as_deref_mut()).await?;
+                    self.client()
+                        .execute_operation(create, session.as_deref_mut())
+                        .await?;
                 }
             }
         }
