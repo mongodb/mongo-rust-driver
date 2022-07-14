@@ -111,7 +111,7 @@ functions:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh
+        .evergreen/install-dependencies.sh rust
 
   "download benchmark data":
     command: shell.exec
