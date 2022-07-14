@@ -29,7 +29,7 @@ use std::{
     path::PathBuf,
 };
 
-pub use self::{
+pub(crate) use self::{
     unified_runner::{
         merge_uri_options,
         run_unified_format_test,

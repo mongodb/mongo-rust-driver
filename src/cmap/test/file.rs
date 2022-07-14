@@ -21,7 +21,7 @@ pub struct TestFile {
     #[serde(default)]
     pub ignore: Vec<String>,
     pub fail_point: Option<Document>,
-    pub run_on: Option<Vec<RunOn>>,
+    pub(crate) run_on: Option<Vec<RunOn>>,
 }
 
 #[derive(Debug, Deserialize)]

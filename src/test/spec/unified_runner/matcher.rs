@@ -3,12 +3,18 @@ use bson::Document;
 use crate::{
     bson::{doc, spec::ElementType, Bson},
     bson_util::get_int,
-    test::{CmapEvent, CommandEvent, Event},
+    test::{CmapEvent, CommandEvent, Event, SdamEvent},
 };
 
-use super::{EntityMap, ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent};
+use super::{
+    test_event::ExpectedSdamEvent,
+    EntityMap,
+    ExpectedCmapEvent,
+    ExpectedCommandEvent,
+    ExpectedEvent,
+};
 
-pub fn results_match(
+pub(crate) fn results_match(
     actual: Option<&Bson>,
     expected: &Bson,
     returns_root_documents: bool,
@@ -17,7 +23,7 @@ pub fn results_match(
     results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
-pub fn events_match(
+pub(crate) fn events_match(
     actual: &Event,
     expected: &ExpectedEvent,
     entities: Option<&EntityMap>,
@@ -27,6 +33,7 @@ pub fn events_match(
             command_events_match(act, exp, entities)
         }
         (Event::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
+        (Event::Sdam(act), ExpectedEvent::Sdam(exp)) => sdam_events_match(act, exp),
         _ => expected_err(actual, expected),
     }
 }
@@ -150,6 +157,25 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> Result
         ) => match_opt(&actual.reason, expected_reason),
         (CmapEvent::ConnectionCheckedOut(_), ExpectedCmapEvent::ConnectionCheckedOut {}) => Ok(()),
         (CmapEvent::ConnectionCheckedIn(_), ExpectedCmapEvent::ConnectionCheckedIn {}) => Ok(()),
+        _ => expected_err(actual, expected),
+    }
+}
+
+fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result<(), String> {
+    match (actual, expected) {
+        (
+            SdamEvent::ServerDescriptionChanged(actual),
+            ExpectedSdamEvent::ServerDescriptionChanged {
+                previous_description: _,
+                new_description,
+            },
+        ) => {
+            // TODO: DRIVERS-2366 finish this
+            match_opt(
+                &actual.new_description.server_type(),
+                &new_description.as_ref().and_then(|s| s.server_type),
+            )
+        }
         _ => expected_err(actual, expected),
     }
 }

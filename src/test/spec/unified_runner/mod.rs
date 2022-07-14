@@ -1,9 +1,10 @@
-pub mod entity;
-pub mod matcher;
-mod operation;
-mod test_event;
-pub mod test_file;
-pub mod test_runner;
+pub(crate) mod entity;
+pub(crate) mod matcher;
+pub(crate) mod observer;
+pub(crate) mod operation;
+pub(crate) mod test_event;
+pub(crate) mod test_file;
+pub(crate) mod test_runner;
 
 use std::{convert::TryFrom, ffi::OsStr, fs::read_dir, path::PathBuf};
 
@@ -13,10 +14,10 @@ use tokio::sync::RwLockWriteGuard;
 
 use crate::test::{log_uncaptured, run_single_test, run_spec_test, LOCK};
 
-pub use self::{
+pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
     matcher::{events_match, results_match},
-    operation::{Operation, OperationObject},
+    operation::Operation,
     test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
     test_file::{
         merge_uri_options,
@@ -32,13 +33,13 @@ pub use self::{
 };
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 7, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 10, 0);
 
-pub async fn run_unified_format_test(test_file: TestFile) {
+pub(crate) async fn run_unified_format_test(test_file: TestFile) {
     run_unified_format_test_filtered(test_file, |_| true).await
 }
 
-pub async fn run_unified_format_test_filtered(
+pub(crate) async fn run_unified_format_test_filtered(
     test_file: TestFile,
     pred: impl Fn(&TestCase) -> bool,
 ) {
@@ -49,7 +50,7 @@ pub async fn run_unified_format_test_filtered(
         &test_file.schema_version
     );
 
-    let mut test_runner = TestRunner::new().await;
+    let test_runner = TestRunner::new().await;
     test_runner.run_test(test_file, pred).await;
 }
 

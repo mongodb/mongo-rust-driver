@@ -3,7 +3,7 @@ mod failpoint;
 mod lock;
 mod matchable;
 
-pub use self::{
+pub(crate) use self::{
     event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
@@ -38,12 +38,12 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct TestClient {
+pub(crate) struct TestClient {
     client: Client,
-    pub options: ClientOptions,
+    pub(crate) options: ClientOptions,
     pub(crate) server_info: HelloCommandResponse,
-    pub server_version: Version,
-    pub server_parameters: Document,
+    pub(crate) server_version: Version,
+    pub(crate) server_parameters: Document,
 }
 
 impl std::ops::Deref for TestClient {
@@ -55,15 +55,15 @@ impl std::ops::Deref for TestClient {
 }
 
 impl TestClient {
-    pub async fn new() -> Self {
+    pub(crate) async fn new() -> Self {
         Self::with_options(None).await
     }
 
-    pub async fn with_options(options: Option<ClientOptions>) -> Self {
+    pub(crate) async fn with_options(options: Option<ClientOptions>) -> Self {
         Self::with_handler(None, options).await
     }
 
-    pub async fn with_handler(
+    pub(crate) async fn with_handler(
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
     ) -> Self {
@@ -123,12 +123,12 @@ impl TestClient {
         }
     }
 
-    pub async fn with_additional_options(options: Option<ClientOptions>) -> Self {
+    pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
         let options = Self::options_for_multiple_mongoses(options, false).await;
         Self::with_options(Some(options)).await
     }
 
-    pub async fn create_user(
+    pub(crate) async fn create_user(
         &self,
         user: &str,
         pwd: impl Into<Option<&str>>,
@@ -152,7 +152,7 @@ impl TestClient {
         Ok(())
     }
 
-    pub async fn drop_and_create_user(
+    pub(crate) async fn drop_and_create_user(
         &self,
         user: &str,
         pwd: impl Into<Option<&str>>,
@@ -175,17 +175,25 @@ impl TestClient {
         self.create_user(user, pwd, roles, mechanisms, db).await
     }
 
-    pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection<Document> {
+    pub(crate) fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection<Document> {
         self.database(db_name).collection(coll_name)
     }
 
-    pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection<Document> {
+    pub(crate) async fn init_db_and_coll(
+        &self,
+        db_name: &str,
+        coll_name: &str,
+    ) -> Collection<Document> {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
         coll
     }
 
-    pub async fn init_db_and_typed_coll<T>(&self, db_name: &str, coll_name: &str) -> Collection<T>
+    pub(crate) async fn init_db_and_typed_coll<T>(
+        &self,
+        db_name: &str,
+        coll_name: &str,
+    ) -> Collection<T>
     where
         T: Serialize + DeserializeOwned + Unpin + Debug,
     {
@@ -194,7 +202,7 @@ impl TestClient {
         coll
     }
 
-    pub fn get_coll_with_options(
+    pub(crate) fn get_coll_with_options(
         &self,
         db_name: &str,
         coll_name: &str,
@@ -204,7 +212,7 @@ impl TestClient {
             .collection_with_options(coll_name, options)
     }
 
-    pub async fn init_db_and_coll_with_options(
+    pub(crate) async fn init_db_and_coll_with_options(
         &self,
         db_name: &str,
         coll_name: &str,
@@ -215,7 +223,7 @@ impl TestClient {
         coll
     }
 
-    pub async fn create_fresh_collection(
+    pub(crate) async fn create_fresh_collection(
         &self,
         db_name: &str,
         coll_name: &str,
@@ -230,7 +238,7 @@ impl TestClient {
         self.get_coll(db_name, coll_name)
     }
 
-    pub fn supports_fail_command(&self) -> bool {
+    pub(crate) fn supports_fail_command(&self) -> bool {
         let version = if self.is_sharded() {
             VersionReq::parse(">= 4.1.5").unwrap()
         } else {
@@ -239,7 +247,7 @@ impl TestClient {
         version.matches(&self.server_version)
     }
 
-    pub fn supports_block_connection(&self) -> bool {
+    pub(crate) fn supports_block_connection(&self) -> bool {
         let version = VersionReq::parse(">= 4.2.9").unwrap();
         version.matches(&self.server_version)
     }
@@ -248,7 +256,7 @@ impl TestClient {
     /// only when it uses a specified appName.
     ///
     /// See SERVER-49336 for more info.
-    pub fn supports_fail_command_appname_initial_handshake(&self) -> bool {
+    pub(crate) fn supports_fail_command_appname_initial_handshake(&self) -> bool {
         let requirements = [
             VersionReq::parse(">= 4.2.15, < 4.3.0").unwrap(),
             VersionReq::parse(">= 4.4.7, < 4.5.0").unwrap(),
@@ -259,12 +267,12 @@ impl TestClient {
             .any(|req| req.matches(&self.server_version))
     }
 
-    pub fn supports_transactions(&self) -> bool {
+    pub(crate) fn supports_transactions(&self) -> bool {
         self.is_replica_set() && self.server_version_gte(4, 0)
             || self.is_sharded() && self.server_version_gte(4, 2)
     }
 
-    pub async fn enable_failpoint(
+    pub(crate) async fn enable_failpoint(
         &self,
         fp: FailPoint,
         criteria: impl Into<Option<SelectionCriteria>>,
@@ -272,53 +280,53 @@ impl TestClient {
         fp.enable(self, criteria).await
     }
 
-    pub fn auth_enabled(&self) -> bool {
+    pub(crate) fn auth_enabled(&self) -> bool {
         self.options.credential.is_some()
     }
 
-    pub fn is_standalone(&self) -> bool {
+    pub(crate) fn is_standalone(&self) -> bool {
         self.base_topology() == Topology::Single
     }
 
-    pub fn is_replica_set(&self) -> bool {
+    pub(crate) fn is_replica_set(&self) -> bool {
         self.base_topology() == Topology::ReplicaSet
     }
 
-    pub fn is_sharded(&self) -> bool {
+    pub(crate) fn is_sharded(&self) -> bool {
         self.base_topology() == Topology::Sharded
     }
 
-    pub fn is_load_balanced(&self) -> bool {
+    pub(crate) fn is_load_balanced(&self) -> bool {
         self.base_topology() == Topology::LoadBalanced
     }
 
-    pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
+    pub(crate) fn server_version_eq(&self, major: u64, minor: u64) -> bool {
         self.server_version.major == major && self.server_version.minor == minor
     }
 
     #[allow(dead_code)]
-    pub fn server_version_gt(&self, major: u64, minor: u64) -> bool {
+    pub(crate) fn server_version_gt(&self, major: u64, minor: u64) -> bool {
         self.server_version.major > major
             || (self.server_version.major == major && self.server_version.minor > minor)
     }
 
-    pub fn server_version_gte(&self, major: u64, minor: u64) -> bool {
+    pub(crate) fn server_version_gte(&self, major: u64, minor: u64) -> bool {
         self.server_version.major > major
             || (self.server_version.major == major && self.server_version.minor >= minor)
     }
 
-    pub fn server_version_lt(&self, major: u64, minor: u64) -> bool {
+    pub(crate) fn server_version_lt(&self, major: u64, minor: u64) -> bool {
         self.server_version.major < major
             || (self.server_version.major == major && self.server_version.minor < minor)
     }
 
     #[allow(dead_code)]
-    pub fn server_version_lte(&self, major: u64, minor: u64) -> bool {
+    pub(crate) fn server_version_lte(&self, major: u64, minor: u64) -> bool {
         self.server_version.major < major
             || (self.server_version.major == major && self.server_version.minor <= minor)
     }
 
-    pub async fn drop_collection(&self, db_name: &str, coll_name: &str) {
+    pub(crate) async fn drop_collection(&self, db_name: &str, coll_name: &str) {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
     }
@@ -338,7 +346,7 @@ impl TestClient {
         Topology::Single
     }
 
-    pub async fn topology(&self) -> Topology {
+    pub(crate) async fn topology(&self) -> Topology {
         let bt = self.base_topology();
         if let Topology::Sharded = bt {
             let shard_info = self
@@ -358,7 +366,7 @@ impl TestClient {
         bt
     }
 
-    pub fn topology_string(&self) -> String {
+    pub(crate) fn topology_string(&self) -> String {
         match self.base_topology() {
             Topology::LoadBalanced => "load-balanced",
             Topology::Sharded | Topology::ShardedReplicaSet => "sharded",
@@ -368,7 +376,7 @@ impl TestClient {
         .to_string()
     }
 
-    pub async fn options_for_multiple_mongoses(
+    pub(crate) async fn options_for_multiple_mongoses(
         options: Option<ClientOptions>,
         use_multiple_mongoses: bool,
     ) -> ClientOptions {
@@ -408,7 +416,7 @@ impl TestClient {
     }
 }
 
-pub async fn drop_collection<T>(coll: &Collection<T>)
+pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
 where
     T: Serialize + DeserializeOwned + Unpin + Debug,
 {
@@ -425,7 +433,7 @@ struct BuildInfo {
     version: String,
 }
 
-pub fn get_default_name(description: &str) -> String {
+pub(crate) fn get_default_name(description: &str) -> String {
     let mut db_name = description
         .replace('$', "%")
         .replace(' ', "_")
@@ -436,7 +444,7 @@ pub fn get_default_name(description: &str) -> String {
 }
 
 /// Log a message on stderr that won't be captured by `cargo test`.  Panics if the write fails.
-pub fn log_uncaptured<S: AsRef<str>>(text: S) {
+pub(crate) fn log_uncaptured<S: AsRef<str>>(text: S) {
     use std::io::Write;
 
     let mut stderr = std::io::stderr();

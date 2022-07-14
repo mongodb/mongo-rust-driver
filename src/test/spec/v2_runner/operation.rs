@@ -42,7 +42,7 @@ use crate::{
     IndexModel,
 };
 
-pub trait TestOperation: Debug {
+pub(crate) trait TestOperation: Debug {
     fn execute_on_collection<'a>(
         &'a self,
         _collection: &'a Collection<Document>,
@@ -75,20 +75,20 @@ pub trait TestOperation: Debug {
 }
 
 #[derive(Debug)]
-pub struct Operation {
+pub(crate) struct Operation {
     operation: Box<dyn TestOperation>,
-    pub name: String,
-    pub object: Option<OperationObject>,
-    pub collection_options: Option<CollectionOptions>,
-    pub database_options: Option<DatabaseOptions>,
-    pub error: Option<bool>,
-    pub result: Option<OperationResult>,
-    pub session: Option<String>,
+    pub(crate) name: String,
+    pub(crate) object: Option<OperationObject>,
+    pub(crate) collection_options: Option<CollectionOptions>,
+    pub(crate) database_options: Option<DatabaseOptions>,
+    pub(crate) error: Option<bool>,
+    pub(crate) result: Option<OperationResult>,
+    pub(crate) session: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub enum OperationObject {
+pub(crate) enum OperationObject {
     Database,
     Collection,
     Client,
@@ -101,19 +101,19 @@ pub enum OperationObject {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum OperationResult {
+pub(crate) enum OperationResult {
     Error(OperationError),
     Success(Bson),
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct OperationError {
-    pub error_contains: Option<String>,
-    pub error_code_name: Option<String>,
-    pub error_code: Option<i32>,
-    pub error_labels_contain: Option<Vec<String>>,
-    pub error_labels_omit: Option<Vec<String>>,
+pub(crate) struct OperationError {
+    pub(crate) error_contains: Option<String>,
+    pub(crate) error_code_name: Option<String>,
+    pub(crate) error_code: Option<i32>,
+    pub(crate) error_labels_contain: Option<Vec<String>>,
+    pub(crate) error_labels_omit: Option<Vec<String>>,
 }
 
 impl<'de> Deserialize<'de> for Operation {
@@ -121,18 +121,18 @@ impl<'de> Deserialize<'de> for Operation {
         #[derive(Debug, Deserialize)]
         #[serde(rename_all = "camelCase", deny_unknown_fields)]
         struct OperationDefinition {
-            pub name: String,
-            pub object: Option<OperationObject>,
-            pub collection_options: Option<CollectionOptions>,
-            pub database_options: Option<DatabaseOptions>,
+            pub(crate) name: String,
+            pub(crate) object: Option<OperationObject>,
+            pub(crate) collection_options: Option<CollectionOptions>,
+            pub(crate) database_options: Option<DatabaseOptions>,
             #[serde(default = "default_arguments")]
-            pub arguments: Document,
-            pub error: Option<bool>,
-            pub result: Option<OperationResult>,
+            pub(crate) arguments: Document,
+            pub(crate) error: Option<bool>,
+            pub(crate) result: Option<OperationResult>,
             // We don't need to use this field, but it needs to be included during deserialization
             // so that we can use the deny_unknown_fields tag.
             #[serde(rename = "command_name")]
-            pub _command_name: Option<String>,
+            pub(crate) _command_name: Option<String>,
         }
 
         fn default_arguments() -> Document {

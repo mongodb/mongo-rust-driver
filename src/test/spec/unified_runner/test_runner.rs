@@ -1,6 +1,8 @@
-use std::{collections::HashMap, fs::File, io::BufWriter, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::TryStreamExt;
+
+use tokio::sync::{mpsc, RwLock};
 
 use crate::{
     bson::{doc, Document},
@@ -15,12 +17,12 @@ use crate::{
         SelectionCriteria,
     },
     runtime,
+    sdam::TopologyDescription,
     test::{
         log_uncaptured,
         spec::unified_runner::{
             entity::EventList,
-            matcher::{events_match, results_match},
-            operation::{Expectation, OperationObject},
+            matcher::events_match,
             test_file::{ExpectedEventType, TestCase, TestFile},
         },
         update_options_for_testing,
@@ -40,12 +42,13 @@ use crate::{
 };
 
 use super::{
+    entity::ThreadEntity,
     merge_uri_options,
+    test_file::ThreadMessage,
     ClientEntity,
     CollectionData,
     Entity,
     SessionEntity,
-    TestCursor,
     TestFileEntity,
 };
 
@@ -60,40 +63,43 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "watch",
 ];
 
-pub type EntityMap = HashMap<String, Entity>;
+pub(crate) type EntityMap = HashMap<String, Entity>;
 
-pub struct TestRunner {
-    pub internal_client: TestClient,
-    pub entities: EntityMap,
-    pub fail_point_guards: Vec<FailPointGuard>,
+#[derive(Clone)]
+pub(crate) struct TestRunner {
+    pub(crate) internal_client: TestClient,
+    pub(crate) entities: Arc<RwLock<EntityMap>>,
+    pub(crate) fail_point_guards: Arc<RwLock<Vec<FailPointGuard>>>,
 }
 
 impl TestRunner {
-    pub async fn new() -> Self {
+    pub(crate) async fn new() -> Self {
         Self {
             internal_client: TestClient::new().await,
-            entities: HashMap::new(),
-            fail_point_guards: Vec::new(),
+            entities: Default::default(),
+            fail_point_guards: Default::default(),
         }
     }
 
-    pub async fn new_with_connection_string(connection_string: &str) -> Self {
+    pub(crate) async fn new_with_connection_string(connection_string: &str) -> Self {
         #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
         let options = ClientOptions::parse(connection_string).await.unwrap();
         #[cfg(any(feature = "sync", feature = "tokio-sync"))]
         let options = ClientOptions::parse(connection_string).unwrap();
         Self {
             internal_client: TestClient::with_options(Some(options)).await,
-            entities: HashMap::new(),
-            fail_point_guards: Vec::new(),
+            entities: Arc::new(RwLock::new(EntityMap::new())),
+            fail_point_guards: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
-    pub async fn run_test(&mut self, test_file: TestFile, pred: impl Fn(&TestCase) -> bool) {
+    pub(crate) async fn run_test(&self, test_file: TestFile, pred: impl Fn(&TestCase) -> bool) {
+        let test_runner = TestRunner::new().await;
+
         if let Some(requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
             for requirement in requirements {
-                if requirement.can_run_on(&self.internal_client).await {
+                if requirement.can_run_on(&test_runner.internal_client).await {
                     can_run_on = true;
                 }
             }
@@ -141,7 +147,7 @@ impl TestRunner {
             if let Some(requirements) = test_case.run_on_requirements {
                 let mut can_run_on = false;
                 for requirement in requirements {
-                    if requirement.can_run_on(&self.internal_client).await {
+                    if requirement.can_run_on(&test_runner.internal_client).await {
                         can_run_on = true;
                     }
                 }
@@ -158,81 +164,22 @@ impl TestRunner {
 
             if let Some(ref initial_data) = test_file.initial_data {
                 for data in initial_data {
-                    self.insert_initial_data(data).await;
+                    test_runner.insert_initial_data(data).await;
                 }
             }
 
+            test_runner.entities.write().await.clear();
             if let Some(ref create_entities) = test_file.create_entities {
-                self.populate_entity_map(create_entities).await;
+                test_runner
+                    .populate_entity_map(create_entities, &test_case.description)
+                    .await;
             }
 
             for operation in test_case.operations {
-                self.sync_workers().await;
-                match operation.object {
-                    OperationObject::TestRunner => {
-                        operation.execute_test_runner_operation(self).await;
-                    }
-                    OperationObject::Entity(ref id) => {
-                        let result = operation.execute_entity_operation(id, self).await;
-
-                        match &operation.expectation {
-                            Expectation::Result {
-                                expected_value,
-                                save_as_entity,
-                            } => {
-                                let desc = &test_case.description;
-                                let opt_entity = result.unwrap_or_else(|e| {
-                                    panic!(
-                                        "[{}] {} should succeed, but failed with the following \
-                                         error: {}",
-                                        desc, operation.name, e
-                                    )
-                                });
-                                if expected_value.is_some() || save_as_entity.is_some() {
-                                    let entity = opt_entity.unwrap_or_else(|| {
-                                        panic!(
-                                            "[{}] {} did not return an entity",
-                                            desc, operation.name
-                                        )
-                                    });
-                                    if let Some(expected_bson) = expected_value {
-                                        if let Entity::Bson(actual) = &entity {
-                                            if let Err(e) = results_match(
-                                                Some(actual),
-                                                expected_bson,
-                                                operation.returns_root_documents(),
-                                                Some(&self.entities),
-                                            ) {
-                                                panic!(
-                                                    "[{}] result mismatch, expected = {:#?}  \
-                                                     actual = {:#?}\nmismatch detail: {}",
-                                                    desc, expected_bson, actual, e
-                                                );
-                                            }
-                                        } else {
-                                            panic!(
-                                                "[{}] Incorrect entity type returned from {}, \
-                                                 expected BSON",
-                                                desc, operation.name
-                                            );
-                                        }
-                                    }
-                                    if let Some(id) = save_as_entity {
-                                        self.insert_entity(id, entity);
-                                    }
-                                }
-                            }
-                            Expectation::Error(expect_error) => {
-                                let error = result.expect_err(&format!(
-                                    "{}: {} should return an error",
-                                    test_case.description, operation.name
-                                ));
-                                expect_error.verify_result(&error);
-                            }
-                            Expectation::Ignore => (),
-                        }
-                    }
-                }
+                test_runner.sync_workers().await;
+                operation
+                    .execute(test_runner.clone(), &test_case.description)
+                    .await;
                 // This test (in src/test/spec/json/sessions/server-support.json) runs two
                 // operations with implicit sessions in sequence and then checks to see if they
                 // used the same lsid. We delay for one second to ensure that the
@@ -245,7 +192,8 @@ impl TestRunner {
 
             if let Some(ref events) = test_case.expect_events {
                 for expected in events {
-                    let entity = self.entities.get(&expected.client).unwrap();
+                    let entities = test_runner.entities.read().await;
+                    let entity = entities.get(&expected.client).unwrap();
                     let client = entity.as_client();
                     client.sync_workers().await;
                     let event_type = expected.event_type.unwrap_or(ExpectedEventType::Command);
@@ -273,7 +221,7 @@ impl TestRunner {
                     }
 
                     for (actual, expected) in actual_events.iter().zip(expected_events) {
-                        if let Err(e) = events_match(actual, expected, Some(&self.entities)) {
+                        if let Err(e) = events_match(actual, expected, Some(&entities)) {
                             panic!(
                                 "event mismatch: expected = {:#?}, actual = {:#?}\nall \
                                  expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",
@@ -284,7 +232,7 @@ impl TestRunner {
                 }
             }
 
-            self.fail_point_guards.clear();
+            test_runner.fail_point_guards.write().await.clear();
 
             if let Some(ref outcome) = test_case.outcome {
                 for expected_data in outcome {
@@ -299,7 +247,7 @@ impl TestRunner {
                         .selection_criteria(selection_criteria)
                         .read_concern(read_concern)
                         .build();
-                    let collection = self
+                    let collection = test_runner
                         .internal_client
                         .get_coll_with_options(db_name, coll_name, options);
 
@@ -320,7 +268,7 @@ impl TestRunner {
         }
     }
 
-    pub async fn insert_initial_data(&self, data: &CollectionData) {
+    pub(crate) async fn insert_initial_data(&self, data: &CollectionData) {
         let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
 
         if !data.documents.is_empty() {
@@ -352,9 +300,11 @@ impl TestRunner {
         }
     }
 
-    pub async fn populate_entity_map(&mut self, create_entities: &[TestFileEntity]) {
-        self.entities.clear();
-
+    pub(crate) async fn populate_entity_map(
+        &self,
+        create_entities: &[TestFileEntity],
+        description: impl AsRef<str>,
+    ) {
         for entity in create_entities {
             let (id, entity) = match entity {
                 TestFileEntity::Client(client) => {
@@ -364,7 +314,8 @@ impl TestRunner {
                                 client_id: client.id.clone(),
                                 event_names: store_events_as_entity.events.clone(),
                             };
-                            self.insert_entity(&store_events_as_entity.id, event_list.into());
+                            self.insert_entity(&store_events_as_entity.id, event_list)
+                                .await;
                         }
                     }
 
@@ -374,7 +325,6 @@ impl TestRunner {
                     let observe_sensitive_commands =
                         client.observe_sensitive_commands.unwrap_or(false);
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
-                    let observer = Arc::new(EventHandler::new());
 
                     let given_uri = if CLIENT_OPTIONS.get().await.load_balanced.unwrap_or(false) {
                         // for serverless testing, ignore use_multiple_mongoses.
@@ -391,11 +341,23 @@ impl TestRunner {
                         &DEFAULT_URI
                     };
                     let uri = merge_uri_options(given_uri, client.uri_options.as_ref());
-                    let mut options = ClientOptions::parse_uri(&uri, None).await.unwrap();
+                    let mut options =
+                        ClientOptions::parse_uri(&uri, None)
+                            .await
+                            .unwrap_or_else(|e| {
+                                panic!(
+                                    "[{}] invalid client URI: {}, error: {}",
+                                    description.as_ref(),
+                                    uri,
+                                    e
+                                )
+                            });
                     update_options_for_testing(&mut options);
-                    options.command_event_handler = Some(observer.clone());
-                    options.cmap_event_handler = Some(observer.clone());
-                    options.sdam_event_handler = Some(observer.clone());
+                    let handler = Arc::new(EventHandler::new());
+                    options.command_event_handler = Some(handler.clone());
+                    options.cmap_event_handler = Some(handler.clone());
+                    options.sdam_event_handler = Some(handler.clone());
+
                     options.server_api = server_api;
 
                     if let Some(use_multiple_mongoses) = client.use_multiple_mongoses {
@@ -403,7 +365,8 @@ impl TestRunner {
                             if use_multiple_mongoses {
                                 assert!(
                                     options.hosts.len() > 1,
-                                    "Test requires multiple mongos hosts"
+                                    "[{}]: Test requires multiple mongos hosts",
+                                    description.as_ref()
                                 );
                             } else {
                                 options.hosts.drain(1..);
@@ -417,7 +380,7 @@ impl TestRunner {
                         id,
                         Entity::Client(ClientEntity::new(
                             client,
-                            observer,
+                            handler,
                             observe_events,
                             ignore_command_names,
                             observe_sensitive_commands,
@@ -426,7 +389,7 @@ impl TestRunner {
                 }
                 TestFileEntity::Database(database) => {
                     let id = database.id.clone();
-                    let client = self.entities.get(&database.client).unwrap().as_client();
+                    let client = self.get_client(&database.client).await;
                     let database = if let Some(ref options) = database.database_options {
                         let options = options.as_database_options();
                         client.database_with_options(&database.database_name, options)
@@ -437,11 +400,7 @@ impl TestRunner {
                 }
                 TestFileEntity::Collection(collection) => {
                     let id = collection.id.clone();
-                    let database = self
-                        .entities
-                        .get(&collection.database)
-                        .unwrap()
-                        .as_database();
+                    let database = self.get_database(&collection.database).await;
                     let collection = if let Some(ref options) = collection.collection_options {
                         let options = options.as_collection_options();
                         database.collection_with_options(&collection.collection_name, options)
@@ -452,7 +411,7 @@ impl TestRunner {
                 }
                 TestFileEntity::Session(session) => {
                     let id = session.id.clone();
-                    let client = self.get_client(&session.client);
+                    let client = self.get_client(&session.client).await;
                     let client_session = client
                         .start_session(session.session_options.clone())
                         .await
@@ -462,62 +421,113 @@ impl TestRunner {
                 TestFileEntity::Bucket(_) => {
                     panic!("GridFS not implemented");
                 }
+                TestFileEntity::Thread(thread) => {
+                    let (sender, mut receiver) = mpsc::unbounded_channel::<ThreadMessage>();
+                    let runner = self.clone();
+                    let d = description.as_ref().to_string();
+                    let id = thread.id.clone();
+                    runtime::execute(async move {
+                        while let Some(msg) = receiver.recv().await {
+                            match msg {
+                                ThreadMessage::ExecuteOperation(op) => {
+                                    op.execute(runner.clone(), d.as_str()).await;
+                                }
+                                ThreadMessage::Stop(sender) => {
+                                    sender.send(Ok(())).unwrap_or_else(|_| {
+                                        panic!(
+                                            "[{}] thread {} stopped before waitForThread \
+                                             operation executed",
+                                            d.as_str(),
+                                            id
+                                        )
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                    (thread.id.clone(), Entity::Thread(ThreadEntity { sender }))
+                }
             };
-            self.insert_entity(&id, entity);
+            self.insert_entity(&id, entity).await;
         }
     }
 
-    pub fn insert_entity(&mut self, id: &str, entity: Entity) {
-        if self.entities.insert(id.to_string(), entity).is_some() {
-            panic!("Entity with id {} already present in entity map", id);
+    pub(crate) async fn insert_entity(&self, id: impl AsRef<str>, entity: impl Into<Entity>) {
+        if self
+            .entities
+            .write()
+            .await
+            .insert(id.as_ref().to_string(), entity.into())
+            .is_some()
+        {
+            panic!(
+                "Entity with id {} already present in entity map",
+                id.as_ref()
+            );
         }
     }
 
-    pub async fn sync_workers(&self) {
+    pub(crate) async fn sync_workers(&self) {
         self.internal_client.sync_workers().await;
-        for entity in self.entities.values() {
+        let entities = self.entities.read().await;
+        for entity in entities.values() {
             if let Entity::Client(client) = entity {
                 client.sync_workers().await;
             }
         }
     }
 
-    pub fn get_client(&self, id: &str) -> &ClientEntity {
-        self.entities.get(id).unwrap().as_client()
+    pub(crate) async fn get_client(&self, id: &str) -> ClientEntity {
+        self.entities
+            .read()
+            .await
+            .get(id)
+            .unwrap()
+            .as_client()
+            .clone()
     }
 
-    pub fn get_database(&self, id: &str) -> &Database {
-        self.entities.get(id).unwrap().as_database()
+    pub(crate) async fn get_database(&self, id: &str) -> Database {
+        self.entities
+            .read()
+            .await
+            .get(id)
+            .unwrap()
+            .as_database()
+            .clone()
     }
 
-    pub fn get_collection(&self, id: &str) -> &Collection<Document> {
-        self.entities.get(id).unwrap().as_collection()
+    pub(crate) async fn get_collection(&self, id: &str) -> Collection<Document> {
+        self.entities
+            .read()
+            .await
+            .get(id)
+            .unwrap()
+            .as_collection()
+            .clone()
     }
 
-    pub fn get_session(&self, id: &str) -> &SessionEntity {
-        self.entities.get(id).unwrap().as_session_entity()
+    pub(crate) async fn get_thread(&self, id: &str) -> ThreadEntity {
+        self.entities
+            .read()
+            .await
+            .get(id)
+            .unwrap()
+            .as_thread()
+            .clone()
     }
 
-    pub fn get_mut_session(&mut self, id: &str) -> &mut SessionEntity {
-        self.entities.get_mut(id).unwrap().as_mut_session_entity()
-    }
-
-    pub fn get_mut_find_cursor(&mut self, id: &str) -> &mut TestCursor {
-        self.entities.get_mut(id).unwrap().as_mut_cursor()
-    }
-
-    pub fn write_events_list_to_file(&self, id: &str, writer: &mut BufWriter<File>) {
-        let event_list_entity = match self.entities.get(id) {
-            Some(entity) => entity.as_event_list(),
-            None => return,
-        };
-        let client = self.get_client(&event_list_entity.client_id);
-        let names: Vec<&str> = event_list_entity
-            .event_names
-            .iter()
-            .map(String::as_ref)
-            .collect();
-
-        client.write_events_list_to_file(&names, writer);
+    pub(crate) async fn get_topology_description(
+        &self,
+        id: impl AsRef<str>,
+    ) -> TopologyDescription {
+        self.entities
+            .read()
+            .await
+            .get(id.as_ref())
+            .unwrap()
+            .as_topology_description()
+            .clone()
     }
 }
