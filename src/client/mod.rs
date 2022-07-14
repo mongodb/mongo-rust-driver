@@ -136,7 +136,7 @@ impl Client {
     /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption
     /// enabled.
     #[cfg(feature = "csfle")]
-    pub async fn with_encryption_opts(
+    pub async fn with_encryption_options(
         options: ClientOptions,
         auto_enc: options::AutoEncryptionOpts,
     ) -> Result<Self> {
