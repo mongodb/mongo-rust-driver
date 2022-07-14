@@ -296,32 +296,10 @@ impl Database {
         resolve_options!(self, options, [write_concern]);
         let mut session = session.into();
 
-        let db = self.name().to_string();
         let coll = name.as_ref().to_string();
 
         #[cfg(feature = "csfle")]
-        {
-            let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
-            let use_enc_fields_map = options.as_ref().and_then(|o| o.use_encrypted_fields_map).unwrap_or(true);
-            if !has_encrypted_fields && use_enc_fields_map {
-                let enc_opts = self.client().auto_encryption_opts().await;
-                if let Some(enc_opts_fields) = enc_opts
-                    .as_ref()
-                    .and_then(|eo| eo.encrypted_fields_map.as_ref())
-                    .and_then(|efm| efm.get(&format!("{}.{}", db, coll)))
-                {
-                    options.get_or_insert_with(Default::default).encrypted_fields = Some(enc_opts_fields.clone());
-                }
-            }
-
-            if let Some(opts) = options.as_ref() {
-                if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                    for &key in &["esc", "ecc", "ecoc"] {
-                        self.create_aux_collection(&coll, opts, session.as_deref_mut(), enc_fields, key).await?;
-                    }
-                }
-            }
-        };
+        self.create_aux_collections(&coll, &mut options, session.as_deref_mut()).await?;
 
         self.execute_create_collection(coll.clone(), options, session.as_deref_mut()).await?;
 
@@ -349,29 +327,42 @@ impl Database {
     }
 
     #[cfg(feature = "csfle")]
-    async fn create_aux_collection(
+    async fn create_aux_collections(
         &self,
         base_name: &str,
-        base_opts: &CreateCollectionOptions,
-        session: Option<&mut ClientSession>,
-        enc_fields: &Document,
-        key: &str,
+        options: &mut Option<CreateCollectionOptions>,
+        mut session: Option<&mut ClientSession>,
     ) -> Result<()> {
-        let name = match enc_fields.get_str(format!("{}Collection", key)) {
-            Ok(s) => s.to_string(),
-            Err(_) => format!("enxcol_.{}.{}", base_name, key),
-        };
+        let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
+        let use_enc_fields_map = options.as_ref().and_then(|o| o.use_encrypted_fields_map).unwrap_or(true);
+        if !has_encrypted_fields && use_enc_fields_map {
+            let enc_opts = self.client().auto_encryption_opts().await;
+            if let Some(enc_opts_fields) = enc_opts
+                .as_ref()
+                .and_then(|eo| eo.encrypted_fields_map.as_ref())
+                .and_then(|efm| efm.get(&format!("{}.{}", self.name(), base_name)))
+            {
+                options.get_or_insert_with(Default::default).encrypted_fields = Some(enc_opts_fields.clone());
+            }
+        }
 
-        let mut opts = base_opts.clone();
-        opts.use_encrypted_fields_map = Some(false);
-        opts.clustered_index = Some(self::options::ClusteredIndex {
-            key: doc! { "_id": 1 },
-            unique: true,
-            name: None,
-            v: None,
-        });
+        if let Some(opts) = options.as_ref() {
+            if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
+                for name in crate::client::csfle::aux_collection_names(base_name, enc_fields) {
+                    let mut sub_opts = opts.clone();
+                    sub_opts.use_encrypted_fields_map = Some(false);
+                    sub_opts.clustered_index = Some(self::options::ClusteredIndex {
+                        key: doc! { "_id": 1 },
+                        unique: true,
+                        name: None,
+                        v: None,
+                    });
 
-        self.execute_create_collection(name, Some(opts), session).await
+                    self.execute_create_collection(name, Some(sub_opts), session.as_deref_mut()).await?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.

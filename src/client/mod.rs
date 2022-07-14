@@ -1,6 +1,6 @@
 pub mod auth;
 #[cfg(feature = "csfle")]
-mod csfle;
+pub(crate) mod csfle;
 mod executor;
 pub mod options;
 pub mod session;

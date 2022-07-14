@@ -174,3 +174,15 @@ impl ClientState {
         })
     }
 }
+
+pub(crate) fn aux_collection_names(base_name: &str, enc_fields: &bson::Document) -> Vec<String> {
+    let mut out = vec![];
+    for &key in &["esc", "ecc", "ecoc"] {
+        let name = match enc_fields.get_str(format!("{}Collection", key)) {
+            Ok(s) => s.to_string(),
+            Err(_) => format!("enxcol_.{}.{}", base_name, key),
+        };
+        out.push(name);
+    }
+    out
+}
