@@ -301,7 +301,12 @@ impl Database {
         #[cfg(feature = "csfle")]
         self.create_aux_collections(&coll, &mut options, session.as_deref_mut()).await?;
 
-        self.execute_create_collection(coll.clone(), options, session.as_deref_mut()).await?;
+        let db = self.name().to_string();
+        let create = Create::new(
+            Namespace { db, coll: coll.clone(), },
+            options,
+        );
+        self.client().execute_operation(create, session.as_deref_mut()).await?;
 
         #[cfg(feature = "csfle")]
         {
@@ -312,20 +317,6 @@ impl Database {
         Ok(())
     }
 
-    async fn execute_create_collection(
-        &self,
-        coll: String,
-        options: Option<CreateCollectionOptions>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let db = self.name().to_string();
-        let create = Create::new(
-            Namespace { db, coll, },
-            options,
-        );
-        self.client().execute_operation(create, session).await
-    }
-
     #[cfg(feature = "csfle")]
     async fn create_aux_collections(
         &self,
@@ -334,8 +325,8 @@ impl Database {
         mut session: Option<&mut ClientSession>,
     ) -> Result<()> {
         let has_encrypted_fields = options.as_ref().and_then(|o| o.encrypted_fields.as_ref()).is_some();
-        let use_enc_fields_map = options.as_ref().and_then(|o| o.use_encrypted_fields_map).unwrap_or(true);
-        if !has_encrypted_fields && use_enc_fields_map {
+        // If options does not have `associated_fields`, populate it from client-wide `encrypted_fields_map`:
+        if !has_encrypted_fields {
             let enc_opts = self.client().auto_encryption_opts().await;
             if let Some(enc_opts_fields) = enc_opts
                 .as_ref()
@@ -348,17 +339,16 @@ impl Database {
 
         if let Some(opts) = options.as_ref() {
             if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                for name in crate::client::csfle::aux_collection_names(base_name, enc_fields) {
+                for ns in crate::client::csfle::aux_collections(base_name, enc_fields)? {
                     let mut sub_opts = opts.clone();
-                    sub_opts.use_encrypted_fields_map = Some(false);
                     sub_opts.clustered_index = Some(self::options::ClusteredIndex {
                         key: doc! { "_id": 1 },
                         unique: true,
                         name: None,
                         v: None,
                     });
-
-                    self.execute_create_collection(name, Some(sub_opts), session.as_deref_mut()).await?;
+                    let create = Create::new(ns, Some(sub_opts));
+                    self.client().execute_operation(create, session.as_deref_mut()).await?;
                 }
             }
         }

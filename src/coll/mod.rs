@@ -290,6 +290,14 @@ impl<T> Collection<T> {
                 }
             }
         }
+
+        // Drop the collections.
+        if let Some(enc_fields) = enc_fields {
+            for ns in crate::client::csfle::aux_collections(self.name(), enc_fields)? {
+                let drop = DropCollection::new(ns, options.cloned());
+                self.client().execute_operation(drop, session.as_deref_mut()).await?;
+            }
+        }
         Ok(())
     }
 
@@ -1426,6 +1434,21 @@ impl Namespace {
             coll: String::new(),
         }
     }
+
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
+        let mut parts = s.split('.');
+
+        let db = parts.next();
+        let coll = parts.collect::<Vec<_>>().join(".");
+
+        match (db, coll) {
+            (Some(db), coll) if !coll.is_empty() => Some(Self {
+                db: db.to_string(),
+                coll,
+            }),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Namespace {
@@ -1440,18 +1463,7 @@ impl<'de> Deserialize<'de> for Namespace {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        let mut parts = s.split('.');
-
-        let db = parts.next();
-        let coll = parts.collect::<Vec<_>>().join(".");
-
-        match (db, coll) {
-            (Some(db), coll) if !coll.is_empty() => Ok(Self {
-                db: db.to_string(),
-                coll,
-            }),
-            _ => Err(D::Error::custom("Missing one or more fields in namespace")),
-        }
+        Self::from_str(&s).ok_or_else(|| D::Error::custom("Missing one or more fields in namespace"))
     }
 }
 
