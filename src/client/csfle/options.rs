@@ -8,6 +8,7 @@ use crate::{
     bson::{doc, Bson, Document},
     client::options::TlsOptions,
     error::{Error, Result},
+    Namespace,
 };
 
 /// Options related to automatic encryption.
@@ -19,16 +20,16 @@ use crate::{
 /// https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list
 /// )). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
 /// AutoEncryptionOpts.
-#[derive(Debug, Default, TypedBuilder, Clone)]
+#[derive(Debug, TypedBuilder, Clone)]
 #[non_exhaustive]
 #[builder(field_defaults(setter(into)))]
-pub struct AutoEncryptionOpts {
+pub struct AutoEncryptionOptions {
     /// Used for data key queries.  Will default to an internal client if not set.
     #[builder(default)]
     pub key_vault_client: Option<crate::Client>,
     /// A collection that contains all data keys used for encryption and decryption (aka the key
     /// vault collection).
-    pub key_vault_namespace: String,
+    pub key_vault_namespace: Namespace,
     /// Options individual to each KMS provider.
     pub kms_providers: KmsProviders,
     /// Specify a JSONSchema locally.
@@ -69,7 +70,7 @@ pub type KmsProviders = HashMap<KmsProvider, Document>;
 /// TLS options for connections to each KMS provider.
 pub type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
 
-impl AutoEncryptionOpts {
+impl AutoEncryptionOptions {
     pub(crate) fn extra_option<'a, Opt: ExtraOption<'a>>(
         &'a self,
         opt: &Opt,

@@ -14,7 +14,7 @@ use crate::{
 };
 
 use options::{
-    AutoEncryptionOpts,
+    AutoEncryptionOptions,
     EO_CRYPT_SHARED_LIB_PATH,
     EO_CRYPT_SHARED_REQUIRED,
     EO_MONGOCRYPTD_BYPASS_SPAWN,
@@ -33,7 +33,7 @@ pub(super) struct ClientState {
     crypt: Crypt,
     mongocryptd_client: Option<Client>,
     aux_clients: AuxClients,
-    opts: AutoEncryptionOpts,
+    opts: AutoEncryptionOptions,
 }
 
 #[derive(Debug)]
@@ -47,24 +47,24 @@ struct AuxClients {
 }
 
 impl ClientState {
-    pub(super) async fn new(client: &Client, opts: AutoEncryptionOpts) -> Result<Option<Self>> {
+    pub(super) async fn new(client: &Client, opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
-        let mongocryptd_client = Self::spawn_mongocryptd(&opts, &crypt).await?;
+        let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
 
-        Ok(Some(Self {
+        Ok(Self {
             crypt,
             mongocryptd_client,
             aux_clients,
             opts,
-        }))
+        })
     }
 
-    pub(super) fn opts(&self) -> &AutoEncryptionOpts {
+    pub(super) fn opts(&self) -> &AutoEncryptionOptions {
         &self.opts
     }
 
-    fn make_crypt(opts: &AutoEncryptionOpts) -> Result<Crypt> {
+    fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
         let mut builder = Crypt::builder();
         if Some(true) != opts.bypass_auto_encryption {
             builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
@@ -83,7 +83,12 @@ impl ClientState {
         Ok(crypt)
     }
 
-    async fn spawn_mongocryptd(opts: &AutoEncryptionOpts, crypt: &Crypt) -> Result<Option<Client>> {
+    /// If crypt_shared is unavailable and options have not disabled it, spawn mongocryptd.  Returns
+    /// a `Client` connected to the mongocryptd if one was spawned.
+    async fn spawn_mongocryptd_if_needed(
+        opts: &AutoEncryptionOptions,
+        crypt: &Crypt,
+    ) -> Result<Option<Client>> {
         if opts.bypass_auto_encryption == Some(true)
             || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
@@ -126,10 +131,15 @@ impl ClientState {
         let uri = opts
             .extra_option(&EO_MONGOCRYPTD_URI)?
             .unwrap_or("mongodb://localhost:27020");
-        Ok(Some(Client::with_uri_str(uri).await?))
+        let mut options = super::options::ClientOptions::parse_uri(uri, None).await?;
+        options.server_selection_timeout = Some(std::time::Duration::from_millis(10_000));
+        Ok(Some(Client::with_options(options)?))
     }
 
-    fn make_aux_clients(client: &Client, auto_enc_opts: &AutoEncryptionOpts) -> Result<AuxClients> {
+    fn make_aux_clients(
+        client: &Client,
+        auto_enc_opts: &AutoEncryptionOptions,
+    ) -> Result<AuxClients> {
         let mut internal_client: Option<Client> = None;
         let mut get_internal_client = || -> Result<WeakClient> {
             if let Some(c) = &internal_client {

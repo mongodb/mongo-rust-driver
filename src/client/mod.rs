@@ -138,10 +138,10 @@ impl Client {
     #[cfg(feature = "csfle")]
     pub async fn with_encryption_options(
         options: ClientOptions,
-        auto_enc: options::AutoEncryptionOpts,
+        auto_enc: options::AutoEncryptionOptions,
     ) -> Result<Self> {
         let client = Self::with_options(options)?;
-        *client.inner.csfle.write().await = csfle::ClientState::new(&client, auto_enc).await?;
+        *client.inner.csfle.write().await = Some(csfle::ClientState::new(&client, auto_enc).await?);
         Ok(client)
     }
 
@@ -469,7 +469,7 @@ impl Client {
     #[allow(dead_code)]
     pub(crate) async fn auto_encryption_opts(
         &self,
-    ) -> Option<tokio::sync::RwLockReadGuard<'_, options::AutoEncryptionOpts>> {
+    ) -> Option<tokio::sync::RwLockReadGuard<'_, options::AutoEncryptionOptions>> {
         tokio::sync::RwLockReadGuard::try_map(self.inner.csfle.read().await, |csfle| {
             csfle.as_ref().map(|cs| cs.opts())
         })
