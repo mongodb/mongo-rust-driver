@@ -1047,7 +1047,7 @@ dependencies = [
 
 [[package]]
 name = "mongodb"
-version = "2.3.0-beta.1"
+version = "2.3.0"
 dependencies = [
  "approx",
  "async-std",
