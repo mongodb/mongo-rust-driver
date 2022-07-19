@@ -39,7 +39,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.2.0"
+mongodb = "2.3.0"
 ```
 
 #### Configuring the async runtime
@@ -48,7 +48,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.2.0"
+version = "2.3.0"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -57,7 +57,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.2.0"
+version = "2.3.0"
 features = ["tokio-sync"]
 ```
 Using the `"sync"` feature also requires using `default-features = false`.

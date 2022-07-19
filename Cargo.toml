@@ -15,7 +15,7 @@ homepage = "https://www.mongodb.com/docs/drivers/rust/"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "2.3.0-beta.1"
+version = "2.4.0"
 
 exclude = [
     "etc/**",
