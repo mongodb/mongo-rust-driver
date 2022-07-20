@@ -49,6 +49,7 @@ functions:
 
           TAG=${GIT_TAG}           \
           TOKEN=${CRATES_IO_TOKEN} \
+          PROJECT_DIRECTORY="$(pwd)" \
             bash .evergreen/release-danger-do-not-run-manually.sh
 
 tasks:
