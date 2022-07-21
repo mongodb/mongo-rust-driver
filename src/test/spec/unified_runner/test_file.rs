@@ -268,6 +268,7 @@ pub struct CollectionOrDatabaseOptions {
     #[serde(rename = "readPreference")]
     pub selection_criteria: Option<SelectionCriteria>,
     pub write_concern: Option<WriteConcern>,
+    pub comment: Option<Bson>,
 }
 
 impl CollectionOrDatabaseOptions {
@@ -276,6 +277,7 @@ impl CollectionOrDatabaseOptions {
             read_concern: self.read_concern.clone(),
             selection_criteria: self.selection_criteria.clone(),
             write_concern: self.write_concern.clone(),
+            comment: self.comment.clone(),
         }
     }
 
@@ -284,6 +286,7 @@ impl CollectionOrDatabaseOptions {
             read_concern: self.read_concern.clone(),
             selection_criteria: self.selection_criteria.clone(),
             write_concern: self.write_concern.clone(),
+            comment: self.comment.clone(),
         }
     }
 }

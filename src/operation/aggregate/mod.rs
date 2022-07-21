@@ -14,7 +14,12 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, WriteConcernOnlyBody, SERVER_4_2_0_WIRE_VERSION};
+use super::{
+    CursorBody,
+    WriteConcernOnlyBody,
+    SERVER_4_2_0_WIRE_VERSION,
+    SERVER_4_4_0_WIRE_VERSION,
+};
 
 pub(crate) use change_stream::ChangeStreamAggregate;
 
@@ -95,11 +100,18 @@ impl Operation for Aggregate {
             wc_error_info.validate()?;
         };
 
+        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+            None
+        } else {
+            self.options.as_ref().and_then(|opts| opts.comment.clone())
+        };
+
         Ok(CursorSpecification::new(
             cursor_response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
+            comment,
         ))
     }
 

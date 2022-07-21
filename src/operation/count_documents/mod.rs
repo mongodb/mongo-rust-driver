@@ -66,6 +66,7 @@ impl CountDocuments {
                 .collation(opts.collation)
                 .selection_criteria(opts.selection_criteria)
                 .read_concern(opts.read_concern)
+                .comment(opts.comment)
                 .build()
         });
 

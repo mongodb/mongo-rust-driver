@@ -76,6 +76,7 @@ impl Operation for ListCollections {
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,
+            None,
         ))
     }
 

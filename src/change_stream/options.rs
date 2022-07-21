@@ -5,7 +5,7 @@ use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::Timestamp,
+    bson::{Bson, Timestamp},
     change_stream::event::ResumeToken,
     collation::Collation,
     concern::ReadConcern,
@@ -94,6 +94,13 @@ pub struct ChangeStreamOptions {
     #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    #[builder(default)]
+    pub comment: Option<Bson>,
 }
 
 impl ChangeStreamOptions {
@@ -104,6 +111,7 @@ impl ChangeStreamOptions {
             .max_await_time(self.max_await_time)
             .read_concern(self.read_concern.clone())
             .selection_criteria(self.selection_criteria.clone())
+            .comment(self.comment.clone())
             .build()
     }
 }

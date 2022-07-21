@@ -14,7 +14,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 use tokio::sync::oneshot;
 
 use crate::{
-    bson::Document,
+    bson::{Bson, Document},
     change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
@@ -374,6 +374,7 @@ impl CursorSpecification {
         address: ServerAddress,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
+        comment: impl Into<Option<Bson>>,
     ) -> Self {
         Self {
             info: CursorInformation {
@@ -382,6 +383,7 @@ impl CursorSpecification {
                 address,
                 batch_size: batch_size.into(),
                 max_time: max_time.into(),
+                comment: comment.into(),
             },
             initial_buffer: info.first_batch,
             post_batch_resume_token: ResumeToken::from_raw(info.post_batch_resume_token),
@@ -416,6 +418,7 @@ pub(crate) struct CursorInformation {
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
+    pub(crate) comment: Option<Bson>,
 }
 
 #[derive(Debug)]

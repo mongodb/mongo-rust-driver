@@ -4,7 +4,7 @@ use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, Bson, Document},
     bson_util,
     coll::options::{
         FindOneAndDeleteOptions,
@@ -76,6 +76,9 @@ pub(super) struct FindAndModifyOptions {
     #[builder(default)]
     #[serde(rename = "let")]
     pub(crate) let_vars: Option<Document>,
+
+    #[builder(default)]
+    pub(crate) comment: Option<Bson>,
 }
 
 impl FindAndModifyOptions {
@@ -93,6 +96,7 @@ impl FindAndModifyOptions {
         modify_opts.write_concern = opts.write_concern;
         modify_opts.hint = opts.hint;
         modify_opts.let_vars = opts.let_vars;
+        modify_opts.comment = opts.comment;
         modify_opts
     }
 
@@ -115,6 +119,7 @@ impl FindAndModifyOptions {
         modify_opts.write_concern = opts.write_concern;
         modify_opts.hint = opts.hint;
         modify_opts.let_vars = opts.let_vars;
+        modify_opts.comment = opts.comment;
 
         modify_opts
     }
@@ -138,6 +143,7 @@ impl FindAndModifyOptions {
         modify_opts.write_concern = opts.write_concern;
         modify_opts.hint = opts.hint;
         modify_opts.let_vars = opts.let_vars;
+        modify_opts.comment = opts.comment;
 
         modify_opts
     }

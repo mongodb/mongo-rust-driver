@@ -2641,4 +2641,10 @@ pub struct TransactionOptions {
         default
     )]
     pub max_commit_time: Option<Duration>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }

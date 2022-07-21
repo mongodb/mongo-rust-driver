@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
-    operation::{append_options, CursorBody, Operation, Retryability},
+    operation::{append_options, CursorBody, Operation, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
@@ -81,6 +81,10 @@ impl Operation for Find {
                 }
                 _ => {}
             };
+
+            if let Some(ref comment) = options.comment {
+                body.insert("comment", comment);
+            }
         }
 
         append_options(&mut body, self.options.as_ref())?;
@@ -111,11 +115,18 @@ impl Operation for Find {
     ) -> Result<Self::O> {
         let response: CursorBody = response.body()?;
 
+        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+            None
+        } else {
+            self.options.as_ref().and_then(|opts| opts.comment.clone())
+        };
+
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
+            comment,
         ))
     }
 

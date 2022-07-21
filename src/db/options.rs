@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::Document,
+    bson::{Bson, Document},
     bson_util,
     concern::{ReadConcern, WriteConcern},
     options::Collation,
@@ -27,6 +27,12 @@ pub struct DatabaseOptions {
 
     /// The default write concern for operations.
     pub write_concern: Option<WriteConcern>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// These are the valid options for creating a collection with
@@ -110,6 +116,12 @@ pub struct CreateCollectionOptions {
 
     /// Options for clustered collections.
     pub clustered_index: Option<ClusteredIndex>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -242,6 +254,12 @@ pub struct ListCollectionsOptions {
         rename(serialize = "cursor")
     )]
     pub batch_size: Option<u32>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
@@ -254,6 +272,12 @@ pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
     pub authorized_databases: Option<bool>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies how change stream pre- and post-images should be supported.
