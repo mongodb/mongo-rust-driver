@@ -235,7 +235,12 @@ impl TestRunner {
                     }
 
                     for (actual, expected) in actual_events.iter().zip(expected_events) {
-                        if let Err(e) = events_match(actual, expected, Some(&entities)) {
+                        if let Err(e) = events_match(
+                            actual,
+                            expected,
+                            Some(&entities),
+                            test_case.description.as_str(),
+                        ) {
                             panic!(
                                 "event mismatch: expected = {:#?}, actual = {:#?}\nall \
                                  expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",

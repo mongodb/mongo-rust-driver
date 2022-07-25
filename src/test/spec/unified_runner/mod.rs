@@ -12,7 +12,7 @@ use futures::future::FutureExt;
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{log_uncaptured, run_single_test, run_spec_test, LOCK};
+use crate::test::{log_uncaptured, run_single_test, LOCK};
 
 pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},

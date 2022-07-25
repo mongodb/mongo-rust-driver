@@ -5,6 +5,7 @@ use serde::Serialize;
 pub use crate::sdam::description::{server::ServerType, topology::TopologyType};
 use crate::{
     bson::DateTime,
+    error::Error,
     hello::HelloCommandResponse,
     options::ServerAddress,
     sdam::ServerDescription,
@@ -99,6 +100,11 @@ impl<'a> ServerInfo<'a> {
     /// Gets the tags associated with the server.
     pub fn tags(&self) -> Option<&TagSet> {
         self.command_response_getter(|r| r.tags.as_ref())
+    }
+
+    /// Gets the error this server encountered, if any.
+    pub fn error(&self) -> Option<&Error> {
+        self.description.reply.as_ref().err()
     }
 }
 

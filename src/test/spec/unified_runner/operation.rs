@@ -3,7 +3,6 @@ use std::{
     convert::TryInto,
     fmt::Debug,
     ops::Deref,
-    panic::{catch_unwind, AssertUnwindSafe},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -191,7 +190,7 @@ impl Operation {
                             "{}: {} should return an error",
                             description, self.name
                         ));
-                        expect_error.verify_result(&error);
+                        expect_error.verify_result(&error, description).unwrap();
                     }
                     Expectation::Ignore => (),
                 }
@@ -2353,15 +2352,12 @@ impl TestOperation for Loop {
                             self.report_success(&mut entities);
                         }
                         (Err(error), Expectation::Error(ref expected_error)) => {
-                            match catch_unwind(AssertUnwindSafe(|| {
-                                expected_error.verify_result(&error);
-                            })) {
+                            match expected_error.verify_result(&error, operation.name.as_str()) {
                                 Ok(_) => self.report_success(&mut entities),
-                                Err(_) => report_failure!(
-                                    self,
-                                    &operation.name,
-                                    error,
-                                    expected_error,
+                                Err(e) => report_error_or_failure!(
+                                    self.store_failures_as_entity,
+                                    self.store_errors_as_entity,
+                                    e,
                                     &mut entities
                                 ),
                             }

@@ -1,6 +1,6 @@
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{run_spec_test, LOCK};
+use crate::test::LOCK;
 
 use super::{run_spec_test_with_path, run_unified_format_test_filtered, unified_runner::TestCase};
 

@@ -4,7 +4,7 @@ use crate::{
     bson::doc,
     error::ErrorKind,
     options::SessionOptions,
-    test::{run_spec_test, TestClient, LOCK},
+    test::{TestClient, LOCK},
 };
 
 use super::{run_spec_test_with_path, run_unified_format_test};

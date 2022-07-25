@@ -357,45 +357,97 @@ pub(crate) struct ExpectError {
 }
 
 impl ExpectError {
-    pub(crate) fn verify_result(&self, error: &Error) {
+    pub(crate) fn verify_result(
+        &self,
+        error: &Error,
+        description: impl AsRef<str>,
+    ) -> std::result::Result<(), String> {
+        let description = description.as_ref();
+
         if let Some(is_client_error) = self.is_client_error {
-            assert_eq!(is_client_error, !error.is_server_error());
+            if is_client_error != !error.is_server_error() {
+                return Err(format!(
+                    "{}: expected client error but got {:?}",
+                    description, error
+                ));
+            }
         }
         if let Some(error_contains) = &self.error_contains {
             match &error.message() {
-                Some(msg) => assert!(msg.contains(error_contains)),
-                None => panic!("{} should include message field", error),
+                Some(msg) if msg.contains(error_contains) => (),
+                _ => {
+                    return Err(format!(
+                        "{}: \"{}\" should include message field",
+                        description, error
+                    ))
+                }
             }
         }
         if let Some(error_code) = self.error_code {
             match &error.code() {
-                Some(code) => assert_eq!(
-                    *code, error_code,
-                    "error {:?} did not match expected error code {}",
-                    error, error_code
-                ),
-                None => panic!("{} should include code", error),
+                Some(code) => {
+                    if code != &error_code {
+                        return Err(format!(
+                            "{}: error code {} ({:?}) did not match expected error code {}",
+                            description,
+                            code,
+                            error.code_name(),
+                            error_code
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!(
+                        "{}: {:?} was expected to include code {} but had no code",
+                        description, error, error_code
+                    ))
+                }
             }
         }
-        if let Some(error_code_name) = &self.error_code_name {
-            match &error.code_name() {
-                Some(name) => assert_eq!(&error_code_name, name),
-                None => panic!("{} should include code name", error),
+
+        if let Some(expected_code_name) = &self.error_code_name {
+            match error.code_name() {
+                Some(name) => {
+                    if name != expected_code_name {
+                        return Err(format!(
+                            "{}: error code name \"{}\" did not match expected error code name \
+                             \"{}\"",
+                            description, name, expected_code_name,
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!(
+                        "{}: {:?} was expected to include code name \"{}\" but had no code name",
+                        description, error, expected_code_name
+                    ))
+                }
             }
         }
         if let Some(error_labels_contain) = &self.error_labels_contain {
             for label in error_labels_contain {
-                assert!(error.labels().contains(label));
+                if !error.contains_label(label) {
+                    return Err(format!(
+                        "{}: expected {:?} to contain label \"{}\"",
+                        description, error, label
+                    ));
+                }
             }
         }
         if let Some(error_labels_omit) = &self.error_labels_omit {
             for label in error_labels_omit {
-                assert!(!error.labels().contains(label));
+                if error.contains_label(label) {
+                    return Err(format!(
+                        "{}: expected {:?} to omit label \"{}\"",
+                        description, error, label
+                    ));
+                }
             }
         }
         if self.expect_result.is_some() {
             // TODO RUST-260: match against partial results
         }
+        Ok(())
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::test::{run_spec_test, TestClient, LOCK};
+use crate::test::{TestClient, LOCK};
 
 use super::{run_spec_test_with_path, run_unified_format_test_filtered, unified_runner::TestCase};
 
