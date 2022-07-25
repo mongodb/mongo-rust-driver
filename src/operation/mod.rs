@@ -17,6 +17,7 @@ mod insert;
 mod list_collections;
 mod list_databases;
 mod list_indexes;
+mod raw_output;
 mod run_command;
 mod update;
 
