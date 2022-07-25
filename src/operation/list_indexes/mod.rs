@@ -3,7 +3,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, Operation},
+    operation::{append_options, OperationWithDefaults},
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
@@ -36,7 +36,7 @@ impl ListIndexes {
     }
 }
 
-impl Operation for ListIndexes {
+impl OperationWithDefaults for ListIndexes {
     type O = CursorSpecification;
     type Command = Document;
 

@@ -11,7 +11,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
-    operation::{remove_empty_write_concern, Operation, Retryability, WriteResponseBody},
+    operation::{remove_empty_write_concern, OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Namespace,
@@ -49,7 +49,7 @@ impl<'a, T> Insert<'a, T> {
     }
 }
 
-impl<'a, T: Serialize> Operation for Insert<'a, T> {
+impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
     type O = InsertManyResult;
     type Command = InsertCommand;
 

@@ -74,6 +74,8 @@ pub(crate) use update::Update;
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 
 /// A trait modeling the behavior of a server side operation.
+/// 
+/// No methods in this trait should have default behaviors to ensure that wrapper operations replicate all behavior.  Default behavior is provided by the `OperationDefault` trait.
 pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
@@ -90,15 +92,11 @@ pub(crate) trait Operation {
 
     /// Perform custom serialization of the built command.
     /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        Ok(bson::to_vec(&cmd)?)
-    }
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>>;
 
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
-    fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>> {
-        Ok(None)
-    }
+    fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>>;
 
     /// Interprets the server response to the command.
     fn handle_response(
@@ -109,52 +107,32 @@ pub(crate) trait Operation {
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        Err(error)
-    }
+    fn handle_error(&self, error: Error) -> Result<Self::O>;
 
     /// Criteria to use for selecting the server that this operation will be executed on.
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        None
-    }
+    fn selection_criteria(&self) -> Option<&SelectionCriteria>;
 
     /// Whether or not this operation will request acknowledgment from the server.
-    fn is_acknowledged(&self) -> bool {
-        self.write_concern()
-            .map(WriteConcern::is_acknowledged)
-            .unwrap_or(true)
-    }
+    fn is_acknowledged(&self) -> bool;
 
     /// The write concern to use for this operation, if any.
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        None
-    }
+    fn write_concern(&self) -> Option<&WriteConcern>;
 
     /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        false
-    }
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool;
 
     /// Whether this operation supports sessions or not.
-    fn supports_sessions(&self) -> bool {
-        true
-    }
+    fn supports_sessions(&self) -> bool;
 
     /// The level of retryability the operation supports.
-    fn retryability(&self) -> Retryability {
-        Retryability::None
-    }
+    fn retryability(&self) -> Retryability;
 
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self) {}
+    fn update_for_retry(&mut self);
 
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-        None
-    }
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
-    fn name(&self) -> &str {
-        Self::NAME
-    }
+    fn name(&self) -> &str;
 }
 
 pub(crate) trait CommandBody: Serialize {
@@ -399,3 +377,139 @@ macro_rules! remove_empty_write_concern {
 }
 
 pub(crate) use remove_empty_write_concern;
+
+// A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be implemented by leaf operation types.
+pub(crate) trait OperationWithDefaults {
+    /// The output type of this operation.
+    type O;
+
+    /// The format of the command body constructed in `build`.
+    type Command: CommandBody;
+
+    /// The name of the server side command associated with this operation.
+    const NAME: &'static str;
+
+    /// Returns the command that should be sent to the server as part of this operation.
+    /// The operation may store some additional state that is required for handling the response.
+    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
+
+    /// Perform custom serialization of the built command.
+    /// By default, this will just call through to the `Serialize` implementation of the command.
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+        Ok(bson::to_vec(&cmd)?)
+    }
+
+    /// Parse the response for the atClusterTime field.
+    /// Depending on the operation, this may be found in different locations.
+    fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>> {
+        Ok(None)
+    }
+
+    /// Interprets the server response to the command.
+    fn handle_response(
+        &self,
+        response: RawCommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O>;
+
+    /// Interpret an error encountered while sending the built command to the server, potentially
+    /// recovering.
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        Err(error)
+    }
+
+    /// Criteria to use for selecting the server that this operation will be executed on.
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        None
+    }
+
+    /// Whether or not this operation will request acknowledgment from the server.
+    fn is_acknowledged(&self) -> bool {
+        self.write_concern()
+            .map(WriteConcern::is_acknowledged)
+            .unwrap_or(true)
+    }
+
+    /// The write concern to use for this operation, if any.
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        None
+    }
+
+    /// Returns whether or not this command supports the `readConcern` field.
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        false
+    }
+
+    /// Whether this operation supports sessions or not.
+    fn supports_sessions(&self) -> bool {
+        true
+    }
+
+    /// The level of retryability the operation supports.
+    fn retryability(&self) -> Retryability {
+        Retryability::None
+    }
+
+    /// Updates this operation as needed for a retry.
+    fn update_for_retry(&mut self) {}
+
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        None
+    }
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+}
+
+impl<T: OperationWithDefaults> Operation for T {
+        type O = T::O;
+        type Command = T::Command;
+        const NAME: &'static str = T::NAME;    
+        fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+            self.build(description)
+        }
+        fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+            self.serialize_command(cmd)
+        }
+        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
+            self.extract_at_cluster_time(response)
+        }
+        fn handle_response(
+            &self,
+            response: RawCommandResponse,
+            description: &StreamDescription,
+        ) -> Result<Self::O> {
+            self.handle_response(response, description)
+        }
+        fn handle_error(&self, error: Error) -> Result<Self::O> {
+            self.handle_error(error)
+        }
+        fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+            self.selection_criteria()
+        }
+        fn is_acknowledged(&self) -> bool {
+            self.is_acknowledged()
+        }
+        fn write_concern(&self) -> Option<&WriteConcern> {
+            self.write_concern()
+        }
+        fn supports_read_concern(&self, description: &StreamDescription) -> bool {
+            self.supports_read_concern(description)
+        }
+        fn supports_sessions(&self) -> bool {
+            self.supports_sessions()
+        }
+        fn retryability(&self) -> Retryability {
+            self.retryability()
+        }
+        fn update_for_retry(&mut self) {
+            self.update_for_retry()
+        }
+        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+            self.pinned_connection()
+        }
+        fn name(&self) -> &str {
+            self.name()
+        }
+}

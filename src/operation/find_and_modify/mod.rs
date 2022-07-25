@@ -21,7 +21,7 @@ use crate::{
         Namespace,
     },
     error::{ErrorKind, Result},
-    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
     options::WriteConcern,
 };
 
@@ -95,7 +95,7 @@ where
     }
 }
 
-impl<T> Operation for FindAndModify<T>
+impl<T> OperationWithDefaults for FindAndModify<T>
 where
     T: DeserializeOwned,
 {

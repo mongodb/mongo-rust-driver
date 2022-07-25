@@ -5,12 +5,12 @@ use crate::{
     client::session::TransactionPin,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{Operation, Retryability},
+    operation::{Retryability},
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{WriteConcernOnlyBody, OperationWithDefaults};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -26,7 +26,7 @@ impl AbortTransaction {
     }
 }
 
-impl Operation for AbortTransaction {
+impl OperationWithDefaults for AbortTransaction {
     type O = ();
     type Command = Document;
 

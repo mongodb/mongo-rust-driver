@@ -5,7 +5,7 @@ use std::convert::TryInto;
 
 use bson::RawBsonRef;
 
-use super::{CursorBody, Operation};
+use super::{CursorBody, Operation, OperationWithDefaults};
 use crate::{
     bson::Document,
     client::SESSIONS_UNSUPPORTED_COMMANDS,
@@ -50,7 +50,7 @@ impl<'conn> RunCommand<'conn> {
     }
 }
 
-impl<'conn> Operation for RunCommand<'conn> {
+impl<'conn> OperationWithDefaults for RunCommand<'conn> {
     type O = Document;
     type Command = Document;
 

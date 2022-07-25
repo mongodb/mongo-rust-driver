@@ -5,7 +5,7 @@ use std::convert::TryInto;
 
 use serde::Deserialize;
 
-use super::{Operation, Retryability, SingleCursorResult};
+use super::{OperationWithDefaults, Retryability, SingleCursorResult};
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
@@ -75,7 +75,7 @@ impl CountDocuments {
     }
 }
 
-impl Operation for CountDocuments {
+impl OperationWithDefaults for CountDocuments {
     type O = u64;
     type Command = Document;
 

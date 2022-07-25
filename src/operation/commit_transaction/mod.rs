@@ -5,7 +5,7 @@ use bson::{doc, Document};
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
 };
 
@@ -21,7 +21,7 @@ impl CommitTransaction {
     }
 }
 
-impl Operation for CommitTransaction {
+impl OperationWithDefaults for CommitTransaction {
     type O = ();
     type Command = Document;
 

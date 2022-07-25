@@ -9,7 +9,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, Result},
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
 };
 
@@ -35,7 +35,7 @@ impl Count {
     }
 }
 
-impl Operation for Count {
+impl OperationWithDefaults for Count {
     type O = u64;
     type Command = Document;
 

@@ -9,12 +9,12 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
 
-use super::{CursorBody, WriteConcernOnlyBody, SERVER_4_2_0_WIRE_VERSION};
+use super::{CursorBody, WriteConcernOnlyBody, SERVER_4_2_0_WIRE_VERSION, OperationWithDefaults};
 
 pub(crate) use change_stream::ChangeStreamAggregate;
 
@@ -46,7 +46,7 @@ impl Aggregate {
 
 // IMPORTANT: If new method implementations are added here, make sure `ChangeStreamAggregate` has
 // the equivalent delegations.
-impl Operation for Aggregate {
+impl OperationWithDefaults for Aggregate {
     type O = CursorSpecification;
     type Command = Document;
 
