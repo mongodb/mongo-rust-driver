@@ -1,4 +1,6 @@
 pub mod auth;
+#[cfg(feature = "csfle")]
+mod csfle;
 mod executor;
 pub mod options;
 pub mod session;
@@ -101,6 +103,8 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
+    #[cfg(feature = "csfle")]
+    csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
 }
 
 impl Client {
@@ -122,10 +126,23 @@ impl Client {
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
+            #[cfg(feature = "csfle")]
+            csfle: Default::default(),
             options,
         });
-
         Ok(Self { inner })
+    }
+
+    /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption
+    /// enabled.
+    #[cfg(feature = "csfle")]
+    pub async fn with_encryption_options(
+        options: ClientOptions,
+        auto_enc: options::AutoEncryptionOptions,
+    ) -> Result<Self> {
+        let client = Self::with_options(options)?;
+        *client.inner.csfle.write().await = Some(csfle::ClientState::new(&client, auto_enc).await?);
+        Ok(client)
     }
 
     pub(crate) fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
@@ -439,5 +456,37 @@ impl Client {
             .peek_latest()
             .description
             .clone()
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) fn weak(&self) -> WeakClient {
+        WeakClient {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
+    #[cfg(feature = "csfle")]
+    #[allow(dead_code)]
+    pub(crate) async fn auto_encryption_opts(
+        &self,
+    ) -> Option<tokio::sync::RwLockReadGuard<'_, options::AutoEncryptionOptions>> {
+        tokio::sync::RwLockReadGuard::try_map(self.inner.csfle.read().await, |csfle| {
+            csfle.as_ref().map(|cs| cs.opts())
+        })
+        .ok()
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Clone, Debug)]
+pub(crate) struct WeakClient {
+    inner: std::sync::Weak<ClientInner>,
+}
+
+#[cfg(feature = "csfle")]
+impl WeakClient {
+    #[allow(dead_code)]
+    pub(crate) fn upgrade(&self) -> Option<Client> {
+        self.inner.upgrade().map(|inner| Client { inner })
     }
 }
