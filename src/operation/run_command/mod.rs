@@ -5,7 +5,7 @@ use std::convert::TryInto;
 
 use bson::RawBsonRef;
 
-use super::{CursorBody, Operation, OperationWithDefaults};
+use super::{CursorBody, OperationWithDefaults};
 use crate::{
     bson::Document,
     client::SESSIONS_UNSUPPORTED_COMMANDS,

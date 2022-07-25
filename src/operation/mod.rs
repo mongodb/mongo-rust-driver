@@ -68,6 +68,7 @@ pub(crate) use insert::Insert;
 pub(crate) use list_collections::ListCollections;
 pub(crate) use list_databases::ListDatabases;
 pub(crate) use list_indexes::ListIndexes;
+pub(crate) use raw_output::RawOutput;
 pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
