@@ -28,12 +28,6 @@ pub struct CollectionOptions {
 
     /// The default write concern for operations.
     pub write_concern: Option<WriteConcern>,
-
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub comment: Option<Bson>,
 }
 
 /// Specifies whether a
@@ -542,11 +536,10 @@ pub struct AggregateOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// Tags the query with an arbitrary string to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub comment: Option<Bson>,
+    // TODO: Change to Option<Bson> for 3.0 release.
+    pub comment: Option<String>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,
@@ -764,11 +757,9 @@ pub struct FindOptions {
     #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
     pub batch_size: Option<u32>,
 
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// Tags the query with an arbitrary string to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub comment: Option<Bson>,
+    pub comment: Option<String>,
 
     /// The type of cursor to return.
     #[serde(skip)]

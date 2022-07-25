@@ -1,7 +1,7 @@
 //! Contains options for ChangeStreams.
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use std::time::Duration;
+use std::{time::Duration, convert::TryInto};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -97,13 +97,12 @@ pub struct ChangeStreamOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     #[builder(default)]
     pub comment: Option<Bson>,
 }
 
 impl ChangeStreamOptions {
+    // TODO-Sana: should comment for ChangeStreamOptions be changed to Option<String>
     pub(crate) fn aggregate_options(&self) -> AggregateOptions {
         AggregateOptions::builder()
             .batch_size(self.batch_size)
