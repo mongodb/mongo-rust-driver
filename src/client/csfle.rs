@@ -1,4 +1,5 @@
 pub mod options;
+mod state_machine;
 
 use std::{
     path::Path,
