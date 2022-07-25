@@ -11,9 +11,8 @@ pub mod options;
 >>>>>>> e88913b (convert generic tfileid to bson)
 use core::task::{Context, Poll};
 use std::{
-    io::{self, Result},
-    marker::PhantomPinned,
     pin::Pin,
+    io::{self, Error}
 };
 >>>>>>> 5780428 (push public api skeleton)
 
@@ -184,11 +183,11 @@ pub struct GridFsBucket {
 }
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
-pub struct GridFsStream {
+pub struct GridFsUploadStream {
     pub id: Bson,
-    _pin: PhantomPinned,
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 impl AsyncRead for GridFSStream {
 >>>>>>> 5780428 (push public api skeleton)
@@ -204,10 +203,18 @@ impl AsyncRead for GridFsStream {
 =======
     ) -> Poll<io::Result<()>> {
 >>>>>>> 5780428 (push public api skeleton)
+=======
+impl AsyncWrite for GridFsUploadStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8]
+    ) -> Poll<Result<usize, Error>> {
+>>>>>>> a070beb (split GridFsStream type)
         todo!()
     }
-}
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 impl futures_util::io::AsyncRead for GridFsDownloadStream {
@@ -385,14 +392,33 @@ impl AsyncWrite for GridFSStream {
 impl AsyncWrite for GridFsStream {
 >>>>>>> d77c8b0 (add public api documentation)
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
+=======
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>
+    ) -> Poll<Result<(), Error>> {
+>>>>>>> a070beb (split GridFsStream type)
         todo!()
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<()>> {
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>
+    ) -> Poll<Result<(), Error>> {
         todo!()
     }
+}
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<()>> {
+pub struct GridFsDownloadStream {
+    pub id: Bson,
+}
+
+impl AsyncRead for GridFsDownloadStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>
+    ) -> Poll<io::Result<()>> {
         todo!()
     }
 }
@@ -428,28 +454,28 @@ impl GridFsBucket {
         self.db.selection_criteria()
     }
 
-    /// Opens a [`GridFsStream`] that the application can write the contents of the file to.
+    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
     /// The application provides a custom file id.
     ///
-    /// Returns a [`GridFsStream`] to which the application will write the contents.
+    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
     pub fn open_upload_stream_with_id(
         &self,
         id: Bson,
         filename: String,
-        options: impl Into<GridFsUploadOptions>,
-    ) -> GridFsStream {
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) -> GridFsUploadStream {
         todo!()
     }
 
-    /// Opens a [`GridFsStream`] that the application can write the contents of the file to.
+    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
     /// The driver generates a unique [`Bson::ObjectId`] for the file id.
     ///
-    /// Returns a [`GridFsStream`] to which the application will write the contents.
+    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
     pub fn open_upload_stream(
         &self,
         filename: String,
-        options: impl Into<GridFsUploadOptions>,
-    ) -> GridFsStream {
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) -> GridFsUploadStream {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
     }
 
@@ -458,8 +484,8 @@ impl GridFsBucket {
         &self,
         id: Bson,
         filename: String,
-        source: GridFsStream,
-        options: impl Into<GridFsUploadOptions>,
+        source: impl AsyncRead,
+        options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         todo!()
     }
@@ -469,32 +495,32 @@ impl GridFsBucket {
     pub fn upload_from_stream(
         &self,
         filename: String,
-        source: GridFsStream,
-        options: impl Into<GridFsUploadOptions>,
+        source: impl AsyncRead,
+        options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         self.upload_from_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, source, options)
     }
 
-    /// Opens and returns a [`GridFsStream`] from which the application can read
+    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
-    pub fn open_download_stream(&self, id: Bson) -> GridFsStream {
+    pub fn open_download_stream(&self, id: Bson) -> GridFsDownloadStream {
         todo!()
     }
 
-    /// Opens and returns a [`GridFsStream`] from which the application can read
+    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `filename` and the revision
     /// in `options`.
     pub fn open_download_stream_by_name(
         &self,
         filename: String,
-        options: impl Into<GridFsDownloadByNameOptions>,
-    ) -> GridFsStream {
+        options: impl Into<Option<GridFsDownloadByNameOptions>>,
+    ) -> GridFsDownloadStream {
         todo!()
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the destination [`GridFsStream`].
-    pub fn download_to_stream<T>(&self, id: Bson, destination: GridFsStream) {
+    /// the contents to the destination [`GridFsDownloadStream`].
+    pub fn download_to_stream<T>(&self, id: Bson, destination: impl AsyncWrite) {
         todo!()
     }
 
@@ -504,8 +530,8 @@ impl GridFsBucket {
     pub fn download_to_stream_by_name(
         &self,
         filename: String,
-        destination: GridFsStream,
-        options: impl Into<GridFsDownloadByNameOptions>,
+        destination: impl AsyncWrite,
+        options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) {
         todo!()
     }
@@ -556,8 +582,8 @@ impl GridFsBucket {
     pub fn find(
         &self,
         filter: Document,
-        options: impl Into<GridFsBucketOptions>,
-    ) -> Result<Cursor<FilesCollectionDocument>> {
+        options: impl Into<Option<GridFsBucketOptions>>,
+    ) -> io::Result<Cursor<FilesCollectionDocument>> {
         todo!()
     }
 
