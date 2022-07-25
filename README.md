@@ -32,7 +32,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 
 ## Installation
 ### Requirements
-- Rust 1.53+
+- Rust 1.56+
 - MongoDB 3.6+
 
 ### Importing
@@ -369,7 +369,7 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 ## Minimum supported Rust version (MSRV)
 
-The MSRV for this crate is currently 1.53.0. This will be rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.56.0. This will be rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## License
