@@ -17,13 +17,20 @@ impl Client {
         loop {
             match ctx.state()? {
                 State::NeedMongoCollinfo => {
-                    let filter: Document = raw_to_doc(ctx.mongo_op()?)?;
+                    let filter = raw_to_doc(ctx.mongo_op()?)?;
                     let db = db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoCollinfo state"))?;
                     let mut cursor = db.list_collections(filter, None).await?;
                     if cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;
                     }
                 }
+                State::NeedMongoMarkings => {
+                    let command = raw_to_doc(ctx.mongo_op()?)?;
+                    let db = db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoMarkings state"))?;
+                    let result = db.run_command(command, None).await?;
+                }
+                State::Ready => result = ctx.finalize()?.to_owned(),
+                State::Done => break,    
                 _ => todo!(),
             }
         }
