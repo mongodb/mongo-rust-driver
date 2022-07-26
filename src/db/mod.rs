@@ -298,27 +298,23 @@ impl Database {
         resolve_options!(self, options, [write_concern]);
         let mut session = session.into();
 
-        let coll = name.as_ref().to_string();
+        let ns = Namespace {
+            db: self.name().to_string(),
+            coll: name.as_ref().to_string(),
+        };
 
         #[cfg(feature = "csfle")]
-        self.create_aux_collections(&coll, &mut options, session.as_deref_mut())
+        self.create_aux_collections(&ns, &mut options, session.as_deref_mut())
             .await?;
 
-        let db = self.name().to_string();
-        let create = Create::new(
-            Namespace {
-                db,
-                coll: coll.clone(),
-            },
-            options,
-        );
+        let create = Create::new(ns.clone(), options);
         self.client()
             .execute_operation(create, session.as_deref_mut())
             .await?;
 
         #[cfg(feature = "csfle")]
         {
-            let coll = self.collection::<Document>(&coll);
+            let coll = self.collection::<Document>(&ns.coll);
             coll.create_index_common(
                 crate::IndexModel {
                     keys: doc! {"__safeContent__": 1},
@@ -337,7 +333,7 @@ impl Database {
     #[allow(clippy::needless_option_as_deref)]
     async fn create_aux_collections(
         &self,
-        base_name: &str,
+        base_ns: &Namespace,
         options: &mut Option<CreateCollectionOptions>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<()> {
@@ -352,7 +348,7 @@ impl Database {
             if let Some(enc_opts_fields) = enc_opts
                 .as_ref()
                 .and_then(|eo| eo.encrypted_fields_map.as_ref())
-                .and_then(|efm| efm.get(&format!("{}.{}", self.name(), base_name)))
+                .and_then(|efm| efm.get(&format!("{}", &base_ns)))
             {
                 options
                     .get_or_insert_with(Default::default)
@@ -362,7 +358,7 @@ impl Database {
 
         if let Some(opts) = options.as_ref() {
             if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                for ns in crate::client::csfle::aux_collections(base_name, enc_fields)? {
+                for ns in crate::client::csfle::aux_collections(base_ns, enc_fields)? {
                     let mut sub_opts = opts.clone();
                     sub_opts.clustered_index = Some(self::options::ClusteredIndex {
                         key: doc! { "_id": 1 },

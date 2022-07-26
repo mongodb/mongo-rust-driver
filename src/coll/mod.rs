@@ -305,7 +305,7 @@ impl<T> Collection<T> {
 
         // Drop the collections.
         if let Some(enc_fields) = enc_fields {
-            for ns in crate::client::csfle::aux_collections(self.name(), enc_fields)? {
+            for ns in crate::client::csfle::aux_collections(&self.namespace(), enc_fields)? {
                 let drop = DropCollection::new(ns, options.cloned());
                 self.client()
                     .execute_operation(drop, session.as_deref_mut())

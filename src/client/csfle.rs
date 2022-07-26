@@ -177,19 +177,19 @@ impl ClientState {
 }
 
 pub(crate) fn aux_collections(
-    base_name: &str,
+    base_ns: &Namespace,
     enc_fields: &bson::Document,
 ) -> Result<Vec<Namespace>> {
     let mut out = vec![];
     for &key in &["esc", "ecc", "ecoc"] {
-        let name = match enc_fields.get_str(format!("{}Collection", key)) {
+        let coll = match enc_fields.get_str(format!("{}Collection", key)) {
             Ok(s) => s.to_string(),
-            Err(_) => format!("enxcol_.{}.{}", base_name, key),
+            Err(_) => format!("enxcol_.{}.{}", base_ns.coll, key),
         };
-        out.push(
-            Namespace::from_str(&name)
-                .ok_or_else(|| Error::invalid_argument(format!("invalid namespace {:?}", name)))?,
-        );
+        out.push(Namespace {
+            coll,
+            ..base_ns.clone()
+        });
     }
     Ok(out)
 }

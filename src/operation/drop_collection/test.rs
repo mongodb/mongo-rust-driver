@@ -15,6 +15,7 @@ fn build() {
             w: Some(Acknowledgment::Custom("abc".to_string())),
             ..Default::default()
         }),
+        ..Default::default()
     };
 
     let ns = Namespace {
