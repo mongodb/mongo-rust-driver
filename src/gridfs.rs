@@ -9,6 +9,8 @@ use crate::{
     error::Result,
     selection_criteria::SelectionCriteria,
     Database,
+    error::{Error, ErrorKind, Result},
+    Collection,
 };
 use bson::{oid::ObjectId, Bson, DateTime, Document};
 use options::*;
@@ -24,7 +26,7 @@ struct Chunk {
     files_id: Bson,
     n: u32,
     // default size is 255 KiB
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 /// A collection in which information about stored files is stored. There will be one files
@@ -244,7 +246,20 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        todo!()
+        let collection = self.db.collection::<FilesCollectionDocument>(
+            &(self.options.map_or("fs".to_string(), |opts| {
+                opts.bucket_name.unwrap_or("fs".to_string())
+            }) + ".files"),
+        );
+
+        let fcd = match collection.find_one(doc! { "_id": id }, None).await? {
+            Some(fcd) => fcd,
+            None => return Err(Error::new(crate::error::ErrorKind::InvalidArgument { message: String::from("pls") }, None)),
+        };
+
+        
+
+        Ok(GridFsDownloadStream { id, fcd, chunks })
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
