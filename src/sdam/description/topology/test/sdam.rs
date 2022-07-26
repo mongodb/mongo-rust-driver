@@ -1,4 +1,9 @@
-use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use bson::Document;
 use serde::Deserialize;
@@ -13,6 +18,7 @@ use crate::{
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
+    runtime,
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
@@ -816,4 +822,131 @@ async fn pool_cleared_error_does_not_mark_unknown() {
             .server_type,
         ServerType::Standalone
     );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn streaming_min_heartbeat_frequency() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
+    let handler = Arc::new(EventHandler::new());
+    let mut options = CLIENT_OPTIONS.get().await.clone();
+    options.heartbeat_freq = Some(Duration::from_millis(500));
+    options.sdam_event_handler = Some(handler.clone());
+
+    let hosts = options.hosts.clone();
+
+    let client = Client::with_options(options).unwrap();
+    // discover a server
+    client
+        .database("admin")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .unwrap();
+
+    // For each server in the topology, start a task that ensures heartbeats happen roughly every
+    // 500ms for 5 heartbeats.
+    let mut tasks = Vec::new();
+    for address in hosts {
+        let h = handler.clone();
+        tasks.push(runtime::spawn(async move {
+            let mut subscriber = h.subscribe();
+            for _ in 0..5 {
+                let event = subscriber
+                    .wait_for_event(Duration::from_millis(750), |e| {
+                        matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) if e.server_address == address)
+                    })
+                    .await;
+                if event.is_none() {
+                    return Err(format!("timed out waiting for heartbeat from {}", address));
+                }
+            }
+            Ok(())
+        }));
+    }
+
+    for task in tasks {
+        task.await.unwrap();
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn rtt_is_updated() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let test_client = TestClient::new().await;
+    if test_client.server_version_lt(4, 4) {
+        log_uncaptured(format!(
+            "skipping rtt_is_updated due to server version less than 4.4"
+        ));
+        return;
+    }
+
+    let app_name = "streamingRttTest";
+
+    let handler = Arc::new(EventHandler::new());
+    let mut options = CLIENT_OPTIONS.get().await.clone();
+    options.heartbeat_freq = Some(Duration::from_millis(500));
+    options.app_name = Some(app_name.to_string());
+    options.sdam_event_handler = Some(handler.clone());
+    options.hosts.drain(1..);
+    options.direct_connection = Some(true);
+
+    let host = options.hosts[0].clone();
+
+    let client = Client::with_options(options).unwrap();
+    let mut subscriber = handler.subscribe();
+
+    // run a find to wait for the primary to be discovered
+    client
+        .database("foo")
+        .collection::<Document>("bar")
+        .find(None, None)
+        .await
+        .unwrap();
+
+    // wait for multiple heartbeats, assert their RTT is > 0
+    log_uncaptured("collecting events");
+    let events = subscriber
+        .collect_events(Duration::from_secs(2), |e| {
+            if let Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) = e {
+                assert!(
+                    e.new_description.average_round_trip_time().unwrap() > Duration::from_millis(0)
+                );
+            };
+            true
+        })
+        .await;
+    assert!(events.len() > 0);
+
+    // configure a failpoint that blocks hello commands
+    let fp = FailPoint::fail_command(
+        &["hello", LEGACY_HELLO_COMMAND_NAME],
+        FailPointMode::Times(1000),
+        FailCommandOptions::builder()
+            .block_connection(Duration::from_millis(500))
+            .app_name(app_name.to_string())
+            .build(),
+    );
+    let _gp_guard = fp.enable(&client, None).await.unwrap();
+
+    let mut watcher = client.topology().watch();
+    runtime::timeout(Duration::from_secs(10), async move {
+        loop {
+            watcher.wait_for_update(Duration::MAX).await;
+            let rtt = watcher
+                .borrow()
+                .server_description(&host)
+                .unwrap()
+                .average_round_trip_time
+                .unwrap();
+
+            if rtt > Duration::from_millis(250) {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
 }

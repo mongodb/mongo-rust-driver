@@ -566,7 +566,10 @@ impl TopologyWorker {
             let updated = is_load_balanced
                 || self.mark_server_as_unknown(server.address.clone(), error.clone());
             if updated {
-                server.pool.clear(error.clone(), handshake.service_id()).await;
+                server
+                    .pool
+                    .clear(error.clone(), handshake.service_id())
+                    .await;
                 if !error.is_auth_error() {
                     self.check_manager.cancel_in_progress_checks(error);
                 }
@@ -805,7 +808,7 @@ enum TopologyCheckMessage {
     ImmediateCheck,
 
     /// The monitor should cancel any in-progress checks.
-    CancelCheck { reason: Error }
+    CancelCheck { reason: Error },
 }
 
 impl TopologyCheckManager {
@@ -820,7 +823,9 @@ impl TopologyCheckManager {
     }
 
     fn cancel_in_progress_checks(&self, reason: Error) {
-        let _ = self.sender.send(TopologyCheckMessage::CancelCheck { reason });
+        let _ = self
+            .sender
+            .send(TopologyCheckMessage::CancelCheck { reason });
     }
 
     /// Subscribe to check requests.
@@ -844,24 +849,26 @@ impl TopologyCheckRequestReceiver {
                 match self.receiver.recv().await {
                     Ok(TopologyCheckMessage::ImmediateCheck) => return,
                     Ok(TopologyCheckMessage::CancelCheck { .. }) => continue,
-                    Err(_) => return
+                    Err(_) => return,
                 }
             }
-        }).await;
+        })
+        .await;
     }
 
     // pub(crate) fn subscribe_to_cancellations(&self) -> Option<()> {
     //     self.receiver.clone()
     // }
 
-    /// Wait until a cancellation is seen or the given duration has elapsed, ignoring any check requests.
-    /// If a cancellation was requested, this method returns the error that caused it. Otherwise None is returned.
+    /// Wait until a cancellation is seen or the given duration has elapsed, ignoring any check
+    /// requests. If a cancellation was requested, this method returns the error that caused it.
+    /// Otherwise None is returned.
     pub(crate) async fn listen_for_cancellation(&mut self) -> Option<Error> {
         loop {
             match self.receiver.recv().await {
                 Ok(TopologyCheckMessage::CancelCheck { reason }) => return Some(reason),
                 Ok(TopologyCheckMessage::ImmediateCheck) => continue,
-                Err(_) => return None
+                Err(_) => return None,
             }
         }
     }

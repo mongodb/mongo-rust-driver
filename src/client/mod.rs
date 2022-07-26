@@ -458,6 +458,11 @@ impl Client {
             .clone()
     }
 
+    #[cfg(test)]
+    pub(crate) fn topology(&self) -> &crate::sdam::Topology {
+        &self.inner.topology
+    }
+
     #[cfg(feature = "csfle")]
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {

@@ -6,13 +6,17 @@ use tokio::sync::watch;
 use super::{
     description::server::{ServerDescription, TopologyVersion},
     topology::SdamEventEmitter,
-    TopologyCheckRequestReceiver, TopologyUpdater, TopologyWatcher,
+    TopologyCheckRequestReceiver,
+    TopologyUpdater,
+    TopologyWatcher,
 };
 use crate::{
     cmap::{Connection, Handshaker},
     error::{Error, Result},
     event::sdam::{
-        SdamEvent, ServerHeartbeatFailedEvent, ServerHeartbeatStartedEvent,
+        SdamEvent,
+        ServerHeartbeatFailedEvent,
+        ServerHeartbeatStartedEvent,
         ServerHeartbeatSucceededEvent,
     },
     hello::{hello_command, run_hello, AwaitableHelloOptions, HelloReply},
@@ -72,7 +76,7 @@ impl Monitor {
         };
 
         runtime::execute(monitor.execute());
-        // runtime::execute(rtt_monitor.execute());
+        runtime::execute(rtt_monitor.execute());
     }
 
     async fn execute(mut self) {

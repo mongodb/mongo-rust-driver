@@ -106,7 +106,7 @@ impl From<TopologyVersion> for Bson {
 }
 
 /// A description of the most up-to-date information known about a server.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct ServerDescription {
     /// The address of this server.
     pub(crate) address: ServerAddress,
@@ -133,6 +133,15 @@ pub(crate) struct ServerDescription {
     // ServerDescription for information we need from the hello reply by propagating with `?`.
     #[serde(serialize_with = "bson_util::serialize_result_error_as_string")]
     pub(crate) reply: Result<Option<HelloReply>>,
+}
+
+impl Serialize for ServerDescription {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        todo!()
+    }
 }
 
 impl PartialEq for ServerDescription {
