@@ -156,6 +156,8 @@ async fn invalid() {
         let path = path.join(&test_file_path);
         let path_display = path.display().to_string();
 
+        file_level_log(format!("Attempting to parse {}", path_display));
+
         let json: serde_json::Value =
             serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();
         let result: Result<TestFile, _> = bson::from_bson(
