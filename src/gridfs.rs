@@ -2,8 +2,8 @@ pub mod options;
 
 use core::task::{Context, Poll};
 use std::{
+    io::{self, Error},
     pin::Pin,
-    io::{self, Error}
 };
 
 use crate::{
@@ -16,6 +16,7 @@ use crate::{
 use options::*;
 
 use bson::{oid::ObjectId, Bson, DateTime, Document};
+use futures_util;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 // Contained in a "chunks" collection for each user file
@@ -50,26 +51,27 @@ pub struct GridFsUploadStream {
     pub id: Bson,
 }
 
+impl GridFsUploadStream {
+    /// Consumes the stream and uploads data in the stream to the server.
+    pub fn finish(self) {
+        todo!()
+    }
+}
+
 impl AsyncWrite for GridFsUploadStream {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8]
+        buf: &[u8],
     ) -> Poll<Result<usize, Error>> {
         todo!()
     }
 
-    fn poll_flush(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>
-    ) -> Poll<Result<(), Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         todo!()
     }
 
-    fn poll_shutdown(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>
-    ) -> Poll<Result<(), Error>> {
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         todo!()
     }
 }
@@ -82,7 +84,7 @@ impl AsyncRead for GridFsDownloadStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>
+        buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         todo!()
     }
@@ -144,26 +146,60 @@ impl GridFsBucket {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
     }
 
-    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id.
-    pub fn upload_from_stream_with_id(
+    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
+    /// `tokio` runtime.
+    pub fn upload_from_stream_with_id_tokio(
         &self,
         id: Bson,
         filename: String,
-        source: impl AsyncRead,
+        source: impl tokio::io::AsyncRead,
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) {
+        todo!()
+    }
+
+    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
+    /// `futures` crate.
+    pub fn upload_from_stream_with_id_futures(
+        &self,
+        id: Bson,
+        filename: String,
+        source: impl futures_util::io::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         todo!()
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id.
-    pub fn upload_from_stream(
+    /// the file id. Uses the `tokio` runtime.
+    pub fn upload_from_stream_tokio(
         &self,
         filename: String,
         source: impl AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
-        self.upload_from_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, source, options)
+        self.upload_from_stream_with_id_tokio(
+            Bson::ObjectId(ObjectId::new()),
+            filename,
+            source,
+            options,
+        )
+    }
+
+    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
+    /// the file id. Uses the `futures` crate.
+    pub fn upload_from_stream_futures(
+        &self,
+        filename: String,
+        source: impl futures_util::io::AsyncRead,
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) {
+        self.upload_from_stream_with_id_futures(
+            Bson::ObjectId(ObjectId::new()),
+            filename,
+            source,
+            options,
+        )
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
@@ -184,18 +220,40 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the destination [`GridFsDownloadStream`].
-    pub fn download_to_stream<T>(&self, id: Bson, destination: impl AsyncWrite) {
+    /// the contents to the destination [`GridFsDownloadStream`]. Uses the `tokio` runtime.
+    pub fn download_to_stream_tokio(&self, id: Bson, destination: impl tokio::io::AsyncWrite) {
+        todo!()
+    }
+
+    /// Downloads the contents of the stored file specified by `id` and writes
+    /// the contents to the destination [`GridFsDownloadStream`]. Uses the `futures` crate.
+    pub fn download_to_stream_futures(
+        &self,
+        id: Bson,
+        destination: impl futures_util::io::AsyncWrite,
+    ) {
         todo!()
     }
 
     /// Downloads the contents of the stored file specified by `filename` and by
     /// the revision in `options` and writes the contents to the destination
-    /// [`GridFsStream`].
-    pub fn download_to_stream_by_name(
+    /// [`GridFsStream`]. Uses the `tokio` runtime.
+    pub fn download_to_stream_by_name_tokio(
         &self,
         filename: String,
-        destination: impl AsyncWrite,
+        destination: impl tokio::io::AsyncWrite,
+        options: impl Into<Option<GridFsDownloadByNameOptions>>,
+    ) {
+        todo!()
+    }
+
+    /// Downloads the contents of the stored file specified by `filename` and by
+    /// the revision in `options` and writes the contents to the destination
+    /// [`GridFsStream`]. Uses the `futures` crate.
+    pub fn download_to_stream_by_name_futures(
+        &self,
+        filename: String,
+        destination: impl futures_util::io::AsyncWrite,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) {
         todo!()
