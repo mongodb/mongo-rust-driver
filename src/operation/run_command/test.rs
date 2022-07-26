@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use bson::Timestamp;
 
 use super::RunCommand;
@@ -20,7 +22,8 @@ fn build() {
         command
             .body
             .get("hello")
-            .and_then(crate::bson_util::get_int),
+            .unwrap()
+            .and_then(|raw| crate::bson_util::get_int(&raw.try_into().unwrap())),
         Some(1)
     );
 }

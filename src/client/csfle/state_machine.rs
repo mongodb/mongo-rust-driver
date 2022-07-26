@@ -5,7 +5,7 @@ use mongocrypt::ctx::{Ctx, State};
 
 use crate::{Client, Database};
 use crate::error::{Error, Result};
-use crate::operation::{ListCollections, RawOutput};
+use crate::operation::{ListCollections, RawOutput, RunCommand};
 
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
     raw.try_into().map_err(|e| Error::internal("???"))
@@ -23,11 +23,19 @@ impl Client {
                     if cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;
                     }
+                    ctx.mongo_done()?;
                 }
                 State::NeedMongoMarkings => {
-                    let command = raw_to_doc(ctx.mongo_op()?)?;
                     let db = db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoMarkings state"))?;
-                    let result = db.run_command(command, None).await?;
+                    let op = RawOutput(RunCommand::new_raw(
+                        db.name().to_string(),
+                        ctx.mongo_op()?.to_raw_document_buf(),
+                        None,
+                        None,
+                    )?);
+                    let result = self.execute_operation(op, None).await?;
+                    ctx.mongo_feed(result.raw_body())?;
+                    ctx.mongo_done()?;
                 }
                 State::Ready => result = ctx.finalize()?.to_owned(),
                 State::Done => break,    

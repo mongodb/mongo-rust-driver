@@ -153,6 +153,17 @@ impl CommandBody for Document {
     }
 }
 
+impl CommandBody for RawDocumentBuf {
+    fn should_redact(&self) -> bool {
+        if let Some(Ok((command_name, _))) = self.into_iter().next() {
+            HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
+                && self.get("speculativeAuthenticate").ok().flatten().is_some()
+        } else {
+            false
+        }
+    }
+}
+
 impl<T: CommandBody> Command<T> {
     pub(crate) fn should_redact(&self) -> bool {
         let name = self.name.to_lowercase();
