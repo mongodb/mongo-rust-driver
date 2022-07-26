@@ -238,9 +238,7 @@ impl TestRunner {
                         if let Err(e) = events_match(
                             actual,
                             expected,
-                            Some(&entities),
-                            test_case.description.as_str(),
-                        ) {
+                            Some(&entities)) {
                             panic!(
                                 "event mismatch: expected = {:#?}, actual = {:#?}\nall \
                                  expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",

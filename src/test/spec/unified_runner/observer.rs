@@ -65,7 +65,7 @@ impl EventObserver {
         // then count
         self.seen_events
             .iter()
-            .filter(|e| events_match(e, event, Some(&es), "event observer").is_ok())
+            .filter(|e| events_match(e, event, Some(&es)).is_ok())
             .count()
     }
 
@@ -84,7 +84,7 @@ impl EventObserver {
         runtime::timeout(Duration::from_secs(10), async {
             while let Some(e) = self.recv().await {
                 let es = entities.read().await;
-                if events_match(&e, event, Some(&es), "event observer").is_ok() {
+                if events_match(&e, event, Some(&es)).is_ok() {
                     seen += 1;
                     if seen == count {
                         return Ok(());

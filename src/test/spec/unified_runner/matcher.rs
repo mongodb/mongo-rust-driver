@@ -28,14 +28,13 @@ pub(crate) fn events_match(
     actual: &Event,
     expected: &ExpectedEvent,
     entities: Option<&EntityMap>,
-    description: impl AsRef<str>,
 ) -> Result<(), String> {
     match (actual, expected) {
         (Event::Command(act), ExpectedEvent::Command(exp)) => {
             command_events_match(act, exp, entities)
         }
         (Event::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
-        (Event::Sdam(act), ExpectedEvent::Sdam(exp)) => sdam_events_match(act, exp, description),
+        (Event::Sdam(act), ExpectedEvent::Sdam(exp)) => sdam_events_match(act, exp),
         _ => expected_err(actual, expected),
     }
 }
@@ -166,7 +165,6 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> Result
 fn sdam_events_match(
     actual: &SdamEvent,
     expected: &ExpectedSdamEvent,
-    description: impl AsRef<str>,
 ) -> Result<(), String> {
     match (actual, expected) {
         (
@@ -179,26 +177,7 @@ fn sdam_events_match(
             let match_sd = |actual: &ServerDescription,
                             expected: &TestServerDescription|
              -> std::result::Result<(), String> {
-                if let Some(ref expected_error) = expected.error {
-                    let err = actual.error().ok_or_else(|| {
-                        format!(
-                            "expected actual error to match {:?}, but was None",
-                            expected_error
-                        )
-                    })?;
-                    expected_error.verify_result(err, description.as_ref())?;
-                } else {
-                    match_opt(&actual.server_type(), &expected.server_type)?;
-                    match_opt(
-                        &actual.max_wire_version().unwrap(),
-                        &expected.max_wire_version,
-                    )?;
-                    match_opt(
-                        &actual.min_wire_version().unwrap(),
-                        &expected.min_wire_version,
-                    )?;
-                    // TODO: RUST-360 compare topologyVersion
-                }
+                match_opt(&actual.server_type(), &expected.server_type)?;
                 Ok(())
             };
 

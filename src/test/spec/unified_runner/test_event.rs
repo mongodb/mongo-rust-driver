@@ -6,8 +6,6 @@ use crate::{
 };
 use serde::Deserialize;
 
-use super::ExpectError;
-
 #[derive(Debug, Deserialize)]
 #[serde(untagged, deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) enum ExpectedEvent {
@@ -86,16 +84,8 @@ pub(crate) enum ExpectedSdamEvent {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TestServerDescription {
-    #[allow(unused)]
-    pub(crate) error: Option<ExpectError>,
     #[serde(rename = "type")]
     pub(crate) server_type: Option<ServerType>,
-    #[allow(unused)]
-    pub(crate) min_wire_version: Option<i32>,
-    #[allow(unused)]
-    pub(crate) max_wire_version: Option<i32>,
-    #[allow(unused)]
-    pub(crate) topology_version: Option<Document>,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
