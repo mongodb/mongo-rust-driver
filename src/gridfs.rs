@@ -9,32 +9,36 @@ use crate::{
     error::{Error, Result},
     selection_criteria::SelectionCriteria,
     Database,
+    error::{Error, ErrorKind, Result},
+    Collection,
 };
 
 use options::*;
 
-use bson::{oid::ObjectId, Bson, DateTime, Document};
+use bson::{doc, oid::ObjectId, Bson, DateTime, Document};
 use futures_util;
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 // Contained in a "chunks" collection for each user file
-struct Chunk {
-    id: ObjectId,
-    files_id: Bson,
-    n: i32,
+pub struct Chunk {
+    pub id: ObjectId,
+    pub files_id: Bson,
+    pub n: i32,
     // default size is 255 KiB
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 // A collection in which information about stored files is stored. There will be one files
 // collection document per stored file.
+#[derive(Deserialize, Serialize)]
 pub struct FilesCollectionDocument {
-    id: Bson,
-    length: i64,
-    chunk_size: i32,
-    upload_date: DateTime,
-    filename: String,
-    metadata: Document,
+    pub id: Bson,
+    pub length: i64,
+    pub chunk_size: i32,
+    pub upload_date: DateTime,
+    pub filename: String,
+    pub metadata: Document,
 }
 
 /// Struct for storing GridFS managed files within a [`Database`].
@@ -85,6 +89,9 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
 
 pub struct GridFsDownloadStream {
     pub id: Bson,
+    pub files: Collection<FilesCollectionDocument>,
+    pub chunks: Collection<Chunk>,
+    pub cursor: Cursor<Chunk>,
 }
 
 impl tokio::io::AsyncRead for GridFsDownloadStream {
@@ -200,7 +207,20 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        todo!()
+        let collection = self.db.collection::<FilesCollectionDocument>(
+            &(self.options.map_or("fs".to_string(), |opts| {
+                opts.bucket_name.unwrap_or("fs".to_string())
+            }) + ".files"),
+        );
+
+        let fcd = match collection.find_one(doc! { "_id": id }, None).await? {
+            Some(fcd) => fcd,
+            None => return Err(Error::new(crate::error::ErrorKind::InvalidArgument { message: String::from("pls") }, None)),
+        };
+
+        
+
+        Ok(GridFsDownloadStream { id, fcd, chunks })
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
