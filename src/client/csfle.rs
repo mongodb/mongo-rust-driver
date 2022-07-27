@@ -66,6 +66,10 @@ impl ClientState {
         &self.opts
     }
 
+    pub(crate) fn crypt(&self) -> &Crypt {
+        &self.crypt
+    }
+
     fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
         let mut builder = Crypt::builder();
         if Some(true) != opts.bypass_auto_encryption {

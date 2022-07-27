@@ -1,5 +1,6 @@
 use bson::{doc, RawBsonRef, RawDocument, Timestamp};
 use lazy_static::lazy_static;
+use mongocrypt::ctx::{CtxBuilder, Ctx};
 use serde::de::DeserializeOwned;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
@@ -597,7 +598,23 @@ impl Client {
         let cmd_name = cmd.name.clone();
         let target_db = cmd.target_db.clone();
 
-        let serialized = op.serialize_command(cmd)?;
+        let mut serialized = op.serialize_command(cmd)?;
+        #[cfg(feature = "csfle")]
+        {
+            let guard = self.inner.csfle.read().await;
+            if let Some(csfle) = guard.as_ref() {
+                if csfle.opts().bypass_auto_encryption != Some(true) {
+                    /*
+                    let ctx = csfle
+                        .crypt()
+                        .ctx_builder()
+                        .build_encrypt(&target_db, RawDocument::from_bytes(&serialized)?)?;
+                    let new_bytes = self.run_mongocrypt_ctx(ctx, Some(target_db.clone())).await?;
+                    serialized = new_bytes.into_bytes();
+                    */
+                }
+            }
+        }
         let raw_cmd = RawCommand {
             name: cmd_name.clone(),
             target_db,
