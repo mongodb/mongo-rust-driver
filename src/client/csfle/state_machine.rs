@@ -7,12 +7,12 @@ use bson::{RawDocumentBuf, Document, RawDocument};
 use mongocrypt::ctx::{Ctx, State, CtxBuilder};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{Client, Database};
+use crate::{Client};
 use crate::error::{Error, Result};
-use crate::operation::{ListCollections, RawOutput, RunCommand};
+use crate::operation::{RawOutput, RunCommand};
 
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
-    raw.try_into().map_err(|e| Error::internal("???"))
+    raw.try_into().map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
 }
 
 impl Client {
@@ -51,48 +51,24 @@ impl Client {
                         reply.send(None)
                     }.map_err(|_| thread_err())?;
                 }
+                CtxRequest::NeedMongoMarkings { command, reply } => {
+                    let db = db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoMarkings state"))?;
+                    let op = RawOutput(RunCommand::new_raw(
+                        db.to_string(),
+                        command,
+                        None,
+                        None,
+                    )?);
+                    let guard = self.inner.csfle.read().await;
+                    let csfle = guard.as_ref().ok_or_else(|| Error::internal("csfle state not found"))?;
+                    let mongocryptd_client = csfle.mongocryptd_client.as_ref().ok_or_else(|| Error::internal("mongocryptd client not found"))?;
+                    let result = mongocryptd_client.execute_operation(op, None).await?;
+                    reply.send(result.into_raw_document_buf()).map_err(|_| thread_err())?;
+                }
                 CtxRequest::Done(doc) => return Ok(doc),
                 CtxRequest::Err(e) => return Err(e),
             }
         }
-        /*
-        Box::pin(async move {
-            let mut result = None;
-            loop {
-                let state = ctx.state()?;
-                match state {
-                    State::NeedMongoCollinfo => {
-                        let filter = raw_to_doc(ctx.mongo_op()?)?;
-                        let db = self.database(db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoCollinfo state"))?);
-                        let mut cursor = db.list_collections(filter, None).await?;
-                        if cursor.advance().await? {
-                            ctx.mongo_feed(cursor.current())?;
-                        }
-                        ctx.mongo_done()?;
-                    }
-                    State::NeedMongoMarkings => {
-                        let db = db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoMarkings state"))?;
-                        let op = RawOutput(RunCommand::new_raw(
-                            db.to_string(),
-                            ctx.mongo_op()?.to_raw_document_buf(),
-                            None,
-                            None,
-                        )?);
-                        let guard = self.inner.csfle.read().await;
-                        let csfle = guard.as_ref().ok_or_else(|| Error::internal("csfle state not found"))?;
-                        let mongocryptd_client = csfle.mongocryptd_client.as_ref().ok_or_else(|| Error::internal("mongocryptd client not found"))?;
-                        let result = mongocryptd_client.execute_operation(op, None).await?;
-                        ctx.mongo_feed(result.raw_body())?;
-                        ctx.mongo_done()?;
-                    }
-                    State::Ready => result = Some(ctx.finalize()?.to_owned()),
-                    State::Done => break,
-                    _ => todo!(),
-                }
-            }
-            result.ok_or_else(|| Error::internal("libmongocrypt terminated without output"))
-        })
-        */
     }
 }
 
@@ -113,6 +89,18 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
                 }
                 ctx.mongo_done()?;
             }
+            State::NeedMongoMarkings => {
+                let command = ctx.mongo_op()?.to_raw_document_buf();
+                let (reply, reply_recv) = sync_oneshot();
+                if let Err(_) = send.send(CtxRequest::NeedMongoMarkings { command, reply }) {
+                    return Ok(None);
+                }
+                match reply_recv.recv() {
+                    Ok(v) => ctx.mongo_feed(&v)?,
+                    Err(_) => return Ok(None),
+                }
+                ctx.mongo_done()?;
+            }
             State::Ready => result = Some(ctx.finalize()?.to_owned()),
             State::Done => break,
             _ => todo!(),
@@ -125,6 +113,10 @@ enum CtxRequest {
     NeedMongoCollinfo {
         filter: Document,
         reply: SyncOneshotSender<Option<RawDocumentBuf>>,
+    },
+    NeedMongoMarkings {
+        command: RawDocumentBuf,
+        reply: SyncOneshotSender<RawDocumentBuf>,
     },
     Done(RawDocumentBuf),
     Err(Error),
