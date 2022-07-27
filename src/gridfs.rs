@@ -172,14 +172,11 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> GridFsUploadStream {
-        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
-            opts.bucket_name.unwrap_or("fs".to_string())
-        });
         GridFsUploadStream {
             id,
             length: 0,
             filename,
-            options: options.into()
+            options: options.into(),
         }
     }
 
@@ -197,15 +194,46 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
+<<<<<<< HEAD
     /// `tokio` crate's `AsyncRead` trait for the `source`.
     pub async fn upload_from_tokio_reader_with_id(
+=======
+    /// `tokio` runtime.
+    pub async fn upload_from_stream_with_id_tokio<T: tokio::io::AsyncRead + std::marker::Unpin>(
+>>>>>>> 8731c53 (add tokio upload method)
         &self,
-        id: Bson,
+        files_id: Bson,
         filename: String,
-        source: impl tokio::io::AsyncRead,
+        source: T,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
-        todo!()
+    ) -> Result<()> {
+        let options: GridFsUploadOptions = options
+            .into()
+            .map(Into::into)
+            .unwrap_or_else(Default::default);
+        let chunk_size = options.chunk_size_bytes.unwrap_or(255);
+        let mut buf = [0; 16 * 1024];
+        let mut handle = source.take(chunk_size as u64);
+        let mut n = 0;
+        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
+            opts.bucket_name.unwrap_or("fs".to_string())
+        });
+        let chunks: Collection<Chunk> = self.db.collection(&(bucket_name + ".chunks"));
+        loop {
+            let num_bytes = handle.read(&mut buf).await?;
+            if num_bytes == 0 {
+                break;
+            }
+            let chunk = Chunk {
+                id: ObjectId::new(),
+                files_id: files_id.clone(),
+                n,
+                data: Vec::from(&buf[..num_bytes]),
+            };
+            chunks.insert_one(chunk, None).await?;
+            n += 1;
+        }
+        Ok(())
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
@@ -320,18 +348,19 @@ impl GridFsBucket {
             .db
             .collection::<FilesCollectionDocument>(&(bucket_name.clone() + ".files"))
             .find_one(doc! { "filename": &filename }, options)
-            .await? {
-                Some(fcd) => fcd,
-                None => {
-                    let labels: Option<Vec<_>> = None;
-                    return Err(Error::new(
-                        ErrorKind::InvalidArgument {
-                            message: format!("couldn't find file with id {}", &id),
-                        },
-                        labels,
-                    ));
-                }
-            };
+            .await?
+        {
+            Some(fcd) => fcd,
+            None => {
+                let labels: Option<Vec<_>> = None;
+                return Err(Error::new(
+                    ErrorKind::InvalidArgument {
+                        message: format!("couldn't find file with name {}", &filename),
+                    },
+                    labels,
+                ));
+            }
+        };
 
         let chunks = self.db.collection::<Chunk>(&(bucket_name + ".chunks"));
         let id = file.id.clone();
