@@ -54,7 +54,7 @@ impl EventObserver {
         }
     }
 
-    pub(crate) async fn event_count(
+    pub(crate) async fn matching_event_count(
         &mut self,
         event: &ExpectedEvent,
         entities: Arc<RwLock<EntityMap>>,
@@ -69,13 +69,13 @@ impl EventObserver {
             .count()
     }
 
-    pub async fn wait_for_event(
+    pub async fn wait_for_matching_events(
         &mut self,
         event: &ExpectedEvent,
         count: usize,
         entities: Arc<RwLock<EntityMap>>,
     ) -> Result<()> {
-        let mut seen = self.event_count(event, entities.clone()).await;
+        let mut seen = self.matching_event_count(event, entities.clone()).await;
 
         if seen >= count {
             return Ok(());

@@ -2452,7 +2452,7 @@ impl TestOperation for AssertEventCount {
                 .observer
                 .lock()
                 .await
-                .event_count(&self.event, entities)
+                .matching_event_count(&self.event, entities)
                 .await;
             assert_eq!(actual_count, self.count);
         }
@@ -2480,7 +2480,7 @@ impl TestOperation for WaitForEvent {
                 .observer
                 .lock()
                 .await
-                .wait_for_event(&self.event, self.count, entities)
+                .wait_for_matching_events(&self.event, self.count, entities)
                 .await
                 .unwrap();
         }
