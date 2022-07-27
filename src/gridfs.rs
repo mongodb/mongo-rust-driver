@@ -6,10 +6,10 @@ use std::pin::Pin;
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::Result,
     selection_criteria::SelectionCriteria,
     Database,
     error::{Error, ErrorKind, Result},
+    options::FindOneOptions,
     Collection,
 };
 use bson::{oid::ObjectId, Bson, DateTime, Document};
@@ -51,8 +51,15 @@ pub struct GridFsBucket {
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
+<<<<<<< HEAD
     files_id: Bson,
 }
+=======
+    pub id: Bson,
+    pub file: FilesCollectionDocument,
+    pub chunks: Collection<Chunk>,
+    pub cursor: Option<Cursor<Chunk>>,}
+>>>>>>> b30f4f3 (add download stream implementation)
 
 impl GridFsUploadStream {
     /// Gets the file `id` for the stream.
@@ -115,9 +122,9 @@ impl futures_util::AsyncWrite for GridFsUploadStream {
 
 pub struct GridFsDownloadStream {
     pub files_id: Bson,
-    pub files: Collection<FilesCollectionDocument>,
+    pub file: FilesCollectionDocument,
     pub chunks: Collection<Chunk>,
-    pub cursor: Cursor<Chunk>,
+    pub cursor: Option<Cursor<Chunk>>,
 }
 
 impl GridFsDownloadStream {
@@ -173,7 +180,7 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<GridFsUploadStream> {
-        todo!()
+        
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
@@ -250,20 +257,35 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        let collection = self.db.collection::<FilesCollectionDocument>(
-            &(self.options.map_or("fs".to_string(), |opts| {
-                opts.bucket_name.unwrap_or("fs".to_string())
-            }) + ".files"),
-        );
-
-        let fcd = match collection.find_one(doc! { "_id": id }, None).await? {
+        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
+            opts.bucket_name.unwrap_or("fs".to_string())
+        });
+        let file = match self
+            .db
+            .collection::<FilesCollectionDocument>(&(bucket_name.clone() + ".files"))
+            .find_one(doc! { "_id": &id }, None)
+            .await?
+        {
             Some(fcd) => fcd,
-            None => return Err(Error::new(crate::error::ErrorKind::InvalidArgument { message: String::from("pls") }, None)),
+            None => {
+                let labels: Option<Vec<_>> = None;
+                return Err(Error::new(
+                    ErrorKind::InvalidArgument {
+                        message: format!("couldn't find file with id {}", &id),
+                    },
+                    labels,
+                ));
+            }
         };
 
-        
+        let chunks = self.db.collection::<Chunk>(&(bucket_name + ".chunks"));
 
-        Ok(GridFsDownloadStream { id, fcd, chunks })
+        Ok(GridFsDownloadStream {
+            files_id: id,
+            file,
+            chunks,
+            cursor: None,
+        })
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
@@ -274,7 +296,52 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<GridFsDownloadStream> {
-        todo!()
+        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
+            opts.bucket_name.unwrap_or("fs".to_string())
+        });
+        let mut sort = doc! { "uploadDate": -1 };
+        let mut skip: i32 = 0;
+        if let Some(opts) = options.into() {
+            if let Some(rev) = opts.revision {
+                if rev >= 0 {
+                    sort = doc! { "uploadDate": 1 };
+                    skip = rev;
+                } else {
+                    skip = -rev - 1;
+                }
+            }
+        }
+        let options = FindOneOptions::builder()
+            .sort(sort)
+            .skip(skip as u64)
+            .build();
+
+        let file = match self
+            .db
+            .collection::<FilesCollectionDocument>(&(bucket_name.clone() + ".files"))
+            .find_one(doc! { "filename": &filename }, options)
+            .await? {
+                Some(fcd) => fcd,
+                None => {
+                    let labels: Option<Vec<_>> = None;
+                    return Err(Error::new(
+                        ErrorKind::InvalidArgument {
+                            message: format!("couldn't find file with id {}", &id),
+                        },
+                        labels,
+                    ));
+                }
+            };
+
+        let chunks = self.db.collection::<Chunk>(&(bucket_name + ".chunks"));
+        let id = file.id.clone();
+
+        Ok(GridFsDownloadStream {
+            files_id: id,
+            file,
+            chunks,
+            cursor: None,
+        })
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
