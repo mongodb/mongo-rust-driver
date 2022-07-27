@@ -4,7 +4,6 @@ use std::sync::mpsc as sync_mpsc;
 use std::thread;
 
 use bson::{RawDocumentBuf, Document, RawDocument};
-use futures_core::future::{BoxFuture, LocalBoxFuture};
 use mongocrypt::ctx::{Ctx, State, CtxBuilder};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -29,19 +28,17 @@ impl Client {
             let ctx = match build_ctx(builder) {
                 Ok(c) => c,
                 Err(e) => {
-                    send.send(CtxRequest::Err(e));
+                    let _ = send.send(CtxRequest::Err(e));
                     return;
                 }
             };
-            match ctx_loop(ctx, send.clone()) {
+            let _ = match ctx_loop(ctx, send.clone()) {
                 Ok(Some(doc)) => send.send(CtxRequest::Done(doc)),
                 Ok(None) => send.send(CtxRequest::Err(Error::internal("libmongocrypt terminated without output"))),
                 Err(e) => send.send(CtxRequest::Err(e)),
             };
         });
-        fn thread_err() -> Error {
-            Error::internal("ctx thread unexpectedly terminated")
-        }
+        let thread_err = || Error::internal("ctx thread unexpectedly terminated");
         loop {
             let request = recv.recv().await.ok_or_else(thread_err)?;
             match request {
@@ -49,10 +46,10 @@ impl Client {
                     let db = self.database(db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoCollinfo state"))?);
                     let mut cursor = db.list_collections(filter, None).await?;
                     if cursor.advance().await? {
-                        reply.send(Some(cursor.current().to_raw_document_buf()));
+                        reply.send(Some(cursor.current().to_raw_document_buf()))
                     } else {
-                        reply.send(None);
-                    }
+                        reply.send(None)
+                    }.map_err(|_| thread_err())?;
                 }
                 CtxRequest::Done(doc) => return Ok(doc),
                 CtxRequest::Err(e) => return Err(e),
@@ -106,8 +103,9 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
             State::NeedMongoCollinfo => {
                 let filter = raw_to_doc(ctx.mongo_op()?)?;
                 let (reply, reply_recv) = sync_oneshot();
-                // TODO: terminate loop if send fails
-                send.send(CtxRequest::NeedMongoCollinfo { filter, reply });
+                if let Err(_) = send.send(CtxRequest::NeedMongoCollinfo { filter, reply }) {
+                    return Ok(None);
+                }
                 match reply_recv.recv() {
                     Ok(Some(v)) => ctx.mongo_feed(&v)?,
                     Ok(None) => (),
@@ -115,6 +113,7 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
                 }
                 ctx.mongo_done()?;
             }
+            State::Ready => result = Some(ctx.finalize()?.to_owned()),
             State::Done => break,
             _ => todo!(),
         }

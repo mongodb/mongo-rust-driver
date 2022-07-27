@@ -1,13 +1,11 @@
 use bson::{doc, RawBsonRef, RawDocument, Timestamp, RawDocumentBuf};
 use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
-use mongocrypt::ctx::{CtxBuilder, Ctx};
 use serde::de::DeserializeOwned;
-use tokio::task::LocalSet;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
-use super::{session::TransactionState, Client, ClientSession, csfle::ClientState};
+use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
