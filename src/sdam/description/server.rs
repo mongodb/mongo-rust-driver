@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, DateTime},
+    bson_util,
     client::ClusterTime,
     error::{ErrorKind, Result},
     hello::HelloReply,
@@ -82,7 +83,7 @@ impl Default for ServerType {
 }
 
 /// A description of the most up-to-date information known about a server.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct ServerDescription {
     /// The address of this server.
     pub(crate) address: ServerAddress,
@@ -107,36 +108,8 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the hello reply by propagating with `?`.
+    #[serde(serialize_with = "bson_util::serialize_result_error_as_string")]
     pub(crate) reply: Result<Option<HelloReply>>,
-}
-
-impl Serialize for ServerDescription {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        #[derive(Serialize)]
-        struct Helper<'a> {
-            address: &'a ServerAddress,
-            server_type: ServerType,
-            last_update_time: Option<DateTime>,
-            average_round_trip_time: Option<Duration>,
-            reply: std::result::Result<Option<&'a HelloReply>, String>,
-        }
-
-        let helper = Helper {
-            address: &self.address,
-            server_type: self.server_type,
-            last_update_time: self.last_update_time,
-            average_round_trip_time: self.average_round_trip_time,
-            reply: self
-                .reply
-                .as_ref()
-                .map(|o| o.as_ref())
-                .map_err(|e| e.to_string()),
-        };
-        helper.serialize(serializer)
-    }
 }
 
 impl PartialEq for ServerDescription {

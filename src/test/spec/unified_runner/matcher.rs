@@ -162,10 +162,7 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> Result
     }
 }
 
-fn sdam_events_match(
-    actual: &SdamEvent,
-    expected: &ExpectedSdamEvent,
-) -> Result<(), String> {
+fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result<(), String> {
     match (actual, expected) {
         (
             SdamEvent::ServerDescriptionChanged(actual),
