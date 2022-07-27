@@ -51,15 +51,14 @@ pub struct GridFsBucket {
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
-<<<<<<< HEAD
-    files_id: Bson,
-}
-=======
-    pub id: Bson,
+    pub files_id: Bson,
     pub file: FilesCollectionDocument,
     pub chunks: Collection<Chunk>,
-    pub cursor: Option<Cursor<Chunk>>,}
->>>>>>> b30f4f3 (add download stream implementation)
+    pub cursor: Option<Cursor<Chunk>>,
+    pub length: u64,
+    pub filename: String,
+    pub options: Option<GridFsUploadOptions>,
+}
 
 impl GridFsUploadStream {
     /// Gets the file `id` for the stream.
@@ -179,8 +178,16 @@ impl GridFsBucket {
         id: Bson,
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
-        
+    ) -> GridFsUploadStream {
+        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
+            opts.bucket_name.unwrap_or("fs".to_string())
+        });
+        GridFsUploadStream {
+            id,
+            length: 0,
+            filename,
+            options: options.into()
+        }
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
@@ -191,7 +198,7 @@ impl GridFsBucket {
         &self,
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
+    ) -> GridFsUploadStream {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
             .await
     }
