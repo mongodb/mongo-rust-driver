@@ -171,8 +171,16 @@ impl GridFsBucket {
         id: Bson,
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
-        
+    ) -> GridFsUploadStream {
+        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
+            opts.bucket_name.unwrap_or("fs".to_string())
+        });
+        GridFsUploadStream {
+            id,
+            length: 0,
+            filename,
+            options: options.into()
+        }
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
@@ -183,7 +191,7 @@ impl GridFsBucket {
         &self,
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
+    ) -> GridFsUploadStream {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
             .await
     }
