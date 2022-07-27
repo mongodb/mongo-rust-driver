@@ -17,7 +17,7 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 }
 
 impl Client {
-    pub(crate) async fn run_mongocrypt_ctx(&self, build_ctx: impl FnOnce(CtxBuilder) -> Ctx + Send + 'static, db: Option<&str>) -> Result<RawDocumentBuf> {
+    pub(crate) async fn run_mongocrypt_ctx(&self, build_ctx: impl FnOnce(CtxBuilder) -> Result<Ctx> + Send + 'static, db: Option<&str>) -> Result<RawDocumentBuf> {
         let guard = self.inner.csfle.read().await;
         let crypt = match guard.as_ref() {
             Some(csfle) => Arc::clone(&csfle.crypt),
@@ -26,12 +26,18 @@ impl Client {
         let (send, mut recv) = tokio::sync::mpsc::unbounded_channel();
         thread::spawn(move || {
             let builder = crypt.ctx_builder();
-            let ctx = build_ctx(builder);
+            let ctx = match build_ctx(builder) {
+                Ok(c) => c,
+                Err(e) => {
+                    send.send(CtxRequest::Err(e));
+                    return;
+                }
+            };
             match ctx_loop(ctx, send.clone()) {
                 Ok(Some(doc)) => send.send(CtxRequest::Done(doc)),
                 Ok(None) => send.send(CtxRequest::Err(Error::internal("libmongocrypt terminated without output"))),
                 Err(e) => send.send(CtxRequest::Err(e)),
-            }
+            };
         });
         fn thread_err() -> Error {
             Error::internal("ctx thread unexpectedly terminated")

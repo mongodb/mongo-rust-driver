@@ -1,4 +1,5 @@
 use bson::{doc, RawBsonRef, RawDocument, Timestamp, RawDocumentBuf};
+use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::{CtxBuilder, Ctx};
 use serde::de::DeserializeOwned;
@@ -603,38 +604,7 @@ impl Client {
         #[cfg(feature = "csfle")]
         {
             if self.inner.csfle.read().await.is_some() {
-                let client = self.clone();
-                /*
-                local.spawn_local(async move {
-                    let guard = match client.inner.csfle.read().await.as_ref() {
-                        Some(g) => g,
-                        None => return,
-                    };
-                });
-                */
-            }
-            let guard = self.inner.csfle.read().await;
-            if let Some(csfle) = guard.as_ref() {
-                if csfle.opts().bypass_auto_encryption != Some(true) {
-                    let local = LocalSet::new();
-                    let target_db = &target_db;
-                    let serialized = &serialized;
-                    let client = self.clone();
-                    /*
-                    local.spawn_local(async move {
-                        let new_message = client.auto_encrypt(serialized, todo!(), target_db).await;
-                    });
-                    */
-                    //local.await;
-                    /*
-                    let ctx = csfle
-                        .crypt()
-                        .ctx_builder()
-                        .build_encrypt(&target_db, RawDocument::from_bytes(&serialized)?)?;
-                    let new_bytes = self.run_mongocrypt_ctx(ctx, Some(target_db.clone())).await?;
-                    serialized = new_bytes.into_bytes();
-                    */
-                }
+                serialized = self.auto_encrypt(&serialized, &target_db).await?.into_bytes();
             }
         }
         let raw_cmd = RawCommand {
@@ -804,20 +774,19 @@ impl Client {
         }
     }
 
-    /*
-    async fn auto_encrypt(
-        &self, 
-        serialized: &[u8],
-        csfle: &ClientState,
-        target_db: &str,
-    ) -> Result<RawDocumentBuf> {
-        let ctx = csfle
-            .crypt()
-            .ctx_builder()
-            .build_encrypt(&target_db, RawDocument::from_bytes(&serialized)?)?;
-        self.run_mongocrypt_ctx(ctx, Some(target_db)).await
+    fn auto_encrypt<'a>(
+        &'a self, 
+        serialized: &'a [u8],
+        target_db: &'a str,
+    ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
+        Box::pin(async move {
+            let serialized = serialized.to_vec();
+            let db = target_db.to_string();
+            self.run_mongocrypt_ctx(move |builder| {
+                Ok(builder.build_encrypt(&db, RawDocument::from_bytes(&serialized)?)?)
+            }, Some(target_db)).await
+        })
     }
-    */
 
     /// Start an implicit session if the operation and write concern are compatible with sessions.
     async fn start_implicit_session<T: Operation>(&self, op: &T) -> Result<Option<ClientSession>> {
