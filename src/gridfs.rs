@@ -213,6 +213,11 @@ impl GridFsUploadStream {
     pub fn finish(self) {
         todo!()
     }
+
+    /// Aborts the upload and discards the upload stream.
+    pub fn abort(self) {
+        todo!()
+    }
 }
 
 <<<<<<< HEAD
