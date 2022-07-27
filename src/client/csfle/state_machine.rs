@@ -38,6 +38,7 @@ impl Client {
                 Err(e) => send.send(CtxRequest::Err(e)),
             };
         });
+
         let thread_err = || Error::internal("ctx thread unexpectedly terminated");
         loop {
             let request = recv.recv().await.ok_or_else(thread_err)?;
@@ -72,6 +73,10 @@ impl Client {
     }
 }
 
+fn ctx_err<T>(_: T) -> Error {
+    Error::internal("ctx thread could not communicate with async task")
+}
+
 fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<RawDocumentBuf>> {
     let mut result = None;
     loop {
@@ -79,26 +84,17 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
             State::NeedMongoCollinfo => {
                 let filter = raw_to_doc(ctx.mongo_op()?)?;
                 let (reply, reply_recv) = sync_oneshot();
-                if let Err(_) = send.send(CtxRequest::NeedMongoCollinfo { filter, reply }) {
-                    return Ok(None);
-                }
-                match reply_recv.recv() {
-                    Ok(Some(v)) => ctx.mongo_feed(&v)?,
-                    Ok(None) => (),
-                    Err(_) => return Ok(None),  // waiting async task terminated, no need to keep running
+                send.send(CtxRequest::NeedMongoCollinfo { filter, reply }).map_err(ctx_err)?;
+                if let Some(v) = reply_recv.recv().map_err(ctx_err)? {
+                    ctx.mongo_feed(&v)?;
                 }
                 ctx.mongo_done()?;
             }
             State::NeedMongoMarkings => {
                 let command = ctx.mongo_op()?.to_raw_document_buf();
                 let (reply, reply_recv) = sync_oneshot();
-                if let Err(_) = send.send(CtxRequest::NeedMongoMarkings { command, reply }) {
-                    return Ok(None);
-                }
-                match reply_recv.recv() {
-                    Ok(v) => ctx.mongo_feed(&v)?,
-                    Err(_) => return Ok(None),
-                }
+                send.send(CtxRequest::NeedMongoMarkings { command, reply }).map_err(ctx_err)?;
+                ctx.mongo_feed(&reply_recv.recv().map_err(ctx_err)?)?;
                 ctx.mongo_done()?;
             }
             State::Ready => result = Some(ctx.finalize()?.to_owned()),
