@@ -9,7 +9,7 @@ use bson::Document;
 
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsBucketOptions {
     /// The bucket name. Defaults to 'fs'.
