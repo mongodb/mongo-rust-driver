@@ -139,10 +139,10 @@ pub(crate) struct Operation {
 }
 
 impl Operation {
-    pub(crate) async fn execute<'a>(&self, test_runner: TestRunner, description: &str) {
+    pub(crate) async fn execute<'a>(&self, test_runner: &TestRunner, description: &str) {
         match self.object {
             OperationObject::TestRunner => {
-                self.execute_test_runner_operation(&test_runner).await;
+                self.execute_test_runner_operation(test_runner).await;
             }
             OperationObject::Entity(ref id) => {
                 let result = self.execute_entity_operation(id, &test_runner).await;

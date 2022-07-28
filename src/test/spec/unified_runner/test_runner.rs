@@ -100,7 +100,6 @@ impl TestRunner {
         test_file: TestFile,
         pred: impl Fn(&TestCase) -> bool,
     ) {
-        let test_runner = TestRunner::new().await;
         let path = path.into();
         let file_title = path
             .as_ref()
@@ -110,7 +109,7 @@ impl TestRunner {
         if let Some(requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
             for requirement in requirements {
-                if requirement.can_run_on(&test_runner.internal_client).await {
+                if requirement.can_run_on(&self.internal_client).await {
                     can_run_on = true;
                 }
             }
@@ -161,7 +160,7 @@ impl TestRunner {
             if let Some(requirements) = test_case.run_on_requirements {
                 let mut can_run_on = false;
                 for requirement in requirements {
-                    if requirement.can_run_on(&test_runner.internal_client).await {
+                    if requirement.can_run_on(&self.internal_client).await {
                         can_run_on = true;
                     }
                 }
@@ -178,22 +177,19 @@ impl TestRunner {
 
             if let Some(ref initial_data) = test_file.initial_data {
                 for data in initial_data {
-                    test_runner.insert_initial_data(data).await;
+                    self.insert_initial_data(data).await;
                 }
             }
 
-            test_runner.entities.write().await.clear();
+            self.entities.write().await.clear();
             if let Some(ref create_entities) = test_file.create_entities {
-                test_runner
-                    .populate_entity_map(create_entities, &test_case.description)
+                self.populate_entity_map(create_entities, &test_case.description)
                     .await;
             }
 
             for operation in test_case.operations {
-                test_runner.sync_workers().await;
-                operation
-                    .execute(test_runner.clone(), &test_case.description)
-                    .await;
+                self.sync_workers().await;
+                operation.execute(self, &test_case.description).await;
                 // This test (in src/test/spec/json/sessions/server-support.json) runs two
                 // operations with implicit sessions in sequence and then checks to see if they
                 // used the same lsid. We delay for one second to ensure that the
@@ -206,7 +202,7 @@ impl TestRunner {
 
             if let Some(ref events) = test_case.expect_events {
                 for expected in events {
-                    let entities = test_runner.entities.read().await;
+                    let entities = self.entities.read().await;
                     let entity = entities.get(&expected.client).unwrap();
                     let client = entity.as_client();
                     client.sync_workers().await;
@@ -246,7 +242,7 @@ impl TestRunner {
                 }
             }
 
-            test_runner.fail_point_guards.write().await.clear();
+            self.fail_point_guards.write().await.clear();
 
             if let Some(ref outcome) = test_case.outcome {
                 for expected_data in outcome {
@@ -261,7 +257,7 @@ impl TestRunner {
                         .selection_criteria(selection_criteria)
                         .read_concern(read_concern)
                         .build();
-                    let collection = test_runner
+                    let collection = self
                         .internal_client
                         .get_coll_with_options(db_name, coll_name, options);
 
@@ -442,7 +438,7 @@ impl TestRunner {
                         while let Some(msg) = receiver.recv().await {
                             match msg {
                                 ThreadMessage::ExecuteOperation(op) => {
-                                    op.execute(runner.clone(), d.as_str()).await;
+                                    op.execute(&runner, d.as_str()).await;
                                 }
                                 ThreadMessage::Stop(sender) => {
                                     sender.send(Ok(())).unwrap_or_else(|_| {
