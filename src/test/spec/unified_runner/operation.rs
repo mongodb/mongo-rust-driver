@@ -103,6 +103,10 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
     }
 }
 
+/// To facilitate working with sessions through the lock, this macro pops it out of the entity map,
+/// "passes" it to the provided block, and then returns it to the entity map. It does it this way
+/// so that we can continue to borrow the entity map in other ways even when we're using a session,
+/// which we'd have to borrow mutably from the map.
 macro_rules! with_mut_session {
     ($test_runner:ident, $id:expr, |$session:ident| $body:expr) => {
         async {
