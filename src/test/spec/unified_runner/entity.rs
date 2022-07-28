@@ -3,6 +3,7 @@ use std::{
     io::BufWriter,
     ops::{Deref, DerefMut},
     sync::Arc,
+    time::Duration,
 };
 
 use tokio::sync::{mpsc, oneshot, Mutex};
@@ -11,7 +12,9 @@ use crate::{
     bson::{Bson, Document},
     change_stream::ChangeStream,
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
+    error::Error,
     event::command::CommandStartedEvent,
+    runtime,
     sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
@@ -214,8 +217,18 @@ impl ThreadEntity {
 
     pub(crate) async fn wait(&self) -> bool {
         let (tx, rx) = oneshot::channel();
-        self.sender.send(ThreadMessage::Stop(tx)).unwrap();
-        rx.await.is_ok()
+
+        // if the task panicked, this send will fail
+        if self.sender.send(ThreadMessage::Stop(tx)).is_err() {
+            return false;
+        }
+
+        // return that both the timeout was satisfied and that the task responded to the
+        // acknowledgment request.
+        runtime::timeout(Duration::from_secs(10), rx)
+            .await
+            .and_then(|r| r.map_err(|e| Error::internal(""))) // flatten tokio error into mongodb::Error
+            .is_ok()
     }
 }
 

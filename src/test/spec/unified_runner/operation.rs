@@ -2430,7 +2430,11 @@ impl TestOperation for WaitForThread {
     ) -> BoxFuture<'a, ()> {
         async {
             let thread = test_runner.get_thread(self.thread.as_str()).await;
-            assert!(thread.wait().await);
+            assert!(
+                thread.wait().await,
+                "thread {:?} did not exit successfully",
+                self.thread
+            );
         }
         .boxed()
     }

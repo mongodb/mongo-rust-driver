@@ -267,7 +267,7 @@ pub(crate) struct Thread {
 #[derive(Debug)]
 pub(crate) enum ThreadMessage {
     ExecuteOperation(Arc<Operation>),
-    Stop(oneshot::Sender<Result<()>>),
+    Stop(oneshot::Sender<()>),
 }
 
 #[derive(Debug, Deserialize)]

@@ -441,14 +441,10 @@ impl TestRunner {
                                     op.execute(&runner, d.as_str()).await;
                                 }
                                 ThreadMessage::Stop(sender) => {
-                                    sender.send(Ok(())).unwrap_or_else(|_| {
-                                        panic!(
-                                            "[{}] thread {} stopped before waitForThread \
-                                             operation executed",
-                                            d.as_str(),
-                                            id
-                                        )
-                                    });
+                                    // This returns an error if the waitForThread operation stopped
+                                    // listening (e.g. due to timeout). The waitForThread operation
+                                    // will handle reporting that error, so we can ignore it here.
+                                    let _ = sender.send(());
                                     break;
                                 }
                             }
