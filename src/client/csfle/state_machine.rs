@@ -4,6 +4,7 @@ use std::sync::mpsc as sync_mpsc;
 use std::thread;
 
 use bson::{RawDocumentBuf, Document, RawDocument};
+use futures_util::TryStreamExt;
 use mongocrypt::ctx::{Ctx, State, CtxBuilder};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -39,18 +40,17 @@ impl Client {
             };
         });
 
-        let thread_err = || Error::internal("ctx thread unexpectedly terminated");
         loop {
             let request = recv.recv().await.ok_or_else(thread_err)?;
             match request {
                 CtxRequest::NeedMongoCollinfo { filter, reply } => {
                     let db = self.database(db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoCollinfo state"))?);
                     let mut cursor = db.list_collections(filter, None).await?;
-                    if cursor.advance().await? {
-                        reply.send(Some(cursor.current().to_raw_document_buf()))
+                    reply.send(if cursor.advance().await? {
+                        Some(cursor.current().to_raw_document_buf())
                     } else {
-                        reply.send(None)
-                    }.map_err(|_| thread_err())?;
+                        None
+                    })?;
                 }
                 CtxRequest::NeedMongoMarkings { command, reply } => {
                     let db = db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoMarkings state"))?;
@@ -64,13 +64,26 @@ impl Client {
                     let csfle = guard.as_ref().ok_or_else(|| Error::internal("csfle state not found"))?;
                     let mongocryptd_client = csfle.mongocryptd_client.as_ref().ok_or_else(|| Error::internal("mongocryptd client not found"))?;
                     let result = mongocryptd_client.execute_operation(op, None).await?;
-                    reply.send(result.into_raw_document_buf()).map_err(|_| thread_err())?;
+                    reply.send(result.into_raw_document_buf())?;
+                }
+                CtxRequest::NeedMongoKeys { filter, reply } => {
+                    let guard = self.inner.csfle.read().await;
+                    let csfle = guard.as_ref().ok_or_else(|| Error::internal("csfle state not found"))?;
+                    let kv_ns = &csfle.opts.key_vault_namespace;
+                    let kv_client = csfle.aux_clients.key_vault_client.upgrade().ok_or_else(|| Error::internal("key vault client dropped"))?;
+                    let kv_coll = kv_client.database(&kv_ns.db).collection::<RawDocumentBuf>(&kv_ns.coll);
+                    let results: Vec<_> = kv_coll.find(filter, None).await?.try_collect().await?;
+                    reply.send(results)?;
                 }
                 CtxRequest::Done(doc) => return Ok(doc),
                 CtxRequest::Err(e) => return Err(e),
             }
         }
     }
+}
+
+fn thread_err() -> Error {
+    Error::internal("ctx thread unexpectedly terminated")
 }
 
 fn ctx_err<T>(_: T) -> Error {
@@ -83,18 +96,27 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
         match ctx.state()? {
             State::NeedMongoCollinfo => {
                 let filter = raw_to_doc(ctx.mongo_op()?)?;
-                let (reply, reply_recv) = sync_oneshot();
+                let (reply, reply_recv) = reply_oneshot();
                 send.send(CtxRequest::NeedMongoCollinfo { filter, reply }).map_err(ctx_err)?;
-                if let Some(v) = reply_recv.recv().map_err(ctx_err)? {
+                if let Some(v) = reply_recv.recv()? {
                     ctx.mongo_feed(&v)?;
                 }
                 ctx.mongo_done()?;
             }
             State::NeedMongoMarkings => {
                 let command = ctx.mongo_op()?.to_raw_document_buf();
-                let (reply, reply_recv) = sync_oneshot();
+                let (reply, reply_recv) = reply_oneshot();
                 send.send(CtxRequest::NeedMongoMarkings { command, reply }).map_err(ctx_err)?;
-                ctx.mongo_feed(&reply_recv.recv().map_err(ctx_err)?)?;
+                ctx.mongo_feed(&reply_recv.recv()?)?;
+                ctx.mongo_done()?;
+            }
+            State::NeedMongoKeys => {
+                let filter = raw_to_doc(ctx.mongo_op()?)?;
+                let (reply, reply_recv) = reply_oneshot();
+                send.send(CtxRequest::NeedMongoKeys { filter, reply }).map_err(ctx_err)?;
+                for v in reply_recv.recv()? {
+                    ctx.mongo_feed(&v)?;
+                }
                 ctx.mongo_done()?;
             }
             State::Ready => result = Some(ctx.finalize()?.to_owned()),
@@ -108,33 +130,38 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
 enum CtxRequest {
     NeedMongoCollinfo {
         filter: Document,
-        reply: SyncOneshotSender<Option<RawDocumentBuf>>,
+        reply: ReplySender<Option<RawDocumentBuf>>,
     },
     NeedMongoMarkings {
         command: RawDocumentBuf,
-        reply: SyncOneshotSender<RawDocumentBuf>,
+        reply: ReplySender<RawDocumentBuf>,
+    },
+    NeedMongoKeys {
+        filter: Document,
+        reply: ReplySender<Vec<RawDocumentBuf>>,
     },
     Done(RawDocumentBuf),
     Err(Error),
 }
 
-struct SyncOneshotSender<T>(sync_mpsc::SyncSender<T>);
+struct ReplySender<T>(sync_mpsc::SyncSender<T>);
 
-impl<T> SyncOneshotSender<T> {
-    fn send(self, value: T) -> std::result::Result<(), T> {
-        self.0.send(value).map_err(|sync_mpsc::SendError(value)| value)
+impl<T> ReplySender<T> {
+    fn send(self, value: T) -> Result<()> {
+        self.0.send(value).map_err(|_| thread_err())
     }
 }
 
-struct SyncOneshotReceiver<T>(sync_mpsc::Receiver<T>);
+struct ReplyReceiver<T>(sync_mpsc::Receiver<T>);
 
-impl<T> SyncOneshotReceiver<T> {
-    fn recv(self) -> std::result::Result<T, sync_mpsc::RecvError> {
-        self.0.recv()
+impl<T> ReplyReceiver<T> {
+    fn recv(self) -> Result<T> {
+        self.0.recv().map_err(ctx_err)
     }
 }
 
-fn sync_oneshot<T>() -> (SyncOneshotSender<T>, SyncOneshotReceiver<T>) {
+/// This is a sync version of `tokio::sync::oneshot::channel`; sending will never block (and so can be used in async code), receiving will block until a value is sent.
+fn reply_oneshot<T>() -> (ReplySender<T>, ReplyReceiver<T>) {
     let (sender, receiver) = sync_mpsc::sync_channel(1);
-    (SyncOneshotSender(sender), SyncOneshotReceiver(receiver))
+    (ReplySender(sender), ReplyReceiver(receiver))
 }
