@@ -54,6 +54,9 @@ bson-serde_with = ["bson/serde_with"]
 # Enable support for v0.8 of the uuid crate in the public API of the BSON library.
 bson-uuid-0_8 = ["bson/uuid-0_8"]
 
+# Enable support for v1.x of the uuid crate in the public API of the BSON library.
+bson-uuid-1 = ["bson/uuid-1"]
+
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
 aws-auth = ["reqwest"]
@@ -148,7 +151,7 @@ version = "0.7.0"
 features = ["io"]
 
 [dependencies.uuid]
-version = "0.8.2"
+version = "1.1.2"
 features = ["v4"]
 
 [dev-dependencies]
