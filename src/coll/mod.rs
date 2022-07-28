@@ -276,7 +276,7 @@ impl<T> Collection<T> {
         let found;
         if enc_fields.is_none() && client_enc_fields.is_some() {
             let filter = doc! { "name": self.name() };
-            let specs: Vec<_> = match session.as_deref_mut() {
+            let mut specs: Vec<_> = match session.as_deref_mut() {
                 Some(s) => {
                     let mut cursor = self
                         .inner
@@ -294,11 +294,10 @@ impl<T> Collection<T> {
                         .await?
                 }
             };
-            for spec in specs {
+            if let Some(spec) = specs.pop() {
                 if let Some(enc) = spec.options.encrypted_fields {
                     found = enc;
                     enc_fields = Some(&found);
-                    break;
                 }
             }
         }
