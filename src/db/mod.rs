@@ -571,9 +571,25 @@ impl Database {
         &self,
         options: impl Into<Option<GridFsBucketOptions>>,
     ) -> GridFsBucket {
+        let options: GridFsBucketOptions = options.into().unwrap_or_default();
+        let read_concern = options
+            .read_concern
+            .or_else(|| self.read_concern().cloned());
+        let write_concern = options
+            .write_concern
+            .or_else(|| self.write_concern().cloned());
+        let read_preference = options
+            .read_preference
+            .or_else(|| self.selection_criteria().cloned());
+        let bucket_name = options.bucket_name.unwrap_or_else(|| "fs".to_string());
+        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(255 * 1024);
         GridFsBucket {
             db: self.clone(),
-            options: options.into(),
+            bucket_name,
+            chunk_size_bytes,
+            read_concern,
+            write_concern,
+            read_preference,
         }
     }
 }
