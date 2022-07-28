@@ -227,7 +227,7 @@ impl ThreadEntity {
         // acknowledgment request.
         runtime::timeout(Duration::from_secs(10), rx)
             .await
-            .and_then(|r| r.map_err(|e| Error::internal(""))) // flatten tokio error into mongodb::Error
+            .and_then(|r| r.map_err(|_| Error::internal(""))) // flatten tokio error into mongodb::Error
             .is_ok()
     }
 }

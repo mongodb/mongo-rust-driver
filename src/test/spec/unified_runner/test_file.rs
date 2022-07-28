@@ -10,7 +10,7 @@ use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     client::options::{ServerApi, ServerApiVersion, SessionOptions},
     concern::{Acknowledgment, ReadConcernLevel},
-    error::{Error, Result},
+    error::Error,
     options::{
         ClientOptions,
         CollectionOptions,

@@ -433,7 +433,6 @@ impl TestRunner {
                     let (sender, mut receiver) = mpsc::unbounded_channel::<ThreadMessage>();
                     let runner = self.clone();
                     let d = description.as_ref().to_string();
-                    let id = thread.id.clone();
                     runtime::execute(async move {
                         while let Some(msg) = receiver.recv().await {
                             match msg {

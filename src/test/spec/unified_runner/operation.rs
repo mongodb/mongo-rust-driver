@@ -145,7 +145,7 @@ impl Operation {
                 self.execute_test_runner_operation(test_runner).await;
             }
             OperationObject::Entity(ref id) => {
-                let result = self.execute_entity_operation(id, &test_runner).await;
+                let result = self.execute_entity_operation(id, test_runner).await;
 
                 match &self.expectation {
                     Expectation::Result {
