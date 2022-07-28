@@ -16,6 +16,7 @@ use crate::{
 
 use super::{events_match, EntityMap, ExpectedEvent};
 
+// TODO: RUST-1424: consolidate this with `EventHandler`
 /// Observer used to cache all the seen events for a given client in a unified test.
 /// Used to implement assertEventCount and waitForEvent operations.
 #[derive(Debug)]
