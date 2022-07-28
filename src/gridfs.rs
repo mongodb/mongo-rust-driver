@@ -1,17 +1,14 @@
 pub mod options;
 
 use core::task::{Context, Poll};
-use std::{
-    io,
-    pin::Pin,
-};
+use std::{io, pin::Pin};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
+    error::{Error, Result},
     selection_criteria::SelectionCriteria,
     Database,
-    error::{Error, Result},
 };
 
 use options::*;
@@ -43,8 +40,12 @@ pub struct FilesCollectionDocument {
 /// Struct for storing GridFS managed files within a [`Database`].
 pub struct GridFsBucket {
     // Contains a "chunks" collection
+    pub(crate) bucket_name: String,
     pub(crate) db: Database,
-    pub(crate) options: Option<GridFsBucketOptions>,
+    pub(crate) chunk_size_bytes: i32,
+    pub(crate) read_concern: Option<ReadConcern>,
+    pub(crate) write_concern: Option<WriteConcern>,
+    pub(crate) read_preference: Option<SelectionCriteria>,
 }
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
@@ -99,32 +100,17 @@ impl tokio::io::AsyncRead for GridFsDownloadStream {
 impl GridFsBucket {
     /// Gets the read concern of the [`GridFsBucket`].
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        if let Some(options) = &self.options {
-            if let Some(ref rc) = options.read_concern {
-                return Some(rc);
-            }
-        }
-        self.db.read_concern()
+        self.read_concern.as_ref()
     }
 
     /// Gets the write concern of the [`GridFsBucket`].
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        if let Some(options) = &self.options {
-            if let Some(ref wc) = options.write_concern {
-                return Some(wc);
-            }
-        }
-        self.db.write_concern()
+        self.write_concern.as_ref()
     }
 
     /// Gets the read preference of the [`GridFsBucket`].
     pub fn read_preference(&self) -> Option<&SelectionCriteria> {
-        if let Some(options) = &self.options {
-            if options.read_preference.is_some() {
-                return options.read_preference.as_ref();
-            }
-        }
-        self.db.selection_criteria()
+        self.read_preference.as_ref()
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
@@ -149,7 +135,8 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<GridFsUploadStream> {
-        self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options).await
+        self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
+            .await
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
@@ -189,7 +176,8 @@ impl GridFsBucket {
             filename,
             source,
             options,
-        ).await
+        )
+        .await
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
@@ -205,7 +193,8 @@ impl GridFsBucket {
             filename,
             source,
             options,
-        ).await
+        )
+        .await
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
@@ -227,7 +216,11 @@ impl GridFsBucket {
 
     /// Downloads the contents of the stored file specified by `id` and writes
     /// the contents to the destination [`GridFsDownloadStream`]. Uses the `tokio` runtime.
-    pub async fn download_to_stream_tokio(&self, id: Bson, destination: impl tokio::io::AsyncWrite) {
+    pub async fn download_to_stream_tokio(
+        &self,
+        id: Bson,
+        destination: impl tokio::io::AsyncWrite,
+    ) {
         todo!()
     }
 
