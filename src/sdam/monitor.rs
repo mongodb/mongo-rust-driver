@@ -91,6 +91,8 @@ impl Monitor {
             // in the streaming protocol, we just read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
             // failed.
+            // So we only go to sleep if the topology version is none or the last
+            // check did not succeed.
             if self.topology_version.is_none() || !check_succeeded {
                 println!("tv is none");
                 #[cfg(test)]
@@ -119,7 +121,6 @@ impl Monitor {
     ///
     /// Returns whether the check succeeded or not.
     async fn check_server(&mut self) -> bool {
-        self.update_request_receiver.clear_all_requests();
         let check_result = match self.perform_hello().await {
             HelloResult::Err(e) => {
                 let previous_description = self.topology_watcher.server_description(&self.address);
@@ -136,6 +137,10 @@ impl Monitor {
             }
             other => other,
         };
+
+        // Per the server monitoring spec, we ignore any check requests that came in while we were
+        // performing a check.
+        self.update_request_receiver.clear_all_requests();
 
         match check_result {
             HelloResult::Ok(reply) => {
@@ -282,7 +287,7 @@ impl Monitor {
 struct RttMonitor {
     sender: watch::Sender<RttInfo>,
     connection: Option<Connection>,
-    watcher: TopologyWatcher,
+    topology: TopologyWatcher,
     address: ServerAddress,
     client_options: ClientOptions,
     handshaker: Handshaker,
@@ -296,7 +301,7 @@ struct RttInfo {
 impl RttMonitor {
     fn new(
         address: ServerAddress,
-        watcher: TopologyWatcher,
+        topology: TopologyWatcher,
         handshaker: Handshaker,
         client_options: ClientOptions,
     ) -> (Self, watch::Receiver<RttInfo>) {
@@ -304,7 +309,7 @@ impl RttMonitor {
         let monitor = Self {
             address,
             connection: None,
-            watcher,
+            topology,
             client_options,
             handshaker,
             sender,
@@ -313,7 +318,9 @@ impl RttMonitor {
     }
 
     async fn execute(mut self) {
-        while self.watcher.is_alive() && !self.sender.is_closed() {
+        // keep executing until either the topology is closed or server monitor is done (i.e. the
+        // sender is closed)
+        while self.topology.is_alive() && !self.sender.is_closed() {
             let start = Instant::now();
             let result = async {
                 match self.connection {
@@ -333,7 +340,7 @@ impl RttMonitor {
                             self.client_options.tls_options(),
                         )
                         .await?;
-                        self.handshaker.handshake(&mut connection).await?;
+                        let result = self.handshaker.handshake(&mut connection).await?;
                         self.connection = Some(connection);
                     }
                 };
