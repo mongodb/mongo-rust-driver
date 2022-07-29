@@ -1,12 +1,9 @@
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::sync::mpsc as sync_mpsc;
-use std::thread;
 
 use bson::{RawDocumentBuf, Document, RawDocument};
 use futures_util::TryStreamExt;
-use mongocrypt::ctx::{Ctx, State, CtxBuilder};
-use tokio::sync::mpsc::UnboundedSender;
+use mongocrypt::ctx::{Ctx, State};
 
 use crate::{Client};
 use crate::error::{Error, Result};
@@ -17,13 +14,26 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 }
 
 impl Client {
-    pub(crate) async fn run_mongocrypt_ctx(&self, build_ctx: impl FnOnce(CtxBuilder) -> Result<Ctx> + Send + 'static, db: Option<&str>) -> Result<RawDocumentBuf> {
+    pub(crate) async fn run_mongocrypt_ctx(&self, mut ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let guard = self.inner.csfle.read().await;
         let crypt = match guard.as_ref() {
-            Some(csfle) => Arc::clone(&csfle.crypt),
+            Some(csfle) => &csfle.crypt,
             None => return Err(Error::internal("no csfle state for mongocrypt ctx")),
         };
-        let (send, mut recv) = tokio::sync::mpsc::unbounded_channel();
+        let mut result = None;
+        loop {
+            match ctx.state()? {
+                State::Ready => result = Some(ctx.finalize()?.to_owned()),
+                State::Done => break,
+                _ => todo!(),
+            }
+        }
+        match result {
+            Some(doc) => Ok(doc),
+            None => Err(Error::internal("libmongocrypt terminated without output")),
+        }
+        /*
+        let (send, mut recv) = tokio_mpsc::unbounded_channel();
         thread::spawn(move || {
             let builder = crypt.ctx_builder();
             let ctx = match build_ctx(builder) {
@@ -75,22 +85,19 @@ impl Client {
                     let results: Vec<_> = kv_coll.find(filter, None).await?.try_collect().await?;
                     reply.send(results)?;
                 }
+                CtxRequest::NeedKms { messages } => {
+
+                }
                 CtxRequest::Done(doc) => return Ok(doc),
                 CtxRequest::Err(e) => return Err(e),
             }
         }
+        */
     }
 }
 
-fn thread_err() -> Error {
-    Error::internal("ctx thread unexpectedly terminated")
-}
-
-fn ctx_err<T>(_: T) -> Error {
-    Error::internal("ctx thread could not communicate with async task")
-}
-
-fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<RawDocumentBuf>> {
+/*
+fn ctx_loop(mut ctx: Ctx, send: tokio_mpsc::UnboundedSender<CtxRequest>) -> Result<Option<RawDocumentBuf>> {
     let mut result = None;
     loop {
         match ctx.state()? {
@@ -119,6 +126,17 @@ fn ctx_loop(mut ctx: Ctx, send: UnboundedSender<CtxRequest>) -> Result<Option<Ra
                 }
                 ctx.mongo_done()?;
             }
+            State::NeedKms => {
+                let scope = ctx.kms_scope();
+                let mut messages = vec![];
+                while let Some(kms_ctx) = scope.next_kms_ctx() {
+                    let endpoint = kms_ctx.endpoint()?.to_string();
+                    let message = kms_ctx.message()?.to_vec();
+                    let (rsp_sender, responses_needed) = tokio_mpsc::unbounded_channel();
+                    messages.push(KmsMessage { endpoint, message, responses_needed });
+                }
+                send.send(CtxRequest::NeedKms { messages }).map_err(ctx_err)?;
+            }
             State::Ready => result = Some(ctx.finalize()?.to_owned()),
             State::Done => break,
             _ => todo!(),
@@ -140,8 +158,22 @@ enum CtxRequest {
         filter: Document,
         reply: ReplySender<Vec<RawDocumentBuf>>,
     },
+    NeedKms {
+        messages: Vec<KmsMessage>,
+    },
     Done(RawDocumentBuf),
     Err(Error),
+}
+
+struct KmsMessage {
+    endpoint: String,
+    message: Vec<u8>,
+    responses_needed: tokio_mpsc::UnboundedReceiver<ResponseNeeded>,
+}
+
+struct ResponseNeeded {
+    bytes_needed: u8,
+    response: ReplySender<Vec<u8>>,
 }
 
 struct ReplySender<T>(sync_mpsc::SyncSender<T>);
@@ -160,8 +192,9 @@ impl<T> ReplyReceiver<T> {
     }
 }
 
-/// This is a sync version of `tokio::sync::oneshot::channel`; sending will never block (and so can be used in async code), receiving will block until a value is sent.
+/// This is a sync version of `tokio::sync::oneshot::channel`; sending will never block (and so can be used in async code), receiving will synchronously block until a value is sent.
 fn reply_oneshot<T>() -> (ReplySender<T>, ReplyReceiver<T>) {
     let (sender, receiver) = sync_mpsc::sync_channel(1);
     (ReplySender(sender), ReplyReceiver(receiver))
 }
+*/

@@ -3,7 +3,7 @@ mod state_machine;
 
 use std::{
     path::Path,
-    process::{Command, Stdio}, sync::Arc,
+    process::{Command, Stdio},
 };
 
 use derivative::Derivative;
@@ -32,7 +32,7 @@ use super::WeakClient;
 pub(super) struct ClientState {
     #[derivative(Debug = "ignore")]
     #[allow(dead_code)]
-    crypt: Arc<Crypt>,
+    pub(crate) crypt: Crypt,
     mongocryptd_client: Option<Client>,
     aux_clients: AuxClients,
     opts: AutoEncryptionOptions,
@@ -55,7 +55,7 @@ impl ClientState {
         let aux_clients = Self::make_aux_clients(client, &opts)?;
 
         Ok(Self {
-            crypt: Arc::new(crypt),
+            crypt,
             mongocryptd_client,
             aux_clients,
             opts,

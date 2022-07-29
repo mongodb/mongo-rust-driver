@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
-use super::{session::TransactionState, Client, ClientSession};
+use super::{session::TransactionState, Client, ClientSession, csfle::ClientState};
 use crate::{
     bson::Document,
     change_stream::{
@@ -601,8 +601,9 @@ impl Client {
         let mut serialized = op.serialize_command(cmd)?;
         #[cfg(feature = "csfle")]
         {
-            if self.inner.csfle.read().await.is_some() {
-                serialized = self.auto_encrypt(&serialized, &target_db).await?.into_bytes();
+            let guard = self.inner.csfle.read().await;
+            if let Some(ref csfle) = *guard {
+                serialized = self.auto_encrypt(csfle, &serialized, &target_db).await?.into_bytes();
             }
         }
         let raw_cmd = RawCommand {
@@ -774,15 +775,15 @@ impl Client {
 
     fn auto_encrypt<'a>(
         &'a self, 
+        csfle: &'a ClientState,
         serialized: &'a [u8],
         target_db: &'a str,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
-            let serialized = serialized.to_vec();
+            let doc = RawDocument::from_bytes(serialized)?.to_raw_document_buf();
             let db = target_db.to_string();
-            self.run_mongocrypt_ctx(move |builder| {
-                Ok(builder.build_encrypt(&db, RawDocument::from_bytes(&serialized)?)?)
-            }, Some(target_db)).await
+            let ctx = csfle.crypt.build_ctx(move |builder| builder.build_encrypt(&db, &doc))?;
+            self.run_mongocrypt_ctx(ctx, Some(target_db)).await
         })
     }
 
