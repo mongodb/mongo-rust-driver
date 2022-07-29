@@ -1,7 +1,7 @@
 pub mod options;
 
 use core::task::{Context, Poll};
-use std::pin::Pin;
+use std::{io, pin::Pin, sync::Arc};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
@@ -194,45 +194,71 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-<<<<<<< HEAD
     /// `tokio` crate's `AsyncRead` trait for the `source`.
     pub async fn upload_from_tokio_reader_with_id(
-=======
-    /// `tokio` runtime.
-    pub async fn upload_from_stream_with_id_tokio<T: tokio::io::AsyncRead + std::marker::Unpin>(
->>>>>>> 8731c53 (add tokio upload method)
         &self,
         files_id: Bson,
         filename: String,
-        source: T,
+        source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()> {
         let options: GridFsUploadOptions = options
             .into()
             .map(Into::into)
             .unwrap_or_else(Default::default);
-        let chunk_size = options.chunk_size_bytes.unwrap_or(255);
-        let mut buf = [0; 16 * 1024];
-        let mut handle = source.take(chunk_size as u64);
+        let chunk_size = options.chunk_size_bytes.unwrap_or(self.chunk_size_bytes);
+        let mut length = 0;
         let mut n = 0;
-        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
-            opts.bucket_name.unwrap_or("fs".to_string())
-        });
-        let chunks: Collection<Chunk> = self.db.collection(&(bucket_name + ".chunks"));
-        loop {
-            let num_bytes = handle.read(&mut buf).await?;
-            if num_bytes == 0 {
+        // Get chunks collection
+        let chunks: Collection<Chunk> = self
+            .db
+            .collection(&(format!("{}.chunks", self.bucket_name)));
+        // Read data in, chunk_size_bytes at a time.
+        let mut eof = false;
+        while !eof {
+            let mut buf = vec![0u8; chunk_size as usize];
+            let mut curr_length = 0usize;
+            while curr_length < chunk_size as usize {
+                let bytes_read = match source.read(&mut buf[curr_length..]).await {
+                    Ok(num) => num,
+                    Err(e) => {
+                        // clean up any uploaded chunks
+                        self.abort_upload().await?;
+                        let labels: Option<Vec<_>> = None;
+                        return Err(Error::new(ErrorKind::Io(Arc::new(e)), labels));
+                    }
+                };
+                curr_length += bytes_read;
+                if bytes_read == 0 {
+                    eof = true;
+                    break;
+                }
+            }
+            if curr_length == 0 {
                 break;
             }
             let chunk = Chunk {
                 id: ObjectId::new(),
                 files_id: files_id.clone(),
                 n,
-                data: Vec::from(&buf[..num_bytes]),
+                data: buf,
             };
+            // Put chunk in chunks collection.
             chunks.insert_one(chunk, None).await?;
+            length += curr_length;
             n += 1;
         }
+        let files_collection: Collection<FilesCollectionDocument> =
+            self.db.collection(&(format!("{}.files", self.bucket_name)));
+        let file = FilesCollectionDocument {
+            id: Bson::ObjectId(ObjectId::new()),
+            length: length as i64,
+            chunk_size,
+            upload_date: DateTime::now(),
+            filename,
+            metadata: options.metadata,
+        };
+        files_collection.insert_one(file, None).await?;
         Ok(())
     }
 
@@ -245,7 +271,8 @@ impl GridFsBucket {
         source: impl futures_util::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
-        todo!()
+        use futures_util::{AsyncReadExt, AsyncWriteExt};
+        sourc
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
@@ -285,12 +312,9 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
-            opts.bucket_name.unwrap_or("fs".to_string())
-        });
         let file = match self
             .db
-            .collection::<FilesCollectionDocument>(&(bucket_name.clone() + ".files"))
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
             .find_one(doc! { "_id": &id }, None)
             .await?
         {
@@ -306,7 +330,9 @@ impl GridFsBucket {
             }
         };
 
-        let chunks = self.db.collection::<Chunk>(&(bucket_name + ".chunks"));
+        let chunks = self
+            .db
+            .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
 
         Ok(GridFsDownloadStream {
             id,
@@ -324,9 +350,6 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<GridFsDownloadStream> {
-        let bucket_name = self.options.clone().map_or("fs".to_string(), |opts| {
-            opts.bucket_name.unwrap_or("fs".to_string())
-        });
         let mut sort = doc! { "uploadDate": -1 };
         let mut skip: i32 = 0;
         if let Some(opts) = options.into() {
@@ -346,7 +369,7 @@ impl GridFsBucket {
 
         let file = match self
             .db
-            .collection::<FilesCollectionDocument>(&(bucket_name.clone() + ".files"))
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
             .find_one(doc! { "filename": &filename }, options)
             .await?
         {
@@ -362,7 +385,9 @@ impl GridFsBucket {
             }
         };
 
-        let chunks = self.db.collection::<Chunk>(&(bucket_name + ".chunks"));
+        let chunks = self
+            .db
+            .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
         let id = file.id.clone();
 
         Ok(GridFsDownloadStream {
@@ -441,6 +466,10 @@ impl GridFsBucket {
 
     /// Drops the files associated with this bucket.
     pub async fn drop(&self) {
+        todo!()
+    }
+
+    async fn abort_upload(&self) -> Result<()> {
         todo!()
     }
 }
