@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 
 use bson::{RawDocumentBuf, Document, RawDocument};
-use futures_util::TryStreamExt;
+use futures_util::{StreamExt, TryStreamExt, stream};
 use mongocrypt::ctx::{Ctx, State};
 
 use crate::{Client};
@@ -22,7 +22,28 @@ impl Client {
         };
         let mut result = None;
         loop {
-            match ctx.state()? {
+            let state = ctx.state()?;
+            match state {
+                State::NeedMongoCollinfo => {
+                    let filter = raw_to_doc(ctx.mongo_op()?)?;
+                    let db = self.database(db.as_ref().ok_or_else(|| Error::internal("db required for NeedMongoCollinfo state"))?);
+                    let mut cursor = db.list_collections(filter, None).await?;
+                    if cursor.advance().await? {
+                        ctx.mongo_feed(cursor.current())?;
+                    }
+                    ctx.mongo_done()?;
+                }
+                State::NeedKms => {
+                    let scope = ctx.kms_scope();
+                    let mut kms_ctxen: Vec<Result<_>> = vec![];
+                    while let Some(kms_ctx) = scope.next_kms_ctx()? {
+                        kms_ctxen.push(Ok(kms_ctx));
+                    }
+                    let f = stream::iter(kms_ctxen).try_for_each_concurrent(None, |kms_ctx| async move {
+                        Ok(())
+                    });
+                    f.await;
+                }
                 State::Ready => result = Some(ctx.finalize()?.to_owned()),
                 State::Done => break,
                 _ => todo!(),
