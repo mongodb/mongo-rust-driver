@@ -81,10 +81,6 @@ pub struct GridFsFindOptions {
     /// The maximum amount of time to allow the query to run.
     pub max_time_ms: Option<Duration>,
 
-    /// The server normally times out idle cursors after an inactivity period
-    /// to prevent excess memory use. Set this option to prevent that.
-    pub no_cursor_timeout: Option<bool>,
-
     /// The number of documents to skip before returning.
     pub skip: Option<u64>,
 
