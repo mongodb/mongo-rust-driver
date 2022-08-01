@@ -2,8 +2,8 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
-use std::time::Duration;
 use serde::Deserialize;
+use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use bson::Document;

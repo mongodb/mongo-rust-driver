@@ -11,10 +11,10 @@ use crate::{
     Database,
 };
 
-use options::*;
-use serde::{Deserialize, Serialize};
 use bson::{oid::ObjectId, Bson, DateTime, Document};
 use futures_util;
+use options::*;
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub const DEFAULT_BUCKET_NAME: &'static str = "fs";
