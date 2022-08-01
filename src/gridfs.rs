@@ -53,23 +53,33 @@ pub struct GridFsBucket {
 
 // TODO: RUST-1395 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
-    files_id: Bson,
+    pub id: Bson,
+    pub files_id: Bson,
+    pub length: i64,
+    pub filename: String,
+    pub chunk_size: i32,
+    pub metadata: Option<Document>,
+    pub files: Collection<FilesCollectionDocument>,
 }
 
 impl GridFsUploadStream {
-    /// Gets the file `id` for the stream.
-    pub fn files_id(&self) -> &Bson {
-        &self.files_id
+    /// Consumes the stream and inserts the FilesCollectionDocument into the files collection. No further writes to the stream are allowed after this function call.
+    pub async fn finish(self) -> Result<()> {
+        let file = FilesCollectionDocument {
+            id: self.files_id,
+            length: self.length,
+            chunk_size: self.chunk_size,
+            upload_date: DateTime::now(),
+            filename: self.filename,
+            metadata: self.metadata,
+        };
+        self.files.insert_one(file, None).await?;
+        Ok(())
     }
 
-    /// Consumes the stream and uploads data in the stream to the server.
-    pub async fn finish(self) {
-        todo!()
-    }
-
-    /// Aborts the upload and discards the upload stream.
-    pub async fn abort(self) {
-        todo!()
+    /// Aborts the upload and discards any uploaded chunks.
+    pub async fn abort(self) -> Result<()> {
+        self.files.delete_many(doc! {"_id": self.files_id}, None).await?
     }
 }
 
@@ -168,15 +178,23 @@ impl GridFsBucket {
     /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
     pub async fn open_upload_stream_with_id(
         &self,
-        id: Bson,
+        files_id: Bson,
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> GridFsUploadStream {
+        let files: Collection<FilesCollectionDocument> =
+            self.db.collection(&(format!("{}.files", self.bucket_name)));
+        let options = options.into();
+        resolve_options!(self, options, [chunk_size, metadata]);
+        let chunk_size = 
         GridFsUploadStream {
-            id,
+            id: Bson::ObjectId(ObjectId::new()),
+            files_id,
             length: 0,
             filename,
-            options: options.into(),
+            chunk_size,
+            files,
+            metadata: options.metadata,
         }
     }
 
@@ -223,7 +241,7 @@ impl GridFsBucket {
                     Ok(num) => num,
                     Err(e) => {
                         // clean up any uploaded chunks
-                        self.abort_upload().await?;
+                        chunks.delete_many(doc! { "files_id": &files_id }, None).await?;
                         let labels: Option<Vec<_>> = None;
                         return Err(Error::new(ErrorKind::Io(Arc::new(e)), labels));
                     }
@@ -272,7 +290,7 @@ impl GridFsBucket {
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         use futures_util::{AsyncReadExt, AsyncWriteExt};
-        sourc
+        
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
