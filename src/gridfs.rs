@@ -12,7 +12,7 @@ use crate::{
 };
 
 use options::*;
-
+use serde::{Deserialize, Serialize};
 use bson::{oid::ObjectId, Bson, DateTime, Document};
 use futures_util;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -26,8 +26,9 @@ struct Chunk {
     data: Vec<u8>,
 }
 
-// A collection in which information about stored files is stored. There will be one files
-// collection document per stored file.
+/// A collection in which information about stored files is stored. There will be one files
+/// collection document per stored file.
+#[derive(Serialize, Deserialize)]
 pub struct FilesCollectionDocument {
     id: Bson,
     length: i64,
@@ -50,17 +51,22 @@ pub struct GridFsBucket {
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
-    pub id: Bson,
+    id: Bson,
 }
 
 impl GridFsUploadStream {
+    /// Gets the stream `id`.
+    pub fn stream_id(&self) -> &Bson {
+        &self.id
+    }
+
     /// Consumes the stream and uploads data in the stream to the server.
-    pub fn finish(self) {
+    pub async fn finish(self) {
         todo!()
     }
 
     /// Aborts the upload and discards the upload stream.
-    pub fn abort(self) {
+    pub async fn abort(self) {
         todo!()
     }
 }
@@ -84,7 +90,14 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
 }
 
 pub struct GridFsDownloadStream {
-    pub id: Bson,
+    id: Bson,
+}
+
+impl GridFsDownloadStream {
+    /// Gets the stream `id`.
+    pub fn stream_id(&self) -> &Bson {
+        &self.id
+    }
 }
 
 impl tokio::io::AsyncRead for GridFsDownloadStream {
@@ -140,8 +153,8 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `tokio` runtime.
-    pub async fn upload_from_stream_with_id_tokio(
+    /// `tokio` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_tokio_reader_with_id(
         &self,
         id: Bson,
         filename: String,
@@ -152,8 +165,8 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `futures` crate.
-    pub async fn upload_from_stream_with_id_futures(
+    /// `futures` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_futures_reader_with_id(
         &self,
         id: Bson,
         filename: String,
@@ -164,14 +177,14 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `tokio` runtime.
-    pub async fn upload_from_stream_tokio(
+    /// the file id. Uses the `tokio` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_tokio_reader(
         &self,
         filename: String,
-        source: impl AsyncRead,
+        source: impl tokio::io::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
-        self.upload_from_stream_with_id_tokio(
+        self.upload_from_tokio_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
             filename,
             source,
@@ -181,14 +194,14 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `futures` crate.
-    pub async fn upload_from_stream_futures(
+    /// the file id. Uses the `futures` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_futures_reader(
         &self,
         filename: String,
         source: impl futures_util::io::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
-        self.upload_from_stream_with_id_futures(
+        self.upload_from_futures_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
             filename,
             source,
@@ -215,8 +228,9 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the destination [`GridFsDownloadStream`]. Uses the `tokio` runtime.
-    pub async fn download_to_stream_tokio(
+    /// the contents to the `destination`. Uses the `tokio` crate's `AsyncWrite`
+    /// trait for the `destination`.
+    pub async fn download_to_tokio_writer(
         &self,
         id: Bson,
         destination: impl tokio::io::AsyncWrite,
@@ -225,8 +239,9 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the destination [`GridFsDownloadStream`]. Uses the `futures` crate.
-    pub async fn download_to_stream_futures(
+    /// the contents to the `destination`. Uses the
+    /// `futures` crate's `AsyncWrite` trait for the `destination`.
+    pub async fn download_to_futures_writer(
         &self,
         id: Bson,
         destination: impl futures_util::io::AsyncWrite,
@@ -235,9 +250,9 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `filename` and by
-    /// the revision in `options` and writes the contents to the destination
-    /// [`GridFsStream`]. Uses the `tokio` runtime.
-    pub async fn download_to_stream_by_name_tokio(
+    /// the revision in `options` and writes the contents to the `destination`. Uses the
+    /// `tokio` crate's `AsyncWrite` trait for the `destination`.
+    pub async fn download_to_tokio_writer_by_name(
         &self,
         filename: String,
         destination: impl tokio::io::AsyncWrite,
@@ -247,9 +262,9 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `filename` and by
-    /// the revision in `options` and writes the contents to the destination
-    /// [`GridFsStream`]. Uses the `futures` crate.
-    pub async fn download_to_stream_by_name_futures(
+    /// the revision in `options` and writes the contents to the `destination`. Uses the
+    /// `futures` crate's `AsyncWrite` trait for the `destination`.
+    pub async fn download_to_futures_writer_by_name(
         &self,
         filename: String,
         destination: impl futures_util::io::AsyncWrite,
@@ -269,7 +284,7 @@ impl GridFsBucket {
         &self,
         filter: Document,
         options: impl Into<Option<GridFsBucketOptions>>,
-    ) -> io::Result<Cursor<FilesCollectionDocument>> {
+    ) -> Result<Cursor<FilesCollectionDocument>> {
         todo!()
     }
 
