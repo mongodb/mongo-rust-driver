@@ -34,12 +34,14 @@ tokio-runtime = [
     "tokio/rt",
     "tokio/time",
     "serde_bytes",
+    "mongocrypt/tokio",
 ]
 async-std-runtime = [
     "async-std",
     "async-std/attributes",
     "async-std-resolver",
     "tokio-util/compat",
+    "mongocrypt/async-std",
 ]
 sync = ["async-std-runtime"]
 tokio-sync = ["tokio-runtime"]
