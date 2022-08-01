@@ -129,7 +129,7 @@ features = ["dangerous_configuration"]
 
 [dependencies.tokio-util]
 version = "0.7.0"
-features = ["io"]
+features = ["io", "compat"]
 
 [dependencies.uuid]
 version = "0.8.2"
