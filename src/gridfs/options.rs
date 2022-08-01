@@ -29,7 +29,7 @@ pub struct GridFsBucketOptions {
     pub selection_criteria: Option<SelectionCriteria>,
 }
 
-/// Contains the options for creating a [`GridFsStream`] to upload a file to a
+/// Contains the options for creating a [`GridFsUploadStream`] to upload a file to a
 /// [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
@@ -43,7 +43,7 @@ pub struct GridFsUploadOptions {
     pub metadata: Option<Document>,
 }
 
-/// Contains the options for creating [`GridFsStream`] to retrieve a stored file
+/// Contains the options for creating a [`GridFsDownloadStream`] to retrieve a stored file
 /// from a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
