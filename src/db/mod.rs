@@ -17,7 +17,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-    gridfs::{options::GridFsBucketOptions, GridFsBucket},
+    gridfs::{options::GridFsBucketOptions, GridFsBucket, DEFAULT_BUCKET_NAME, DEFAULT_CHUNK_SIZE_BYTES},
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -506,18 +506,18 @@ impl Database {
         let write_concern = options
             .write_concern
             .or_else(|| self.write_concern().cloned());
-        let read_preference = options
-            .read_preference
+        let selection_criteria = options
+            .selection_criteria
             .or_else(|| self.selection_criteria().cloned());
-        let bucket_name = options.bucket_name.unwrap_or_else(|| "fs".to_string());
-        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(255 * 1024);
+        let bucket_name = options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
+        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES);
         GridFsBucket {
             db: self.clone(),
             bucket_name,
             chunk_size_bytes,
             read_concern,
             write_concern,
-            read_preference,
+            selection_criteria,
         }
     }
 }

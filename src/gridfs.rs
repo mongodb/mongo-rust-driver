@@ -17,11 +17,14 @@ use bson::{oid::ObjectId, Bson, DateTime, Document};
 use futures_util;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+pub const DEFAULT_BUCKET_NAME: &'static str = "fs";
+pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
+
 // Contained in a "chunks" collection for each user file
 struct Chunk {
     id: ObjectId,
     files_id: Bson,
-    n: i32,
+    n: u32,
     // default size is 255 KiB
     data: Vec<u8>,
 }
@@ -32,7 +35,7 @@ struct Chunk {
 pub struct FilesCollectionDocument {
     id: Bson,
     length: i64,
-    chunk_size: i32,
+    chunk_size: u32,
     upload_date: DateTime,
     filename: String,
     metadata: Document,
@@ -43,10 +46,10 @@ pub struct GridFsBucket {
     // Contains a "chunks" collection
     pub(crate) bucket_name: String,
     pub(crate) db: Database,
-    pub(crate) chunk_size_bytes: i32,
+    pub(crate) chunk_size_bytes: u32,
     pub(crate) read_concern: Option<ReadConcern>,
     pub(crate) write_concern: Option<WriteConcern>,
-    pub(crate) read_preference: Option<SelectionCriteria>,
+    pub(crate) selection_criteria: Option<SelectionCriteria>,
 }
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
@@ -121,9 +124,9 @@ impl GridFsBucket {
         self.write_concern.as_ref()
     }
 
-    /// Gets the read preference of the [`GridFsBucket`].
-    pub fn read_preference(&self) -> Option<&SelectionCriteria> {
-        self.read_preference.as_ref()
+    /// Gets the selection criteria of the [`GridFsBucket`].
+    pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.selection_criteria.as_ref()
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.

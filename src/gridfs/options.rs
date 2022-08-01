@@ -2,6 +2,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
+use std::time::Duration;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
@@ -16,7 +17,7 @@ pub struct GridFsBucketOptions {
     pub bucket_name: Option<String>,
 
     /// The chunk size in bytes used to break the user file into chunks. Defaults to 255 KiB.
-    pub chunk_size_bytes: Option<i32>,
+    pub chunk_size_bytes: Option<u32>,
 
     /// The write concern. Defaults to the write concern of the database.
     pub write_concern: Option<WriteConcern>,
@@ -24,8 +25,8 @@ pub struct GridFsBucketOptions {
     /// The read concern. Defaults to the read concern of the database.
     pub read_concern: Option<ReadConcern>,
 
-    /// The read preference. Defaults to the read preference of the database.
-    pub read_preference: Option<SelectionCriteria>,
+    /// The selection criteria. Defaults to the selection criteria of the database.
+    pub selection_criteria: Option<SelectionCriteria>,
 }
 
 /// Contains the options for creating a [`GridFsStream`] to upload a file to a
@@ -36,7 +37,7 @@ pub struct GridFsBucketOptions {
 pub struct GridFsUploadOptions {
     /// The number of bytes per chunk of this file. Defaults to the `chunk_size_bytes` specified
     /// in the [`GridFsBucketOptions`].
-    pub chunk_size_bytes: Option<i32>,
+    pub chunk_size_bytes: Option<u32>,
 
     /// User data for the 'metadata' field of the files collection document.
     pub metadata: Option<Document>,
@@ -72,20 +73,20 @@ pub struct GridFsFindOptions {
     pub allow_disk_use: Option<bool>,
 
     /// The number of documents to return per batch.
-    pub batch_size: Option<i32>,
+    pub batch_size: Option<u32>,
 
     /// The maximum number of documents to return.
-    pub limit: Option<i32>,
+    pub limit: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
-    pub max_time_ms: Option<i64>,
+    pub max_time_ms: Option<Duration>,
 
     /// The server normally times out idle cursors after an inactivity period
-    /// (10 minutes) to prevent excess memory use. Set this option to prevent that.
+    /// to prevent excess memory use. Set this option to prevent that.
     pub no_cursor_timeout: Option<bool>,
 
     /// The number of documents to skip before returning.
-    pub skip: i32,
+    pub skip: Option<u64>,
 
     /// The order by which to sort results. Defaults to not sorting.
     pub sort: Option<Document>,
