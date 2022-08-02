@@ -44,12 +44,8 @@ pub struct FilesCollectionDocument {
 /// Struct for storing GridFS managed files within a [`Database`].
 pub struct GridFsBucket {
     // Contains a "chunks" collection
-    pub(crate) bucket_name: String,
     pub(crate) db: Database,
-    pub(crate) chunk_size_bytes: u32,
-    pub(crate) read_concern: Option<ReadConcern>,
-    pub(crate) write_concern: Option<WriteConcern>,
-    pub(crate) selection_criteria: Option<SelectionCriteria>,
+    pub(crate) options: GridFsBucketOptions,
 }
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
@@ -116,18 +112,28 @@ impl tokio::io::AsyncRead for GridFsDownloadStream {
 impl GridFsBucket {
     /// Gets the read concern of the [`GridFsBucket`].
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        self.read_concern.as_ref()
+        if self.options.read_concern.is_some() {
+            self.options.read_concern.as_ref()
+        } else {
+            self.db.read_concern()
+        }
     }
 
     /// Gets the write concern of the [`GridFsBucket`].
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        self.write_concern.as_ref()
-    }
+        if self.options.write_concern.is_some() {
+            self.options.write_concern.as_ref()
+        } else {
+            self.db.write_concern()
+        }    }
 
     /// Gets the selection criteria of the [`GridFsBucket`].
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria.as_ref()
-    }
+        if self.options.selection_criteria.is_some() {
+            self.options.selection_criteria.as_ref()
+        } else {
+            self.db.selection_criteria()
+        }    }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
     /// The application provides a custom file id.
