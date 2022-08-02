@@ -502,29 +502,25 @@ impl Database {
     /// Creates a new [`GridFsBucket`] in the database with the given options.
     pub fn new_gridfs_bucket(
         &self,
-        options: impl Into<Option<GridFsBucketOptions>>,
+        options: Option<GridFsBucketOptions>,
     ) -> GridFsBucket {
-        let options: GridFsBucketOptions = options.into().unwrap_or_default();
-        let read_concern = options
+        let mut options: GridFsBucketOptions = options.unwrap_or_default();
+        options.read_concern = options
             .read_concern
             .or_else(|| self.read_concern().cloned());
-        let write_concern = options
+        options.write_concern = options
             .write_concern
             .or_else(|| self.write_concern().cloned());
-        let selection_criteria = options
+        options.selection_criteria = options
             .selection_criteria
             .or_else(|| self.selection_criteria().cloned());
-        let bucket_name = options
+        options.bucket_name = options
             .bucket_name
-            .unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
-        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES);
+            .or_else(|| Some(DEFAULT_BUCKET_NAME.to_string()));
+        options.chunk_size_bytes = options.chunk_size_bytes.or(Some(DEFAULT_CHUNK_SIZE_BYTES));
         GridFsBucket {
             db: self.clone(),
-            bucket_name,
-            chunk_size_bytes,
-            read_concern,
-            write_concern,
-            selection_criteria,
+            options,
         }
     }
 }
