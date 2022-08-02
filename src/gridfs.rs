@@ -98,7 +98,7 @@ pub struct GridFsDownloadStream {
 
 impl GridFsDownloadStream {
     /// Gets the file `id` for the stream.
-    pub fn stream_id(&self) -> &Bson {
+    pub fn files_id(&self) -> &Bson {
         &self.files_id
     }
 }
