@@ -233,8 +233,9 @@ impl GridFsBucket {
         files_id: Bson,
         filename: String,
         source: &mut T,
-        options: impl Into<Option<GridFsUploadOptions>>
+        options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()> {
+        use tokio::io::AsyncReadExt;
         let options: GridFsUploadOptions = options
             .into()
             .map(Into::into)
@@ -304,8 +305,65 @@ impl GridFsBucket {
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()> {
-        let mut source = source.compat();
-        self.upload_from_stream_with_id_common(files_id, filename, source.get_mut(), options).await
+        use futures_util::AsyncReadExt;
+        let options: GridFsUploadOptions = options
+            .into()
+            .map(Into::into)
+            .unwrap_or_else(Default::default);
+        let chunk_size = options.chunk_size_bytes.unwrap_or(self.chunk_size_bytes);
+        let mut length = 0;
+        let mut n = 0;
+        // Get chunks collection
+        let chunks: Collection<Chunk> = self
+            .db
+            .collection(&(format!("{}.chunks", self.bucket_name)));
+        // Read data in, chunk_size_bytes at a time.
+        let mut eof = false;
+        while !eof {
+            let mut buf = vec![0u8; chunk_size as usize];
+            let mut curr_length = 0usize;
+            while curr_length < chunk_size as usize {
+                let bytes_read = match source.read(&mut buf[curr_length..]).await {
+                    Ok(num) => num,
+                    Err(e) => {
+                        // clean up any uploaded chunks
+                        chunks.delete_many(doc! { "files_id": &files_id }, None).await?;
+                        let labels: Option<Vec<_>> = None;
+                        return Err(Error::new(ErrorKind::Io(Arc::new(e)), labels));
+                    }
+                };
+                curr_length += bytes_read;
+                if bytes_read == 0 {
+                    eof = true;
+                    break;
+                }
+            }
+            if curr_length == 0 {
+                break;
+            }
+            let chunk = Chunk {
+                id: ObjectId::new(),
+                files_id: files_id.clone(),
+                n,
+                data: buf,
+            };
+            // Put chunk in chunks collection.
+            chunks.insert_one(chunk, None).await?;
+            length += curr_length;
+            n += 1;
+        }
+        let files_collection: Collection<FilesCollectionDocument> =
+            self.db.collection(&(format!("{}.files", self.bucket_name)));
+        let file = FilesCollectionDocument {
+            id: Bson::ObjectId(ObjectId::new()),
+            length: length as i64,
+            chunk_size,
+            upload_date: DateTime::now(),
+            filename,
+            metadata: options.metadata,
+        };
+        files_collection.insert_one(file, None).await?;
+        Ok(())
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
