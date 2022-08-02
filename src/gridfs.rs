@@ -9,8 +9,9 @@ use crate::{
     selection_criteria::SelectionCriteria,
     Database,
     error::{Error, ErrorKind, Result},
-    options::FindOneOptions,
+    coll::options::{FindOptions, FindOneOptions},
     Collection,
+    bson::{Document, doc, oid::ObjectId, DateTime, Bson},
 };
 use futures_util;
 use options::*;
