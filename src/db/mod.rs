@@ -5,19 +5,20 @@ use std::{fmt::Debug, sync::Arc};
 use futures_util::stream::TryStreamExt;
 
 use crate::{
-    bson::{Bson, Document},
+    bson::{Bson, Document, doc},
     change_stream::{
         event::ChangeStreamEvent,
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
     },
+    IndexModel,
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-    gridfs::{options::GridFsBucketOptions, GridFsBucket},
+    gridfs::{options::GridFsBucketOptions, GridFsBucket, FilesCollectionDocument, Chunk},
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -511,6 +512,12 @@ impl Database {
             .or_else(|| self.selection_criteria().cloned());
         let bucket_name = options.bucket_name.unwrap_or_else(|| "fs".to_string());
         let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(255 * 1024);
+        let files = self.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
+        let chunks = self.collection::<Chunk>(&format!("{}.chunks", bucket_name));
+        files.create_index(IndexModel::builder().keys(doc! { "filename": 1, "uploadDate": 1 }).build(), None);
+        chunks.create_index(IndexModel::builder().keys(doc! { "files_id": 1, "n": 1 }).build(), None);
+
+
         GridFsBucket {
             db: self.clone(),
             bucket_name,
