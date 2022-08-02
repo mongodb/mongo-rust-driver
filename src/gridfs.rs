@@ -54,13 +54,13 @@ pub struct GridFsBucket {
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
-    id: Bson,
+    files_id: Bson,
 }
 
 impl GridFsUploadStream {
-    /// Gets the stream `id`.
-    pub fn stream_id(&self) -> &Bson {
-        &self.id
+    /// Gets the file `id` for the stream.
+    pub fn files_id(&self) -> &Bson {
+        &self.files_id
     }
 
     /// Consumes the stream and uploads data in the stream to the server.
@@ -93,13 +93,13 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
 }
 
 pub struct GridFsDownloadStream {
-    id: Bson,
+    files_id: Bson,
 }
 
 impl GridFsDownloadStream {
-    /// Gets the stream `id`.
+    /// Gets the file `id` for the stream.
     pub fn stream_id(&self) -> &Bson {
-        &self.id
+        &self.files_id
     }
 }
 
