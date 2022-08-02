@@ -4,7 +4,11 @@ use std::sync::Arc;
 use bson::{RawDocumentBuf, Document, RawDocument};
 use futures_util::{StreamExt, TryStreamExt, stream};
 use mongocrypt::ctx::{Ctx, State};
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
+use crate::client::options::{ServerAddress, TlsOptions};
+use crate::cmap::options::StreamOptions;
+use crate::runtime::AsyncStream;
 use crate::{Client};
 use crate::error::{Error, Result};
 use crate::operation::{RawOutput, RunCommand};
@@ -39,10 +43,24 @@ impl Client {
                     while let Some(kms_ctx) = scope.next_kms_ctx()? {
                         kms_ctxen.push(Ok(kms_ctx));
                     }
-                    let f = stream::iter(kms_ctxen).try_for_each_concurrent(None, |kms_ctx| async move {
+                    stream::iter(kms_ctxen).try_for_each_concurrent(None, |mut kms_ctx| async move {
+                        let endpoint = kms_ctx.endpoint()?;
+                        let addr = ServerAddress::parse(endpoint)?;
+                        let mut stream = AsyncStream::connect(StreamOptions::builder()
+                            .address(addr)
+                            .tls_options(TlsOptions::default())
+                            .build()
+                        ).await?;
+                        stream.write_all(kms_ctx.message()?).await?;
+                        let mut buf = vec![];
+                        while kms_ctx.bytes_needed() > 0 {
+                            let buf_size = kms_ctx.bytes_needed().try_into().map_err(|e| Error::internal(format!("buffer size overflow: {}", e)))?;
+                            buf.resize(buf_size, 0);
+                            let count = stream.read(&mut buf).await?;
+                            kms_ctx.feed(&buf[0..count])?;
+                        }
                         Ok(())
-                    });
-                    f.await;
+                    }).await?;
                 }
                 State::Ready => result = Some(ctx.finalize()?.to_owned()),
                 State::Done => break,
