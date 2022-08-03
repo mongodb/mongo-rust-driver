@@ -737,7 +737,7 @@ impl Client {
                 err.add_labels_and_update_pin(Some(connection), session, Some(retryability))?;
                 op.handle_error(err)
             }
-            Ok(response) => {
+            Ok(mut response) => {
                 self.emit_command_event(|handler| {
                     let reply = if should_redact {
                         Document::new()
@@ -757,6 +757,15 @@ impl Client {
                     };
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
+
+                #[cfg(feature = "csfle")]
+                {
+                    let guard = self.inner.csfle.read().await;
+                    if let Some(ref csfle) = *guard {     
+                        let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
+                        response = RawCommandResponse::new_raw(response.source, new_body);
+                    }
+                }
 
                 match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => Ok(response),
@@ -785,6 +794,19 @@ impl Client {
             let db = target_db.to_string();
             let ctx = csfle.crypt.build_ctx(move |builder| builder.build_encrypt(&db, &doc))?;
             self.run_mongocrypt_ctx(ctx, Some(target_db)).await
+        })
+    }
+
+    #[cfg(feature = "csfle")]
+    fn auto_decrypt<'a>(
+        &'a self, 
+        csfle: &'a super::csfle::ClientState,
+        doc: &'a RawDocument,
+    ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
+        Box::pin(async move {
+            let doc = doc.to_raw_document_buf();
+            let ctx = csfle.crypt.build_ctx(move |builder| builder.build_decrypt(&doc))?;
+            self.run_mongocrypt_ctx(ctx, None).await
         })
     }
 
