@@ -304,11 +304,8 @@ impl ConnectionPoolWorker {
                     } => {
                         self.clear(cause, service_id);
                     }
-                    PoolManagementRequest::MarkAsReady {
-                        _completion_handler,
-                    } => {
+                    PoolManagementRequest::MarkAsReady => {
                         self.mark_as_ready();
-                        _completion_handler.acknowledge(());
                     }
                     PoolManagementRequest::HandleConnectionSucceeded(conn) => {
                         self.handle_connection_succeeded(conn);

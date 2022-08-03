@@ -30,7 +30,6 @@ use crate::{
         TopologyOpeningEvent,
     },
     runtime::{self, AcknowledgedMessage, HttpClient, WorkerHandle, WorkerHandleListener},
-    sdam::description::topology::verify_max_staleness,
     selection_criteria::SelectionCriteria,
     ClusterTime,
     ServerInfo,
@@ -445,7 +444,7 @@ impl TopologyWorker {
             });
 
             for address in diff.added_addresses {
-                if new_state.servers.contains_key(&address) {
+                if new_state.servers.contains_key(address) {
                     debug_assert!(
                         false,
                         "adding address that already exists in topology: {}",
@@ -503,13 +502,12 @@ impl TopologyWorker {
         error: Error,
         handshake: HandshakePhase,
     ) -> bool {
-        println!("{}: handling {}", address, error);
         match self.server_description(&address) {
             Some(sd) => {
                 if let Some(existing_tv) = sd.topology_version() {
                     if let Some(tv) = error.topology_version() {
+                        // If the error is from a stale topology version, ignore it.
                         if !tv.is_more_recent_than(existing_tv) {
-                            println!("{:#?} is not more recent than {:#?}", tv, existing_tv);
                             return false;
                         }
                     }

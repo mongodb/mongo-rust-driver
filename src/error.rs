@@ -535,6 +535,7 @@ pub struct CommandError {
     #[serde(rename = "errmsg")]
     pub message: String,
 
+    /// The topology version reported by the server in the error response.
     #[serde(rename = "topologyVersion")]
     pub(crate) topology_version: Option<TopologyVersion>,
 }

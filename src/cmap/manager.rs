@@ -39,23 +39,10 @@ impl PoolManager {
 
     /// Mark the pool as "ready" as per the CMAP specification.
     ///
-    /// Since management requests are treated with the highest priority by the pool,
-    /// there's no need to wait for acknowledgment, because we know the pool will process
-    /// the "mark as ready" message before any others.
+    /// Since management requests are treated with the highest priority by the pool and will be
+    /// processed before all others, there's no need to wait for acknowledgment.
     pub(super) fn mark_as_ready(&self) {
-        let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
-        let was_sent = self
-            .sender
-            .send(PoolManagementRequest::MarkAsReady {
-                _completion_handler: message,
-            })
-            .is_ok();
-
-        // async move {
-        //     if was_sent {
-        //         acknowledgment_receiver.wait_for_acknowledgment().await;
-        //     }
-        // }
+        let _ = self.sender.send(PoolManagementRequest::MarkAsReady);
     }
 
     /// Check in the given connection to the pool.
@@ -115,9 +102,7 @@ pub(super) enum PoolManagementRequest {
     },
 
     /// Mark the pool as Ready, allowing connections to be created and checked out.
-    MarkAsReady {
-        _completion_handler: AcknowledgedMessage<()>,
-    },
+    MarkAsReady,
 
     /// Check in the given connection.
     CheckIn(Box<Connection>),

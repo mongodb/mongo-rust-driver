@@ -1,9 +1,4 @@
-use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
@@ -879,9 +874,7 @@ async fn rtt_is_updated() {
 
     let test_client = TestClient::new().await;
     if test_client.server_version_lt(4, 4) {
-        log_uncaptured(format!(
-            "skipping rtt_is_updated due to server version less than 4.4"
-        ));
+        log_uncaptured("skipping rtt_is_updated due to server version less than 4.4");
         return;
     }
 
@@ -919,7 +912,7 @@ async fn rtt_is_updated() {
             true
         })
         .await;
-    assert!(events.len() > 0);
+    assert!(!events.is_empty());
 
     // configure a failpoint that blocks hello commands
     let fp = FailPoint::fail_command(

@@ -49,7 +49,7 @@ impl Message {
     pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Self {
         let mut flags = MessageFlags::empty();
         if command.exhaust_allowed {
-            flags = flags | MessageFlags::EXHAUST_ALLOWED;
+            flags |= MessageFlags::EXHAUST_ALLOWED;
         }
 
         Self {

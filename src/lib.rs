@@ -297,7 +297,8 @@
     allow(
         clippy::unreadable_literal,
         clippy::cognitive_complexity,
-        clippy::float_cmp
+        clippy::float_cmp,
+        clippy::match_like_matches_macro
     )
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]

@@ -37,8 +37,17 @@ pub(crate) struct Monitor {
     sdam_event_emitter: Option<SdamEventEmitter>,
     update_request_receiver: TopologyCheckRequestReceiver,
     client_options: ClientOptions,
+
+    /// The most recent topology version returned by the server in a hello response.
+    /// If some, indicates that this monitor should use the streaming protocol. If none, it should
+    /// use the polling protocol.
     topology_version: Option<TopologyVersion>,
+
+    /// Handle to the RTT monitor, used to get the latest known round trip time for a given server.
     rtt_monitor_handle: watch::Receiver<RttInfo>,
+
+    /// Handle to the `Server` instance in the `Topology`. This is used to detect when a server has
+    /// been removed from the topology and no longer needs to be monitored.
     server_handle_listener: WorkerHandleListener,
 }
 
@@ -52,7 +61,6 @@ impl Monitor {
         handle_listener: WorkerHandleListener,
         client_options: ClientOptions,
     ) {
-        println!("starting monitor for {}", address);
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
 
         let (rtt_monitor, rtt_monitor_handle) = RttMonitor::new(
@@ -85,16 +93,16 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while self.server_handle_listener.is_alive() {
+        while self.server_handle_listener.check_if_alive() {
             let check_succeeded = self.check_server().await;
 
-            // in the streaming protocol, we just read from the socket continuously
+            // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
             // failed.
-            // So we only go to sleep if the topology version is none or the last
-            // check did not succeed.
+            //
+            // We only go to sleep when using the polling protocol (i.e. server never returned a
+            // topologyVersion) or when the most recent check failed.
             if self.topology_version.is_none() || !check_succeeded {
-                println!("tv is none");
                 #[cfg(test)]
                 let min_frequency = self
                     .client_options
@@ -112,8 +120,6 @@ impl Monitor {
                     .await;
             }
         }
-
-        println!("monitor closing");
     }
 
     /// Checks the the server by running a hello command. If an I/O error occurs, the
@@ -172,17 +178,20 @@ impl Monitor {
         let execute_hello = async {
             match self.connection {
                 Some(ref mut conn) => {
+                    // If the server indicated there was moreToCome, just read from the socket.
                     if conn.is_streaming() {
-                        println!("{}: receiving streamed message", self.address);
                         conn.receive_message()
                             .await
                             .and_then(|r| r.into_hello_reply(None))
+                    // Otherwise, send a regular hello command.
                     } else {
-                        println!("{}: starting new hello", self.address);
                         let heartbeat_frequency = self
                             .client_options
                             .heartbeat_freq
                             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
+
+                        // If the initial handshake returned a topology version, send it back to the
+                        // server to begin streaming responses.
                         let opts = self.topology_version.map(|tv| AwaitableHelloOptions {
                             topology_version: tv,
                             max_await_time: heartbeat_frequency,
@@ -199,7 +208,6 @@ impl Monitor {
                     }
                 }
                 None => {
-                    println!("{}: new conn", self.address);
                     let mut connection = Connection::connect_monitoring(
                         self.address.clone(),
                         self.client_options.connect_timeout,
@@ -219,12 +227,16 @@ impl Monitor {
                 }
             }
         };
+
+        // Begin executing the hello, listening for a cancellation request.
         let result = tokio::select! {
             result = execute_hello => match result {
                 Ok(reply) => HelloResult::Ok(reply),
                 Err(e) => HelloResult::Err(e)
             },
-            Some(err) = self.update_request_receiver.listen_for_cancellation() => HelloResult::Cancelled { reason: err }
+            Some(err) = self.update_request_receiver.listen_for_cancellation() => {
+                HelloResult::Cancelled { reason: err }
+            }
         };
         let duration = start.elapsed();
 
@@ -246,13 +258,13 @@ impl Monitor {
                 })
                 .await;
 
-                println!(
-                    "{}: setting topology version to {:?}",
-                    self.address, r.command_response.topology_version
-                );
+                // If the response included a topology version, cache it so that we can return it in
+                // the next hello.
                 self.topology_version = r.command_response.topology_version;
             }
             HelloResult::Err(ref e) | HelloResult::Cancelled { reason: ref e } => {
+                // Per the spec, cancelled requests and errors both require the monitoring
+                // connection to be closed.
                 self.connection.take();
                 self.emit_event(|| {
                     SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
@@ -340,7 +352,7 @@ impl RttMonitor {
                             self.client_options.tls_options(),
                         )
                         .await?;
-                        let result = self.handshaker.handshake(&mut connection).await?;
+                        let _ = self.handshaker.handshake(&mut connection).await?;
                         self.connection = Some(connection);
                     }
                 };
@@ -360,7 +372,7 @@ impl RttMonitor {
 
                     let _ = self.sender.send(new_rtt);
                 }
-                _ => {
+                Err(_) => {
                     self.connection.take();
                 }
             };
@@ -375,6 +387,7 @@ impl RttMonitor {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // The Ok branch is bigger but more common
 #[derive(Debug, Clone)]
 enum HelloResult {
     Ok(HelloReply),

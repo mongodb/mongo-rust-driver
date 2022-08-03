@@ -307,7 +307,6 @@ impl Connection {
 
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
-        println!("more to come: {}", self.more_to_come);
 
         RawCommandResponse::new(self.address.clone(), response_message)
     }
@@ -348,10 +347,12 @@ impl Connection {
     /// moreToCome flag.
     pub(crate) async fn receive_message(&mut self) -> Result<RawCommandResponse> {
         if !self.more_to_come {
-            todo!("return error here")
+            return Err(Error::internal(format!(
+                "attempted to stream response from connection to {} but moreToCome bit was not set",
+                self.address()
+            )));
         }
 
-        println!("reading here");
         let response_message_result = Message::read_from(
             &mut self.stream,
             self.stream_description
@@ -364,7 +365,6 @@ impl Connection {
 
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
-        println!("more to come? {}", self.more_to_come);
 
         RawCommandResponse::new(self.address.clone(), response_message)
     }

@@ -74,13 +74,13 @@ pub(crate) async fn run_hello(conn: &mut Connection, command: Command) -> Result
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct HelloReply {
-    pub server_address: ServerAddress,
-    pub command_response: HelloCommandResponse,
-    pub raw_command_response: RawDocumentBuf,
+    pub(crate) server_address: ServerAddress,
+    pub(crate) command_response: HelloCommandResponse,
+    pub(crate) raw_command_response: RawDocumentBuf,
     /// The time it took to send the initial hello command and receive this reply.
     /// `None` if this reply was awaited.
-    pub round_trip_time: Option<Duration>,
-    pub cluster_time: Option<ClusterTime>,
+    pub(crate) round_trip_time: Option<Duration>,
+    pub(crate) cluster_time: Option<ClusterTime>,
 }
 
 /// The response to a `hello` command.
