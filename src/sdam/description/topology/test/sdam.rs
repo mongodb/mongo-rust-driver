@@ -824,6 +824,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     );
 }
 
+/// Streaming protocol prose test 1 from SDAM spec tests.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn streaming_min_heartbeat_frequency() {
@@ -870,6 +871,7 @@ async fn streaming_min_heartbeat_frequency() {
     }
 }
 
+/// RTT prose test 1 from SDAM spec tests.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn rtt_is_updated() {
@@ -907,7 +909,6 @@ async fn rtt_is_updated() {
         .unwrap();
 
     // wait for multiple heartbeats, assert their RTT is > 0
-    log_uncaptured("collecting events");
     let events = subscriber
         .collect_events(Duration::from_secs(2), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) = e {
