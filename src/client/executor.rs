@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
-use super::{session::TransactionState, Client, ClientSession, csfle::ClientState};
+use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
@@ -773,9 +773,10 @@ impl Client {
         }
     }
 
+    #[cfg(feature = "csfle")]
     fn auto_encrypt<'a>(
         &'a self, 
-        csfle: &'a ClientState,
+        csfle: &'a super::csfle::ClientState,
         serialized: &'a [u8],
         target_db: &'a str,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
