@@ -67,7 +67,11 @@ impl<'conn> RunCommand<'conn> {
     }
 
     fn command_name(&self) -> Option<&str> {
-        self.command.into_iter().next().and_then(|r| r.ok()).map(|(k, _)| k)
+        self.command
+            .into_iter()
+            .next()
+            .and_then(|r| r.ok())
+            .map(|(k, _)| k)
     }
 }
 

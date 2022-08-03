@@ -7,7 +7,12 @@ use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, OperationWithDefaults, WriteConcernOnlyBody},
+    operation::{
+        append_options,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+        WriteConcernOnlyBody,
+    },
     options::{DropDatabaseOptions, WriteConcern},
 };
 

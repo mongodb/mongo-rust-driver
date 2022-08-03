@@ -11,7 +11,12 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
-    operation::{remove_empty_write_concern, OperationWithDefaults, Retryability, WriteResponseBody},
+    operation::{
+        remove_empty_write_concern,
+        OperationWithDefaults,
+        Retryability,
+        WriteResponseBody,
+    },
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Namespace,

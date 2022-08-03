@@ -1,4 +1,4 @@
-use bson::{doc, RawBsonRef, RawDocument, Timestamp, RawDocumentBuf};
+use bson::{doc, RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
@@ -603,7 +603,12 @@ impl Client {
         {
             let guard = self.inner.csfle.read().await;
             if let Some(ref csfle) = *guard {
-                serialized = self.auto_encrypt(csfle, &serialized, &target_db).await?.into_bytes();
+                if csfle.opts().bypass_auto_encryption != Some(true) {
+                    serialized = self
+                        .auto_encrypt(csfle, &serialized, &target_db)
+                        .await?
+                        .into_bytes();
+                }
             }
         }
         let raw_cmd = RawCommand {
@@ -761,9 +766,11 @@ impl Client {
                 #[cfg(feature = "csfle")]
                 {
                     let guard = self.inner.csfle.read().await;
-                    if let Some(ref csfle) = *guard {     
-                        let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
-                        response = RawCommandResponse::new_raw(response.source, new_body);
+                    if let Some(ref csfle) = *guard {
+                        if csfle.opts().bypass_auto_encryption != Some(true) {
+                            let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
+                            response = RawCommandResponse::new_raw(response.source, new_body);
+                        }
                     }
                 }
 
@@ -784,7 +791,7 @@ impl Client {
 
     #[cfg(feature = "csfle")]
     fn auto_encrypt<'a>(
-        &'a self, 
+        &'a self,
         csfle: &'a super::csfle::ClientState,
         serialized: &'a [u8],
         target_db: &'a str,
@@ -792,20 +799,24 @@ impl Client {
         Box::pin(async move {
             let doc = RawDocument::from_bytes(serialized)?.to_raw_document_buf();
             let db = target_db.to_string();
-            let ctx = csfle.crypt.build_ctx(move |builder| builder.build_encrypt(&db, &doc))?;
+            let ctx = csfle
+                .crypt
+                .build_ctx(move |builder| builder.build_encrypt(&db, &doc))?;
             self.run_mongocrypt_ctx(ctx, Some(target_db)).await
         })
     }
 
     #[cfg(feature = "csfle")]
     fn auto_decrypt<'a>(
-        &'a self, 
+        &'a self,
         csfle: &'a super::csfle::ClientState,
         doc: &'a RawDocument,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
             let doc = doc.to_raw_document_buf();
-            let ctx = csfle.crypt.build_ctx(move |builder| builder.build_decrypt(&doc))?;
+            let ctx = csfle
+                .crypt
+                .build_ctx(move |builder| builder.build_decrypt(&doc))?;
             self.run_mongocrypt_ctx(ctx, None).await
         })
     }

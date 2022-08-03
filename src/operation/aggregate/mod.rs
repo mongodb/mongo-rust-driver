@@ -14,7 +14,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, WriteConcernOnlyBody, SERVER_4_2_0_WIRE_VERSION, OperationWithDefaults};
+use super::{CursorBody, OperationWithDefaults, WriteConcernOnlyBody, SERVER_4_2_0_WIRE_VERSION};
 
 pub(crate) use change_stream::ChangeStreamAggregate;
 

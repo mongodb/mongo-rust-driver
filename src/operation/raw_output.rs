@@ -1,5 +1,7 @@
-use crate::cmap::{StreamDescription, RawCommandResponse, Command};
-use crate::error::Result;
+use crate::{
+    cmap::{Command, RawCommandResponse, StreamDescription},
+    error::Result,
+};
 
 use super::Operation;
 
@@ -18,7 +20,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.serialize_command(cmd)
     }
 
-    fn extract_at_cluster_time(&self, response: &bson::RawDocument) -> Result<Option<bson::Timestamp>> {
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
         self.0.extract_at_cluster_time(response)
     }
 

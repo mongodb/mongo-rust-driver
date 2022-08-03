@@ -75,8 +75,9 @@ pub(crate) use update::Update;
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 
 /// A trait modeling the behavior of a server side operation.
-/// 
-/// No methods in this trait should have default behaviors to ensure that wrapper operations replicate all behavior.  Default behavior is provided by the `OperationDefault` trait.
+///
+/// No methods in this trait should have default behaviors to ensure that wrapper operations
+/// replicate all behavior.  Default behavior is provided by the `OperationDefault` trait.
 pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
@@ -390,7 +391,8 @@ macro_rules! remove_empty_write_concern {
 
 pub(crate) use remove_empty_write_concern;
 
-// A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be implemented by leaf operation types.
+// A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
+// implemented by leaf operation types.
 pub(crate) trait OperationWithDefaults {
     /// The output type of this operation.
     type O;
@@ -475,53 +477,53 @@ pub(crate) trait OperationWithDefaults {
 }
 
 impl<T: OperationWithDefaults> Operation for T {
-        type O = T::O;
-        type Command = T::Command;
-        const NAME: &'static str = T::NAME;    
-        fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
-            self.build(description)
-        }
-        fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-            self.serialize_command(cmd)
-        }
-        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
-            self.extract_at_cluster_time(response)
-        }
-        fn handle_response(
-            &self,
-            response: RawCommandResponse,
-            description: &StreamDescription,
-        ) -> Result<Self::O> {
-            self.handle_response(response, description)
-        }
-        fn handle_error(&self, error: Error) -> Result<Self::O> {
-            self.handle_error(error)
-        }
-        fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-            self.selection_criteria()
-        }
-        fn is_acknowledged(&self) -> bool {
-            self.is_acknowledged()
-        }
-        fn write_concern(&self) -> Option<&WriteConcern> {
-            self.write_concern()
-        }
-        fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-            self.supports_read_concern(description)
-        }
-        fn supports_sessions(&self) -> bool {
-            self.supports_sessions()
-        }
-        fn retryability(&self) -> Retryability {
-            self.retryability()
-        }
-        fn update_for_retry(&mut self) {
-            self.update_for_retry()
-        }
-        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-            self.pinned_connection()
-        }
-        fn name(&self) -> &str {
-            self.name()
-        }
+    type O = T::O;
+    type Command = T::Command;
+    const NAME: &'static str = T::NAME;
+    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+        self.build(description)
+    }
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+        self.serialize_command(cmd)
+    }
+    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
+        self.extract_at_cluster_time(response)
+    }
+    fn handle_response(
+        &self,
+        response: RawCommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
+        self.handle_response(response, description)
+    }
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        self.handle_error(error)
+    }
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.selection_criteria()
+    }
+    fn is_acknowledged(&self) -> bool {
+        self.is_acknowledged()
+    }
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.write_concern()
+    }
+    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
+        self.supports_read_concern(description)
+    }
+    fn supports_sessions(&self) -> bool {
+        self.supports_sessions()
+    }
+    fn retryability(&self) -> Retryability {
+        self.retryability()
+    }
+    fn update_for_retry(&mut self) {
+        self.update_for_retry()
+    }
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        self.pinned_connection()
+    }
+    fn name(&self) -> &str {
+        self.name()
+    }
 }
