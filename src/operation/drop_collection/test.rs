@@ -1,53 +1,8 @@
 use crate::{
     bson::doc,
-    cmap::StreamDescription,
-    concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteFailure},
-    operation::{test::handle_response_test, DropCollection, Operation},
-    options::DropCollectionOptions,
-    Namespace,
+    operation::{test::handle_response_test, DropCollection},
 };
-
-#[test]
-fn build() {
-    let options = DropCollectionOptions {
-        write_concern: Some(WriteConcern {
-            w: Some(Acknowledgment::Custom("abc".to_string())),
-            ..Default::default()
-        }),
-    };
-
-    let ns = Namespace {
-        db: "test_db".to_string(),
-        coll: "test_coll".to_string(),
-    };
-
-    let mut op = DropCollection::new(ns.clone(), Some(options));
-
-    let description = StreamDescription::new_testing();
-    let cmd = op.build(&description).expect("build should succeed");
-
-    assert_eq!(cmd.name.as_str(), "drop");
-    assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(
-        cmd.body,
-        doc! {
-            "drop": "test_coll",
-            "writeConcern": { "w": "abc" }
-        }
-    );
-
-    let mut op = DropCollection::new(ns, None);
-    let cmd = op.build(&description).expect("build should succeed");
-    assert_eq!(cmd.name.as_str(), "drop");
-    assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(
-        cmd.body,
-        doc! {
-            "drop": "test_coll",
-        }
-    );
-}
 
 #[test]
 fn handle_success() {

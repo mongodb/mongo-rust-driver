@@ -11,6 +11,7 @@ use mongocrypt::Crypt;
 use crate::{
     error::{Error, Result},
     Client,
+    Namespace,
 };
 
 use options::{
@@ -173,4 +174,22 @@ impl ClientState {
             internal_client,
         })
     }
+}
+
+pub(crate) fn aux_collections(
+    base_ns: &Namespace,
+    enc_fields: &bson::Document,
+) -> Result<Vec<Namespace>> {
+    let mut out = vec![];
+    for &key in &["esc", "ecc", "ecoc"] {
+        let coll = match enc_fields.get_str(format!("{}Collection", key)) {
+            Ok(s) => s.to_string(),
+            Err(_) => format!("enxcol_.{}.{}", base_ns.coll, key),
+        };
+        out.push(Namespace {
+            coll,
+            ..base_ns.clone()
+        });
+    }
+    Ok(out)
 }
