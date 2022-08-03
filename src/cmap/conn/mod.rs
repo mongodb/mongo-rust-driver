@@ -279,6 +279,13 @@ impl Connection {
         message: Message,
         to_compress: bool,
     ) -> Result<RawCommandResponse> {
+        if self.more_to_come {
+            return Err(Error::internal(format!(
+                "attempted to send a new message to {} but moreToCome bit was set",
+                self.address()
+            )));
+        }
+
         self.command_executing = true;
 
         // If the client has agreed on a compressor with the server, and the command
