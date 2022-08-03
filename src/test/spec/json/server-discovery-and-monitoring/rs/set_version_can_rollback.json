@@ -8,7 +8,7 @@
           "a:27017",
           {
             "ok": 1,
-            "hello": true,
+            "helloOk": true,
             "isWritablePrimary": true,
             "hosts": [
               "a:27017",
@@ -50,13 +50,12 @@
       }
     },
     {
-      "_comment": "Response from new primary with newer election Id",
       "responses": [
         [
           "b:27017",
           {
             "ok": 1,
-            "hello": true,
+            "helloOk": true,
             "isWritablePrimary": true,
             "hosts": [
               "a:27017",
@@ -98,13 +97,12 @@
       }
     },
     {
-      "_comment": "Response from stale primary",
       "responses": [
         [
           "a:27017",
           {
             "ok": 1,
-            "hello": true,
+            "helloOk": true,
             "isWritablePrimary": true,
             "hosts": [
               "a:27017",
