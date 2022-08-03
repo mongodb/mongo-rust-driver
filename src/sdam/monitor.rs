@@ -296,6 +296,8 @@ impl Monitor {
     }
 }
 
+/// The monitor used for tracking the round-trip-time to the server, as described in the SDAM spec.
+/// This monitor uses its owne connection to track RTT and publishes it to a channel.
 struct RttMonitor {
     sender: watch::Sender<RttInfo>,
     connection: Option<Connection>,
@@ -311,6 +313,9 @@ struct RttInfo {
 }
 
 impl RttMonitor {
+    /// Creates a new RTT monitor for the server at the given address, returning a receiver that the
+    /// RTT statistics will be published to. This does not start the monitor.
+    /// [`RttMonitor::execute`] needs to be invoked to start it.
     fn new(
         address: ServerAddress,
         topology: TopologyWatcher,
@@ -365,6 +370,7 @@ impl RttMonitor {
                 Ok(_) => {
                     let new_rtt = match self.sender.borrow().average {
                         Some(old_rtt) => RttInfo {
+                            // Average is 20% most recent sample and 80% prior sample.
                             average: Some((rtt / 5) + (old_rtt * 4 / 5)),
                         },
                         None => RttInfo { average: Some(rtt) },
@@ -372,6 +378,8 @@ impl RttMonitor {
 
                     let _ = self.sender.send(new_rtt);
                 }
+                // From the SDAM spec: "Errors encountered when running a hello or legacy hello
+                // command MUST NOT update the topology."
                 Err(_) => {
                     self.connection.take();
                 }
