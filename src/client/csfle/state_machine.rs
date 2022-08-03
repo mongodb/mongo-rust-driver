@@ -12,10 +12,6 @@ use crate::{Client};
 use crate::error::{Error, Result};
 use crate::operation::{RawOutput, RunCommand};
 
-fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
-    raw.try_into().map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
-}
-
 impl Client {
     pub(crate) async fn run_mongocrypt_ctx(&self, mut ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let guard = self.inner.csfle.read().await;
@@ -86,9 +82,10 @@ impl Client {
                         Ok(())
                     }).await?;
                 }
+                State::NeedKmsCredentials => todo!("RUST-1314"),
                 State::Ready => result = Some(ctx.finalize()?.to_owned()),
                 State::Done => break,
-                _ => todo!(),
+                s => return Err(Error::internal(format!("unhandled state {:?}", s))),
             }
         }
         match result {
@@ -96,4 +93,8 @@ impl Client {
             None => Err(Error::internal("libmongocrypt terminated without output")),
         }
     }
+}
+
+fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
+    raw.try_into().map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
 }
