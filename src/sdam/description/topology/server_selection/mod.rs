@@ -185,6 +185,11 @@ impl TopologyDescription {
             .filter(move |server| types.contains(&server.server_type))
     }
 
+    #[cfg(test)]
+    pub(crate) fn primary(&self) -> Option<&ServerDescription> {
+        self.servers_with_type(&[ServerType::RsPrimary]).next()
+    }
+
     fn suitable_servers_in_replica_set<'a>(
         &self,
         read_preference: &'a ReadPreference,

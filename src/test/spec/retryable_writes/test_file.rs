@@ -8,46 +8,46 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TestFile {
-    pub run_on: Option<Vec<RunOn>>,
-    pub data: Vec<Document>,
-    pub tests: Vec<TestCase>,
+pub(crate) struct TestFile {
+    pub(crate) run_on: Option<Vec<RunOn>>,
+    pub(crate) data: Vec<Document>,
+    pub(crate) tests: Vec<TestCase>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TestCase {
-    pub description: String,
-    pub client_options: Option<ClientOptions>,
-    pub use_multiple_mongoses: Option<bool>,
-    pub fail_point: Option<Document>,
-    pub operation: Operation,
-    pub outcome: Outcome,
+pub(crate) struct TestCase {
+    pub(crate) description: String,
+    pub(crate) client_options: Option<ClientOptions>,
+    pub(crate) use_multiple_mongoses: Option<bool>,
+    pub(crate) fail_point: Option<Document>,
+    pub(crate) operation: Operation,
+    pub(crate) outcome: Outcome,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Outcome {
-    pub error: Option<bool>,
-    pub result: Option<TestResult>,
-    pub collection: CollectionOutcome,
+pub(crate) struct Outcome {
+    pub(crate) error: Option<bool>,
+    pub(crate) result: Option<TestResult>,
+    pub(crate) collection: CollectionOutcome,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum TestResult {
+pub(crate) enum TestResult {
     Labels(Labels),
     Value(Bson),
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Labels {
-    pub error_labels_contain: Option<Vec<String>>,
-    pub error_labels_omit: Option<Vec<String>>,
+pub(crate) struct Labels {
+    pub(crate) error_labels_contain: Option<Vec<String>>,
+    pub(crate) error_labels_omit: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CollectionOutcome {
-    pub name: Option<String>,
-    pub data: Vec<Document>,
+pub(crate) struct CollectionOutcome {
+    pub(crate) name: Option<String>,
+    pub(crate) data: Vec<Document>,
 }

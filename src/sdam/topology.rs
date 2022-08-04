@@ -186,10 +186,7 @@ impl Topology {
                     average_round_trip_time: Some(Duration::from_nanos(0)),
                     ..ServerDescription::new(server_address.clone(), None)
                 };
-                new_state
-                    .description
-                    .update(new_desc)
-                    .map_err(Error::internal)?;
+                new_state.description.update(new_desc)?;
             }
 
             worker.process_topology_diff(&old_description, &new_state.description);
@@ -480,7 +477,10 @@ impl TopologyWorker {
             if sd.is_available() {
                 let got_name = sd.set_name();
                 if latest_state.description.topology_type() == TopologyType::Single
-                    && got_name.as_ref().map(|opt| opt.as_ref()) != Ok(Some(expected_name))
+                    && !matches!(
+                        got_name.as_ref().map(|opt| opt.as_ref()),
+                        Ok(Some(name)) if name == expected_name
+                    )
                 {
                     let got_display = match got_name {
                         Ok(Some(s)) => format!("{:?}", s),
@@ -490,10 +490,10 @@ impl TopologyWorker {
                     // Mark server as unknown.
                     sd = ServerDescription::new(
                         sd.address,
-                        Some(Err(format!(
+                        Some(Err(Error::invalid_argument(format!(
                             "Connection string replicaSet name {:?} does not match actual name {}",
                             expected_name, got_display,
-                        ))),
+                        )))),
                     );
                 }
             }
@@ -580,7 +580,7 @@ impl TopologyWorker {
 
     /// Mark the server at the given address as Unknown using the provided error as the cause.
     async fn mark_server_as_unknown(&mut self, address: ServerAddress, error: Error) -> bool {
-        let description = ServerDescription::new(address, Some(Err(error.to_string())));
+        let description = ServerDescription::new(address, Some(Err(error)));
         self.update_server(description).await
     }
 

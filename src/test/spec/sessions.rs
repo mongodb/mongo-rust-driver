@@ -4,16 +4,16 @@ use crate::{
     bson::doc,
     error::ErrorKind,
     options::SessionOptions,
-    test::{run_spec_test, TestClient, LOCK},
+    test::{TestClient, LOCK},
 };
 
-use super::run_unified_format_test;
+use super::{run_spec_test_with_path, run_unified_format_test};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test(&["sessions"], run_unified_format_test).await;
+    run_spec_test_with_path(&["sessions"], run_unified_format_test).await;
 }
 
 // Sessions prose test 1

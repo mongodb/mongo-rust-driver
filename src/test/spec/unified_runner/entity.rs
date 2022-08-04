@@ -3,15 +3,19 @@ use std::{
     io::BufWriter,
     ops::{Deref, DerefMut},
     sync::Arc,
+    time::Duration,
 };
 
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex};
 
 use crate::{
     bson::{Bson, Document},
     change_stream::ChangeStream,
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
+    error::Error,
     event::command::CommandStartedEvent,
+    runtime,
+    sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
         CommandEvent,
@@ -26,9 +30,11 @@ use crate::{
     SessionCursor,
 };
 
+use super::{observer::EventObserver, test_file::ThreadMessage, Operation};
+
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum Entity {
+pub(crate) enum Entity {
     Client(ClientEntity),
     Database(Database),
     Collection(Collection<Document>),
@@ -36,27 +42,30 @@ pub enum Entity {
     Cursor(TestCursor),
     Bson(Bson),
     EventList(EventList),
+    Thread(ThreadEntity),
+    TopologyDescription(TopologyDescription),
     None,
 }
 
 #[derive(Clone, Debug)]
-pub struct ClientEntity {
+pub(crate) struct ClientEntity {
     client: Client,
-    observer: Arc<EventHandler>,
+    handler: Arc<EventHandler>,
+    pub(crate) observer: Arc<Mutex<EventObserver>>,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
 }
 
 #[derive(Debug)]
-pub struct SessionEntity {
-    pub lsid: Document,
-    pub client_session: Option<Box<ClientSession>>,
+pub(crate) struct SessionEntity {
+    pub(crate) lsid: Document,
+    pub(crate) client_session: Option<Box<ClientSession>>,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-pub enum TestCursor {
+pub(crate) enum TestCursor {
     // Due to https://github.com/rust-lang/rust/issues/59245, the `Entity` type is required to be
     // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only
     // has a `Send` bound.  Wrapping it in `Mutex` works around this.
@@ -83,7 +92,7 @@ impl From<EventList> for Entity {
 }
 
 impl TestCursor {
-    pub async fn make_kill_watcher(&mut self) -> oneshot::Receiver<()> {
+    pub(crate) async fn make_kill_watcher(&mut self) -> oneshot::Receiver<()> {
         match self {
             Self::Normal(cursor) => {
                 let (tx, rx) = oneshot::channel();
@@ -106,16 +115,18 @@ impl TestCursor {
 }
 
 impl ClientEntity {
-    pub fn new(
+    pub(crate) fn new(
         client: Client,
-        observer: Arc<EventHandler>,
+        handler: Arc<EventHandler>,
         observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
+        let observer = EventObserver::new(handler.broadcaster().subscribe());
         Self {
             client,
-            observer,
+            handler,
+            observer: Arc::new(Mutex::new(observer)),
             observe_events,
             ignore_command_names,
             observe_sensitive_commands,
@@ -125,8 +136,8 @@ impl ClientEntity {
     /// Gets a list of all of the events of the requested event types that occurred on this client.
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
-    pub fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
-        self.observer.get_filtered_events(expected_type, |event| {
+    pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
+        self.handler.get_filtered_events(expected_type, |event| {
             if let Event::Command(cev) = event {
                 if !self.allow_command_event(cev) {
                     return false;
@@ -172,23 +183,52 @@ impl ClientEntity {
     }
 
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
-    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        self.observer.get_all_command_started_events()
+    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+        self.handler.get_all_command_started_events()
     }
 
     /// Writes all events with the given name to the given BufWriter.
     pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
-        self.observer.write_events_list_to_file(names, writer);
+        self.handler.write_events_list_to_file(names, writer);
     }
 
     /// Gets the count of connections currently checked out.
-    pub fn connections_checked_out(&self) -> u32 {
-        self.observer.connections_checked_out()
+    pub(crate) fn connections_checked_out(&self) -> u32 {
+        self.handler.connections_checked_out()
     }
 
     /// Synchronize all connection pool worker threads.
-    pub async fn sync_workers(&self) {
+    pub(crate) async fn sync_workers(&self) {
         self.client.sync_workers().await;
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ThreadEntity {
+    pub(crate) sender: mpsc::UnboundedSender<ThreadMessage>,
+}
+
+impl ThreadEntity {
+    pub(crate) fn run_operation(&self, op: Arc<Operation>) {
+        self.sender
+            .send(ThreadMessage::ExecuteOperation(op))
+            .unwrap();
+    }
+
+    pub(crate) async fn wait(&self) -> bool {
+        let (tx, rx) = oneshot::channel();
+
+        // if the task panicked, this send will fail
+        if self.sender.send(ThreadMessage::Stop(tx)).is_err() {
+            return false;
+        }
+
+        // return that both the timeout was satisfied and that the task responded to the
+        // acknowledgment request.
+        runtime::timeout(Duration::from_secs(10), rx)
+            .await
+            .and_then(|r| r.map_err(|_| Error::internal(""))) // flatten tokio error into mongodb::Error
+            .is_ok()
     }
 }
 
@@ -210,6 +250,12 @@ impl From<Bson> for Entity {
     }
 }
 
+impl From<TopologyDescription> for Entity {
+    fn from(td: TopologyDescription) -> Self {
+        Self::TopologyDescription(td)
+    }
+}
+
 impl Deref for ClientEntity {
     type Target = Client;
 
@@ -219,7 +265,7 @@ impl Deref for ClientEntity {
 }
 
 impl SessionEntity {
-    pub fn new(client_session: ClientSession) -> Self {
+    pub(crate) fn new(client_session: ClientSession) -> Self {
         let lsid = client_session.id().clone();
         Self {
             client_session: Some(Box::new(client_session)),
@@ -246,56 +292,70 @@ impl DerefMut for SessionEntity {
 }
 
 impl Entity {
-    pub fn as_client(&self) -> &ClientEntity {
+    pub(crate) fn as_client(&self) -> &ClientEntity {
         match self {
             Self::Client(client) => client,
             _ => panic!("Expected client entity, got {:?}", &self),
         }
     }
 
-    pub fn as_database(&self) -> &Database {
+    pub(crate) fn as_database(&self) -> &Database {
         match self {
             Self::Database(database) => database,
             _ => panic!("Expected database entity, got {:?}", &self),
         }
     }
 
-    pub fn as_collection(&self) -> &Collection<Document> {
+    pub(crate) fn as_collection(&self) -> &Collection<Document> {
         match self {
             Self::Collection(collection) => collection,
             _ => panic!("Expected collection entity, got {:?}", &self),
         }
     }
 
-    pub fn as_session_entity(&self) -> &SessionEntity {
+    pub(crate) fn as_session_entity(&self) -> &SessionEntity {
         match self {
             Self::Session(client_session) => client_session,
             _ => panic!("Expected client session entity, got {:?}", &self),
         }
     }
 
-    pub fn as_mut_session_entity(&mut self) -> &mut SessionEntity {
+    pub(crate) fn as_mut_session_entity(&mut self) -> &mut SessionEntity {
         match self {
             Self::Session(client_session) => client_session,
             _ => panic!("Expected mutable client session entity, got {:?}", &self),
         }
     }
 
-    pub fn as_bson(&self) -> &Bson {
+    pub(crate) fn as_bson(&self) -> &Bson {
         match self {
             Self::Bson(bson) => bson,
             _ => panic!("Expected BSON entity, got {:?}", &self),
         }
     }
 
-    pub fn as_mut_cursor(&mut self) -> &mut TestCursor {
+    pub(crate) fn as_mut_cursor(&mut self) -> &mut TestCursor {
         match self {
             Self::Cursor(cursor) => cursor,
             _ => panic!("Expected cursor, got {:?}", &self),
         }
     }
 
-    pub fn into_cursor(self) -> TestCursor {
+    pub(crate) fn as_thread(&self) -> &ThreadEntity {
+        match self {
+            Self::Thread(thread) => thread,
+            _ => panic!("Expected thread, got {:?}", self),
+        }
+    }
+
+    pub(crate) fn as_topology_description(&self) -> &TopologyDescription {
+        match self {
+            Self::TopologyDescription(desc) => desc,
+            _ => panic!("Expected Topologydescription, got {:?}", self),
+        }
+    }
+
+    pub(crate) fn into_cursor(self) -> TestCursor {
         match self {
             Self::Cursor(cursor) => cursor,
             _ => panic!("Expected cursor, got {:?}", &self),

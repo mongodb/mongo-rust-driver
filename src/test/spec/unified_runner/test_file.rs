@@ -1,7 +1,8 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
+use tokio::sync::oneshot;
 
 use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 
@@ -25,15 +26,14 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct TestFile {
-    pub description: String,
+pub(crate) struct TestFile {
+    pub(crate) description: String,
     #[serde(deserialize_with = "deserialize_schema_version")]
-    pub schema_version: Version,
-    pub run_on_requirements: Option<Vec<RunOnRequirement>>,
-    pub allow_multiple_mongoses: Option<bool>,
-    pub create_entities: Option<Vec<TestFileEntity>>,
-    pub initial_data: Option<Vec<CollectionData>>,
-    pub tests: Vec<TestCase>,
+    pub(crate) schema_version: Version,
+    pub(crate) run_on_requirements: Option<Vec<RunOnRequirement>>,
+    pub(crate) create_entities: Option<Vec<TestFileEntity>>,
+    pub(crate) initial_data: Option<Vec<CollectionData>>,
+    pub(crate) tests: Vec<TestCase>,
     // We don't need to use this field, but it needs to be included during deserialization so that
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "_yamlAnchors")]
@@ -58,7 +58,7 @@ where
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RunOnRequirement {
+pub(crate) struct RunOnRequirement {
     min_server_version: Option<String>,
     max_server_version: Option<String>,
     topologies: Option<Vec<Topology>>,
@@ -69,7 +69,7 @@ pub struct RunOnRequirement {
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
-pub enum Topology {
+pub(crate) enum Topology {
     Single,
     ReplicaSet,
     Sharded,
@@ -80,7 +80,7 @@ pub enum Topology {
 }
 
 impl RunOnRequirement {
-    pub async fn can_run_on(&self, client: &TestClient) -> bool {
+    pub(crate) async fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
@@ -126,12 +126,13 @@ impl RunOnRequirement {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub enum TestFileEntity {
+pub(crate) enum TestFileEntity {
     Client(Client),
     Database(Database),
     Collection(Collection),
     Session(Session),
     Bucket(Bucket),
+    Thread(Thread),
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,20 +144,20 @@ pub struct StoreEventsAsEntity {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Client {
-    pub id: String,
-    pub uri_options: Option<Document>,
-    pub use_multiple_mongoses: Option<bool>,
-    pub observe_events: Option<Vec<ObserveEvent>>,
-    pub ignore_command_monitoring_events: Option<Vec<String>>,
+pub(crate) struct Client {
+    pub(crate) id: String,
+    pub(crate) uri_options: Option<Document>,
+    pub(crate) use_multiple_mongoses: Option<bool>,
+    pub(crate) observe_events: Option<Vec<ObserveEvent>>,
+    pub(crate) ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
-    pub observe_sensitive_commands: Option<bool>,
+    pub(crate) observe_sensitive_commands: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
-    pub server_api: Option<ServerApi>,
-    pub store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
+    pub(crate) server_api: Option<ServerApi>,
+    pub(crate) store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
 }
 
-pub fn deserialize_server_api_test_format<'de, D>(
+pub(crate) fn deserialize_server_api_test_format<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<ServerApi>, D::Error>
 where
@@ -178,7 +179,7 @@ where
     }))
 }
 
-pub fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> String {
+pub(crate) fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> String {
     let uri_options = match uri_options {
         Some(opts) => opts,
         None => return given_uri.to_string(),
@@ -222,56 +223,64 @@ pub fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> Str
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Database {
-    pub id: String,
-    pub client: String,
-    pub database_name: String,
-    pub database_options: Option<CollectionOrDatabaseOptions>,
+pub(crate) struct Database {
+    pub(crate) id: String,
+    pub(crate) client: String,
+    pub(crate) database_name: String,
+    pub(crate) database_options: Option<CollectionOrDatabaseOptions>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Collection {
-    pub id: String,
-    pub database: String,
-    pub collection_name: String,
-    pub collection_options: Option<CollectionOrDatabaseOptions>,
+pub(crate) struct Collection {
+    pub(crate) id: String,
+    pub(crate) database: String,
+    pub(crate) collection_name: String,
+    pub(crate) collection_options: Option<CollectionOrDatabaseOptions>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Session {
-    pub id: String,
-    pub client: String,
-    pub session_options: Option<SessionOptions>,
+pub(crate) struct Session {
+    pub(crate) id: String,
+    pub(crate) client: String,
+    pub(crate) session_options: Option<SessionOptions>,
+}
+
+// TODO: RUST-527 remove the unused annotation
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[allow(unused)]
+pub(crate) struct Bucket {
+    pub(crate) id: String,
+    pub(crate) database: String,
+    pub(crate) bucket_options: Option<Document>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Bucket {
-    pub id: String,
-    pub database: String,
-    pub bucket_options: Option<Document>,
+pub(crate) struct Thread {
+    pub(crate) id: String,
+}
+
+/// Messages used for communicating with test runner "threads".
+#[derive(Debug)]
+pub(crate) enum ThreadMessage {
+    ExecuteOperation(Arc<Operation>),
+    Stop(oneshot::Sender<()>),
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Stream {
-    pub id: String,
-    pub hex_bytes: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CollectionOrDatabaseOptions {
-    pub read_concern: Option<ReadConcern>,
+pub(crate) struct CollectionOrDatabaseOptions {
+    pub(crate) read_concern: Option<ReadConcern>,
     #[serde(rename = "readPreference")]
-    pub selection_criteria: Option<SelectionCriteria>,
-    pub write_concern: Option<WriteConcern>,
+    pub(crate) selection_criteria: Option<SelectionCriteria>,
+    pub(crate) write_concern: Option<WriteConcern>,
 }
 
 impl CollectionOrDatabaseOptions {
-    pub fn as_database_options(&self) -> DatabaseOptions {
+    pub(crate) fn as_database_options(&self) -> DatabaseOptions {
         DatabaseOptions {
             read_concern: self.read_concern.clone(),
             selection_criteria: self.selection_criteria.clone(),
@@ -279,7 +288,7 @@ impl CollectionOrDatabaseOptions {
         }
     }
 
-    pub fn as_collection_options(&self) -> CollectionOptions {
+    pub(crate) fn as_collection_options(&self) -> CollectionOptions {
         CollectionOptions {
             read_concern: self.read_concern.clone(),
             selection_criteria: self.selection_criteria.clone(),
@@ -290,35 +299,35 @@ impl CollectionOrDatabaseOptions {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CollectionData {
-    pub collection_name: String,
-    pub database_name: String,
-    pub documents: Vec<Document>,
+pub(crate) struct CollectionData {
+    pub(crate) collection_name: String,
+    pub(crate) database_name: String,
+    pub(crate) documents: Vec<Document>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct TestCase {
-    pub description: String,
-    pub run_on_requirements: Option<Vec<RunOnRequirement>>,
-    pub skip_reason: Option<String>,
-    pub operations: Vec<Operation>,
-    pub expect_events: Option<Vec<ExpectedEvents>>,
-    pub outcome: Option<Vec<CollectionData>>,
+pub(crate) struct TestCase {
+    pub(crate) description: String,
+    pub(crate) run_on_requirements: Option<Vec<RunOnRequirement>>,
+    pub(crate) skip_reason: Option<String>,
+    pub(crate) operations: Vec<Operation>,
+    pub(crate) expect_events: Option<Vec<ExpectedEvents>>,
+    pub(crate) outcome: Option<Vec<CollectionData>>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ExpectedEvents {
-    pub client: String,
-    pub events: Vec<ExpectedEvent>,
-    pub event_type: Option<ExpectedEventType>,
-    pub ignore_extra_events: Option<bool>,
+pub(crate) struct ExpectedEvents {
+    pub(crate) client: String,
+    pub(crate) events: Vec<ExpectedEvent>,
+    pub(crate) event_type: Option<ExpectedEventType>,
+    pub(crate) ignore_extra_events: Option<bool>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub enum ExpectedEventType {
+pub(crate) enum ExpectedEventType {
     Command,
     Cmap,
     // TODO RUST-1055 Remove this when connection usage is serialized.
@@ -328,64 +337,117 @@ pub enum ExpectedEventType {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub enum EventMatch {
+pub(crate) enum EventMatch {
     Exact,
     Prefix,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ExpectError {
-    pub is_error: Option<bool>,
-    pub is_client_error: Option<bool>,
-    pub error_contains: Option<String>,
-    pub error_code: Option<i32>,
-    pub error_code_name: Option<String>,
-    pub error_labels_contain: Option<Vec<String>>,
-    pub error_labels_omit: Option<Vec<String>>,
-    pub expect_result: Option<Bson>,
+pub(crate) struct ExpectError {
+    #[allow(unused)]
+    pub(crate) is_error: Option<bool>,
+    pub(crate) is_client_error: Option<bool>,
+    pub(crate) error_contains: Option<String>,
+    pub(crate) error_code: Option<i32>,
+    pub(crate) error_code_name: Option<String>,
+    pub(crate) error_labels_contain: Option<Vec<String>>,
+    pub(crate) error_labels_omit: Option<Vec<String>>,
+    pub(crate) expect_result: Option<Bson>,
 }
 
 impl ExpectError {
-    pub fn verify_result(&self, error: &Error) {
+    pub(crate) fn verify_result(
+        &self,
+        error: &Error,
+        description: impl AsRef<str>,
+    ) -> std::result::Result<(), String> {
+        let description = description.as_ref();
+
         if let Some(is_client_error) = self.is_client_error {
-            assert_eq!(is_client_error, !error.is_server_error());
+            if is_client_error != !error.is_server_error() {
+                return Err(format!(
+                    "{}: expected client error but got {:?}",
+                    description, error
+                ));
+            }
         }
         if let Some(error_contains) = &self.error_contains {
             match &error.message() {
-                Some(msg) => assert!(msg.contains(error_contains)),
-                None => panic!("{} should include message field", error),
+                Some(msg) if msg.contains(error_contains) => (),
+                _ => {
+                    return Err(format!(
+                        "{}: \"{}\" should include message field",
+                        description, error
+                    ))
+                }
             }
         }
         if let Some(error_code) = self.error_code {
             match &error.code() {
-                Some(code) => assert_eq!(
-                    *code, error_code,
-                    "error {:?} did not match expected error code {}",
-                    error, error_code
-                ),
-                None => panic!("{} should include code", error),
+                Some(code) => {
+                    if code != &error_code {
+                        return Err(format!(
+                            "{}: error code {} ({:?}) did not match expected error code {}",
+                            description,
+                            code,
+                            error.code_name(),
+                            error_code
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!(
+                        "{}: {:?} was expected to include code {} but had no code",
+                        description, error, error_code
+                    ))
+                }
             }
         }
-        if let Some(error_code_name) = &self.error_code_name {
-            match &error.code_name() {
-                Some(name) => assert_eq!(&error_code_name, name),
-                None => panic!("{} should include code name", error),
+
+        if let Some(expected_code_name) = &self.error_code_name {
+            match error.code_name() {
+                Some(name) => {
+                    if name != expected_code_name {
+                        return Err(format!(
+                            "{}: error code name \"{}\" did not match expected error code name \
+                             \"{}\"",
+                            description, name, expected_code_name,
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!(
+                        "{}: {:?} was expected to include code name \"{}\" but had no code name",
+                        description, error, expected_code_name
+                    ))
+                }
             }
         }
         if let Some(error_labels_contain) = &self.error_labels_contain {
             for label in error_labels_contain {
-                assert!(error.labels().contains(label));
+                if !error.contains_label(label) {
+                    return Err(format!(
+                        "{}: expected {:?} to contain label \"{}\"",
+                        description, error, label
+                    ));
+                }
             }
         }
         if let Some(error_labels_omit) = &self.error_labels_omit {
             for label in error_labels_omit {
-                assert!(!error.labels().contains(label));
+                if error.contains_label(label) {
+                    return Err(format!(
+                        "{}: expected {:?} to omit label \"{}\"",
+                        description, error, label
+                    ));
+                }
             }
         }
         if self.expect_result.is_some() {
             // TODO RUST-260: match against partial results
         }
+        Ok(())
     }
 }
 

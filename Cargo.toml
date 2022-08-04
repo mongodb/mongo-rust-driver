@@ -7,7 +7,7 @@ authors = [
     "Kaitlin Mahar <kaitlin.mahar@mongodb.com>",
 ]
 description = "The official MongoDB driver for Rust"
-edition = "2018"
+edition = "2021"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
 categories = ["asynchronous", "database", "web-programming"]
 repository = "https://github.com/mongodb/mongo-rust-driver"
@@ -163,6 +163,7 @@ function_name = "0.2.1"
 futures = "0.3"
 home = "0.5"
 pretty_assertions = "1.1.0"
+serde = { version = "*", features = ["rc"] }
 serde_json = "1.0.64"
 semver = "1.0.0"
 time = "0.3.9"
