@@ -500,11 +500,8 @@ impl Database {
     }
 
     /// Creates a new [`GridFsBucket`] in the database with the given options.
-    pub fn new_gridfs_bucket(
-        &self,
-        options: Option<GridFsBucketOptions>,
-    ) -> GridFsBucket {
-        let mut options: GridFsBucketOptions = options.unwrap_or_default();
+    pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
+        let mut options = options.into().unwrap_or_default();
         options.read_concern = options
             .read_concern
             .or_else(|| self.read_concern().cloned());
