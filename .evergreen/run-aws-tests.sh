@@ -45,4 +45,4 @@ set -o errexit
 source ./.evergreen/configure-rust.sh
 
 RUST_BACKTRACE=1 cargo test --features aws-auth auth_aws::auth_aws
-RUST_BACKTRACE=1 cargo test --features aws-auth lambda_example::test_handler
+RUST_BACKTRACE=1 cargo test --features aws-auth lambda_examples::auth::test_handler
