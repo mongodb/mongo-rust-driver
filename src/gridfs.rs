@@ -12,7 +12,6 @@ use crate::{
 };
 use bson::{oid::ObjectId, Bson, DateTime, Document};
 use futures;
-use futures_util;
 use options::*;
 use serde::{Deserialize, Serialize};
 use tokio::io::ReadBuf;
@@ -88,7 +87,7 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
     }
 }
 
-impl futures_util::io::AsyncWrite for GridFsUploadStream {
+impl futures::io::AsyncWrite for GridFsUploadStream {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -133,7 +132,7 @@ impl tokio::io::AsyncRead for GridFsDownloadStream {
     }
 }
 
-impl futures_util::io::AsyncRead for GridFsDownloadStream {
+impl futures::io::AsyncRead for GridFsDownloadStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -203,7 +202,7 @@ impl GridFsBucket {
         &self,
         id: Bson,
         filename: String,
-        source: impl futures_util::io::AsyncRead,
+        source: impl futures::io::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         todo!()
@@ -231,7 +230,7 @@ impl GridFsBucket {
     pub async fn upload_from_futures_0_3_reader(
         &self,
         filename: String,
-        source: impl futures_util::io::AsyncRead,
+        source: impl futures::io::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         self.upload_from_futures_0_3_reader_with_id(
@@ -277,7 +276,7 @@ impl GridFsBucket {
     pub async fn download_to_futures_0_3_writer(
         &self,
         id: Bson,
-        destination: impl futures_util::io::AsyncWrite,
+        destination: impl futures::io::AsyncWrite,
     ) {
         todo!()
     }
@@ -300,7 +299,7 @@ impl GridFsBucket {
     pub async fn download_to_futures_0_3_writer_by_name(
         &self,
         filename: String,
-        destination: impl futures_util::io::AsyncWrite,
+        destination: impl futures::io::AsyncWrite,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) {
         todo!()
