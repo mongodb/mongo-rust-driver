@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, State};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::{io::{AsyncReadExt, AsyncWriteExt}, sync::oneshot};
 
 use crate::{
     client::options::{ServerAddress, TlsOptions},
@@ -17,7 +17,7 @@ use crate::{
 impl Client {
     pub(crate) async fn run_mongocrypt_ctx(
         &self,
-        mut ctx: Ctx,
+        ctx: Ctx,
         db: Option<&str>,
     ) -> Result<RawDocumentBuf> {
         let guard = self.inner.csfle.read().await;
@@ -25,11 +25,17 @@ impl Client {
             Some(csfle) => csfle,
             None => return Err(Error::internal("no csfle state for mongocrypt ctx")),
         };
+        // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing thread for crypto finalization.  An `Option` would also work here, but `Result` means we can return a helpful error if things get into a broken state rather than panicing.
         let mut result = None;
+        let num_cpus = std::thread::available_parallelism()?.get();
+        let crypt_threads = rayon::ThreadPoolBuilder::new().num_threads(num_cpus).build()
+            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
+        let mut ctx = Ok(ctx);
         loop {
-            let state = ctx.state()?;
+            let state = result_ref(&ctx)?.state()?;
             match state {
                 State::NeedMongoCollinfo => {
+                    let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
                     let db = self.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
@@ -41,6 +47,7 @@ impl Client {
                     ctx.mongo_done()?;
                 }
                 State::NeedMongoMarkings => {
+                    let ctx = result_mut(&mut ctx)?;
                     let command = ctx.mongo_op()?.to_raw_document_buf();
                     let db = db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoMarkings state")
@@ -55,6 +62,7 @@ impl Client {
                     ctx.mongo_done()?;
                 }
                 State::NeedMongoKeys => {
+                    let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
                     let kv_ns = &csfle.opts.key_vault_namespace;
                     let kv_client = csfle
@@ -72,9 +80,10 @@ impl Client {
                     ctx.mongo_done()?;
                 }
                 State::NeedKms => {
+                    let ctx = result_mut(&mut ctx)?;
                     let scope = ctx.kms_scope();
                     let mut kms_ctxen: Vec<Result<_>> = vec![];
-                    while let Some(kms_ctx) = scope.next_kms_ctx()? {
+                    while let Some(kms_ctx) = scope.next_kms_ctx() {
                         kms_ctxen.push(Ok(kms_ctx));
                     }
                     stream::iter(kms_ctxen)
@@ -103,7 +112,17 @@ impl Client {
                         .await?;
                 }
                 State::NeedKmsCredentials => todo!("RUST-1314"),
-                State::Ready => result = Some(ctx.finalize()?.to_owned()),
+                State::Ready => {
+                    let (tx, rx) = oneshot::channel();
+                    let mut thread_ctx = std::mem::replace(&mut ctx, Err(Error::internal("crypto context not present")))?;
+                    crypt_threads.spawn(move || {
+                        let result = thread_ctx.finalize().map(|doc| doc.to_owned());
+                        let _ = tx.send((thread_ctx, result));
+                    });
+                    let (ctx_again, output) = rx.await.map_err(|_| Error::internal("crypto thread dropped"))?;
+                    ctx = Ok(ctx_again);
+                    result = Some(output?);
+                }
                 State::Done => break,
                 s => return Err(Error::internal(format!("unhandled state {:?}", s))),
             }
@@ -113,6 +132,14 @@ impl Client {
             None => Err(Error::internal("libmongocrypt terminated without output")),
         }
     }
+}
+
+fn result_ref<T>(r: &Result<T>) -> Result<&T> {
+    r.as_ref().map_err(Error::clone)
+}
+
+fn result_mut<T>(r: &mut Result<T>) -> Result<&mut T> {
+    r.as_mut().map_err(|e| e.clone())
 }
 
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {

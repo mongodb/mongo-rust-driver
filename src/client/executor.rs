@@ -797,11 +797,12 @@ impl Client {
         target_db: &'a str,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
-            let doc = RawDocument::from_bytes(serialized)?.to_raw_document_buf();
+            let doc = RawDocument::from_bytes(serialized)?;
             let db = target_db.to_string();
             let ctx = csfle
                 .crypt
-                .build_ctx(move |builder| builder.build_encrypt(&db, &doc))?;
+                .ctx_builder()
+                .build_encrypt(&db, doc)?;
             self.run_mongocrypt_ctx(ctx, Some(target_db)).await
         })
     }
@@ -813,10 +814,10 @@ impl Client {
         doc: &'a RawDocument,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
-            let doc = doc.to_raw_document_buf();
             let ctx = csfle
                 .crypt
-                .build_ctx(move |builder| builder.build_decrypt(&doc))?;
+                .ctx_builder()
+                .build_decrypt(doc)?;
             self.run_mongocrypt_ctx(ctx, None).await
         })
     }
