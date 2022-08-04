@@ -45,6 +45,7 @@ impl<'conn> RunCommand<'conn> {
         })
     }
 
+    #[cfg(feature = "csfle")]
     pub(crate) fn new_raw(
         db: String,
         command: RawDocumentBuf,

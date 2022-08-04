@@ -3,7 +3,10 @@ use std::convert::TryInto;
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, State};
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, sync::oneshot};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::oneshot,
+};
 
 use crate::{
     client::options::{ServerAddress, TlsOptions},
@@ -25,10 +28,14 @@ impl Client {
             Some(csfle) => csfle,
             None => return Err(Error::internal("no csfle state for mongocrypt ctx")),
         };
-        // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing thread for crypto finalization.  An `Option` would also work here, but `Result` means we can return a helpful error if things get into a broken state rather than panicing.
+        // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
+        // thread for crypto finalization.  An `Option` would also work here, but `Result` means we
+        // can return a helpful error if things get into a broken state rather than panicing.
         let mut result = None;
         let num_cpus = std::thread::available_parallelism()?.get();
-        let crypt_threads = rayon::ThreadPoolBuilder::new().num_threads(num_cpus).build()
+        let crypt_threads = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus)
+            .build()
             .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
         let mut ctx = Ok(ctx);
         loop {
@@ -114,12 +121,17 @@ impl Client {
                 State::NeedKmsCredentials => todo!("RUST-1314"),
                 State::Ready => {
                     let (tx, rx) = oneshot::channel();
-                    let mut thread_ctx = std::mem::replace(&mut ctx, Err(Error::internal("crypto context not present")))?;
+                    let mut thread_ctx = std::mem::replace(
+                        &mut ctx,
+                        Err(Error::internal("crypto context not present")),
+                    )?;
                     crypt_threads.spawn(move || {
                         let result = thread_ctx.finalize().map(|doc| doc.to_owned());
                         let _ = tx.send((thread_ctx, result));
                     });
-                    let (ctx_again, output) = rx.await.map_err(|_| Error::internal("crypto thread dropped"))?;
+                    let (ctx_again, output) = rx
+                        .await
+                        .map_err(|_| Error::internal("crypto thread dropped"))?;
                     ctx = Ok(ctx_again);
                     result = Some(output?);
                 }

@@ -1,4 +1,7 @@
-use bson::{doc, RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
+#[cfg(feature = "csfle")]
+use bson::RawDocumentBuf;
+use bson::{doc, RawBsonRef, RawDocument, Timestamp};
+#[cfg(feature = "csfle")]
 use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
@@ -598,19 +601,22 @@ impl Client {
         let cmd_name = cmd.name.clone();
         let target_db = cmd.target_db.clone();
 
-        let mut serialized = op.serialize_command(cmd)?;
+        let serialized = op.serialize_command(cmd)?;
         #[cfg(feature = "csfle")]
-        {
+        let serialized = {
             let guard = self.inner.csfle.read().await;
             if let Some(ref csfle) = *guard {
                 if csfle.opts().bypass_auto_encryption != Some(true) {
-                    serialized = self
-                        .auto_encrypt(csfle, &serialized, &target_db)
+                    self.auto_encrypt(csfle, RawDocument::from_bytes(&serialized)?, &target_db)
                         .await?
-                        .into_bytes();
+                        .into_bytes()
+                } else {
+                    serialized
                 }
+            } else {
+                serialized
             }
-        }
+        };
         let raw_cmd = RawCommand {
             name: cmd_name.clone(),
             target_db,
@@ -742,7 +748,7 @@ impl Client {
                 err.add_labels_and_update_pin(Some(connection), session, Some(retryability))?;
                 op.handle_error(err)
             }
-            Ok(mut response) => {
+            Ok(response) => {
                 self.emit_command_event(|handler| {
                     let reply = if should_redact {
                         Document::new()
@@ -764,15 +770,19 @@ impl Client {
                 });
 
                 #[cfg(feature = "csfle")]
-                {
+                let response = {
                     let guard = self.inner.csfle.read().await;
                     if let Some(ref csfle) = *guard {
                         if csfle.opts().bypass_auto_encryption != Some(true) {
                             let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
-                            response = RawCommandResponse::new_raw(response.source, new_body);
+                            RawCommandResponse::new_raw(response.source, new_body)
+                        } else {
+                            response
                         }
+                    } else {
+                        response
                     }
-                }
+                };
 
                 match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => Ok(response),
@@ -793,16 +803,14 @@ impl Client {
     fn auto_encrypt<'a>(
         &'a self,
         csfle: &'a super::csfle::ClientState,
-        serialized: &'a [u8],
+        command: &'a RawDocument,
         target_db: &'a str,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
-            let doc = RawDocument::from_bytes(serialized)?;
-            let db = target_db.to_string();
             let ctx = csfle
                 .crypt
                 .ctx_builder()
-                .build_encrypt(&db, doc)?;
+                .build_encrypt(target_db, command)?;
             self.run_mongocrypt_ctx(ctx, Some(target_db)).await
         })
     }
@@ -811,13 +819,10 @@ impl Client {
     fn auto_decrypt<'a>(
         &'a self,
         csfle: &'a super::csfle::ClientState,
-        doc: &'a RawDocument,
+        response: &'a RawDocument,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
-            let ctx = csfle
-                .crypt
-                .ctx_builder()
-                .build_decrypt(doc)?;
+            let ctx = csfle.crypt.ctx_builder().build_decrypt(response)?;
             self.run_mongocrypt_ctx(ctx, None).await
         })
     }
