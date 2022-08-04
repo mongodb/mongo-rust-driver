@@ -516,21 +516,10 @@ impl Database {
         options.selection_criteria = options
             .selection_criteria
             .or_else(|| self.selection_criteria().cloned());
-<<<<<<< HEAD
         options.bucket_name = options
             .bucket_name
             .or_else(|| Some(DEFAULT_BUCKET_NAME.to_string()));
         options.chunk_size_bytes = options.chunk_size_bytes.or(Some(DEFAULT_CHUNK_SIZE_BYTES));
-=======
-        let bucket_name = options.bucket_name.unwrap_or_else(|| "fs".to_string());
-        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(255 * 1024);
-        let files = self.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
-        let chunks = self.collection::<Chunk>(&format!("{}.chunks", bucket_name));
-        files.create_index(IndexModel::builder().keys(doc! { "filename": 1, "uploadDate": 1 }).build(), None);
-        chunks.create_index(IndexModel::builder().keys(doc! { "files_id": 1, "n": 1 }).build(), None);
-
-
->>>>>>> ede6694 (add indexes to files and chunks collection)
         GridFsBucket {
             db: self.clone(),
             options,

@@ -238,7 +238,6 @@ impl GridFsBucket {
         use tokio::io::AsyncReadExt;
         let options: GridFsUploadOptions = options
             .into()
-            .map(Into::into)
             .unwrap_or_else(Default::default);
         let chunk_size = options.chunk_size_bytes.unwrap_or(self.chunk_size_bytes);
         let mut length = 0;
