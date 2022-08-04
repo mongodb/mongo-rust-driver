@@ -102,7 +102,11 @@ impl<'a> ServerInfo<'a> {
         self.command_response_getter(|r| r.tags.as_ref())
     }
 
-    /// Gets the error this server encountered, if any.
+    /// Gets the error that caused the server's state to be transitioned to Unknown, if any.
+    ///
+    /// When the driver encounters certain errors during operation execution or server monitoring,
+    /// it transitions the affected server's state to Unknown, rendering the server unusable for
+    /// future operations until it is confirmed to be in healthy state again.
     pub fn error(&self) -> Option<&Error> {
         self.description.reply.as_ref().err()
     }
