@@ -79,7 +79,7 @@ pub struct GridFsFindOptions {
     pub limit: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
-    pub max_time_ms: Option<Duration>,
+    pub max_time: Option<Duration>,
 
     /// The number of documents to skip before returning.
     pub skip: Option<u64>,

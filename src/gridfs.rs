@@ -1,21 +1,21 @@
 pub mod options;
 
 use core::task::{Context, Poll};
-use std::{io, pin::Pin};
+use std::pin::Pin;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::{Error, Result},
+    error::Result,
     selection_criteria::SelectionCriteria,
     Database,
 };
-
 use bson::{oid::ObjectId, Bson, DateTime, Document};
+use futures;
 use futures_util;
 use options::*;
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::ReadBuf;
 
 pub const DEFAULT_BUCKET_NAME: &'static str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
@@ -88,6 +88,30 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
     }
 }
 
+impl futures_util::io::AsyncWrite for GridFsUploadStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<core::result::Result<usize, futures::io::Error>> {
+        todo!()
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<core::result::Result<(), futures::io::Error>> {
+        todo!()
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<core::result::Result<(), futures::io::Error>> {
+        todo!()
+    }
+}
+
 pub struct GridFsDownloadStream {
     files_id: Bson,
 }
@@ -105,6 +129,16 @@ impl tokio::io::AsyncRead for GridFsDownloadStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<tokio::io::Result<()>> {
+        todo!()
+    }
+}
+
+impl futures_util::io::AsyncRead for GridFsDownloadStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<core::result::Result<usize, futures::io::Error>> {
         todo!()
     }
 }
@@ -164,8 +198,8 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `futures` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_futures_reader_with_id(
+    /// `futures-0.3` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_futures_0_3_reader_with_id(
         &self,
         id: Bson,
         filename: String,
@@ -193,14 +227,14 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `futures` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_futures_reader(
+    /// the file id. Uses the `futures-0.3` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_futures_0_3_reader(
         &self,
         filename: String,
         source: impl futures_util::io::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
-        self.upload_from_futures_reader_with_id(
+        self.upload_from_futures_0_3_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
             filename,
             source,
@@ -238,9 +272,9 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the `destination`. Uses the
-    /// `futures` crate's `AsyncWrite` trait for the `destination`.
-    pub async fn download_to_futures_writer(
+    /// the contents to the `destination`. Uses the `futures-0.3` crate's `AsyncWrite`
+    /// trait for the `destination`.
+    pub async fn download_to_futures_0_3_writer(
         &self,
         id: Bson,
         destination: impl futures_util::io::AsyncWrite,
@@ -262,8 +296,8 @@ impl GridFsBucket {
 
     /// Downloads the contents of the stored file specified by `filename` and by
     /// the revision in `options` and writes the contents to the `destination`. Uses the
-    /// `futures` crate's `AsyncWrite` trait for the `destination`.
-    pub async fn download_to_futures_writer_by_name(
+    /// `futures-0.3` crate's `AsyncWrite` trait for the `destination`.
+    pub async fn download_to_futures_0_3_writer_by_name(
         &self,
         filename: String,
         destination: impl futures_util::io::AsyncWrite,
