@@ -202,7 +202,7 @@ impl GridFsBucket {
         &self,
         id: Bson,
         filename: String,
-        source: impl futures::io::AsyncRead,
+        source: impl futures_util::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         todo!()
@@ -230,7 +230,7 @@ impl GridFsBucket {
     pub async fn upload_from_futures_0_3_reader(
         &self,
         filename: String,
-        source: impl futures::io::AsyncRead,
+        source: impl futures_util::AsyncRead,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) {
         self.upload_from_futures_0_3_reader_with_id(
@@ -276,7 +276,7 @@ impl GridFsBucket {
     pub async fn download_to_futures_0_3_writer(
         &self,
         id: Bson,
-        destination: impl futures::io::AsyncWrite,
+        destination: impl futures_util::AsyncWrite,
     ) {
         todo!()
     }
@@ -299,7 +299,7 @@ impl GridFsBucket {
     pub async fn download_to_futures_0_3_writer_by_name(
         &self,
         filename: String,
-        destination: impl futures::io::AsyncWrite,
+        destination: impl futures_util::AsyncWrite,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) {
         todo!()
