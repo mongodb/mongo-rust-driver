@@ -18,16 +18,12 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-<<<<<<< HEAD
     gridfs::{
         options::GridFsBucketOptions,
         GridFsBucket,
         DEFAULT_BUCKET_NAME,
         DEFAULT_CHUNK_SIZE_BYTES,
     },
-=======
-    gridfs::{options::GridFsBucketOptions, GridFsBucket, FilesCollectionDocument, Chunk},
->>>>>>> ede6694 (add indexes to files and chunks collection)
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,

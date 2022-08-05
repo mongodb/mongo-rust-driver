@@ -21,6 +21,7 @@ pub const DEFAULT_BUCKET_NAME: &'static str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
 // Contained in a "chunks" collection for each user file
+#[derive(Serialize)]
 struct Chunk {
     id: ObjectId,
     files_id: Bson,
@@ -53,7 +54,6 @@ pub struct GridFsBucket {
 pub struct GridFsUploadStream {
     pub files_id: Bson,
     pub chunks: Collection<Chunk>,
-    pub cursor: Option<Cursor<Chunk>>,
     pub length: u64,
     pub filename: String,
     pub chunk_size: u32,
@@ -150,7 +150,7 @@ impl tokio::io::AsyncRead for GridFsDownloadStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<tokio::io::Result<()>> {
-        todo!()
+        todo!()   
     }
 }
 
@@ -190,26 +190,30 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> GridFsUploadStream {
-        let files: Collection<FilesCollectionDocument> =
-            self.db.collection(&(format!("{}.files", self.bucket_name)));
         let options: Option<GridFsUploadOptions> = options.into();
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
         let chunk_size = if let Some(ref opts) = options {
-            opts.chunk_size_bytes.unwrap_or(self.chunk_size_bytes)
+            opts.chunk_size_bytes.unwrap_or_else(|| self.options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES))
         } else {
-            self.chunk_size_bytes
+            self.options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES)
         };
+        let files: Collection<FilesCollectionDocument> =
+            self.db.collection(&(format!("{}.files", &bucket_name)));
+        let chunks: Collection<Chunk> =
+            self.db.collection(&(format!("{}.chunks", &bucket_name)));
         let metadata = if let Some(ref opts) = options {
             opts.metadata.clone()
         } else {
             None
         };
         GridFsUploadStream {
-            files_id: id,
+            files_id,
             length: 0,
             filename,
             chunk_size,
             files,
             metadata,
+            chunks,
         }
     }
 
@@ -239,13 +243,19 @@ impl GridFsBucket {
         let options: GridFsUploadOptions = options
             .into()
             .unwrap_or_else(Default::default);
-        let chunk_size = options.chunk_size_bytes.unwrap_or(self.chunk_size_bytes);
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
+
+        let files: Collection<FilesCollectionDocument> =
+            self.db.collection(&(format!("{}.files", &bucket_name)));
+        let chunks: Collection<Chunk> =
+            self.db.collection(&(format!("{}.chunks", &bucket_name)));
+        let chunk_size = self.options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES);
         let mut length = 0;
         let mut n = 0;
         // Get chunks collection
         let chunks: Collection<Chunk> = self
             .db
-            .collection(&(format!("{}.chunks", self.bucket_name)));
+            .collection(&(format!("{}.chunks", &bucket_name)));
         // Read data in, chunk_size_bytes at a time.
         let mut eof = false;
         while !eof {
@@ -278,14 +288,14 @@ impl GridFsBucket {
             };
             // Put chunk in chunks collection.
             chunks.insert_one(chunk, None).await?;
-            length += curr_length;
+            length += curr_length as u64;
             n += 1;
         }
         let files_collection: Collection<FilesCollectionDocument> =
-            self.db.collection(&(format!("{}.files", self.bucket_name)));
+            self.db.collection(&(format!("{}.files", &bucket_name)));
         let file = FilesCollectionDocument {
             id: Bson::ObjectId(ObjectId::new()),
-            length: length as i64,
+            length,
             chunk_size,
             upload_date: DateTime::now(),
             filename,
@@ -297,25 +307,27 @@ impl GridFsBucket {
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
     /// `futures-0.3` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_futures_0_3_reader_with_id(
+    pub async fn upload_from_futures_0_3_reader_with_id<T: futures_util::AsyncRead + std::marker::Unpin>(
         &self,
         files_id: Bson,
         filename: String,
-        source: &mut T,
+        source: T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()> {
         use futures_util::AsyncReadExt;
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
+        let chunk_size = self.options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES);
+
         let options: GridFsUploadOptions = options
             .into()
             .map(Into::into)
             .unwrap_or_else(Default::default);
-        let chunk_size = options.chunk_size_bytes.unwrap_or(self.chunk_size_bytes);
         let mut length = 0;
         let mut n = 0;
         // Get chunks collection
         let chunks: Collection<Chunk> = self
             .db
-            .collection(&(format!("{}.chunks", self.bucket_name)));
+            .collection(&(format!("{}.chunks", &bucket_name)));
         // Read data in, chunk_size_bytes at a time.
         let mut eof = false;
         while !eof {
@@ -352,10 +364,10 @@ impl GridFsBucket {
             n += 1;
         }
         let files_collection: Collection<FilesCollectionDocument> =
-            self.db.collection(&(format!("{}.files", self.bucket_name)));
+            self.db.collection(&(format!("{}.files", &bucket_name)));
         let file = FilesCollectionDocument {
             id: Bson::ObjectId(ObjectId::new()),
-            length: length as i64,
+            length: length as u64,
             chunk_size,
             upload_date: DateTime::now(),
             filename,
@@ -372,7 +384,7 @@ impl GridFsBucket {
         filename: String,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
+    ) -> Result<()> {
         self.upload_from_tokio_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
             filename,
@@ -384,12 +396,12 @@ impl GridFsBucket {
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
     /// the file id. Uses the `futures-0.3` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_futures_0_3_reader(
+    pub async fn upload_from_futures_0_3_reader<T: futures_util::AsyncRead + std::marker::Unpin>(
         &self,
         filename: String,
-        source: &mut T,
+        source: T,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
+    ) -> Result<()> {
         self.upload_from_futures_0_3_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
             filename,
@@ -402,6 +414,7 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
         let file = match self
             .db
             .collection::<FilesCollectionDocument>(&(format!("{}.files", self.options.bucket_name.unwrap_or(DEFAULT_BUCKET_NAME.to_string()))))
@@ -422,7 +435,7 @@ impl GridFsBucket {
 
         let chunks = self
             .db
-            .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
+            .collection::<Chunk>(&(format!("{}.chunks", &bucket_name)));
 
         let options = FindOptions::builder().sort(doc! { "n": -1 }).build();
         let cursor = chunks.find(doc! { "files_id": &id } , options).await?;
@@ -460,10 +473,10 @@ impl GridFsBucket {
             .skip(skip as u64)
             .build();
 
-        let bucket_name = self.options.bucket_name.as_ref().unwrap_or(DEFAULT_BUCKET_NAME);
+        let bucket_name = self.options.bucket_name.as_ref().unwrap_or_else(|| &DEFAULT_BUCKET_NAME.to_string());
         let file = match self
             .db
-            .collection::<FilesCollectionDocument>(&(format!("{}.files", bucket_name)))
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", &bucket_name)))
             .find_one(doc! { "filename": &filename }, options)
             .await?
         {
@@ -495,14 +508,17 @@ impl GridFsBucket {
     }
 
 
-    pub async fn download_to_stream_common(
+    pub async fn download_to_stream_common<T: tokio::io::AsyncWrite + std::marker::Unpin>(
         &self,
         id: Bson,
-        destination: impl tokio::io::AsyncWrite,
+        destination: T,
     ) -> Result<()> {
+        use tokio::io::AsyncWriteExt;
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
+        let chunk_size = self.options.chunk_size_bytes.unwrap_or(DEFAULT_CHUNK_SIZE_BYTES);
         let file = match self
             .db
-            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", &bucket_name)))
             .find_one(doc! { "_id": &id }, None)
             .await? {
                 Some(fcd) => fcd,
@@ -523,7 +539,7 @@ impl GridFsBucket {
 
         let chunks = self
             .db
-            .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
+            .collection::<Chunk>(&(format!("{}.chunks", &bucket_name)));
 
         let options = FindOptions::builder().sort(doc! { "n": -1 }).build();
         let mut cursor = chunks.find(doc! { "files_id": &id } , options).await?;
@@ -533,7 +549,7 @@ impl GridFsBucket {
             if chunk.n != n {
                 let labels: Option<Vec<_>> = None;
                 return Err(Error::new(ErrorKind::InvalidResponse { message: "missing chunks in file".to_string() }, labels));
-            } else if chunk.data.len() != self.chunk_size_bytes && !cursor.is_exhausted() {
+            } else if chunk.data.len() != chunk_size && !cursor.is_exhausted() {
                 let labels: Option<Vec<_>> = None;
                 return Err(Error::new(ErrorKind::InvalidResponse { message: "received invalid chunk".to_string() }, labels));
             }
@@ -546,12 +562,12 @@ impl GridFsBucket {
     /// Downloads the contents of the stored file specified by `id` and writes
     /// the contents to the `destination`. Uses the `tokio` crate's `AsyncWrite`
     /// trait for the `destination`.
-    pub async fn download_to_tokio_writer(
+    pub async fn download_to_tokio_writer<T: tokio::io::AsyncWrite + std::marker::Unpin>(
         &self,
         id: Bson,
-        destination: impl tokio::io::AsyncWrite,
+        destination: T,
     ) -> Result<()> {
-        self.download_to_stream_common(id, destination)
+        self.download_to_stream_common(id, destination).await
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
@@ -592,9 +608,10 @@ impl GridFsBucket {
     /// Given an `id`, deletes the stored file's files collection document and
     /// associated chunks from a [`GridFsBucket`].
     pub async fn delete(&self, id: Bson) -> Result<()> {
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
         let file = match self
             .db
-            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", &bucket_name)))
             .find_one(doc! { "_id": &id }, None)
             .await? {
                 Some(fcd) => fcd,
@@ -610,7 +627,7 @@ impl GridFsBucket {
             };
         let chunks: Collection<Chunk> = self
         .db
-        .collection(&(format!("{}.chunks", self.bucket_name)));
+        .collection(&(format!("{}.chunks", &bucket_name)));
         chunks.delete_many(doc! { "files_id": id }, None).await?;
         Ok(())
     }
@@ -621,7 +638,8 @@ impl GridFsBucket {
         filter: Document,
         options: impl Into<Option<GridFsFindOptions>>,
     ) -> Result<Cursor<FilesCollectionDocument>> {
-        self.db.collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name))).find(filter, None).await
+        let bucket_name = self.options.bucket_name.unwrap_or_else(|| DEFAULT_BUCKET_NAME.to_string());
+        self.db.collection::<FilesCollectionDocument>(&(format!("{}.files", bucket_name))).find(filter, None).await
     }
 
     /// Renames the stored file with the specified `id`.
