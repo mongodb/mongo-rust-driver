@@ -5,14 +5,13 @@ use std::{fmt::Debug, sync::Arc};
 use futures_util::stream::TryStreamExt;
 
 use crate::{
-    bson::{Bson, Document, doc},
+    bson::{doc, Bson, Document},
     change_stream::{
         event::ChangeStreamEvent,
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
     },
-    IndexModel,
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
@@ -38,6 +37,7 @@ use crate::{
     Client,
     ClientSession,
     Collection,
+    IndexModel,
     Namespace,
     SessionCursor,
 };
