@@ -52,9 +52,9 @@ impl ClientState {
         let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
         let exec = CryptExecutor::new(
-            mongocryptd_client,
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
+            mongocryptd_client,
             aux_clients.metadata_client,
         )?;
 

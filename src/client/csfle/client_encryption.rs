@@ -1,18 +1,30 @@
+#![allow(dead_code)]
+
 use crate::{Cursor, Client, Namespace};
 use crate::bson::{Binary, Document};
 use crate::error::Result;
+use mongocrypt::Crypt;
 use mongocrypt::ctx::KmsProvider;
 
-use super::ClientState;
 use super::options::{KmsProviders, KmsProvidersTlsOptions};
+use super::state_machine::CryptExecutor;
 
 pub struct ClientEncryption {
-    csfle: ClientState,
+    crypt: Crypt,
+    exec: CryptExecutor,
+    opts: ClientEncryptionOptions,
 }
 
 impl ClientEncryption {
-    pub fn new(_opts: ClientEncryptionOptions) -> Self {
-        todo!()
+    pub fn new(opts: ClientEncryptionOptions) -> Result<Self> {
+        let crypt = Crypt::builder().build()?;
+        let exec = CryptExecutor::new(
+            opts.key_vault_client.weak(),
+            opts.key_vault_namespace.clone(),
+            None,
+            None,
+        )?;
+        Ok(Self { crypt, exec, opts })
     }
 
     pub fn create_data_key(&self, _kms_provider: KmsProvider, _opts: DataKeyOptions) -> Result<Binary> {

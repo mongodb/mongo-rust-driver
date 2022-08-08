@@ -20,18 +20,18 @@ use crate::{
 
 #[derive(Debug)]
 pub(crate) struct CryptExecutor {
-    mongocryptd_client: Option<Client>,
     key_vault_client: WeakClient,
     key_vault_namespace: Namespace,
+    mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
     crypto_threads: ThreadPool,
 }
 
 impl CryptExecutor {
     pub(crate) fn new(
-        mongocryptd_client: Option<Client>,
         key_vault_client: WeakClient,
         key_vault_namespace: Namespace,
+        mongocryptd_client: Option<Client>,
         metadata_client: Option<WeakClient>,
     ) -> Result<Self> {
         let num_cpus = std::thread::available_parallelism()?.get();
@@ -40,9 +40,9 @@ impl CryptExecutor {
             .build()
             .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
         Ok(Self {
-            mongocryptd_client,
             key_vault_client,
             key_vault_namespace,
+            mongocryptd_client,
             metadata_client,
             crypto_threads,
         })
