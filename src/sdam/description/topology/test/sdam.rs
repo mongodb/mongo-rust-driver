@@ -646,6 +646,13 @@ async fn heartbeat_events() {
         return;
     }
 
+    if client.server_version_gte(4, 4) {
+        log_uncaptured(
+            "skipping heartbeat_events test due to server support for the streaming protocol",
+        );
+        return;
+    }
+
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))
