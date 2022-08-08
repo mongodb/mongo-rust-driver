@@ -17,7 +17,7 @@ use crate::{
 
 use super::tls::AsyncTlsStream;
 
-const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 
 /// A runtime-agnostic async stream possibly using TLS.

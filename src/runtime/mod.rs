@@ -4,7 +4,7 @@ mod http;
 mod interval;
 mod join_handle;
 mod resolver;
-mod stream;
+pub(crate) mod stream;
 mod sync_read_ext;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;

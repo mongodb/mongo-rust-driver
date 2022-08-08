@@ -163,7 +163,6 @@ impl Connection {
     /// Construct and connect a new connection used for monitoring.
     pub(crate) async fn connect_monitoring(
         address: ServerAddress,
-        connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
         Self::new(
@@ -171,7 +170,7 @@ impl Connection {
             address,
             0,
             Some(ConnectionOptions {
-                connect_timeout,
+                connect_timeout: None, // handled by the monitor
                 tls_options,
                 event_handler: None,
             }),

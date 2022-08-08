@@ -103,6 +103,11 @@ impl Error {
         .into()
     }
 
+    /// Construct a generic network timeout error.
+    pub(crate) fn network_timeout() -> Error {
+        ErrorKind::Io(Arc::new(std::io::ErrorKind::TimedOut.into())).into()
+    }
+
     pub(crate) fn invalid_argument(message: impl Into<String>) -> Error {
         ErrorKind::InvalidArgument {
             message: message.into(),

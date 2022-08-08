@@ -21,7 +21,7 @@ use crate::{
     },
     hello::{hello_command, run_hello, AwaitableHelloOptions, HelloReply},
     options::{ClientOptions, ServerAddress},
-    runtime::{self, WorkerHandleListener},
+    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, WorkerHandleListener},
 };
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -174,7 +174,20 @@ impl Monitor {
         })
         .await;
 
-        let start = Instant::now();
+        let timeout = if self.connect_timeout().as_millis() == 0 {
+            // If connectTimeoutMS = 0, then the socket timeout for monitoring is unlimited.
+            Duration::MAX
+        } else if matches!(&self.connection, Some(conn) if conn.is_streaming()) {
+            // For streaming responses, use connectTimeoutMS + heartbeatFrequencyMS for socket
+            // timeout.
+            self.heartbeat_frequency()
+                .checked_add(self.connect_timeout())
+                .unwrap_or(Duration::MAX)
+        } else {
+            // Otherwise, just use connectTimeoutMS.
+            self.connect_timeout()
+        };
+
         let execute_hello = async {
             match self.connection {
                 Some(ref mut conn) => {
@@ -210,7 +223,6 @@ impl Monitor {
                 None => {
                     let mut connection = Connection::connect_monitoring(
                         self.address.clone(),
-                        self.client_options.connect_timeout,
                         self.client_options.tls_options(),
                     )
                     .await?;
@@ -228,7 +240,8 @@ impl Monitor {
             }
         };
 
-        // Begin executing the hello, listening for a cancellation request.
+        // Begin executing the hello, listening for a cancellation request and timeout.
+        let start = Instant::now();
         let result = tokio::select! {
             result = execute_hello => match result {
                 Ok(reply) => HelloResult::Ok(reply),
@@ -236,6 +249,9 @@ impl Monitor {
             },
             Some(err) = self.update_request_receiver.listen_for_cancellation() => {
                 HelloResult::Cancelled { reason: err }
+            }
+            _ = runtime::delay_for(timeout) => {
+                HelloResult::Err(Error::network_timeout())
             }
         };
         let duration = start.elapsed();
@@ -293,6 +309,18 @@ impl Monitor {
         if let Some(ref emitter) = self.sdam_event_emitter {
             emitter.emit(event()).await
         }
+    }
+
+    fn connect_timeout(&self) -> Duration {
+        self.client_options
+            .connect_timeout
+            .unwrap_or(DEFAULT_CONNECT_TIMEOUT)
+    }
+
+    fn heartbeat_frequency(&self) -> Duration {
+        self.client_options
+            .heartbeat_freq
+            .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY)
     }
 }
 
@@ -352,8 +380,12 @@ impl RttMonitor {
         // keep executing until either the topology is closed or server monitor is done (i.e. the
         // sender is closed)
         while self.topology.is_alive() && !self.sender.is_closed() {
-            let start = Instant::now();
-            let result = async {
+            let timeout = self
+                .client_options
+                .connect_timeout
+                .unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+
+            let perform_check = async {
                 match self.connection {
                     Some(ref mut conn) => {
                         let command = hello_command(
@@ -367,7 +399,6 @@ impl RttMonitor {
                     None => {
                         let mut connection = Connection::connect_monitoring(
                             self.address.clone(),
-                            self.client_options.connect_timeout,
                             self.client_options.tls_options(),
                         )
                         .await?;
@@ -376,21 +407,25 @@ impl RttMonitor {
                     }
                 };
                 Result::Ok(())
-            }
-            .await;
-            let rtt = start.elapsed();
+            };
 
-            match result {
-                Ok(_) => {
-                    let new_rtt = self.sender.borrow().with_updated_average_rtt(rtt);
-                    let _ = self.sender.send(new_rtt);
-                }
-                // From the SDAM spec: "Errors encountered when running a hello or legacy hello
-                // command MUST NOT update the topology."
-                Err(_) => {
-                    self.connection.take();
+            let start = Instant::now();
+            let check_succeded = tokio::select! {
+                r = perform_check => r.is_ok(),
+                _ = runtime::delay_for(timeout) => {
+                    false
                 }
             };
+            let rtt = start.elapsed();
+
+            if check_succeded {
+                let new_rtt = self.sender.borrow().with_updated_average_rtt(rtt);
+                let _ = self.sender.send(new_rtt);
+            } else {
+                // From the SDAM spec: "Errors encountered when running a hello or legacy hello
+                // command MUST NOT update the topology."
+                self.connection.take();
+            }
 
             runtime::delay_for(
                 self.client_options
