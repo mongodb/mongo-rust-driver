@@ -1,7 +1,7 @@
 pub mod options;
 
 use core::task::{Context, Poll};
-use std::{cell::RefCell, future::Future, pin::Pin, sync::Arc};
+use std::{cell::RefCell, future::Future, pin::Pin, sync::Arc, thread::sleep, time::Duration};
 
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document},
@@ -16,13 +16,13 @@ use crate::{
 use futures_util;
 use options::*;
 use serde::{Deserialize, Serialize};
-use tokio::io::ReadBuf;
+use tokio::io::{ReadBuf, AsyncWriteExt};
 
 pub const DEFAULT_BUCKET_NAME: &'static str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
 // Contained in a "chunks" collection for each user file
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 struct Chunk {
     id: ObjectId,
     files_id: Bson,
@@ -33,7 +33,7 @@ struct Chunk {
 
 /// A collection in which information about stored files is stored. There will be one files
 /// collection document per stored file.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct FilesCollectionDocument {
     pub id: Bson,
     pub length: u64,
@@ -52,6 +52,7 @@ pub struct GridFsBucket {
 }
 
 // TODO: RUST-1399 Add documentation and example code for this struct.
+#[derive(Debug)]
 pub struct GridFsUploadStream {
     files_id: Bson,
     chunks: Collection<Chunk>,
@@ -72,17 +73,19 @@ impl GridFsUploadStream {
 
     /// Consumes the stream and inserts the FilesCollectionDocument into the files collection. No
     /// further writes to the stream are allowed after this function call.
-    pub async fn finish(self) -> Result<()> {
+    pub async fn finish(mut self) -> Result<()> {
         let file = FilesCollectionDocument {
-            id: self.files_id,
+            id: (&self.files_id).clone(),
             length: *self.length.borrow(),
             chunk_size: self.chunk_size,
             upload_date: DateTime::now(),
-            filename: self.filename,
-            metadata: self.metadata,
+            filename: (&self.filename).clone().to_string(),
+            metadata: (&self.metadata).clone(),
         };
         self.files.insert_one(file, None).await?;
-        Ok(())
+
+        let labels: Option<Vec<_>> = None;
+        self.shutdown().await.map_err(|e| Error::new(ErrorKind::Io(Arc::new(e)), labels))
     }
 
     /// Aborts the upload and discards any uploaded chunks.
@@ -100,8 +103,10 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<tokio::io::Result<usize>> {
+        println!("buf: {:?}", buf);
         self.buffer.borrow_mut().append(&mut Vec::from(buf));
         if self.buffer.borrow().len() < self.chunk_size as usize {
+            println!("I'm ready!");
             return Poll::Ready(Ok(buf.len()));
         }
 
@@ -123,6 +128,7 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
             *self.n.borrow_mut() += 1;
             *self.length.borrow_mut() += self.chunk_size as u64;
         }
+        println!("chunks = {:?}", chunks);
         self.buffer
             .borrow_mut()
             .drain(..(chunks.len() * self.chunk_size as usize));
@@ -153,42 +159,31 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
             data: self.buffer.borrow().to_vec(),
         };
         let mut fut = Box::pin(self.chunks.insert_one(chunk, None));
-        match fut.as_mut().poll(cx) {
-            Poll::Ready(result) => match result {
-                Ok(_) => {
-                    *self.n.borrow_mut() += 1;
-                    *self.length.borrow_mut() += self.buffer.borrow().len() as u64;
-                    self.buffer.borrow_mut().drain(..);
-                    let file = FilesCollectionDocument {
-                        id: Bson::ObjectId(ObjectId::new()),
-                        length: *self.length.borrow(),
-                        chunk_size: self.chunk_size,
-                        upload_date: DateTime::now(),
-                        filename: self.filename.clone(),
-                        metadata: self.metadata.clone(),
-                    };
-                    let mut fut = Box::pin(self.files.insert_one(file, None));
-                    match fut.as_mut().poll(cx) {
-                        Poll::Ready(result) => match result {
-                            Ok(_) => return Poll::Ready(Ok(())),
-                            Err(e) => {
-                                return Poll::Ready(std::io::Result::Err(std::io::Error::new(
-                                    std::io::ErrorKind::BrokenPipe,
-                                    e,
-                                )))
-                            }
-                        },
-                        Poll::Pending => return Poll::Pending,
+
+        loop {
+            match fut.as_mut().poll(cx) {
+                Poll::Ready(result) => match result {
+                    Ok(_) => {
+                        assert_eq!(4, 5);
+
+                        *self.n.borrow_mut() += 1;
+                        *self.length.borrow_mut() += self.buffer.borrow().len() as u64;
+                        self.buffer.borrow_mut().drain(..);
+                        return Poll::Ready(Ok(()))
                     }
-                }
-                Err(e) => {
-                    return Poll::Ready(std::io::Result::Err(std::io::Error::new(
-                        std::io::ErrorKind::BrokenPipe,
-                        e,
-                    )))
-                }
-            },
-            Poll::Pending => return Poll::Pending,
+                    Err(e) => {
+                        return Poll::Ready(std::io::Result::Err(std::io::Error::new(
+                            std::io::ErrorKind::BrokenPipe,
+                            e,
+                        )))
+                    }
+                },
+                Poll::Pending => {
+                    sleep(Duration::from_millis(100));
+                    println!("x");
+                    continue
+                },
+            }
         }
     }
 }
@@ -295,7 +290,7 @@ impl GridFsBucket {
     pub async fn open_upload_stream_with_id(
         &self,
         files_id: Bson,
-        filename: String,
+        filename: &str,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> GridFsUploadStream {
         let options: Option<GridFsUploadOptions> = options.into();
@@ -326,7 +321,7 @@ impl GridFsBucket {
         GridFsUploadStream {
             files_id,
             length: RefCell::new(0),
-            filename,
+            filename: filename.to_string(),
             chunk_size,
             files,
             metadata,
@@ -342,7 +337,7 @@ impl GridFsBucket {
     /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
     pub async fn open_upload_stream(
         &self,
-        filename: String,
+        filename: &str,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> GridFsUploadStream {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
@@ -710,7 +705,7 @@ impl GridFsBucket {
                     labels,
                 ));
             }
-            destination.write(&chunk.data);
+            destination.write(&chunk.data).await;
             n += 1;
         }
         Ok(())

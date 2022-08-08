@@ -11,6 +11,7 @@ mod documentation_examples;
 mod index_management;
 mod spec;
 mod util;
+mod gridfs_test;
 
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
