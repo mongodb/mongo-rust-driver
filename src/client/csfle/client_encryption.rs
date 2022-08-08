@@ -1,15 +1,18 @@
-use crate::Cursor;
+use crate::{Cursor, Client, Namespace};
 use crate::bson::{Binary, Document};
 use crate::error::Result;
 use mongocrypt::ctx::KmsProvider;
 
+use super::ClientState;
+use super::options::{KmsProviders, KmsProvidersTlsOptions};
+
 pub struct ClientEncryption {
-    _todo: (),
+    csfle: ClientState,
 }
 
 impl ClientEncryption {
     pub fn new(_opts: ClientEncryptionOptions) -> Self {
-        Self { _todo: () }
+        todo!()
     }
 
     pub fn create_data_key(&self, _kms_provider: KmsProvider, _opts: DataKeyOptions) -> Result<Binary> {
@@ -54,7 +57,10 @@ impl ClientEncryption {
 }
 
 pub struct ClientEncryptionOptions {
-    _todo: (),
+    pub key_vault_client: Client,
+    pub key_vault_namespace: Namespace,
+    pub kms_providers: KmsProviders,
+    pub tls_options: Option<KmsProvidersTlsOptions>,
 }
 
 pub struct DataKeyOptions {

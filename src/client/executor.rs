@@ -808,10 +808,10 @@ impl Client {
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
             let ctx = csfle
-                .crypt
+                .crypt()
                 .ctx_builder()
                 .build_encrypt(target_db, command)?;
-            csfle.run_mongocrypt_ctx(ctx, Some(self.database(target_db))).await
+            csfle.exec().run_ctx(ctx, Some(target_db)).await
         })
     }
 
@@ -822,8 +822,8 @@ impl Client {
         response: &'a RawDocument,
     ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
         Box::pin(async move {
-            let ctx = csfle.crypt.ctx_builder().build_decrypt(response)?;
-            csfle.run_mongocrypt_ctx(ctx, None).await
+            let ctx = csfle.crypt().ctx_builder().build_decrypt(response)?;
+            csfle.exec().run_ctx(ctx, None).await
         })
     }
 

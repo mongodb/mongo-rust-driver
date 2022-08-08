@@ -3,24 +3,52 @@ use std::convert::TryInto;
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, State};
+use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::oneshot,
 };
 
 use crate::{
-    client::options::ServerAddress,
+    client::{options::ServerAddress, WeakClient},
     cmap::options::StreamOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     runtime::AsyncStream,
-    Database,
+    Client, Namespace,
 };
 
-use super::ClientState;
+#[derive(Debug)]
+pub(crate) struct CryptExecutor {
+    mongocryptd_client: Option<Client>,
+    key_vault_client: WeakClient,
+    key_vault_namespace: Namespace,
+    metadata_client: Option<WeakClient>,
+    crypto_threads: ThreadPool,
+}
 
-impl ClientState {
-    pub(crate) async fn run_mongocrypt_ctx(
+impl CryptExecutor {
+    pub(crate) fn new(
+        mongocryptd_client: Option<Client>,
+        key_vault_client: WeakClient,
+        key_vault_namespace: Namespace,
+        metadata_client: Option<WeakClient>,
+    ) -> Result<Self> {
+        let num_cpus = std::thread::available_parallelism()?.get();
+        let crypto_threads = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus)
+            .build()
+            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
+        Ok(Self {
+            mongocryptd_client,
+            key_vault_client,
+            key_vault_namespace,
+            metadata_client,
+            crypto_threads,
+        })
+    }
+
+    pub(crate) async fn run_ctx(
         &self,
         ctx: Ctx,
         db: Option<&str>,
@@ -37,7 +65,6 @@ impl ClientState {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
                     let metadata_client = self
-                        .aux_clients
                         .metadata_client
                         .as_ref()
                         .and_then(|w| w.upgrade())
@@ -71,9 +98,8 @@ impl ClientState {
                 State::NeedMongoKeys => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let kv_ns = &self.opts.key_vault_namespace;
+                    let kv_ns = &self.key_vault_namespace;
                     let kv_client = self
-                        .aux_clients
                         .key_vault_client
                         .upgrade()
                         .ok_or_else(|| Error::internal("key vault client dropped"))?;
