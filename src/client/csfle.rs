@@ -1,3 +1,4 @@
+pub mod client_encryption;
 pub mod options;
 mod state_machine;
 
