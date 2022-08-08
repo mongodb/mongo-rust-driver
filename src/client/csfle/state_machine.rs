@@ -29,11 +29,6 @@ impl Client {
             None => return Err(Error::internal("no csfle state for mongocrypt ctx")),
         };
         let mut result = None;
-        let num_cpus = std::thread::available_parallelism()?.get();
-        let crypt_threads = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus)
-            .build()
-            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
         // thread for crypto finalization.  An `Option` would also work here, but `Result` means we
         // can return a helpful error if things get into a broken state rather than panicing.
@@ -125,7 +120,7 @@ impl Client {
                         &mut ctx,
                         Err(Error::internal("crypto context not present")),
                     )?;
-                    crypt_threads.spawn(move || {
+                    csfle.crypto_threads.spawn(move || {
                         let result = thread_ctx.finalize().map(|doc| doc.to_owned());
                         let _ = tx.send((thread_ctx, result));
                     });

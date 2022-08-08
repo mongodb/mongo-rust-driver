@@ -8,6 +8,7 @@ use std::{
 
 use derivative::Derivative;
 use mongocrypt::Crypt;
+use rayon::ThreadPool;
 
 use crate::{
     error::{Error, Result},
@@ -36,6 +37,7 @@ pub(super) struct ClientState {
     mongocryptd_client: Option<Client>,
     aux_clients: AuxClients,
     opts: AutoEncryptionOptions,
+    crypto_threads: ThreadPool,
 }
 
 #[derive(Debug)]
@@ -53,12 +55,18 @@ impl ClientState {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
+        let num_cpus = std::thread::available_parallelism()?.get();
+        let crypto_threads = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus)
+            .build()
+            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
 
         Ok(Self {
             crypt,
             mongocryptd_client,
             aux_clients,
             opts,
+            crypto_threads,
         })
     }
 
