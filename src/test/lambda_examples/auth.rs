@@ -11,7 +11,9 @@ use mongodb::{
 };
 use serde_json::Value;
 
-// Initialize a global static MongoDB Client with AWS authentication.
+// Initialize a global static MongoDB Client with AWS authentication. The following environment
+// variables should also be set: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and, optionally,
+// AWS_SESSION_TOKEN.
 //
 // The client can be accessed as follows:
 // let client = MONGODB_CLIENT.get().await;
@@ -47,11 +49,23 @@ async fn main() -> Result<(), lambda_runtime::Error> {
     lambda_runtime::run(service).await?;
     Ok(())
 }
+// end lambda connection example 2
+
+// Runs a ping operation on the "db" database and returns the response.
+async fn handler_create_client(_: LambdaEvent<Value>) -> Result<Value, lambda_runtime::Error> {
+    let uri = std::env::var("MONGODB_URI").unwrap();
+    let client = Client::with_uri_str(uri).await.unwrap();
+    let response = client
+        .database("db")
+        .run_command(doc! { "ping": 1 }, None)
+        .await?;
+    let json = serde_json::to_value(response)?;
+    Ok(json)
+}
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_handler() {
     let event = LambdaEvent::new(Value::Null, Default::default());
-    handler(event).await.unwrap();
+    handler_create_client(event).await.unwrap();
 }
-// end lambda connection example 2
