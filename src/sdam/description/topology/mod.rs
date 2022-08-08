@@ -304,20 +304,6 @@ impl TopologyDescription {
         self.compatibility_error.as_ref()
     }
 
-    /// Update the ServerDescription's round trip time based on the rolling average.
-    fn update_round_trip_time(&self, server_description: &mut ServerDescription) {
-        if let Some(old_rtt) = self
-            .servers
-            .get(&server_description.address)
-            .and_then(|server_desc| server_desc.average_round_trip_time)
-        {
-            if let Some(new_rtt) = server_description.average_round_trip_time {
-                server_description.average_round_trip_time =
-                    Some((new_rtt / 5) + (old_rtt * 4 / 5));
-            }
-        }
-    }
-
     /// Updates the topology's logical session timeout value based on the server's value for it.
     fn update_session_support_status(&mut self, server_description: &ServerDescription) {
         if !server_description.server_type.is_data_bearing() {
@@ -494,9 +480,32 @@ impl TopologyDescription {
             }
         }
 
-        // Update the round trip time on the server description to the weighted average as described
-        // by the spec.
-        self.update_round_trip_time(&mut server_description);
+        if let Some(expected_name) = &self.set_name {
+            if server_description.is_available() {
+                let got_name = server_description.set_name();
+                if self.topology_type() == TopologyType::Single
+                    && !matches!(
+                        got_name.as_ref().map(|opt| opt.as_ref()),
+                        Ok(Some(name)) if name == expected_name
+                    )
+                {
+                    let got_display = match got_name {
+                        Ok(Some(s)) => format!("{:?}", s),
+                        Ok(None) => "<none>".to_string(),
+                        Err(s) => format!("<error: {}>", s),
+                    };
+                    // Mark server as unknown.
+                    server_description = ServerDescription::new(
+                        server_description.address,
+                        Some(Err(Error::invalid_argument(format!(
+                            "Connection string replicaSet name {:?} does not match actual name {}",
+                            expected_name, got_display,
+                        )))),
+                        server_description.average_round_trip_time,
+                    );
+                }
+            }
+        }
 
         // Replace the old info about the server with the new info.
         self.servers.insert(
@@ -870,7 +879,10 @@ impl Default for TransactionSupportStatus {
 pub(crate) struct TopologyDescriptionDiff<'a> {
     pub(crate) removed_addresses: Vec<&'a ServerAddress>,
     pub(crate) added_addresses: Vec<&'a ServerAddress>,
-    pub(crate) changed_servers: Vec<(&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription))>,
+    pub(crate) changed_servers: Vec<(
+        &'a ServerAddress,
+        (&'a ServerDescription, &'a ServerDescription),
+    )>,
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {

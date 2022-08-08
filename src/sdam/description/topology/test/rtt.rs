@@ -3,9 +3,12 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use crate::{
-    sdam::description::{
-        server::ServerDescription,
-        topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
+    sdam::{
+        description::{
+            server::ServerDescription,
+            topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
+        },
+        monitor::RttInfo,
     },
     test::run_spec_test,
 };
@@ -33,38 +36,13 @@ async fn run_test(test_file: TestFile) {
         AverageRtt::S(ref s) => panic!("invalid average round trip time: {}", s),
     };
 
-    // The address is not used, so it doesn't matter.
-    let mut old_server_desc = ServerDescription::new(Default::default(), None, None);
-    let mut new_server_desc = old_server_desc.clone();
-
-    old_server_desc.average_round_trip_time = avg_rtt_ms.map(f64_ms_as_duration);
-    new_server_desc.average_round_trip_time = Some(f64_ms_as_duration(test_file.new_rtt_ms));
-
-    let topology = TopologyDescription {
-        single_seed: false,
-        topology_type: TopologyType::ReplicaSetNoPrimary,
-        set_name: None,
-        max_set_version: None,
-        max_election_id: None,
-        compatibility_error: None,
-        session_support_status: Default::default(),
-        transaction_support_status: Default::default(),
-        cluster_time: None,
-        local_threshold: None,
-        heartbeat_freq: None,
-        servers: {
-            let mut servers = HashMap::new();
-            servers.insert(Default::default(), old_server_desc);
-
-            servers
-        },
+    let rtt_info = RttInfo {
+        average: avg_rtt_ms.map(f64_ms_as_duration),
     };
-
-    topology.update_round_trip_time(&mut new_server_desc);
-
+    let new_rtt = rtt_info.with_updated_average_rtt(f64_ms_as_duration(test_file.new_rtt_ms));
     assert_eq!(
-        new_server_desc.average_round_trip_time,
-        Some(f64_ms_as_duration(test_file.new_avg_rtt))
+        new_rtt.average.unwrap(),
+        f64_ms_as_duration(test_file.new_avg_rtt)
     );
 }
 

@@ -308,8 +308,22 @@ struct RttMonitor {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct RttInfo {
-    average: Option<Duration>,
+pub(crate) struct RttInfo {
+    pub(crate) average: Option<Duration>,
+}
+
+impl RttInfo {
+    pub(crate) fn with_updated_average_rtt(self, sample: Duration) -> Self {
+        match self.average {
+            Some(old_rtt) => RttInfo {
+                // Average is 20% most recent sample and 80% prior sample.
+                average: Some((sample / 5) + (old_rtt * 4 / 5)),
+            },
+            None => RttInfo {
+                average: Some(sample),
+            },
+        }
+    }
 }
 
 impl RttMonitor {
@@ -368,14 +382,7 @@ impl RttMonitor {
 
             match result {
                 Ok(_) => {
-                    let new_rtt = match self.sender.borrow().average {
-                        Some(old_rtt) => RttInfo {
-                            // Average is 20% most recent sample and 80% prior sample.
-                            average: Some((rtt / 5) + (old_rtt * 4 / 5)),
-                        },
-                        None => RttInfo { average: Some(rtt) },
-                    };
-
+                    let new_rtt = self.sender.borrow().with_updated_average_rtt(rtt);
                     let _ = self.sender.send(new_rtt);
                 }
                 // From the SDAM spec: "Errors encountered when running a hello or legacy hello
