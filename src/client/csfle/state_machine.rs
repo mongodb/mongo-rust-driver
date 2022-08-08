@@ -14,20 +14,17 @@ use crate::{
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     runtime::AsyncStream,
-    Client,
+    Database,
 };
 
-impl Client {
+use super::ClientState;
+
+impl ClientState {
     pub(crate) async fn run_mongocrypt_ctx(
         &self,
         ctx: Ctx,
         db: Option<&str>,
     ) -> Result<RawDocumentBuf> {
-        let guard = self.inner.csfle.read().await;
-        let csfle = match guard.as_ref() {
-            Some(csfle) => csfle,
-            None => return Err(Error::internal("no csfle state for mongocrypt ctx")),
-        };
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
         // thread for crypto finalization.  An `Option` would also work here, but `Result` means we
@@ -39,7 +36,7 @@ impl Client {
                 State::NeedMongoCollinfo => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let metadata_client = csfle
+                    let metadata_client = self
                         .aux_clients
                         .metadata_client
                         .as_ref()
@@ -63,7 +60,7 @@ impl Client {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
                     let op = RawOutput(RunCommand::new_raw(db.to_string(), command, None, None)?);
-                    let mongocryptd_client = csfle
+                    let mongocryptd_client = self
                         .mongocryptd_client
                         .as_ref()
                         .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
@@ -74,8 +71,8 @@ impl Client {
                 State::NeedMongoKeys => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let kv_ns = &csfle.opts.key_vault_namespace;
-                    let kv_client = csfle
+                    let kv_ns = &self.opts.key_vault_namespace;
+                    let kv_client = self
                         .aux_clients
                         .key_vault_client
                         .upgrade()
@@ -136,7 +133,7 @@ impl Client {
                         &mut ctx,
                         Err(Error::internal("crypto context not present")),
                     )?;
-                    csfle.crypto_threads.spawn(move || {
+                    self.crypto_threads.spawn(move || {
                         let result = thread_ctx.finalize().map(|doc| doc.to_owned());
                         let _ = tx.send((thread_ctx, result));
                     });
