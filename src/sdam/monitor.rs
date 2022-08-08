@@ -94,7 +94,9 @@ impl Monitor {
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
         while self.server_handle_listener.check_if_alive() {
+            println!("{}: performing check", self.address);
             let check_succeeded = self.check_server().await;
+            println!("{}: check done, succeded: {}", self.address, check_succeeded);
 
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
@@ -115,6 +117,7 @@ impl Monitor {
                 let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
                 runtime::delay_for(min_frequency).await;
+                println!("{}: waiting for check request", self.address);
                 self.update_request_receiver
                     .wait_for_check_request(heartbeat_frequency - min_frequency)
                     .await;
@@ -144,12 +147,12 @@ impl Monitor {
             other => other,
         };
 
-        // Per the server monitoring spec, we ignore any check requests that came in while we were
-        // performing a check.
-        self.update_request_receiver.clear_all_requests();
-
         match check_result {
             HelloResult::Ok(reply) => {
+                // Per the server monitoring spec, we ignore any check requests that came in while we were
+                // performing a check.
+                self.update_request_receiver.clear_all_requests();
+
                 let server_description = ServerDescription::new(
                     self.address.clone(),
                     Some(Ok(reply)),
@@ -193,11 +196,13 @@ impl Monitor {
                 Some(ref mut conn) => {
                     // If the server indicated there was moreToCome, just read from the socket.
                     if conn.is_streaming() {
+                        println!("{}: receiving streamed message", self.address);
                         conn.receive_message()
                             .await
                             .and_then(|r| r.into_hello_reply(None))
                     // Otherwise, send a regular hello command.
                     } else {
+                        println!("{}: sending regular hello command", self.address);
                         let heartbeat_frequency = self
                             .client_options
                             .heartbeat_freq
@@ -217,16 +222,20 @@ impl Monitor {
                             opts,
                         );
 
-                        run_hello(conn, command).await
+                        let out = run_hello(conn, command).await;
+                        println!("{}: done regular hello", self.address);
+                        out
                     }
                 }
                 None => {
+                    println!("{}: creating new connection", self.address);
                     let mut connection = Connection::connect_monitoring(
                         self.address.clone(),
                         self.client_options.tls_options(),
                     )
                     .await?;
 
+                    println!("{}: handshaking connection", self.address);
                     let res = self
                         .handshaker
                         .handshake(&mut connection)
@@ -240,6 +249,9 @@ impl Monitor {
             }
         };
 
+        let sleep = runtime::delay_for(timeout);
+        tokio::pin!(sleep);
+
         // Begin executing the hello, listening for a cancellation request and timeout.
         let start = Instant::now();
         let result = tokio::select! {
@@ -248,9 +260,11 @@ impl Monitor {
                 Err(e) => HelloResult::Err(e)
             },
             Some(err) = self.update_request_receiver.listen_for_cancellation() => {
+                println!("cancelled");
                 HelloResult::Cancelled { reason: err }
             }
-            _ = runtime::delay_for(timeout) => {
+            _ = &mut sleep => {
+                println!("timed out");
                 HelloResult::Err(Error::network_timeout())
             }
         };

@@ -12,7 +12,7 @@ async fn run_unified() {
         |path, t| {
             run_unified_format_test_filtered(path, t, |test| {
                 // skipped because we don't support socketTimeoutMS
-                test.description.as_str() != "Ignore network timeout error on find"
+                test.description.as_str() == "Cancel server check"
             })
         },
     ).await;

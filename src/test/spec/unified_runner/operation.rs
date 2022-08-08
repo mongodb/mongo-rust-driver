@@ -140,6 +140,7 @@ pub(crate) struct Operation {
 
 impl Operation {
     pub(crate) async fn execute<'a>(&self, test_runner: &TestRunner, description: &str) {
+        println!("=============== executing {} ==============", self.name);
         match self.object {
             OperationObject::TestRunner => {
                 self.execute_test_runner_operation(test_runner).await;
@@ -2430,11 +2431,9 @@ impl TestOperation for WaitForThread {
     ) -> BoxFuture<'a, ()> {
         async {
             let thread = test_runner.get_thread(self.thread.as_str()).await;
-            assert!(
-                thread.wait().await,
-                "thread {:?} did not exit successfully",
-                self.thread
-            );
+            thread.wait().await.unwrap_or_else(|e| {
+                panic!("thread {:?} did not exit successfully: {}", self.thread, e)
+            });
         }
         .boxed()
     }

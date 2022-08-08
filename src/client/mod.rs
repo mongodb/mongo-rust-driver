@@ -406,14 +406,17 @@ impl Client {
         loop {
             let state = watcher.observe_latest();
 
+            println!("attempting to select server");
             if let Some(server) = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
                 &state.servers,
             )? {
+                println!("got {}", server.address);
                 return Ok(server);
             }
 
+            println!("failed, requesting update");
             self.inner.topology.request_update();
 
             let change_occurred = start_time.elapsed() < timeout

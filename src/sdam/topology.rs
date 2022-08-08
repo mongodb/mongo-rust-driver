@@ -569,6 +569,7 @@ impl TopologyWorker {
                     .clear(error.clone(), handshake.service_id())
                     .await;
                 if !error.is_auth_error() {
+                    println!("cancelling in progress check");
                     self.check_manager.cancel_in_progress_checks(error);
                 }
             }
@@ -845,7 +846,10 @@ impl TopologyCheckRequestReceiver {
         let _: std::result::Result<_, _> = runtime::timeout(timeout, async {
             loop {
                 match self.receiver.recv().await {
-                    Ok(TopologyCheckMessage::ImmediateCheck) => return,
+                    Ok(TopologyCheckMessage::ImmediateCheck) => {
+                        println!("got immediate check request");
+                        return;
+                    }
                     Ok(TopologyCheckMessage::CancelCheck { .. }) => continue,
                     Err(_) => return,
                 }
