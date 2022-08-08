@@ -480,11 +480,6 @@ impl Client {
         })
         .ok()
     }
-
-    #[cfg(test)]
-    pub(crate) fn topology(&self) -> &Topology {
-        &self.inner.topology
-    }
 }
 
 #[cfg(feature = "csfle")]

@@ -868,10 +868,9 @@ impl Default for TransactionSupportStatus {
 /// Returned from `TopologyDescription::diff`.
 #[derive(Debug)]
 pub(crate) struct TopologyDescriptionDiff<'a> {
-    pub(crate) removed_addresses: HashSet<&'a ServerAddress>,
-    pub(crate) added_addresses: HashSet<&'a ServerAddress>,
-    pub(crate) changed_servers:
-        HashMap<&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription)>,
+    pub(crate) removed_addresses: Vec<&'a ServerAddress>,
+    pub(crate) added_addresses: Vec<&'a ServerAddress>,
+    pub(crate) changed_servers: Vec<(&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription))>,
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
