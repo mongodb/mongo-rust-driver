@@ -11,12 +11,11 @@ use crate::{
     Database,
 };
 use bson::{oid::ObjectId, Bson, DateTime, Document};
-use futures_util;
 use options::*;
 use serde::{Deserialize, Serialize};
 use tokio::io::ReadBuf;
 
-pub const DEFAULT_BUCKET_NAME: &'static str = "fs";
+pub const DEFAULT_BUCKET_NAME: &str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
 // Contained in a "chunks" collection for each user file
@@ -47,7 +46,7 @@ pub struct GridFsBucket {
     pub(crate) options: GridFsBucketOptions,
 }
 
-// TODO: RUST-1399 Add documentation and example code for this struct.
+// TODO: RUST-1395 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
     files_id: Bson,
 }
