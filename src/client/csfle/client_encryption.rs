@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::results::DeleteResult;
 use crate::{Cursor, Client, Namespace};
 use crate::bson::{Binary, Document};
 use crate::error::Result;
@@ -68,6 +69,7 @@ impl ClientEncryption {
     }
 }
 
+#[non_exhaustive]
 pub struct ClientEncryptionOptions {
     pub key_vault_client: Client,
     pub key_vault_namespace: Namespace,
@@ -75,22 +77,33 @@ pub struct ClientEncryptionOptions {
     pub tls_options: Option<KmsProvidersTlsOptions>,
 }
 
+#[non_exhaustive]
 pub struct DataKeyOptions {
-    _todo: (),
+    pub master_key: Option<Document>,
+    pub key_alt_names: Option<Vec<String>>,
+    pub key_material: Option<Vec<u8>>,  // TODO: BinData?
 }
 
+#[non_exhaustive]
 pub struct RewrapManyDataKeyOptions {
-    _todo: (),
+    pub provider: KmsProvider,  // TODO: String?
+    pub master_key: Option<Document>,
 }
 
+#[non_exhaustive]
 pub struct RewrapManyDataKeyResult {
-    _todo: (),
+    //pub bulk_write_result: Option<BulkWriteResult>  // No bulk write support!
 }
 
-pub struct DeleteResult {
-    _todo: (),
-}
-
+#[non_exhaustive]
 pub struct EncryptOptions {
-    _todo: (),
+    pub key: EncryptKey,
+    pub algorithm: String,
+    pub contention_factor: Option<i64>,
+    pub query_type: Option<String>,
+}
+
+pub enum EncryptKey {
+    Id(Binary),
+    AltName(String),
 }
