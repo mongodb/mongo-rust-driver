@@ -122,7 +122,7 @@ impl Monitor {
                 runtime::delay_for(min_frequency).await;
                 println!("{}: waiting for check request", self.address);
                 self.update_request_receiver
-                    .wait_for_check_request(heartbeat_frequency - min_frequency)
+                    .wait_for_check_request_1(heartbeat_frequency - min_frequency)
                     .await;
             }
         }
@@ -152,9 +152,6 @@ impl Monitor {
 
         match check_result {
             HelloResult::Ok(reply) => {
-                // Per the server monitoring spec, we ignore any check requests that came in while
-                // we were performing a check.
-                self.update_request_receiver.clear_all_requests();
 
                 let server_description = ServerDescription::new(
                     self.address.clone(),
@@ -262,7 +259,8 @@ impl Monitor {
                 Ok(reply) => HelloResult::Ok(reply),
                 Err(e) => HelloResult::Err(e)
             },
-            r = self.update_request_receiver.listen_for_cancellation() => {
+            r = self.update_request_receiver.wait_for_cancellation_1() => {
+                println!("cancelled, reason: {:?}", r);
                 HelloResult::Cancelled { reason: r.unwrap_or_else(|| Error::internal("client closed")) }
             }
             _ = &mut sleep => {

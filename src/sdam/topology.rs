@@ -10,6 +10,7 @@ use bson::oid::ObjectId;
 use futures_util::stream::{FuturesUnordered, StreamExt};
 use futures_util::FutureExt;
 use tokio::sync::{
+    self,
     broadcast::{self, error::RecvError},
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
@@ -119,6 +120,7 @@ impl Topology {
 
     /// Begin watching for changes in the topology.
     pub(crate) fn watch(&self) -> TopologyWatcher {
+        // self.check_requester.print_statuses();
         let mut watcher = self.watcher.clone();
         // mark the latest topology as seen
         watcher.receiver.borrow_and_update();
@@ -306,6 +308,8 @@ impl TopologyWorker {
 
         runtime::execute(async move {
             loop {
+                // println!("got update, here's requester: {:?}", self.check_manager);
+                self.check_manager.print_statuses();
                 tokio::select! {
                     Some(update) = self.update_receiver.recv() => {
                         let (update, ack) = update.into_parts();
@@ -346,6 +350,7 @@ impl TopologyWorker {
                 }
             }
 
+            println!("topology worker droped==================");
             // indicate to the topology watchers that the topology is no longer alive
             drop(self.publisher);
 
@@ -798,39 +803,63 @@ impl TopologyPublisher {
 #[derive(Clone, Debug)]
 struct TopologyCheckManager {
     sender: broadcast::Sender<TopologyCheckMessage>,
+    other_sender: Arc<watch::Sender<TopologyCheckMessage>>,
 }
 
 /// Messages that a `TopologyCheckManager` can broadcast to all monitors.
 #[derive(Debug, Clone)]
 enum TopologyCheckMessage {
+    None,
+
     /// The monitor should perform an immediate check at next opportunity.
     ImmediateCheck,
 
     /// The monitor should cancel any in-progress checks.
-    CancelCheck { reason: Error },
+    CancelCheck {
+        reason: Error,
+    },
 }
 
 impl TopologyCheckManager {
     fn new() -> TopologyCheckManager {
         let (tx, _rx) = broadcast::channel(1024);
-        TopologyCheckManager { sender: tx }
+        let (tx1, _rx1) = watch::channel(TopologyCheckMessage::None);
+        let tx1 = Arc::new(tx1);
+        // let t = tx1.clone();
+        // runtime::spawn(async move {
+        //     loop {
+        //         println!("num handles: {}", t.receiver_count());
+        //         runtime::delay_for(Duration::from_secs(1)).await;
+        //     }
+        // });
+        TopologyCheckManager {
+            sender: tx,
+            other_sender: tx1,
+        }
+    }
+
+    fn print_statuses(&self) {
+        println!("receiver count: {}", self.other_sender.receiver_count());
     }
 
     /// Request that all monitors perform immediate checks.
     fn request_check(&self) {
         let _ = self.sender.send(TopologyCheckMessage::ImmediateCheck);
+        let _ = self.other_sender.send(TopologyCheckMessage::ImmediateCheck);
     }
 
     fn cancel_in_progress_checks(&self, reason: Error) {
-        let _ = self
-            .sender
-            .send(TopologyCheckMessage::CancelCheck { reason });
+        // let _ = self
+        //     .sender
+        //     .send(TopologyCheckMessage::CancelCheck { reason });
+        let _ = self.other_sender.send(TopologyCheckMessage::CancelCheck { reason });
     }
 
     /// Subscribe to check requests.
     fn subscribe(&self) -> TopologyCheckRequestReceiver {
         TopologyCheckRequestReceiver {
             receiver: self.sender.subscribe(),
+            other_receiver: self.other_sender.subscribe(),
         }
     }
 }
@@ -838,6 +867,7 @@ impl TopologyCheckManager {
 /// Receiver used to listen for check requests.
 pub(crate) struct TopologyCheckRequestReceiver {
     receiver: broadcast::Receiver<TopologyCheckMessage>,
+    other_receiver: watch::Receiver<TopologyCheckMessage>,
 }
 
 impl TopologyCheckRequestReceiver {
@@ -852,10 +882,43 @@ impl TopologyCheckRequestReceiver {
                     }
                     Ok(TopologyCheckMessage::CancelCheck { .. }) => continue,
                     Err(_) => return,
+                    _ => todo!(),
                 }
             }
         })
         .await;
+    }
+
+    pub(crate) async fn wait_for_check_request_1(&mut self, timeout: Duration) {
+        let _ = runtime::timeout(timeout, async {
+            while self.other_receiver.changed().await.is_ok() {
+                if let TopologyCheckMessage::ImmediateCheck = *self.other_receiver.borrow() {
+                    return;
+                }
+            }
+        })
+        .await;
+    }
+
+    pub(crate) async fn wait_for_cancellation_1(&mut self) -> Option<Error> {
+        loop {
+            let r =  self.other_receiver.changed().await;
+            println!("{:?}", r);
+            if r.is_ok() {
+                if let TopologyCheckMessage::CancelCheck { ref reason } = *self.other_receiver.borrow() {
+                    return Some(reason.clone());
+                }
+            } else {
+                break;
+            }
+        }
+        // while self.other_receiver.changed().await.is_ok() {
+        //     if let TopologyCheckMessage::CancelCheck { ref reason } = *self.other_receiver.borrow()
+        //     {
+        //         return Some(reason.clone());
+        //     }
+        // }
+        return None;
     }
 
     // pub(crate) fn subscribe_to_cancellations(&self) -> Option<()> {
@@ -872,6 +935,7 @@ impl TopologyCheckRequestReceiver {
                 Ok(TopologyCheckMessage::ImmediateCheck) => continue,
                 Err(RecvError::Lagged(_)) => continue,
                 Err(RecvError::Closed) => return None,
+                _ => todo!(),
             }
         }
     }
@@ -880,6 +944,7 @@ impl TopologyCheckRequestReceiver {
     /// return immediately.
     pub(crate) fn clear_all_requests(&mut self) {
         let _: std::result::Result<_, _> = self.receiver.try_recv();
+        self.other_receiver.borrow_and_update();
     }
 }
 
