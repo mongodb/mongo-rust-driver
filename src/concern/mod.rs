@@ -29,6 +29,10 @@ pub struct ReadConcern {
     pub level: ReadConcernLevel,
 }
 
+impl ReadConcern {
+    pub const MAJORITY: ReadConcern = ReadConcern { level: ReadConcernLevel::Majority };
+}
+
 /// An internal-only read concern type that allows the omission of a "level" as well as
 /// specification of "atClusterTime" and "afterClusterTime".
 #[skip_serializing_none]
@@ -217,6 +221,12 @@ pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to the on-disk journal.
     #[serde(rename = "j", alias = "journal")]
     pub journal: Option<bool>,
+}
+
+impl WriteConcern {
+    // Can't use `Default::default()` in const contexts yet :(
+    const DEFAULT: WriteConcern = WriteConcern { w: None, w_timeout: None, journal: None };
+    pub const MAJORITY: WriteConcern = WriteConcern { w: Some(Acknowledgment::Majority), ..WriteConcern::DEFAULT };
 }
 
 /// The type of the `w` field in a [`WriteConcern`](struct.WriteConcern.html).
