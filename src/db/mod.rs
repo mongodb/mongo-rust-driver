@@ -19,6 +19,12 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
+    gridfs::{
+        options::GridFsBucketOptions,
+        GridFsBucket,
+        DEFAULT_BUCKET_NAME,
+        DEFAULT_CHUNK_SIZE_BYTES,
+    },
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -563,5 +569,27 @@ impl Database {
         self.client()
             .execute_watch_with_session(pipeline, options, target, None, session)
             .await
+    }
+
+    /// Creates a new GridFsBucket in the database with the given options.
+    pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
+        let mut options = options.into().unwrap_or_default();
+        options.read_concern = options
+            .read_concern
+            .or_else(|| self.read_concern().cloned());
+        options.write_concern = options
+            .write_concern
+            .or_else(|| self.write_concern().cloned());
+        options.selection_criteria = options
+            .selection_criteria
+            .or_else(|| self.selection_criteria().cloned());
+        options.bucket_name = options
+            .bucket_name
+            .or_else(|| Some(DEFAULT_BUCKET_NAME.to_string()));
+        options.chunk_size_bytes = options.chunk_size_bytes.or(Some(DEFAULT_CHUNK_SIZE_BYTES));
+        GridFsBucket {
+            db: self.clone(),
+            options,
+        }
     }
 }
