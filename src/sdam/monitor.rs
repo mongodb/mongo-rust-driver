@@ -96,7 +96,10 @@ impl Monitor {
         while self.server_handle_listener.check_if_alive() {
             println!("{}: performing check", self.address);
             let check_succeeded = self.check_server().await;
-            println!("{}: check done, succeded: {}", self.address, check_succeeded);
+            println!(
+                "{}: check done, succeded: {}",
+                self.address, check_succeeded
+            );
 
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
@@ -149,8 +152,8 @@ impl Monitor {
 
         match check_result {
             HelloResult::Ok(reply) => {
-                // Per the server monitoring spec, we ignore any check requests that came in while we were
-                // performing a check.
+                // Per the server monitoring spec, we ignore any check requests that came in while
+                // we were performing a check.
                 self.update_request_receiver.clear_all_requests();
 
                 let server_description = ServerDescription::new(
@@ -259,9 +262,8 @@ impl Monitor {
                 Ok(reply) => HelloResult::Ok(reply),
                 Err(e) => HelloResult::Err(e)
             },
-            Some(err) = self.update_request_receiver.listen_for_cancellation() => {
-                println!("cancelled");
-                HelloResult::Cancelled { reason: err }
+            r = self.update_request_receiver.listen_for_cancellation() => {
+                HelloResult::Cancelled { reason: r.unwrap_or_else(|| Error::internal("client closed")) }
             }
             _ = &mut sleep => {
                 println!("timed out");

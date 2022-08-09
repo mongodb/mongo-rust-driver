@@ -10,7 +10,7 @@ use bson::oid::ObjectId;
 use futures_util::stream::{FuturesUnordered, StreamExt};
 use futures_util::FutureExt;
 use tokio::sync::{
-    broadcast,
+    broadcast::{self, error::RecvError},
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
 };
@@ -812,7 +812,7 @@ enum TopologyCheckMessage {
 
 impl TopologyCheckManager {
     fn new() -> TopologyCheckManager {
-        let (tx, _rx) = broadcast::channel(1);
+        let (tx, _rx) = broadcast::channel(1024);
         TopologyCheckManager { sender: tx }
     }
 
@@ -870,7 +870,8 @@ impl TopologyCheckRequestReceiver {
             match self.receiver.recv().await {
                 Ok(TopologyCheckMessage::CancelCheck { reason }) => return Some(reason),
                 Ok(TopologyCheckMessage::ImmediateCheck) => continue,
-                Err(_) => return None,
+                Err(RecvError::Lagged(_)) => continue,
+                Err(RecvError::Closed) => return None,
             }
         }
     }
