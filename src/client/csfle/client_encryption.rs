@@ -47,7 +47,7 @@ impl ClientEncryption {
         self.key_vault.insert_one(&data_key, None).await?;
         let bin_ref = data_key.get_binary("_id")
             .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
-        // TODO: impl ToOwned
+        // TODO(aegnor): impl ToOwned
         Ok(Binary {
             subtype: bin_ref.subtype,
             bytes: bin_ref.bytes.to_owned(),
@@ -56,7 +56,7 @@ impl ClientEncryption {
 
     fn create_data_key_ctx(&self, kms_provider: KmsProvider, opts: DataKeyOptions) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
-        // TODO: move this to KmsProvider
+        // TODO(aegnor): move this to KmsProvider
         let kms_provider = match kms_provider {
             KmsProvider::Aws => "aws",
             KmsProvider::Azure => "azure",
@@ -84,28 +84,44 @@ impl ClientEncryption {
         todo!()
     }
 
-    pub fn delete_key(&self, _id: &Binary) -> Result<DeleteResult> {
-        todo!()
+    pub async fn delete_key(&self, id: &Binary) -> Result<DeleteResult> {
+        self.key_vault.delete_one(doc! { "_id": id }, None).await
     }
 
-    pub fn get_key(&self, _id: &Binary) -> Result<Option<Document>> {
-        todo!()
+    pub async fn get_key(&self, id: &Binary) -> Result<Option<RawDocumentBuf>> {
+        self.key_vault.find_one(doc! { "_id": id }, None).await
     }
 
-    pub fn get_keys(&self) -> Result<Cursor<Document>> {
-        todo!()
+    pub async fn get_keys(&self) -> Result<Cursor<RawDocumentBuf>> {
+        self.key_vault.find(doc! { }, None).await
     }
 
-    pub fn add_key_alt_name(&self, _id: &Binary, key_alt_name: &str) -> Result<Option<Document>> {
-        todo!()
+    pub async fn add_key_alt_name(&self, id: &Binary, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
+        self.key_vault.find_one_and_update(doc! { "_id": id }, doc! { "$addToSet": { "keyAltNames": key_alt_name } }, None).await
     }
 
-    pub fn remove_key_alt_name(&self, _id: &Binary, key_alt_name: &str) -> Result<Option<Document>> {
-        todo!()
+    pub async fn remove_key_alt_name(&self, id: &Binary, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
+        let update = doc! {
+            "$set": {
+                "keyAltNames": {
+                    "$cond": [
+                        { "$eq": ["$keyAltNames", [key_alt_name]] },
+                        "$$REMOVE",
+                        {
+                            "$filter": {
+                                "input": "$keyAltNames",
+                                "cond": { "$ne": ["$$this", key_alt_name] },
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        self.key_vault.find_one_and_update(doc! { "_id": id }, vec![update], None).await
     }
 
-    pub fn get_key_by_alt_name(&self, key_alt_name: &str) -> Result<Option<Document>> {
-        todo!()
+    pub async fn get_key_by_alt_name(&self, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
+        self.key_vault.find_one(doc! { "keyAltNames": key_alt_name }, None).await
     }
 
     pub fn encrypt(&self, value: bson::Bson, opts: EncryptOptions) -> Result<Binary> {
@@ -129,12 +145,12 @@ pub struct ClientEncryptionOptions {
 pub struct DataKeyOptions {
     pub master_key: Option<Document>,
     pub key_alt_names: Option<Vec<String>>,
-    pub key_material: Option<Vec<u8>>,  // TODO: BinData?
+    pub key_material: Option<Vec<u8>>,  // TODO(aegnor): BinData?
 }
 
 #[non_exhaustive]
 pub struct RewrapManyDataKeyOptions {
-    pub provider: KmsProvider,  // TODO: String?
+    pub provider: KmsProvider,  // TODO(aegnor): String?
     pub master_key: Option<Document>,
 }
 
