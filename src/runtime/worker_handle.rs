@@ -33,7 +33,10 @@ impl WorkerHandleListener {
     pub(crate) fn check_if_alive(&mut self) -> bool {
         match self.receiver.try_recv() {
             Err(mpsc::error::TryRecvError::Disconnected) => false,
-            _ => true,
+            o => {
+                println!("still alive: {:?}", o);
+                true
+            },
         }
     }
 

@@ -67,7 +67,7 @@ pub(crate) struct RunOnRequirement {
     auth: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub(crate) enum Topology {
     Single,
@@ -94,7 +94,13 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref topologies) = self.topologies {
-            if !topologies.contains(&client.topology().await) {
+            let client_topology = client.topology().await;
+            if !topologies.iter().any(|expected_topology| {
+                match (expected_topology, client_topology) {
+                    (Topology::Sharded, Topology::Sharded | Topology::ShardedReplicaSet) => true,
+                    _ => expected_topology == &client_topology
+                }
+            }) {
                 return false;
             }
         }

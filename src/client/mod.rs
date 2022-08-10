@@ -410,7 +410,7 @@ impl Client {
             if let Some(server) = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
-                &state.servers,
+                &state.servers().expect("client keeps topology alive"),
             )? {
                 println!("got {}", server.address);
                 return Ok(server);

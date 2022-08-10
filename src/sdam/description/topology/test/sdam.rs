@@ -763,7 +763,8 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     let server = topology
         .watch()
         .observe_latest()
-        .servers
+        .servers()
+        .unwrap()
         .into_iter()
         .next()
         .unwrap()

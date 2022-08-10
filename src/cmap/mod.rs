@@ -46,8 +46,8 @@ use crate::runtime::WorkerHandle;
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 
-/// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
-/// internal state that is mutable is additionally wrapped by a lock.
+/// A pool of connections implementing the CMAP spec.
+/// This type is actually a handle to task that manages the connections and is cheap to clone and pass around.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPool {

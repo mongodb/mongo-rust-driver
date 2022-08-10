@@ -121,12 +121,17 @@ impl Monitor {
 
                 runtime::delay_for(min_frequency).await;
                 println!("{}: waiting for check request", self.address);
+                let start = Instant::now();
                 self.update_request_receiver
                     .wait_for_check_request_1(heartbeat_frequency - min_frequency)
                     .await;
+                println!("{}: done waiting for request (elapsed: {:?})", self.address, start.elapsed());
             }
         }
+        println!("{}: monitor exiting", self.address);
     }
+
+    
 
     /// Checks the the server by running a hello command. If an I/O error occurs, the
     /// connection will replaced with a new one.
@@ -180,7 +185,7 @@ impl Monitor {
         let timeout = if self.connect_timeout().as_millis() == 0 {
             // If connectTimeoutMS = 0, then the socket timeout for monitoring is unlimited.
             Duration::MAX
-        } else if matches!(&self.connection, Some(conn) if conn.is_streaming()) {
+        } else if self.topology_version.is_some() {
             // For streaming responses, use connectTimeoutMS + heartbeatFrequencyMS for socket
             // timeout.
             self.heartbeat_frequency()
@@ -261,6 +266,9 @@ impl Monitor {
             },
             r = self.update_request_receiver.wait_for_cancellation_1() => {
                 println!("cancelled, reason: {:?}", r);
+                if r.is_none() {
+                    self.update_request_receiver.print_statuses();
+                }
                 HelloResult::Cancelled { reason: r.unwrap_or_else(|| Error::internal("client closed")) }
             }
             _ = &mut sleep => {
