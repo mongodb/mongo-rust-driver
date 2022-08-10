@@ -36,7 +36,7 @@ impl WorkerHandleListener {
             o => {
                 println!("still alive: {:?}", o);
                 true
-            },
+            }
         }
     }
 

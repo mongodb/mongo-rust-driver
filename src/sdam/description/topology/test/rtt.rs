@@ -1,13 +1,8 @@
-use std::collections::HashMap;
-
 use serde::Deserialize;
 
 use crate::{
     sdam::{
-        description::{
-            server::ServerDescription,
-            topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
-        },
+        description::topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
         monitor::RttInfo,
     },
     test::run_spec_test,

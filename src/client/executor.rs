@@ -416,7 +416,10 @@ impl Client {
         prior_txn_number: Option<i64>,
         first_error: Error,
     ) -> Result<ExecutionOutput<T>> {
-        println!("exeucting op failed due to {}, performing retry", first_error);
+        println!(
+            "exeucting op failed due to {}, performing retry",
+            first_error
+        );
 
         op.update_for_retry();
 

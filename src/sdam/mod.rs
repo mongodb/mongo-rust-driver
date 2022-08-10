@@ -23,8 +23,8 @@ pub(crate) use self::{
     server::Server,
     topology::{
         HandshakePhase,
+        MonitorManagementReceiver,
         Topology,
-        TopologyCheckRequestReceiver,
         TopologyUpdater,
         TopologyWatcher,
     },

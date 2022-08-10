@@ -10,11 +10,11 @@ mod crud_v1;
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 mod ocsp;
-mod sdam;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
+mod sdam;
 mod sessions;
 mod transactions;
 pub mod unified_runner;

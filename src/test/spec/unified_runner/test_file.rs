@@ -98,7 +98,7 @@ impl RunOnRequirement {
             if !topologies.iter().any(|expected_topology| {
                 match (expected_topology, client_topology) {
                     (Topology::Sharded, Topology::Sharded | Topology::ShardedReplicaSet) => true,
-                    _ => expected_topology == &client_topology
+                    _ => expected_topology == &client_topology,
                 }
             }) {
                 return false;
@@ -273,7 +273,7 @@ pub(crate) struct Thread {
 #[derive(Debug)]
 pub(crate) enum ThreadMessage {
     ExecuteOperation(Arc<Operation>),
-    Stop(oneshot::Sender<()>)
+    Stop(oneshot::Sender<()>),
 }
 
 #[derive(Debug, Deserialize)]

@@ -15,5 +15,6 @@ async fn run_unified() {
                 test.description.as_str() != "Ignore network timeout error on find"
             })
         },
-    ).await;
+    )
+    .await;
 }

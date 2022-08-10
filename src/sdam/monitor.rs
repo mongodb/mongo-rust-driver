@@ -6,7 +6,7 @@ use tokio::sync::watch;
 use super::{
     description::server::{ServerDescription, TopologyVersion},
     topology::SdamEventEmitter,
-    TopologyCheckRequestReceiver,
+    MonitorManagementReceiver,
     TopologyUpdater,
     TopologyWatcher,
 };
@@ -35,7 +35,7 @@ pub(crate) struct Monitor {
     topology_updater: TopologyUpdater,
     topology_watcher: TopologyWatcher,
     sdam_event_emitter: Option<SdamEventEmitter>,
-    update_request_receiver: TopologyCheckRequestReceiver,
+    management_receiver: MonitorManagementReceiver,
     client_options: ClientOptions,
 
     /// The most recent topology version returned by the server in a hello response.
@@ -43,8 +43,9 @@ pub(crate) struct Monitor {
     /// use the polling protocol.
     topology_version: Option<TopologyVersion>,
 
-    /// Handle to the RTT monitor, used to get the latest known round trip time for a given server.
-    rtt_monitor_handle: watch::Receiver<RttInfo>,
+    /// Handle to the RTT monitor, used to get the latest known round trip time for a given server
+    /// and to reset the RTT when the monitor disconnects from the server.
+    rtt_monitor_handle: RttMonitorHandle,
 
     /// Handle to the `Server` instance in the `Topology`. This is used to detect when a server has
     /// been removed from the topology and no longer needs to be monitored.
@@ -57,7 +58,7 @@ impl Monitor {
         topology_updater: TopologyUpdater,
         topology_watcher: TopologyWatcher,
         sdam_event_emitter: Option<SdamEventEmitter>,
-        update_request_receiver: TopologyCheckRequestReceiver,
+        management_receiver: MonitorManagementReceiver,
         handle_listener: WorkerHandleListener,
         client_options: ClientOptions,
     ) {
@@ -76,7 +77,7 @@ impl Monitor {
             topology_updater,
             topology_watcher,
             sdam_event_emitter,
-            update_request_receiver,
+            management_receiver,
             rtt_monitor_handle,
             server_handle_listener: handle_listener,
             connection: None,
@@ -94,12 +95,7 @@ impl Monitor {
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
         while self.server_handle_listener.check_if_alive() {
-            println!("{}: performing check", self.address);
             let check_succeeded = self.check_server().await;
-            println!(
-                "{}: check done, succeded: {}",
-                self.address, check_succeeded
-            );
 
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
@@ -120,18 +116,12 @@ impl Monitor {
                 let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
                 runtime::delay_for(min_frequency).await;
-                println!("{}: waiting for check request", self.address);
-                let start = Instant::now();
-                self.update_request_receiver
-                    .wait_for_check_request_1(heartbeat_frequency - min_frequency)
+                self.management_receiver
+                    .wait_for_check_request(heartbeat_frequency - min_frequency)
                     .await;
-                println!("{}: done waiting for request (elapsed: {:?})", self.address, start.elapsed());
             }
         }
-        println!("{}: monitor exiting", self.address);
     }
-
-    
 
     /// Checks the the server by running a hello command. If an I/O error occurs, the
     /// connection will replaced with a new one.
@@ -157,11 +147,10 @@ impl Monitor {
 
         match check_result {
             HelloResult::Ok(reply) => {
-
                 let server_description = ServerDescription::new(
                     self.address.clone(),
                     Some(Ok(reply)),
-                    self.rtt_monitor_handle.borrow().average,
+                    self.rtt_monitor_handle.average_rtt(),
                 );
                 self.topology_updater.update(server_description).await;
                 true
@@ -201,13 +190,11 @@ impl Monitor {
                 Some(ref mut conn) => {
                     // If the server indicated there was moreToCome, just read from the socket.
                     if conn.is_streaming() {
-                        println!("{}: receiving streamed message", self.address);
                         conn.receive_message()
                             .await
                             .and_then(|r| r.into_hello_reply(None))
                     // Otherwise, send a regular hello command.
                     } else {
-                        println!("{}: sending regular hello command", self.address);
                         let heartbeat_frequency = self
                             .client_options
                             .heartbeat_freq
@@ -227,20 +214,16 @@ impl Monitor {
                             opts,
                         );
 
-                        let out = run_hello(conn, command).await;
-                        println!("{}: done regular hello", self.address);
-                        out
+                        run_hello(conn, command).await
                     }
                 }
                 None => {
-                    println!("{}: creating new connection", self.address);
                     let mut connection = Connection::connect_monitoring(
                         self.address.clone(),
                         self.client_options.tls_options(),
                     )
                     .await?;
 
-                    println!("{}: handshaking connection", self.address);
                     let res = self
                         .handshaker
                         .handshake(&mut connection)
@@ -257,18 +240,15 @@ impl Monitor {
         let sleep = runtime::delay_for(timeout);
         tokio::pin!(sleep);
 
-        // Begin executing the hello, listening for a cancellation request and timeout.
+        // Begin executing the hello and listening for a cancellation request while also keeping
+        // track of the timeout.
         let start = Instant::now();
         let result = tokio::select! {
             result = execute_hello => match result {
                 Ok(reply) => HelloResult::Ok(reply),
                 Err(e) => HelloResult::Err(e)
             },
-            r = self.update_request_receiver.wait_for_cancellation_1() => {
-                println!("cancelled, reason: {:?}", r);
-                if r.is_none() {
-                    self.update_request_receiver.print_statuses();
-                }
+            r = self.management_receiver.wait_for_cancellation() => {
                 HelloResult::Cancelled { reason: r.unwrap_or_else(|| Error::internal("client closed")) }
             }
             _ = &mut sleep => {
@@ -304,6 +284,7 @@ impl Monitor {
                 // Per the spec, cancelled requests and errors both require the monitoring
                 // connection to be closed.
                 self.connection.take();
+                self.rtt_monitor_handle.reset();
                 self.emit_event(|| {
                     SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
                         duration,
@@ -350,6 +331,7 @@ impl Monitor {
 /// This monitor uses its owne connection to track RTT and publishes it to a channel.
 struct RttMonitor {
     sender: watch::Sender<RttInfo>,
+    reset_receiver: watch::Receiver<()>,
     connection: Option<Connection>,
     topology: TopologyWatcher,
     address: ServerAddress,
@@ -385,17 +367,27 @@ impl RttMonitor {
         topology: TopologyWatcher,
         handshaker: Handshaker,
         client_options: ClientOptions,
-    ) -> (Self, watch::Receiver<RttInfo>) {
-        let (sender, receiver) = watch::channel(RttInfo { average: None });
+    ) -> (Self, RttMonitorHandle) {
+        let (sender, rtt_receiver) = watch::channel(RttInfo { average: None });
+        let (reset_sender, mut reset_receiver) = watch::channel(());
+        // clear out initial reset request
+        reset_receiver.borrow_and_update();
+
         let monitor = Self {
             address,
             connection: None,
             topology,
             client_options,
             handshaker,
+            reset_receiver,
             sender,
         };
-        (monitor, receiver)
+
+        let handle = RttMonitorHandle {
+            reset_sender,
+            rtt_receiver,
+        };
+        (monitor, handle)
     }
 
     async fn execute(mut self) {
@@ -447,6 +439,9 @@ impl RttMonitor {
                 // From the SDAM spec: "Errors encountered when running a hello or legacy hello
                 // command MUST NOT update the topology."
                 self.connection.take();
+
+                // Also from the SDAM spec: "Don't call reset() here. The Monitor thread is
+                // responsible for resetting the average RTT."
             }
 
             runtime::delay_for(
@@ -455,7 +450,29 @@ impl RttMonitor {
                     .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
             )
             .await;
+
+            // Check to see if the other monitor has requested that the current average be
+            // discarded.
+            if self.reset_receiver.has_changed().unwrap_or(false) {
+                self.reset_receiver.borrow_and_update();
+                let _ = self.sender.send(RttInfo { average: None });
+            }
         }
+    }
+}
+
+struct RttMonitorHandle {
+    rtt_receiver: watch::Receiver<RttInfo>,
+    reset_sender: watch::Sender<()>,
+}
+
+impl RttMonitorHandle {
+    fn average_rtt(&self) -> Option<Duration> {
+        self.rtt_receiver.borrow().average
+    }
+
+    fn reset(&mut self) {
+        let _ = self.reset_sender.send(());
     }
 }
 

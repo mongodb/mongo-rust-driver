@@ -406,17 +406,14 @@ impl Client {
         loop {
             let state = watcher.observe_latest();
 
-            println!("attempting to select server");
             if let Some(server) = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
-                &state.servers().expect("client keeps topology alive"),
+                &state.servers(),
             )? {
-                println!("got {}", server.address);
                 return Ok(server);
             }
 
-            println!("failed, requesting update");
             self.inner.topology.request_update();
 
             let change_occurred = start_time.elapsed() < timeout
@@ -435,13 +432,14 @@ impl Client {
         }
     }
 
-    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
-    pub(crate) async fn get_hosts(&self) -> Vec<String> {
+    #[cfg(test)]
+    pub(crate) fn get_hosts(&self) -> Vec<String> {
         let watcher = self.inner.topology.watch();
         let state = watcher.peek_latest();
 
-        let servers = state.servers.keys();
-        servers
+        state
+            .servers()
+            .keys()
             .map(|stream_address| format!("{}", stream_address))
             .collect()
     }

@@ -764,7 +764,6 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .watch()
         .observe_latest()
         .servers()
-        .unwrap()
         .into_iter()
         .next()
         .unwrap()
