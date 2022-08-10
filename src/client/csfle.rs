@@ -32,7 +32,6 @@ use super::WeakClient;
 #[derivative(Debug)]
 pub(super) struct ClientState {
     #[derivative(Debug = "ignore")]
-    #[allow(dead_code)]
     pub(crate) crypt: Crypt,
     mongocryptd_client: Option<Client>,
     aux_clients: AuxClients,
@@ -42,12 +41,9 @@ pub(super) struct ClientState {
 
 #[derive(Debug)]
 struct AuxClients {
-    #[allow(dead_code)]
     key_vault_client: WeakClient,
-    #[allow(dead_code)]
     metadata_client: Option<WeakClient>,
-    #[allow(dead_code)]
-    internal_client: Option<Client>,
+    _internal_client: Option<Client>,
 }
 
 impl ClientState {
@@ -180,7 +176,7 @@ impl ClientState {
         Ok(AuxClients {
             key_vault_client,
             metadata_client,
-            internal_client,
+            _internal_client: internal_client,
         })
     }
 }

@@ -1189,6 +1189,10 @@ where
         }
 
         let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
+        #[cfg(feature = "csfle")]
+        let encrypted = self.client().auto_encryption_opts().await.is_some();
+        #[cfg(not(feature = "csfle"))]
+        let encrypted = false;
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
         let mut error_labels: HashSet<String> = Default::default();
@@ -1198,7 +1202,7 @@ where
 
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert = Insert::new(self.namespace(), docs, options.clone());
+            let insert = Insert::new(self.namespace(), docs, options.clone(), encrypted);
 
             match self
                 .client()
@@ -1325,6 +1329,7 @@ where
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
+            false,
         );
         self.client()
             .execute_operation(insert, session)

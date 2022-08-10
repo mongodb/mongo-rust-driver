@@ -39,7 +39,15 @@ impl Client {
                 State::NeedMongoCollinfo => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let db = self.database(db.as_ref().ok_or_else(|| {
+                    let metadata_client = csfle
+                        .aux_clients
+                        .metadata_client
+                        .as_ref()
+                        .and_then(|w| w.upgrade())
+                        .ok_or_else(|| {
+                            Error::internal("metadata_client required for NeedMongoCollinfo state")
+                        })?;
+                    let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
                     let mut cursor = db.list_collections(filter, None).await?;
