@@ -148,8 +148,10 @@ impl ClientEncryption {
         Ok(builder.build_explicit_encrypt(value)?)
     }
 
-    pub fn decrypt(&self, value: Binary) -> Result<bson::Bson> {
-        todo!()
+    pub async fn decrypt(&self, value: &[u8]) -> Result<bson::RawBson> {
+        let ctx = self.crypt.ctx_builder().build_explicit_decrypt(value)?;
+        let result = self.exec.run_ctx(ctx, None).await?;
+        Ok(result.get("v")?.ok_or_else(|| Error::internal("invalid decryption result"))?.to_raw_bson())
     }
 }
 
