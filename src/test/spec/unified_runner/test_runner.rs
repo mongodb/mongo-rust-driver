@@ -18,11 +18,7 @@ use crate::{
         SelectionCriteria,
     },
     runtime,
-<<<<<<< HEAD
     sdam::TopologyDescription,
-    gridfs::GridFsBucket,
-=======
->>>>>>> a72d9b5 (make clippy fix)
     test::{
         log_uncaptured,
         spec::unified_runner::{
@@ -433,10 +429,10 @@ impl TestRunner {
                 }
                 TestFileEntity::Bucket(bucket) => {
                     let id = bucket.id.clone();
-                    let database = self.entities.get(&bucket.database).unwrap().as_database();
+                    let database = self.get_database(&bucket.database).await;
                     (
                         id,
-                        Entity::Bucket(database.new_gridfs_bucket(bucket.bucket_options.clone())),
+                        Entity::Bucket(database.gridfs_bucket(bucket.bucket_options.clone())),
                     )
                 }
                 TestFileEntity::Thread(thread) => {
@@ -520,9 +516,15 @@ impl TestRunner {
             .as_collection()
             .clone()
     }
-    
-    pub fn get_bucket(&self, id: &str) -> &GridFsBucket {
-        self.entities.get(id).unwrap().as_bucket_entity()
+
+    pub(crate) async fn get_bucket(&self, id: &str) -> GridFsBucket {
+        self.entities
+            .read()
+            .await
+            .get(id)
+            .unwrap()
+            .as_bucket_entity()
+            .clone()
     }
 
     pub(crate) async fn get_thread(&self, id: &str) -> ThreadEntity {

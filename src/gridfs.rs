@@ -6,127 +6,35 @@ use std::pin::Pin;
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
+    error::Result,
+    gridfs::options::*,
     selection_criteria::SelectionCriteria,
     Database,
 };
 
-use bson::{oid::ObjectId, DateTime, Document};
-use serde::Deserialize;
-use typed_builder::TypedBuilder;
+use bson::{oid::ObjectId, Bson, DateTime, Document};
+use serde::{Deserialize, Serialize};
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::ReadBuf;
 
-pub trait GridFsError {}
-
-/// Contains the options for creating a [`GridFsBucket`].
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[builder(field_defaults(setter(into)))]
-#[non_exhaustive]
-pub struct GridFsBucketOptions {
-    /// The bucket name. Defaults to 'fs'.
-    pub bucket_name: Option<String>,
-
-    /// The chunk size in bytes. Defaults to 255 KiB.
-    pub chunk_size_bytes: Option<i32>,
-
-    /// The write concern. Defaults to the write concern of the database.
-    pub write_concern: Option<WriteConcern>,
-
-    /// The read concern. Defaults to the read concern of the database.
-    pub read_concern: Option<ReadConcern>,
-
-    /// The read preference. Defaults to the read preference of the database.
-    #[serde(rename = "read_preference")]
-    pub selection_criteria: Option<SelectionCriteria>,
-}
-
-/// Contains the options for creating a [`GridFsStream`] to upload a file to a
-/// [`GridFsBucket`].
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[builder(field_defaults(setter(into)))]
-#[non_exhaustive]
-pub struct GridFsUploadOptions {
-    /// The number of bytes per chunk of this file. Defaults to the chunk_size_bytes in the
-    /// GridFsBucketOptions.
-    pub chunk_size_bytes: Option<i32>,
-
-    /// User data for the 'metadata' field of the files collection document.
-    pub metadata: Option<Document>,
-}
-
-/// Contains the options for creating [`GridFsStream`] to retrieve a stored file
-/// from a [`GridFsBucket`].
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
-#[non_exhaustive]
-pub struct GridFsDownloadByNameOptions {
-    /// Which revision (documents with the same filename and different `upload_date`)
-    /// of the file to retrieve. Defaults to -1 (the most recent revision).
-    ///
-    /// Revision numbers are defined as follows:
-    /// 0 = the original stored file
-    /// 1 = the first revision
-    /// 2 = the second revision
-    /// etc...
-    /// -2 = the second most recent revision
-    /// -1 = the most recent revision
-    pub revision: Option<i32>,
-}
-
-/// Contains the options for performing a find operation on a files collection.  
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
-#[non_exhaustive]
-pub struct GridFsFindOptions {
-    /// Enables writing to temporary files on the server. When set to true, the
-    /// server can write temporary data to disk while executing the find operation
-    /// on the files collection.
-    pub allow_disk_use: Option<bool>,
-
-    /// The number of documents to return per batch.
-    pub batch_size: Option<i32>,
-
-    /// The maximum number of documents to return.
-    pub limit: Option<i32>,
-
-    /// The maximum amount of time to allow the query to run.
-    pub max_time_ms: Option<i64>,
-
-    /// The server normally times out idle cursors after an inactivity period
-    /// (10 minutes) to prevent excess memory use. Set this option to prevent that.
-    pub no_cursor_timeout: Option<bool>,
-
-    /// The number of documents to skip before returning.
-    pub skip: i32,
-
-    /// The order by which to sort results. Defaults to not sorting.
-    pub sort: Option<Document>,
-}
+pub const DEFAULT_BUCKET_NAME: &str = "fs";
+pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
 // Contained in a "chunks" collection for each user file
-struct Chunk<T: Eq + Copy> {
+
+struct Chunk {
     id: ObjectId,
-    files_id: T,
+    files_id: Bson,
     n: i32,
     // default size is 255 KiB
     data: Vec<u8>,
 }
 
-<<<<<<< HEAD
 /// A collection in which information about stored files is stored. There will be one files
 /// collection document per stored file.
 #[derive(Serialize, Deserialize)]
 pub struct FilesCollectionDocument {
     id: Bson,
-=======
-// A collection in which information about stored files is stored. There will be one files
-// collection document per stored file.
-#[derive(Clone, Debug, Deserialize)]
-struct FilesCollectionDocument<T: Eq + Copy> {
-    id: T,
->>>>>>> 23f5ef4 (add deserialization support for upload and delete)
     length: i64,
     chunk_size: u32,
     upload_date: DateTime,
@@ -135,25 +43,17 @@ struct FilesCollectionDocument<T: Eq + Copy> {
 }
 
 /// Struct for storing GridFS managed files within a [`Database`].
+#[derive(Debug, Clone)]
 pub struct GridFsBucket {
     // Contains a "chunks" collection
     pub(crate) db: Database,
     pub(crate) options: GridFsBucketOptions,
 }
 
-<<<<<<< HEAD
 // TODO: RUST-1399 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
     files_id: Bson,
-=======
-#[derive(Debug)]
-<<<<<<< HEAD
-pub struct GridFsStream {
->>>>>>> 23f5ef4 (add deserialization support for upload and delete)
 }
-=======
-pub struct GridFsStream {}
->>>>>>> a72d9b5 (make clippy fix)
 
 impl GridFsUploadStream {
     /// Gets the file `id` for the stream.
@@ -410,11 +310,7 @@ impl GridFsBucket {
 
     /// Given an `id`, deletes the stored file's files collection document and
     /// associated chunks from a [`GridFsBucket`].
-<<<<<<< HEAD
     pub async fn delete(&self, id: Bson) {
-=======
-    pub fn delete<T>(&self, id: T) -> Result<()> {
->>>>>>> 23f5ef4 (add deserialization support for upload and delete)
         todo!()
     }
 
@@ -428,11 +324,7 @@ impl GridFsBucket {
     }
 
     /// Renames the stored file with the specified `id`.
-<<<<<<< HEAD
     pub async fn rename(&self, id: Bson, new_filename: String) {
-=======
-    pub fn rename<T>(&self, id: T, new_filename: String) -> Result<()> {
->>>>>>> 23f5ef4 (add deserialization support for upload and delete)
         todo!()
     }
 

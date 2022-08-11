@@ -14,9 +14,9 @@ use crate::{
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::Error,
     event::command::CommandStartedEvent,
+    gridfs::GridFsBucket,
     runtime,
     sdam::TopologyDescription,
-    gridfs::GridFsBucket,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
         CommandEvent,

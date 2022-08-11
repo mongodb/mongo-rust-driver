@@ -571,7 +571,7 @@ impl Database {
             .await
     }
 
-    /// Creates a new [`GridFsBucket`] in the database with the given options.
+    /// Creates a new GridFsBucket in the database with the given options.
     pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
         let mut options = options.into().unwrap_or_default();
         options.read_concern = options

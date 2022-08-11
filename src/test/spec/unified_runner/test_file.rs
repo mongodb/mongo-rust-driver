@@ -11,7 +11,7 @@ use crate::{
     client::options::{ServerApi, ServerApiVersion, SessionOptions},
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
-    gridfs::GridFsBucketOptions,
+    gridfs::options::GridFsBucketOptions,
     options::{
         ClientOptions,
         CollectionOptions,
@@ -253,7 +253,7 @@ pub(crate) struct Session {
 pub(crate) struct Bucket {
     pub(crate) id: String,
     pub(crate) database: String,
-    pub(crate) bucket_options: Option<Document>,
+    pub(crate) bucket_options: Option<GridFsBucketOptions>,
 }
 
 #[derive(Debug, Deserialize)]
