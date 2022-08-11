@@ -320,7 +320,6 @@ impl Client {
             .and_then(|s| s.transaction.pinned_mongos())
             .or_else(|| op.selection_criteria());
 
-        println!("executing {:?}", op.name());
         let server = match self.select_server(selection_criteria).await {
             Ok(server) => server,
             Err(mut err) => {
@@ -416,11 +415,6 @@ impl Client {
         prior_txn_number: Option<i64>,
         first_error: Error,
     ) -> Result<ExecutionOutput<T>> {
-        println!(
-            "exeucting op failed due to {}, performing retry",
-            first_error
-        );
-
         op.update_for_retry();
 
         let server = match self.select_server(op.selection_criteria()).await {

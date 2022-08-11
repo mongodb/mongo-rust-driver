@@ -1,10 +1,7 @@
 use serde::Deserialize;
 
 use crate::{
-    sdam::{
-        description::topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
-        monitor::RttInfo,
-    },
+    sdam::{description::topology::test::f64_ms_as_duration, monitor::RttInfo},
     test::run_spec_test,
 };
 

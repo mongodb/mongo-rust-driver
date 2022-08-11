@@ -855,11 +855,10 @@ impl TopologyMonitorsManager {
 
     /// Subscribe to management requests.
     fn subscribe(&self) -> MonitorManagementReceiver {
-        let out = MonitorManagementReceiver {
+        MonitorManagementReceiver {
             check_request_receiver: self.check_request_sender.subscribe(),
             cancellation_receiver: self.cancellation_sender.subscribe(),
-        };
-        out
+        }
     }
 }
 

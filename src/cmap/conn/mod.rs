@@ -86,10 +86,10 @@ pub(crate) struct Connection {
     /// into a pool.
     error: bool,
 
-    /// If the most recently received message included the moreToCome flag, indicating the server
-    /// may send more responses without any additional requests. Attempting to send new messages
-    /// on this connection while this value is true will return an error. This value will remain
-    /// true until a server response does not include the moreToComeFlag.
+    /// Whether the most recently received message included the moreToCome flag, indicating the
+    /// server may send more responses without any additional requests. Attempting to send new
+    /// messages on this connection while this value is true will return an error. This value
+    /// will remain true until a server response does not include the moreToComeFlag.
     more_to_come: bool,
 
     stream: AsyncStream,

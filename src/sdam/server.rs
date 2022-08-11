@@ -73,9 +73,3 @@ impl Server {
         self.operation_count.load(Ordering::SeqCst)
     }
 }
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        println!("dropping server for {}", self.address);
-    }
-}

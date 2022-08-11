@@ -140,7 +140,6 @@ pub(crate) struct Operation {
 
 impl Operation {
     pub(crate) async fn execute<'a>(&self, test_runner: &TestRunner, description: &str) {
-        println!("=============== executing {} ==============", self.name);
         match self.object {
             OperationObject::TestRunner => {
                 self.execute_test_runner_operation(test_runner).await;
