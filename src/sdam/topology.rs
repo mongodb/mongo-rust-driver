@@ -120,7 +120,6 @@ impl Topology {
 
     /// Begin watching for changes in the topology.
     pub(crate) fn watch(&self) -> TopologyWatcher {
-        // self.check_requester.print_statuses();
         let mut watcher = self.watcher.clone();
         // mark the latest topology as seen
         watcher.receiver.borrow_and_update();
@@ -303,6 +302,9 @@ struct TopologyWorker {
 }
 
 impl TopologyWorker {
+    /// Open the topology by populating it with the initial seed list provided in the options.
+    /// This will kick off the monitoring tasks for the servers included in the seedlist, as well as
+    /// the SRV polling monitor.
     fn initialize(&mut self) -> Result<()> {
         self.emit_event(|| {
             SdamEvent::TopologyOpening(TopologyOpeningEvent {
@@ -325,10 +327,6 @@ impl TopologyWorker {
             });
         }
 
-        Ok(())
-    }
-
-    fn start(mut self) {
         if self.monitoring_enabled() {
             SrvPollingMonitor::start(
                 self.topology_updater.clone(),
@@ -337,6 +335,10 @@ impl TopologyWorker {
             );
         }
 
+        Ok(())
+    }
+
+    fn start(mut self) {
         runtime::execute(async move {
             loop {
                 tokio::select! {
@@ -833,7 +835,7 @@ impl TopologyMonitorsManager {
     fn new() -> TopologyMonitorsManager {
         let (check_request_sender, _rx1) = watch::channel(());
 
-        // Populate the channel with a placeholder error. This will never
+        // The channel is populated with a placeholder error on creation. This error will never
         // actually be observed by a monitor, since the only receiver that will
         // see it is getting dropped at the end of this scope.
         let (cancellation_sender, _rx2) = watch::channel(Error::internal("client opening"));
@@ -881,6 +883,9 @@ impl MonitorManagementReceiver {
 
     /// Wait for a cancellation request to be received.
     /// Any immediate check requests that come in while this waiting is happening will be ignored.
+    ///
+    /// If a cancellation request is received, the error that caused it will be returned. This
+    /// method only returns `None` when the `Topology` is closed.
     pub(crate) async fn wait_for_cancellation(&mut self) -> Option<Error> {
         let err = if self.cancellation_receiver.changed().await.is_ok() {
             Some(self.cancellation_receiver.borrow().clone())

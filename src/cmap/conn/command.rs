@@ -20,6 +20,7 @@ use crate::{
 pub(crate) struct RawCommand {
     pub(crate) name: String,
     pub(crate) target_db: String,
+    /// Whether or not the server may respond to this command multiple times via the moreToComeBit.
     pub(crate) exhaust_allowed: bool,
     pub(crate) bytes: Vec<u8>,
 }

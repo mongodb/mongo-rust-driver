@@ -83,6 +83,8 @@ impl Default for ServerType {
     }
 }
 
+/// Struct modeling the `topologyVersion` field included in the server's hello and legacy hello
+/// responses.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TopologyVersion {

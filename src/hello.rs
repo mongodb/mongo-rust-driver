@@ -65,7 +65,7 @@ pub(crate) fn hello_command(
     command
 }
 
-/// Execute a hello or legacy hello command, recording the rtt.
+/// Execute a hello or legacy hello command, recording the round trip time.
 pub(crate) async fn run_hello(conn: &mut Connection, command: Command) -> Result<HelloReply> {
     let start = Instant::now();
     let response_result = conn.send_command(command, None).await;

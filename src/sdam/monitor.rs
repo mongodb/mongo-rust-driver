@@ -170,6 +170,7 @@ impl Monitor {
         self.emit_event(|| {
             SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
+                awaited: self.topology_version.is_some(),
             })
         })
         .await;
@@ -274,6 +275,7 @@ impl Monitor {
                         duration,
                         reply,
                         server_address: self.address.clone(),
+                        awaited: self.topology_version.is_some(),
                     })
                 })
                 .await;
@@ -286,15 +288,17 @@ impl Monitor {
                 // Per the spec, cancelled requests and errors both require the monitoring
                 // connection to be closed.
                 self.connection.take();
-                self.rtt_monitor_handle.reset();
+                self.rtt_monitor_handle.reset_average_rtt();
                 self.emit_event(|| {
                     SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
                         duration,
                         failure: e.clone(),
                         server_address: self.address.clone(),
+                        awaited: self.topology_version.is_some(),
                     })
                 })
                 .await;
+                self.topology_version.take();
             }
         }
 
@@ -463,7 +467,7 @@ impl RttMonitorHandle {
         self.rtt_receiver.borrow().average
     }
 
-    fn reset(&mut self) {
+    fn reset_average_rtt(&mut self) {
         let _ = self.reset_sender.send(RttInfo::default());
     }
 }
