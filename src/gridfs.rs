@@ -4,6 +4,7 @@ use core::task::{Context, Poll};
 use std::{pin::Pin, sync::Arc};
 
 use crate::{
+    coll::options::UpdateModifications,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
@@ -68,7 +69,8 @@ pub struct GridFsUploadStream {
 }
 
 impl GridFsUploadStream {
-    /// Consumes the stream and inserts the FilesCollectionDocument into the files collection. No further writes to the stream are allowed after this function call.
+    /// Consumes the stream and inserts the FilesCollectionDocument into the files collection. No
+    /// further writes to the stream are allowed after this function call.
     pub async fn finish(self) -> Result<()> {
         let file = FilesCollectionDocument {
             id: self.files_id,
@@ -84,7 +86,9 @@ impl GridFsUploadStream {
 
     /// Aborts the upload and discards any uploaded chunks.
     pub async fn abort(self) -> Result<()> {
-        self.files.delete_many(doc! {"_id": self.files_id}, None).await?;
+        self.files
+            .delete_many(doc! {"_id": self.files_id}, None)
+            .await?;
         Ok(())
     }
 }
@@ -218,7 +222,9 @@ impl GridFsBucket {
                     Ok(num) => num,
                     Err(e) => {
                         // clean up any uploaded chunks
-                        chunks.delete_many(doc! { "files_id": &files_id }, None).await?;
+                        chunks
+                            .delete_many(doc! { "files_id": &files_id }, None)
+                            .await?;
                         let labels: Option<Vec<_>> = None;
                         return Err(Error::new(ErrorKind::Io(Arc::new(e)), labels));
                     }
@@ -259,7 +265,9 @@ impl GridFsBucket {
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
     /// `futures` crate.
-    pub async fn upload_from_stream_with_id_futures<T: futures_util::io::AsyncRead + std::marker::Unpin>(
+    pub async fn upload_from_stream_with_id_futures<
+        T: futures_util::io::AsyncRead + std::marker::Unpin,
+    >(
         &self,
         files_id: Bson,
         filename: String,
@@ -288,7 +296,9 @@ impl GridFsBucket {
                     Ok(num) => num,
                     Err(e) => {
                         // clean up any uploaded chunks
-                        chunks.delete_many(doc! { "files_id": &files_id }, None).await?;
+                        chunks
+                            .delete_many(doc! { "files_id": &files_id }, None)
+                            .await?;
                         let labels: Option<Vec<_>> = None;
                         return Err(Error::new(ErrorKind::Io(Arc::new(e)), labels));
                     }
@@ -387,7 +397,7 @@ impl GridFsBucket {
             .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
 
         let options = FindOptions::builder().sort(doc! { "n": -1 }).build();
-        let cursor = chunks.find(doc! { "files_id": &id } , options).await?;
+        let cursor = chunks.find(doc! { "files_id": &id }, options).await?;
 
         Ok(GridFsDownloadStream {
             id,
@@ -445,7 +455,7 @@ impl GridFsBucket {
             .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
         let id = file.id.clone();
         let options = FindOptions::builder().sort(doc! { "n": -1 }).build();
-        let cursor = chunks.find(doc! { "files_id": &id } , options).await?;
+        let cursor = chunks.find(doc! { "files_id": &id }, options).await?;
 
         Ok(GridFsDownloadStream {
             id,
@@ -454,7 +464,6 @@ impl GridFsBucket {
             cursor,
         })
     }
-
 
     pub async fn download_to_stream_common(
         &self,
@@ -465,21 +474,22 @@ impl GridFsBucket {
             .db
             .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
             .find_one(doc! { "_id": &id }, None)
-            .await? {
-                Some(fcd) => fcd,
-                None => {
-                    let labels: Option<Vec<_>> = None;
-                    return Err(Error::new(
-                        ErrorKind::InvalidArgument {
-                            message: format!("couldn't find file with id {}", &id),
-                        },
-                        labels,
-                    ));
-                }
-            };
-        
+            .await?
+        {
+            Some(fcd) => fcd,
+            None => {
+                let labels: Option<Vec<_>> = None;
+                return Err(Error::new(
+                    ErrorKind::InvalidArgument {
+                        message: format!("couldn't find file with id {}", &id),
+                    },
+                    labels,
+                ));
+            }
+        };
+
         if file.length == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         let chunks = self
@@ -487,21 +497,30 @@ impl GridFsBucket {
             .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)));
 
         let options = FindOptions::builder().sort(doc! { "n": -1 }).build();
-        let mut cursor = chunks.find(doc! { "files_id": &id } , options).await?;
+        let mut cursor = chunks.find(doc! { "files_id": &id }, options).await?;
         let mut n = 0;
         while let Some(c) = cursor.next().await {
             let chunk = c?;
             if chunk.n != n {
                 let labels: Option<Vec<_>> = None;
-                return Err(Error::new(ErrorKind::InvalidResponse { message: "missing chunks in file".to_string() }, labels));
+                return Err(Error::new(
+                    ErrorKind::InvalidResponse {
+                        message: "missing chunks in file".to_string(),
+                    },
+                    labels,
+                ));
             } else if chunk.data.len() != self.chunk_size_bytes && !cursor.is_exhausted() {
                 let labels: Option<Vec<_>> = None;
-                return Err(Error::new(ErrorKind::InvalidResponse { message: "received invalid chunk".to_string() }, labels));
+                return Err(Error::new(
+                    ErrorKind::InvalidResponse {
+                        message: "received invalid chunk".to_string(),
+                    },
+                    labels,
+                ));
             }
             destination.write(chunk.data);
         }
         Ok(())
-
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
@@ -555,21 +574,22 @@ impl GridFsBucket {
             .db
             .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
             .find_one(doc! { "_id": &id }, None)
-            .await? {
-                Some(fcd) => fcd,
-                None => {
-                    let labels: Option<Vec<_>> = None;
-                    return Err(Error::new(
-                        ErrorKind::InvalidArgument {
-                            message: format!("couldn't find file with id {}", &id),
-                        },
-                        labels,
-                    ));
-                }
-            };
+            .await?
+        {
+            Some(fcd) => fcd,
+            None => {
+                let labels: Option<Vec<_>> = None;
+                return Err(Error::new(
+                    ErrorKind::InvalidArgument {
+                        message: format!("couldn't find file with id {}", &id),
+                    },
+                    labels,
+                ));
+            }
+        };
         let chunks: Collection<Chunk> = self
-        .db
-        .collection(&(format!("{}.chunks", self.bucket_name)));
+            .db
+            .collection(&(format!("{}.chunks", self.bucket_name)));
         chunks.delete_many(doc! { "files_id": id }, None).await?;
         Ok(())
     }
@@ -580,20 +600,33 @@ impl GridFsBucket {
         filter: Document,
         options: impl Into<Option<GridFsFindOptions>>,
     ) -> Result<Cursor<FilesCollectionDocument>> {
-        self.db.collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name))).find(filter, None).await
+        self.db
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
+            .find(filter, None)
+            .await
     }
 
     /// Renames the stored file with the specified `id`.
-    pub async fn rename(&self, id: Bson, new_filename: String) {
-        todo!()
+    pub async fn rename(&self, id: Bson, new_filename: String) -> Result<()> {
+        self.db
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
+            .update_one(
+                doc! { "_id": id },
+                UpdateModifications::Document(doc! { "filename": { "$set": new_filename } }),
+                None,
+            )
+            .await?;
+        Ok(())
     }
 
     /// Drops the files associated with this bucket.
-    pub async fn drop(&self) {
-        todo!()
-    }
-
-    async fn abort_upload(&self) -> Result<()> {
-        todo!()
+    pub async fn drop(&self) -> Result<()> {
+        self.db
+            .collection::<FilesCollectionDocument>(&(format!("{}.files", self.bucket_name)))
+            .drop(None).await?;
+        self.db
+            .collection::<Chunk>(&(format!("{}.chunks", self.bucket_name)))
+            .drop(None).await?;
+        Ok(())
     }
 }
