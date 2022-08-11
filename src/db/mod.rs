@@ -20,16 +20,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-<<<<<<< HEAD
-    gridfs::{
-        options::GridFsBucketOptions,
-        GridFsBucket,
-        DEFAULT_BUCKET_NAME,
-        DEFAULT_CHUNK_SIZE_BYTES,
-    },
-=======
     gridfs::{options::GridFsBucketOptions, GridFsBucket, FilesCollectionDocument, Chunk},
->>>>>>> ede6694 (add indexes to files and chunks collection)
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -578,34 +569,6 @@ impl Database {
 
     /// Creates a new GridFsBucket in the database with the given options.
     pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
-        let mut options = options.into().unwrap_or_default();
-        options.read_concern = options
-            .read_concern
-            .or_else(|| self.read_concern().cloned());
-        options.write_concern = options
-            .write_concern
-            .or_else(|| self.write_concern().cloned());
-        options.selection_criteria = options
-            .selection_criteria
-            .or_else(|| self.selection_criteria().cloned());
-<<<<<<< HEAD
-        options.bucket_name = options
-            .bucket_name
-            .or_else(|| Some(DEFAULT_BUCKET_NAME.to_string()));
-        options.chunk_size_bytes = options.chunk_size_bytes.or(Some(DEFAULT_CHUNK_SIZE_BYTES));
-=======
-        let bucket_name = options.bucket_name.unwrap_or_else(|| "fs".to_string());
-        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(255 * 1024);
-        let files = self.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
-        let chunks = self.collection::<Chunk>(&format!("{}.chunks", bucket_name));
-        files.create_index(IndexModel::builder().keys(doc! { "filename": 1, "uploadDate": 1 }).build(), None);
-        chunks.create_index(IndexModel::builder().keys(doc! { "files_id": 1, "n": 1 }).build(), None);
-
-
->>>>>>> ede6694 (add indexes to files and chunks collection)
-        GridFsBucket {
-            db: self.clone(),
-            options,
-        }
+        GridFsBucket::new(self.clone(), options.into().unwrap_or_default())
     }
 }
