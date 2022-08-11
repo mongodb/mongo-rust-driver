@@ -77,7 +77,7 @@ impl ClientEncryption {
     }
 
     pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: RewrapManyDataKeyOptions) -> Result<RewrapManyDataKeyResult> {
-        todo!()
+        todo!("RUST-1441")
     }
 
     pub async fn delete_key(&self, id: &Binary) -> Result<DeleteResult> {
@@ -167,12 +167,12 @@ pub struct ClientEncryptionOptions {
 pub struct DataKeyOptions {
     pub master_key: Option<Document>,
     pub key_alt_names: Option<Vec<String>>,
-    pub key_material: Option<Vec<u8>>,  // TODO(aegnor): BinData?
+    pub key_material: Option<Vec<u8>>,
 }
 
 #[non_exhaustive]
 pub struct RewrapManyDataKeyOptions {
-    pub provider: KmsProvider,  // TODO(aegnor): String?
+    pub provider: KmsProvider,
     pub master_key: Option<Document>,
 }
 
