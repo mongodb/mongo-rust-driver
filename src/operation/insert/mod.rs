@@ -38,6 +38,14 @@ impl<'a, T> Insert<'a, T> {
         ns: Namespace,
         documents: Vec<&'a T>,
         options: Option<InsertManyOptions>,
+    ) -> Self {
+        Self::new_encrypted(ns, documents, options, false)
+    }
+
+    pub(crate) fn new_encrypted(
+        ns: Namespace,
+        documents: Vec<&'a T>,
+        options: Option<InsertManyOptions>,
         encrypted: bool,
     ) -> Self {
         Self {

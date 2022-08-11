@@ -6,5 +6,5 @@
 export FEATURE_COMBINATIONS=(
     '' # default features
     '--no-default-features --features async-std-runtime,sync' # features that conflict w/ default features
-    '--features tokio-sync,zstd-compression,snappy-compression,zlib-compression,openssl-tls,aws-auth' # additive features
+    '--features tokio-sync,zstd-compression,snappy-compression,zlib-compression,openssl-tls,aws-auth,csfle' # additive features
 )

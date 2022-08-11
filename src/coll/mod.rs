@@ -1202,7 +1202,7 @@ where
 
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert = Insert::new(self.namespace(), docs, options.clone(), encrypted);
+            let insert = Insert::new_encrypted(self.namespace(), docs, options.clone(), encrypted);
 
             match self
                 .client()
@@ -1329,7 +1329,6 @@ where
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
-            false,
         );
         self.client()
             .execute_operation(insert, session)
