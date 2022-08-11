@@ -44,6 +44,12 @@ async fn run_unified() {
 async fn streaming_min_heartbeat_frequency() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 
+    let test_client = TestClient::new().await;
+    if test_client.is_load_balanced() {
+        log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
+        return;
+    }
+
     let handler = Arc::new(EventHandler::new());
     let mut options = CLIENT_OPTIONS.get().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
@@ -94,6 +100,11 @@ async fn rtt_is_updated() {
     let test_client = TestClient::new().await;
     if test_client.server_version_lt(4, 4) {
         log_uncaptured("skipping rtt_is_updated due to server version less than 4.4");
+        return;
+    }
+
+    if test_client.is_load_balanced() {
+        log_uncaptured("skipping rtt_is_updated due to load balanced topology");
         return;
     }
 
