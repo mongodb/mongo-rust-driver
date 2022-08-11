@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use bson::doc;
 use tokio::sync::watch;
@@ -252,7 +255,6 @@ impl Monitor {
                 HelloResult::Cancelled { reason: r.unwrap_or_else(|| Error::internal("client closed")) }
             }
             _ = &mut sleep => {
-                println!("timed out");
                 HelloResult::Err(Error::network_timeout())
             }
         };
@@ -328,10 +330,10 @@ impl Monitor {
 }
 
 /// The monitor used for tracking the round-trip-time to the server, as described in the SDAM spec.
-/// This monitor uses its owne connection to track RTT and publishes it to a channel.
+/// This monitor uses its own connection to make RTT measurements, and it publishes the averages of
+/// those measurements to a channel.
 struct RttMonitor {
-    sender: watch::Sender<RttInfo>,
-    reset_receiver: watch::Receiver<()>,
+    sender: Arc<watch::Sender<RttInfo>>,
     connection: Option<Connection>,
     topology: TopologyWatcher,
     address: ServerAddress,
@@ -339,7 +341,7 @@ struct RttMonitor {
     handshaker: Handshaker,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct RttInfo {
     pub(crate) average: Option<Duration>,
 }
@@ -369,9 +371,7 @@ impl RttMonitor {
         client_options: ClientOptions,
     ) -> (Self, RttMonitorHandle) {
         let (sender, rtt_receiver) = watch::channel(RttInfo { average: None });
-        let (reset_sender, mut reset_receiver) = watch::channel(());
-        // clear out initial reset request
-        reset_receiver.borrow_and_update();
+        let sender = Arc::new(sender);
 
         let monitor = Self {
             address,
@@ -379,12 +379,11 @@ impl RttMonitor {
             topology,
             client_options,
             handshaker,
-            reset_receiver,
-            sender,
+            sender: sender.clone(),
         };
 
         let handle = RttMonitorHandle {
-            reset_sender,
+            reset_sender: sender,
             rtt_receiver,
         };
         (monitor, handle)
@@ -450,20 +449,13 @@ impl RttMonitor {
                     .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
             )
             .await;
-
-            // Check to see if the other monitor has requested that the current average be
-            // discarded.
-            if self.reset_receiver.has_changed().unwrap_or(false) {
-                self.reset_receiver.borrow_and_update();
-                let _ = self.sender.send(RttInfo { average: None });
-            }
         }
     }
 }
 
 struct RttMonitorHandle {
     rtt_receiver: watch::Receiver<RttInfo>,
-    reset_sender: watch::Sender<()>,
+    reset_sender: Arc<watch::Sender<RttInfo>>,
 }
 
 impl RttMonitorHandle {
@@ -472,7 +464,7 @@ impl RttMonitorHandle {
     }
 
     fn reset(&mut self) {
-        let _ = self.reset_sender.send(());
+        let _ = self.reset_sender.send(RttInfo::default());
     }
 }
 
