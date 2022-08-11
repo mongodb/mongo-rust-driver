@@ -6,9 +6,9 @@ use crate::results::DeleteResult;
 use crate::{Cursor, Client, Namespace, Collection};
 use crate::bson::{Binary, Document};
 use crate::error::{Result, Error};
-use bson::{doc, RawDocumentBuf};
+use bson::{doc, RawDocumentBuf, rawdoc, RawBinaryRef};
 use mongocrypt::Crypt;
-use mongocrypt::ctx::{KmsProvider, Ctx};
+use mongocrypt::ctx::{KmsProvider, Ctx, Algorithm};
 
 use super::options::{KmsProviders, KmsProvidersTlsOptions};
 use super::state_machine::CryptExecutor;
@@ -47,11 +47,7 @@ impl ClientEncryption {
         self.key_vault.insert_one(&data_key, None).await?;
         let bin_ref = data_key.get_binary("_id")
             .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
-        // TODO(aegnor): impl ToOwned
-        Ok(Binary {
-            subtype: bin_ref.subtype,
-            bytes: bin_ref.bytes.to_owned(),
-        })
+        Ok(bin_owned(bin_ref))
     }
 
     fn create_data_key_ctx(&self, kms_provider: KmsProvider, opts: DataKeyOptions) -> Result<Ctx> {
@@ -80,7 +76,7 @@ impl ClientEncryption {
         Ok(builder.build_datakey()?)
     }
 
-    pub fn rewrap_many_data_key(&self, _filter: Document, _opts: RewrapManyDataKeyOptions) -> Result<RewrapManyDataKeyResult> {
+    pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: RewrapManyDataKeyOptions) -> Result<RewrapManyDataKeyResult> {
         todo!()
     }
 
@@ -124,8 +120,32 @@ impl ClientEncryption {
         self.key_vault.find_one(doc! { "keyAltNames": key_alt_name }, None).await
     }
 
-    pub fn encrypt(&self, value: bson::Bson, opts: EncryptOptions) -> Result<Binary> {
-        todo!()
+    pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
+        let ctx = self.encrypt_ctx(value, opts)?;
+        let result = self.exec.run_ctx(ctx, None).await?;
+        let bin_ref = result.get_binary("v")
+            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+        Ok(bin_owned(bin_ref))
+    }
+
+    fn encrypt_ctx(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Ctx> {
+        let mut builder = self.crypt.ctx_builder();
+        match opts.key {
+            EncryptKey::Id(id) => {
+                builder = builder.key_id(&id.bytes)?;
+            }
+            EncryptKey::AltName(name) => {
+                builder = builder.key_alt_name(&name)?;
+            }
+        }
+        builder = builder.algorithm(opts.algorithm)?;
+        if let Some(factor) = opts.contention_factor {
+            builder = builder.contention_factor(factor)?;
+        }
+        if let Some(qtype) = opts.query_type {
+            builder = builder.query_type(&qtype)?;
+        }
+        Ok(builder.build_explicit_encrypt(value)?)
     }
 
     pub fn decrypt(&self, value: Binary) -> Result<bson::Bson> {
@@ -162,7 +182,7 @@ pub struct RewrapManyDataKeyResult {
 #[non_exhaustive]
 pub struct EncryptOptions {
     pub key: EncryptKey,
-    pub algorithm: String,
+    pub algorithm: Algorithm,
     pub contention_factor: Option<i64>,
     pub query_type: Option<String>,
 }
@@ -170,4 +190,9 @@ pub struct EncryptOptions {
 pub enum EncryptKey {
     Id(Binary),
     AltName(String),
+}
+
+// TODO(aegnor): impl ToOwned
+fn bin_owned(bin_ref: RawBinaryRef) -> Binary {
+    Binary { subtype: bin_ref.subtype, bytes: bin_ref.bytes.to_owned() }
 }
