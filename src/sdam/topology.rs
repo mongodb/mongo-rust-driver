@@ -52,7 +52,7 @@ use super::{
 pub(crate) struct Topology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
-    check_requester: TopologyMonitorsManager,
+    monitors_manager: TopologyMonitorsManager,
     _worker_handle: WorkerHandle,
 }
 
@@ -61,7 +61,7 @@ impl Topology {
         let http_client = HttpClient::default();
         let description = TopologyDescription::default();
 
-        let update_requester = TopologyMonitorsManager::new();
+        let monitors_manager = TopologyMonitorsManager::new();
         let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
             let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
 
@@ -96,7 +96,7 @@ impl Topology {
             http_client,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
-            check_manager: update_requester.clone(),
+            monitors_manager: monitors_manager.clone(),
             handle_listener,
             event_emitter,
         };
@@ -107,7 +107,7 @@ impl Topology {
         Ok(Topology {
             watcher,
             updater,
-            check_requester: update_requester,
+            monitors_manager,
             _worker_handle: worker_handle,
         })
     }
@@ -127,7 +127,7 @@ impl Topology {
 
     /// Request that all server monitors perform an immediate check of the topology.
     pub(crate) fn request_update(&self) {
-        self.check_requester.request_check()
+        self.monitors_manager.request_check()
     }
 
     /// Handle an error that occurred during operation execution.
@@ -292,7 +292,7 @@ struct TopologyWorker {
     // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
     topology_updater: TopologyUpdater,
-    check_manager: TopologyMonitorsManager,
+    monitors_manager: TopologyMonitorsManager,
 }
 
 impl TopologyWorker {
@@ -379,9 +379,9 @@ impl TopologyWorker {
 
             // close all the monitors.
             drop(self.servers);
-            self.check_manager
+            self.monitors_manager
                 .cancel_in_progress_checks(CancellationReason::TopologyClosed);
-            self.check_manager.wait_for_close().await;
+            self.monitors_manager.wait_for_close().await;
 
             if let Some(emitter) = self.event_emitter {
                 emitter
@@ -503,7 +503,7 @@ impl TopologyWorker {
                         self.topology_updater.clone(),
                         self.topology_watcher.clone(),
                         self.event_emitter.clone(),
-                        self.check_manager.subscribe(),
+                        self.monitors_manager.subscribe(),
                         listener,
                         self.options.clone(),
                     );
@@ -585,7 +585,7 @@ impl TopologyWorker {
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
                 server.pool.clear(error, handshake.service_id()).await;
             }
-            self.check_manager.request_check();
+            self.monitors_manager.request_check();
 
             updated
         } else if error.is_non_timeout_network_error()
@@ -602,7 +602,7 @@ impl TopologyWorker {
                     .clear(error.clone(), handshake.service_id())
                     .await;
                 if !error.is_auth_error() {
-                    self.check_manager.cancel_in_progress_checks(error);
+                    self.monitors_manager.cancel_in_progress_checks(error);
                 }
             }
             updated
