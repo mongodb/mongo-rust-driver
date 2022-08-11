@@ -1,10 +1,10 @@
-use tokio::sync::mpsc;
+use tokio::sync::watch;
 
 /// Handle to a worker. Once all handles have been dropped, the worker
 /// will stop waiting for new requests.
 #[derive(Debug, Clone)]
 pub(crate) struct WorkerHandle {
-    _sender: mpsc::Sender<()>,
+    _receiver: watch::Receiver<()>,
 }
 
 impl WorkerHandle {
@@ -18,32 +18,31 @@ impl WorkerHandle {
 /// Listener used to determine when all handles have been dropped.
 #[derive(Debug)]
 pub(crate) struct WorkerHandleListener {
-    receiver: mpsc::Receiver<()>,
+    sender: watch::Sender<()>,
 }
 
 impl WorkerHandleListener {
     /// Listen until all handles are dropped.
     /// This will not return until all handles are dropped, so make sure to only poll this via
     /// select or with a timeout.
-    pub(crate) async fn wait_for_all_handle_drops(&mut self) {
-        self.receiver.recv().await;
+    pub(crate) async fn wait_for_all_handle_drops(&self) {
+        self.sender.closed().await
     }
 
     /// Returns whether there are handles that have not been dropped yet.
-    pub(crate) fn check_if_alive(&mut self) -> bool {
-        match self.receiver.try_recv() {
-            Err(mpsc::error::TryRecvError::Disconnected) => false,
-            _ => true,
-        }
+    pub(crate) fn is_alive(&self) -> bool {
+        !self.sender.is_closed()
     }
 
     /// Constructs a new channel for for monitoring whether this worker still has references
     /// to it.
     pub(crate) fn channel() -> (WorkerHandle, WorkerHandleListener) {
-        let (sender, receiver) = mpsc::channel(1);
+        let (sender, receiver) = watch::channel(());
         (
-            WorkerHandle { _sender: sender },
-            WorkerHandleListener { receiver },
+            WorkerHandle {
+                _receiver: receiver,
+            },
+            WorkerHandleListener { sender },
         )
     }
 }

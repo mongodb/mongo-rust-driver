@@ -25,6 +25,7 @@ use crate::{
     hello::{hello_command, run_hello, AwaitableHelloOptions, HelloReply},
     options::{ClientOptions, ServerAddress},
     runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, WorkerHandleListener},
+    sdam::topology::CancellationReason,
 };
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -97,7 +98,7 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while self.server_handle_listener.check_if_alive() {
+        while self.is_alive() {
             let check_succeeded = self.check_server().await;
 
             // In the streaming protocol, we read from the socket continuously
@@ -106,7 +107,7 @@ impl Monitor {
             //
             // We only go to sleep when using the polling protocol (i.e. server never returned a
             // topologyVersion) or when the most recent check failed.
-            if self.topology_version.is_none() || !check_succeeded {
+            if (self.topology_version.is_none() || !check_succeeded) && self.is_alive() {
                 #[cfg(test)]
                 let min_frequency = self
                     .client_options
@@ -124,6 +125,10 @@ impl Monitor {
                     .await;
             }
         }
+    }
+
+    fn is_alive(&self) -> bool {
+        self.server_handle_listener.is_alive()
     }
 
     /// Checks the the server by running a hello command. If an I/O error occurs, the
@@ -253,7 +258,11 @@ impl Monitor {
                 Err(e) => HelloResult::Err(e)
             },
             r = self.management_receiver.wait_for_cancellation() => {
-                HelloResult::Cancelled { reason: r.unwrap_or_else(|| Error::internal("client closed")) }
+                let reason_error = match r {
+                    CancellationReason::Error(e) => e,
+                    CancellationReason::TopologyClosed => Error::internal("topology closed")
+                };
+                HelloResult::Cancelled { reason: reason_error }
             }
             _ = &mut sleep => {
                 HelloResult::Err(Error::network_timeout())

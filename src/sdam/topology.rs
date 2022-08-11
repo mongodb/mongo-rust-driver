@@ -65,20 +65,14 @@ impl Topology {
         let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
             let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
 
+            // Spin up a task to handle events so that a user's event handling code can't block the
+            // TopologyWorker.
             let handler = handler.clone();
             runtime::execute(async move {
                 while let Some(event) = rx.recv().await {
                     let (event, ack) = event.into_parts();
-
-                    let is_closed = matches!(event, SdamEvent::TopologyClosed(_));
                     handle_sdam_event(handler.as_ref(), event);
-
                     ack.acknowledge(());
-
-                    // no more events should be emitted after a TopologyClosedEvent
-                    if is_closed {
-                        break;
-                    };
                 }
             });
             SdamEventEmitter { sender: tx }
@@ -382,6 +376,12 @@ impl TopologyWorker {
 
             // indicate to the topology watchers that the topology is no longer alive
             drop(self.publisher);
+
+            // close all the monitors.
+            drop(self.servers);
+            self.check_manager
+                .cancel_in_progress_checks(CancellationReason::TopologyClosed);
+            self.check_manager.wait_for_close().await;
 
             if let Some(emitter) = self.event_emitter {
                 emitter
@@ -828,17 +828,29 @@ impl TopologyPublisher {
 #[derive(Clone, Debug)]
 struct TopologyMonitorsManager {
     check_request_sender: Arc<watch::Sender<()>>,
-    cancellation_sender: Arc<watch::Sender<Error>>,
+    cancellation_sender: Arc<watch::Sender<CancellationReason>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum CancellationReason {
+    Error(Error),
+    TopologyClosed,
+}
+
+impl From<Error> for CancellationReason {
+    fn from(e: Error) -> Self {
+        Self::Error(e)
+    }
 }
 
 impl TopologyMonitorsManager {
     fn new() -> TopologyMonitorsManager {
         let (check_request_sender, _rx1) = watch::channel(());
 
-        // The channel is populated with a placeholder error on creation. This error will never
-        // actually be observed by a monitor, since the only receiver that will
-        // see it is getting dropped at the end of this scope.
-        let (cancellation_sender, _rx2) = watch::channel(Error::internal("client opening"));
+        // The channel is populated with a temporary placeholder reason. The monitor will never
+        // observer this though, since the only receiver that did see it (_rx2) wil be dropped at
+        // the end of this scope.
+        let (cancellation_sender, _rx2) = watch::channel(CancellationReason::TopologyClosed);
         TopologyMonitorsManager {
             check_request_sender: Arc::new(check_request_sender),
             cancellation_sender: Arc::new(cancellation_sender),
@@ -851,8 +863,13 @@ impl TopologyMonitorsManager {
     }
 
     /// Request that any in-progress monitor checks be cancelled due to the provided error.
-    fn cancel_in_progress_checks(&self, reason: Error) {
-        let _ = self.cancellation_sender.send(reason);
+    fn cancel_in_progress_checks(&self, reason: impl Into<CancellationReason>) {
+        let _ = self.cancellation_sender.send(reason.into());
+    }
+
+    /// Wait until all the monitors have terminated.
+    async fn wait_for_close(self) {
+        self.check_request_sender.closed().await;
     }
 
     /// Subscribe to management requests.
@@ -868,14 +885,31 @@ impl TopologyMonitorsManager {
 /// Each server monitor owns one of these.
 pub(crate) struct MonitorManagementReceiver {
     check_request_receiver: watch::Receiver<()>,
-    cancellation_receiver: watch::Receiver<Error>,
+    cancellation_receiver: watch::Receiver<CancellationReason>,
 }
 
 impl MonitorManagementReceiver {
     /// Wait until either an immediate check is requested or that the provided timeout is hit.
-    /// Any cancellation requests that come in while this waiting is happening will be ignored.
+    /// Any cancellation requests that come in while this waiting is happening will be ignored,
+    /// except for those that indicate the topology is closing.
     pub(crate) async fn wait_for_check_request(&mut self, timeout: Duration) {
-        let _ = runtime::timeout(timeout, self.check_request_receiver.changed()).await;
+        let _ = runtime::timeout(timeout, async {
+            loop {
+                tokio::select! {
+                    _ = self.check_request_receiver.changed() => {
+                        break;
+                    }
+                    Ok(_) = self.cancellation_receiver.changed() => {
+                        // if we receive a cancellation request indicating the topology has been dropped,
+                        // then just return early.
+                        if matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
+                            break;
+                        }
+                    }
+                }
+            }
+        })
+        .await;
 
         // clear out ignored cancellation requests while we were waiting to begin a check
         self.cancellation_receiver.borrow_and_update();
@@ -886,11 +920,11 @@ impl MonitorManagementReceiver {
     ///
     /// If a cancellation request is received, the error that caused it will be returned. This
     /// method only returns `None` when the `Topology` is closed.
-    pub(crate) async fn wait_for_cancellation(&mut self) -> Option<Error> {
+    pub(crate) async fn wait_for_cancellation(&mut self) -> CancellationReason {
         let err = if self.cancellation_receiver.changed().await.is_ok() {
-            Some(self.cancellation_receiver.borrow().clone())
+            self.cancellation_receiver.borrow().clone()
         } else {
-            None
+            CancellationReason::TopologyClosed
         };
         // clear out ignored check requests
         self.check_request_receiver.borrow_and_update();

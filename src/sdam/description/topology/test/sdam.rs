@@ -600,7 +600,7 @@ async fn topology_closed_event_last() {
     drop(client);
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::Sdam(SdamEvent::TopologyClosed(_)))
         })
         .await
@@ -608,7 +608,7 @@ async fn topology_closed_event_last() {
 
     // no further SDAM events should be emitted after the TopologyClosedEvent
     let event = subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::Sdam(_))
         })
         .await;
