@@ -359,6 +359,7 @@ impl Connection {
             )));
         }
 
+        self.command_executing = true;
         let response_message_result = Message::read_from(
             &mut self.stream,
             self.stream_description
