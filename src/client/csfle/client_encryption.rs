@@ -6,21 +6,23 @@ use crate::results::DeleteResult;
 use crate::{Cursor, Client, Namespace, Collection};
 use crate::bson::{Binary, Document};
 use crate::error::{Result, Error};
-use bson::{doc, RawDocumentBuf, rawdoc, RawBinaryRef};
+use bson::spec::BinarySubtype;
+use bson::{doc, RawDocumentBuf, RawBinaryRef};
 use mongocrypt::Crypt;
 use mongocrypt::ctx::{KmsProvider, Ctx, Algorithm};
 
 use super::options::{KmsProviders, KmsProvidersTlsOptions};
 use super::state_machine::CryptExecutor;
 
+/// A handle to the key vault.  Used to create data encryption keys, and to explicitly encrypt and decrypt values when auto-encryption is not an option.
 pub struct ClientEncryption {
     crypt: Crypt,
     exec: CryptExecutor,
-    opts: ClientEncryptionOptions,
     key_vault: Collection<RawDocumentBuf>,
 }
 
 impl ClientEncryption {
+    /// Create a new key vault handle with the given options.
     pub fn new(opts: ClientEncryptionOptions) -> Result<Self> {
         let crypt = Crypt::builder().build()?;
         let exec = CryptExecutor::new(
@@ -38,9 +40,11 @@ impl ClientEncryption {
                     .read_concern(ReadConcern::MAJORITY)
                     .build(),
             );
-        Ok(Self { crypt, exec, opts, key_vault })
+        Ok(Self { crypt, exec, key_vault })
     }
 
+    /// Creates a new key document and inserts into the key vault collection.
+    /// Returns the _id of the created document as a UUID (BSON binary subtype 0x04).
     pub async fn create_data_key(&self, kms_provider: KmsProvider, opts: DataKeyOptions) -> Result<Binary> {
         let ctx = self.create_data_key_ctx(kms_provider, opts)?;
         let data_key = self.exec.run_ctx(ctx, None).await?;
@@ -76,26 +80,38 @@ impl ClientEncryption {
         Ok(builder.build_datakey()?)
     }
 
+    /*
     pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: RewrapManyDataKeyOptions) -> Result<RewrapManyDataKeyResult> {
         todo!("RUST-1441")
     }
+    */
 
+    /// Removes the key document with the given UUID (BSON binary subtype 0x04) from the key vault collection.
+    /// Returns the result of the internal deleteOne() operation on the key vault collection.
     pub async fn delete_key(&self, id: &Binary) -> Result<DeleteResult> {
         self.key_vault.delete_one(doc! { "_id": id }, None).await
     }
 
+    /// Finds a single key document with the given UUID (BSON binary subtype 0x04).
+    /// Returns the result of the internal find() operation on the key vault collection.
     pub async fn get_key(&self, id: &Binary) -> Result<Option<RawDocumentBuf>> {
         self.key_vault.find_one(doc! { "_id": id }, None).await
     }
 
+    /// Finds all documents in the key vault collection.
+    /// Returns the result of the internal find() operation on the key vault collection.
     pub async fn get_keys(&self) -> Result<Cursor<RawDocumentBuf>> {
         self.key_vault.find(doc! { }, None).await
     }
 
+    /// Adds a keyAltName to the keyAltNames array of the key document in the key vault collection with the given UUID (BSON binary subtype 0x04).
+    /// Returns the previous version of the key document.
     pub async fn add_key_alt_name(&self, id: &Binary, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
         self.key_vault.find_one_and_update(doc! { "_id": id }, doc! { "$addToSet": { "keyAltNames": key_alt_name } }, None).await
     }
 
+    /// Removes a keyAltName from the keyAltNames array of the key document in the key vault collection with the given UUID (BSON binary subtype 0x04).
+    /// Returns the previous version of the key document.
     pub async fn remove_key_alt_name(&self, id: &Binary, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
         let update = doc! {
             "$set": {
@@ -116,11 +132,14 @@ impl ClientEncryption {
         self.key_vault.find_one_and_update(doc! { "_id": id }, vec![update], None).await
     }
 
-    pub async fn get_key_by_alt_name(&self, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
+   /// Returns a key document in the key vault collection with the given keyAltName.
+   pub async fn get_key_by_alt_name(&self, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
         self.key_vault.find_one(doc! { "keyAltNames": key_alt_name }, None).await
     }
 
-    pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
+   /// Encrypts a BsonValue with a given key and algorithm.
+   /// Returns an encrypted value (BSON binary of subtype 6).
+   pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
         let ctx = self.encrypt_ctx(value, opts)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result.get_binary("v")
@@ -148,18 +167,38 @@ impl ClientEncryption {
         Ok(builder.build_explicit_encrypt(value)?)
     }
 
-    pub async fn decrypt(&self, value: &[u8]) -> Result<bson::RawBson> {
-        let ctx = self.crypt.ctx_builder().build_explicit_decrypt(value)?;
+    /// Decrypts an encrypted value (BSON binary of subtype 6).
+    /// Returns the original BSON value.
+    pub async fn decrypt<'a>(&self, value: RawBinaryRef<'a>) -> Result<bson::RawBson> {
+        if value.subtype != BinarySubtype::Encrypted {
+            return Err(Error::invalid_argument(format!("Invalid binary subtype for decrypt: expected {:?}, got {:?}", BinarySubtype::Encrypted, value.subtype)));
+        }
+        let ctx = self.crypt.ctx_builder().build_explicit_decrypt(value.bytes)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         Ok(result.get("v")?.ok_or_else(|| Error::internal("invalid decryption result"))?.to_raw_bson())
     }
 }
 
+// TODO(aegnor): Binary::as_raw()
+fn bin_ref(bin: &Binary) -> RawBinaryRef {
+    RawBinaryRef {
+        subtype: bin.subtype,
+        bytes: &bin.bytes,
+    }
+}
+
+/// Options for initializing a new `ClientEncryption`.
 #[non_exhaustive]
 pub struct ClientEncryptionOptions {
+    /// The key vault `Client`.
+    /// 
+    /// Typically this is the same as the main client; it can be different in order to route data key queries to a separate MongoDB cluster, or the same cluster but with a different credential.
     pub key_vault_client: Client,
+    /// The key vault `Namespace`, referring to a collection that contains all data keys used for encryption and decryption.
     pub key_vault_namespace: Namespace,
+    /// Map of KMS provider properties; multiple KMS providers may be specified.
     pub kms_providers: KmsProviders,
+    /// 
     pub tls_options: Option<KmsProvidersTlsOptions>,
 }
 
