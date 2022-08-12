@@ -25,6 +25,7 @@ use crate::{
 use tokio::io::{AsyncWriteExt, ReadBuf};
 
 use bson::{doc, oid::ObjectId, spec::BinarySubtype, Binary, Bson, DateTime, Document};
+use futures_util;
 use serde::{Deserialize, Serialize};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 
@@ -267,9 +268,9 @@ impl GridFsBucket {
         filename: &str,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<()>
+    ) -> Result<()> 
     where
-        T: tokio::io::AsyncRead + std::marker::Unpin,
+        T: tokio::io::AsyncRead + std::marker::Unpin
     {
         use tokio::io::AsyncReadExt;
 
@@ -368,7 +369,7 @@ impl GridFsBucket {
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
     where
-        T: tokio::io::AsyncRead + std::marker::Unpin,
+        T: tokio::io::AsyncRead + std::marker::Unpin
     {
         self.upload_from_tokio_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
@@ -386,9 +387,9 @@ impl GridFsBucket {
         filename: &str,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<()>
+    ) -> Result<()> 
     where
-        T: futures_util::io::AsyncRead + std::marker::Unpin,
+        T: futures_util::io::AsyncRead + std::marker::Unpin
     {
         self.upload_from_futures_0_3_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
@@ -567,9 +568,15 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `filename` and by
+<<<<<<< HEAD
     /// the revision in `options` and writes the contents to the `destination`. Uses the
     /// `tokio` crate's `AsyncWrite` trait for the `destination`.
     pub async fn download_to_tokio_writer_by_name<T>(
+=======
+    /// the revision in `options` and writes the contents to the destination
+    /// [`GridFsStream`]. Uses the `tokio` runtime.
+    pub async fn download_to_tokio_writer_by_name(
+>>>>>>> 8bdee4c (clean up code and add drop/rename)
         &self,
         filename: &str,
         destination: &mut T,
