@@ -9,7 +9,7 @@ use tokio::{
 };
 
 use crate::{
-    client::options::{ServerAddress, TlsOptions},
+    client::options::ServerAddress,
     cmap::options::StreamOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
@@ -100,10 +100,18 @@ impl Client {
                         .try_for_each_concurrent(None, |mut kms_ctx| async move {
                             let endpoint = kms_ctx.endpoint()?;
                             let addr = ServerAddress::parse(endpoint)?;
+                            let provider = kms_ctx.kms_provider()?;
+                            let tls_options = csfle
+                                .opts()
+                                .tls_options
+                                .as_ref()
+                                .and_then(|tls| tls.get(&provider))
+                                .cloned()
+                                .unwrap_or_default();
                             let mut stream = AsyncStream::connect(
                                 StreamOptions::builder()
                                     .address(addr)
-                                    .tls_options(TlsOptions::default())
+                                    .tls_options(tls_options)
                                     .build(),
                             )
                             .await?;
