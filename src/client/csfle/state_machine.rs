@@ -18,12 +18,15 @@ use crate::{
     Client, Namespace,
 };
 
+use super::options::KmsProvidersTlsOptions;
+
 #[derive(Debug)]
 pub(crate) struct CryptExecutor {
     key_vault_client: WeakClient,
     key_vault_namespace: Namespace,
     mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
+    tls_options: Option<KmsProvidersTlsOptions>,
     crypto_threads: ThreadPool,
 }
 
@@ -33,6 +36,7 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         mongocryptd_client: Option<Client>,
         metadata_client: Option<WeakClient>,
+        tls_options: Option<KmsProvidersTlsOptions>,
     ) -> Result<Self> {
         let num_cpus = std::thread::available_parallelism()?.get();
         let crypto_threads = rayon::ThreadPoolBuilder::new()
@@ -44,6 +48,7 @@ impl CryptExecutor {
             key_vault_namespace,
             mongocryptd_client,
             metadata_client,
+            tls_options,
             crypto_threads,
         })
     }
@@ -124,8 +129,7 @@ impl CryptExecutor {
                             let endpoint = kms_ctx.endpoint()?;
                             let addr = ServerAddress::parse(endpoint)?;
                             let provider = kms_ctx.kms_provider()?;
-                            let tls_options = csfle
-                                .opts()
+                            let tls_options = self
                                 .tls_options
                                 .as_ref()
                                 .and_then(|tls| tls.get(&provider))

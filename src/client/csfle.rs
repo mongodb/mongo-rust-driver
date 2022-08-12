@@ -47,7 +47,7 @@ struct AuxClients {
 }
 
 impl ClientState {
-    pub(super) async fn new(client: &Client, opts: AutoEncryptionOptions) -> Result<Self> {
+    pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
@@ -56,6 +56,7 @@ impl ClientState {
             opts.key_vault_namespace.clone(),
             mongocryptd_client,
             aux_clients.metadata_client,
+            opts.tls_options.take(),
         )?;
 
         Ok(Self {

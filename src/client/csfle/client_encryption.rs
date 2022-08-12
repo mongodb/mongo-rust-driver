@@ -30,6 +30,7 @@ impl ClientEncryption {
             opts.key_vault_namespace.clone(),
             None,
             None,
+            opts.tls_options,
         )?;
         let key_vault = opts.key_vault_client
             .database(&opts.key_vault_namespace.db)
