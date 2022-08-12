@@ -495,45 +495,8 @@ impl Database {
             .await
     }
 
-    /// Creates a new [`GridFsBucket`] in the database with the given options.
-    pub fn new_gridfs_bucket(
-        &self,
-        options: impl Into<Option<GridFsBucketOptions>>,
-    ) -> GridFsBucket {
-        let options: GridFsBucketOptions = options.into().unwrap_or_default();
-        let read_concern = options
-            .read_concern
-            .or_else(|| self.read_concern().cloned());
-        let write_concern = options
-            .write_concern
-            .or_else(|| self.write_concern().cloned());
-        let read_preference = options
-            .read_preference
-            .or_else(|| self.selection_criteria().cloned());
-        let bucket_name = options.bucket_name.unwrap_or_else(|| "fs".to_string());
-        let chunk_size_bytes = options.chunk_size_bytes.unwrap_or(255 * 1024);
-        let files = self.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
-        let chunks = self.collection::<Chunk>(&format!("{}.chunks", bucket_name));
-        files.create_index(
-            IndexModel::builder()
-                .keys(doc! { "filename": 1, "uploadDate": 1 })
-                .build(),
-            None,
-        );
-        chunks.create_index(
-            IndexModel::builder()
-                .keys(doc! { "files_id": 1, "n": 1 })
-                .build(),
-            None,
-        );
-
-        GridFsBucket {
-            db: self.clone(),
-            bucket_name,
-            chunk_size_bytes,
-            read_concern,
-            write_concern,
-            read_preference,
-        }
+    /// Creates a new GridFsBucket in the database with the given options.
+    pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
+        GridFsBucket::new(self.clone(), options.into().unwrap_or_default())
     }
 }

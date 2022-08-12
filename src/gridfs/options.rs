@@ -1,4 +1,7 @@
+use std::{option::Option, time::Duration};
+
 use crate::{
+    coll::options::FindOptions,
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
@@ -24,8 +27,8 @@ pub struct GridFsBucketOptions {
     /// The read concern. Defaults to the read concern of the database.
     pub read_concern: Option<ReadConcern>,
 
-    /// The read preference. Defaults to the read preference of the database.
-    pub read_preference: Option<SelectionCriteria>,
+    /// The selection criteria. Defaults to the selection criteria of the database.
+    pub selection_criteria: Option<SelectionCriteria>,
 }
 
 /// Contains the options for creating a [`GridFsStream`] to upload a file to a
@@ -72,21 +75,30 @@ pub struct GridFsFindOptions {
     pub allow_disk_use: Option<bool>,
 
     /// The number of documents to return per batch.
-    pub batch_size: Option<i32>,
+    pub batch_size: Option<u32>,
 
     /// The maximum number of documents to return.
-    pub limit: Option<i32>,
+    pub limit: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
-    pub max_time_ms: Option<i64>,
-
-    /// The server normally times out idle cursors after an inactivity period
-    /// (10 minutes) to prevent excess memory use. Set this option to prevent that.
-    pub no_cursor_timeout: Option<bool>,
+    pub max_time: Option<Duration>,
 
     /// The number of documents to skip before returning.
-    pub skip: i32,
+    pub skip: Option<u64>,
 
     /// The order by which to sort results. Defaults to not sorting.
     pub sort: Option<Document>,
+}
+
+impl From<GridFsFindOptions> for FindOptions {
+    fn from(options: GridFsFindOptions) -> Self {
+        FindOptions::builder()
+            .allow_disk_use(options.allow_disk_use)
+            .batch_size(options.batch_size)
+            .limit(options.limit)
+            .max_time(options.max_time)
+            .skip(options.skip)
+            .sort(options.sort)
+            .build()
+    }
 }
