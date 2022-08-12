@@ -7,7 +7,6 @@ use crate::{
     coll::options::{
         DeleteOptions,
         DropCollectionOptions,
-        FindOneAndDeleteOptions,
         InsertOneOptions,
         UpdateModifications,
         UpdateOptions,
@@ -496,10 +495,14 @@ impl GridFsBucket {
             return Ok(());
         }
 
-        let options = FindOptions::builder().sort(doc! { "n": -1 }).build();
+        let options = FindOptions::builder()
+            .sort(doc! { "n": -1 })
+            .read_concern(self.read_concern().cloned())
+            .selection_criteria(self.selection_criteria().cloned())
+            .build();
         let mut cursor = self
             .chunks()
-            .find(doc! { "files_id": &id }, options)
+            .find(doc! { "files_id": &file.id }, options)
             .await?;
         let mut n = 0;
         while cursor.advance().await? {
