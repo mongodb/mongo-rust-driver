@@ -17,7 +17,7 @@ use crate::{
         SelectionCriteria,
     },
     runtime,
-    sdam::TopologyDescription,
+    sdam::{TopologyDescription, MIN_HEARTBEAT_FREQUENCY},
     test::{
         log_uncaptured,
         spec::unified_runner::{
@@ -380,6 +380,17 @@ impl TestRunner {
                                 options.hosts.drain(1..);
                             }
                         }
+                    }
+
+                    // In order to speed up the tests where a failpoint is used, the test runner
+                    // MAY specified a reduced value for `heartbeatFrequencyMS` and
+                    // `minHeartbeatFrequencyMS`. Test runners MUST NOT do so
+                    // for any client that specifies `heartbeatFrequencyMS` it its
+                    // `uriOptions`.
+                    if options.heartbeat_freq.is_none() {
+                        options.test_options_mut().min_heartbeat_freq =
+                            Some(Duration::from_millis(50));
+                        options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
                     }
 
                     let client = Client::with_options(options).unwrap();

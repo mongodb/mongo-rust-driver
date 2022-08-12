@@ -91,6 +91,59 @@ async fn streaming_min_heartbeat_frequency() {
     }
 }
 
+/// Variant of the previous prose test that checks for a non-minHeartbeatFrequencyMS value.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn heartbeat_frequency_is_respected() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
+    let test_client = TestClient::new().await;
+    if test_client.is_load_balanced() {
+        log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
+        return;
+    }
+
+    let handler = Arc::new(EventHandler::new());
+    let mut options = CLIENT_OPTIONS.get().await.clone();
+    options.heartbeat_freq = Some(Duration::from_millis(1000));
+    options.sdam_event_handler = Some(handler.clone());
+
+    let hosts = options.hosts.clone();
+
+    let client = Client::with_options(options).unwrap();
+    // discover a server
+    client
+        .database("admin")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .unwrap();
+
+    // For each server in the topology, start a task that ensures heartbeats happen roughly every
+    // 1s for 3s.
+    let mut tasks = Vec::new();
+    for address in hosts {
+        let h = handler.clone();
+        tasks.push(runtime::spawn(async move {
+            let mut subscriber = h.subscribe();
+
+            // collect events for 2 seconds, should see between 2 and 3 heartbeats.
+            let events = subscriber.collect_events(Duration::from_secs(3), |e| {
+                matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) if e.server_address == address)
+            }).await;
+
+            if !(2..=3).contains(&events.len()) {
+                return Err(format!("expected 1 or 2 heartbeats, but got {}", events.len()));
+            }
+
+            Ok(())
+        }));
+    }
+
+    for task in tasks {
+        task.await.unwrap();
+    }
+}
+
 /// RTT prose test 1 from SDAM spec tests.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]

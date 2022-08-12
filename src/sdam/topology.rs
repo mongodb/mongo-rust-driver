@@ -19,30 +19,19 @@ use crate::{
     cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
     error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
-        handle_sdam_event,
-        SdamEvent,
-        ServerClosedEvent,
-        ServerDescriptionChangedEvent,
-        ServerOpeningEvent,
-        TopologyClosedEvent,
-        TopologyDescriptionChangedEvent,
+        handle_sdam_event, SdamEvent, ServerClosedEvent, ServerDescriptionChangedEvent,
+        ServerOpeningEvent, TopologyClosedEvent, TopologyDescriptionChangedEvent,
         TopologyOpeningEvent,
     },
     runtime::{self, AcknowledgedMessage, HttpClient, WorkerHandle, WorkerHandleListener},
     selection_criteria::SelectionCriteria,
-    ClusterTime,
-    ServerInfo,
-    ServerType,
-    TopologyType,
+    ClusterTime, ServerInfo, ServerType, TopologyType,
 };
 
 use super::{
+    monitor::{MonitorManager, MonitorRequestReceiver},
     srv_polling::SrvPollingMonitor,
-    Monitor,
-    Server,
-    ServerDescription,
-    SessionSupportStatus,
-    TopologyDescription,
+    Monitor, Server, ServerDescription, SessionSupportStatus, TopologyDescription,
     TransactionSupportStatus,
 };
 
@@ -52,7 +41,6 @@ use super::{
 pub(crate) struct Topology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
-    monitors_manager: TopologyMonitorsManager,
     _worker_handle: WorkerHandle,
 }
 
@@ -61,7 +49,6 @@ impl Topology {
         let http_client = HttpClient::default();
         let description = TopologyDescription::default();
 
-        let monitors_manager = TopologyMonitorsManager::new();
         let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
             let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
 
@@ -96,7 +83,6 @@ impl Topology {
             http_client,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
-            monitors_manager: monitors_manager.clone(),
             handle_listener,
             event_emitter,
         };
@@ -107,7 +93,6 @@ impl Topology {
         Ok(Topology {
             watcher,
             updater,
-            monitors_manager,
             _worker_handle: worker_handle,
         })
     }
@@ -123,11 +108,6 @@ impl Topology {
     #[cfg(test)]
     pub(crate) fn clone_updater(&self) -> TopologyUpdater {
         self.updater.clone()
-    }
-
-    /// Request that all server monitors perform an immediate check of the topology.
-    pub(crate) fn request_update(&self) {
-        self.monitors_manager.request_check()
     }
 
     /// Handle an error that occurred during operation execution.
@@ -280,7 +260,7 @@ struct TopologyWorker {
 
     /// Map of addresses to servers in the topology. Once servers are dropped from this map, they
     /// will cease to be monitored and their connection pools will be closed.
-    servers: HashMap<ServerAddress, Arc<Server>>,
+    servers: HashMap<ServerAddress, MonitoredServer>,
 
     /// The current TopologyDescription.
     topology_description: TopologyDescription,
@@ -292,7 +272,6 @@ struct TopologyWorker {
     // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
     topology_updater: TopologyUpdater,
-    monitors_manager: TopologyMonitorsManager,
 }
 
 impl TopologyWorker {
@@ -378,10 +357,10 @@ impl TopologyWorker {
             drop(self.publisher);
 
             // close all the monitors.
-            drop(self.servers);
-            self.monitors_manager
-                .cancel_in_progress_checks(CancellationReason::TopologyClosed);
-            self.monitors_manager.wait_for_close().await;
+            for server in self.servers.into_values() {
+                drop(server.inner);
+                server.monitor_manager.close_monitor().await;
+            }
 
             if let Some(emitter) = self.event_emitter {
                 emitter
@@ -398,7 +377,7 @@ impl TopologyWorker {
         let servers = self
             .servers
             .iter()
-            .map(|(k, v)| (k.clone(), Arc::downgrade(v)))
+            .map(|(k, v)| (k.clone(), Arc::downgrade(&v.inner)))
             .collect();
         self.publisher.publish_new_state(TopologyState {
             description: self.topology_description.clone(),
@@ -487,15 +466,28 @@ impl TopologyWorker {
                 }
 
                 let (monitor_handle, listener) = WorkerHandleListener::channel();
+                let monitor_manager = MonitorManager::new(monitor_handle);
+
+                let monitor_request_receiver = MonitorRequestReceiver::new(
+                    &monitor_manager,
+                    self.topology_watcher.subscribe_to_topology_check_requests(),
+                    listener,
+                );
 
                 let server = Server::new(
                     address.clone(),
-                    monitor_handle,
                     self.options.clone(),
                     self.http_client.clone(),
                     self.topology_updater.clone(),
                 );
-                self.servers.insert(address.clone(), server);
+
+                self.servers.insert(
+                    address.clone(),
+                    MonitoredServer {
+                        inner: server,
+                        monitor_manager,
+                    },
+                );
 
                 if self.monitoring_enabled() {
                     Monitor::start(
@@ -503,8 +495,7 @@ impl TopologyWorker {
                         self.topology_updater.clone(),
                         self.topology_watcher.clone(),
                         self.event_emitter.clone(),
-                        self.monitors_manager.subscribe(),
-                        listener,
+                        monitor_request_receiver,
                         self.options.clone(),
                     );
                 }
@@ -549,7 +540,7 @@ impl TopologyWorker {
             None => return false,
         }
 
-        let server = match self.server(&address) {
+        let mut server = match self.server(&address) {
             Some(s) => s,
             None => return false,
         };
@@ -585,7 +576,7 @@ impl TopologyWorker {
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
                 server.pool.clear(error, handshake.service_id()).await;
             }
-            self.monitors_manager.request_check();
+            server.monitor_manager.request_immediate_check();
 
             updated
         } else if error.is_non_timeout_network_error()
@@ -602,7 +593,7 @@ impl TopologyWorker {
                     .clear(error.clone(), handshake.service_id())
                     .await;
                 if !error.is_auth_error() {
-                    self.monitors_manager.cancel_in_progress_checks(error);
+                    server.monitor_manager.cancel_in_progress_check(error);
                 }
             }
             updated
@@ -632,7 +623,7 @@ impl TopologyWorker {
     }
 
     /// Get the server at the provided address if present in the topology.
-    fn server(&self, address: &ServerAddress) -> Option<Arc<Server>> {
+    fn server(&self, address: &ServerAddress) -> Option<MonitoredServer> {
         self.servers.get(address).cloned()
     }
 
@@ -683,6 +674,7 @@ impl TopologyUpdater {
         (updater, update_receiver)
     }
 
+    /// Send an update message to the topology.
     async fn send_message(&self, update: UpdateMessage) -> bool {
         let (message, receiver) = AcknowledgedMessage::package(update);
 
@@ -753,13 +745,26 @@ impl TopologyUpdateReceiver {
 /// Struct used to get the latest topology state and monitor the topology for changes.
 #[derive(Debug, Clone)]
 pub(crate) struct TopologyWatcher {
+    /// Receiver for the latest set of servers and latest TopologyDescription published by the
+    /// topology.
     receiver: watch::Receiver<TopologyState>,
+
+    /// Sender used to request a check of the entire topology. The number indicates how many
+    /// operations have requested an update and are waiting for the topology to change.
+    sender: Arc<watch::Sender<u32>>,
+
+    /// Whether or not this watcher incremented the count in `sender`.
+    requested_check: bool,
 }
 
 impl TopologyWatcher {
     fn channel(initial_state: TopologyState) -> (TopologyWatcher, TopologyPublisher) {
         let (tx, rx) = watch::channel(initial_state);
-        let watcher = TopologyWatcher { receiver: rx };
+        let watcher = TopologyWatcher {
+            receiver: rx,
+            sender: Arc::new(watch::channel(0).0),
+            requested_check: false,
+        };
         let publisher = TopologyPublisher { state_sender: tx };
         (watcher, publisher)
     }
@@ -784,6 +789,25 @@ impl TopologyWatcher {
         self.receiver.borrow_and_update().clone()
     }
 
+    fn subscribe_to_topology_check_requests(&self) -> TopologyCheckRequestReceiver {
+        TopologyCheckRequestReceiver {
+            receiver: self.sender.subscribe(),
+        }
+    }
+
+    /// Request that all the monitors associated with the topology perform immediate checks.
+    pub(crate) fn request_immediate_check(&mut self) {
+        if self.requested_check {
+            return;
+        }
+        self.requested_check = true;
+
+        // Increment the number of operations waiting for a topology update. When the monitors
+        // see this, they'll perform checks as soon as possible.
+        // Once a change is detected or this watcher is dropped, this will be decremented again.
+        self.sender.send_modify(|counter| *counter += 1);
+    }
+
     /// Wait for a new state to be published or for the timeout to be reached, returning a bool
     /// indicating whether an update was seen or not.
     ///
@@ -792,7 +816,21 @@ impl TopologyWatcher {
         let changed = runtime::timeout(timeout, self.receiver.changed())
             .await
             .is_ok();
+
+        self.receiver.borrow_and_update();
+
+        if changed {
+            self.retract_immediate_check_request();
+        }
+
         changed
+    }
+
+    fn retract_immediate_check_request(&mut self) {
+        if self.requested_check {
+            self.requested_check = false;
+            self.sender.send_modify(|count| *count -= 1);
+        }
     }
 
     /// Borrow the latest state. This does not mark it as seen.
@@ -809,6 +847,12 @@ impl TopologyWatcher {
     }
 }
 
+impl Drop for TopologyWatcher {
+    fn drop(&mut self) {
+        self.retract_immediate_check_request();
+    }
+}
+
 /// Struct used to broadcsat the latest view of the topology.
 struct TopologyPublisher {
     state_sender: watch::Sender<TopologyState>,
@@ -821,114 +865,6 @@ impl TopologyPublisher {
     /// `TopologyState`, the watchers will still be notified.
     fn publish_new_state(&self, state: TopologyState) {
         let _ = self.state_sender.send(state);
-    }
-}
-
-/// Handle used to manage the server monitors associated with this topology.
-#[derive(Clone, Debug)]
-struct TopologyMonitorsManager {
-    check_request_sender: Arc<watch::Sender<()>>,
-    cancellation_sender: Arc<watch::Sender<CancellationReason>>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum CancellationReason {
-    Error(Error),
-    TopologyClosed,
-}
-
-impl From<Error> for CancellationReason {
-    fn from(e: Error) -> Self {
-        Self::Error(e)
-    }
-}
-
-impl TopologyMonitorsManager {
-    fn new() -> TopologyMonitorsManager {
-        let (check_request_sender, _rx1) = watch::channel(());
-
-        // The channel is populated with a temporary placeholder reason. The monitor will never
-        // observer this though, since the only receiver that did see it (_rx2) wil be dropped at
-        // the end of this scope.
-        let (cancellation_sender, _rx2) = watch::channel(CancellationReason::TopologyClosed);
-        TopologyMonitorsManager {
-            check_request_sender: Arc::new(check_request_sender),
-            cancellation_sender: Arc::new(cancellation_sender),
-        }
-    }
-
-    /// Request that all monitors perform immediate checks.
-    fn request_check(&self) {
-        let _ = self.check_request_sender.send(());
-    }
-
-    /// Request that any in-progress monitor checks be cancelled due to the provided error.
-    fn cancel_in_progress_checks(&self, reason: impl Into<CancellationReason>) {
-        let _ = self.cancellation_sender.send(reason.into());
-    }
-
-    /// Wait until all the monitors have terminated.
-    async fn wait_for_close(self) {
-        self.check_request_sender.closed().await;
-    }
-
-    /// Subscribe to management requests.
-    fn subscribe(&self) -> MonitorManagementReceiver {
-        MonitorManagementReceiver {
-            check_request_receiver: self.check_request_sender.subscribe(),
-            cancellation_receiver: self.cancellation_sender.subscribe(),
-        }
-    }
-}
-
-/// Receiver used to listen for monitor management requests from a [`TopologyMonitorsManager`].
-/// Each server monitor owns one of these.
-pub(crate) struct MonitorManagementReceiver {
-    check_request_receiver: watch::Receiver<()>,
-    cancellation_receiver: watch::Receiver<CancellationReason>,
-}
-
-impl MonitorManagementReceiver {
-    /// Wait until either an immediate check is requested or that the provided timeout is hit.
-    /// Any cancellation requests that come in while this waiting is happening will be ignored,
-    /// except for those that indicate the topology is closing.
-    pub(crate) async fn wait_for_check_request(&mut self, timeout: Duration) {
-        let _ = runtime::timeout(timeout, async {
-            loop {
-                tokio::select! {
-                    _ = self.check_request_receiver.changed() => {
-                        break;
-                    }
-                    Ok(_) = self.cancellation_receiver.changed() => {
-                        // if we receive a cancellation request indicating the topology has been dropped,
-                        // then just return early.
-                        if matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
-                            break;
-                        }
-                    }
-                }
-            }
-        })
-        .await;
-
-        // clear out ignored cancellation requests while we were waiting to begin a check
-        self.cancellation_receiver.borrow_and_update();
-    }
-
-    /// Wait for a cancellation request to be received.
-    /// Any immediate check requests that come in while this waiting is happening will be ignored.
-    ///
-    /// If a cancellation request is received, the error that caused it will be returned. This
-    /// method only returns `None` when the `Topology` is closed.
-    pub(crate) async fn wait_for_cancellation(&mut self) -> CancellationReason {
-        let err = if self.cancellation_receiver.changed().await.is_ok() {
-            self.cancellation_receiver.borrow().clone()
-        } else {
-            CancellationReason::TopologyClosed
-        };
-        // clear out ignored check requests
-        self.check_request_receiver.borrow_and_update();
-        err
     }
 }
 
@@ -1016,5 +952,45 @@ impl HandshakePhase {
             } => Some(*max_wire_version),
             _ => None,
         }
+    }
+}
+
+/// Struct used to receive topology-wide immediate check requests from operations in server
+/// selection. Such requests can be made through a `TopologyWatcher`.
+#[derive(Debug, Clone)]
+pub(crate) struct TopologyCheckRequestReceiver {
+    /// This receives the number of operations that are blocked waiting for an update to the
+    /// topology. If the number is > 0, then that means the monitor should perform a check
+    /// ASAP.
+    ///
+    /// A counter is used here instead of `()` so that operations can retract their requests. This
+    /// enables the monitor to unambiguiously determine whether a request is stale or not and
+    /// eliminates races between the monitor listening for check requests and operations
+    /// actually sending them.
+    receiver: watch::Receiver<u32>,
+}
+
+impl TopologyCheckRequestReceiver {
+    pub(crate) async fn wait_for_check_request(&mut self) {
+        while self.receiver.changed().await.is_ok() {
+            if *self.receiver.borrow() > 0 {
+                break;
+            }
+        }
+    }
+}
+
+/// Struct wrapping a [`Server`]. When this is dropped, the monitor for this server will close.
+#[derive(Debug, Clone)]
+struct MonitoredServer {
+    inner: Arc<Server>,
+    monitor_manager: MonitorManager,
+}
+
+impl std::ops::Deref for MonitoredServer {
+    type Target = Server;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.deref()
     }
 }

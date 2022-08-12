@@ -414,7 +414,7 @@ impl Client {
                 return Ok(server);
             }
 
-            self.inner.topology.request_update();
+            watcher.request_immediate_check();
 
             let change_occurred = start_time.elapsed() < timeout
                 && watcher

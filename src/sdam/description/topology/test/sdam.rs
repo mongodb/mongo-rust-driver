@@ -645,13 +645,6 @@ async fn heartbeat_events() {
         return;
     }
 
-    if client.server_version_gte(4, 4) {
-        log_uncaptured(
-            "skipping heartbeat_events test due to server support for the streaming protocol",
-        );
-        return;
-    }
-
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))
@@ -676,7 +669,7 @@ async fn heartbeat_events() {
         .build();
     let failpoint = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(1),
+        FailPointMode::Times(2),
         options,
     );
     let _fp_guard = client

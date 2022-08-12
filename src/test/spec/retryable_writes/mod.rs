@@ -18,6 +18,7 @@ use crate::{
     options::{ClientOptions, FindOptions, InsertManyOptions},
     runtime,
     runtime::AsyncJoinHandle,
+    sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         assert_matches,
         log_uncaptured,
@@ -49,15 +50,18 @@ async fn run_unified() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
     async fn run_test(test_file: TestFile) {
+        let setup_client = TestClient::new().await;
+
         for mut test_case in test_file.tests {
             if test_case.operation.name == "bulkWrite" {
                 continue;
             }
-            let hosts = &CLIENT_OPTIONS.get().await.hosts;
-            let options = test_case.client_options.map(|mut opts| {
-                opts.hosts = hosts.clone();
-                opts
-            });
+            let mut options = test_case.client_options.unwrap_or_default();
+            options.hosts = CLIENT_OPTIONS.get().await.hosts.clone();
+            if options.heartbeat_freq.is_none() {
+                options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
+            }
+
             let client = EventClient::with_additional_options(
                 options,
                 Some(Duration::from_millis(50)),
@@ -86,7 +90,7 @@ async fn run_legacy() {
             }
 
             if let Some(ref mut fail_point) = test_case.fail_point {
-                client
+                setup_client
                     .database("admin")
                     .run_command(fail_point.clone(), None)
                     .await
@@ -158,7 +162,7 @@ async fn run_legacy() {
                 None => coll_name.to_string(),
             };
 
-            let coll = client.get_coll(&db_name, &coll_name);
+            let coll = setup_client.get_coll(&db_name, &coll_name);
             let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
                 .find(None, options)
@@ -174,14 +178,14 @@ async fn run_legacy() {
                     "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
                     "mode": "off",
                 };
-                client
+                setup_client
                     .database("admin")
                     .run_command(disable, None)
                     .await
                     .unwrap();
             }
 
-            client.database(&db_name).drop(None).await.unwrap();
+            setup_client.database(&db_name).drop(None).await.unwrap();
         }
     }
 

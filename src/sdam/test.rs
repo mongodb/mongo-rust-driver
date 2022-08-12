@@ -146,7 +146,7 @@ async fn sdam_pool_management() {
         .build();
     let failpoint = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(1),
+        FailPointMode::Times(2),
         fp_options,
     );
 

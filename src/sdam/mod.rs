@@ -21,13 +21,7 @@ pub(crate) use self::{
     },
     monitor::{Monitor, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     server::Server,
-    topology::{
-        HandshakePhase,
-        MonitorManagementReceiver,
-        Topology,
-        TopologyUpdater,
-        TopologyWatcher,
-    },
+    topology::{HandshakePhase, Topology, TopologyUpdater, TopologyWatcher},
 };
 
 #[cfg(test)]

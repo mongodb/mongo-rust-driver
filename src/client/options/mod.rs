@@ -568,7 +568,7 @@ pub struct ClientOptions {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TestOptions {
     /// Override MIN_HEARTBEAT_FREQUENCY.
-    pub(crate) heartbeat_freq: Option<Duration>,
+    pub(crate) min_heartbeat_freq: Option<Duration>,
 
     /// Disable server and SRV-polling monitor threads.
     pub(crate) disable_monitoring_threads: bool,

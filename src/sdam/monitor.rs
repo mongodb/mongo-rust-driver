@@ -8,8 +8,7 @@ use tokio::sync::watch;
 
 use super::{
     description::server::{ServerDescription, TopologyVersion},
-    topology::SdamEventEmitter,
-    MonitorManagementReceiver,
+    topology::{SdamEventEmitter, TopologyCheckRequestReceiver},
     TopologyUpdater,
     TopologyWatcher,
 };
@@ -24,8 +23,7 @@ use crate::{
     },
     hello::{hello_command, run_hello, AwaitableHelloOptions, HelloReply},
     options::{ClientOptions, ServerAddress},
-    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, WorkerHandleListener},
-    sdam::topology::CancellationReason,
+    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, WorkerHandle, WorkerHandleListener},
 };
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -39,7 +37,6 @@ pub(crate) struct Monitor {
     topology_updater: TopologyUpdater,
     topology_watcher: TopologyWatcher,
     sdam_event_emitter: Option<SdamEventEmitter>,
-    management_receiver: MonitorManagementReceiver,
     client_options: ClientOptions,
 
     /// The most recent topology version returned by the server in a hello response.
@@ -52,8 +49,9 @@ pub(crate) struct Monitor {
     rtt_monitor_handle: RttMonitorHandle,
 
     /// Handle to the `Server` instance in the `Topology`. This is used to detect when a server has
-    /// been removed from the topology and no longer needs to be monitored.
-    server_handle_listener: WorkerHandleListener,
+    /// been removed from the topology and no longer needs to be monitored and to receive
+    /// cancellation requests.
+    request_receiver: MonitorRequestReceiver,
 }
 
 impl Monitor {
@@ -62,8 +60,7 @@ impl Monitor {
         topology_updater: TopologyUpdater,
         topology_watcher: TopologyWatcher,
         sdam_event_emitter: Option<SdamEventEmitter>,
-        management_receiver: MonitorManagementReceiver,
-        handle_listener: WorkerHandleListener,
+        manager_receiver: MonitorRequestReceiver,
         client_options: ClientOptions,
     ) {
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
@@ -81,9 +78,8 @@ impl Monitor {
             topology_updater,
             topology_watcher,
             sdam_event_emitter,
-            management_receiver,
             rtt_monitor_handle,
-            server_handle_listener: handle_listener,
+            request_receiver: manager_receiver,
             connection: None,
             topology_version: None,
         };
@@ -93,10 +89,7 @@ impl Monitor {
     }
 
     async fn execute(mut self) {
-        let heartbeat_frequency = self
-            .client_options
-            .heartbeat_freq
-            .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
+        let heartbeat_frequency = self.heartbeat_frequency();
 
         while self.is_alive() {
             let check_succeeded = self.check_server().await;
@@ -113,14 +106,14 @@ impl Monitor {
                     .client_options
                     .test_options
                     .as_ref()
-                    .and_then(|to| to.heartbeat_freq)
+                    .and_then(|to| to.min_heartbeat_freq)
                     .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
 
                 #[cfg(not(test))]
                 let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
                 runtime::delay_for(min_frequency).await;
-                self.management_receiver
+                self.request_receiver
                     .wait_for_check_request(heartbeat_frequency - min_frequency)
                     .await;
             }
@@ -128,7 +121,7 @@ impl Monitor {
     }
 
     fn is_alive(&self) -> bool {
-        self.server_handle_listener.is_alive()
+        self.request_receiver.is_alive()
     }
 
     /// Checks the the server by running a hello command. If an I/O error occurs, the
@@ -177,8 +170,7 @@ impl Monitor {
                 server_address: self.address.clone(),
                 awaited: self.topology_version.is_some(),
             })
-        })
-        .await;
+        });
 
         let timeout = if self.connect_timeout().as_millis() == 0 {
             // If connectTimeoutMS = 0, then the socket timeout for monitoring is unlimited.
@@ -194,6 +186,8 @@ impl Monitor {
             self.connect_timeout()
         };
 
+        let heartbeat_frequency = self.heartbeat_frequency();
+
         let execute_hello = async {
             match self.connection {
                 Some(ref mut conn) => {
@@ -204,11 +198,6 @@ impl Monitor {
                             .and_then(|r| r.into_hello_reply(None))
                     // Otherwise, send a regular hello command.
                     } else {
-                        let heartbeat_frequency = self
-                            .client_options
-                            .heartbeat_freq
-                            .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
-
                         // If the initial handshake returned a topology version, send it back to the
                         // server to begin streaming responses.
                         let opts = self.topology_version.map(|tv| AwaitableHelloOptions {
@@ -249,15 +238,14 @@ impl Monitor {
         let sleep = runtime::delay_for(timeout);
         tokio::pin!(sleep);
 
-        // Begin executing the hello and listening for a cancellation request while also keeping
-        // track of the timeout.
+        // Execute the hello while also listening for cancellation and keeping track of the timeout.
         let start = Instant::now();
         let result = tokio::select! {
             result = execute_hello => match result {
                 Ok(reply) => HelloResult::Ok(reply),
                 Err(e) => HelloResult::Err(e)
             },
-            r = self.management_receiver.wait_for_cancellation() => {
+            r = self.request_receiver.wait_for_cancellation() => {
                 let reason_error = match r {
                     CancellationReason::Error(e) => e,
                     CancellationReason::TopologyClosed => Error::internal("topology closed")
@@ -286,8 +274,7 @@ impl Monitor {
                         server_address: self.address.clone(),
                         awaited: self.topology_version.is_some(),
                     })
-                })
-                .await;
+                });
 
                 // If the response included a topology version, cache it so that we can return it in
                 // the next hello.
@@ -305,8 +292,7 @@ impl Monitor {
                         server_address: self.address.clone(),
                         awaited: self.topology_version.is_some(),
                     })
-                })
-                .await;
+                });
                 self.topology_version.take();
             }
         }
@@ -320,12 +306,13 @@ impl Monitor {
             .await
     }
 
-    async fn emit_event<F>(&self, event: F)
+    fn emit_event<F>(&self, event: F)
     where
         F: FnOnce() -> SdamEvent,
     {
         if let Some(ref emitter) = self.sdam_event_emitter {
-            emitter.emit(event()).await
+            // We don't care about ordering or waiting for the event to have been received.
+            let _ = emitter.emit(event());
         }
     }
 
@@ -487,4 +474,151 @@ enum HelloResult {
     Ok(HelloReply),
     Err(Error),
     Cancelled { reason: Error },
+}
+
+/// Struct used to keep a monitor alive, individually request an immediate check, and to cancel
+/// in-progress checks.
+#[derive(Debug, Clone)]
+pub(crate) struct MonitorManager {
+    /// `WorkerHandle` used to keep the monitor alive. When this is dropped, the monitor will exit.
+    handle: WorkerHandle,
+
+    /// Sender used to cancel in-progress monitor checks and, if the reason is TopologyClosed,
+    /// close the monitor.
+    cancellation_sender: Arc<watch::Sender<CancellationReason>>,
+
+    /// Sender used to individually request an immediate check from the monitor associated with
+    /// this manager.
+    check_requester: Arc<watch::Sender<()>>,
+}
+
+impl MonitorManager {
+    pub(crate) fn new(monitor_handle: WorkerHandle) -> Self {
+        // The CancellationReason used as the initial value is just a placeholder. The only receiver
+        // that could have seen it is dropped in this scope, and the monitor's receiver will
+        // never observe it.
+        let (tx, _) = watch::channel(CancellationReason::TopologyClosed);
+        let check_requester = Arc::new(watch::channel(()).0);
+
+        MonitorManager {
+            handle: monitor_handle,
+            cancellation_sender: Arc::new(tx),
+            check_requester,
+        }
+    }
+
+    /// Cancel any in progress checks, notify the monitor that it should close, and wait for it to
+    /// do so.
+    pub(crate) async fn close_monitor(self) {
+        drop(self.handle);
+        let _ = self
+            .cancellation_sender
+            .send(CancellationReason::TopologyClosed);
+        self.cancellation_sender.closed().await;
+    }
+
+    /// Cancel any in progress check with the provided reason.
+    pub(crate) fn cancel_in_progress_check(&mut self, reason: impl Into<CancellationReason>) {
+        let _ = self.cancellation_sender.send(reason.into());
+    }
+
+    /// Request an immediate topology check by this monitor. If the monitor is currently performing
+    /// a check, this request will be ignored.
+    pub(crate) fn request_immediate_check(&mut self) {
+        let _ = self.check_requester.send(());
+    }
+}
+
+/// Struct used to receive cancellation and immediate check requests from various different places.
+pub(crate) struct MonitorRequestReceiver {
+    /// Handle listener used to determine whether this monitor should continue to execute or not.
+    /// The `MonitorManager` owned by the `TopologyWorker` owns the handle that this listener
+    /// corresponds to.
+    handle_listener: WorkerHandleListener,
+
+    /// Receiver for cancellation requests. These come in when an operation encounters network
+    /// errors or when the topology is closed.
+    cancellation_receiver: watch::Receiver<CancellationReason>,
+
+    /// Receiver used to listen for immediate check requests sent by the `TopologyWorker` that only
+    /// apply to the server associated with the monitor, not for the whole topology.
+    individual_check_request_receiver: watch::Receiver<()>,
+
+    /// Receiver used to listen for immediate check requests that were broadcast to the entire
+    /// topology by operations attempting to select a server.
+    topology_check_request_receiver: TopologyCheckRequestReceiver,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum CancellationReason {
+    Error(Error),
+    TopologyClosed,
+}
+
+impl From<Error> for CancellationReason {
+    fn from(e: Error) -> Self {
+        Self::Error(e)
+    }
+}
+
+impl MonitorRequestReceiver {
+    pub(crate) fn new(
+        manager: &MonitorManager,
+        topology_check_request_receiver: TopologyCheckRequestReceiver,
+        handle_listener: WorkerHandleListener,
+    ) -> Self {
+        Self {
+            handle_listener,
+            cancellation_receiver: manager.cancellation_sender.subscribe(),
+            individual_check_request_receiver: manager.check_requester.subscribe(),
+            topology_check_request_receiver,
+        }
+    }
+
+    /// Wait for a request to cancel the current in-progress check to come in, returning the reason
+    /// for it. Any check requests that are received during this time will be ignored, as per
+    /// the spec.
+    async fn wait_for_cancellation(&mut self) -> CancellationReason {
+        let err = if self.cancellation_receiver.changed().await.is_ok() {
+            self.cancellation_receiver.borrow().clone()
+        } else {
+            CancellationReason::TopologyClosed
+        };
+        // clear out ignored check requests
+        self.individual_check_request_receiver.borrow_and_update();
+        err
+    }
+
+    /// Wait for a request to immediately check the server to come in, guarded by the provided
+    /// timeout. If a cancellation request is received indicating the topology has closed, this
+    /// method will return. All other cancellation requests will be ignored.
+    async fn wait_for_check_request(&mut self, timeout: Duration) {
+        let _ = runtime::timeout(timeout, async {
+            loop {
+                tokio::select! {
+                    _ = self.individual_check_request_receiver.changed() => {
+                        break;
+                    }
+                    _ = self.topology_check_request_receiver.wait_for_check_request() => {
+                        break;
+                    }
+                    Ok(_) = self.cancellation_receiver.changed() => {
+                        // if we receive a cancellation request indicating the topology has been dropped,
+                        // then just return early.
+                        if matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
+                            break;
+                        }
+                    }
+                }
+            }
+        })
+        .await;
+
+        // clear out ignored cancellation requests while we were waiting to begin a check
+        self.cancellation_receiver.borrow_and_update();
+    }
+
+    fn is_alive(&self) -> bool {
+        self.handle_listener.is_alive()
+    }
 }
