@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+//! Support for explicit encryption.
 
 use crate::{
     bson::{Binary, Document},
@@ -285,9 +285,11 @@ pub struct EncryptOptions {
     pub query_type: Option<String>,
 }
 
-/// An encryption key reference, either an _id value or alternate name.
+/// An encryption key reference.
 pub enum EncryptKey {
+    /// Find the key by _id value.
     Id(Binary),
+    /// Find the key by alternate name.
     AltName(String),
 }
 

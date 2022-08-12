@@ -344,7 +344,7 @@ mod test;
 extern crate derive_more;
 
 pub use crate::{
-    client::{session::ClientSession, Client},
+    client::{session::ClientSession, Client, csfle::client_encryption},
     coll::Collection,
     cursor::{
         session::{SessionCursor, SessionCursorStream},
