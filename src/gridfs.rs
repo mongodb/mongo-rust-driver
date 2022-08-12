@@ -484,7 +484,7 @@ impl GridFsBucket {
         })
     }
 
-    pub async fn download_to_tokio_writer_common<T>(
+    async fn download_to_tokio_writer_common<T>(
         &self,
         file: FilesCollectionDocument,
         destination: &mut T,
