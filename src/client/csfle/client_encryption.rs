@@ -221,14 +221,6 @@ impl ClientEncryption {
     }
 }
 
-// TODO(aegnor): Binary::as_raw()
-fn bin_ref(bin: &Binary) -> RawBinaryRef {
-    RawBinaryRef {
-        subtype: bin.subtype,
-        bytes: &bin.bytes,
-    }
-}
-
 /// Options for initializing a new `ClientEncryption`.
 #[non_exhaustive]
 pub struct ClientEncryptionOptions {
@@ -293,7 +285,6 @@ pub enum EncryptKey {
     AltName(String),
 }
 
-// TODO(aegnor): impl ToOwned
 fn bin_owned(bin_ref: RawBinaryRef) -> Binary {
     Binary {
         subtype: bin_ref.subtype,

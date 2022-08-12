@@ -30,9 +30,25 @@ pub struct ReadConcern {
 }
 
 impl ReadConcern {
-    // TODO(aegnor): consts for other levels
+    /// A `ReadConcern` with level `ReadConcernLevel::Local`.
+    pub const LOCAL: ReadConcern = ReadConcern {
+        level: ReadConcernLevel::Local,
+    };
+    /// A `ReadConcern` with level `ReadConcernLevel::Majority`.
     pub const MAJORITY: ReadConcern = ReadConcern {
         level: ReadConcernLevel::Majority,
+    };
+    /// A `ReadConcern` with level `ReadConcernLevel::Linearizable`.
+    pub const LINEARIZABLE: ReadConcern = ReadConcern {
+        level: ReadConcernLevel::Linearizable,
+    };
+    /// A `ReadConcern` with level `ReadConcernLevel::Available`.
+    pub const AVAILBLE: ReadConcern = ReadConcern {
+        level: ReadConcernLevel::Available,
+    };
+    /// A `ReadConcern` with level `ReadConcernLevel::Snapshot`.
+    pub const SNAPSHOT: ReadConcern = ReadConcern {
+        level: ReadConcernLevel::Snapshot,
     };
 }
 
@@ -233,7 +249,7 @@ impl WriteConcern {
         w_timeout: None,
         journal: None,
     };
-    // TODO(aegnor): consts for other acknowledgements
+    /// A `WriteConcern` requesting `Acknowledgment::Majority`.
     pub const MAJORITY: WriteConcern = WriteConcern {
         w: Some(Acknowledgment::Majority),
         ..WriteConcern::DEFAULT
