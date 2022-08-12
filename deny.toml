@@ -49,8 +49,6 @@ notice = "deny"
 # output a note when they are encountered.
 ignore = [
     # TODO RUST-1293
-    "RUSTSEC-2020-0159",
-    # TODO RUST-1293
     "RUSTSEC-2020-0071",
 ]
 # Threshold for security vulnerabilities, any vulnerability with a CVSS score
@@ -80,6 +78,7 @@ allow = [
     "OpenSSL",
     "BSD-3-Clause",
     "MPL-2.0",
+    "Unicode-DFS-2016",
 ]
 # List of explicitly disallowed licenses
 # See https://spdx.org/licenses/ for list of possible licenses
@@ -201,7 +200,10 @@ unknown-git = "deny"
 # if not specified. If it is specified but empty, no registries are allowed.
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # List of URLs for allowed Git repositories
-allow-git = ["https://github.com/mongodb/bson-rust"]
+allow-git = [
+    "https://github.com/mongodb/bson-rust",
+    "https://github.com/mongodb/libmongocrypt-rust",
+]
 
 [sources.allow-org]
 # 1 or more github.com organizations to allow git sources for

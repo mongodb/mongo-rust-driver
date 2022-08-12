@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, DateTime},
+    bson_util,
     client::ClusterTime,
+    error::{ErrorKind, Result},
     hello::HelloReply,
     options::ServerAddress,
     selection_criteria::TagSet,
@@ -106,7 +108,8 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the hello reply by propagating with `?`.
-    pub(crate) reply: Result<Option<HelloReply>, String>,
+    #[serde(serialize_with = "bson_util::serialize_result_error_as_string")]
+    pub(crate) reply: Result<Option<HelloReply>>,
 }
 
 impl PartialEq for ServerDescription {
@@ -122,17 +125,22 @@ impl PartialEq for ServerDescription {
 
                 self_response == other_response
             }
-            (Err(self_err), Err(other_err)) => self_err == other_err,
+            (Err(self_err), Err(other_err)) => {
+                match (self_err.kind.as_ref(), other_err.kind.as_ref()) {
+                    (
+                        ErrorKind::Command(self_command_err),
+                        ErrorKind::Command(other_command_err),
+                    ) => self_command_err.code == other_command_err.code,
+                    _ => self_err.to_string() == other_err.to_string(),
+                }
+            }
             _ => false,
         }
     }
 }
 
 impl ServerDescription {
-    pub(crate) fn new(
-        mut address: ServerAddress,
-        hello_reply: Option<Result<HelloReply, String>>,
-    ) -> Self {
+    pub(crate) fn new(mut address: ServerAddress, hello_reply: Option<Result<HelloReply>>) -> Self {
         address = ServerAddress::Tcp {
             host: address.host().to_lowercase(),
             port: address.port(),
@@ -231,7 +239,7 @@ impl ServerDescription {
         None
     }
 
-    pub(crate) fn set_name(&self) -> Result<Option<String>, String> {
+    pub(crate) fn set_name(&self) -> Result<Option<String>> {
         let set_name = self
             .reply
             .as_ref()
@@ -241,7 +249,7 @@ impl ServerDescription {
         Ok(set_name)
     }
 
-    pub(crate) fn known_hosts(&self) -> Result<impl Iterator<Item = &String>, String> {
+    pub(crate) fn known_hosts(&self) -> Result<impl Iterator<Item = &String>> {
         let known_hosts = self
             .reply
             .as_ref()
@@ -262,7 +270,7 @@ impl ServerDescription {
         Ok(known_hosts.into_iter().flatten())
     }
 
-    pub(crate) fn invalid_me(&self) -> Result<bool, String> {
+    pub(crate) fn invalid_me(&self) -> Result<bool> {
         if let Some(ref reply) = self.reply.as_ref().map_err(Clone::clone)? {
             if let Some(ref me) = reply.command_response.me {
                 return Ok(&self.address.to_string() != me);
@@ -272,7 +280,7 @@ impl ServerDescription {
         Ok(false)
     }
 
-    pub(crate) fn set_version(&self) -> Result<Option<i32>, String> {
+    pub(crate) fn set_version(&self) -> Result<Option<i32>> {
         let me = self
             .reply
             .as_ref()
@@ -282,7 +290,7 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn election_id(&self) -> Result<Option<ObjectId>, String> {
+    pub(crate) fn election_id(&self) -> Result<Option<ObjectId>> {
         let me = self
             .reply
             .as_ref()
@@ -293,7 +301,7 @@ impl ServerDescription {
     }
 
     #[cfg(test)]
-    pub(crate) fn min_wire_version(&self) -> Result<Option<i32>, String> {
+    pub(crate) fn min_wire_version(&self) -> Result<Option<i32>> {
         let me = self
             .reply
             .as_ref()
@@ -303,7 +311,7 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn max_wire_version(&self) -> Result<Option<i32>, String> {
+    pub(crate) fn max_wire_version(&self) -> Result<Option<i32>> {
         let me = self
             .reply
             .as_ref()
@@ -313,7 +321,7 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn last_write_date(&self) -> Result<Option<DateTime>, String> {
+    pub(crate) fn last_write_date(&self) -> Result<Option<DateTime>> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply
@@ -325,7 +333,7 @@ impl ServerDescription {
         }
     }
 
-    pub(crate) fn logical_session_timeout(&self) -> Result<Option<Duration>, String> {
+    pub(crate) fn logical_session_timeout(&self) -> Result<Option<Duration>> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply
@@ -336,7 +344,7 @@ impl ServerDescription {
         }
     }
 
-    pub(crate) fn cluster_time(&self) -> Result<Option<ClusterTime>, String> {
+    pub(crate) fn cluster_time(&self) -> Result<Option<ClusterTime>> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply.cluster_time.clone()),

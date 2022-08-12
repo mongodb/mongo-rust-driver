@@ -15,27 +15,28 @@ use super::{operation::Operation, test_event::CommandStartedEvent};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TestFile {
+pub(crate) struct TestFile {
     #[serde(rename = "runOn")]
-    pub run_on: Option<Vec<RunOn>>,
-    pub database_name: Option<String>,
-    pub collection_name: Option<String>,
-    pub bucket_name: Option<String>,
-    pub data: Option<TestData>,
-    pub tests: Vec<Test>,
+    pub(crate) run_on: Option<Vec<RunOn>>,
+    pub(crate) database_name: Option<String>,
+    pub(crate) collection_name: Option<String>,
+    #[allow(unused)]
+    pub(crate) bucket_name: Option<String>,
+    pub(crate) data: Option<TestData>,
+    pub(crate) tests: Vec<Test>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RunOn {
-    pub min_server_version: Option<String>,
-    pub max_server_version: Option<String>,
-    pub topology: Option<Vec<String>>,
+pub(crate) struct RunOn {
+    pub(crate) min_server_version: Option<String>,
+    pub(crate) max_server_version: Option<String>,
+    pub(crate) topology: Option<Vec<String>>,
     pub(crate) serverless: Option<Serverless>,
 }
 
 impl RunOn {
-    pub fn can_run_on(&self, client: &TestClient) -> bool {
+    pub(crate) fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
@@ -64,29 +65,29 @@ impl RunOn {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum TestData {
+pub(crate) enum TestData {
     Single(Vec<Document>),
     Many(HashMap<String, Vec<Document>>),
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Test {
-    pub description: String,
-    pub skip_reason: Option<String>,
-    pub use_multiple_mongoses: Option<bool>,
+pub(crate) struct Test {
+    pub(crate) description: String,
+    pub(crate) skip_reason: Option<String>,
+    pub(crate) use_multiple_mongoses: Option<bool>,
     #[serde(
         default,
         deserialize_with = "deserialize_uri_options_to_uri_string_option",
         rename = "clientOptions"
     )]
-    pub client_uri: Option<String>,
-    pub fail_point: Option<FailPoint>,
-    pub session_options: Option<HashMap<String, SessionOptions>>,
-    pub operations: Vec<Operation>,
+    pub(crate) client_uri: Option<String>,
+    pub(crate) fail_point: Option<FailPoint>,
+    pub(crate) session_options: Option<HashMap<String, SessionOptions>>,
+    pub(crate) operations: Vec<Operation>,
     #[serde(default, deserialize_with = "deserialize_command_started_events")]
-    pub expectations: Option<Vec<CommandStartedEvent>>,
-    pub outcome: Option<Outcome>,
+    pub(crate) expectations: Option<Vec<CommandStartedEvent>>,
+    pub(crate) outcome: Option<Outcome>,
 }
 
 fn deserialize_uri_options_to_uri_string_option<'de, D>(
@@ -100,12 +101,12 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Outcome {
-    pub collection: CollectionOutcome,
+pub(crate) struct Outcome {
+    pub(crate) collection: CollectionOutcome,
 }
 
 impl Outcome {
-    pub async fn matches_actual(
+    pub(crate) async fn matches_actual(
         self,
         db_name: String,
         coll_name: String,
@@ -133,9 +134,9 @@ impl Outcome {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CollectionOutcome {
-    pub name: Option<String>,
-    pub data: Vec<Document>,
+pub(crate) struct CollectionOutcome {
+    pub(crate) name: Option<String>,
+    pub(crate) data: Vec<Document>,
 }
 
 fn deserialize_command_started_events<'de, D>(

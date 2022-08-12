@@ -2,6 +2,8 @@ pub mod options;
 
 use std::{fmt::Debug, sync::Arc};
 
+#[cfg(feature = "csfle")]
+use bson::doc;
 use futures_util::stream::TryStreamExt;
 
 use crate::{
@@ -17,6 +19,12 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
+    gridfs::{
+        options::GridFsBucketOptions,
+        GridFsBucket,
+        DEFAULT_BUCKET_NAME,
+        DEFAULT_CHUNK_SIZE_BYTES,
+    },
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -285,23 +293,93 @@ impl Database {
             .await
     }
 
+    #[allow(clippy::needless_option_as_deref)]
     async fn create_collection_common(
         &self,
         name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
-        let mut options = options.into();
+        let mut options: Option<CreateCollectionOptions> = options.into();
         resolve_options!(self, options, [write_concern]);
+        let mut session = session.into();
 
-        let create = Create::new(
-            Namespace {
-                db: self.name().to_string(),
-                coll: name.as_ref().to_string(),
-            },
-            options,
-        );
-        self.client().execute_operation(create, session).await
+        let ns = Namespace {
+            db: self.name().to_string(),
+            coll: name.as_ref().to_string(),
+        };
+
+        #[cfg(feature = "csfle")]
+        self.create_aux_collections(&ns, &mut options, session.as_deref_mut())
+            .await?;
+
+        let create = Create::new(ns.clone(), options);
+        self.client()
+            .execute_operation(create, session.as_deref_mut())
+            .await?;
+
+        #[cfg(feature = "csfle")]
+        {
+            let coll = self.collection::<Document>(&ns.coll);
+            coll.create_index_common(
+                crate::IndexModel {
+                    keys: doc! {"__safeContent__": 1},
+                    options: None,
+                },
+                None,
+                session.as_deref_mut(),
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "csfle")]
+    #[allow(clippy::needless_option_as_deref)]
+    async fn create_aux_collections(
+        &self,
+        base_ns: &Namespace,
+        options: &mut Option<CreateCollectionOptions>,
+        mut session: Option<&mut ClientSession>,
+    ) -> Result<()> {
+        let has_encrypted_fields = options
+            .as_ref()
+            .and_then(|o| o.encrypted_fields.as_ref())
+            .is_some();
+        // If options does not have `associated_fields`, populate it from client-wide
+        // `encrypted_fields_map`:
+        if !has_encrypted_fields {
+            let enc_opts = self.client().auto_encryption_opts().await;
+            if let Some(enc_opts_fields) = enc_opts
+                .as_ref()
+                .and_then(|eo| eo.encrypted_fields_map.as_ref())
+                .and_then(|efm| efm.get(&format!("{}", &base_ns)))
+            {
+                options
+                    .get_or_insert_with(Default::default)
+                    .encrypted_fields = Some(enc_opts_fields.clone());
+            }
+        }
+
+        if let Some(opts) = options.as_ref() {
+            if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
+                for ns in crate::client::csfle::aux_collections(base_ns, enc_fields)? {
+                    let mut sub_opts = opts.clone();
+                    sub_opts.clustered_index = Some(self::options::ClusteredIndex {
+                        key: doc! { "_id": 1 },
+                        unique: true,
+                        name: None,
+                        v: None,
+                    });
+                    let create = Create::new(ns, Some(sub_opts));
+                    self.client()
+                        .execute_operation(create, session.as_deref_mut())
+                        .await?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.
@@ -491,5 +569,27 @@ impl Database {
         self.client()
             .execute_watch_with_session(pipeline, options, target, None, session)
             .await
+    }
+
+    /// Creates a new GridFsBucket in the database with the given options.
+    pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
+        let mut options = options.into().unwrap_or_default();
+        options.read_concern = options
+            .read_concern
+            .or_else(|| self.read_concern().cloned());
+        options.write_concern = options
+            .write_concern
+            .or_else(|| self.write_concern().cloned());
+        options.selection_criteria = options
+            .selection_criteria
+            .or_else(|| self.selection_criteria().cloned());
+        options.bucket_name = options
+            .bucket_name
+            .or_else(|| Some(DEFAULT_BUCKET_NAME.to_string()));
+        options.chunk_size_bytes = options.chunk_size_bytes.or(Some(DEFAULT_CHUNK_SIZE_BYTES));
+        GridFsBucket {
+            db: self.clone(),
+            options,
+        }
     }
 }

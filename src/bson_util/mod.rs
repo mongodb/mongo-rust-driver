@@ -225,6 +225,16 @@ pub(crate) fn serialize_error_as_string<S: Serializer>(
     serializer.serialize_str(&val.to_string())
 }
 
+/// Serializes a Result, serializing the error value as a string if present.
+pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
+    val: &Result<T>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    val.as_ref()
+        .map_err(|e| e.to_string())
+        .serialize(serializer)
+}
+
 #[cfg(test)]
 mod test {
     use crate::bson_util::num_decimal_digits;

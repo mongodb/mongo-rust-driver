@@ -42,7 +42,7 @@ async fn run() {
                 }
             }
         }
-        run_unified_format_test_filtered(test_file, |tc| {
+        run_unified_format_test_filtered(path, test_file, |tc| {
             // TODO RUST-142 unskip this when change streams are implemented.
             if tc.description == "change streams pin to a connection" {
                 log_uncaptured("skipping due to change streams not being implemented");

@@ -32,14 +32,14 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 
 ## Installation
 ### Requirements
-- Rust 1.53+
+- Rust 1.56+
 - MongoDB 3.6+
 
 ### Importing
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.2.0"
+mongodb = "2.3.0"
 ```
 
 #### Configuring the async runtime
@@ -48,7 +48,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.2.0"
+version = "2.3.0"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -57,7 +57,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.2.0"
+version = "2.3.0"
 features = ["tokio-sync"]
 ```
 Using the `"sync"` feature also requires using `default-features = false`.
@@ -72,6 +72,7 @@ Using the `"sync"` feature also requires using `default-features = false`.
 | `sync`               | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
 | `aws-auth`           | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
 | `bson-uuid-0_8`      | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
+| `bson-uuid-1`        | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
 | `bson-chrono-0_4`    | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
 | `bson-serde_with`    | Enable support for the [`serde_with`](docs.rs/serde_with/latest) crate in the public API of the re-exported `bson` crate.             | `serde_with` 1.0                    | no      |
 | `zlib-compression`   | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                              | `flate2` 1.0                        | no      |
@@ -368,7 +369,7 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 ## Minimum supported Rust version (MSRV)
 
-The MSRV for this crate is currently 1.53.0. This will be rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.56.0. This will be rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## License

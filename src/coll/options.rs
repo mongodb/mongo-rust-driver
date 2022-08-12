@@ -948,6 +948,11 @@ pub struct CreateIndexOptions {
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+
+    /// Map of encrypted fields for the collection.
+    #[cfg(feature = "csfle")]
+    #[serde(skip)]
+    pub encrypted_fields: Option<Document>,
 }
 
 /// Specifies the options to a

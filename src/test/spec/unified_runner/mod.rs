@@ -1,9 +1,10 @@
-pub mod entity;
-pub mod matcher;
-mod operation;
-mod test_event;
-pub mod test_file;
-pub mod test_runner;
+pub(crate) mod entity;
+pub(crate) mod matcher;
+pub(crate) mod observer;
+pub(crate) mod operation;
+pub(crate) mod test_event;
+pub(crate) mod test_file;
+pub(crate) mod test_runner;
 
 use std::{convert::TryFrom, ffi::OsStr, fs::read_dir, path::PathBuf};
 
@@ -11,12 +12,12 @@ use futures::future::FutureExt;
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{log_uncaptured, run_single_test, run_spec_test, LOCK};
+use crate::test::{log_uncaptured, run_single_test, LOCK};
 
-pub use self::{
+pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
     matcher::{events_match, results_match},
-    operation::{Operation, OperationObject},
+    operation::Operation,
     test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
     test_file::{
         merge_uri_options,
@@ -31,14 +32,21 @@ pub use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 7, 0);
+use super::run_spec_test_with_path;
 
-pub async fn run_unified_format_test(test_file: TestFile) {
-    run_unified_format_test_filtered(test_file, |_| true).await
+static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 10, 0);
+
+fn file_level_log(message: impl AsRef<str>) {
+    log_uncaptured(format!("\n------------\n{}\n", message.as_ref()));
 }
 
-pub async fn run_unified_format_test_filtered(
+pub(crate) async fn run_unified_format_test(path: PathBuf, test_file: TestFile) {
+    run_unified_format_test_filtered(path, test_file, |_| true).await
+}
+
+pub(crate) async fn run_unified_format_test_filtered(
+    path: PathBuf,
     test_file: TestFile,
     pred: impl Fn(&TestCase) -> bool,
 ) {
@@ -49,15 +57,15 @@ pub async fn run_unified_format_test_filtered(
         &test_file.schema_version
     );
 
-    let mut test_runner = TestRunner::new().await;
-    test_runner.run_test(test_file, pred).await;
+    let test_runner = TestRunner::new().await;
+    test_runner.run_test(path, test_file, pred).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_examples() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_spec_test(
+    run_spec_test_with_path(
         &["unified-test-format", "examples"],
         run_unified_format_test,
     )
@@ -97,7 +105,7 @@ async fn valid_fail() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_spec_test(
+    run_spec_test_with_path(
         &["unified-test-format", "valid-pass"],
         run_unified_format_test,
     )
@@ -142,11 +150,13 @@ async fn invalid() {
             .iter()
             .any(|skip| *skip == test_file_str)
         {
-            log_uncaptured(format!("Skipping {}", test_file_str));
+            file_level_log(format!("Skipping {}", test_file_str));
             continue;
         }
         let path = path.join(&test_file_path);
         let path_display = path.display().to_string();
+
+        file_level_log(format!("Attempting to parse {}", path_display));
 
         let json: serde_json::Value =
             serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();

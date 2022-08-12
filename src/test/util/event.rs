@@ -55,8 +55,8 @@ use crate::{
     test::{spec::ExpectedEventType, LOCK},
 };
 
-pub type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
-pub type CmapEvent = crate::cmap::test::event::Event;
+pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
+pub(crate) type CmapEvent = crate::cmap::test::event::Event;
 
 fn add_event_to_queue<T>(event_queue: &EventQueue<T>, event: T) {
     event_queue
@@ -67,14 +67,14 @@ fn add_event_to_queue<T>(event_queue: &EventQueue<T>, event: T) {
 
 #[derive(Clone, Debug, From)]
 #[allow(clippy::large_enum_variant)]
-pub enum Event {
+pub(crate) enum Event {
     Cmap(CmapEvent),
     Command(CommandEvent),
     Sdam(SdamEvent),
 }
 
 impl Event {
-    pub fn unwrap_sdam_event(self) -> SdamEvent {
+    pub(crate) fn unwrap_sdam_event(self) -> SdamEvent {
         if let Event::Sdam(e) = self {
             e
         } else {
@@ -85,7 +85,7 @@ impl Event {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
-pub enum SdamEvent {
+pub(crate) enum SdamEvent {
     ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
     ServerOpening(ServerOpeningEvent),
     ServerClosed(ServerClosedEvent),
@@ -116,7 +116,7 @@ impl SdamEvent {
 #[derive(Clone, Debug, Serialize)]
 #[allow(clippy::large_enum_variant)]
 #[serde(untagged)]
-pub enum CommandEvent {
+pub(crate) enum CommandEvent {
     Started(CommandStartedEvent),
     Succeeded(CommandSucceededEvent),
     Failed(CommandFailedEvent),
@@ -131,7 +131,7 @@ impl CommandEvent {
         }
     }
 
-    pub fn command_name(&self) -> &str {
+    pub(crate) fn command_name(&self) -> &str {
         match self {
             CommandEvent::Started(event) => event.command_name.as_str(),
             CommandEvent::Failed(event) => event.command_name.as_str(),
@@ -147,14 +147,14 @@ impl CommandEvent {
         }
     }
 
-    pub fn as_command_started(&self) -> Option<&CommandStartedEvent> {
+    pub(crate) fn as_command_started(&self) -> Option<&CommandStartedEvent> {
         match self {
             CommandEvent::Started(e) => Some(e),
             _ => None,
         }
     }
 
-    pub fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
+    pub(crate) fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
             CommandEvent::Succeeded(e) => Some(e),
             _ => None,
@@ -163,7 +163,7 @@ impl CommandEvent {
 }
 
 #[derive(Clone, Debug)]
-pub struct EventHandler {
+pub(crate) struct EventHandler {
     command_events: EventQueue<CommandEvent>,
     sdam_events: EventQueue<SdamEvent>,
     cmap_events: EventQueue<CmapEvent>,
@@ -172,7 +172,7 @@ pub struct EventHandler {
 }
 
 impl EventHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let (event_broadcaster, _) = tokio::sync::broadcast::channel(10_000);
         Self {
             command_events: Default::default(),
@@ -189,15 +189,22 @@ impl EventHandler {
             self.event_broadcaster.send(event.into());
     }
 
-    pub fn subscribe(&self) -> EventSubscriber {
+    pub(crate) fn subscribe(&self) -> EventSubscriber {
         EventSubscriber {
             _handler: self,
             receiver: self.event_broadcaster.subscribe(),
         }
     }
 
+    pub(crate) fn broadcaster(&self) -> &tokio::sync::broadcast::Sender<Event> {
+        &self.event_broadcaster
+    }
+
     /// Gets all of the command started events for the specified command names.
-    pub fn get_command_started_events(&self, command_names: &[&str]) -> Vec<CommandStartedEvent> {
+    pub(crate) fn get_command_started_events(
+        &self,
+        command_names: &[&str],
+    ) -> Vec<CommandStartedEvent> {
         let events = self.command_events.read().unwrap();
         events
             .iter()
@@ -215,7 +222,7 @@ impl EventHandler {
     }
 
     /// Gets all of the command started events, excluding configureFailPoint events.
-    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         let events = self.command_events.read().unwrap();
         events
             .iter()
@@ -228,7 +235,11 @@ impl EventHandler {
             .collect()
     }
 
-    pub fn get_filtered_events<F>(&self, event_type: ExpectedEventType, filter: F) -> Vec<Event>
+    pub(crate) fn get_filtered_events<F>(
+        &self,
+        event_type: ExpectedEventType,
+        filter: F,
+    ) -> Vec<Event>
     where
         F: Fn(&Event) -> bool,
     {
@@ -259,7 +270,7 @@ impl EventHandler {
         }
     }
 
-    pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
+    pub(crate) fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
         let mut add_comma = false;
         let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
             event.insert("name", name);
@@ -296,11 +307,11 @@ impl EventHandler {
         }
     }
 
-    pub fn connections_checked_out(&self) -> u32 {
+    pub(crate) fn connections_checked_out(&self) -> u32 {
         *self.connections_checked_out.lock().unwrap()
     }
 
-    pub fn clear_cached_events(&self) {
+    pub(crate) fn clear_cached_events(&self) {
         self.command_events.write().unwrap().clear();
         self.cmap_events.write().unwrap().clear();
         self.sdam_events.write().unwrap().clear();
@@ -454,7 +465,7 @@ impl CommandEventHandler for EventHandler {
 }
 
 #[derive(Debug)]
-pub struct EventSubscriber<'a> {
+pub(crate) struct EventSubscriber<'a> {
     /// A reference to the handler this subscriber is receiving events from.
     /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
     /// events.
@@ -463,7 +474,11 @@ pub struct EventSubscriber<'a> {
 }
 
 impl EventSubscriber<'_> {
-    pub async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<Event>
+    pub(crate) async fn wait_for_event<F>(
+        &mut self,
+        timeout: Duration,
+        mut filter: F,
+    ) -> Option<Event>
     where
         F: FnMut(&Event) -> bool,
     {
@@ -485,7 +500,7 @@ impl EventSubscriber<'_> {
         .flatten()
     }
 
-    pub async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<Event>
+    pub(crate) async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<Event>
     where
         F: FnMut(&Event) -> bool,
     {
@@ -498,7 +513,7 @@ impl EventSubscriber<'_> {
 }
 
 #[derive(Clone, Debug)]
-pub struct EventClient {
+pub(crate) struct EventClient {
     client: TestClient,
     pub(crate) handler: Arc<EventHandler>,
 }
@@ -518,7 +533,7 @@ impl std::ops::DerefMut for EventClient {
 }
 
 impl EventClient {
-    pub async fn new() -> Self {
+    pub(crate) async fn new() -> Self {
         EventClient::with_options(None).await
     }
 
@@ -535,11 +550,11 @@ impl EventClient {
         Self { client, handler }
     }
 
-    pub async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
+    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
         Self::with_options_and_handler(options, None).await
     }
 
-    pub async fn with_additional_options(
+    pub(crate) async fn with_additional_options(
         options: impl Into<Option<ClientOptions>>,
         heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
@@ -558,7 +573,7 @@ impl EventClient {
     /// events before and between them.
     ///
     /// Panics if the command failed or could not be found in the events.
-    pub fn get_successful_command_execution(
+    pub(crate) fn get_successful_command_execution(
         &self,
         command_name: &str,
     ) -> (CommandStartedEvent, CommandSucceededEvent) {
@@ -595,16 +610,19 @@ impl EventClient {
     }
 
     /// Gets all of the command started events for the specified command names.
-    pub fn get_command_started_events(&self, command_names: &[&str]) -> Vec<CommandStartedEvent> {
+    pub(crate) fn get_command_started_events(
+        &self,
+        command_names: &[&str],
+    ) -> Vec<CommandStartedEvent> {
         self.handler.get_command_started_events(command_names)
     }
 
     /// Gets all command started events, excluding configureFailPoint events.
-    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.handler.get_all_command_started_events()
     }
 
-    pub fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
+    pub(crate) fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
         self.handler
             .command_events
             .write()
@@ -615,7 +633,7 @@ impl EventClient {
             .collect()
     }
 
-    pub fn count_pool_cleared_events(&self) -> usize {
+    pub(crate) fn count_pool_cleared_events(&self) -> usize {
         let mut out = 0;
         for (event, _) in self.handler.cmap_events.read().unwrap().iter() {
             if matches!(event, CmapEvent::PoolCleared(_)) {
@@ -626,11 +644,11 @@ impl EventClient {
     }
 
     #[allow(dead_code)]
-    pub fn subscribe_to_events(&self) -> EventSubscriber<'_> {
+    pub(crate) fn subscribe_to_events(&self) -> EventSubscriber<'_> {
         self.handler.subscribe()
     }
 
-    pub fn clear_cached_events(&self) {
+    pub(crate) fn clear_cached_events(&self) {
         self.handler.clear_cached_events()
     }
 }

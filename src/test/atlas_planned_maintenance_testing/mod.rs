@@ -22,6 +22,8 @@ use crate::{
 
 use json_models::{Events, Results};
 
+use super::spec::unified_runner::EntityMap;
+
 #[test]
 fn get_exe_name() {
     let mut file = File::create("exe_name.txt").expect("Failed to create file");
@@ -51,7 +53,8 @@ async fn workload_executor() {
     let mut test_runner = TestRunner::new_with_connection_string(&connection_string).await;
 
     let execution_errors = execute_workload(&mut test_runner, workload).await;
-    write_json(&mut test_runner, execution_errors);
+    let mut entities = test_runner.entities.write().await;
+    write_json(&mut entities, execution_errors);
 }
 
 async fn execute_workload(test_runner: &mut TestRunner, workload: Value) -> Vec<Bson> {
@@ -62,7 +65,7 @@ async fn execute_workload(test_runner: &mut TestRunner, workload: Value) -> Vec<
 
     log_uncaptured("Running planned maintenance tests");
 
-    if AssertUnwindSafe(test_runner.run_test(test_file, |_| true))
+    if AssertUnwindSafe(test_runner.run_test(None, test_file, |_| true))
         .catch_unwind()
         .await
         .is_err()
@@ -81,27 +84,25 @@ async fn execute_workload(test_runner: &mut TestRunner, workload: Value) -> Vec<
     execution_errors
 }
 
-fn write_json(test_runner: &mut TestRunner, mut errors: Vec<Bson>) {
+fn write_json(entities: &mut EntityMap, mut errors: Vec<Bson>) {
     log_uncaptured("Writing planned maintenance test results to files");
 
     let mut events = Events::new_empty();
-    if let Some(Entity::Bson(Bson::Array(mut operation_errors))) =
-        test_runner.entities.remove("errors")
-    {
+    if let Some(Entity::Bson(Bson::Array(mut operation_errors))) = entities.remove("errors") {
         errors.append(&mut operation_errors);
     }
     events.errors = errors;
-    if let Some(Entity::Bson(Bson::Array(failures))) = test_runner.entities.remove("failures") {
+    if let Some(Entity::Bson(Bson::Array(failures))) = entities.remove("failures") {
         events.failures = failures;
     }
 
     let mut results = Results::new_empty();
     results.num_errors = events.errors.len().into();
     results.num_failures = events.failures.len().into();
-    if let Some(Entity::Bson(Bson::Int64(iterations))) = test_runner.entities.remove("iterations") {
+    if let Some(Entity::Bson(Bson::Int64(iterations))) = entities.remove("iterations") {
         results.num_iterations = iterations.into();
     }
-    if let Some(Entity::Bson(Bson::Int64(successes))) = test_runner.entities.remove("successes") {
+    if let Some(Entity::Bson(Bson::Int64(successes))) = entities.remove("successes") {
         results.num_successes = successes.into();
     }
 
@@ -120,7 +121,20 @@ fn write_json(test_runner: &mut TestRunner, mut errors: Vec<Bson>) {
     // The events key is expected to be present regardless of whether storeEventsAsEntities was
     // defined.
     write!(&mut writer, ",\"events\":[").unwrap();
-    test_runner.write_events_list_to_file("events", &mut writer);
+    let event_list_entity = match entities.get("events") {
+        Some(entity) => entity.as_event_list().to_owned(),
+        None => return,
+    };
+    let client = entities
+        .get(&event_list_entity.client_id)
+        .unwrap()
+        .as_client();
+    let names: Vec<&str> = event_list_entity
+        .event_names
+        .iter()
+        .map(String::as_ref)
+        .collect();
+    client.write_events_list_to_file(&names, &mut writer);
     write!(&mut writer, "]}}").unwrap();
 
     let mut results_path = PathBuf::from(&path);

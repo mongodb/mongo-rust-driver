@@ -3,12 +3,16 @@ pub mod event;
 pub(crate) mod options;
 pub mod session;
 
+#[cfg(test)]
+use std::collections::VecDeque;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
+#[cfg(test)]
+use bson::RawDocumentBuf;
 use bson::{Document, Timestamp};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Stream};
@@ -166,6 +170,11 @@ where
     #[cfg(test)]
     pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
         self.cursor.set_kill_watcher(tx);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
+        self.cursor.current_batch()
     }
 }
 
