@@ -15,7 +15,8 @@ use crate::{
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     runtime::AsyncStream,
-    Client, Namespace,
+    Client,
+    Namespace,
 };
 
 use super::options::KmsProvidersTlsOptions;
@@ -53,11 +54,7 @@ impl CryptExecutor {
         })
     }
 
-    pub(crate) async fn run_ctx(
-        &self,
-        ctx: Ctx,
-        db: Option<&str>,
-    ) -> Result<RawDocumentBuf> {
+    pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
         // thread for crypto finalization.  An `Option` would also work here, but `Result` means we
@@ -74,8 +71,8 @@ impl CryptExecutor {
                         .as_ref()
                         .and_then(|w| w.upgrade())
                         .ok_or_else(|| {
-                            Error::internal("metadata_client required for NeedMongoCollinfo state")
-                        })?;
+                        Error::internal("metadata_client required for NeedMongoCollinfo state")
+                    })?;
                     let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);

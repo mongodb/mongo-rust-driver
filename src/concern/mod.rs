@@ -31,7 +31,9 @@ pub struct ReadConcern {
 
 impl ReadConcern {
     // TODO(aegnor): consts for other levels
-    pub const MAJORITY: ReadConcern = ReadConcern { level: ReadConcernLevel::Majority };
+    pub const MAJORITY: ReadConcern = ReadConcern {
+        level: ReadConcernLevel::Majority,
+    };
 }
 
 /// An internal-only read concern type that allows the omission of a "level" as well as
@@ -226,9 +228,16 @@ pub struct WriteConcern {
 
 impl WriteConcern {
     // Can't use `Default::default()` in const contexts yet :(
-    const DEFAULT: WriteConcern = WriteConcern { w: None, w_timeout: None, journal: None };
+    const DEFAULT: WriteConcern = WriteConcern {
+        w: None,
+        w_timeout: None,
+        journal: None,
+    };
     // TODO(aegnor): consts for other acknowledgements
-    pub const MAJORITY: WriteConcern = WriteConcern { w: Some(Acknowledgment::Majority), ..WriteConcern::DEFAULT };
+    pub const MAJORITY: WriteConcern = WriteConcern {
+        w: Some(Acknowledgment::Majority),
+        ..WriteConcern::DEFAULT
+    };
 }
 
 /// The type of the `w` field in a [`WriteConcern`](struct.WriteConcern.html).
