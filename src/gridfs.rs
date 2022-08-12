@@ -7,6 +7,7 @@ use crate::{
     coll::options::{
         DeleteOptions,
         DropCollectionOptions,
+        FindOneAndDeleteOptions,
         InsertOneOptions,
         UpdateModifications,
         UpdateOptions,
@@ -25,8 +26,8 @@ use crate::{
 use tokio::io::{AsyncWriteExt, ReadBuf};
 
 use bson::{doc, oid::ObjectId, spec::BinarySubtype, Binary, Bson, DateTime, Document};
-use futures_util;
 use serde::{Deserialize, Serialize};
+use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 
 pub const DEFAULT_BUCKET_NAME: &str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
@@ -260,92 +261,8 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `tokio` runtime.
+    /// `tokio` crate's `AsyncRead` trait for the `source`.
     pub async fn upload_from_tokio_reader_with_id<T>(
-        &self,
-        files_id: Bson,
-        filename: String,
-        source: &mut T,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<()> 
-    where
-        T: tokio::io::AsyncRead + std::marker::Unpin
-    {
-        use tokio::io::AsyncReadExt;
-
-        self.check_or_create_indexes().await?;
-
-        let mut options: GridFsUploadOptions = options.into().unwrap_or_default();
-        options.chunk_size_bytes = options
-            .chunk_size_bytes
-            .or_else(|| Some(self.chunk_size_bytes()));
-        options.metadata = options.metadata.or(None);
-
-        let chunk_size = options.chunk_size_bytes.unwrap();
-        let mut length = 0;
-        let mut n = 0;
-        // Get chunks collection
-        let chunks = self.chunks();
-
-        let insert_options = InsertOneOptions::builder()
-            .write_concern(self.write_concern().cloned())
-            .build();
-
-        'outer: loop {
-            let mut buf = vec![0u8; chunk_size as usize];
-            let mut curr_length = 0usize;
-            '_inner: while curr_length < chunk_size as usize {
-                let bytes_read = match source.read(&mut buf[curr_length..]).await {
-                    Ok(num) => num,
-                    Err(e) => {
-                        // abort the upload by cleaning up any uploaded chunks
-                        let delete_options = DeleteOptions::builder()
-                            .write_concern(self.write_concern().cloned())
-                            .build();
-                        chunks
-                            .delete_many(doc! { "files_id": &files_id }, delete_options)
-                            .await?;
-                        return Err(ErrorKind::Io(Arc::new(e)).into());
-                    }
-                };
-                curr_length += bytes_read;
-                if bytes_read == 0 {
-                    break 'outer;
-                }
-            }
-            if curr_length == 0 {
-                break;
-            }
-            let chunk = Chunk {
-                id: ObjectId::new(),
-                files_id: files_id.clone(),
-                n,
-                data: Binary {
-                    bytes: buf,
-                    subtype: BinarySubtype::Generic,
-                },
-            };
-            // Put chunk in chunks collection.
-            chunks.insert_one(chunk, insert_options.clone()).await?;
-            length += curr_length;
-            n += 1;
-        }
-
-        let file = FilesCollectionDocument {
-            id: Bson::ObjectId(ObjectId::new()),
-            length: length as u64,
-            chunk_size,
-            upload_date: DateTime::now(),
-            filename,
-            metadata: options.metadata,
-        };
-        self.files().insert_one(file, insert_options).await?;
-        Ok(())
-    }
-
-    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `futures` crate.
-    pub async fn upload_from_futures_0_3_reader_with_id<T>(
         &self,
         files_id: Bson,
         filename: &str,
@@ -353,9 +270,12 @@ impl GridFsBucket {
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
     where
-        T: futures_util::io::AsyncRead + std::marker::Unpin
+        T: tokio::io::AsyncRead + std::marker::Unpin,
     {
-        use futures_util::AsyncReadExt;
+        use tokio::io::AsyncReadExt;
+
+        self.check_or_create_indexes().await?;
+
         let mut options: GridFsUploadOptions = options.into().unwrap_or_default();
         options.chunk_size_bytes = options
             .chunk_size_bytes
@@ -424,16 +344,32 @@ impl GridFsBucket {
         Ok(())
     }
 
-    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `tokio` runtime.
-    pub async fn upload_from_tokio_reader<T>(
+    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
+    /// `futures-0.3` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_futures_0_3_reader_with_id<T>(
         &self,
-        filename: String,
+        files_id: Bson,
+        filename: &str,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
     where
-        T: tokio::io::AsyncRead + std::marker::Unpin
+        T: futures_util::io::AsyncRead + std::marker::Unpin,
+    {
+        self.upload_from_tokio_reader_with_id(files_id, filename, &mut source.compat(), options)
+            .await
+    }
+
+    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
+    /// the file id. Uses the `tokio` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_tokio_reader<T>(
+        &self,
+        filename: &str,
+        source: &mut T,
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) -> Result<()>
+    where
+        T: tokio::io::AsyncRead + std::marker::Unpin,
     {
         self.upload_from_tokio_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
@@ -445,15 +381,15 @@ impl GridFsBucket {
     }
 
     /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `futures` crate.
-    pub async fn upload_from_futures_0_3_reader<T> (
+    /// the file id. Uses the `futures-0.3` crate's `AsyncRead` trait for the `source`.
+    pub async fn upload_from_futures_0_3_reader<T>(
         &self,
         filename: &str,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<()> 
+    ) -> Result<()>
     where
-        T: futures_util::io::AsyncRead + std::marker::Unpin
+        T: futures_util::io::AsyncRead + std::marker::Unpin,
     {
         self.upload_from_futures_0_3_reader_with_id(
             Bson::ObjectId(ObjectId::new()),
@@ -548,36 +484,14 @@ impl GridFsBucket {
         })
     }
 
-    pub async fn download_to_common_writer(
+    pub async fn download_to_tokio_writer_common<T>(
         &self,
-        id: Bson,
-        destination: impl tokio::io::AsyncWrite,
-    ) -> Result<()> {
-        todo!()
-    }
-
-    /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the destination [`GridFsDownloadStream`]. Uses the `tokio` runtime.
-    pub async fn download_to_tokio_writer<T: tokio::io::AsyncWrite + std::marker::Unpin>(
-        &self,
-        id: Bson,
+        file: FilesCollectionDocument,
         destination: &mut T,
-    ) -> Result<()> {
-        let options = FindOneOptions::builder()
-            .read_concern(self.read_concern().cloned())
-            .selection_criteria(self.selection_criteria().cloned())
-            .build();
-
-        let file = match self.files().find_one(doc! { "_id": &id }, options).await? {
-            Some(fcd) => fcd,
-            None => {
-                return Err(ErrorKind::InvalidArgument {
-                    message: format!("couldn't find file with id {}", &id),
-                }
-                .into());
-            }
-        };
-
+    ) -> Result<()>
+    where
+        T: tokio::io::AsyncWrite + std::marker::Unpin,
+    {
         if file.length == 0 {
             return Ok(());
         }
@@ -610,43 +524,18 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the destination [`GridFsDownloadStream`]. Uses the `futures` crate.
-    pub async fn download_to_futures_0_3_writer(
-        &self,
-        id: Bson,
-        destination: impl futures_util::io::AsyncWrite,
-    ) {
-        todo!()
-    }
+    /// the contents to the `destination`. Uses the `tokio` crate's `AsyncWrite`
+    /// trait for the `destination`.
+    pub async fn download_to_tokio_writer<T>(&self, id: Bson, destination: &mut T) -> Result<()>
+    where
+        T: tokio::io::AsyncWrite + std::marker::Unpin,
+    {
+        let options = FindOneOptions::builder()
+            .read_concern(self.read_concern().cloned())
+            .selection_criteria(self.selection_criteria().cloned())
+            .build();
 
-    /// Downloads the contents of the stored file specified by `filename` and by
-    /// the revision in `options` and writes the contents to the destination
-    /// [`GridFsStream`]. Uses the `tokio` runtime.
-    pub async fn download_to_tokio_writer_by_name(
-        &self,
-        filename: String,
-        destination: impl tokio::io::AsyncWrite,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) {
-        todo!()
-    }
-
-    /// Downloads the contents of the stored file specified by `filename` and by
-    /// the revision in `options` and writes the contents to the destination
-    /// [`GridFsStream`]. Uses the `futures` crate.
-    pub async fn download_to_futures_0_3_writer_by_name(
-        &self,
-        filename: String,
-        destination: impl futures_util::io::AsyncWrite,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) {
-        todo!()
-    }
-
-    /// Given an `id`, deletes the stored file's files collection document and
-    /// associated chunks from a [`GridFsBucket`].
-    pub async fn delete(&self, id: Bson) -> Result<()> {
-        let file = match self.files().find_one(doc! { "_id": &id }, None).await? {
+        let file = match self.files().find_one(doc! { "_id": &id }, options).await? {
             Some(fcd) => fcd,
             None => {
                 return Err(ErrorKind::InvalidArgument {
@@ -655,14 +544,115 @@ impl GridFsBucket {
                 .into());
             }
         };
+        self.download_to_tokio_writer_common(file, destination)
+            .await
+    }
 
+    /// Downloads the contents of the stored file specified by `id` and writes
+    /// the contents to the `destination`. Uses the `futures-0.3` crate's `AsyncWrite`
+    /// trait for the `destination`.
+    pub async fn download_to_futures_0_3_writer<T>(
+        &self,
+        id: Bson,
+        destination: &mut T,
+    ) -> Result<()>
+    where
+        T: futures_util::io::AsyncWrite + std::marker::Unpin,
+    {
+        self.download_to_tokio_writer(id, &mut destination.compat_write())
+            .await
+    }
+
+    /// Downloads the contents of the stored file specified by `filename` and by
+    /// the revision in `options` and writes the contents to the `destination`. Uses the
+    /// `tokio` crate's `AsyncWrite` trait for the `destination`.
+    pub async fn download_to_tokio_writer_by_name<T>(
+        &self,
+        filename: &str,
+        destination: &mut T,
+        options: impl Into<Option<GridFsDownloadByNameOptions>>,
+    ) -> Result<()>
+    where
+        T: tokio::io::AsyncWrite + std::marker::Unpin,
+    {
+        let mut sort = doc! { "uploadDate": -1 };
+        let mut skip = 0;
+        if let Some(opts) = options.into() {
+            if let Some(rev) = opts.revision {
+                if rev >= 0 {
+                    sort = doc! { "uploadDate": 1 };
+                    skip = rev as u64;
+                } else {
+                    skip = (-rev - 1) as u64;
+                }
+            }
+        }
+        let options = FindOneOptions::builder()
+            .sort(sort)
+            .skip(skip)
+            .read_concern(self.read_concern().cloned())
+            .selection_criteria(self.selection_criteria().cloned())
+            .build();
+        let file = match self
+            .files()
+            .find_one(doc! { "filename": filename }, options)
+            .await?
+        {
+            Some(fcd) => fcd,
+            None => {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!("couldn't find file with name {}", &filename),
+                }
+                .into());
+            }
+        };
+        self.download_to_tokio_writer_common(file, destination)
+            .await
+    }
+
+    /// Downloads the contents of the stored file specified by `filename` and by
+    /// the revision in `options` and writes the contents to the `destination`. Uses the
+    /// `futures-0.3` crate's `AsyncWrite` trait for the `destination`.
+    pub async fn download_to_futures_0_3_writer_by_name<T>(
+        &self,
+        filename: &str,
+        destination: &mut T,
+        options: impl Into<Option<GridFsDownloadByNameOptions>>,
+    ) -> Result<()>
+    where
+        T: futures_util::io::AsyncWrite + std::marker::Unpin,
+    {
+        self.download_to_tokio_writer_by_name(filename, &mut destination.compat_write(), options)
+            .await
+    }
+
+    /// Given an `id`, deletes the stored file's files collection document and
+    /// associated chunks from a [`GridFsBucket`].
+    pub async fn delete(&self, id: Bson) -> Result<()> {
         let options = DeleteOptions::builder()
             .write_concern(self.write_concern().cloned())
             .build();
 
+        if self
+            .files()
+            .delete_one(doc! { "_id": &id }, options.clone())
+            .await?
+            .deleted_count
+            != 1
+        {
+            self.chunks()
+                .delete_many(doc! { "files_id": &id }, options)
+                .await?;
+            return Err(ErrorKind::InvalidArgument {
+                message: format!("couldn't find file with id {}", &id),
+            }
+            .into());
+        };
+
         self.chunks()
             .delete_many(doc! { "files_id": id }, options)
             .await?;
+
         Ok(())
     }
 
