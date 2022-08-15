@@ -5,6 +5,8 @@ use crate::{
 
 use super::Operation;
 
+/// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
+/// unvalidated as a `RawCommandResponse`.
 pub(crate) struct RawOutput<Op>(pub(crate) Op);
 
 impl<Op: Operation> Operation for RawOutput<Op> {
