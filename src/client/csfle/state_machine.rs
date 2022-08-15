@@ -84,8 +84,8 @@ impl Client {
                         .database(&kv_ns.db)
                         .collection::<RawDocumentBuf>(&kv_ns.coll);
                     let mut cursor = kv_coll.find(filter, None).await?;
-                    while let Some(result) = cursor.try_next().await? {
-                        ctx.mongo_feed(&result)?
+                    while cursor.advance().await? {
+                        ctx.mongo_feed(cursor.current())?;
                     }
                     ctx.mongo_done()?;
                 }
