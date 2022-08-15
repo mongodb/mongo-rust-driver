@@ -7,20 +7,19 @@ use bson::doc;
 use futures_util::stream::TryStreamExt;
 
 use crate::{
-    bson::{Bson, Document, doc},
+    bson::{Bson, Document},
     change_stream::{
         event::ChangeStreamEvent,
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
     },
-    IndexModel,
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-    gridfs::{options::GridFsBucketOptions, GridFsBucket, FilesCollectionDocument, Chunk},
+    gridfs::{options::GridFsBucketOptions, GridFsBucket},
     operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,

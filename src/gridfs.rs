@@ -137,6 +137,37 @@ pub struct GridFsDownloadStream {
     pub cursor: Cursor<Chunk>,
 }
 
+impl futures_util::AsyncWrite for GridFsUploadStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<core::result::Result<usize, futures_util::io::Error>> {
+        todo!()
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<core::result::Result<(), futures_util::io::Error>> {
+        todo!()
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<core::result::Result<(), futures_util::io::Error>> {
+        todo!()
+    }
+}
+
+impl GridFsDownloadStream {
+    /// Gets the file `id` for the stream.
+    pub fn files_id(&self) -> &Bson {
+        &self.files_id
+    }
+}
+
 impl tokio::io::AsyncRead for GridFsDownloadStream {
     fn poll_read(
         self: Pin<&mut Self>,
