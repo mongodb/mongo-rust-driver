@@ -186,10 +186,7 @@ impl Topology {
                     average_round_trip_time: Some(Duration::from_nanos(0)),
                     ..ServerDescription::new(server_address.clone(), None)
                 };
-                new_state
-                    .description
-                    .update(new_desc)
-                    .map_err(Error::internal)?;
+                new_state.description.update(new_desc)?;
             }
 
             worker.process_topology_diff(&old_description, &new_state.description);
@@ -477,23 +474,28 @@ impl TopologyWorker {
         let old_description = latest_state.description.clone();
 
         if let Some(expected_name) = &self.options.repl_set_name {
-            let got_name = sd.set_name();
-            if latest_state.description.topology_type() == TopologyType::Single
-                && got_name.as_ref().map(|opt| opt.as_ref()) != Ok(Some(expected_name))
-            {
-                let got_display = match got_name {
-                    Ok(Some(s)) => format!("{:?}", s),
-                    Ok(None) => "<none>".to_string(),
-                    Err(s) => format!("<error: {}>", s),
-                };
-                // Mark server as unknown.
-                sd = ServerDescription::new(
-                    sd.address,
-                    Some(Err(format!(
-                        "Connection string replicaSet name {:?} does not match actual name {}",
-                        expected_name, got_display,
-                    ))),
-                );
+            if sd.is_available() {
+                let got_name = sd.set_name();
+                if latest_state.description.topology_type() == TopologyType::Single
+                    && !matches!(
+                        got_name.as_ref().map(|opt| opt.as_ref()),
+                        Ok(Some(name)) if name == expected_name
+                    )
+                {
+                    let got_display = match got_name {
+                        Ok(Some(s)) => format!("{:?}", s),
+                        Ok(None) => "<none>".to_string(),
+                        Err(s) => format!("<error: {}>", s),
+                    };
+                    // Mark server as unknown.
+                    sd = ServerDescription::new(
+                        sd.address,
+                        Some(Err(Error::invalid_argument(format!(
+                            "Connection string replicaSet name {:?} does not match actual name {}",
+                            expected_name, got_display,
+                        )))),
+                    );
+                }
             }
         }
 
@@ -513,17 +515,17 @@ impl TopologyWorker {
         let topology_changed =
             self.process_topology_diff(&old_description, &latest_state.description);
 
-        if topology_changed {
-            if server_type.is_data_bearing()
+        if topology_changed
+            && (server_type.is_data_bearing()
                 || (server_type != ServerType::Unknown
-                    && latest_state.description.topology_type() == TopologyType::Single)
-            {
-                if let Some(s) = latest_state.servers.get(&server_address) {
-                    s.pool.mark_as_ready().await;
-                }
+                    && latest_state.description.topology_type() == TopologyType::Single))
+        {
+            if let Some(s) = latest_state.servers.get(&server_address) {
+                s.pool.mark_as_ready().await;
             }
-            self.publisher.publish_new_state(latest_state)
         }
+
+        self.publisher.publish_new_state(latest_state);
 
         topology_changed
     }
@@ -578,7 +580,7 @@ impl TopologyWorker {
 
     /// Mark the server at the given address as Unknown using the provided error as the cause.
     async fn mark_server_as_unknown(&mut self, address: ServerAddress, error: Error) -> bool {
-        let description = ServerDescription::new(address, Some(Err(error.to_string())));
+        let description = ServerDescription::new(address, Some(Err(error)));
         self.update_server(description).await
     }
 

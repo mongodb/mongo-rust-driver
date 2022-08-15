@@ -397,6 +397,13 @@ impl From<std::io::ErrorKind> for ErrorKind {
     }
 }
 
+#[cfg(feature = "csfle")]
+impl From<mongocrypt::error::Error> for ErrorKind {
+    fn from(err: mongocrypt::error::Error) -> Self {
+        Self::Csfle(err)
+    }
+}
+
 /// The types of errors that can occur.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Error)]
@@ -483,6 +490,11 @@ pub enum ErrorKind {
     /// No resume token was present in a change stream document.
     #[error("Cannot provide resume functionality when the resume token is missing")]
     MissingResumeToken,
+
+    /// An error occurred during encryption or decryption.
+    #[cfg(feature = "csfle")]
+    #[error("An error occurred during client-side encryption: {0}")]
+    Csfle(mongocrypt::error::Error),
 }
 
 impl ErrorKind {

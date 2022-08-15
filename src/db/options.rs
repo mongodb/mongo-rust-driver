@@ -88,15 +88,15 @@ pub struct CreateCollectionOptions {
     pub index_option_defaults: Option<IndexOptionDefaults>,
 
     /// An object containing options for creating time series collections. See the [`create`
-    /// command documentation](https://docs.mongodb.com/manual/reference/command/create/) for
+    /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for
     /// supported options, and the [Time Series Collections documentation](
-    /// https://docs.mongodb.com/manual/core/timeseries-collections/) for more information.
+    /// https://www.mongodb.com/docs/manual/core/timeseries-collections/) for more information.
     ///
     /// This feature is only available on server versions 5.0 and above.
     pub timeseries: Option<TimeseriesOptions>,
 
     /// Used to automatically delete documents in time series collections. See the [`create`
-    /// command documentation](https://docs.mongodb.com/manual/reference/command/create/) for more
+    /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for more
     /// information.
     #[serde(
         default,
@@ -110,6 +110,10 @@ pub struct CreateCollectionOptions {
 
     /// Options for clustered collections.
     pub clustered_index: Option<ClusteredIndex>,
+
+    /// Map of encrypted fields for the created collection.
+    #[cfg(feature = "csfle")]
+    pub encrypted_fields: Option<Document>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during

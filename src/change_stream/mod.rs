@@ -3,12 +3,16 @@ pub mod event;
 pub(crate) mod options;
 pub mod session;
 
+#[cfg(test)]
+use std::collections::VecDeque;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
+#[cfg(test)]
+use bson::RawDocumentBuf;
 use bson::{Document, Timestamp};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Stream};
@@ -71,8 +75,8 @@ use crate::{
 /// # }
 /// ```
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/changeStreams) for more
-/// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
+/// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams) for more
+/// details. Also see the documentation on [usage recommendations](https://www.mongodb.com/docs/manual/administration/change-streams-production-recommendations/).
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct ChangeStream<T>
@@ -111,7 +115,7 @@ where
     /// change.
     ///
     /// See the documentation
-    /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
+    /// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<ResumeToken> {
         self.data.resume_token.clone()
@@ -166,6 +170,11 @@ where
     #[cfg(test)]
     pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
         self.cursor.set_kill_watcher(tx);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
+        self.cursor.current_batch()
     }
 }
 

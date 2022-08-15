@@ -43,6 +43,9 @@ use crate::runtime;
 
 pub use resolver_config::ResolverConfig;
 
+#[cfg(feature = "csfle")]
+pub use crate::client::csfle::options::AutoEncryptionOptions;
+
 const DEFAULT_PORT: u16 = 27017;
 
 const URI_OPTIONS: &[&str] = &[
@@ -312,7 +315,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 }
 
 /// Options used to declare a stable server API.  For more information, see the [Stable API](
-/// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
+/// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
@@ -500,7 +503,7 @@ pub struct ClientOptions {
     /// a separate client that declares the appropriate API version.
     ///
     /// For more information, see the [Stable API](
-    /// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
+    /// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
     #[builder(default)]
     pub server_api: Option<ServerApi>,
 
@@ -676,7 +679,7 @@ impl Serialize for ClientOptions {
 
 /// Contains the options that can be set via a MongoDB connection string.
 ///
-/// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+/// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
 #[derive(Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct ConnectionString {
@@ -1000,7 +1003,7 @@ impl ClientOptions {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
     /// part of this method.
     ///
-    /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
     ///
     /// Note that [default_database](ClientOptions::default_database) will be set from
     /// `/defaultauthdb` in connection string.
@@ -1071,7 +1074,7 @@ impl ClientOptions {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
     ///
-    /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
     ///
     /// See the docstring on `ClientOptions::parse` for information on how the various URI options
     /// map to fields on `ClientOptions`.
@@ -2586,7 +2589,7 @@ pub struct SessionOptions {
     pub default_transaction_options: Option<TransactionOptions>,
 
     /// If true, all operations performed in the context of this session
-    /// will be [causally consistent](https://docs.mongodb.com/manual/core/causal-consistency-read-write-concerns/).
+    /// will be [causally consistent](https://www.mongodb.com/docs/manual/core/causal-consistency-read-write-concerns/).
     ///
     /// Defaults to true if [`SessionOptions::snapshot`] is unspecified.
     pub causal_consistency: Option<bool>,

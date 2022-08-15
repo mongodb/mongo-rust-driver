@@ -3,14 +3,19 @@
 
 use std::time::Duration;
 
+use serde::Serialize;
+
 use crate::{
     bson::{oid::ObjectId, Document},
-    cmap::ConnectionInfo,
+    bson_util::serialize_error_as_string,
     error::Error,
 };
 
+pub use crate::cmap::ConnectionInfo;
+
 /// An event that triggers when a database command is initiated.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CommandStartedEvent {
     /// The command being run.
@@ -36,7 +41,8 @@ pub struct CommandStartedEvent {
 }
 
 /// An event that triggers when a database command completes without an error.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CommandSucceededEvent {
     /// The total execution time of the command (including the network round-trip).
@@ -61,7 +67,8 @@ pub struct CommandSucceededEvent {
 }
 
 /// An event that triggers when a command failed to complete successfully.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CommandFailedEvent {
     /// The total execution time of the command (including the network round-trip).
@@ -71,6 +78,7 @@ pub struct CommandFailedEvent {
     pub command_name: String,
 
     /// The error that the driver returned due to the event failing.
+    #[serde(serialize_with = "serialize_error_as_string")]
     pub failure: Error,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the

@@ -112,17 +112,21 @@ Each YAML file has the following keys:
     and "sharded". If this field is omitted, the default is all topologies (i.e.
     ``["single", "replicaset", "sharded"]``).
 
-  - ``serverless``: Optional string. Whether or not the test should be run on
-    serverless instances imitating sharded clusters. Valid values are "require",
-    "forbid", and "allow". If "require", the test MUST only be run on serverless
-    instances. If "forbid", the test MUST NOT be run on serverless instances. If
-    omitted or "allow", this option has no effect.
+  - ``serverless``: (optional): Whether or not the test should be run on Atlas
+    Serverless instances. Valid values are "require", "forbid", and "allow". If
+    "require", the test MUST only be run on Atlas Serverless instances. If
+    "forbid", the test MUST NOT be run on Atlas Serverless instances. If omitted
+    or "allow", this option has no effect.
 
-    The test runner MUST be informed whether or not serverless is being used in
-    order to determine if this requirement is met (e.g. through an environment
-    variable or configuration option). Since the serverless proxy imitates a
-    mongos, the runner is not capable of determining this by issuing a server
-    command such as ``buildInfo`` or ``hello``.
+    The test runner MUST be informed whether or not Atlas Serverless is being
+    used in order to determine if this requirement is met (e.g. through an
+    environment variable or configuration option).
+
+    Note: the Atlas Serverless proxy imitates mongos, so the test runner is not
+    capable of determining if Atlas Serverless is in use by issuing commands
+    such as ``buildInfo`` or ``hello``. Furthermore, connections to Atlas
+    Serverless use a load balancer, so the topology will appear as
+    "load-balanced".
 
 - ``database_name`` and ``collection_name``: The database and collection to use
   for testing.
@@ -138,10 +142,19 @@ Each YAML file has the following keys:
   - ``skipReason``: Optional, string describing why this test should be
     skipped.
 
-  - ``useMultipleMongoses`` (optional): If ``true``, the MongoClient for this
-    test should be initialized with multiple mongos seed addresses. If ``false``
-    or omitted, only a single mongos address should be specified. This field has
-    no effect for non-sharded topologies.
+  - ``useMultipleMongoses`` (optional): If ``true``, and the topology type is
+    ``Sharded``, the MongoClient for this test should be initialized with multiple
+    mongos seed addresses. If ``false`` or omitted, only a single mongos address
+    should be specified.
+
+    If ``true``, the topology type is ``LoadBalanced``, and Atlas Serverless is
+    not being used, the MongoClient for this test should be initialized with the
+    URI of the load balancer fronting multiple servers. If ``false`` or omitted,
+    the MongoClient for this test should be initialized with the URI of the load
+    balancer fronting a single server.
+
+    ``useMultipleMongoses`` only affects ``Sharded`` and ``LoadBalanced``
+    topologies (excluding Atlas Serverless).
 
   - ``clientOptions``: Optional, parameters to pass to MongoClient().
 
@@ -650,6 +663,7 @@ is the only command allowed in a sharded transaction that uses the
 Changelog
 =========
 
+:2022-04-22: Clarifications to ``serverless`` and ``useMultipleMongoses``.
 :2019-05-15: Add operation level ``error`` field to assert any error.
 :2019-03-25: Add workaround for StaleDbVersion on distinct.
 :2019-03-01: Add top-level ``runOn`` field to denote server version and/or

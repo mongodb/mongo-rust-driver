@@ -2,43 +2,47 @@ use crate::{
     bson::Document,
     event::cmap::{ConnectionCheckoutFailedReason, ConnectionClosedReason},
     test::{CmapEvent, CommandEvent, Event},
+    ServerType,
 };
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize)]
 #[serde(untagged, deny_unknown_fields, rename_all = "camelCase")]
-pub enum ExpectedEvent {
+pub(crate) enum ExpectedEvent {
     Cmap(ExpectedCmapEvent),
     Command(ExpectedCommandEvent),
-    Sdam,
+    Sdam(Box<ExpectedSdamEvent>),
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub enum ExpectedCommandEvent {
+pub(crate) enum ExpectedCommandEvent {
     #[serde(rename = "commandStartedEvent", rename_all = "camelCase")]
     Started {
         command_name: Option<String>,
         database_name: Option<String>,
         command: Option<Document>,
         has_service_id: Option<bool>,
+        has_server_connection_id: Option<bool>,
     },
     #[serde(rename = "commandSucceededEvent", rename_all = "camelCase")]
     Succeeded {
         command_name: Option<String>,
         reply: Option<Document>,
         has_service_id: Option<bool>,
+        has_server_connection_id: Option<bool>,
     },
     #[serde(rename = "commandFailedEvent", rename_all = "camelCase")]
     Failed {
         command_name: Option<String>,
         has_service_id: Option<bool>,
+        has_server_connection_id: Option<bool>,
     },
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub enum ExpectedCmapEvent {
+pub(crate) enum ExpectedCmapEvent {
     #[serde(rename = "poolCreatedEvent")]
     PoolCreated {},
     #[serde(rename = "poolReadyEvent")]
@@ -67,8 +71,25 @@ pub enum ExpectedCmapEvent {
     ConnectionCheckedIn {},
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Deserialize)]
-pub enum ObserveEvent {
+#[derive(Debug, Deserialize)]
+pub(crate) enum ExpectedSdamEvent {
+    #[serde(rename = "serverDescriptionChangedEvent", rename_all = "camelCase")]
+    ServerDescriptionChanged {
+        #[allow(unused)]
+        previous_description: Option<TestServerDescription>,
+        new_description: Option<TestServerDescription>,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TestServerDescription {
+    #[serde(rename = "type")]
+    pub(crate) server_type: Option<ServerType>,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize)]
+pub(crate) enum ObserveEvent {
     #[serde(rename = "commandStartedEvent")]
     CommandStarted,
     #[serde(rename = "commandSucceededEvent")]
@@ -97,10 +118,12 @@ pub enum ObserveEvent {
     ConnectionCheckedOut,
     #[serde(rename = "connectionCheckedInEvent")]
     ConnectionCheckedIn,
+    #[serde(rename = "serverDescriptionChangedEvent")]
+    ServerDescriptionChanged,
 }
 
 impl ObserveEvent {
-    pub fn matches(&self, event: &Event) -> bool {
+    pub(crate) fn matches(&self, event: &Event) -> bool {
         #[allow(clippy::match_like_matches_macro)]
         match (self, event) {
             (Self::CommandStarted, Event::Command(CommandEvent::Started(_))) => true,

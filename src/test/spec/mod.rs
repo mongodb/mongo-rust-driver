@@ -16,7 +16,7 @@ mod retryable_reads;
 mod retryable_writes;
 mod sessions;
 mod transactions;
-mod unified_runner;
+pub mod unified_runner;
 mod v2_runner;
 mod versioned_api;
 mod write_error;
@@ -29,7 +29,7 @@ use std::{
     path::PathBuf,
 };
 
-pub use self::{
+pub(crate) use self::{
     unified_runner::{
         merge_uri_options,
         run_unified_format_test,
@@ -84,11 +84,11 @@ where
 
 pub(crate) async fn run_single_test<T, F, G>(path: PathBuf, run_test_file: &F)
 where
-    F: Fn(T) -> G,
+    F: Fn(PathBuf, T) -> G,
     G: Future<Output = ()>,
     T: DeserializeOwned,
 {
-    run_single_test_with_path(path, &|_, t| run_test_file(t)).await
+    run_single_test_with_path(path, run_test_file).await
 }
 
 pub(crate) async fn run_single_test_with_path<T, F, G>(path: PathBuf, run_test_file: &F)
@@ -97,10 +97,8 @@ where
     G: Future<Output = ()>,
     T: DeserializeOwned,
 {
-    let json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap()).unwrap();
-
-    // Printing the name of the test file makes it easier to debug deserialization errors.
-    println!("Running tests from {}", path.display());
+    let json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap())
+        .unwrap_or_else(|err| panic!("{}: {}", path.display(), err));
 
     run_test_file(
         path.clone(),

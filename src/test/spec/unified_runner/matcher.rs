@@ -3,12 +3,19 @@ use bson::Document;
 use crate::{
     bson::{doc, spec::ElementType, Bson},
     bson_util::get_int,
-    test::{CmapEvent, CommandEvent, Event},
+    event::sdam::ServerDescription,
+    test::{CmapEvent, CommandEvent, Event, SdamEvent},
 };
 
-use super::{EntityMap, ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent};
+use super::{
+    test_event::{ExpectedSdamEvent, TestServerDescription},
+    EntityMap,
+    ExpectedCmapEvent,
+    ExpectedCommandEvent,
+    ExpectedEvent,
+};
 
-pub fn results_match(
+pub(crate) fn results_match(
     actual: Option<&Bson>,
     expected: &Bson,
     returns_root_documents: bool,
@@ -17,7 +24,7 @@ pub fn results_match(
     results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
-pub fn events_match(
+pub(crate) fn events_match(
     actual: &Event,
     expected: &ExpectedEvent,
     entities: Option<&EntityMap>,
@@ -27,6 +34,7 @@ pub fn events_match(
             command_events_match(act, exp, entities)
         }
         (Event::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
+        (Event::Sdam(act), ExpectedEvent::Sdam(exp)) => sdam_events_match(act, exp),
         _ => expected_err(actual, expected),
     }
 }
@@ -68,11 +76,16 @@ fn command_events_match(
                 database_name: expected_database_name,
                 command: expected_command,
                 has_service_id: expected_has_service_id,
+                has_server_connection_id: expected_has_server_connection_id,
             },
         ) => {
             match_opt(&actual.command_name, expected_command_name)?;
             match_opt(&actual.db, expected_database_name)?;
             match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(
+                &actual.connection.server_id.is_some(),
+                expected_has_server_connection_id,
+            )?;
             match_results_opt(&actual.command, expected_command, entities)?;
             Ok(())
         }
@@ -82,10 +95,15 @@ fn command_events_match(
                 command_name: expected_command_name,
                 reply: expected_reply,
                 has_service_id: expected_has_service_id,
+                has_server_connection_id: expected_has_server_connection_id,
             },
         ) => {
             match_opt(&actual.command_name, expected_command_name)?;
             match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(
+                &actual.connection.server_id.is_some(),
+                expected_has_server_connection_id,
+            )?;
             match_results_opt(&actual.reply, expected_reply, None)?;
             Ok(())
         }
@@ -94,9 +112,14 @@ fn command_events_match(
             ExpectedCommandEvent::Failed {
                 command_name: expected_command_name,
                 has_service_id: expected_has_service_id,
+                has_server_connection_id: expected_has_server_connection_id,
             },
         ) => {
             match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(
+                &actual.connection.server_id.is_some(),
+                expected_has_server_connection_id,
+            )?;
             match_opt(&actual.command_name, expected_command_name)?;
             Ok(())
         }
@@ -135,6 +158,34 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> Result
         ) => match_opt(&actual.reason, expected_reason),
         (CmapEvent::ConnectionCheckedOut(_), ExpectedCmapEvent::ConnectionCheckedOut {}) => Ok(()),
         (CmapEvent::ConnectionCheckedIn(_), ExpectedCmapEvent::ConnectionCheckedIn {}) => Ok(()),
+        _ => expected_err(actual, expected),
+    }
+}
+
+fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result<(), String> {
+    match (actual, expected) {
+        (
+            SdamEvent::ServerDescriptionChanged(actual),
+            ExpectedSdamEvent::ServerDescriptionChanged {
+                previous_description,
+                new_description,
+            },
+        ) => {
+            let match_sd = |actual: &ServerDescription,
+                            expected: &TestServerDescription|
+             -> std::result::Result<(), String> {
+                match_opt(&actual.server_type(), &expected.server_type)?;
+                Ok(())
+            };
+
+            if let Some(expected_previous_description) = previous_description {
+                match_sd(&actual.previous_description, expected_previous_description)?;
+            }
+            if let Some(expected_new_description) = new_description {
+                match_sd(&actual.new_description, expected_new_description)?;
+            }
+            Ok(())
+        }
         _ => expected_err(actual, expected),
     }
 }

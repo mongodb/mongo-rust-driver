@@ -131,7 +131,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct HelloReply {
     pub server_address: ServerAddress,
     pub command_response: HelloCommandResponse,
@@ -142,7 +142,7 @@ pub(crate) struct HelloReply {
 
 /// The response to a `hello` command.
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/reference/command/hello/) for more details.
+/// See the documentation [here](https://www.mongodb.com/docs/manual/reference/command/hello/) for more details.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HelloCommandResponse {
@@ -237,6 +237,10 @@ pub(crate) struct HelloCommandResponse {
 
     /// The maximum permitted size of a BSON wire protocol message.
     pub max_message_size_bytes: i32,
+
+    /// The server-generated ID for the connection the "hello" command was run on.
+    /// Present on server versions 4.2+.
+    pub connection_id: Option<i32>,
 }
 
 impl PartialEq for HelloCommandResponse {

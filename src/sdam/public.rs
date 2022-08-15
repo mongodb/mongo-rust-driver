@@ -1,8 +1,11 @@
 use std::{borrow::Cow, fmt, time::Duration};
 
+use serde::Serialize;
+
 pub use crate::sdam::description::{server::ServerType, topology::TopologyType};
 use crate::{
     bson::DateTime,
+    error::Error,
     hello::HelloCommandResponse,
     options::ServerAddress,
     sdam::ServerDescription,
@@ -14,6 +17,15 @@ use crate::{
 #[derive(Clone)]
 pub struct ServerInfo<'a> {
     pub(crate) description: Cow<'a, ServerDescription>,
+}
+
+impl<'a> Serialize for ServerInfo<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.description.serialize(serializer)
+    }
 }
 
 impl<'a> ServerInfo<'a> {
@@ -88,6 +100,15 @@ impl<'a> ServerInfo<'a> {
     /// Gets the tags associated with the server.
     pub fn tags(&self) -> Option<&TagSet> {
         self.command_response_getter(|r| r.tags.as_ref())
+    }
+
+    /// Gets the error that caused the server's state to be transitioned to Unknown, if any.
+    ///
+    /// When the driver encounters certain errors during operation execution or server monitoring,
+    /// it transitions the affected server's state to Unknown, rendering the server unusable for
+    /// future operations until it is confirmed to be in healthy state again.
+    pub fn error(&self) -> Option<&Error> {
+        self.description.reply.as_ref().err()
     }
 }
 

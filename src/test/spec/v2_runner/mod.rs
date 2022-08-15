@@ -1,6 +1,6 @@
-pub mod operation;
-pub mod test_event;
-pub mod test_file;
+pub(crate) mod operation;
+pub(crate) mod test_event;
+pub(crate) mod test_file;
 
 use std::{ops::Deref, sync::Arc, time::Duration};
 
@@ -38,7 +38,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "mapReduce",
 ];
 
-pub async fn run_v2_test(test_file: TestFile) {
+pub(crate) async fn run_v2_test(test_file: TestFile) {
     let internal_client = TestClient::new().await;
 
     if let Some(requirements) = test_file.run_on {

@@ -1,5 +1,7 @@
 use std::{collections::HashMap, fmt};
 
+use serde::Serialize;
+
 use crate::{
     bson::oid::ObjectId,
     client::options::ServerAddress,
@@ -12,6 +14,15 @@ use crate::{
 #[derive(Clone)]
 pub struct TopologyDescription {
     pub(crate) description: crate::sdam::TopologyDescription,
+}
+
+impl Serialize for TopologyDescription {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.description.serialize(serializer)
+    }
 }
 
 impl From<crate::sdam::TopologyDescription> for TopologyDescription {

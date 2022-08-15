@@ -126,6 +126,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             compressors: None,
             hello_ok: test.hello_ok,
             max_message_size_bytes: 48 * 1024 * 1024,
+            connection_id: None,
         }
     }
 }
@@ -646,7 +647,7 @@ async fn heartbeat_events() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    if !client.supports_fail_command_appname() {
+    if !client.supports_fail_command_appname_initial_handshake() {
         return;
     }
 

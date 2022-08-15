@@ -1,5 +1,6 @@
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod atlas_connectivity;
+mod atlas_planned_maintenance_testing;
 mod auth_aws;
 mod change_stream;
 mod client;
@@ -9,7 +10,7 @@ mod db;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod documentation_examples;
 mod index_management;
-mod spec;
+pub mod spec;
 mod util;
 
 pub(crate) use self::{

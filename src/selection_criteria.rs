@@ -20,7 +20,7 @@ pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
     /// staleness, and server tags.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/core/read-preference/) for more details.
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/core/read-preference/) for more details.
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
@@ -110,7 +110,7 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 /// eligible for the operation. The max staleness value maps to the `maxStalenessSeconds` MongoDB
 /// option and will be sent to the server as an integer number of seconds.
 ///
-/// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
+/// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference) for more details.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReadPreference {
@@ -248,7 +248,7 @@ pub struct ReadPreferenceOptions {
     /// servers that are at least version 4.4. Note that hedged reads are automatically enabled for
     /// read preference mode "nearest".
     ///
-    /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
+    /// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference-hedge-option/) for more details.
     pub hedge: Option<HedgedReadOptions>,
 }
 
@@ -266,7 +266,7 @@ impl ReadPreferenceOptions {
 
 /// Specifies hedging behavior for reads.
 ///
-/// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
+/// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference-hedge-option/) for more details.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[non_exhaustive]
 pub struct HedgedReadOptions {
@@ -386,7 +386,7 @@ impl ReadPreference {
     }
 }
 
-/// A read preference tag set. See the documentation [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/) for more details.
+/// A read preference tag set. See the documentation [here](https://www.mongodb.com/docs/manual/tutorial/configure-replica-set-tag-sets/) for more details.
 pub type TagSet = HashMap<String, String>;
 
 #[cfg(test)]

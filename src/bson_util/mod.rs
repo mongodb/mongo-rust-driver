@@ -9,7 +9,7 @@ use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
 
@@ -215,6 +215,24 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
 
     Ok(bytes)
+}
+
+/// Serializes an Error as a string.
+pub(crate) fn serialize_error_as_string<S: Serializer>(
+    val: &Error,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(&val.to_string())
+}
+
+/// Serializes a Result, serializing the error value as a string if present.
+pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
+    val: &Result<T>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    val.as_ref()
+        .map_err(|e| e.to_string())
+        .serialize(serializer)
 }
 
 #[cfg(test)]

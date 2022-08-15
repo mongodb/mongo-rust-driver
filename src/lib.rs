@@ -8,7 +8,7 @@
 //! # Installation
 //!
 //! ## Requirements
-//! - Rust 1.53+
+//! - Rust 1.56+
 //! - MongoDB 3.6+
 //!
 //! ## Importing
@@ -16,7 +16,7 @@
 //! your application, simply add it to your project's `Cargo.toml`.
 //! ```toml
 //! [dependencies]
-//! mongodb = "2.3.0-beta"
+//! mongodb = "2.4.0"
 //! ```
 //!
 //! ### Configuring the async runtime
@@ -30,7 +30,7 @@
 //! add the following to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.3.0-beta"
+//! version = "2.4.0"
 //! default-features = false
 //! features = ["async-std-runtime"]
 //! ```
@@ -40,7 +40,7 @@
 //! feature to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.3.0-beta"
+//! version = "2.4.0"
 //! features = ["tokio-sync"]
 //! ```
 //! Using the `"sync"` feature also requires using `default-features = false`.
@@ -57,6 +57,7 @@
 //! | `tokio-sync`         | Expose the synchronous API (`mongodb::sync`), using a tokio backend. Cannot be used with the `async-std-runtime` feature flag.        | `tokio` 1.0 with the `full` feature | no      |
 //! | `aws-auth`           | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
 //! | `bson-uuid-0_8`      | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
+//! | `bson-uuid-1`        | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
 //! | `bson-chrono-0_4`    | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
 //! | `bson-serde_with`    | Enable support for the [`serde_with`](docs.rs/serde_with/latest) crate in the public API of the re-exported `bson` crate.             | `serde_with` 1.0                    | no      |
 //! | `zlib-compression`   | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                              | `flate2` 1.0                        | no      |
@@ -283,7 +284,7 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.53.0. This will be rarely be increased, and if it ever is,
+//! The MSRV for this crate is currently 1.56.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
@@ -301,7 +302,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/2.3.0-beta")]
+#![doc(html_root_url = "https://docs.rs/mongodb/2.4.0")]
 
 #[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
 compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");

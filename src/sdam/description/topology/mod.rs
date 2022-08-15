@@ -7,12 +7,13 @@ use std::{
     time::Duration,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
     cmap::Command,
+    error::{Error, Result},
     options::{ClientOptions, ServerAddress},
     sdam::{
         description::server::{ServerDescription, ServerType},
@@ -22,7 +23,7 @@ use crate::{
 };
 
 /// The possible types for a topology.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
 #[non_exhaustive]
 pub enum TopologyType {
     /// A single mongod server.
@@ -65,10 +66,11 @@ impl Default for TopologyType {
 }
 
 /// A description of the most up-to-date information known about a topology.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub(crate) struct TopologyDescription {
     /// Whether or not the topology was initialized with a single seed.
+    #[serde(skip)]
     pub(crate) single_seed: bool,
 
     /// The current type of the topology.
@@ -89,19 +91,24 @@ pub(crate) struct TopologyDescription {
 
     /// Whether or not this topology supports sessions, and if so, what the logicalSessionTimeout
     /// is for them.
+    #[serde(skip)]
     pub(crate) session_support_status: SessionSupportStatus,
 
     /// Whether or not this topology supports transactions.
+    #[serde(skip)]
     pub(crate) transaction_support_status: TransactionSupportStatus,
 
     /// The highest reported cluster time by any server in this topology.
+    #[serde(skip)]
     pub(crate) cluster_time: Option<ClusterTime>,
 
     /// The amount of latency beyond that of the suitable server with the minimum latency that is
     /// acceptable for a read operation.
+    #[serde(skip)]
     pub(crate) local_threshold: Option<Duration>,
 
     /// The maximum amount of time to wait before checking a given server by sending server check.
+    #[serde(skip)]
     pub(crate) heartbeat_freq: Option<Duration>,
 
     /// The server descriptions of each member of the topology.
@@ -454,10 +461,7 @@ impl TopologyDescription {
 
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
-    pub(crate) fn update(
-        &mut self,
-        mut server_description: ServerDescription,
-    ) -> Result<(), String> {
+    pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
         // Ignore updates from servers not currently in the cluster.
         if !self.servers.contains_key(&server_description.address) {
             return Ok(());
@@ -510,10 +514,7 @@ impl TopologyDescription {
     }
 
     /// Update the Unknown topology description based on the server description.
-    fn update_unknown_topology(
-        &mut self,
-        server_description: ServerDescription,
-    ) -> Result<(), String> {
+    fn update_unknown_topology(&mut self, server_description: ServerDescription) -> Result<()> {
         match server_description.server_type {
             ServerType::Unknown | ServerType::RsGhost => {}
             ServerType::Standalone => {
@@ -529,7 +530,7 @@ impl TopologyDescription {
                 self.update_rs_without_primary_server(server_description)?;
             }
             ServerType::LoadBalancer => {
-                return Err("cannot transition to a load balancer".to_string())
+                return Err(Error::internal("cannot transition to a load balancer"))
             }
         }
 
@@ -550,7 +551,7 @@ impl TopologyDescription {
     fn update_replica_set_no_primary_topology(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         match server_description.server_type {
             ServerType::Unknown | ServerType::RsGhost => {}
             ServerType::Standalone | ServerType::Mongos => {
@@ -564,7 +565,7 @@ impl TopologyDescription {
                 self.update_rs_without_primary_server(server_description)?;
             }
             ServerType::LoadBalancer => {
-                return Err("cannot transition to a load balancer".to_string())
+                return Err(Error::internal("cannot transition to a load balancer"))
             }
         }
 
@@ -575,7 +576,7 @@ impl TopologyDescription {
     fn update_replica_set_with_primary_topology(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         match server_description.server_type {
             ServerType::Unknown | ServerType::RsGhost => {
                 self.record_primary_state();
@@ -589,7 +590,7 @@ impl TopologyDescription {
                 self.update_rs_with_primary_from_member(server_description)?;
             }
             ServerType::LoadBalancer => {
-                return Err("cannot transition to a load balancer".to_string())
+                return Err(Error::internal("cannot transition to a load balancer"));
             }
         }
 
@@ -610,7 +611,7 @@ impl TopologyDescription {
     fn update_rs_without_primary_server(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         if self.set_name.is_none() {
             self.set_name = server_description.set_name()?;
         } else if self.set_name != server_description.set_name()? {
@@ -633,7 +634,7 @@ impl TopologyDescription {
     fn update_rs_with_primary_from_member(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         if self.set_name != server_description.set_name()? {
             self.servers.remove(&server_description.address);
             self.record_primary_state();
@@ -655,7 +656,7 @@ impl TopologyDescription {
     fn update_rs_from_primary_server(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         if self.set_name.is_none() {
             self.set_name = server_description.set_name()?;
         } else if self.set_name != server_description.set_name()? {
@@ -744,13 +745,8 @@ impl TopologyDescription {
     }
 
     /// Create a new ServerDescription for each address and add it to the topology.
-    fn add_new_servers<'a>(
-        &mut self,
-        servers: impl Iterator<Item = &'a String>,
-    ) -> Result<(), String> {
-        let servers: Result<Vec<_>, String> = servers
-            .map(|server| ServerAddress::parse(server).map_err(|e| e.to_string()))
-            .collect();
+    fn add_new_servers<'a>(&mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
+        let servers: Result<Vec<_>> = servers.map(ServerAddress::parse).collect();
 
         self.add_new_servers_from_addresses(servers?.iter());
         Ok(())
@@ -850,16 +846,13 @@ pub(crate) struct TopologyDescriptionDiff<'a> {
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
-    verify_max_staleness_inner(max_staleness)
-        .map_err(|s| crate::error::ErrorKind::InvalidArgument { message: s }.into())
-}
-
-fn verify_max_staleness_inner(max_staleness: Option<Duration>) -> std::result::Result<(), String> {
     if max_staleness
         .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
         .unwrap_or(false)
     {
-        return Err("max staleness cannot be both positive and below 90 seconds".into());
+        return Err(Error::invalid_argument(
+            "max staleness cannot be both positive and below 90 seconds",
+        ));
     }
 
     Ok(())

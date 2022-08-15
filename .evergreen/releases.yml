@@ -37,7 +37,7 @@ functions:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh
+        .evergreen/install-dependencies.sh rust
 
   "publish release":
     - command: shell.exec
@@ -49,6 +49,7 @@ functions:
 
           TAG=${GIT_TAG}           \
           TOKEN=${CRATES_IO_TOKEN} \
+          PROJECT_DIRECTORY="$(pwd)" \
             bash .evergreen/release-danger-do-not-run-manually.sh
 
 tasks:
