@@ -304,8 +304,9 @@ impl ConnectionPoolWorker {
                     } => {
                         self.clear(cause, service_id);
                     }
-                    PoolManagementRequest::MarkAsReady => {
+                    PoolManagementRequest::MarkAsReady { completion_handler } => {
                         self.mark_as_ready();
+                        completion_handler.acknowledge(());
                     }
                     PoolManagementRequest::HandleConnectionSucceeded(conn) => {
                         self.handle_connection_succeeded(conn);
@@ -325,7 +326,7 @@ impl ConnectionPoolWorker {
 
             if self.can_service_connection_request() {
                 if let Some(request) = self.wait_queue.pop_front() {
-                    self.check_out(request).await;
+                    self.check_out(request);
                 }
             }
         }
@@ -357,7 +358,7 @@ impl ConnectionPoolWorker {
         self.below_max_connections() && self.pending_connection_count < MAX_CONNECTING
     }
 
-    async fn check_out(&mut self, request: ConnectionRequest) {
+    fn check_out(&mut self, request: ConnectionRequest) {
         // first attempt to check out an available connection
         while let Some(mut conn) = self.available_connections.pop_back() {
             // Close the connection if it's stale.

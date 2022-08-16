@@ -275,7 +275,7 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_subscriber = handler.subscribe();
-    let topology = Topology::new(options.clone()).unwrap();
+    let topology = Topology::new(options.clone());
     let mut servers = topology.servers();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
@@ -749,7 +749,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .hosts(vec![address.clone()])
         .build();
     options.test_options_mut().disable_monitoring_threads = true;
-    let topology = Topology::new(options).unwrap();
+    let topology = Topology::new(options);
 
     // get the one server in the topology
     let server = topology

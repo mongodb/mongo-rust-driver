@@ -124,7 +124,7 @@ impl Client {
         options.validate()?;
 
         let inner = Arc::new(ClientInner {
-            topology: Topology::new(options.clone())?,
+            topology: Topology::new(options.clone()),
             session_pool: ServerSessionPool::new(),
             #[cfg(feature = "csfle")]
             csfle: Default::default(),

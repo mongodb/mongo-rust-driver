@@ -146,18 +146,11 @@ impl Default for TopologyDescription {
 }
 
 impl TopologyDescription {
-    pub(crate) fn initialize(&mut self, options: &ClientOptions) -> Result<()> {
+    pub(crate) fn initialize(&mut self, options: &ClientOptions) {
         debug_assert!(
             self.servers.is_empty() && self.topology_type == TopologyType::Unknown,
             "new TopologyDescriptions should start empty"
         );
-
-        verify_max_staleness(
-            options
-                .selection_criteria
-                .as_ref()
-                .and_then(|criteria| criteria.max_staleness()),
-        )?;
 
         self.topology_type = if let Some(true) = options.direct_connection {
             TopologyType::Single
@@ -192,8 +185,6 @@ impl TopologyDescription {
         self.set_name = options.repl_set_name.clone();
         self.local_threshold = options.local_threshold;
         self.heartbeat_freq = options.heartbeat_freq;
-
-        Ok(())
     }
 
     /// Gets the topology type of the cluster.
@@ -885,7 +876,7 @@ pub(crate) struct TopologyDescriptionDiff<'a> {
     )>,
 }
 
-fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
+pub(crate) fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
     if max_staleness
         .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
         .unwrap_or(false)

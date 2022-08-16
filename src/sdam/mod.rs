@@ -14,6 +14,7 @@ pub(crate) use self::{
         server::{ServerDescription, TopologyVersion},
         topology::{
             server_selection::{self, SelectedServer, IDLE_WRITE_PERIOD},
+            verify_max_staleness,
             SessionSupportStatus,
             TopologyDescription,
             TransactionSupportStatus,

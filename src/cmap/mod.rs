@@ -168,8 +168,8 @@ impl ConnectionPool {
     }
 
     /// Mark the pool as "ready" as per the CMAP specification.
-    pub(crate) fn mark_as_ready(&self) {
-        self.manager.mark_as_ready()
+    pub(crate) async fn mark_as_ready(&self) {
+        self.manager.mark_as_ready().await
     }
 
     pub(crate) fn generation(&self) -> PoolGeneration {

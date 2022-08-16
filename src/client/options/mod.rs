@@ -33,7 +33,12 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
     options::ReadConcernLevel,
-    sdam::{DEFAULT_HEARTBEAT_FREQUENCY, IDLE_WRITE_PERIOD, MIN_HEARTBEAT_FREQUENCY},
+    sdam::{
+        verify_max_staleness,
+        DEFAULT_HEARTBEAT_FREQUENCY,
+        IDLE_WRITE_PERIOD,
+        MIN_HEARTBEAT_FREQUENCY,
+    },
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
@@ -1331,6 +1336,12 @@ impl ClientOptions {
                 }
             }
         }
+
+        verify_max_staleness(
+            self.selection_criteria
+                .as_ref()
+                .and_then(|criteria| criteria.max_staleness()),
+        )?;
 
         Ok(())
     }

@@ -21,7 +21,6 @@ impl<M, R> AcknowledgedMessage<M, R> {
     }
 
     /// Send acknowledgement to the receiver.
-    #[allow(dead_code)]
     pub(crate) fn acknowledge(self, result: impl Into<R>) {
         self.acknowledger.acknowledge(result)
     }
