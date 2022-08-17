@@ -4,7 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, OperationWithDefaults, Retryability},
     options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
 };
 
@@ -39,7 +39,7 @@ impl ChangeStreamAggregate {
     }
 }
 
-impl Operation for ChangeStreamAggregate {
+impl OperationWithDefaults for ChangeStreamAggregate {
     type O = (CursorSpecification, ChangeStreamData);
     type Command = Document;
 

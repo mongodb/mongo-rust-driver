@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{append_options, remove_empty_write_concern, Operation},
+    operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
     Namespace,
@@ -47,7 +47,7 @@ impl CreateIndexes {
     }
 }
 
-impl Operation for CreateIndexes {
+impl OperationWithDefaults for CreateIndexes {
     type O = CreateIndexesResult;
     type Command = Document;
     const NAME: &'static str = "createIndexes";

@@ -7,7 +7,12 @@ use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, Operation, WriteConcernOnlyBody},
+    operation::{
+        append_options,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+        WriteConcernOnlyBody,
+    },
     options::{DropDatabaseOptions, WriteConcern},
 };
 
@@ -28,7 +33,7 @@ impl DropDatabase {
     }
 }
 
-impl Operation for DropDatabase {
+impl OperationWithDefaults for DropDatabase {
     type O = ();
     type Command = Document;
 

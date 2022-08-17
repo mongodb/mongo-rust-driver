@@ -12,7 +12,7 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
     error::{ErrorKind, Result},
-    operation::Operation,
+    operation::OperationWithDefaults,
     options::SelectionCriteria,
     results::GetMoreResult,
     Namespace,
@@ -44,7 +44,7 @@ impl<'conn> GetMore<'conn> {
     }
 }
 
-impl<'conn> Operation for GetMore<'conn> {
+impl<'conn> OperationWithDefaults for GetMore<'conn> {
     type O = GetMoreResult;
     type Command = Document;
 

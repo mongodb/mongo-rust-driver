@@ -8,7 +8,7 @@ use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, OperationWithDefaults, Retryability},
     options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
@@ -43,7 +43,7 @@ impl ListDatabases {
     }
 }
 
-impl Operation for ListDatabases {
+impl OperationWithDefaults for ListDatabases {
     type O = Vec<RawDocumentBuf>;
     type Command = Document;
 
