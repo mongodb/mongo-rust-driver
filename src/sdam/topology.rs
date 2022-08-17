@@ -203,10 +203,7 @@ impl Topology {
     /// If the topology hasn't opened yet, this will wait for it.
     #[cfg(test)]
     pub(crate) async fn servers(&mut self) -> HashMap<ServerAddress, Arc<Server>> {
-        // Wait for topology to be initialized.
-        while self.watcher.peek_latest().description.servers.is_empty() {
-            self.watcher.wait_for_update(Duration::MAX).await;
-        }
+        self.watcher.wait_for_update(Duration::MAX).await;
         self.watcher.peek_latest().servers()
     }
 

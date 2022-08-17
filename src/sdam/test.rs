@@ -265,6 +265,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
     options.repl_set_name = Some("invalid".to_string());
+    options.server_selection_timeout = Some(Duration::from_secs(5));
     let client = Client::with_options(options)?;
     let result = client.list_database_names(None, None).await;
     assert!(

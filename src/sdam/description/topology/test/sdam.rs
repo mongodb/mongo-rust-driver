@@ -11,7 +11,6 @@ use crate::{
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
-    event::sdam::TopologyOpeningEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
@@ -266,6 +265,8 @@ async fn run_test(test_file: TestFile) {
             return;
         }
     }
+
+    log_uncaptured(format!("Executing {}", test_description));
 
     let mut options = ClientOptions::parse_uri(&test_file.uri, None)
         .await
