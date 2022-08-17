@@ -344,7 +344,7 @@ mod test;
 extern crate derive_more;
 
 pub use crate::{
-    client::{session::ClientSession, Client, csfle::client_encryption},
+    client::{session::ClientSession, Client},
     coll::Collection,
     cursor::{
         session::{SessionCursor, SessionCursorStream},
@@ -352,6 +352,8 @@ pub use crate::{
     },
     db::Database,
 };
+#[cfg(feature = "csfle")]
+pub use crate::client::csfle::client_encryption;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
