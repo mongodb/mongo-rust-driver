@@ -11,6 +11,7 @@ use crate::{
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
+    event::sdam::TopologyOpeningEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
@@ -275,8 +276,9 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_subscriber = handler.subscribe();
-    let topology = Topology::new(options.clone());
-    let mut servers = topology.servers();
+    let mut topology = Topology::new(options.clone());
+
+    let mut servers = topology.servers().await;
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
@@ -314,7 +316,7 @@ async fn run_test(test_file: TestFile) {
                     Ok(reply) => {
                         let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)), None);
                         if topology.clone_updater().update(new_sd).await {
-                            servers = topology.servers();
+                            servers = topology.servers().await;
                         }
                     }
                     Err(e) => {
@@ -749,17 +751,10 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .hosts(vec![address.clone()])
         .build();
     options.test_options_mut().disable_monitoring_threads = true;
-    let topology = Topology::new(options);
+    let mut topology = Topology::new(options);
 
     // get the one server in the topology
-    let server = topology
-        .watch()
-        .observe_latest()
-        .servers()
-        .into_iter()
-        .next()
-        .unwrap()
-        .1;
+    let server = topology.servers().await.into_values().next().unwrap();
 
     let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
         "ok": 1,

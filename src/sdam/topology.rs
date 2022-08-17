@@ -195,13 +195,18 @@ impl Topology {
 
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
-    pub(crate) fn server_addresses(&self) -> HashSet<ServerAddress> {
-        self.watcher.peek_latest().servers.keys().cloned().collect()
+    pub(crate) async fn server_addresses(&mut self) -> HashSet<ServerAddress> {
+        self.servers().await.into_keys().collect()
     }
 
     /// Gets the addresses of the servers in the cluster.
+    /// If the topology hasn't opened yet, this will wait for it.
     #[cfg(test)]
-    pub(crate) fn servers(&self) -> HashMap<ServerAddress, Arc<Server>> {
+    pub(crate) async fn servers(&mut self) -> HashMap<ServerAddress, Arc<Server>> {
+        // Wait for topology to be initialized.
+        while self.watcher.peek_latest().description.servers.is_empty() {
+            self.watcher.wait_for_update(Duration::MAX).await;
+        }
         self.watcher.peek_latest().servers()
     }
 
@@ -673,7 +678,7 @@ impl TopologyWorker {
 /// Struct used to update the topology.
 #[derive(Debug, Clone)]
 pub(crate) struct TopologyUpdater {
-    sender: UnboundedSender<AcknowledgedMessage<UpdateMessage, bool>>,
+    sender: mpsc::UnboundedSender<AcknowledgedMessage<UpdateMessage, bool>>,
 }
 
 impl TopologyUpdater {
