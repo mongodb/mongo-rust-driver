@@ -285,6 +285,7 @@ pub enum EncryptKey {
     AltName(String),
 }
 
+// TODO: this can be `bin_ref.to_binary()` once PR#370 is merged.
 fn bin_owned(bin_ref: RawBinaryRef) -> Binary {
     Binary {
         subtype: bin_ref.subtype,

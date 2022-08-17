@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)]
+
 pub mod options;
 
 use core::task::{Context, Poll};
