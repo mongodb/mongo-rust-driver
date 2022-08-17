@@ -1,10 +1,7 @@
 use bson::Timestamp;
 
 use super::RunCommand;
-use crate::{
-    bson::doc,
-    operation::test::handle_response_test,
-};
+use crate::{bson::doc, operation::test::handle_response_test};
 
 #[test]
 fn handle_success() {
