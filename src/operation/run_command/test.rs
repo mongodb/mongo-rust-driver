@@ -10,25 +10,6 @@ use crate::{
 };
 
 #[test]
-fn build() {
-    let mut op = RunCommand::new("foo".into(), doc! { "hello": 1 }, None, None).unwrap();
-    assert!(op.selection_criteria().is_none());
-
-    let command = op.build(&StreamDescription::new_testing()).unwrap();
-
-    assert_eq!(command.name, "hello");
-    assert_eq!(command.target_db, "foo");
-    assert_eq!(
-        command
-            .body
-            .get("hello")
-            .unwrap()
-            .and_then(|raw| crate::bson_util::get_int(&raw.try_into().unwrap())),
-        Some(1)
-    );
-}
-
-#[test]
 fn handle_success() {
     let op = RunCommand::new("foo".into(), doc! { "hello": 1 }, None, None).unwrap();
 

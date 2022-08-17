@@ -393,7 +393,7 @@ macro_rules! remove_empty_write_concern {
 pub(crate) use remove_empty_write_concern;
 
 // A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
-// implemented by leaf operation types.
+// implemented by operation types that do not delegate to other operations.
 pub(crate) trait OperationWithDefaults {
     /// The output type of this operation.
     type O;
