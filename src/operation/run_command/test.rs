@@ -1,12 +1,9 @@
-use std::convert::TryInto;
-
 use bson::Timestamp;
 
 use super::RunCommand;
 use crate::{
     bson::doc,
-    cmap::StreamDescription,
-    operation::{test::handle_response_test, Operation},
+    operation::test::handle_response_test,
 };
 
 #[test]
