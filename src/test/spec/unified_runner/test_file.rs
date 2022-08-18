@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use regex::Regex;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 use tokio::sync::oneshot;
@@ -163,6 +164,12 @@ pub(crate) struct Client {
     pub(crate) store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
 }
 
+impl Client {
+    pub(crate) fn use_multiple_mongoses(&self) -> bool {
+        self.use_multiple_mongoses.unwrap_or(false)
+    }
+}
+
 pub(crate) fn deserialize_server_api_test_format<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<ServerApi>, D::Error>
@@ -185,7 +192,11 @@ where
     }))
 }
 
-pub(crate) fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> String {
+pub(crate) fn merge_uri_options(
+    given_uri: &str,
+    uri_options: Option<&Document>,
+    use_multiple_hosts: bool,
+) -> String {
     let uri_options = match uri_options {
         Some(opts) => opts,
         None => return given_uri.to_string(),
@@ -200,6 +211,22 @@ pub(crate) fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>)
         uri.push('/');
     }
     uri.push('?');
+
+    if !use_multiple_hosts {
+        let hosts_regex = Regex::new(r"mongodb://([^/]*)/").unwrap();
+        let single_host = hosts_regex
+            .captures(&uri)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .split(",")
+            .next()
+            .expect("expected URI to contain at least one host, but it had none");
+        uri = hosts_regex
+            .replace(uri.as_str(), format!("mongodb://{}/", single_host))
+            .to_string();
+    }
 
     if let Some(options) = given_uri_parts.next() {
         let options = options.split('&');
@@ -465,7 +492,7 @@ async fn merged_uri_options() {
         "w": 2,
         "readconcernlevel": "local",
     };
-    let uri = merge_uri_options(&DEFAULT_URI, Some(&options));
+    let uri = merge_uri_options(&DEFAULT_URI, Some(&options), true);
     let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
 
     assert!(options.tls_options().is_some());

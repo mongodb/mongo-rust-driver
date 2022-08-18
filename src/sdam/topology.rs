@@ -600,10 +600,15 @@ impl TopologyWorker {
                     || error.is_network_timeout()
                     || error.is_command_error()))
         {
-            let updated = is_load_balanced
-                || self
-                    .mark_server_as_unknown(server.address.clone(), error.clone())
-                    .await;
+            let updated = if is_load_balanced {
+                // Only clear the pool in load balanced mode if we got far enough in the handshake
+                // to determine a serviceId.
+                handshake.service_id().is_some()
+            } else {
+                self.mark_server_as_unknown(server.address.clone(), error.clone())
+                    .await
+            };
+
             if updated {
                 server
                     .pool
@@ -663,13 +668,15 @@ impl TopologyWorker {
             self.options
                 .test_options
                 .as_ref()
-                .map(|to| !to.disable_monitoring_threads)
-                .or(self.options.load_balanced)
-                .unwrap_or(true)
+                .map(|to| to.disable_monitoring_threads)
+                != Some(true)
+                && self.options.load_balanced != Some(true)
         }
 
         #[cfg(not(test))]
-        self.options.load_balanced.unwrap_or(true)
+        {
+            self.options.load_balanced != Some(true)
+        }
     }
 }
 

@@ -336,7 +336,7 @@ impl TestRunner {
 
                     let given_uri = if CLIENT_OPTIONS.get().await.load_balanced.unwrap_or(false) {
                         // for serverless testing, ignore use_multiple_mongoses.
-                        if client.use_multiple_mongoses.unwrap_or(true) && !*SERVERLESS {
+                        if client.use_multiple_mongoses() && !*SERVERLESS {
                             LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
                                 "Test requires URI for load balancer fronting multiple servers",
                             )
@@ -348,7 +348,11 @@ impl TestRunner {
                     } else {
                         &DEFAULT_URI
                     };
-                    let uri = merge_uri_options(given_uri, client.uri_options.as_ref());
+                    let uri = merge_uri_options(
+                        given_uri,
+                        client.uri_options.as_ref(),
+                        client.use_multiple_mongoses(),
+                    );
                     let mut options =
                         ClientOptions::parse_uri(&uri, None)
                             .await
@@ -368,17 +372,13 @@ impl TestRunner {
 
                     options.server_api = server_api;
 
-                    if let Some(use_multiple_mongoses) = client.use_multiple_mongoses {
+                    if client.use_multiple_mongoses() {
                         if TestClient::new().await.is_sharded() {
-                            if use_multiple_mongoses {
-                                assert!(
-                                    options.hosts.len() > 1,
-                                    "[{}]: Test requires multiple mongos hosts",
-                                    description.as_ref()
-                                );
-                            } else {
-                                options.hosts.drain(1..);
-                            }
+                            assert!(
+                                options.hosts.len() > 1,
+                                "[{}]: Test requires multiple mongos hosts",
+                                description.as_ref()
+                            );
                         }
                     }
 
