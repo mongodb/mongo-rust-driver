@@ -166,7 +166,7 @@ pub(crate) struct Client {
 
 impl Client {
     pub(crate) fn use_multiple_mongoses(&self) -> bool {
-        self.use_multiple_mongoses.unwrap_or(false)
+        self.use_multiple_mongoses.unwrap_or(true)
     }
 }
 
@@ -197,10 +197,6 @@ pub(crate) fn merge_uri_options(
     uri_options: Option<&Document>,
     use_multiple_hosts: bool,
 ) -> String {
-    let uri_options = match uri_options {
-        Some(opts) => opts,
-        None => return given_uri.to_string(),
-    };
     let mut given_uri_parts = given_uri.split('?');
 
     let mut uri = String::from(given_uri_parts.next().unwrap());
@@ -227,6 +223,11 @@ pub(crate) fn merge_uri_options(
             .replace(uri.as_str(), format!("mongodb://{}/", single_host))
             .to_string();
     }
+
+    let uri_options = match uri_options {
+        Some(opts) => opts,
+        None => return uri,
+    };
 
     if let Some(options) = given_uri_parts.next() {
         let options = options.split('&');
