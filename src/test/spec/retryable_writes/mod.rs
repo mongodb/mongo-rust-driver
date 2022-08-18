@@ -50,8 +50,6 @@ async fn run_unified() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
     async fn run_test(test_file: TestFile) {
-        let setup_client = TestClient::new().await;
-
         for mut test_case in test_file.tests {
             if test_case.operation.name == "bulkWrite" {
                 continue;
@@ -90,7 +88,7 @@ async fn run_legacy() {
             }
 
             if let Some(ref mut fail_point) = test_case.fail_point {
-                setup_client
+                client
                     .database("admin")
                     .run_command(fail_point.clone(), None)
                     .await
@@ -162,7 +160,7 @@ async fn run_legacy() {
                 None => coll_name.to_string(),
             };
 
-            let coll = setup_client.get_coll(&db_name, &coll_name);
+            let coll = client.get_coll(&db_name, &coll_name);
             let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
                 .find(None, options)
@@ -178,14 +176,14 @@ async fn run_legacy() {
                     "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
                     "mode": "off",
                 };
-                setup_client
+                client
                     .database("admin")
                     .run_command(disable, None)
                     .await
                     .unwrap();
             }
 
-            setup_client.database(&db_name).drop(None).await.unwrap();
+            client.database(&db_name).drop(None).await.unwrap();
         }
     }
 
