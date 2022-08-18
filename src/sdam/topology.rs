@@ -664,11 +664,12 @@ impl TopologyWorker {
                 .test_options
                 .as_ref()
                 .map(|to| !to.disable_monitoring_threads)
+                .or(self.options.load_balanced)
                 .unwrap_or(true)
         }
 
         #[cfg(not(test))]
-        true
+        self.options.load_balanced.unwrap_or(true)
     }
 }
 
