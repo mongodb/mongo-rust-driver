@@ -1373,7 +1373,6 @@ impl TestOperation for FailPointCommand {
             let client = test_runner.get_client(&self.client).await;
             let guard = self
                 .fail_point
-                .clone()
                 .enable(&client, Some(ReadPreference::Primary.into()))
                 .await
                 .unwrap();

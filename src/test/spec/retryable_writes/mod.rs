@@ -46,7 +46,7 @@ async fn run_unified() {
     run_spec_test_with_path(&["retryable-writes", "unified"], run_unified_format_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
     async fn run_test(test_file: TestFile) {
@@ -87,16 +87,22 @@ async fn run_legacy() {
                     .expect(&test_case.description);
             }
 
-            if let Some(ref mut fail_point) = test_case.fail_point {
-                client
-                    .database("admin")
-                    .run_command(fail_point.clone(), None)
-                    .await
-                    .unwrap();
-            }
+            let _fp_guard = if let Some(ref mut fail_point) = test_case.fail_point {
+                Some(fail_point.enable(&client, None).await.unwrap_or_else(|e| {
+                    panic!(
+                        "{}: error enabling failpoint: {:#?}",
+                        test_case.description, e
+                    )
+                }))
+            } else {
+                None
+            };
 
             let coll = client.database(&db_name).collection(coll_name);
             let result = test_case.operation.execute_on_collection(&coll, None).await;
+
+            // Disable the failpoint, if any.
+            drop(_fp_guard);
 
             if let Some(error) = test_case.outcome.error {
                 assert_eq!(
@@ -171,17 +177,6 @@ async fn run_legacy() {
                 .unwrap();
             assert_eq!(test_case.outcome.collection.data, actual_data);
 
-            if let Some(fail_point) = test_case.fail_point {
-                let disable = doc! {
-                    "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
-                    "mode": "off",
-                };
-                client
-                    .database("admin")
-                    .run_command(disable, None)
-                    .await
-                    .unwrap();
-            }
 
             client.database(&db_name).drop(None).await.unwrap();
         }
