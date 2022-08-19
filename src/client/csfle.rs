@@ -2,9 +2,7 @@ pub mod client_encryption;
 pub mod options;
 mod state_machine;
 
-use std::{
-    path::Path,
-};
+use std::path::Path;
 
 use derivative::Derivative;
 use mongocrypt::Crypt;
@@ -56,7 +54,8 @@ impl ClientState {
             opts.tls_options.take(),
             mongocryptd_opts,
             aux_clients.metadata_client,
-        ).await?;
+        )
+        .await?;
 
         Ok(Self {
             crypt,
@@ -97,7 +96,10 @@ impl ClientState {
         Ok(crypt)
     }
 
-    fn make_mongocryptd_opts(opts: &AutoEncryptionOptions, crypt: &Crypt) -> Result<Option<MongocryptdOptions>> {
+    fn make_mongocryptd_opts(
+        opts: &AutoEncryptionOptions,
+        crypt: &Crypt,
+    ) -> Result<Option<MongocryptdOptions>> {
         if opts.bypass_auto_encryption == Some(true)
             || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
@@ -105,7 +107,9 @@ impl ClientState {
         {
             return Ok(None);
         }
-        let spawn_path = opts.extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)?.map(std::path::PathBuf::from);
+        let spawn_path = opts
+            .extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)?
+            .map(std::path::PathBuf::from);
         let mut spawn_args = vec![];
         if let Some(args) = opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)? {
             for arg in args {
@@ -115,7 +119,9 @@ impl ClientState {
                 spawn_args.push(str_arg.to_string());
             }
         }
-        let uri = opts.extra_option(&EO_MONGOCRYPTD_URI)?.map(|s| s.to_string());
+        let uri = opts
+            .extra_option(&EO_MONGOCRYPTD_URI)?
+            .map(|s| s.to_string());
         Ok(Some(MongocryptdOptions {
             spawn_path,
             spawn_args,

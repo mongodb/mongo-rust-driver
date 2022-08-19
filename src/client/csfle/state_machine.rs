@@ -6,13 +6,13 @@ use mongocrypt::ctx::{Ctx, State};
 use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::oneshot,
+    sync::{oneshot, Mutex},
 };
 
 use crate::{
     client::{options::ServerAddress, WeakClient},
     cmap::options::StreamOptions,
-    error::{Error, Result},
+    error::{Error, ErrorKind, Result},
     operation::{RawOutput, RunCommand},
     runtime::AsyncStream,
     Client,
@@ -27,9 +27,14 @@ pub(crate) struct CryptExecutor {
     key_vault_namespace: Namespace,
     tls_options: Option<KmsProvidersTlsOptions>,
     crypto_threads: ThreadPool,
-    mongocryptd_opts: Option<MongocryptdOptions>,
-    mongocryptd_client: Option<Client>,
+    mongocryptd: Option<Mongocryptd>,
     metadata_client: Option<WeakClient>,
+}
+
+#[derive(Debug)]
+struct Mongocryptd {
+    opts: MongocryptdOptions,
+    client: Mutex<Client>,
 }
 
 impl CryptExecutor {
@@ -37,8 +42,7 @@ impl CryptExecutor {
         key_vault_client: WeakClient,
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
-    ) -> Result<Self>
-    {
+    ) -> Result<Self> {
         let num_cpus = std::thread::available_parallelism()?.get();
         let crypto_threads = rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus)
@@ -49,8 +53,7 @@ impl CryptExecutor {
             key_vault_namespace,
             tls_options,
             crypto_threads,
-            mongocryptd_opts: None,
-            mongocryptd_client: None,
+            mongocryptd: None,
             metadata_client: None,
         })
     }
@@ -62,13 +65,15 @@ impl CryptExecutor {
         mongocryptd_opts: Option<MongocryptdOptions>,
         metadata_client: Option<WeakClient>,
     ) -> Result<Self> {
-        let mongocryptd_client = match &mongocryptd_opts {
-            Some(opts) => opts.spawn().await?,
+        let mongocryptd = match mongocryptd_opts {
+            Some(opts) => {
+                let client = Mutex::new(opts.spawn().await?);
+                Some(Mongocryptd { opts, client })
+            }
             None => None,
         };
         let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
-        exec.mongocryptd_opts = mongocryptd_opts;
-        exec.mongocryptd_client = mongocryptd_client;
+        exec.mongocryptd = mongocryptd;
         exec.metadata_client = metadata_client;
         Ok(exec)
     }
@@ -108,11 +113,22 @@ impl CryptExecutor {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
                     let op = RawOutput(RunCommand::new_raw(db.to_string(), command, None, None)?);
-                    let mongocryptd_client = self
-                        .mongocryptd_client
+                    let mongocryptd = self
+                        .mongocryptd
                         .as_ref()
                         .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
-                    let response = mongocryptd_client.execute_operation(op, None).await?;
+                    let mut mongocryptd_client = mongocryptd.client.lock().await;
+                    let mut result = mongocryptd_client.execute_operation(op.clone(), None).await;
+                    if let Err(e) = &result {
+                        if matches!(&*e.kind, ErrorKind::ServerSelection { .. }) {
+                            *mongocryptd_client = mongocryptd.opts.spawn().await?;
+                            let new_result = mongocryptd_client.execute_operation(op, None).await;
+                            if new_result.is_ok() {
+                                result = new_result;
+                            }
+                        }
+                    }
+                    let response = result?;
                     ctx.mongo_feed(response.raw_body())?;
                     ctx.mongo_done()?;
                 }
@@ -202,15 +218,13 @@ impl CryptExecutor {
 
 #[derive(Debug)]
 pub(crate) struct MongocryptdOptions {
-    pub(crate) spawn_path: Option<PathBuf>,    // opts.extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)
-    pub(crate) spawn_args: Vec<String>,        // opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)
-    pub(crate) uri: Option<String>,            // opts.extra_option(&EO_MONGOCRYPTD_URI)
+    pub(crate) spawn_path: Option<PathBuf>,
+    pub(crate) spawn_args: Vec<String>,
+    pub(crate) uri: Option<String>,
 }
 
 impl MongocryptdOptions {
-    async fn spawn(
-        &self,
-    ) -> Result<Option<Client>> {
+    async fn spawn(&self) -> Result<Client> {
         use std::process::{Command, Stdio};
 
         let which_path;
@@ -237,11 +251,10 @@ impl MongocryptdOptions {
             .stderr(Stdio::null())
             .spawn()?;
 
-        let uri = self.uri.as_deref()
-            .unwrap_or("mongodb://localhost:27020");
+        let uri = self.uri.as_deref().unwrap_or("mongodb://localhost:27020");
         let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
         options.server_selection_timeout = Some(std::time::Duration::from_millis(10_000));
-        Ok(Some(Client::with_options(options)?))
+        Client::with_options(options)
     }
 }
 
