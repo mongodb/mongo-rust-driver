@@ -226,6 +226,7 @@ impl ClientEncryption {
 
 /// Options for initializing a new `ClientEncryption`.
 #[derive(TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct ClientEncryptionOptions {
     /// The key vault `Client`.
@@ -246,6 +247,7 @@ pub struct ClientEncryptionOptions {
 
 /// Options for creating a data key.
 #[derive(TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct DataKeyOptions {
     /// The master key document, a KMS-specific key used to encrypt the new data key.
@@ -316,6 +318,7 @@ pub enum MasterKey {
 
 /// The options for explicit encryption.
 #[derive(TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct EncryptOptions {
     /// The key to use.
