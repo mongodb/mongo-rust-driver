@@ -372,14 +372,12 @@ impl TestRunner {
 
                     options.server_api = server_api;
 
-                    if client.use_multiple_mongoses() {
-                        if TestClient::new().await.is_sharded() {
-                            assert!(
-                                options.hosts.len() > 1,
-                                "[{}]: Test requires multiple mongos hosts",
-                                description.as_ref()
-                            );
-                        }
+                    if client.use_multiple_mongoses() && TestClient::new().await.is_sharded() {
+                        assert!(
+                            options.hosts.len() > 1,
+                            "[{}]: Test requires multiple mongos hosts",
+                            description.as_ref()
+                        );
                     }
 
                     // In order to speed up the tests where a failpoint is used, the test runner

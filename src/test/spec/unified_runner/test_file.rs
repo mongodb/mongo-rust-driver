@@ -216,7 +216,7 @@ pub(crate) fn merge_uri_options(
             .get(1)
             .unwrap()
             .as_str()
-            .split(",")
+            .split(',')
             .next()
             .expect("expected URI to contain at least one host, but it had none");
         uri = hosts_regex

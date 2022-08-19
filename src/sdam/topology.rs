@@ -894,7 +894,9 @@ impl TopologyWatcher {
     #[cfg(test)]
     pub(crate) async fn wait_until_initialized(&mut self) {
         while !*self.initialized_receiver.borrow() {
-            self.initialized_receiver.changed().await;
+            if self.initialized_receiver.changed().await.is_err() {
+                return;
+            }
         }
     }
 }

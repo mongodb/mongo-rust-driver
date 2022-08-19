@@ -13,7 +13,6 @@ use crate::{
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
-    runtime,
     sdam::{
         description::{
             server::{ServerDescription, ServerType},

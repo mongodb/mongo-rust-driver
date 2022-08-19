@@ -3,7 +3,8 @@ use serde::Deserialize;
 use super::super::{Operation, RunOn};
 use crate::{
     bson::{Bson, Document},
-    options::ClientOptions, test::FailPoint,
+    options::ClientOptions,
+    test::FailPoint,
 };
 
 #[derive(Debug, Deserialize)]
