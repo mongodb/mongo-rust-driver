@@ -1,0 +1,59 @@
+{
+"protocol_version": 2,
+"mtools_version": "1.7.0",
+"parsed_args": {
+"no_progressbar": false,
+"command": "init",
+"single": false,
+"replicaset": true,
+"nodes": 3,
+"arbiter": false,
+"name": "replset",
+"priority": false,
+"sharded": null,
+"config": 1,
+"csrs": true,
+"mongos": 1,
+"verbose": false,
+"port": 27017,
+"binarypath": null,
+"dir": "/Users/sana.verma/mongo-rust-driver/data",
+"hostname": "localhost",
+"auth": false,
+"username": "user",
+"password": "password",
+"auth_db": "admin",
+"auth_roles": [
+"dbAdminAnyDatabase",
+"readWriteAnyDatabase",
+"userAdminAnyDatabase",
+"clusterAdmin"
+],
+"auth_role_docs": false,
+"initial-user": true,
+"tlsCAFile": null,
+"tlsCRLFile": null,
+"tlsAllowInvalidHostnames": false,
+"tlsAllowInvalidCertificates": false,
+"tlsMode": null,
+"tlsCertificateKeyFile": null,
+"tlsCertificateKeyFilePassword": null,
+"tlsClusterFile": null,
+"tlsClusterPassword": null,
+"tlsDisabledProtocols": null,
+"tlsAllowConnectionsWithoutCertificates": false,
+"tlsFIPSMode": false,
+"tlsClientCertificate": null,
+"tlsClientCertificateKeyFile": null,
+"tlsClientCertificateKeyFilePassword": null
+},
+"unknown_args": [
+"--setParameter",
+"enableTestCommands=1"
+],
+"startup_info": {
+"27017": "\"mongod\" --replSet replset --dbpath \"/Users/sana.verma/mongo-rust-driver/data/replset/rs1/db\" --logpath \"/Users/sana.verma/mongo-rust-driver/data/replset/rs1/mongod.log\" --port 27017 --fork  --setParameter \"enableTestCommands=1\"  --wiredTigerCacheSizeGB 1 ",
+"27018": "\"mongod\" --replSet replset --dbpath \"/Users/sana.verma/mongo-rust-driver/data/replset/rs2/db\" --logpath \"/Users/sana.verma/mongo-rust-driver/data/replset/rs2/mongod.log\" --port 27018 --fork  --setParameter \"enableTestCommands=1\"  --wiredTigerCacheSizeGB 1 ",
+"27019": "\"mongod\" --replSet replset --dbpath \"/Users/sana.verma/mongo-rust-driver/data/replset/rs3/db\" --logpath \"/Users/sana.verma/mongo-rust-driver/data/replset/rs3/mongod.log\" --port 27019 --fork  --setParameter \"enableTestCommands=1\"  --wiredTigerCacheSizeGB 1 "
+}
+}

@@ -2719,8 +2719,8 @@ impl TestOperation for Upload {
         async move {
             let bucket = test_runner.get_bucket(id).await;
             let hex_bytes = self.source.get("$$hexBytes").unwrap().as_str().unwrap();
-            // Iterates over two characters of the hex string at a time, parses each pair into a byte,
-            // and then collects them into a vector.
+            // Iterates over two characters of the hex string at a time, parses each pair into a
+            // byte, and then collects them into a vector.
             let hex_string: Vec<u8> = (0..hex_bytes.len())
                 .step_by(2)
                 .map(|i| u8::from_str_radix(&hex_bytes[i..i + 2], 16).unwrap())
