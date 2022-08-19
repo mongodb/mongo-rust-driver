@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_variables)]
+// TODO(RUST-1395) Remove these allows.
 
 pub mod options;
 
