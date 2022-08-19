@@ -2619,7 +2619,7 @@ impl TestOperation for Delete {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let bucket = test_runner.get_bucket(id).await;
-            let mut result = bucket.delete(self.id.clone());
+            bucket.delete(self.id.clone()).await;
             Ok(None)
         }
         .boxed()
@@ -2700,8 +2700,8 @@ impl TestOperation for DownloadByName {
 pub(super) struct Upload {
     source: Document,
     filename: String,
-    // content_type is deprecated and no longer supported.
-    // Option included for deserialization.
+    // content_type and disableMD5 are deprecated and no longer supported.
+    // Options included for deserialization.
     #[serde(rename = "contentType")]
     _content_type: Option<String>,
     #[serde(rename = "disableMD5")]
@@ -2718,14 +2718,15 @@ impl TestOperation for Upload {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let bucket = test_runner.get_bucket(id).await;
-            let hex_bytes = self.source.get("hexBytes").unwrap().as_str().unwrap();
+            let hex_bytes = self.source.get("$$hexBytes").unwrap().as_str().unwrap();
+            // Iterates over two characters of the hex string at a time, parses each pair into a byte,
+            // and then collects them into a vector.
             let hex_string: Vec<u8> = (0..hex_bytes.len())
                 .step_by(2)
                 .map(|i| u8::from_str_radix(&hex_bytes[i..i + 2], 16).unwrap())
                 .collect();
-            let mut result = bucket
-                .upload_from_tokio_reader_with_id(
-                    Bson::ObjectId(ObjectId::new()),
+            bucket
+                .upload_from_tokio_reader(
                     self.filename.clone(),
                     &hex_string[..],
                     self.options.clone(),

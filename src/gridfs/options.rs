@@ -32,6 +32,7 @@ pub struct GridFsBucketOptions {
 /// Contains the options for creating a [`GridFsUploadStream`] to upload a file to a
 /// [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct GridFsUploadOptions {

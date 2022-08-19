@@ -14,7 +14,6 @@ use crate::{
 
 use bson::{oid::ObjectId, Bson, DateTime, Document};
 use serde::{Deserialize, Serialize};
-
 use tokio::io::ReadBuf;
 
 pub const DEFAULT_BUCKET_NAME: &str = "fs";
