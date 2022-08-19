@@ -195,15 +195,14 @@ impl Topology {
 
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
-    pub(crate) async fn server_addresses(&mut self) -> HashSet<ServerAddress> {
-        self.servers().await.into_keys().collect()
+    pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
+        self.servers().into_keys().collect()
     }
 
     /// Gets the addresses of the servers in the cluster.
     /// If the topology hasn't opened yet, this will wait for it.
     #[cfg(test)]
-    pub(crate) async fn servers(&mut self) -> HashMap<ServerAddress, Arc<Server>> {
-        self.watcher.wait_for_update(Duration::MAX).await;
+    pub(crate) fn servers(&mut self) -> HashMap<ServerAddress, Arc<Server>> {
         self.watcher.peek_latest().servers()
     }
 
@@ -321,6 +320,9 @@ impl TopologyWorker {
                 self.options.clone(),
             );
         }
+
+        #[cfg(test)]
+        let _ = self.publisher.initialized_sender.send(true);
     }
 
     fn start(mut self) {
@@ -780,17 +782,28 @@ pub(crate) struct TopologyWatcher {
 
     /// Whether or not this watcher incremented the count in `sender`.
     requested_check: bool,
+
+    #[cfg(test)]
+    initialized_receiver: watch::Receiver<bool>,
 }
 
 impl TopologyWatcher {
     fn channel(initial_state: TopologyState) -> (TopologyWatcher, TopologyPublisher) {
+        #[cfg(test)]
+        let (initialized_sender, initialized_receiver) = watch::channel(false);
         let (tx, rx) = watch::channel(initial_state);
         let watcher = TopologyWatcher {
             receiver: rx,
             sender: Arc::new(watch::channel(0).0),
             requested_check: false,
+            #[cfg(test)]
+            initialized_receiver,
         };
-        let publisher = TopologyPublisher { state_sender: tx };
+        let publisher = TopologyPublisher {
+            state_sender: tx,
+            #[cfg(test)]
+            initialized_sender,
+        };
         (watcher, publisher)
     }
 
@@ -837,10 +850,15 @@ impl TopologyWatcher {
     /// indicating whether an update was seen or not.
     ///
     /// This method marks the new topology state as seen.
-    pub(crate) async fn wait_for_update(&mut self, timeout: Duration) -> bool {
-        let changed = runtime::timeout(timeout, self.receiver.changed())
-            .await
-            .is_ok();
+    pub(crate) async fn wait_for_update(&mut self, timeout: impl Into<Option<Duration>>) -> bool {
+        let changed = if let Some(timeout) = timeout.into() {
+            matches!(
+                runtime::timeout(timeout, self.receiver.changed()).await,
+                Ok(Ok(_))
+            )
+        } else {
+            self.receiver.changed().await.is_ok()
+        };
 
         self.receiver.borrow_and_update();
 
@@ -870,6 +888,15 @@ impl TopologyWatcher {
     pub(crate) fn topology_type(&self) -> TopologyType {
         self.peek_latest().description.topology_type
     }
+
+    /// Wait until the topology worker has had time to initialize from the initial seed list and
+    /// options.
+    #[cfg(test)]
+    pub(crate) async fn wait_until_initialized(&mut self) {
+        while !*self.initialized_receiver.borrow() {
+            self.initialized_receiver.changed().await;
+        }
+    }
 }
 
 impl Drop for TopologyWatcher {
@@ -878,9 +905,14 @@ impl Drop for TopologyWatcher {
     }
 }
 
-/// Struct used to broadcsat the latest view of the topology.
+/// Struct used to broadcast the latest view of the topology.
 struct TopologyPublisher {
     state_sender: watch::Sender<TopologyState>,
+
+    /// Sender used (in tests) to indicate when the Topology has been initialized from the inital
+    /// seed list and options.
+    #[cfg(test)]
+    initialized_sender: watch::Sender<bool>,
 }
 
 impl TopologyPublisher {

@@ -2568,7 +2568,7 @@ impl TestOperation for WaitForPrimaryChange {
                             return;
                         }
                     }
-                    watcher.wait_for_update(Duration::MAX).await;
+                    watcher.wait_for_update(None).await;
                 }
             })
             .await

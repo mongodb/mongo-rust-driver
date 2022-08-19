@@ -215,7 +215,7 @@ async fn rtt_is_updated() {
     let mut watcher = client.topology().watch();
     runtime::timeout(Duration::from_secs(10), async move {
         loop {
-            watcher.wait_for_update(Duration::MAX).await;
+            watcher.wait_for_update(None).await;
             let rtt = watcher
                 .server_description(&host)
                 .unwrap()
