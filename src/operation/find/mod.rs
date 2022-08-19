@@ -2,7 +2,7 @@
 mod test;
 
 use crate::{
-    bson::{doc, Document},
+    bson::{Bson, doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
@@ -126,7 +126,7 @@ impl Operation for Find {
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
-            comment,
+            comment.map(|s| Bson::String(s)),
         ))
     }
 

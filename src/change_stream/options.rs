@@ -98,11 +98,10 @@ pub struct ChangeStreamOptions {
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     #[builder(default)]
-    pub comment: Option<Bson>,
+    pub comment: Option<String>,
 }
 
 impl ChangeStreamOptions {
-    // TODO-Sana: should comment for ChangeStreamOptions be changed to Option<String>
     pub(crate) fn aggregate_options(&self) -> AggregateOptions {
         AggregateOptions::builder()
             .batch_size(self.batch_size)

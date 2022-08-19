@@ -908,11 +908,9 @@ pub struct FindOneOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// Tags the query with an arbitrary string value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub comment: Option<Bson>,
+    pub comment: Option<String>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,

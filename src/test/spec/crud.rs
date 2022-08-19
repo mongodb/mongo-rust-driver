@@ -24,4 +24,11 @@ fn test_predicate(test: &TestCase) -> bool {
         && !(lower.contains("aggregate with $out omits read preference for pre-5.0 server"))
         && !(lower.contains("aggregate with $merge includes read preference for 5.0+ server"))
         && !(lower.contains("aggregate with $merge omits read preference for pre-5.0 server"))
+        // TODO: Unskip when document comment support added for Aggregate
+        && !(lower.contains("countdocuments with document comment"))
+        && !(lower.contains( "aggregate with a document comment"))
+        // TODO: Unskip when document comment support added for Find
+        && !(lower.contains("find with document comment"))
+        && !(lower.contains("find with comment sets comment on getmore"))
+
 }

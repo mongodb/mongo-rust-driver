@@ -14,7 +14,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     Namespace,
 };
-use bson::{doc, Document, RawDocument};
+use bson::{Bson, doc, Document, RawDocument};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -60,13 +60,18 @@ impl CountDocuments {
         });
 
         let aggregate_options = options.map(|opts| {
+            let comment = if let Some(Bson::String(s)) = &opts.comment {
+                Some(s.clone())
+            } else {
+                None
+            };
             AggregateOptions::builder()
                 .hint(opts.hint)
                 .max_time(opts.max_time)
                 .collation(opts.collation)
                 .selection_criteria(opts.selection_criteria)
                 .read_concern(opts.read_concern)
-                .comment(opts.comment)
+                .comment(comment)
                 .build()
         });
 
