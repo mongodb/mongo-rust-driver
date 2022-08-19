@@ -70,15 +70,20 @@ pub struct GridFsBucket {
 
 // TODO: RUST-1395 Add documentation and example code for this struct.
 pub struct GridFsUploadStream {
-    pub bucket: GridFsBucket,
-    pub files_id: Bson,
-    pub length: u64,
-    pub filename: String,
-    pub options: GridFsUploadOptions,
+    bucket: GridFsBucket,
+    files_id: Bson,
+    length: u64,
+    filename: String,
+    options: GridFsUploadOptions,
 }
 
 impl GridFsUploadStream {
-    /// Consumes the stream and inserts the FilesCollectionDocument into the files collection. No
+    /// Gets the file `id` for the stream.
+    pub fn files_id(&self) -> &Bson {
+        &self.files_id
+    }
+
+    /// Consumes the stream and inserts the `FilesCollectionDocument` into the files collection. No
     /// further writes to the stream are allowed following this function call.
     pub async fn finish(mut self) -> Result<()> {
         let options = InsertOneOptions::builder()
@@ -131,10 +136,10 @@ impl tokio::io::AsyncWrite for GridFsUploadStream {
 }
 
 pub struct GridFsDownloadStream {
-    pub bucket: GridFsBucket,
-    pub files_id: Bson,
-    pub file: FilesCollectionDocument,
-    pub cursor: Cursor<Chunk>,
+    bucket: GridFsBucket,
+    files_id: Bson,
+    file: FilesCollectionDocument,
+    cursor: Cursor<Chunk>,
 }
 
 impl futures_util::AsyncWrite for GridFsUploadStream {
@@ -217,38 +222,31 @@ impl GridFsBucket {
         }
     }
 
-    /// Gets the read concern of the [`GridFsBucket`].
-    pub fn read_concern(&self) -> Option<&ReadConcern> {
+    fn read_concern(&self) -> Option<&ReadConcern> {
         self.inner.options.read_concern.as_ref()
     }
 
-    /// Gets the write concern of the [`GridFsBucket`].
-    pub fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.options.write_concern.as_ref()
     }
 
-    /// Gets the selection criteria of the [`GridFsBucket`].
-    pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.inner.options.selection_criteria.as_ref()
     }
 
-    /// Gets a handle to the files collection for the [`GridFsBucket`].
-    pub fn files(&self) -> &Collection<FilesCollectionDocument> {
+    fn files(&self) -> &Collection<FilesCollectionDocument> {
         &self.inner.files
     }
 
-    /// Gets a handle to the chunks collection for the [`GridFsBucket`].
-    pub fn chunks(&self) -> &Collection<Chunk> {
+    fn chunks(&self) -> &Collection<Chunk> {
         &self.inner.chunks
     }
 
-    /// Gets the chunk size in bytes for the [`GridFsBucket`].
-    pub fn chunk_size_bytes(&self) -> u32 {
+    fn chunk_size_bytes(&self) -> u32 {
         self.inner.options.chunk_size_bytes.unwrap()
     }
 
-    /// Gets the name of the [`GridFsBucket`].
-    pub fn bucket_name(&self) -> &str {
+    fn bucket_name(&self) -> &str {
         self.inner.options.bucket_name.as_ref().unwrap()
     }
 
@@ -259,7 +257,7 @@ impl GridFsBucket {
     pub async fn open_upload_stream_with_id(
         &self,
         files_id: Bson,
-        filename: &str,
+        filename: impl AsRef<str>,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<GridFsUploadStream> {
         self.check_or_create_indexes().await?;
@@ -267,12 +265,11 @@ impl GridFsBucket {
         options.chunk_size_bytes = options
             .chunk_size_bytes
             .or_else(|| Some(self.chunk_size_bytes()));
-        options.metadata = options.metadata.or(None);
         Ok(GridFsUploadStream {
             bucket: self.clone(),
             files_id,
             length: 0,
-            filename: filename.to_string(),
+            filename: filename.as_ref().to_string(),
             options,
         })
     }
@@ -283,7 +280,7 @@ impl GridFsBucket {
     /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
     pub async fn open_upload_stream(
         &self,
-        filename: &str,
+        filename: impl AsRef<str>,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<GridFsUploadStream> {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
@@ -295,7 +292,7 @@ impl GridFsBucket {
     pub async fn upload_from_tokio_reader_with_id<T>(
         &self,
         files_id: Bson,
-        filename: &str,
+        filename: impl AsRef<str>,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
@@ -310,7 +307,6 @@ impl GridFsBucket {
         options.chunk_size_bytes = options
             .chunk_size_bytes
             .or_else(|| Some(self.chunk_size_bytes()));
-        options.metadata = options.metadata.or(None);
 
         let chunk_size = options.chunk_size_bytes.unwrap();
         let mut length = 0;
@@ -322,10 +318,10 @@ impl GridFsBucket {
             .write_concern(self.write_concern().cloned())
             .build();
 
-        'outer: loop {
+        loop {
             let mut buf = vec![0u8; chunk_size as usize];
             let mut curr_length = 0usize;
-            '_inner: while curr_length < chunk_size as usize {
+            while curr_length < chunk_size as usize {
                 let bytes_read = match source.read(&mut buf[curr_length..]).await {
                     Ok(num) => num,
                     Err(e) => {
@@ -341,7 +337,7 @@ impl GridFsBucket {
                 };
                 curr_length += bytes_read;
                 if bytes_read == 0 {
-                    break 'outer;
+                    break;
                 }
             }
             if curr_length == 0 {
@@ -352,7 +348,7 @@ impl GridFsBucket {
                 files_id: files_id.clone(),
                 n,
                 data: Binary {
-                    bytes: buf,
+                    bytes: buf[..curr_length].to_vec(),
                     subtype: BinarySubtype::Generic,
                 },
             };
@@ -367,7 +363,7 @@ impl GridFsBucket {
             length: length as u64,
             chunk_size,
             upload_date: DateTime::now(),
-            filename: filename.to_string(),
+            filename: filename.as_ref().to_string(),
             metadata: options.metadata,
         };
         self.files().insert_one(file, insert_options).await?;
@@ -379,7 +375,7 @@ impl GridFsBucket {
     pub async fn upload_from_futures_0_3_reader_with_id<T>(
         &self,
         files_id: Bson,
-        filename: &str,
+        filename: impl AsRef<str>,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
@@ -394,7 +390,7 @@ impl GridFsBucket {
     /// the file id. Uses the `tokio` crate's `AsyncRead` trait for the `source`.
     pub async fn upload_from_tokio_reader<T>(
         &self,
-        filename: &str,
+        filename: impl AsRef<str>,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
@@ -414,7 +410,7 @@ impl GridFsBucket {
     /// the file id. Uses the `futures-0.3` crate's `AsyncRead` trait for the `source`.
     pub async fn upload_from_futures_0_3_reader<T>(
         &self,
-        filename: &str,
+        filename: impl AsRef<str>,
         source: &mut T,
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<()>
@@ -469,7 +465,7 @@ impl GridFsBucket {
     /// in `options`.
     pub async fn open_download_stream_by_name(
         &self,
-        filename: String,
+        filename: impl AsRef<str>,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<GridFsDownloadStream> {
         let mut sort = doc! { "uploadDate": -1 };
@@ -488,13 +484,13 @@ impl GridFsBucket {
 
         let file = match self
             .files()
-            .find_one(doc! { "filename": &filename }, options)
+            .find_one(doc! { "filename": filename.as_ref() }, options)
             .await?
         {
             Some(fcd) => fcd,
             None => {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("couldn't find file with name {}", &filename),
+                    message: format!("couldn't find file with name {}", filename.as_ref()),
                 }
                 .into());
             }
@@ -531,10 +527,12 @@ impl GridFsBucket {
             .read_concern(self.read_concern().cloned())
             .selection_criteria(self.selection_criteria().cloned())
             .build();
+
         let mut cursor = self
             .chunks()
             .find(doc! { "files_id": &file.id }, options)
             .await?;
+
         let mut n = 0;
         while cursor.advance().await? {
             let chunk = cursor.deserialize_current()?;
@@ -551,7 +549,7 @@ impl GridFsBucket {
                 }
                 .into());
             }
-            destination.write(&chunk.data.bytes).await?;
+            destination.write_all(&chunk.data.bytes).await?;
             n += 1;
         }
         Ok(())
@@ -602,7 +600,7 @@ impl GridFsBucket {
     /// `tokio` crate's `AsyncWrite` trait for the `destination`.
     pub async fn download_to_tokio_writer_by_name<T>(
         &self,
-        filename: &str,
+        filename: impl AsRef<str>,
         destination: &mut T,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<()>
@@ -627,15 +625,16 @@ impl GridFsBucket {
             .read_concern(self.read_concern().cloned())
             .selection_criteria(self.selection_criteria().cloned())
             .build();
+
         let file = match self
             .files()
-            .find_one(doc! { "filename": filename }, options)
+            .find_one(doc! { "filename": filename.as_ref() }, options)
             .await?
         {
             Some(fcd) => fcd,
             None => {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("couldn't find file with name {}", &filename),
+                    message: format!("couldn't find file with name {}", &filename.as_ref()),
                 }
                 .into());
             }
@@ -649,7 +648,7 @@ impl GridFsBucket {
     /// `futures-0.3` crate's `AsyncWrite` trait for the `destination`.
     pub async fn download_to_futures_0_3_writer_by_name<T>(
         &self,
-        filename: &str,
+        filename: impl AsRef<str>,
         destination: &mut T,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<()>

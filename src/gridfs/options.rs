@@ -45,7 +45,6 @@ pub struct GridFsUploadOptions {
     pub metadata: Option<Document>,
 }
 
-
 /// Contains the options for creating a [`GridFsDownloadStream`] to retrieve a stored file
 /// from a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
