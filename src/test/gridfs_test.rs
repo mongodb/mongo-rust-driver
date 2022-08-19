@@ -1,8 +1,11 @@
-use crate::{gridfs::options::GridFsBucketOptions, selection_criteria::{SelectionCriteria, ReadPreference}};
 #[cfg(test)]
 use crate::test::TestClient;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use crate::{
+    gridfs::options::GridFsBucketOptions,
+    selection_criteria::{ReadPreference, SelectionCriteria},
+};
 use bson::doc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
 async fn test_gridfs_bucket() {
@@ -26,7 +29,10 @@ async fn test_gridfs_bucket() {
     upload_stream.finish().await.unwrap();
     println!("x 9");
 
-    let mut download_stream = bucket.open_download_stream_by_name("foo".to_string(), None).await.unwrap();
+    let mut download_stream = bucket
+        .open_download_stream_by_name("foo".to_string(), None)
+        .await
+        .unwrap();
     println!("x 10");
     let mut buf = [0u8; 200];
 

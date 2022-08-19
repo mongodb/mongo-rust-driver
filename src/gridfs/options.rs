@@ -1,9 +1,11 @@
+use std::{option::Option, time::Duration};
+
 use crate::{
+    coll::options::FindOptions,
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
 use serde::Deserialize;
-use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use bson::Document;
@@ -86,4 +88,17 @@ pub struct GridFsFindOptions {
 
     /// The order by which to sort results. Defaults to not sorting.
     pub sort: Option<Document>,
+}
+
+impl From<GridFsFindOptions> for FindOptions {
+    fn from(options: GridFsFindOptions) -> Self {
+        FindOptions::builder()
+            .allow_disk_use(options.allow_disk_use)
+            .batch_size(options.batch_size)
+            .limit(options.limit)
+            .max_time(options.max_time)
+            .skip(options.skip)
+            .sort(options.sort)
+            .build()
+    }
 }
