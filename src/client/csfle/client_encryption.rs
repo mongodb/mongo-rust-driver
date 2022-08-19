@@ -16,6 +16,8 @@ use mongocrypt::{
     ctx::{Algorithm, Ctx, KmsProvider},
     Crypt,
 };
+use serde::Serialize;
+use typed_builder::TypedBuilder;
 
 use super::{
     options::{KmsProviders, KmsProvidersTlsOptions},
@@ -32,20 +34,20 @@ pub struct ClientEncryption {
 
 impl ClientEncryption {
     /// Create a new key vault handle with the given options.
-    pub fn new(opts: ClientEncryptionOptions) -> Result<Self> {
+    pub fn new(options: ClientEncryptionOptions) -> Result<Self> {
         let crypt = Crypt::builder().build()?;
         let exec = CryptExecutor::new(
-            opts.key_vault_client.weak(),
-            opts.key_vault_namespace.clone(),
+            options.key_vault_client.weak(),
+            options.key_vault_namespace.clone(),
             None,
             None,
-            opts.tls_options,
+            options.tls_options,
         )?;
-        let key_vault = opts
+        let key_vault = options
             .key_vault_client
-            .database(&opts.key_vault_namespace.db)
+            .database(&options.key_vault_namespace.db)
             .collection_with_options(
-                &opts.key_vault_namespace.coll,
+                &options.key_vault_namespace.coll,
                 CollectionOptions::builder()
                     .write_concern(WriteConcern::MAJORITY)
                     .read_concern(ReadConcern::MAJORITY)
@@ -77,8 +79,9 @@ impl ClientEncryption {
     fn create_data_key_ctx(&self, kms_provider: KmsProvider, opts: DataKeyOptions) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
         let mut key_doc = doc! { "provider": kms_provider.name() };
-        if let Some(master_key) = opts.master_key {
-            key_doc.extend(master_key);
+        if !matches!(opts.master_key, MasterKey::Local) {
+            let master_doc = bson::to_document(&opts.master_key)?;
+            key_doc.extend(master_doc);
         }
         builder = builder.key_encryption_key(&key_doc)?;
         if let Some(alt_names) = opts.key_alt_names {
@@ -222,6 +225,7 @@ impl ClientEncryption {
 }
 
 /// Options for initializing a new `ClientEncryption`.
+#[derive(TypedBuilder)]
 #[non_exhaustive]
 pub struct ClientEncryptionOptions {
     /// The key vault `Client`.
@@ -236,20 +240,36 @@ pub struct ClientEncryptionOptions {
     /// Map of KMS provider properties; multiple KMS providers may be specified.
     pub kms_providers: KmsProviders,
     /// TLS options for connecting to KMS providers.  If not given, default options will be used.
+    #[builder(default)]
     pub tls_options: Option<KmsProvidersTlsOptions>,
 }
 
 /// Options for creating a data key.
+#[derive(TypedBuilder)]
 #[non_exhaustive]
 pub struct DataKeyOptions {
     /// The master key document, a KMS-specific key used to encrypt the new data key.
-    pub master_key: Option<Document>,
+    pub master_key: MasterKey,
     /// An optional list of alternate names used to reference a key.
+    #[builder(default)]
     pub key_alt_names: Option<Vec<String>>,
     /// An optional buffer of 96 bytes to use as custom key material for the data key being
     /// created.  If unset, key material for the new data key is generated from a cryptographically
     /// secure random device.
+    #[builder(default)]
     pub key_material: Option<Vec<u8>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase", untagged)]
+#[non_exhaustive]
+pub enum MasterKey {
+    Aws {
+        region: String,
+        key: String,
+        endpoint: Option<String>,
+    },
+    Local,
 }
 
 // #[non_exhaustive]
@@ -265,6 +285,7 @@ pub struct DataKeyOptions {
 // }
 
 /// The options for explicit encryption.
+#[derive(TypedBuilder)]
 #[non_exhaustive]
 pub struct EncryptOptions {
     /// The key to use.
@@ -272,8 +293,10 @@ pub struct EncryptOptions {
     /// The encryption algorithm.
     pub algorithm: Algorithm,
     /// The contention factor.
+    #[builder(default)]
     pub contention_factor: Option<i64>,
     /// The query type.
+    #[builder(default)]
     pub query_type: Option<String>,
 }
 
