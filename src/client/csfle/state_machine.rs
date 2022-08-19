@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, path::PathBuf};
 
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
@@ -25,20 +25,20 @@ use super::options::KmsProvidersTlsOptions;
 pub(crate) struct CryptExecutor {
     key_vault_client: WeakClient,
     key_vault_namespace: Namespace,
-    mongocryptd_client: Option<Client>,
-    metadata_client: Option<WeakClient>,
     tls_options: Option<KmsProvidersTlsOptions>,
     crypto_threads: ThreadPool,
+    mongocryptd_opts: Option<MongocryptdOptions>,
+    mongocryptd_client: Option<Client>,
+    metadata_client: Option<WeakClient>,
 }
 
 impl CryptExecutor {
-    pub(crate) fn new(
+    pub(crate) fn new_explicit(
         key_vault_client: WeakClient,
         key_vault_namespace: Namespace,
-        mongocryptd_client: Option<Client>,
-        metadata_client: Option<WeakClient>,
         tls_options: Option<KmsProvidersTlsOptions>,
-    ) -> Result<Self> {
+    ) -> Result<Self>
+    {
         let num_cpus = std::thread::available_parallelism()?.get();
         let crypto_threads = rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus)
@@ -47,11 +47,30 @@ impl CryptExecutor {
         Ok(Self {
             key_vault_client,
             key_vault_namespace,
-            mongocryptd_client,
-            metadata_client,
             tls_options,
             crypto_threads,
+            mongocryptd_opts: None,
+            mongocryptd_client: None,
+            metadata_client: None,
         })
+    }
+
+    pub(crate) async fn new_implicit(
+        key_vault_client: WeakClient,
+        key_vault_namespace: Namespace,
+        tls_options: Option<KmsProvidersTlsOptions>,
+        mongocryptd_opts: Option<MongocryptdOptions>,
+        metadata_client: Option<WeakClient>,
+    ) -> Result<Self> {
+        let mongocryptd_client = match &mongocryptd_opts {
+            Some(opts) => opts.spawn().await?,
+            None => None,
+        };
+        let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
+        exec.mongocryptd_opts = mongocryptd_opts;
+        exec.mongocryptd_client = mongocryptd_client;
+        exec.metadata_client = metadata_client;
+        Ok(exec)
     }
 
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
@@ -178,6 +197,51 @@ impl CryptExecutor {
             Some(doc) => Ok(doc),
             None => Err(Error::internal("libmongocrypt terminated without output")),
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct MongocryptdOptions {
+    pub(crate) spawn_path: Option<PathBuf>,    // opts.extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)
+    pub(crate) spawn_args: Vec<String>,        // opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)
+    pub(crate) uri: Option<String>,            // opts.extra_option(&EO_MONGOCRYPTD_URI)
+}
+
+impl MongocryptdOptions {
+    async fn spawn(
+        &self,
+    ) -> Result<Option<Client>> {
+        use std::process::{Command, Stdio};
+
+        let which_path;
+        let bin_path = match &self.spawn_path {
+            Some(s) => s,
+            None => {
+                which_path = which::which("mongocryptd")
+                    .map_err(|e| Error::invalid_argument(format!("{}", e)))?;
+                &which_path
+            }
+        };
+        let mut args: Vec<&str> = vec![];
+        let mut has_idle = false;
+        for arg in &self.spawn_args {
+            has_idle |= arg.starts_with("--idleShutdownTimeoutSecs");
+            args.push(arg);
+        }
+        if !has_idle {
+            args.push("--idleShutdownTimeoutSecs=60");
+        }
+        Command::new(bin_path)
+            .args(&args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+
+        let uri = self.uri.as_deref()
+            .unwrap_or("mongodb://localhost:27020");
+        let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
+        options.server_selection_timeout = Some(std::time::Duration::from_millis(10_000));
+        Ok(Some(Client::with_options(options)?))
     }
 }
 

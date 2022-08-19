@@ -36,11 +36,9 @@ impl ClientEncryption {
     /// Create a new key vault handle with the given options.
     pub fn new(options: ClientEncryptionOptions) -> Result<Self> {
         let crypt = Crypt::builder().build()?;
-        let exec = CryptExecutor::new(
+        let exec = CryptExecutor::new_explicit(
             options.key_vault_client.weak(),
             options.key_vault_namespace.clone(),
-            None,
-            None,
             options.tls_options,
         )?;
         let key_vault = options
