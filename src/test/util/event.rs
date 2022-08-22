@@ -569,6 +569,7 @@ impl EventClient {
         )
         .await;
         options.test_options_mut().min_heartbeat_freq = min_heartbeat_freq;
+        println!("using options: {:#?}", options);
         EventClient::with_options_and_handler(options, event_handler).await
     }
 
