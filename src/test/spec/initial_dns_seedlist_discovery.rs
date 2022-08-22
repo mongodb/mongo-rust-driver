@@ -25,6 +25,7 @@ struct TestFile {
     num_seeds: Option<usize>,
     #[serde(rename = "numHosts")]
     num_hosts: Option<usize>,
+    ping: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -138,23 +139,23 @@ async fn run_test(mut test_file: TestFile) {
     } else {
         // If the connection URI provides authentication information, manually create the user
         // before connecting.
-        if let Some(ParsedOptions {
-            user: Some(ref user),
-            password: Some(ref pwd),
-            ref db,
-        }) = test_file.parsed_options
-        {
-            client
-                .drop_and_create_user(
-                    user,
-                    pwd.as_str(),
-                    &[],
-                    &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
-                    db.as_deref(),
-                )
-                .await
-                .unwrap();
-        }
+        // if let Some(ParsedOptions {
+        //     user: Some(ref user),
+        //     password: Some(ref pwd),
+        //     ref db,
+        // }) = test_file.parsed_options
+        // {
+        //     client
+        //         .drop_and_create_user(
+        //             user,
+        //             pwd.as_str(),
+        //             &[],
+        //             &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
+        //             db.as_deref(),
+        //         )
+        //         .await
+        //         .unwrap();
+        // }
 
         let mut options_with_tls = options.clone();
         if requires_tls {
@@ -162,11 +163,13 @@ async fn run_test(mut test_file: TestFile) {
         }
 
         let client = Client::with_options(options_with_tls).unwrap();
-        client
-            .database("db")
-            .run_command(doc! { "ping" : 1 }, None)
-            .await
-            .unwrap();
+        if test_file.ping == Some(true) {
+            client
+                .database("db")
+                .run_command(doc! { "ping" : 1 }, None)
+                .await
+                .unwrap();
+        }
 
         if let Some(ref mut hosts) = test_file.hosts {
             hosts.sort();
