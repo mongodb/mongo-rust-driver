@@ -2153,7 +2153,8 @@ impl ConnectionString {
                 });
                 let mut message = format!("{} is an invalid option", other);
                 if jaro_winkler >= 0.84 {
-                    let _ = write!(message,
+                    let _ = write!(
+                        message,
                         ". An option with a similar name exists: {}",
                         option
                     );

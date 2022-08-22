@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration, fmt::Write};
+use std::{fmt::Write, sync::Arc, time::Duration};
 
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
