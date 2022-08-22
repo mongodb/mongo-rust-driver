@@ -7,7 +7,7 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
     path::PathBuf,
     str::FromStr,
@@ -2153,10 +2153,10 @@ impl ConnectionString {
                 });
                 let mut message = format!("{} is an invalid option", other);
                 if jaro_winkler >= 0.84 {
-                    message.push_str(&format!(
+                    let _ = write!(message,
                         ". An option with a similar name exists: {}",
                         option
-                    ));
+                    );
                 }
                 return Err(ErrorKind::InvalidArgument { message }.into());
             }
