@@ -155,33 +155,23 @@ async fn sdam_pool_management() {
         .await
         .expect("enabling failpoint should succeed");
 
-    subscriber
-        .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))
-        })
-        .await
-        .expect("should see server heartbeat failed event");
-
-    subscriber
-        .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
-        })
-        .await
-        .expect("should see pool cleared event");
-
-    subscriber
-        .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::Cmap(CmapEvent::PoolReady(_)))
-        })
-        .await
-        .expect("should see pool ready event");
-
-    subscriber
-        .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
-        })
-        .await
-        .expect("should see server heartbeat succeeded event");
+    // Since there is no deterministic ordering, simply collect all the events and check for their
+    // presence.
+    let events = subscriber
+        .collect_events(Duration::from_secs(1), |_| true)
+        .await;
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::Cmap(CmapEvent::PoolCleared(_)))));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::Cmap(CmapEvent::PoolReady(_)))));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
