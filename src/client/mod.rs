@@ -432,7 +432,7 @@ impl Client {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
         let watcher = self.inner.topology.watch();
         let state = watcher.peek_latest();
