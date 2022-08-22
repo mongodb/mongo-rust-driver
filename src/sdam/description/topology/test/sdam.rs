@@ -627,6 +627,8 @@ async fn heartbeat_events() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
 
+    let host = options.hosts.clone();
+
     let event_handler = EventHandler::new();
     let mut subscriber = event_handler.subscribe();
 
@@ -661,16 +663,19 @@ async fn heartbeat_events() {
         return;
     }
 
+    let fp_client_options = ClientOptions::builder().hosts(host).build();
+    let fp_client = TestClient::with_options(Some(fp_client_options)).await;
+
     let options = FailCommandOptions::builder()
         .error_code(1234)
         .app_name("heartbeat_events".to_string())
         .build();
     let failpoint = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(2),
+        FailPointMode::AlwaysOn,
         options,
     );
-    let _fp_guard = client
+    let _fp_guard = fp_client
         .enable_failpoint(failpoint, None)
         .await
         .expect("enabling failpoint should succeed");
