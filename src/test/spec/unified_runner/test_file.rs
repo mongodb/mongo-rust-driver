@@ -1,5 +1,6 @@
-use std::{sync::Arc, time::Duration};
+use std::{borrow::Cow, sync::Arc, time::Duration};
 
+use percent_encoding::NON_ALPHANUMERIC;
 use regex::Regex;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
@@ -197,6 +198,27 @@ pub(crate) fn merge_uri_options(
     uri_options: Option<&Document>,
     use_multiple_hosts: bool,
 ) -> String {
+    let given_uri = if !use_multiple_hosts {
+        let hosts_regex = Regex::new(r"mongodb://([^/]*)").unwrap();
+        let single_host = hosts_regex
+            .captures(given_uri)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .split(',')
+            .next()
+            .expect("expected URI to contain at least one host, but it had none");
+        hosts_regex.replace(given_uri, format!("mongodb://{}", single_host))
+    } else {
+        Cow::Borrowed(given_uri)
+    };
+
+    let uri_options = match uri_options {
+        Some(opts) => opts,
+        None => return given_uri.to_string(),
+    };
+
     let mut given_uri_parts = given_uri.split('?');
 
     let mut uri = String::from(given_uri_parts.next().unwrap());
@@ -207,27 +229,6 @@ pub(crate) fn merge_uri_options(
         uri.push('/');
     }
     uri.push('?');
-
-    if !use_multiple_hosts {
-        let hosts_regex = Regex::new(r"mongodb://([^/]*)/").unwrap();
-        let single_host = hosts_regex
-            .captures(&uri)
-            .unwrap()
-            .get(1)
-            .unwrap()
-            .as_str()
-            .split(',')
-            .next()
-            .expect("expected URI to contain at least one host, but it had none");
-        uri = hosts_regex
-            .replace(uri.as_str(), format!("mongodb://{}/", single_host))
-            .to_string();
-    }
-
-    let uri_options = match uri_options {
-        Some(opts) => opts,
-        None => return uri,
-    };
 
     if let Some(options) = given_uri_parts.next() {
         let options = options.split('&');
@@ -246,7 +247,11 @@ pub(crate) fn merge_uri_options(
         let value = value.to_string();
         // to_string() wraps quotations around Bson strings
         let value = value.trim_start_matches('\"').trim_end_matches('\"');
-        uri.push_str(&format!("{}={}&", &key, value));
+        uri.push_str(&format!(
+            "{}={}&",
+            &key,
+            percent_encoding::percent_encode(value.as_bytes(), NON_ALPHANUMERIC)
+        ));
     }
 
     // remove the trailing '&' from the URI (or '?' if no options are present)
