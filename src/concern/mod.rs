@@ -43,7 +43,7 @@ impl ReadConcern {
         level: ReadConcernLevel::Linearizable,
     };
     /// A `ReadConcern` with level `ReadConcernLevel::Available`.
-    pub const AVAILBLE: ReadConcern = ReadConcern {
+    pub const AVAILABLE: ReadConcern = ReadConcern {
         level: ReadConcernLevel::Available,
     };
     /// A `ReadConcern` with level `ReadConcernLevel::Snapshot`.
