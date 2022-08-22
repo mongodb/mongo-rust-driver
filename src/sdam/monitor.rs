@@ -1,4 +1,5 @@
 use std::{
+    future,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -172,21 +173,30 @@ impl Monitor {
             })
         });
 
+        let heartbeat_frequency = self.heartbeat_frequency();
         let timeout = if self.connect_timeout().as_millis() == 0 {
             // If connectTimeoutMS = 0, then the socket timeout for monitoring is unlimited.
             Duration::MAX
         } else if self.topology_version.is_some() {
             // For streaming responses, use connectTimeoutMS + heartbeatFrequencyMS for socket
             // timeout.
-            self.heartbeat_frequency()
+            heartbeat_frequency
                 .checked_add(self.connect_timeout())
                 .unwrap_or(Duration::MAX)
         } else {
             // Otherwise, just use connectTimeoutMS.
             self.connect_timeout()
         };
-
-        let heartbeat_frequency = self.heartbeat_frequency();
+        let timeout_future = async {
+            // If timeout is infinite, don't bother creating a delay future.
+            // This also avoids a panic on async-std when the provided duration is too large.
+            // See: https://github.com/async-rs/async-std/issues/1037.
+            if timeout == Duration::MAX {
+                future::pending().await
+            } else {
+                runtime::delay_for(timeout).await
+            }
+        };
 
         let execute_hello = async {
             match self.connection {
@@ -235,8 +245,7 @@ impl Monitor {
             }
         };
 
-        let sleep = runtime::delay_for(timeout);
-        tokio::pin!(sleep);
+        tokio::pin!(timeout_future);
 
         // Execute the hello while also listening for cancellation and keeping track of the timeout.
         let start = Instant::now();
@@ -252,7 +261,7 @@ impl Monitor {
                 };
                 HelloResult::Cancelled { reason: reason_error }
             }
-            _ = &mut sleep => {
+            _ = &mut timeout_future => {
                 HelloResult::Err(Error::network_timeout())
             }
         };
