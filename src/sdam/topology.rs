@@ -854,13 +854,11 @@ impl TopologyWatcher {
         let changed = if let Some(timeout) = timeout.into() {
             matches!(
                 runtime::timeout(timeout, self.receiver.changed()).await,
-                Ok(Ok(_))
+                Ok(Ok(()))
             )
         } else {
             self.receiver.changed().await.is_ok()
         };
-
-        self.receiver.borrow_and_update();
 
         if changed {
             self.retract_immediate_check_request();
