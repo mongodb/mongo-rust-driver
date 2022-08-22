@@ -12,5 +12,8 @@ parsed_options:
     user: "b*b@f3tt="
     password: "$4to@L8=MC"
     db: "mydb?"
-ping: true
+# Don't run a ping for URIs that include userinfo. Ping doesn't require authentication, so missing
+# userinfo isn't a problem, but some drivers will fail handshake on a connection if userinfo is
+# provided but incorrect.
+ping: false
 comment: Encoded user, pass, and DB parse correctly
