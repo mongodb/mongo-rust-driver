@@ -20,6 +20,7 @@ use crate::{
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
+        CLIENT_OPTIONS,
         SERVERLESS,
     },
 };
@@ -133,7 +134,9 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
 
         let mut additional_options = match test.client_uri {
             Some(ref uri) => ClientOptions::parse_uri(uri, None).await.unwrap(),
-            None => Default::default(),
+            None => ClientOptions::builder()
+                .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
+                .build(),
         };
         if additional_options.heartbeat_freq.is_none() {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
