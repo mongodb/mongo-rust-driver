@@ -65,39 +65,45 @@ impl ClientEncryption {
     pub async fn create_data_key(
         &self,
         kms_provider: KmsProvider,
-        opts: DataKeyOptions,
+        opts: impl Into<Option<DataKeyOptions>>,
     ) -> Result<Binary> {
-        let ctx = self.create_data_key_ctx(kms_provider, opts)?;
+        let ctx = self.create_data_key_ctx(kms_provider, opts.into())?;
         let data_key = self.exec.run_ctx(ctx, None).await?;
         self.key_vault.insert_one(&data_key, None).await?;
         let bin_ref = data_key
             .get_binary("_id")
             .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
-        Ok(bin_owned(bin_ref))
+        Ok(bin_ref.to_binary())
     }
 
-    fn create_data_key_ctx(&self, kms_provider: KmsProvider, opts: DataKeyOptions) -> Result<Ctx> {
+    fn create_data_key_ctx(
+        &self,
+        kms_provider: KmsProvider,
+        opts: Option<DataKeyOptions>,
+    ) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
         let mut key_doc = doc! { "provider": kms_provider.name() };
-        if !matches!(opts.master_key, MasterKey::Local) {
-            let master_doc = bson::to_document(&opts.master_key)?;
-            key_doc.extend(master_doc);
-        }
-        builder = builder.key_encryption_key(&key_doc)?;
-        if let Some(alt_names) = opts.key_alt_names {
-            for name in alt_names {
-                builder = builder.key_alt_name(&name)?;
+        if let Some(opts) = opts {
+            if !matches!(opts.master_key, MasterKey::Local) {
+                let master_doc = bson::to_document(&opts.master_key)?;
+                key_doc.extend(master_doc);
+            }
+            if let Some(alt_names) = opts.key_alt_names {
+                for name in alt_names {
+                    builder = builder.key_alt_name(&name)?;
+                }
+            }
+            if let Some(material) = opts.key_material {
+                builder = builder.key_material(&material)?;
             }
         }
-        if let Some(material) = opts.key_material {
-            builder = builder.key_material(&material)?;
-        }
+        builder = builder.key_encryption_key(&key_doc)?;
         Ok(builder.build_datakey()?)
     }
 
-    // pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: RewrapManyDataKeyOptions)
-    // -> Result<RewrapManyDataKeyResult> { todo!("RUST-1441")
-    // }
+    // pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: impl
+    // Into<Option<RewrapManyDataKeyOptions>>) -> Result<RewrapManyDataKeyResult> {
+    // todo!("RUST-1441") }
 
     /// Removes the key document with the given UUID (BSON binary subtype 0x04) from the key vault
     /// collection. Returns the result of the internal deleteOne() operation on the key vault
@@ -165,9 +171,12 @@ impl ClientEncryption {
     }
 
     /// Returns a key document in the key vault collection with the given keyAltName.
-    pub async fn get_key_by_alt_name(&self, key_alt_name: &str) -> Result<Option<RawDocumentBuf>> {
+    pub async fn get_key_by_alt_name(
+        &self,
+        key_alt_name: impl AsRef<str>,
+    ) -> Result<Option<RawDocumentBuf>> {
         self.key_vault
-            .find_one(doc! { "keyAltNames": key_alt_name }, None)
+            .find_one(doc! { "keyAltNames": key_alt_name.as_ref() }, None)
             .await
     }
 
@@ -179,7 +188,7 @@ impl ClientEncryption {
         let bin_ref = result
             .get_binary("v")
             .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-        Ok(bin_owned(bin_ref))
+        Ok(bin_ref.to_binary())
     }
 
     fn encrypt_ctx(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Ctx> {
@@ -225,7 +234,7 @@ impl ClientEncryption {
 }
 
 /// Options for initializing a new `ClientEncryption`.
-#[derive(TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct ClientEncryptionOptions {
@@ -246,7 +255,7 @@ pub struct ClientEncryptionOptions {
 }
 
 /// Options for creating a data key.
-#[derive(TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct DataKeyOptions {
@@ -263,7 +272,7 @@ pub struct DataKeyOptions {
 }
 
 /// A KMS-specific key used to encrypt data keys.
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 #[non_exhaustive]
 #[allow(missing_docs)]
@@ -317,7 +326,7 @@ pub enum MasterKey {
 // }
 
 /// The options for explicit encryption.
-#[derive(TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct EncryptOptions {
@@ -338,17 +347,11 @@ pub struct EncryptOptions {
 }
 
 /// An encryption key reference.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum EncryptKey {
     /// Find the key by _id value.
     Id(Binary),
     /// Find the key by alternate name.
     AltName(String),
-}
-
-// TODO: this can be `bin_ref.to_binary()` once PR#370 is merged.
-fn bin_owned(bin_ref: RawBinaryRef) -> Binary {
-    Binary {
-        subtype: bin_ref.subtype,
-        bytes: bin_ref.bytes.to_owned(),
-    }
 }
