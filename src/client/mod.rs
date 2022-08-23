@@ -422,9 +422,8 @@ impl Client {
                     .await;
             if !change_occurred {
                 return Err(ErrorKind::ServerSelection {
-                    message: self
-                        .inner
-                        .topology
+                    message: state
+                        .description
                         .server_selection_timeout_error_message(criteria),
                 }
                 .into());

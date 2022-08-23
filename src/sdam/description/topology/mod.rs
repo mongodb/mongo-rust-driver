@@ -177,7 +177,7 @@ impl TopologyDescription {
         };
 
         for address in options.hosts.iter() {
-            let description = ServerDescription::new(address.clone(), None, None);
+            let description = ServerDescription::new(address.clone());
             self.servers.insert(address.to_owned(), description);
         }
 
@@ -486,13 +486,12 @@ impl TopologyDescription {
                         Err(s) => format!("<error: {}>", s),
                     };
                     // Mark server as unknown.
-                    server_description = ServerDescription::new(
+                    server_description = ServerDescription::new_from_error(
                         server_description.address,
-                        Some(Err(Error::invalid_argument(format!(
+                        Error::invalid_argument(format!(
                             "Connection string replicaSet name {:?} does not match actual name {}",
                             expected_name, got_display,
-                        )))),
-                        server_description.average_round_trip_time,
+                        )),
                     );
                 }
             }
@@ -703,7 +702,7 @@ impl TopologyDescription {
                         {
                             self.servers.insert(
                                 server_description.address.clone(),
-                                ServerDescription::new(server_description.address, None, None),
+                                ServerDescription::new(server_description.address),
                             );
                             self.record_primary_state();
                             return Ok(());
@@ -737,7 +736,7 @@ impl TopologyDescription {
 
             if let ServerType::RsPrimary = self.servers.get(&address).unwrap().server_type {
                 self.servers
-                    .insert(address.clone(), ServerDescription::new(address, None, None));
+                    .insert(address.clone(), ServerDescription::new(address));
             }
         }
 
@@ -786,10 +785,8 @@ impl TopologyDescription {
     ) {
         for server in servers {
             if !self.servers.contains_key(server) {
-                self.servers.insert(
-                    server.clone(),
-                    ServerDescription::new(server.clone(), None, None),
-                );
+                self.servers
+                    .insert(server.clone(), ServerDescription::new(server.clone()));
             }
         }
     }

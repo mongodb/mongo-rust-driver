@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bson::RawDocumentBuf;
 use serde::{Deserialize, Serialize};
@@ -65,11 +65,10 @@ pub(crate) fn hello_command(
     command
 }
 
-/// Execute a hello or legacy hello command, recording the round trip time.
+/// Execute a hello or legacy hello command.
 pub(crate) async fn run_hello(conn: &mut Connection, command: Command) -> Result<HelloReply> {
-    let start = Instant::now();
     let response_result = conn.send_command(command, None).await;
-    response_result.and_then(|raw_response| raw_response.into_hello_reply(Some(start.elapsed())))
+    response_result.and_then(|raw_response| raw_response.into_hello_reply())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -77,9 +76,6 @@ pub(crate) struct HelloReply {
     pub(crate) server_address: ServerAddress,
     pub(crate) command_response: HelloCommandResponse,
     pub(crate) raw_command_response: RawDocumentBuf,
-    /// The time it took to send the initial hello command and receive this reply.
-    /// `None` if this reply was awaited.
-    pub(crate) round_trip_time: Option<Duration>,
     pub(crate) cluster_time: Option<ClusterTime>,
 }
 

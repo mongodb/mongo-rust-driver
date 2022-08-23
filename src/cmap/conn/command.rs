@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bson::{RawDocument, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -251,7 +249,7 @@ impl RawCommandResponse {
             .map_err(|_| Error::invalid_authentication_response(mechanism_name))
     }
 
-    pub(crate) fn into_hello_reply(self, round_trip_time: Option<Duration>) -> Result<HelloReply> {
+    pub(crate) fn into_hello_reply(self) -> Result<HelloReply> {
         match self.body::<CommandResponse<HelloCommandResponse>>() {
             Ok(response) if response.is_success() => {
                 let server_address = self.source_address().clone();
@@ -259,7 +257,6 @@ impl RawCommandResponse {
                 Ok(HelloReply {
                     server_address,
                     command_response: response.body,
-                    round_trip_time,
                     cluster_time,
                     raw_command_response: self.into_raw_document_buf(),
                 })

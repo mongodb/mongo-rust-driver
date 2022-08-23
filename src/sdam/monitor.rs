@@ -149,11 +149,18 @@ impl Monitor {
 
         match check_result {
             HelloResult::Ok(reply) => {
-                let server_description = ServerDescription::new(
-                    self.address.clone(),
-                    Some(Ok(reply)),
-                    self.rtt_monitor_handle.average_rtt(),
-                );
+                let avg_rtt = self.rtt_monitor_handle.average_rtt();
+
+                // If we have an Ok result, then we at least performed a handshake, which should
+                // mean that the RTT has a value.
+                debug_assert!(avg_rtt.is_some());
+
+                // In the event that we don't have an average RTT value (e.g. due to a bug), just
+                // default to using the maximum possible value.
+                let avg_rtt = avg_rtt.unwrap_or(Duration::MAX);
+
+                let server_description =
+                    ServerDescription::new_from_hello_reply(self.address.clone(), reply, avg_rtt);
                 self.topology_updater.update(server_description).await;
                 true
             }
@@ -205,7 +212,7 @@ impl Monitor {
                     if conn.is_streaming() {
                         conn.receive_message()
                             .await
-                            .and_then(|r| r.into_hello_reply(None))
+                            .and_then(|r| r.into_hello_reply())
                     // Otherwise, send a regular hello command.
                     } else {
                         // If the initial handshake returned a topology version, send it back to the
@@ -226,6 +233,8 @@ impl Monitor {
                     }
                 }
                 None => {
+                    let start = Instant::now();
+
                     let mut connection = Connection::connect_monitoring(
                         self.address.clone(),
                         self.client_options.tls_options(),
@@ -237,6 +246,10 @@ impl Monitor {
                         .handshake(&mut connection)
                         .await
                         .map(|r| r.hello_reply);
+
+                    if res.is_ok() {
+                        self.rtt_monitor_handle.add_sample(start.elapsed());
+                    }
 
                     self.connection = Some(connection);
 
@@ -356,15 +369,13 @@ pub(crate) struct RttInfo {
 }
 
 impl RttInfo {
-    pub(crate) fn with_updated_average_rtt(self, sample: Duration) -> Self {
+    pub(crate) fn add_sample(&mut self, sample: Duration) {
         match self.average {
-            Some(old_rtt) => RttInfo {
+            Some(old_rtt) => {
                 // Average is 20% most recent sample and 80% prior sample.
-                average: Some((sample / 5) + (old_rtt * 4 / 5)),
-            },
-            None => RttInfo {
-                average: Some(sample),
-            },
+                self.average = Some((sample / 5) + (old_rtt * 4 / 5))
+            }
+            None => self.average = Some(sample),
         }
     }
 }
@@ -438,11 +449,11 @@ impl RttMonitor {
                     false
                 }
             };
-            let rtt = start.elapsed();
 
             if check_succeded {
-                let new_rtt = self.sender.borrow().with_updated_average_rtt(rtt);
-                let _ = self.sender.send(new_rtt);
+                let _ = self
+                    .sender
+                    .send_modify(|rtt_info| rtt_info.add_sample(start.elapsed()));
             } else {
                 // From the SDAM spec: "Errors encountered when running a hello or legacy hello
                 // command MUST NOT update the topology."
@@ -474,6 +485,12 @@ impl RttMonitorHandle {
 
     fn reset_average_rtt(&mut self) {
         let _ = self.reset_sender.send(RttInfo::default());
+    }
+
+    fn add_sample(&mut self, sample: Duration) {
+        let _ = self.reset_sender.send_modify(|rtt_info| {
+            rtt_info.add_sample(sample);
+        });
     }
 }
 

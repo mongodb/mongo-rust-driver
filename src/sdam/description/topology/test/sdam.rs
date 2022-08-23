@@ -304,7 +304,6 @@ async fn run_test(test_file: TestFile) {
                 Ok(HelloReply {
                     server_address: address.clone(),
                     command_response: command_response.into(),
-                    round_trip_time: None, // Doesn't matter for tests.
                     cluster_time: None,
                     raw_command_response: Default::default(), // doesn't matter for tests
                 })
@@ -312,7 +311,11 @@ async fn run_test(test_file: TestFile) {
 
             match hello_reply {
                 Ok(reply) => {
-                    let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)), None);
+                    let new_sd = ServerDescription::new_from_hello_reply(
+                        address.clone(),
+                        reply,
+                        Duration::from_secs(1),
+                    );
                     topology.clone_updater().update(new_sd).await;
                 }
                 Err(e) => {
@@ -771,16 +774,15 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     // discover the node
     topology
         .clone_updater()
-        .update(ServerDescription::new(
+        .update(ServerDescription::new_from_hello_reply(
             address.clone(),
-            Some(Ok(HelloReply {
+            HelloReply {
                 server_address: address.clone(),
                 command_response: heartbeat_response,
-                round_trip_time: Some(Duration::from_secs(1)),
                 cluster_time: None,
                 raw_command_response: Default::default(),
-            })),
-            None,
+            },
+            Duration::from_secs(1),
         ))
         .await;
     assert_eq!(

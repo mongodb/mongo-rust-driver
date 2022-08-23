@@ -182,17 +182,6 @@ impl Topology {
             .update_command_with_read_pref(server_address, command, criteria)
     }
 
-    /// Creates a new server selection timeout error message given the `criteria`.
-    pub(crate) fn server_selection_timeout_error_message(
-        &self,
-        criteria: &SelectionCriteria,
-    ) -> String {
-        self.watcher
-            .peek_latest()
-            .description
-            .server_selection_timeout_error_message(criteria)
-    }
-
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
@@ -304,10 +293,10 @@ impl TopologyWorker {
         self.update_topology(new_description).await;
 
         if self.options.load_balanced == Some(true) {
-            let base = ServerDescription::new(self.options.hosts[0].clone(), None, None);
+            let base = ServerDescription::new(self.options.hosts[0].clone());
             self.update_server(ServerDescription {
                 server_type: ServerType::LoadBalancer,
-                average_round_trip_time: Some(Duration::from_millis(0)),
+                average_round_trip_time: None,
                 ..base
             })
             .await;
@@ -531,7 +520,7 @@ impl TopologyWorker {
 
     /// Mark the server at the given address as Unknown using the provided error as the cause.
     async fn mark_server_as_unknown(&mut self, address: ServerAddress, error: Error) -> bool {
-        let description = ServerDescription::new(address, Some(Err(error)), None);
+        let description = ServerDescription::new_from_error(address, error);
         self.update_server(description).await
     }
 

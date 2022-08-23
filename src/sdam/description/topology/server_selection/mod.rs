@@ -111,10 +111,6 @@ impl TopologyDescription {
             .into());
         }
 
-        if let TopologyType::Unknown = self.topology_type {
-            return Ok(Vec::new());
-        }
-
         let mut suitable_servers = match criteria {
             SelectionCriteria::ReadPreference(ref read_pref) => self.suitable_servers(read_pref)?,
             SelectionCriteria::Predicate(ref filter) => self
@@ -163,16 +159,19 @@ impl TopologyDescription {
 
         let local_threshold = self.local_threshold.unwrap_or(DEFAULT_LOCAL_THRESHOLD);
 
-        let max_rtt_within_window = shortest_average_rtt.map(|rtt| rtt + local_threshold);
+        let max_rtt_within_window = shortest_average_rtt
+            .map(|rtt| rtt.checked_add(local_threshold).unwrap_or(Duration::MAX));
 
         suitable_servers.retain(move |server_desc| {
             if let Some(server_rtt) = server_desc.average_round_trip_time {
-                if let Some(max_rtt) = max_rtt_within_window {
-                    return server_rtt <= max_rtt;
-                }
+                // unwrap() is safe here because this server's avg rtt being Some indicates that
+                // there exists a max rtt as well.
+                server_rtt <= max_rtt_within_window.unwrap()
+            } else {
+                // SDAM isn't performed with a load balanced topology, so the load balancer won't
+                // have an RTT. Instead, we just select it.
+                matches!(server_desc.server_type, ServerType::LoadBalancer)
             }
-
-            false
         });
     }
 
