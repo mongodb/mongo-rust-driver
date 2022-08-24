@@ -10,7 +10,7 @@ use std::{
 use derivative::Derivative;
 use serde::Serialize;
 use tokio::{
-    io::{BufReader, BufWriter},
+    io::BufStream,
     sync::{mpsc, Mutex},
 };
 
@@ -95,7 +95,7 @@ pub(crate) struct Connection {
     /// will remain true until a server response does not include the moreToComeFlag.
     more_to_come: bool,
 
-    stream: BufReader<BufWriter<AsyncStream>>,
+    stream: BufStream<AsyncStream>,
 
     /// Compressor that the client will use before sending messages.
     /// This compressor does not get used to decompress server messages.
@@ -133,7 +133,7 @@ impl Connection {
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
-            stream: BufReader::new(BufWriter::new(AsyncStream::connect(stream_options).await?)),
+            stream: BufStream::new(AsyncStream::connect(stream_options).await?),
             address,
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
@@ -432,10 +432,7 @@ impl Connection {
             server_id: self.server_id,
             address: self.address.clone(),
             generation: self.generation.clone(),
-            stream: std::mem::replace(
-                &mut self.stream,
-                BufReader::new(BufWriter::new(AsyncStream::Null)),
-            ),
+            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
