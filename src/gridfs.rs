@@ -1,3 +1,6 @@
+#![allow(dead_code, unused_variables)]
+// TODO(RUST-1395) Remove these allows.
+
 pub mod options;
 
 use core::task::{Context, Poll};

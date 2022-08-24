@@ -1,3 +1,4 @@
+pub mod client_encryption;
 pub mod options;
 mod state_machine;
 
@@ -8,7 +9,6 @@ use std::{
 
 use derivative::Derivative;
 use mongocrypt::Crypt;
-use rayon::ThreadPool;
 
 use crate::{
     error::{Error, Result},
@@ -26,44 +26,53 @@ use options::{
     EO_MONGOCRYPTD_URI,
 };
 
+use self::state_machine::CryptExecutor;
+
 use super::WeakClient;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(super) struct ClientState {
     #[derivative(Debug = "ignore")]
-    pub(crate) crypt: Crypt,
-    mongocryptd_client: Option<Client>,
-    aux_clients: AuxClients,
+    crypt: Crypt,
+    exec: CryptExecutor,
+    internal_client: Option<Client>,
     opts: AutoEncryptionOptions,
-    crypto_threads: ThreadPool,
 }
 
-#[derive(Debug)]
 struct AuxClients {
     key_vault_client: WeakClient,
     metadata_client: Option<WeakClient>,
-    _internal_client: Option<Client>,
+    internal_client: Option<Client>,
 }
 
 impl ClientState {
-    pub(super) async fn new(client: &Client, opts: AutoEncryptionOptions) -> Result<Self> {
+    pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
-        let num_cpus = std::thread::available_parallelism()?.get();
-        let crypto_threads = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus)
-            .build()
-            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
+        let exec = CryptExecutor::new(
+            aux_clients.key_vault_client,
+            opts.key_vault_namespace.clone(),
+            mongocryptd_client,
+            aux_clients.metadata_client,
+            opts.tls_options.take(),
+        )?;
 
         Ok(Self {
             crypt,
-            mongocryptd_client,
-            aux_clients,
+            exec,
+            internal_client: aux_clients.internal_client,
             opts,
-            crypto_threads,
         })
+    }
+
+    pub(super) fn crypt(&self) -> &Crypt {
+        &self.crypt
+    }
+
+    pub(super) fn exec(&self) -> &CryptExecutor {
+        &self.exec
     }
 
     pub(super) fn opts(&self) -> &AutoEncryptionOptions {
@@ -176,7 +185,7 @@ impl ClientState {
         Ok(AuxClients {
             key_vault_client,
             metadata_client,
-            _internal_client: internal_client,
+            internal_client,
         })
     }
 }

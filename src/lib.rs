@@ -352,6 +352,8 @@ pub use crate::{
     },
     db::Database,
 };
+#[cfg(feature = "csfle")]
+pub use crate::client::csfle::client_encryption;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 

@@ -3,31 +3,58 @@ use std::convert::TryInto;
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, State};
+use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::oneshot,
 };
 
 use crate::{
-    client::options::ServerAddress,
+    client::{options::ServerAddress, WeakClient},
     cmap::options::StreamOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     runtime::AsyncStream,
     Client,
+    Namespace,
 };
 
-impl Client {
-    pub(crate) async fn run_mongocrypt_ctx(
-        &self,
-        ctx: Ctx,
-        db: Option<&str>,
-    ) -> Result<RawDocumentBuf> {
-        let guard = self.inner.csfle.read().await;
-        let csfle = match guard.as_ref() {
-            Some(csfle) => csfle,
-            None => return Err(Error::internal("no csfle state for mongocrypt ctx")),
-        };
+use super::options::KmsProvidersTlsOptions;
+
+#[derive(Debug)]
+pub(crate) struct CryptExecutor {
+    key_vault_client: WeakClient,
+    key_vault_namespace: Namespace,
+    mongocryptd_client: Option<Client>,
+    metadata_client: Option<WeakClient>,
+    tls_options: Option<KmsProvidersTlsOptions>,
+    crypto_threads: ThreadPool,
+}
+
+impl CryptExecutor {
+    pub(crate) fn new(
+        key_vault_client: WeakClient,
+        key_vault_namespace: Namespace,
+        mongocryptd_client: Option<Client>,
+        metadata_client: Option<WeakClient>,
+        tls_options: Option<KmsProvidersTlsOptions>,
+    ) -> Result<Self> {
+        let num_cpus = std::thread::available_parallelism()?.get();
+        let crypto_threads = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus)
+            .build()
+            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
+        Ok(Self {
+            key_vault_client,
+            key_vault_namespace,
+            mongocryptd_client,
+            metadata_client,
+            tls_options,
+            crypto_threads,
+        })
+    }
+
+    pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
         // thread for crypto finalization.  An `Option` would also work here, but `Result` means we
@@ -39,14 +66,13 @@ impl Client {
                 State::NeedMongoCollinfo => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let metadata_client = csfle
-                        .aux_clients
+                    let metadata_client = self
                         .metadata_client
                         .as_ref()
                         .and_then(|w| w.upgrade())
                         .ok_or_else(|| {
-                            Error::internal("metadata_client required for NeedMongoCollinfo state")
-                        })?;
+                        Error::internal("metadata_client required for NeedMongoCollinfo state")
+                    })?;
                     let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
@@ -63,7 +89,7 @@ impl Client {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
                     let op = RawOutput(RunCommand::new_raw(db.to_string(), command, None, None)?);
-                    let mongocryptd_client = csfle
+                    let mongocryptd_client = self
                         .mongocryptd_client
                         .as_ref()
                         .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
@@ -74,9 +100,8 @@ impl Client {
                 State::NeedMongoKeys => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let kv_ns = &csfle.opts.key_vault_namespace;
-                    let kv_client = csfle
-                        .aux_clients
+                    let kv_ns = &self.key_vault_namespace;
+                    let kv_client = self
                         .key_vault_client
                         .upgrade()
                         .ok_or_else(|| Error::internal("key vault client dropped"))?;
@@ -101,8 +126,7 @@ impl Client {
                             let endpoint = kms_ctx.endpoint()?;
                             let addr = ServerAddress::parse(endpoint)?;
                             let provider = kms_ctx.kms_provider()?;
-                            let tls_options = csfle
-                                .opts()
+                            let tls_options = self
                                 .tls_options
                                 .as_ref()
                                 .and_then(|tls| tls.get(&provider))
@@ -136,7 +160,7 @@ impl Client {
                         &mut ctx,
                         Err(Error::internal("crypto context not present")),
                     )?;
-                    csfle.crypto_threads.spawn(move || {
+                    self.crypto_threads.spawn(move || {
                         let result = thread_ctx.finalize().map(|doc| doc.to_owned());
                         let _ = tx.send((thread_ctx, result));
                     });
