@@ -2,7 +2,6 @@
 mod test;
 
 use lazy_static::lazy_static;
-use os_info::{Type, Version};
 
 use crate::{
     bson::{doc, Bson, Document},
@@ -99,7 +98,7 @@ lazy_static! {
     /// (potentially with additional fields added) can be cloned and put in the `client` field of
     /// the `hello` or legacy hello command.
     static ref BASE_CLIENT_METADATA: ClientMetadata = {
-        let mut metadata = ClientMetadata {
+        let metadata = ClientMetadata {
             application: None,
             driver: DriverMetadata {
                 name: "mongo-rust-driver".into(),
@@ -113,16 +112,6 @@ lazy_static! {
             },
             platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
         };
-
-        let info = os_info::get();
-
-        if info.os_type() != Type::Unknown {
-            let version = info.version();
-
-            if *version != Version::Unknown {
-                metadata.os.version = Some(info.version().to_string());
-            }
-        }
 
         metadata
     };

@@ -86,7 +86,6 @@ md-5 = "0.10.1"
 mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
-os_info = { version = "3.0.1", default-features = false }
 percent-encoding = "2.0.0"
 rand = { version = "0.8.3", features = ["small_rng"] }
 rustc_version_runtime = "0.2.1"
