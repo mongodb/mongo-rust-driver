@@ -198,7 +198,7 @@ pub(crate) fn merge_uri_options(
     uri_options: Option<&Document>,
     use_multiple_hosts: bool,
 ) -> String {
-    let given_uri = if !use_multiple_hosts {
+    let given_uri = if !use_multiple_hosts && !given_uri.starts_with("mongodb+srv") {
         let hosts_regex = Regex::new(r"mongodb://([^/]*)").unwrap();
         let single_host = hosts_regex
             .captures(given_uri)
