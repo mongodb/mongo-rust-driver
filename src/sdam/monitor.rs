@@ -628,10 +628,10 @@ impl MonitorRequestReceiver {
                     _ = self.topology_check_request_receiver.wait_for_check_request() => {
                         break;
                     }
-                    Ok(_) = self.cancellation_receiver.changed() => {
+                    r = self.cancellation_receiver.changed() => {
                         // if we receive a cancellation request indicating the topology has been dropped,
                         // then just return early.
-                        if matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
+                        if r.is_err() || matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
                             break;
                         }
                     }
