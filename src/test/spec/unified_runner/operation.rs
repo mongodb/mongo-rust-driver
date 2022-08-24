@@ -2453,13 +2453,20 @@ impl TestOperation for AssertEventCount {
         async {
             let client = test_runner.get_client(self.client.as_str()).await;
             let entities = test_runner.entities.clone();
-            let actual_count = client
+            let actual_events = client
                 .observer
                 .lock()
                 .await
-                .matching_event_count(&self.event, entities)
+                .matching_events(&self.event, entities)
                 .await;
-            assert_eq!(actual_count, self.count);
+            assert_eq!(
+                actual_events.len(),
+                self.count,
+                "expected to see {} events matching: {:#?}, instead saw: {:#?}",
+                self.count,
+                self.event,
+                actual_events
+            );
         }
         .boxed()
     }
