@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{fmt::Write, sync::Arc, time::Duration};
 
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
@@ -212,7 +212,7 @@ pub(crate) fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>)
         let value = value.to_string();
         // to_string() wraps quotations around Bson strings
         let value = value.trim_start_matches('\"').trim_end_matches('\"');
-        uri.push_str(&format!("{}={}&", &key, value));
+        let _ = write!(uri, "{}={}&", &key, value);
     }
 
     // remove the trailing '&' from the URI (or '?' if no options are present)

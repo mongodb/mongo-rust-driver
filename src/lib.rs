@@ -297,7 +297,8 @@
     allow(
         clippy::unreadable_literal,
         clippy::cognitive_complexity,
-        clippy::float_cmp
+        clippy::float_cmp,
+        clippy::derive_partial_eq_without_eq
     )
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]

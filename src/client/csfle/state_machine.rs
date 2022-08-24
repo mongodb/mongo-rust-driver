@@ -140,7 +140,7 @@ impl CryptExecutor {
                             )
                             .await?;
                             stream.write_all(kms_ctx.message()?).await?;
-                            let mut buf = vec![];
+                            let mut buf = vec![0];
                             while kms_ctx.bytes_needed() > 0 {
                                 let buf_size = kms_ctx.bytes_needed().try_into().map_err(|e| {
                                     Error::internal(format!("buffer size overflow: {}", e))
