@@ -9,7 +9,6 @@ use std::{
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::{
-    cmap::options::StreamOptions,
     error::{ErrorKind, Result},
     options::ServerAddress,
     runtime,
@@ -106,7 +105,10 @@ impl AsyncTcpStream {
         Ok(stream.into())
     }
 
-    async fn connect(address: &ServerAddress, connect_timeout: Option<Duration>) -> Result<Self> {
+    pub(crate) async fn connect(
+        address: &ServerAddress,
+        connect_timeout: Option<Duration>,
+    ) -> Result<Self> {
         let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
 
         let mut socket_addrs: Vec<_> = runtime::resolve_address(address).await?.collect();
@@ -137,22 +139,6 @@ impl AsyncTcpStream {
             }
             .into()
         }))
-    }
-}
-
-impl AsyncStream {
-    /// Creates a new Tokio TCP stream connected to the server as specified by `options`.
-    pub(crate) async fn connect(options: StreamOptions) -> Result<Self> {
-        let inner = AsyncTcpStream::connect(&options.address, options.connect_timeout).await?;
-
-        // If there are TLS options, wrap the inner stream with rustls.
-        match options.tls_options {
-            Some(cfg) => {
-                let host = options.address.host();
-                Ok(Self::Tls(AsyncTlsStream::connect(host, inner, cfg).await?))
-            }
-            None => Ok(Self::Tcp(inner)),
-        }
     }
 }
 

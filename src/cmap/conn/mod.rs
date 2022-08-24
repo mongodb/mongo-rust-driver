@@ -18,10 +18,7 @@ use self::wire::{Message, MessageFlags};
 use super::manager::PoolManager;
 use crate::{
     bson::oid::ObjectId,
-    cmap::{
-        options::{ConnectionOptions, StreamOptions},
-        PoolGeneration,
-    },
+    cmap::PoolGeneration,
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
@@ -114,82 +111,72 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    async fn new(
-        id: u32,
+    fn new(
         address: ServerAddress,
-        generation: u32,
-        options: Option<ConnectionOptions>,
-    ) -> Result<Self> {
-        let stream_options = StreamOptions {
-            address: address.clone(),
-            connect_timeout: options.as_ref().and_then(|opts| opts.connect_timeout),
-            tls_options: options.as_ref().and_then(|opts| opts.tls_options.clone()),
-        };
-
-        let conn = Self {
+        stream: AsyncStream,
+        id: u32,
+        generation: ConnectionGeneration,
+    ) -> Self {
+        Self {
             id,
             server_id: None,
-            generation: ConnectionGeneration::Normal(generation),
+            generation,
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
-            stream: BufStream::new(AsyncStream::connect(stream_options).await?),
+            stream: BufStream::new(stream),
             address,
-            handler: options.and_then(|options| options.event_handler),
+            handler: None,
             stream_description: None,
             error: false,
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
-        };
-
-        Ok(conn)
+        }
     }
 
-    /// Constructs and connects a new connection.
-    pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
+    pub(crate) fn new_pooled(pending_connection: PendingConnection, stream: AsyncStream) -> Self {
         let generation = match pending_connection.generation {
-            PoolGeneration::Normal(gen) => gen,
-            PoolGeneration::LoadBalanced(_) => 0, /* Placeholder; will be overwritten in
-                                                   * `ConnectionEstablisher::
-                                                   * establish_connection`. */
+            PoolGeneration::Normal(gen) => ConnectionGeneration::Normal(gen),
+            PoolGeneration::LoadBalanced(_) => ConnectionGeneration::LoadBalanced(None),
         };
-        Self::new(
+        let mut conn = Self::new(
+            pending_connection.address,
+            stream,
             pending_connection.id,
-            pending_connection.address.clone(),
             generation,
-            pending_connection.options,
-        )
-        .await
+        );
+        conn.handler = pending_connection.event_handler;
+        conn
     }
 
-    /// Construct and connect a new connection used for monitoring.
-    pub(crate) async fn connect_monitoring(
-        address: ServerAddress,
-        tls_options: Option<TlsOptions>,
-    ) -> Result<Self> {
-        Self::new(
-            0,
+    pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream) -> Self {
+        Self {
+            id: 0,
+            server_id: None,
+            generation: ConnectionGeneration::Monitoring,
+            pool_manager: None,
+            command_executing: false,
+            ready_and_available_time: None,
+            stream: BufStream::new(stream),
             address,
-            0,
-            Some(ConnectionOptions {
-                connect_timeout: None, // handled by the monitor
-                tls_options,
-                event_handler: None,
-            }),
-        )
-        .await
+            handler: None,
+            stream_description: None,
+            error: false,
+            pinned_sender: None,
+            compressor: None,
+            more_to_come: false,
+        }
     }
 
-    #[cfg(test)]
-    pub(crate) async fn new_testing(
-        id: u32,
-        address: ServerAddress,
-        generation: u32,
-        options: Option<ConnectionOptions>,
-    ) -> Result<Self> {
-        Self::new(id, address, generation, options).await
-    }
+    // #[cfg(test)]
+    // pub(crate) async fn new_testing(
+    //     id: u32,
+    //     address: ServerAddress,
+    //     generation: u32,
+    // ) -> Result<Self> {
+    //     Self::new(id, address, generation, options).await
+    // }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
@@ -544,35 +531,42 @@ impl PinnedConnectionHandle {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LoadBalancedGeneration {
+    pub(crate) generation: u32,
+    pub(crate) service_id: ObjectId,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum ConnectionGeneration {
+    Monitoring,
     Normal(u32),
-    LoadBalanced {
-        generation: u32,
-        service_id: ObjectId,
-    },
+    LoadBalanced(Option<LoadBalancedGeneration>),
 }
 
 impl ConnectionGeneration {
-    pub(crate) fn service_id(&self) -> Option<ObjectId> {
+    pub(crate) fn service_id(self) -> Option<ObjectId> {
         match self {
-            ConnectionGeneration::Normal(_) => None,
-            ConnectionGeneration::LoadBalanced { service_id, .. } => Some(*service_id),
+            ConnectionGeneration::LoadBalanced(Some(gen)) => Some(gen.service_id),
+            _ => None,
         }
     }
 
-    pub(crate) fn is_stale(&self, current_generation: &PoolGeneration) -> bool {
+    pub(crate) fn is_stale(self, current_generation: &PoolGeneration) -> bool {
         match (self, current_generation) {
-            (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != pgen,
+            (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != *pgen,
             (
-                ConnectionGeneration::LoadBalanced {
-                    generation: cgen,
-                    service_id,
-                },
+                ConnectionGeneration::LoadBalanced(Some(cgen)),
                 PoolGeneration::LoadBalanced(gen_map),
-            ) => cgen != gen_map.get(service_id).unwrap_or(&0),
+            ) => cgen.generation != *gen_map.get(&cgen.service_id).unwrap_or(&0),
             _ => load_balanced_mode_mismatch!(false),
         }
+    }
+}
+
+impl From<LoadBalancedGeneration> for ConnectionGeneration {
+    fn from(gen: LoadBalancedGeneration) -> Self {
+        ConnectionGeneration::LoadBalanced(Some(gen))
     }
 }
 
@@ -581,12 +575,11 @@ impl ConnectionGeneration {
 /// Creating a `PendingConnection` contributes towards the total connection count of a pool, despite
 /// not actually making a TCP connection to the pool's endpoint. This models a "pending" Connection
 /// from the CMAP specification.
-#[derive(Debug)]
-pub(super) struct PendingConnection {
-    pub(super) id: u32,
-    pub(super) address: ServerAddress,
-    pub(super) generation: PoolGeneration,
-    pub(super) options: Option<ConnectionOptions>,
+pub(crate) struct PendingConnection {
+    pub(crate) id: u32,
+    pub(crate) address: ServerAddress,
+    pub(crate) generation: PoolGeneration,
+    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>
 }
 
 impl PendingConnection {

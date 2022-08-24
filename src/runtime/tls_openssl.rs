@@ -23,11 +23,34 @@ pub(crate) struct AsyncTlsStream {
     inner: SslStream<AsyncTcpStream>,
 }
 
+#[derive(Clone)]
+pub(crate) struct TlsConfig {
+    connector: SslConnector,
+    verify_hostname: bool,
+}
+
+impl TlsConfig {
+    pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
+        let verify_hostname = options.allow_invalid_hostnames.unwrap_or(true);
+
+        let connector = make_openssl_connector(options).map_err(|e| {
+            Error::from(ErrorKind::InvalidTlsConfig {
+                message: e.to_string(),
+            })
+        })?;
+
+        Ok(TlsConfig {
+            connector,
+            verify_hostname,
+        })
+    }
+}
+
 impl AsyncTlsStream {
     pub(crate) async fn connect(
         host: &str,
         tcp_stream: AsyncTcpStream,
-        cfg: TlsOptions,
+        cfg: TlsConfig,
     ) -> Result<Self> {
         init_trust();
 
@@ -107,14 +130,14 @@ fn init_trust() {
 fn make_ssl_stream(
     host: &str,
     tcp_stream: AsyncTcpStream,
-    cfg: TlsOptions,
+    cfg: TlsConfig,
 ) -> std::result::Result<SslStream<AsyncTcpStream>, ErrorStack> {
-    let verify_hostname = !cfg.allow_invalid_hostnames.unwrap_or(false);
-    let connector = make_openssl_connector(cfg)?;
-    let ssl = connector
+    let start = std::time::Instant::now();
+    let ssl = cfg
+        .connector
         .configure()?
         .use_server_name_indication(true)
-        .verify_hostname(verify_hostname)
+        .verify_hostname(cfg.verify_hostname)
         .into_ssl(host)?;
     SslStream::new(ssl, tcp_stream)
 }

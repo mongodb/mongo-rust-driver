@@ -33,6 +33,8 @@ use tls_rustls as tls;
 #[cfg(feature = "tokio-runtime")]
 use tokio::time::Interval;
 
+pub(crate) use tls::{AsyncTlsStream, TlsConfig};
+
 /// Spawn a task in the background to run a future.
 ///
 /// If the runtime is still running, this will return a handle to the background task.

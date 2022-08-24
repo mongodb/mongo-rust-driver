@@ -7,7 +7,12 @@ use super::{
 };
 use crate::{
     bson::{doc, Document},
-    cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
+    cmap::{
+        establish::{ConnectionEstablisher, EstablisherOptions},
+        options::ConnectionPoolOptions,
+        Command,
+        ConnectionPool,
+    },
     event::cmap::{CmapEventHandler, ConnectionClosedReason},
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
@@ -48,7 +53,10 @@ async fn acquire_connection_and_send_command() {
 
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
-        Default::default(),
+        ConnectionEstablisher::new(
+            Default::default(),
+            EstablisherOptions::from_client_options(&client_options),
+        ).unwrap(),
         TopologyUpdater::channel().0,
         Some(pool_options),
     );
@@ -124,7 +132,10 @@ async fn concurrent_connections() {
 
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.get().await.hosts[0].clone(),
-        Default::default(),
+        ConnectionEstablisher::new(
+            Default::default(),
+            EstablisherOptions::from_client_options(&client_options),
+        ).unwrap(),
         TopologyUpdater::channel().0,
         Some(options),
     );
@@ -211,7 +222,11 @@ async fn connection_error_during_establishment() {
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
-        Default::default(),
+        ConnectionEstablisher::new(
+            Default::default(),
+            EstablisherOptions::from_client_options(&client_options),
+        )
+        .unwrap(),
         TopologyUpdater::channel().0,
         Some(options),
     );

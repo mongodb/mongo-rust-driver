@@ -14,7 +14,7 @@ use super::{
     TopologyWatcher,
 };
 use crate::{
-    cmap::{Connection, Handshaker},
+    cmap::{establish::ConnectionEstablisher, Connection, Handshaker},
     error::{Error, Result},
     event::sdam::{
         SdamEvent,
@@ -34,7 +34,7 @@ pub(crate) const MIN_HEARTBEAT_FREQUENCY: Duration = Duration::from_millis(500);
 pub(crate) struct Monitor {
     address: ServerAddress,
     connection: Option<Connection>,
-    handshaker: Handshaker,
+    connection_establisher: ConnectionEstablisher,
     topology_updater: TopologyUpdater,
     topology_watcher: TopologyWatcher,
     sdam_event_emitter: Option<SdamEventEmitter>,
@@ -63,19 +63,18 @@ impl Monitor {
         sdam_event_emitter: Option<SdamEventEmitter>,
         manager_receiver: MonitorRequestReceiver,
         client_options: ClientOptions,
+        connection_establisher: ConnectionEstablisher,
     ) {
-        let handshaker = Handshaker::new(Some(client_options.clone().into()));
-
         let (rtt_monitor, rtt_monitor_handle) = RttMonitor::new(
             address.clone(),
             topology_watcher.clone(),
-            handshaker.clone(),
+            connection_establisher.clone(),
             client_options.clone(),
         );
         let monitor = Self {
             address,
             client_options,
-            handshaker,
+            connection_establisher,
             topology_updater,
             topology_watcher,
             sdam_event_emitter,
@@ -234,26 +233,18 @@ impl Monitor {
                 }
                 None => {
                     let start = Instant::now();
-
-                    let mut connection = Connection::connect_monitoring(
-                        self.address.clone(),
-                        self.client_options.tls_options(),
-                    )
-                    .await?;
-
                     let res = self
-                        .handshaker
-                        .handshake(&mut connection)
-                        .await
-                        .map(|r| r.hello_reply);
-
-                    if res.is_ok() {
-                        self.rtt_monitor_handle.add_sample(start.elapsed());
+                        .connection_establisher
+                        .establish_monitoring_connection(self.address.clone())
+                        .await;
+                    match res {
+                        Ok((conn, hello_reply)) => {
+                            self.rtt_monitor_handle.add_sample(start.elapsed());
+                            self.connection = Some(conn);
+                            Ok(hello_reply)
+                        }
+                        Err(e) => Err(e),
                     }
-
-                    self.connection = Some(connection);
-
-                    res
                 }
             }
         };
@@ -360,7 +351,7 @@ struct RttMonitor {
     topology: TopologyWatcher,
     address: ServerAddress,
     client_options: ClientOptions,
-    handshaker: Handshaker,
+    connection_establisher: ConnectionEstablisher,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -387,7 +378,7 @@ impl RttMonitor {
     fn new(
         address: ServerAddress,
         topology: TopologyWatcher,
-        handshaker: Handshaker,
+        connection_establisher: ConnectionEstablisher,
         client_options: ClientOptions,
     ) -> (Self, RttMonitorHandle) {
         let (sender, rtt_receiver) = watch::channel(RttInfo { average: None });
@@ -398,7 +389,7 @@ impl RttMonitor {
             connection: None,
             topology,
             client_options,
-            handshaker,
+            connection_establisher,
             sender: sender.clone(),
         };
 
@@ -430,12 +421,11 @@ impl RttMonitor {
                         conn.send_command(command, None).await?;
                     }
                     None => {
-                        let mut connection = Connection::connect_monitoring(
-                            self.address.clone(),
-                            self.client_options.tls_options(),
-                        )
-                        .await?;
-                        let _ = self.handshaker.handshake(&mut connection).await?;
+                        let connection = self
+                            .connection_establisher
+                            .establish_monitoring_connection(self.address.clone())
+                            .await?
+                            .0;
                         self.connection = Some(connection);
                     }
                 };

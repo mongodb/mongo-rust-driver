@@ -32,7 +32,7 @@ async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
     options.test_options_mut().disable_monitoring_threads = true;
-    let mut topology = Topology::new(options.clone());
+    let mut topology = Topology::new(options.clone()).unwrap();
     topology.watch().wait_until_initialized().await;
     let mut monitor =
         SrvPollingMonitor::new(topology.clone_updater(), topology.watch(), options.clone())
@@ -133,7 +133,7 @@ async fn load_balanced_no_srv_polling() {
         localhost_test_build_10gen(27017),
         localhost_test_build_10gen(27018),
     ]));
-    let mut topology = Topology::new(options);
+    let mut topology = Topology::new(options).unwrap();
     topology.watch().wait_until_initialized().await;
     runtime::delay_for(rescan_interval * 2).await;
     assert_eq!(

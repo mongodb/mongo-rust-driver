@@ -16,8 +16,14 @@ use tokio::sync::{
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
-    cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
-    error::{load_balanced_mode_mismatch, Error},
+    cmap::{
+        conn::ConnectionGeneration,
+        establish::{ConnectionEstablisher, EstablisherOptions},
+        Command,
+        Connection,
+        PoolGeneration,
+    },
+    error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
         handle_sdam_event,
         SdamEvent,
@@ -57,8 +63,7 @@ pub(crate) struct Topology {
 }
 
 impl Topology {
-    pub(crate) fn new(options: ClientOptions) -> Topology {
-        let http_client = HttpClient::default();
+    pub(crate) fn new(options: ClientOptions) -> Result<Topology> {
         let description = TopologyDescription::default();
 
         let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
@@ -85,6 +90,11 @@ impl Topology {
         };
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
+        let connection_establisher = ConnectionEstablisher::new(
+            HttpClient::default(),
+            EstablisherOptions::from_client_options(&options),
+        )?;
+
         let worker = TopologyWorker {
             id: ObjectId::new(),
             topology_description: description,
@@ -92,20 +102,20 @@ impl Topology {
             update_receiver,
             publisher,
             options,
-            http_client,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
             handle_listener,
             event_emitter,
+            connection_establisher,
         };
 
         worker.start();
 
-        Topology {
+        Ok(Topology {
             watcher,
             updater,
             _worker_handle: worker_handle,
-        }
+        })
     }
 
     /// Begin watching for changes in the topology.
@@ -266,9 +276,10 @@ struct TopologyWorker {
     /// The current TopologyDescription.
     topology_description: TopologyDescription,
 
+    connection_establisher: ConnectionEstablisher,
+
     event_emitter: Option<SdamEventEmitter>,
     options: ClientOptions,
-    http_client: HttpClient,
 
     // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
@@ -482,7 +493,7 @@ impl TopologyWorker {
                 let server = Server::new(
                     address.clone(),
                     self.options.clone(),
-                    self.http_client.clone(),
+                    self.connection_establisher.clone(),
                     self.topology_updater.clone(),
                 );
 
@@ -502,6 +513,7 @@ impl TopologyWorker {
                         self.event_emitter.clone(),
                         monitor_request_receiver,
                         self.options.clone(),
+                        self.connection_establisher.clone(),
                     );
                 }
 

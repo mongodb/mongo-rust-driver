@@ -3,7 +3,7 @@ pub(crate) mod test;
 
 pub(crate) mod conn;
 mod connection_requester;
-mod establish;
+pub(crate) mod establish;
 mod manager;
 pub(crate) mod options;
 mod status;
@@ -22,7 +22,11 @@ pub(crate) use self::{
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
 };
-use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
+use self::{
+    connection_requester::ConnectionRequestResult,
+    establish::ConnectionEstablisher,
+    options::ConnectionPoolOptions,
+};
 use crate::{
     bson::oid::ObjectId,
     error::{Error, Result},
@@ -64,13 +68,13 @@ pub(crate) struct ConnectionPool {
 impl ConnectionPool {
     pub(crate) fn new(
         address: ServerAddress,
-        http_client: HttpClient,
+        connection_establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
         let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
             address.clone(),
-            http_client,
+            connection_establisher,
             server_updater,
             options.clone(),
         );

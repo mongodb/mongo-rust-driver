@@ -32,20 +32,33 @@ pub(crate) struct AsyncTlsStream {
     inner: tokio_rustls::client::TlsStream<AsyncTcpStream>,
 }
 
+#[derive(Clone)]
+pub(crate) struct TlsConfig {
+    connector: TlsConnector,
+}
+
+impl TlsConfig {
+    pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
+        let mut tls_config = make_rustls_config(options)?;
+        tls_config.enable_sni = true;
+
+        let connector: TlsConnector = Arc::new(tls_config).into();
+        Ok(TlsConfig { connector })
+    }
+}
+
 impl AsyncTlsStream {
     pub(crate) async fn connect(
         host: &str,
         tcp_stream: AsyncTcpStream,
-        cfg: TlsOptions,
+        cfg: &TlsConfig,
     ) -> Result<Self> {
         let name = ServerName::try_from(host).map_err(|e| ErrorKind::DnsResolve {
             message: format!("could not resolve {:?}: {}", host, e),
         })?;
-        let mut tls_config = make_rustls_config(cfg)?;
-        tls_config.enable_sni = true;
 
-        let connector: TlsConnector = Arc::new(tls_config).into();
-        let conn = connector
+        let conn = cfg
+            .connector
             .connect_with(name, tcp_stream, |c| {
                 c.set_buffer_limit(None);
             })
