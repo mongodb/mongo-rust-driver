@@ -248,6 +248,7 @@ pub(crate) fn merge_uri_options(
         // to_string() wraps quotations around Bson strings
         let value = value.trim_start_matches('\"').trim_end_matches('\"');
         let _ = write!(
+            &mut uri,
             "{}={}&",
             &key,
             percent_encoding::percent_encode(value.as_bytes(), NON_ALPHANUMERIC)
