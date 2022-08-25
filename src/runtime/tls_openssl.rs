@@ -50,7 +50,7 @@ impl AsyncTlsStream {
     pub(crate) async fn connect(
         host: &str,
         tcp_stream: AsyncTcpStream,
-        cfg: TlsConfig,
+        cfg: &TlsConfig,
     ) -> Result<Self> {
         init_trust();
 
@@ -130,7 +130,7 @@ fn init_trust() {
 fn make_ssl_stream(
     host: &str,
     tcp_stream: AsyncTcpStream,
-    cfg: TlsConfig,
+    cfg: &TlsConfig,
 ) -> std::result::Result<SslStream<AsyncTcpStream>, ErrorStack> {
     let start = std::time::Instant::now();
     let ssl = cfg
