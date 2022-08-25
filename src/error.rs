@@ -355,6 +355,10 @@ impl Error {
         false
     }
 
+    pub(crate) fn is_incompatible_server(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::IncompatibleServer { .. })
+    }
+
     pub(crate) fn with_source<E: Into<Option<Error>>>(mut self, source: E) -> Self {
         self.source = source.into().map(Box::new);
         self

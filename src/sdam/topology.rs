@@ -564,6 +564,12 @@ impl TopologyWorker {
         error: Error,
         handshake: HandshakePhase,
     ) -> bool {
+        // If the error was due to a misconfigured query, no need to update the topology.
+        // e.g. using loadBalanced=true when the server isn't configured to be used with a load balancer.
+        if error.is_incompatible_server() {
+            return false;
+        }
+
         match self.server_description(&address) {
             Some(sd) => {
                 if let Some(existing_tv) = sd.topology_version() {

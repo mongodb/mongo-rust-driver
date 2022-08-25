@@ -113,10 +113,12 @@ impl ConnectionEstablisher {
                 }
                 .into();
             }
-            _ => {
+            (PoolGeneration::LoadBalanced(_), None) => {
                 return Err(EstablishError::post_hello(
-                    ErrorKind::Internal {
-                        message: "load-balanced mode mismatch".to_string(),
+                    ErrorKind::IncompatibleServer {
+                        message: "Driver attempted to initialize in load balancing mode, but the \
+                                  server does not support this mode."
+                            .to_string(),
                     }
                     .into(),
                     connection.generation.clone(),

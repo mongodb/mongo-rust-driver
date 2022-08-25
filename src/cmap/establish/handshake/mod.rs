@@ -214,16 +214,6 @@ impl Handshaker {
 
         let mut hello_reply = run_hello(conn, command).await?;
 
-        if self.command.body.contains_key("loadBalanced")
-            && hello_reply.command_response.service_id.is_none()
-        {
-            return Err(ErrorKind::IncompatibleServer {
-                message: "Driver attempted to initialize in load balancing mode, but the server \
-                          does not support this mode."
-                    .to_string(),
-            }
-            .into());
-        }
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
 
         // Record the client's message and the server's response from speculative authentication if
