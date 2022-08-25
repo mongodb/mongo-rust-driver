@@ -448,8 +448,7 @@ impl RttMonitor {
             };
 
             if check_succeded {
-                let _ = self
-                    .sender
+                self.sender
                     .send_modify(|rtt_info| rtt_info.add_sample(start.elapsed()));
             } else {
                 // From the SDAM spec: "Errors encountered when running a hello or legacy hello
@@ -485,7 +484,7 @@ impl RttMonitorHandle {
     }
 
     fn add_sample(&mut self, sample: Duration) {
-        let _ = self.reset_sender.send_modify(|rtt_info| {
+        self.reset_sender.send_modify(|rtt_info| {
             rtt_info.add_sample(sample);
         });
     }

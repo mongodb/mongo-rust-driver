@@ -99,7 +99,7 @@ lazy_static! {
     /// (potentially with additional fields added) can be cloned and put in the `client` field of
     /// the `hello` or legacy hello command.
     static ref BASE_CLIENT_METADATA: ClientMetadata = {
-        let metadata = ClientMetadata {
+        ClientMetadata {
             application: None,
             driver: DriverMetadata {
                 name: "mongo-rust-driver".into(),
@@ -112,9 +112,7 @@ lazy_static! {
                 version: None,
             },
             platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
-        };
-
-        metadata
+        }
     };
 }
 
