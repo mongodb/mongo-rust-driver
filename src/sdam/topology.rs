@@ -365,7 +365,6 @@ impl TopologyWorker {
                         ack.acknowledge(changed);
                     },
                     _ = self.handle_listener.wait_for_all_handle_drops() => {
-                        println!("{}: all handles dropped", self.id);
                         break
                     }
                 }
@@ -379,26 +378,13 @@ impl TopologyWorker {
                 .servers
                 .into_values()
                 .map(|server| {
-                    let address = server.inner.address.clone();
-                    let id = self.id;
                     drop(server.inner);
-                    async move {
-                        println!("{}: waiting for {} to close", id, address);
-                        let start = std::time::Instant::now();
-                        server.monitor_manager.close_monitor().await;
-                        println!(
-                            "{}: done waiting for {}: {}ms",
-                            id,
-                            address,
-                            start.elapsed().as_millis()
-                        );
-                    }
+                    server.monitor_manager.close_monitor()
                 })
                 .collect::<FuturesUnordered<_>>();
             while close_futures.next().await.is_some() {}
 
             if let Some(emitter) = self.event_emitter {
-                println!("emitting closed event");
                 emitter
                     .emit(SdamEvent::TopologyClosed(TopologyClosedEvent {
                         topology_id: self.id,

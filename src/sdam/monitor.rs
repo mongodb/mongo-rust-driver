@@ -96,16 +96,7 @@ impl Monitor {
         let heartbeat_frequency = self.heartbeat_frequency();
 
         while self.is_alive() {
-            println!("{}@{}: performing check", self.id, self.address);
-            let start = Instant::now();
             let check_succeeded = self.check_server().await;
-            println!(
-                "{}@{}: check done after {}ms: {}",
-                self.id,
-                self.address,
-                start.elapsed().as_millis(),
-                check_succeeded
-            );
 
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
@@ -125,32 +116,17 @@ impl Monitor {
                 #[cfg(not(test))]
                 let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-                println!(
-                    "{}@{}: waiting for {}ms",
-                    self.id,
-                    self.address,
-                    min_frequency.as_millis()
-                );
                 let min_sleep = runtime::delay_for(min_frequency);
                 tokio::pin!(min_sleep);
                 tokio::select! {
                     _ = &mut min_sleep => {},
                     _ = self.request_receiver.wait_for_server_close() => {
-                        println!("{}@{}: server closed", self.id, self.address);
                         break;
                     }
                 }
-                println!("{}@{}: waiting for check request", self.id, self.address);
-                let start = std::time::Instant::now();
                 self.request_receiver
                     .wait_for_check_request(heartbeat_frequency - min_frequency)
                     .await;
-                println!(
-                    "{}@{}: woke up from check request after {}ms",
-                    self.id,
-                    self.address,
-                    start.elapsed().as_millis()
-                );
             }
         }
     }
