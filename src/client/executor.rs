@@ -1,4 +1,8 @@
+#[cfg(feature = "csfle")]
+use bson::RawDocumentBuf;
 use bson::{doc, RawBsonRef, RawDocument, Timestamp};
+#[cfg(feature = "csfle")]
+use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
 
@@ -598,6 +602,21 @@ impl Client {
         let target_db = cmd.target_db.clone();
 
         let serialized = op.serialize_command(cmd)?;
+        #[cfg(feature = "csfle")]
+        let serialized = {
+            let guard = self.inner.csfle.read().await;
+            if let Some(ref csfle) = *guard {
+                if csfle.opts().bypass_auto_encryption != Some(true) {
+                    self.auto_encrypt(csfle, RawDocument::from_bytes(&serialized)?, &target_db)
+                        .await?
+                        .into_bytes()
+                } else {
+                    serialized
+                }
+            } else {
+                serialized
+            }
+        };
         let raw_cmd = RawCommand {
             name: cmd_name.clone(),
             target_db,
@@ -751,6 +770,21 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
+                #[cfg(feature = "csfle")]
+                let response = {
+                    let guard = self.inner.csfle.read().await;
+                    if let Some(ref csfle) = *guard {
+                        if csfle.opts().bypass_auto_encryption != Some(true) {
+                            let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
+                            RawCommandResponse::new_raw(response.source, new_body)
+                        } else {
+                            response
+                        }
+                    } else {
+                        response
+                    }
+                };
+
                 match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
@@ -764,6 +798,34 @@ impl Client {
                 }
             }
         }
+    }
+
+    #[cfg(feature = "csfle")]
+    fn auto_encrypt<'a>(
+        &'a self,
+        csfle: &'a super::csfle::ClientState,
+        command: &'a RawDocument,
+        target_db: &'a str,
+    ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
+        Box::pin(async move {
+            let ctx = csfle
+                .crypt()
+                .ctx_builder()
+                .build_encrypt(target_db, command)?;
+            csfle.exec().run_ctx(ctx, Some(target_db)).await
+        })
+    }
+
+    #[cfg(feature = "csfle")]
+    fn auto_decrypt<'a>(
+        &'a self,
+        csfle: &'a super::csfle::ClientState,
+        response: &'a RawDocument,
+    ) -> BoxFuture<'a, Result<RawDocumentBuf>> {
+        Box::pin(async move {
+            let ctx = csfle.crypt().ctx_builder().build_decrypt(response)?;
+            csfle.exec().run_ctx(ctx, None).await
+        })
     }
 
     /// Start an implicit session if the operation and write concern are compatible with sessions.

@@ -7,7 +7,12 @@ use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, Operation, WriteConcernOnlyBody},
+    operation::{
+        append_options,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+        WriteConcernOnlyBody,
+    },
     options::{CreateCollectionOptions, WriteConcern},
     Namespace,
 };
@@ -35,7 +40,7 @@ impl Create {
     }
 }
 
-impl Operation for Create {
+impl OperationWithDefaults for Create {
     type O = ();
     type Command = Document;
 

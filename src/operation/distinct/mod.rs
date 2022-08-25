@@ -9,7 +9,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
 };
 
@@ -49,7 +49,7 @@ impl Distinct {
     }
 }
 
-impl Operation for Distinct {
+impl OperationWithDefaults for Distinct {
     type O = Vec<Bson>;
     type Command = Document;
 

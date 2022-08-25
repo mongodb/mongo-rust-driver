@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_bulk_errors, Result},
-    operation::{Operation, Retryability, WriteResponseBody},
+    operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Namespace,
@@ -55,7 +55,7 @@ impl Update {
     }
 }
 
-impl Operation for Update {
+impl OperationWithDefaults for Update {
     type O = UpdateResult;
     type Command = Document;
 

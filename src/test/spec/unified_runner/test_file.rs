@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc, time::Duration};
+use std::{borrow::Cow, fmt::Write, sync::Arc, time::Duration};
 
 use percent_encoding::NON_ALPHANUMERIC;
 use regex::Regex;
@@ -247,11 +247,11 @@ pub(crate) fn merge_uri_options(
         let value = value.to_string();
         // to_string() wraps quotations around Bson strings
         let value = value.trim_start_matches('\"').trim_end_matches('\"');
-        uri.push_str(&format!(
+        let _ = write!(
             "{}={}&",
             &key,
             percent_encoding::percent_encode(value.as_bytes(), NON_ALPHANUMERIC)
-        ));
+        );
     }
 
     // remove the trailing '&' from the URI (or '?' if no options are present)

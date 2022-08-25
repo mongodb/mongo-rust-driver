@@ -1,29 +1,7 @@
 use bson::Timestamp;
 
 use super::RunCommand;
-use crate::{
-    bson::doc,
-    cmap::StreamDescription,
-    operation::{test::handle_response_test, Operation},
-};
-
-#[test]
-fn build() {
-    let mut op = RunCommand::new("foo".into(), doc! { "hello": 1 }, None, None).unwrap();
-    assert!(op.selection_criteria().is_none());
-
-    let command = op.build(&StreamDescription::new_testing()).unwrap();
-
-    assert_eq!(command.name, "hello");
-    assert_eq!(command.target_db, "foo");
-    assert_eq!(
-        command
-            .body
-            .get("hello")
-            .and_then(crate::bson_util::get_int),
-        Some(1)
-    );
-}
+use crate::{bson::doc, operation::test::handle_response_test};
 
 #[test]
 fn handle_success() {

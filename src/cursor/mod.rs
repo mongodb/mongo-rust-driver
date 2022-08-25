@@ -427,10 +427,9 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
         match self {
             Self::Idle(ref mut session) => Box::pin(async move {
                 let get_more = GetMore::new(info, pinned_connection.handle());
-                let get_more_result = client
+                client
                     .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
-                    .await;
-                get_more_result
+                    .await
             }),
             Self::Executing(_fut) => Box::pin(async {
                 Err(Error::internal(

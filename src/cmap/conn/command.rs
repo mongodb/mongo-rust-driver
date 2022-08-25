@@ -208,10 +208,11 @@ impl RawCommandResponse {
 
     pub(crate) fn new(source: ServerAddress, message: Message) -> Result<Self> {
         let raw = message.single_document_response()?;
-        Ok(Self {
-            source,
-            raw: RawDocumentBuf::from_bytes(raw)?,
-        })
+        Ok(Self::new_raw(source, RawDocumentBuf::from_bytes(raw)?))
+    }
+
+    pub(crate) fn new_raw(source: ServerAddress, raw: RawDocumentBuf) -> Self {
+        Self { source, raw }
     }
 
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {

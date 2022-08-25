@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
-    operation::{append_options, CursorBody, Operation, Retryability},
+    operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
@@ -44,7 +44,7 @@ impl Find {
     }
 }
 
-impl Operation for Find {
+impl OperationWithDefaults for Find {
     type O = CursorSpecification;
     type Command = Document;
     const NAME: &'static str = "find";

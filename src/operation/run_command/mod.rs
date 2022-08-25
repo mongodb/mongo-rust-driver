@@ -3,9 +3,9 @@ mod test;
 
 use std::convert::TryInto;
 
-use bson::RawBsonRef;
+use bson::{RawBsonRef, RawDocumentBuf};
 
-use super::{CursorBody, Operation};
+use super::{CursorBody, OperationWithDefaults};
 use crate::{
     bson::Document,
     client::SESSIONS_UNSUPPORTED_COMMANDS,
@@ -18,7 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct RunCommand<'conn> {
     db: String,
-    command: Document,
+    command: RawDocumentBuf,
     selection_criteria: Option<SelectionCriteria>,
     write_concern: Option<WriteConcern>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
@@ -38,6 +38,28 @@ impl<'conn> RunCommand<'conn> {
 
         Ok(Self {
             db,
+            command: RawDocumentBuf::from_document(&command)?,
+            selection_criteria,
+            write_concern,
+            pinned_connection,
+        })
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) fn new_raw(
+        db: String,
+        command: RawDocumentBuf,
+        selection_criteria: Option<SelectionCriteria>,
+        pinned_connection: Option<&'conn PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        let write_concern = command
+            .get("writeConcern")?
+            .and_then(|b| b.as_document())
+            .map(|doc| bson::from_slice::<WriteConcern>(doc.as_bytes()))
+            .transpose()?;
+
+        Ok(Self {
+            db,
             command,
             selection_criteria,
             write_concern,
@@ -46,19 +68,23 @@ impl<'conn> RunCommand<'conn> {
     }
 
     fn command_name(&self) -> Option<&str> {
-        self.command.keys().next().map(String::as_str)
+        self.command
+            .into_iter()
+            .next()
+            .and_then(|r| r.ok())
+            .map(|(k, _)| k)
     }
 }
 
-impl<'conn> Operation for RunCommand<'conn> {
+impl<'conn> OperationWithDefaults for RunCommand<'conn> {
     type O = Document;
-    type Command = Document;
+    type Command = RawDocumentBuf;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string
     // that should fail loudly if accidentally passed to the server.
     const NAME: &'static str = "$genericRunCommand";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let command_name = self
             .command_name()
             .ok_or_else(|| ErrorKind::InvalidArgument {

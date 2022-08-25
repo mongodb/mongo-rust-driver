@@ -5,7 +5,7 @@ use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, Operation},
+    operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{DropIndexOptions, WriteConcern},
     Namespace,
 };
@@ -34,7 +34,7 @@ impl DropIndexes {
     }
 }
 
-impl Operation for DropIndexes {
+impl OperationWithDefaults for DropIndexes {
     type O = ();
     type Command = Document;
     const NAME: &'static str = "dropIndexes";

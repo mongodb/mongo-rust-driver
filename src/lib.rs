@@ -8,7 +8,7 @@
 //! # Installation
 //!
 //! ## Requirements
-//! - Rust 1.56+
+//! - Rust 1.57+
 //! - MongoDB 3.6+
 //!
 //! ## Importing
@@ -284,7 +284,7 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.56.0. This will be rarely be increased, and if it ever is,
+//! The MSRV for this crate is currently 1.57.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
@@ -299,6 +299,7 @@
         clippy::cognitive_complexity,
         clippy::float_cmp,
         clippy::match_like_matches_macro
+        clippy::derive_partial_eq_without_eq
     )
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -325,8 +326,9 @@ mod cursor;
 mod db;
 pub mod error;
 pub mod event;
-mod index;
+mod gridfs;
 mod hello;
+mod index;
 mod operation;
 pub mod results;
 pub(crate) mod runtime;
@@ -344,18 +346,20 @@ mod test;
 extern crate derive_more;
 
 pub use crate::{
-    client::{Client, session::ClientSession},
+    client::{session::ClientSession, Client},
     coll::Collection,
-    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
+    cursor::{
+        session::{SessionCursor, SessionCursorStream},
+        Cursor,
+    },
     db::Database,
 };
+#[cfg(feature = "csfle")]
+pub use crate::client::csfle::client_encryption;
 
-pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam::public::*};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
-#[cfg(all(
-    feature = "tokio-runtime",
-    feature = "async-std-runtime",
-))]
+#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime",))]
 compile_error!(
     "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"

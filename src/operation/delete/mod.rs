@@ -10,7 +10,7 @@ use crate::{
     operation::{
         append_options,
         remove_empty_write_concern,
-        Operation,
+        OperationWithDefaults,
         Retryability,
         WriteResponseBody,
     },
@@ -59,7 +59,7 @@ impl Delete {
     }
 }
 
-impl Operation for Delete {
+impl OperationWithDefaults for Delete {
     type O = DeleteResult;
     type Command = Document;
 

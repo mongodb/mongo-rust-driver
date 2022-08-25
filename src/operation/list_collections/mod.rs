@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, CursorBody, Operation, Retryability},
+    operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
@@ -39,7 +39,7 @@ impl ListCollections {
     }
 }
 
-impl Operation for ListCollections {
+impl OperationWithDefaults for ListCollections {
     type O = CursorSpecification;
     type Command = Document;
 

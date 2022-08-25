@@ -1,4 +1,6 @@
+pub mod client_encryption;
 pub mod options;
+mod state_machine;
 
 use std::{
     path::Path,
@@ -24,41 +26,53 @@ use options::{
     EO_MONGOCRYPTD_URI,
 };
 
+use self::state_machine::CryptExecutor;
+
 use super::WeakClient;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(super) struct ClientState {
     #[derivative(Debug = "ignore")]
-    #[allow(dead_code)]
     crypt: Crypt,
-    mongocryptd_client: Option<Client>,
-    aux_clients: AuxClients,
+    exec: CryptExecutor,
+    internal_client: Option<Client>,
     opts: AutoEncryptionOptions,
 }
 
-#[derive(Debug)]
 struct AuxClients {
-    #[allow(dead_code)]
     key_vault_client: WeakClient,
-    #[allow(dead_code)]
     metadata_client: Option<WeakClient>,
-    #[allow(dead_code)]
     internal_client: Option<Client>,
 }
 
 impl ClientState {
-    pub(super) async fn new(client: &Client, opts: AutoEncryptionOptions) -> Result<Self> {
+    pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
+        let exec = CryptExecutor::new(
+            aux_clients.key_vault_client,
+            opts.key_vault_namespace.clone(),
+            mongocryptd_client,
+            aux_clients.metadata_client,
+            opts.tls_options.take(),
+        )?;
 
         Ok(Self {
             crypt,
-            mongocryptd_client,
-            aux_clients,
+            exec,
+            internal_client: aux_clients.internal_client,
             opts,
         })
+    }
+
+    pub(super) fn crypt(&self) -> &Crypt {
+        &self.crypt
+    }
+
+    pub(super) fn exec(&self) -> &CryptExecutor {
+        &self.exec
     }
 
     pub(super) fn opts(&self) -> &AutoEncryptionOptions {
