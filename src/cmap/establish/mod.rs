@@ -13,7 +13,7 @@ use crate::{
     },
     error::{Error as MongoError, ErrorKind, Result},
     hello::HelloReply,
-    runtime::{stream::AsyncTcpStream, AsyncStream, AsyncTlsStream, HttpClient, TlsConfig},
+    runtime::{AsyncStream, HttpClient, TlsConfig},
     sdam::HandshakePhase,
 };
 
@@ -66,18 +66,7 @@ impl ConnectionEstablisher {
     }
 
     async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
-        let inner = AsyncTcpStream::connect(&address, None).await?;
-
-        // If there are TLS options, wrap the inner stream with rustls.
-        match self.tls_config {
-            Some(ref cfg) => {
-                let host = address.host();
-                Ok(AsyncStream::Tls(
-                    AsyncTlsStream::connect(host, inner, cfg).await?,
-                ))
-            }
-            None => Ok(AsyncStream::Tcp(inner)),
-        }
+        AsyncStream::connect(address, self.tls_config.as_ref()).await
     }
 
     /// Establishes a connection.
