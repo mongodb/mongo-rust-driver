@@ -1,6 +1,4 @@
 pub(super) mod handshake;
-#[cfg(test)]
-mod test;
 
 use self::handshake::{Handshaker, HandshakerOptions};
 use super::{

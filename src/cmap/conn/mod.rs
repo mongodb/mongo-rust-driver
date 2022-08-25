@@ -174,15 +174,6 @@ impl Connection {
         }
     }
 
-    // #[cfg(test)]
-    // pub(crate) async fn new_testing(
-    //     id: u32,
-    //     address: ServerAddress,
-    //     generation: u32,
-    // ) -> Result<Self> {
-    //     Self::new(id, address, generation, options).await
-    // }
-
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
