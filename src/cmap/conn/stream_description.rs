@@ -93,6 +93,7 @@ impl StreamDescription {
             max_write_batch_size: 100_000,
             hello_ok: false,
             max_message_size_bytes: Default::default(),
+            service_id: None,
         }
     }
 }

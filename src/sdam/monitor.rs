@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::doc;
+use bson::{doc, oid::ObjectId};
 use tokio::sync::watch;
 
 use super::{
@@ -53,6 +53,8 @@ pub(crate) struct Monitor {
     /// been removed from the topology and no longer needs to be monitored and to receive
     /// cancellation requests.
     request_receiver: MonitorRequestReceiver,
+
+    id: ObjectId,
 }
 
 impl Monitor {
@@ -64,6 +66,7 @@ impl Monitor {
         manager_receiver: MonitorRequestReceiver,
         client_options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
+        id: ObjectId,
     ) {
         let (rtt_monitor, rtt_monitor_handle) = RttMonitor::new(
             address.clone(),
@@ -82,6 +85,7 @@ impl Monitor {
             request_receiver: manager_receiver,
             connection: None,
             topology_version: None,
+            id,
         };
 
         runtime::execute(monitor.execute());
@@ -92,7 +96,16 @@ impl Monitor {
         let heartbeat_frequency = self.heartbeat_frequency();
 
         while self.is_alive() {
+            println!("{}@{}: performing check", self.id, self.address);
+            let start = Instant::now();
             let check_succeeded = self.check_server().await;
+            println!(
+                "{}@{}: check done after {}ms: {}",
+                self.id,
+                self.address,
+                start.elapsed().as_millis(),
+                check_succeeded
+            );
 
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
@@ -112,10 +125,32 @@ impl Monitor {
                 #[cfg(not(test))]
                 let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-                runtime::delay_for(min_frequency).await;
+                println!(
+                    "{}@{}: waiting for {}ms",
+                    self.id,
+                    self.address,
+                    min_frequency.as_millis()
+                );
+                let min_sleep = runtime::delay_for(min_frequency);
+                tokio::pin!(min_sleep);
+                tokio::select! {
+                    _ = &mut min_sleep => {},
+                    _ = self.request_receiver.wait_for_server_close() => {
+                        println!("{}@{}: server closed", self.id, self.address);
+                        break;
+                    }
+                }
+                println!("{}@{}: waiting for check request", self.id, self.address);
+                let start = std::time::Instant::now();
                 self.request_receiver
                     .wait_for_check_request(heartbeat_frequency - min_frequency)
                     .await;
+                println!(
+                    "{}@{}: woke up from check request after {}ms",
+                    self.id,
+                    self.address,
+                    start.elapsed().as_millis()
+                );
             }
         }
     }
@@ -261,7 +296,7 @@ impl Monitor {
             r = self.request_receiver.wait_for_cancellation() => {
                 let reason_error = match r {
                     CancellationReason::Error(e) => e,
-                    CancellationReason::TopologyClosed => Error::internal("topology closed")
+                    CancellationReason::ServerClosed => Error::internal("server closed")
                 };
                 HelloResult::Cancelled { reason: reason_error }
             }
@@ -513,7 +548,7 @@ impl MonitorManager {
         // The CancellationReason used as the initial value is just a placeholder. The only receiver
         // that could have seen it is dropped in this scope, and the monitor's receiver will
         // never observe it.
-        let (tx, _) = watch::channel(CancellationReason::TopologyClosed);
+        let (tx, _) = watch::channel(CancellationReason::ServerClosed);
         let check_requester = Arc::new(watch::channel(()).0);
 
         MonitorManager {
@@ -529,7 +564,7 @@ impl MonitorManager {
         drop(self.handle);
         let _ = self
             .cancellation_sender
-            .send(CancellationReason::TopologyClosed);
+            .send(CancellationReason::ServerClosed);
         self.cancellation_sender.closed().await;
     }
 
@@ -568,7 +603,7 @@ pub(crate) struct MonitorRequestReceiver {
 #[derive(Debug, Clone)]
 pub(crate) enum CancellationReason {
     Error(Error),
-    TopologyClosed,
+    ServerClosed,
 }
 
 impl From<Error> for CancellationReason {
@@ -598,7 +633,7 @@ impl MonitorRequestReceiver {
         let err = if self.cancellation_receiver.changed().await.is_ok() {
             self.cancellation_receiver.borrow().clone()
         } else {
-            CancellationReason::TopologyClosed
+            CancellationReason::ServerClosed
         };
         // clear out ignored check requests
         self.individual_check_request_receiver.borrow_and_update();
@@ -618,13 +653,17 @@ impl MonitorRequestReceiver {
                     _ = self.topology_check_request_receiver.wait_for_check_request() => {
                         break;
                     }
-                    r = self.cancellation_receiver.changed() => {
-                        // if we receive a cancellation request indicating the topology has been dropped,
-                        // then just return early.
-                        if r.is_err() || matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
-                            break;
-                        }
+                    _ = self.handle_listener.wait_for_all_handle_drops() => {
+                        // Don't continue waiting after server has been removed from the topology.
+                        break;
                     }
+                    // r = self.cancellation_receiver.changed() => {
+                    //     // if we receive a cancellation request indicating the topology has been dropped,
+                    //     // then just return early.
+                    //     if r.is_err() || matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
+                    //         break;
+                    //     }
+                    // }
                 }
             }
         })
@@ -632,6 +671,11 @@ impl MonitorRequestReceiver {
 
         // clear out ignored cancellation requests while we were waiting to begin a check
         self.cancellation_receiver.borrow_and_update();
+    }
+
+    /// Wait until the server associated with this monitor has been closed.
+    async fn wait_for_server_close(&mut self) {
+        self.handle_listener.wait_for_all_handle_drops().await;
     }
 
     fn is_alive(&self) -> bool {

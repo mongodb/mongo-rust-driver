@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::{Duration, Instant}};
 
 use bson::Document;
 use serde::Deserialize;
@@ -600,12 +600,14 @@ async fn topology_closed_event_last() {
         .unwrap();
     drop(client);
 
+    let start = Instant::now();
     subscriber
         .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::Sdam(SdamEvent::TopologyClosed(_)))
         })
         .await
         .expect("should see topology closed event");
+    println!("found closed event: {}ms", start.elapsed().as_millis());
 
     // no further SDAM events should be emitted after the TopologyClosedEvent
     let event = subscriber
@@ -618,6 +620,8 @@ async fn topology_closed_event_last() {
         "expected no more SDAM events, got {:#?}",
         event
     );
+
+    assert!(false);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
