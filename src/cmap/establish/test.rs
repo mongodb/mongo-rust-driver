@@ -1,14 +1,3 @@
-use tokio::sync::RwLockWriteGuard;
-
-use crate::{
-    bson::{doc, Bson, Document},
-    cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
-    operation::CommandResponse,
-    options::{AuthMechanism, ClientOptions, Credential, ReadPreference},
-    sdam::{ServerType, TopologyType},
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
-};
-
 // async fn speculative_auth_test(
 //     client: &TestClient,
 //     credential: Credential,
@@ -45,8 +34,8 @@ use crate::{
 
 //     let description = client.topology_description();
 
-//     // if running against a replica set, use the primary to ensure the user creation has propagated.
-//     let addr = match description.topology_type {
+//     // if running against a replica set, use the primary to ensure the user creation has
+// propagated.     let addr = match description.topology_type {
 //         TopologyType::ReplicaSetWithPrimary => description
 //             .servers_with_type(&[ServerType::RsPrimary])
 //             .next()
@@ -64,12 +53,12 @@ use crate::{
 
 //     let first_round = handshaker.handshake(&mut conn).await.unwrap().first_round;
 
-//     // We expect that the server will return a response with the `speculativeAuthenticate` field if
-//     // and only if it's new enough to support it.
+//     // We expect that the server will return a response with the `speculativeAuthenticate` field
+// if     // and only if it's new enough to support it.
 //     assert_eq!(first_round.is_some(), client.server_version_gte(4, 4));
 
-//     // Regardless of whether the server supports our speculative authentication attempt, we should
-//     // be able to successfully authenticate after the handshake.
+//     // Regardless of whether the server supports our speculative authentication attempt, we
+// should     // be able to successfully authenticate after the handshake.
 //     credential
 //         .authenticate_stream(&mut conn, &Default::default(), None, first_round)
 //         .await

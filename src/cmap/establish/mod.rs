@@ -5,14 +5,13 @@ mod test;
 use self::handshake::{Handshaker, HandshakerOptions};
 use super::{
     conn::{ConnectionGeneration, LoadBalancedGeneration, PendingConnection},
-    options::ConnectionPoolOptions,
     Connection,
     PoolGeneration,
 };
 use crate::{
     client::{
         auth::Credential,
-        options::{ClientOptions, ServerAddress, ServerApi, TlsOptions},
+        options::{ClientOptions, ServerAddress, TlsOptions},
     },
     error::{Error as MongoError, ErrorKind, Result},
     hello::HelloReply,
@@ -121,7 +120,7 @@ impl ConnectionEstablisher {
                             .to_string(),
                     }
                     .into(),
-                    connection.generation.clone(),
+                    connection.generation,
                 ));
             }
         }

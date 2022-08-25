@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::{Duration, Instant}};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;

@@ -30,7 +30,7 @@ use crate::{
         ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
-    options::{ServerAddress, TlsOptions},
+    options::ServerAddress,
     runtime::AsyncStream,
 };
 pub(crate) use command::{Command, RawCommand, RawCommandResponse};
@@ -425,7 +425,7 @@ impl Connection {
             id: self.id,
             server_id: self.server_id,
             address: self.address.clone(),
-            generation: self.generation.clone(),
+            generation: self.generation,
             stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),

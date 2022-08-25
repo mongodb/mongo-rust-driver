@@ -18,7 +18,6 @@ use tokio::sync::oneshot;
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
     conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
-    establish::handshake::Handshaker,
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
 };
@@ -38,7 +37,6 @@ use crate::{
         PoolCreatedEvent,
     },
     options::ServerAddress,
-    runtime::HttpClient,
     sdam::TopologyUpdater,
 };
 use connection_requester::ConnectionRequester;

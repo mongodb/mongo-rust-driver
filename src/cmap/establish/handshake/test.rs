@@ -1,8 +1,8 @@
 use super::Handshaker;
 use crate::{
     bson::doc,
-    cmap::{establish::handshake::HandshakerOptions, options::ConnectionPoolOptions},
-    options::{ClientOptions, DriverInfo},
+    cmap::establish::handshake::HandshakerOptions,
+    options::DriverInfo,
     runtime::HttpClient,
 };
 

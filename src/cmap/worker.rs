@@ -1,5 +1,3 @@
-use derivative::Derivative;
-
 #[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{

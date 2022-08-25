@@ -520,7 +520,6 @@ impl TopologyWorker {
                         monitor_request_receiver,
                         self.options.clone(),
                         self.connection_establisher.clone(),
-                        self.id,
                     );
                 }
 
@@ -551,7 +550,8 @@ impl TopologyWorker {
         handshake: HandshakePhase,
     ) -> bool {
         // If the error was due to a misconfigured query, no need to update the topology.
-        // e.g. using loadBalanced=true when the server isn't configured to be used with a load balancer.
+        // e.g. using loadBalanced=true when the server isn't configured to be used with a load
+        // balancer.
         if error.is_incompatible_server() {
             return false;
         }
@@ -988,7 +988,7 @@ pub(crate) enum HandshakePhase {
 impl HandshakePhase {
     pub(crate) fn after_completion(handshaked_connection: &Connection) -> Self {
         Self::AfterCompletion {
-            generation: handshaked_connection.generation.clone(),
+            generation: handshaked_connection.generation,
             // given that this is a handshaked connection, the stream description should
             // always be available, so 0 should never actually be returned here.
             max_wire_version: handshaked_connection

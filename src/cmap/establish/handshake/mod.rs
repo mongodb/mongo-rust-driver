@@ -5,12 +5,12 @@ use lazy_static::lazy_static;
 
 use crate::{
     bson::{doc, Bson, Document},
-    client::auth::{ClientFirst, FirstRound},
-    cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
+    client::auth::ClientFirst,
+    cmap::{Command, Connection, StreamDescription},
     compression::Compressor,
-    error::{ErrorKind, Result},
+    error::Result,
     hello::{hello_command, run_hello, HelloReply},
-    options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
+    options::{AuthMechanism, Credential, DriverInfo, ServerApi},
     runtime::HttpClient,
 };
 
@@ -205,7 +205,7 @@ impl Handshaker {
     ) -> Result<HelloReply> {
         let mut command = self.command.clone();
 
-        if let Some(ref cred) = credential {
+        if let Some(cred) = credential {
             cred.append_needed_mechanism_negotiation(&mut command.body);
             command.target_db = cred.resolved_source().to_string();
         }
@@ -249,7 +249,7 @@ impl Handshaker {
 
         conn.server_id = hello_reply.command_response.connection_id;
 
-        if let Some(ref credential) = credential {
+        if let Some(credential) = credential {
             credential
                 .authenticate_stream(
                     conn,

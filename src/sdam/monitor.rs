@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::{doc, oid::ObjectId};
+use bson::doc;
 use tokio::sync::watch;
 
 use super::{
@@ -14,7 +14,7 @@ use super::{
     TopologyWatcher,
 };
 use crate::{
-    cmap::{establish::ConnectionEstablisher, Connection, Handshaker},
+    cmap::{establish::ConnectionEstablisher, Connection},
     error::{Error, Result},
     event::sdam::{
         SdamEvent,
@@ -53,8 +53,6 @@ pub(crate) struct Monitor {
     /// been removed from the topology and no longer needs to be monitored and to receive
     /// cancellation requests.
     request_receiver: MonitorRequestReceiver,
-
-    id: ObjectId,
 }
 
 impl Monitor {
@@ -66,7 +64,6 @@ impl Monitor {
         manager_receiver: MonitorRequestReceiver,
         client_options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
-        id: ObjectId,
     ) {
         let (rtt_monitor, rtt_monitor_handle) = RttMonitor::new(
             address.clone(),
@@ -85,7 +82,6 @@ impl Monitor {
             request_receiver: manager_receiver,
             connection: None,
             topology_version: None,
-            id,
         };
 
         runtime::execute(monitor.execute());

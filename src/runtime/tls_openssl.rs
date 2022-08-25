@@ -132,7 +132,6 @@ fn make_ssl_stream(
     tcp_stream: AsyncTcpStream,
     cfg: &TlsConfig,
 ) -> std::result::Result<SslStream<AsyncTcpStream>, ErrorStack> {
-    let start = std::time::Instant::now();
     let ssl = cfg
         .connector
         .configure()?

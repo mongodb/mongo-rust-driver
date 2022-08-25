@@ -34,7 +34,6 @@ use crate::{
         Matchable,
         CLIENT_OPTIONS,
         LOCK,
-        SERVER_API,
     },
 };
 use bson::doc;

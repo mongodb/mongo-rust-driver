@@ -56,7 +56,8 @@ async fn acquire_connection_and_send_command() {
         ConnectionEstablisher::new(
             Default::default(),
             EstablisherOptions::from_client_options(&client_options),
-        ).unwrap(),
+        )
+        .unwrap(),
         TopologyUpdater::channel().0,
         Some(pool_options),
     );
@@ -135,7 +136,8 @@ async fn concurrent_connections() {
         ConnectionEstablisher::new(
             Default::default(),
             EstablisherOptions::from_client_options(&client_options),
-        ).unwrap(),
+        )
+        .unwrap(),
         TopologyUpdater::channel().0,
         Some(options),
     );

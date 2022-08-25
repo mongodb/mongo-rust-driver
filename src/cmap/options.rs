@@ -6,15 +6,12 @@ use derivative::Derivative;
 #[cfg(test)]
 use serde::de::{Deserializer, Error};
 use serde::Deserialize;
-use typed_builder::TypedBuilder;
 
 use crate::{
     bson_util,
-    client::{auth::Credential, options::ServerApi},
-    compression::Compressor,
+    client::auth::Credential,
     event::cmap::{CmapEventHandler, ConnectionPoolOptions as EventOptions},
-    options::{ClientOptions, DriverInfo, ServerAddress, TlsOptions},
-    runtime::TlsConfig,
+    options::ClientOptions,
 };
 
 /// Contains the options for creating a connection pool.
