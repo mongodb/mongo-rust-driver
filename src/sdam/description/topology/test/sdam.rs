@@ -620,8 +620,6 @@ async fn topology_closed_event_last() {
         "expected no more SDAM events, got {:#?}",
         event
     );
-
-    assert!(false);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
