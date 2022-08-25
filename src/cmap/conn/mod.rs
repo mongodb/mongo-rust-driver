@@ -135,6 +135,9 @@ impl Connection {
         }
     }
 
+    /// Create a connection intended to be stored in a connection pool for operation execution.
+    /// TODO: RUST-1454 Remove this from `Connection`, instead wrap a `Connection` type in a
+    /// separate type specific to pool.
     pub(crate) fn new_pooled(pending_connection: PendingConnection, stream: AsyncStream) -> Self {
         let generation = match pending_connection.generation {
             PoolGeneration::Normal(gen) => ConnectionGeneration::Normal(gen),
@@ -150,9 +153,11 @@ impl Connection {
         conn
     }
 
+    /// Create a connection intended for monitoring purposes.
+    /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
     pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream) -> Self {
         Self {
-            id: 0,
+            id: 0, // Monitoring connections don't have ids.
             server_id: None,
             generation: ConnectionGeneration::Monitoring,
             pool_manager: None,
@@ -187,7 +192,9 @@ impl Connection {
     }
 
     pub(crate) fn service_id(&self) -> Option<ObjectId> {
-        self.generation.service_id()
+        self.stream_description
+            .as_ref()
+            .and_then(|sd| sd.service_id)
     }
 
     pub(crate) fn address(&self) -> &ServerAddress {
@@ -537,6 +544,8 @@ pub(crate) struct LoadBalancedGeneration {
     pub(crate) service_id: ObjectId,
 }
 
+/// TODO: RUST-1454 Once we have separate types for pooled and non-pooled connections, the
+/// monitoring case and the Option<> wrapper can be dropped from this.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ConnectionGeneration {
     Monitoring,
@@ -579,7 +588,7 @@ pub(crate) struct PendingConnection {
     pub(crate) id: u32,
     pub(crate) address: ServerAddress,
     pub(crate) generation: PoolGeneration,
-    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>
+    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 impl PendingConnection {

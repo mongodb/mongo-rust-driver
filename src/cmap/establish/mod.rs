@@ -100,23 +100,11 @@ impl ConnectionEstablisher {
             .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
 
         let mut connection = Connection::new_pooled(pending_connection, stream);
-
-        let hello_reply = self
-            .handshaker
-            .handshake(&mut connection, credential)
-            .await
-            .map_err(|e| {
-                if connection.stream_description.is_none() {
-                    EstablishError::pre_hello(e, pool_gen.clone())
-                } else {
-                    EstablishError::post_hello(e, connection.generation)
-                }
-            })?;
-        let service_id = hello_reply.command_response.service_id;
+        let handshake_result = self.handshaker.handshake(&mut connection, credential).await;
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.
-        match (pool_gen, service_id) {
+        match (&pool_gen, connection.service_id()) {
             (PoolGeneration::Normal(_), _) => {}
             (PoolGeneration::LoadBalanced(gen_map), Some(service_id)) => {
                 connection.generation = LoadBalancedGeneration {
@@ -135,6 +123,14 @@ impl ConnectionEstablisher {
                 ));
             }
         }
+
+        handshake_result.map_err(|e| {
+            if connection.stream_description.is_none() {
+                EstablishError::pre_hello(e, pool_gen)
+            } else {
+                EstablishError::post_hello(e, connection.generation)
+            }
+        })?;
 
         Ok(connection)
     }
