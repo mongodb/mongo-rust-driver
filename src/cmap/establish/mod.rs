@@ -23,10 +23,8 @@ use crate::{
 pub(crate) struct ConnectionEstablisher {
     /// Contains the logic for handshaking a connection.
     handshaker: Handshaker,
-    // http_client: HttpClient,
-    // credential: Option<Credential>,
-    // server_api: Option<ServerApi>,
-    // handshaker_options: Option<HandshakerOptions>,
+
+    /// Cached configuration needed to create TLS connections, if needed.
     tls_config: Option<TlsConfig>,
 }
 
@@ -111,15 +109,19 @@ impl ConnectionEstablisher {
                 .into();
             }
             (PoolGeneration::LoadBalanced(_), None) => {
-                return Err(EstablishError::post_hello(
-                    ErrorKind::IncompatibleServer {
-                        message: "Driver attempted to initialize in load balancing mode, but the \
-                                  server does not support this mode."
-                            .to_string(),
-                    }
-                    .into(),
-                    connection.generation,
-                ));
+                // If the handshake succeeded and there isn't a service id, return a special error.
+                // If the handshake failed, just return the error from that instead.
+                if handshake_result.is_ok() {
+                    return Err(EstablishError::post_hello(
+                        ErrorKind::IncompatibleServer {
+                            message: "Driver attempted to initialize in load balancing mode, but \
+                                      the server does not support this mode."
+                                .to_string(),
+                        }
+                        .into(),
+                        connection.generation,
+                    ));
+                }
             }
         }
 

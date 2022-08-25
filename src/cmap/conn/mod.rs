@@ -555,10 +555,16 @@ impl ConnectionGeneration {
     pub(crate) fn is_stale(self, current_generation: &PoolGeneration) -> bool {
         match (self, current_generation) {
             (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != *pgen,
-            (
-                ConnectionGeneration::LoadBalanced(Some(cgen)),
-                PoolGeneration::LoadBalanced(gen_map),
-            ) => cgen.generation != *gen_map.get(&cgen.service_id).unwrap_or(&0),
+            (ConnectionGeneration::LoadBalanced(cgen), PoolGeneration::LoadBalanced(gen_map)) => {
+                if let Some(cgen) = cgen {
+                    cgen.generation != *gen_map.get(&cgen.service_id).unwrap_or(&0)
+                } else {
+                    // In the event that an error occurred during handshake and no serviceId was
+                    // returned, just ignore the error for SDAM purposes, since
+                    // we won't know which serviceId to clear for.
+                    false
+                }
+            }
             _ => load_balanced_mode_mismatch!(false),
         }
     }
