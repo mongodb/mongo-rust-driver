@@ -157,6 +157,7 @@ impl TestClient {
         Ok(())
     }
 
+    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) async fn drop_and_create_user(
         &self,
         user: &str,

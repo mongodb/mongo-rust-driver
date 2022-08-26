@@ -32,12 +32,16 @@ pub(crate) struct AsyncTlsStream {
     inner: tokio_rustls::client::TlsStream<AsyncTcpStream>,
 }
 
+/// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
+/// and reuse it for multiple connections.
 #[derive(Clone)]
 pub(crate) struct TlsConfig {
     connector: TlsConnector,
 }
 
 impl TlsConfig {
+    /// Create a new `TlsConfig` from the provided options from the user.
+    /// This operation is expensive, so the resultant `TlsConfig` should be cached.
     pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
         let mut tls_config = make_rustls_config(options)?;
         tls_config.enable_sni = true;

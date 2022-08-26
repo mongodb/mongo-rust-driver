@@ -23,6 +23,8 @@ pub(crate) struct AsyncTlsStream {
     inner: SslStream<AsyncTcpStream>,
 }
 
+/// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
+/// and reuse it for multiple connections.
 #[derive(Clone)]
 pub(crate) struct TlsConfig {
     connector: SslConnector,
@@ -30,6 +32,8 @@ pub(crate) struct TlsConfig {
 }
 
 impl TlsConfig {
+    /// Create a new `TlsConfig` from the provided options from the user.
+    /// This operation is expensive, so the resultant `TlsConfig` should be cached.
     pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
         let verify_hostname = options.allow_invalid_hostnames.unwrap_or(true);
 
