@@ -224,6 +224,12 @@ pub struct Server {
     min_wire_version: Option<i32>,
     max_wire_version: Option<i32>,
     topology_version: Option<TopologyVersion>,
+    pool: Option<Pool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Pool {
+    generation: u32,
 }
 
 fn server_type_from_str(s: &str) -> Option<ServerType> {
@@ -359,6 +365,7 @@ async fn run_test(test_file: TestFile) {
 
         topology.watch().wait_until_initialized().await;
         let topology_description = topology.description();
+        let servers = topology.servers();
         let phase_description = phase.description.unwrap_or_else(|| format!("{}", i));
 
         match phase.outcome {
@@ -366,6 +373,7 @@ async fn run_test(test_file: TestFile) {
                 verify_description_outcome(
                     outcome,
                     topology_description,
+                    servers,
                     test_description,
                     phase_description,
                 );
@@ -401,6 +409,7 @@ async fn run_test(test_file: TestFile) {
 fn verify_description_outcome(
     outcome: DescriptionOutcome,
     topology_description: TopologyDescription,
+    servers: HashMap<ServerAddress, Arc<crate::sdam::Server>>,
     test_description: &str,
     phase_description: String,
 ) {
@@ -532,6 +541,22 @@ fn verify_description_outcome(
                 test_description,
                 phase_description
             )
+        }
+
+        if let Some(generation) = server.pool.map(|p| p.generation) {
+            assert_eq!(
+                servers
+                    .get(&address)
+                    .unwrap()
+                    .pool
+                    .generation()
+                    .as_normal()
+                    .unwrap(),
+                generation,
+                "{} (phase {})",
+                test_description,
+                phase_description
+            );
         }
     }
 }
