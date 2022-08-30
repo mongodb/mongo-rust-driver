@@ -61,13 +61,22 @@ impl Monitor {
         runtime::execute(monitor.execute())
     }
 
+    fn is_alive(&self) -> bool {
+        self.topology_watcher.is_alive()
+            && self
+                .topology_watcher
+                .peek_latest()
+                .servers
+                .contains_key(&self.address)
+    }
+
     async fn execute(mut self) {
         let heartbeat_frequency = self
             .client_options
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while self.topology_watcher.is_alive() {
+        while self.is_alive() {
             self.check_server().await;
 
             #[cfg(test)]
@@ -81,10 +90,14 @@ impl Monitor {
             #[cfg(not(test))]
             let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-            runtime::delay_for(min_frequency).await;
-            self.update_request_receiver
-                .wait_for_check_request(heartbeat_frequency - min_frequency)
-                .await;
+            if self.is_alive() {
+                runtime::delay_for(min_frequency).await;
+            }
+            if self.is_alive() {
+                self.update_request_receiver
+                    .wait_for_check_request(heartbeat_frequency - min_frequency)
+                    .await;
+            }
         }
     }
 
