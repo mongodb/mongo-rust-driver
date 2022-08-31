@@ -9,9 +9,10 @@ use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    client::options::ClientOptions,
+    client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
     error::{Error, ErrorKind},
+    event::sdam::SdamEventHandler,
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
     test::{
@@ -499,12 +500,17 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
     let handler = Arc::new(EventHandler::new());
-    let mut options =
-        ClientOptions::parse("mongodb://localhost:49152,localhost:49153,localhost:49154/").await?;
+    let mut options = ClientOptions::builder()
+        .hosts(vec![
+            ServerAddress::parse("localhost:49152")?,
+            ServerAddress::parse("localhost:49153")?,
+            ServerAddress::parse("localhost:49154")?,
+        ])
+        .heartbeat_freq(Duration::from_millis(50))
+        .sdam_event_handler(handler.clone() as Arc<dyn SdamEventHandler>)
+        .repl_set_name("foo".to_string())
+        .build();
     options.heartbeat_freq = Some(Duration::from_millis(50));
-    options.test_options_mut().heartbeat_freq = Some(Duration::from_millis(50));
-    options.sdam_event_handler = Some(handler.clone());
-    options.repl_set_name = Some("foo".to_string());
 
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
