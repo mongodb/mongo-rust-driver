@@ -126,7 +126,24 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
-    pub(crate) fn new(options: ClientOptions) -> crate::error::Result<Self> {
+    pub(crate) fn new_empty() -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: None,
+            max_set_version: None,
+            max_election_id: None,
+            compatibility_error: None,
+            session_support_status: SessionSupportStatus::Undetermined,
+            transaction_support_status: TransactionSupportStatus::Undetermined,
+            cluster_time: None,
+            local_threshold: None,
+            heartbeat_freq: None,
+            servers: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn initialized(options: &ClientOptions) -> crate::error::Result<Self> {
         verify_max_staleness(
             options
                 .selection_criteria
@@ -146,8 +163,13 @@ impl TopologyDescription {
 
         let servers: HashMap<_, _> = options
             .hosts
-            .into_iter()
-            .map(|address| (address.clone(), ServerDescription::new(address, None)))
+            .iter()
+            .map(|address| {
+                (
+                    address.clone(),
+                    ServerDescription::new(address.clone(), None),
+                )
+            })
             .collect();
 
         let session_support_status = if topology_type == TopologyType::LoadBalanced {
@@ -164,9 +186,9 @@ impl TopologyDescription {
         };
 
         Ok(Self {
-            single_seed: servers.len() == 1,
+            single_seed: options.hosts.len() == 1,
             topology_type,
-            set_name: options.repl_set_name,
+            set_name: options.repl_set_name.clone(),
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
@@ -177,23 +199,6 @@ impl TopologyDescription {
             heartbeat_freq: options.heartbeat_freq,
             servers,
         })
-    }
-
-    pub(crate) fn new_empty() -> Self {
-        Self {
-            single_seed: false,
-            topology_type: TopologyType::Unknown,
-            set_name: None,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status: SessionSupportStatus::Undetermined,
-            transaction_support_status: TransactionSupportStatus::Undetermined,
-            cluster_time: None,
-            local_threshold: None,
-            heartbeat_freq: None,
-            servers: HashMap::new(),
-        }
     }
 
     /// Gets the topology type of the cluster.
@@ -435,11 +440,28 @@ impl TopologyDescription {
                 _ => None,
             });
 
-        Some(TopologyDescriptionDiff {
+        #[allow(unused_mut)]
+        let mut diff = TopologyDescriptionDiff {
             removed_addresses: addresses.difference(&other_addresses).cloned().collect(),
             added_addresses: other_addresses.difference(&addresses).cloned().collect(),
             changed_servers: changed_servers.collect(),
-        })
+        };
+
+        // For ordering of events in tests, sort the addresses.
+        #[cfg(test)]
+        {
+            diff.removed_addresses.sort_by_key(|addr| match addr {
+                ServerAddress::Tcp { host, port } => (host, port),
+            });
+            diff.added_addresses.sort_by_key(|addr| match addr {
+                ServerAddress::Tcp { host, port } => (host, port),
+            });
+            diff.changed_servers.sort_by_key(|(addr, _)| match addr {
+                ServerAddress::Tcp { host, port } => (host, port),
+            });
+        }
+
+        Some(diff)
     }
 
     /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
@@ -849,10 +871,12 @@ impl Default for TransactionSupportStatus {
 /// Returned from `TopologyDescription::diff`.
 #[derive(Debug)]
 pub(crate) struct TopologyDescriptionDiff<'a> {
-    pub(crate) removed_addresses: HashSet<&'a ServerAddress>,
-    pub(crate) added_addresses: HashSet<&'a ServerAddress>,
-    pub(crate) changed_servers:
-        HashMap<&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription)>,
+    pub(crate) removed_addresses: Vec<&'a ServerAddress>,
+    pub(crate) added_addresses: Vec<&'a ServerAddress>,
+    pub(crate) changed_servers: Vec<(
+        &'a ServerAddress,
+        (&'a ServerDescription, &'a ServerDescription),
+    )>,
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {

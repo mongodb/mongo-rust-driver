@@ -20,7 +20,7 @@ use crate::{
     },
     hello::{hello_command, run_hello, HelloReply},
     options::{ClientOptions, ServerAddress},
-    runtime,
+    runtime::{self, WorkerHandle, WorkerHandleListener},
 };
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -36,6 +36,7 @@ pub(crate) struct Monitor {
     sdam_event_emitter: Option<SdamEventEmitter>,
     update_request_receiver: TopologyCheckRequestReceiver,
     client_options: ClientOptions,
+    server_handle_listener: WorkerHandleListener,
 }
 
 impl Monitor {
@@ -46,8 +47,10 @@ impl Monitor {
         sdam_event_emitter: Option<SdamEventEmitter>,
         update_request_receiver: TopologyCheckRequestReceiver,
         client_options: ClientOptions,
-    ) {
+    ) -> WorkerHandle {
+        println!("starting monitor for {}", address);
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
+        let (handle, server_handle_listener) = WorkerHandleListener::channel();
         let monitor = Self {
             address,
             client_options,
@@ -57,17 +60,14 @@ impl Monitor {
             sdam_event_emitter,
             update_request_receiver,
             connection: None,
+            server_handle_listener,
         };
-        runtime::execute(monitor.execute())
+        runtime::execute(monitor.execute());
+        handle
     }
 
     fn is_alive(&self) -> bool {
-        self.topology_watcher.is_alive()
-            && self
-                .topology_watcher
-                .peek_latest()
-                .servers
-                .contains_key(&self.address)
+        self.server_handle_listener.is_alive()
     }
 
     async fn execute(mut self) {

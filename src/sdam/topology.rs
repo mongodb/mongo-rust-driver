@@ -60,7 +60,7 @@ pub(crate) struct Topology {
 impl Topology {
     pub(crate) fn new(options: ClientOptions) -> Result<Topology> {
         let http_client = HttpClient::default();
-        let description = TopologyDescription::new(options.clone())?;
+        let description = TopologyDescription::new_empty();
         let is_load_balanced = options.load_balanced == Some(true);
 
         let update_requester = TopologyCheckRequester::new();
@@ -89,64 +89,26 @@ impl Topology {
         let (updater, update_receiver) = TopologyUpdater::channel();
         let (worker_handle, handle_listener) = WorkerHandleListener::channel();
 
-        let servers = description
-            .server_addresses()
-            .map(|address| {
-                (
-                    address.clone(),
-                    Server::new(
-                        address.clone(),
-                        options.clone(),
-                        http_client.clone(),
-                        updater.clone(),
-                    ),
-                )
-            })
-            .collect();
-
         let state = TopologyState {
-            description,
-            servers,
+            description: description.clone(),
+            servers: Default::default(),
         };
-
-        let addresses = state.servers.keys().cloned().collect::<Vec<_>>();
 
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
-        #[cfg(test)]
-        let disable_monitoring_threads = options
-            .test_options
-            .as_ref()
-            .map(|to| to.disable_monitoring_threads)
-            .unwrap_or(false);
-        #[cfg(not(test))]
-        let disable_monitoring_threads = false;
-        if !is_load_balanced && !disable_monitoring_threads {
-            for address in addresses {
-                Monitor::start(
-                    address.clone(),
-                    updater.clone(),
-                    watcher.clone(),
-                    event_emitter.clone(),
-                    update_requester.subscribe(),
-                    options.clone(),
-                );
-            }
-
-            SrvPollingMonitor::start(updater.clone(), watcher.clone(), options.clone());
-        }
-
-        let worker = TopologyWorker {
+        let mut worker = TopologyWorker {
             id: ObjectId::new(),
             update_receiver,
             publisher,
-            options,
+            options: options.clone(),
             http_client,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
             update_requester: update_requester.clone(),
             handle_listener,
             event_emitter,
+            topology_description: description.clone(),
+            servers: Default::default(),
         };
 
         // Emit events for the initialization of the topology and the seed list.
@@ -155,47 +117,37 @@ impl Topology {
                 topology_id: worker.id,
             });
             let _ = emitter.emit(event);
-
-            let new_description = worker.borrow_latest_state().description.clone().into();
-            let event = TopologyDescriptionChangedEvent {
-                topology_id: worker.id,
-                previous_description: TopologyDescription::new_empty().into(),
-                new_description,
-            };
-            let _ = emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
-
-            for server_address in worker.options.hosts.iter() {
-                let event = SdamEvent::ServerOpening(ServerOpeningEvent {
-                    topology_id: worker.id,
-                    address: server_address.clone(),
-                });
-                let _ = emitter.emit(event);
-            }
         }
+
+        let addresses = options.hosts.clone().into_iter().collect::<HashSet<_>>();
+        worker.topology_description = TopologyDescription::initialized(&options)?;
+        worker.sync_hosts(addresses);
+        worker.process_topology_diff(&description);
+        worker.publish_state();
 
         // Load-balanced clients don't have a heartbeat monitor, so we synthesize
         // updating the server to `ServerType::LoadBalancer` with an RTT of 0 so it'll
         // be selected.
         if is_load_balanced {
-            let mut new_state = worker.borrow_latest_state().clone();
-            let old_description = new_state.description.clone();
+            let old_description = worker.topology_description.clone();
 
-            for server_address in new_state.servers.keys() {
+            for server_address in old_description.servers.keys() {
                 let new_desc = ServerDescription {
                     server_type: ServerType::LoadBalancer,
                     average_round_trip_time: Some(Duration::from_nanos(0)),
                     ..ServerDescription::new(server_address.clone(), None)
                 };
-                new_state
-                    .description
+                worker
+                    .topology_description
                     .update(new_desc)
                     .map_err(Error::internal)?;
             }
 
-            worker.process_topology_diff(&old_description, &new_state.description);
-            worker.publisher.publish_new_state(new_state);
+            worker.process_topology_diff(&old_description);
+            worker.publish_state();
         }
 
+        SrvPollingMonitor::start(updater.clone(), watcher.clone(), options);
         worker.start();
 
         Ok(Topology {
@@ -343,6 +295,20 @@ pub(crate) enum UpdateMessage {
     SyncWorkers,
 }
 
+#[derive(Debug, Clone)]
+struct MonitoredServer {
+    server: Arc<Server>,
+    _monitor_handle: WorkerHandle,
+}
+
+impl std::ops::Deref for MonitoredServer {
+    type Target = Server;
+
+    fn deref(&self) -> &Self::Target {
+        self.server.as_ref()
+    }
+}
+
 struct TopologyWorker {
     id: ObjectId,
     update_receiver: TopologyUpdateReceiver,
@@ -351,6 +317,8 @@ struct TopologyWorker {
     event_emitter: Option<SdamEventEmitter>,
     options: ClientOptions,
     http_client: HttpClient,
+    servers: HashMap<ServerAddress, MonitoredServer>,
+    topology_description: TopologyDescription,
 
     // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
@@ -371,9 +339,8 @@ impl TopologyWorker {
                                 true
                             }
                             UpdateMessage::SyncHosts(hosts) => {
-                                let mut state = self.borrow_latest_state().clone();
-                                self.sync_hosts(&mut state, hosts);
-                                self.publisher.publish_new_state(state);
+                                self.sync_hosts(hosts);
+                                self.publish_state();
                                 true
                             }
                             UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await,
@@ -388,7 +355,6 @@ impl TopologyWorker {
                             #[cfg(test)]
                             UpdateMessage::SyncWorkers => {
                                 let rxen: FuturesUnordered<_> = self
-                                    .borrow_latest_state()
                                     .servers
                                     .values()
                                     .map(|v| v.pool.sync_worker())
@@ -407,6 +373,7 @@ impl TopologyWorker {
 
             // indicate to the topology watchers that the topology is no longer alive
             drop(self.publisher);
+            drop(self.servers);
 
             if let Some(emitter) = self.event_emitter {
                 emitter
@@ -418,26 +385,28 @@ impl TopologyWorker {
         });
     }
 
-    /// Get a reference to the latest topology state.
-    ///
-    /// Note that this holds a read lock, so broadcasting a new state while an
-    /// outstanding reference to the `TopologyState` is held will deadlock.
-    fn borrow_latest_state(&self) -> Ref<TopologyState> {
-        self.topology_watcher.peek_latest()
+    fn publish_state(&mut self) {
+        self.publisher.publish_new_state(TopologyState {
+            servers: self
+                .servers
+                .iter()
+                .map(|(k, v)| (k.clone(), v.server.clone()))
+                .collect(),
+            description: self.topology_description.clone(),
+        })
     }
 
     fn advance_cluster_time(&mut self, to: ClusterTime) {
-        let mut latest_state = self.borrow_latest_state().clone();
-        latest_state.description.advance_cluster_time(&to);
-        self.publisher.publish_new_state(latest_state);
+        self.topology_description.advance_cluster_time(&to);
+        self.publish_state();
     }
 
-    fn sync_hosts(&self, state: &mut TopologyState, hosts: HashSet<ServerAddress>) {
-        state.servers.retain(|host, _| hosts.contains(host));
-        state.description.sync_hosts(&hosts);
+    fn sync_hosts(&mut self, hosts: HashSet<ServerAddress>) {
+        self.servers.retain(|host, _| hosts.contains(host));
+        self.topology_description.sync_hosts(&hosts);
 
         for address in hosts {
-            if state.servers.contains_key(&address) {
+            if self.servers.contains_key(&address) {
                 continue;
             }
             let server = Server::new(
@@ -446,7 +415,6 @@ impl TopologyWorker {
                 self.http_client.clone(),
                 self.topology_updater.clone(),
             );
-            state.servers.insert(address.clone(), server);
 
             #[cfg(test)]
             let disable_monitoring_threads = self
@@ -458,28 +426,37 @@ impl TopologyWorker {
             #[cfg(not(test))]
             let disable_monitoring_threads = false;
 
-            if !disable_monitoring_threads {
+            let monitor_handle = if !disable_monitoring_threads {
                 Monitor::start(
-                    address,
+                    address.clone(),
                     self.topology_updater.clone(),
                     self.topology_watcher.clone(),
                     self.event_emitter.clone(),
                     self.update_requester.subscribe(),
                     self.options.clone(),
-                );
-            }
+                )
+            } else {
+                WorkerHandleListener::channel().0
+            };
+
+            self.servers.insert(
+                address,
+                MonitoredServer {
+                    server,
+                    _monitor_handle: monitor_handle,
+                },
+            );
         }
     }
 
     /// Update the topology using the provided `ServerDescription`.
     async fn update_server(&mut self, mut sd: ServerDescription) -> bool {
-        let mut latest_state = self.borrow_latest_state().clone();
-        let old_description = latest_state.description.clone();
+        let old_description = self.topology_description.clone();
 
         if let Some(expected_name) = &self.options.repl_set_name {
             if sd.is_available() {
                 let got_name = sd.set_name();
-                if latest_state.description.topology_type() == TopologyType::Single
+                if self.topology_description.topology_type() == TopologyType::Single
                     && got_name.as_ref().map(|opt| opt.as_ref()) != Ok(Some(expected_name))
                 {
                     let got_display = match got_name {
@@ -503,41 +480,36 @@ impl TopologyWorker {
         let server_address = sd.address.clone();
 
         // TODO: RUST-1270 change this method to not return a result.
-        let _ = latest_state.description.update(sd);
+        let _ = self.topology_description.update(sd);
 
-        let hosts = latest_state
-            .description
+        let hosts = self
+            .topology_description
             .server_addresses()
             .cloned()
             .collect();
-        self.sync_hosts(&mut latest_state, hosts);
+        self.sync_hosts(hosts);
 
-        let topology_changed =
-            self.process_topology_diff(&old_description, &latest_state.description);
+        let topology_changed = self.process_topology_diff(&old_description);
 
         if topology_changed
             && (server_type.is_data_bearing()
                 || (server_type != ServerType::Unknown
-                    && latest_state.description.topology_type() == TopologyType::Single))
+                    && self.topology_description.topology_type() == TopologyType::Single))
         {
-            if let Some(s) = latest_state.servers.get(&server_address) {
+            if let Some(s) = self.servers.get(&server_address) {
                 s.pool.mark_as_ready().await;
             }
         }
 
-        self.publisher.publish_new_state(latest_state);
+        self.publish_state();
 
         topology_changed
     }
 
     /// Emit the appropriate SDAM monitoring events given the changes to the
     /// topology as the result of an update, if any.
-    fn process_topology_diff(
-        &self,
-        old_description: &TopologyDescription,
-        new_description: &TopologyDescription,
-    ) -> bool {
-        let diff = old_description.diff(new_description);
+    fn process_topology_diff(&self, old_description: &TopologyDescription) -> bool {
+        let diff = old_description.diff(&self.topology_description);
         let changed = diff.is_some();
         if let Some(ref emitter) = self.event_emitter {
             if let Some(diff) = diff {
@@ -559,6 +531,13 @@ impl TopologyWorker {
                     let _ = emitter.emit(event);
                 }
 
+                let event = TopologyDescriptionChangedEvent {
+                    topology_id: self.id,
+                    previous_description: old_description.clone().into(),
+                    new_description: self.topology_description.clone().into(),
+                };
+                let _ = emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
+
                 for address in diff.added_addresses {
                     let event = ServerOpeningEvent {
                         address: address.clone(),
@@ -566,13 +545,6 @@ impl TopologyWorker {
                     };
                     let _ = emitter.emit(SdamEvent::ServerOpening(event));
                 }
-
-                let event = TopologyDescriptionChangedEvent {
-                    topology_id: self.id,
-                    previous_description: old_description.clone().into(),
-                    new_description: new_description.clone().into(),
-                };
-                let _ = emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
             }
         }
         changed
@@ -620,7 +592,7 @@ impl TopologyWorker {
         }
 
         let is_load_balanced =
-            self.borrow_latest_state().description.topology_type() == TopologyType::LoadBalanced;
+            self.topology_description.topology_type() == TopologyType::LoadBalanced;
         if error.is_state_change_error() {
             let updated =
                 is_load_balanced || self.mark_server_as_unknown(address, error.clone()).await;
@@ -672,7 +644,7 @@ impl TopologyWorker {
 
     /// Get the server at the provided address if present in the topology.
     fn server(&self, address: &ServerAddress) -> Option<Arc<Server>> {
-        self.borrow_latest_state().servers.get(address).cloned()
+        self.servers.get(address).map(|s| s.server.clone())
     }
 }
 
