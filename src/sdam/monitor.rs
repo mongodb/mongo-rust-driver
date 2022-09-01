@@ -48,7 +48,6 @@ impl Monitor {
         update_request_receiver: TopologyCheckRequestReceiver,
         client_options: ClientOptions,
     ) -> WorkerHandle {
-        println!("starting monitor for {}", address);
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
         let (handle, server_handle_listener) = WorkerHandleListener::channel();
         let monitor = Self {
