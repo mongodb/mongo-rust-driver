@@ -3,6 +3,7 @@ mod http;
 #[cfg(feature = "async-std-runtime")]
 mod interval;
 mod join_handle;
+mod process;
 mod resolver;
 mod stream;
 mod sync_read_ext;
@@ -17,6 +18,7 @@ use std::{future::Future, net::SocketAddr, time::Duration};
 pub(crate) use self::{
     acknowledged_message::AcknowledgedMessage,
     join_handle::AsyncJoinHandle,
+    process::Process,
     resolver::AsyncResolver,
     stream::AsyncStream,
     sync_read_ext::SyncLittleEndianRead,
