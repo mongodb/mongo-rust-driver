@@ -1,9 +1,9 @@
 use std::{ffi::OsStr, process::Stdio};
 
-#[cfg(feature = "tokio-runtime")]
-use tokio::process::{Child, Command};
 #[cfg(feature = "async-std-runtime")]
 use async_std::process::{Child, Command};
+#[cfg(feature = "tokio-runtime")]
+use tokio::process::{Child, Command};
 
 use crate::error::Result;
 
@@ -13,11 +13,11 @@ pub(crate) struct Process {
 }
 
 impl Process {
-    pub(crate) fn spawn<P, I, A>(path: P, args: I)
-        -> Result<Self>
-        where P: AsRef<OsStr>,
-            I: IntoIterator<Item = A>,
-            A: AsRef<OsStr>,
+    pub(crate) fn spawn<P, I, A>(path: P, args: I) -> Result<Self>
+    where
+        P: AsRef<OsStr>,
+        I: IntoIterator<Item = A>,
+        A: AsRef<OsStr>,
     {
         let mut command = Command::new(path);
         let child = command

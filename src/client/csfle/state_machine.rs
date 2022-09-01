@@ -1,4 +1,7 @@
-use std::{convert::TryInto, path::{PathBuf, Path}};
+use std::{
+    convert::TryInto,
+    path::{Path, PathBuf},
+};
 
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
@@ -220,7 +223,11 @@ impl Mongocryptd {
         let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
         options.server_selection_timeout = Some(std::time::Duration::from_millis(10_000));
         let client = Client::with_options(options)?;
-        Ok(Self { opts, client, child })
+        Ok(Self {
+            opts,
+            client,
+            child,
+        })
     }
 
     async fn respawn(&self) -> Result<()> {
