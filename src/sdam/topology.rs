@@ -420,12 +420,15 @@ impl TopologyWorker {
             #[cfg(test)]
             let disable_monitoring_threads = self
                 .options
-                .test_options
-                .as_ref()
-                .map(|to| to.disable_monitoring_threads)
+                .load_balanced
+                .or(self
+                    .options
+                    .test_options
+                    .as_ref()
+                    .map(|to| to.disable_monitoring_threads))
                 .unwrap_or(false);
             #[cfg(not(test))]
-            let disable_monitoring_threads = false;
+            let disable_monitoring_threads = self.options.load_balanced.unwrap_or(false);
 
             let monitor_handle = if !disable_monitoring_threads {
                 Monitor::start(
