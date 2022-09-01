@@ -145,9 +145,10 @@ impl Topology {
 
             worker.process_topology_diff(&old_description);
             worker.publish_state();
+        } else {
+            SrvPollingMonitor::start(updater.clone(), watcher.clone(), options);
         }
 
-        SrvPollingMonitor::start(updater.clone(), watcher.clone(), options);
         worker.start();
 
         Ok(Topology {
