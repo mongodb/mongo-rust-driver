@@ -126,23 +126,6 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
-    pub(crate) fn new_empty() -> Self {
-        Self {
-            single_seed: false,
-            topology_type: TopologyType::Unknown,
-            set_name: None,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status: SessionSupportStatus::Undetermined,
-            transaction_support_status: TransactionSupportStatus::Undetermined,
-            cluster_time: None,
-            local_threshold: None,
-            heartbeat_freq: None,
-            servers: HashMap::new(),
-        }
-    }
-
     pub(crate) fn initialized(options: &ClientOptions) -> crate::error::Result<Self> {
         verify_max_staleness(
             options
@@ -199,6 +182,23 @@ impl TopologyDescription {
             heartbeat_freq: options.heartbeat_freq,
             servers,
         })
+    }
+
+    pub(crate) fn new_empty() -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: None,
+            max_set_version: None,
+            max_election_id: None,
+            compatibility_error: None,
+            session_support_status: SessionSupportStatus::Undetermined,
+            transaction_support_status: TransactionSupportStatus::Undetermined,
+            cluster_time: None,
+            local_threshold: None,
+            heartbeat_freq: None,
+            servers: HashMap::new(),
+        }
     }
 
     /// Gets the topology type of the cluster.
