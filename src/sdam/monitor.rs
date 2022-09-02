@@ -628,13 +628,6 @@ impl MonitorRequestReceiver {
                         // Don't continue waiting after server has been removed from the topology.
                         break;
                     }
-                    // r = self.cancellation_receiver.changed() => {
-                    //     // if we receive a cancellation request indicating the topology has been dropped,
-                    //     // then just return early.
-                    //     if r.is_err() || matches!(&*self.cancellation_receiver.borrow(), CancellationReason::TopologyClosed) {
-                    //         break;
-                    //     }
-                    // }
                 }
             }
         })
