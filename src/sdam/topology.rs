@@ -518,7 +518,21 @@ impl TopologyWorker {
         let changed = diff.is_some();
         if let Some(ref emitter) = self.event_emitter {
             if let Some(diff) = diff {
-                for (address, (previous_description, new_description)) in diff.changed_servers {
+                // For ordering of events in tests, sort the addresses.
+
+                #[cfg(not(test))]
+                let changed_servers = diff.changed_servers;
+
+                #[cfg(test)]
+                let changed_servers = {
+                    let mut servers = diff.changed_servers.into_iter().collect::<Vec<_>>();
+                    servers.sort_by_key(|(addr, _)| match addr {
+                        ServerAddress::Tcp { host, port } => (host, port),
+                    });
+                    servers
+                };
+
+                for (address, (previous_description, new_description)) in changed_servers {
                     let event = ServerDescriptionChangedEvent {
                         address: address.clone(),
                         topology_id: self.id,
@@ -528,7 +542,19 @@ impl TopologyWorker {
                     let _ = emitter.emit(SdamEvent::ServerDescriptionChanged(Box::new(event)));
                 }
 
-                for address in diff.removed_addresses {
+                #[cfg(not(test))]
+                let removed_addresses = diff.removed_addresses;
+
+                #[cfg(test)]
+                let removed_addresses = {
+                    let mut addresses = diff.removed_addresses.into_iter().collect::<Vec<_>>();
+                    addresses.sort_by_key(|addr| match addr {
+                        ServerAddress::Tcp { host, port } => (host, port),
+                    });
+                    addresses
+                };
+
+                for address in removed_addresses {
                     let event = SdamEvent::ServerClosed(ServerClosedEvent {
                         address: address.clone(),
                         topology_id: self.id,
@@ -543,7 +569,19 @@ impl TopologyWorker {
                 };
                 let _ = emitter.emit(SdamEvent::TopologyDescriptionChanged(Box::new(event)));
 
-                for address in diff.added_addresses {
+                #[cfg(not(test))]
+                let added_addresses = diff.added_addresses;
+
+                #[cfg(test)]
+                let added_addresses = {
+                    let mut addresses = diff.added_addresses.into_iter().collect::<Vec<_>>();
+                    addresses.sort_by_key(|addr| match addr {
+                        ServerAddress::Tcp { host, port } => (host, port),
+                    });
+                    addresses
+                };
+
+                for address in added_addresses {
                     let event = ServerOpeningEvent {
                         address: address.clone(),
                         topology_id: self.id,
