@@ -414,28 +414,11 @@ impl TopologyDescription {
                 _ => None,
             });
 
-        #[allow(unused_mut)]
-        let mut diff = TopologyDescriptionDiff {
+        Some(TopologyDescriptionDiff {
             removed_addresses: addresses.difference(&other_addresses).cloned().collect(),
             added_addresses: other_addresses.difference(&addresses).cloned().collect(),
             changed_servers: changed_servers.collect(),
-        };
-
-        // For ordering of events in tests, sort the addresses.
-        #[cfg(test)]
-        {
-            diff.removed_addresses.sort_by_key(|addr| match addr {
-                ServerAddress::Tcp { host, port } => (host, port),
-            });
-            diff.added_addresses.sort_by_key(|addr| match addr {
-                ServerAddress::Tcp { host, port } => (host, port),
-            });
-            diff.changed_servers.sort_by_key(|(addr, _)| match addr {
-                ServerAddress::Tcp { host, port } => (host, port),
-            });
-        }
-
-        Some(diff)
+        })
     }
 
     /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
@@ -867,12 +850,10 @@ impl Default for TransactionSupportStatus {
 /// Returned from `TopologyDescription::diff`.
 #[derive(Debug)]
 pub(crate) struct TopologyDescriptionDiff<'a> {
-    pub(crate) removed_addresses: Vec<&'a ServerAddress>,
-    pub(crate) added_addresses: Vec<&'a ServerAddress>,
-    pub(crate) changed_servers: Vec<(
-        &'a ServerAddress,
-        (&'a ServerDescription, &'a ServerDescription),
-    )>,
+    pub(crate) removed_addresses: HashSet<&'a ServerAddress>,
+    pub(crate) added_addresses: HashSet<&'a ServerAddress>,
+    pub(crate) changed_servers:
+        HashMap<&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription)>,
 }
 
 pub(crate) fn verify_max_staleness(

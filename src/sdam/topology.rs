@@ -434,7 +434,21 @@ impl TopologyWorker {
         let diff = old_description.diff(&self.topology_description);
         let changed = diff.is_some();
         if let Some(diff) = diff {
-            for (address, (previous_description, new_description)) in diff.changed_servers {
+            // For ordering of events in tests, sort the addresses.
+
+            #[cfg(not(test))]
+            let changed_servers = diff.changed_servers;
+
+            #[cfg(test)]
+            let changed_servers = {
+                let mut servers = diff.changed_servers.into_iter().collect::<Vec<_>>();
+                servers.sort_by_key(|(addr, _)| match addr {
+                    ServerAddress::Tcp { host, port } => (host, port),
+                });
+                servers
+            };
+
+            for (address, (previous_description, new_description)) in changed_servers {
                 if new_description.server_type.is_data_bearing()
                     || (new_description.server_type != ServerType::Unknown
                         && self.topology_description.topology_type() == TopologyType::Single)
@@ -453,7 +467,19 @@ impl TopologyWorker {
                 });
             }
 
-            for address in diff.removed_addresses {
+            #[cfg(not(test))]
+            let removed_addresses = diff.removed_addresses;
+
+            #[cfg(test)]
+            let removed_addresses = {
+                let mut addresses = diff.removed_addresses.into_iter().collect::<Vec<_>>();
+                addresses.sort_by_key(|addr| match addr {
+                    ServerAddress::Tcp { host, port } => (host, port),
+                });
+                addresses
+            };
+
+            for address in removed_addresses {
                 let removed_server = self.servers.remove(address);
                 debug_assert!(
                     removed_server.is_some(),
@@ -477,7 +503,19 @@ impl TopologyWorker {
                 }))
             });
 
-            for address in diff.added_addresses {
+            #[cfg(not(test))]
+            let added_addresses = diff.added_addresses;
+
+            #[cfg(test)]
+            let added_addresses = {
+                let mut addresses = diff.added_addresses.into_iter().collect::<Vec<_>>();
+                addresses.sort_by_key(|addr| match addr {
+                    ServerAddress::Tcp { host, port } => (host, port),
+                });
+                addresses
+            };
+
+            for address in added_addresses {
                 if self.servers.contains_key(address) {
                     debug_assert!(
                         false,
