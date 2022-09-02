@@ -24,9 +24,6 @@ pub(crate) struct Server {
 impl Server {
     #[cfg(test)]
     pub(crate) fn new_mocked(address: ServerAddress, operation_count: u32) -> Self {
-        use crate::runtime::WorkerHandleListener;
-
-        let (_monitor_handle, _) = WorkerHandleListener::channel();
         Self {
             address: address.clone(),
             pool: ConnectionPool::new_mocked(address),
