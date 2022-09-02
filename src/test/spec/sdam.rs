@@ -206,7 +206,7 @@ async fn rtt_is_updated() {
             true
         })
         .await;
-    assert!(!events.is_empty());
+    assert!(events.len() > 2);
 
     // configure a failpoint that blocks hello commands
     let fp = FailPoint::fail_command(
