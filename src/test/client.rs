@@ -731,7 +731,7 @@ async fn retry_commit_txn_check_out() {
         return;
     }
 
-    if setup_client.server_version_gte(4, 4) {
+    if setup_client.supports_streaming_monitoring_protocol() {
         log_uncaptured("skipping retry_commit_txn_check_out due to streaming protocol support");
         return;
     }

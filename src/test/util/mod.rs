@@ -278,6 +278,10 @@ impl TestClient {
             || self.is_sharded() && self.server_version_gte(4, 2)
     }
 
+    pub(crate) fn supports_streaming_monitoring_protocol(&self) -> bool {
+        self.server_info.topology_version.is_some()
+    }
+
     pub(crate) async fn enable_failpoint(
         &self,
         fp: FailPoint,

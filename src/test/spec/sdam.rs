@@ -155,13 +155,20 @@ async fn rtt_is_updated() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let test_client = TestClient::new().await;
-    if test_client.server_version_lt(4, 4) {
-        log_uncaptured("skipping rtt_is_updated due to server version less than 4.4");
+    if !test_client.supports_streaming_monitoring_protocol() {
+        log_uncaptured(
+            "skipping rtt_is_updated due to not supporting streaming monitoring protocol",
+        );
         return;
     }
 
     if test_client.is_load_balanced() {
         log_uncaptured("skipping rtt_is_updated due to load balanced topology");
+        return;
+    }
+
+    if test_client.supports_block_connection() {
+        log_uncaptured("skipping rtt_is_updated due to not supporting block_connection");
         return;
     }
 
