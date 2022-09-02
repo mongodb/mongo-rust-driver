@@ -303,7 +303,7 @@ impl Monitor {
             HelloResult::Err(ref e) | HelloResult::Cancelled { reason: ref e } => {
                 // Per the spec, cancelled requests and errors both require the monitoring
                 // connection to be closed.
-                self.connection.take();
+                self.connection = None;
                 self.rtt_monitor_handle.reset_average_rtt();
                 self.emit_event(|| {
                     SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
@@ -453,7 +453,7 @@ impl RttMonitor {
             } else {
                 // From the SDAM spec: "Errors encountered when running a hello or legacy hello
                 // command MUST NOT update the topology."
-                self.connection.take();
+                self.connection = None;
 
                 // Also from the SDAM spec: "Don't call reset() here. The Monitor thread is
                 // responsible for resetting the average RTT."
