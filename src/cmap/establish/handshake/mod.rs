@@ -136,7 +136,6 @@ impl Handshaker {
     /// Creates a new Handshaker.
     pub(crate) fn new(http_client: HttpClient, options: HandshakerOptions) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
-        let mut server_api = None;
         let compressors = options.compressors;
 
         let mut command = hello_command(
@@ -181,17 +180,13 @@ impl Handshaker {
             );
         }
 
-        if let Some(api) = options.server_api {
-            server_api = Some(api);
-        }
-
         command.body.insert("client", metadata);
 
         Self {
             http_client,
             command,
             compressors,
-            server_api,
+            server_api: options.server_api,
         }
     }
 
