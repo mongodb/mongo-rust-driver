@@ -63,7 +63,7 @@ impl EventObserver {
         // first retrieve all the events buffered in the channel
         while self.try_recv().is_some() {}
         let es = entities.read().await;
-        // then count
+        // Then collect all matching events.
         self.seen_events
             .iter()
             .filter(|e| events_match(e, event, Some(&es)).is_ok())
