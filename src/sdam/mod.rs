@@ -13,7 +13,7 @@ pub(crate) use self::{
     description::{
         server::{ServerDescription, TopologyVersion},
         topology::{
-            server_selection::{self, SelectedServer, IDLE_WRITE_PERIOD},
+            server_selection::{self, SelectedServer},
             verify_max_staleness,
             SessionSupportStatus,
             TopologyDescription,

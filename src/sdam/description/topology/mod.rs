@@ -22,6 +22,8 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
+use self::server_selection::IDLE_WRITE_PERIOD;
+
 /// The possible types for a topology.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
 #[non_exhaustive]
@@ -873,14 +875,22 @@ pub(crate) struct TopologyDescriptionDiff<'a> {
     )>,
 }
 
-pub(crate) fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
-    if max_staleness
-        .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
-        .unwrap_or(false)
-    {
-        return Err(Error::invalid_argument(
-            "max staleness cannot be both positive and below 90 seconds",
-        ));
+pub(crate) fn verify_max_staleness(
+    max_staleness: Duration,
+    heartbeat_frequency: Duration,
+) -> crate::error::Result<()> {
+    let smallest_max_staleness = std::cmp::max(
+        Duration::from_secs(90),
+        heartbeat_frequency
+            .checked_add(IDLE_WRITE_PERIOD)
+            .unwrap_or(Duration::MAX),
+    );
+
+    if max_staleness < smallest_max_staleness {
+        return Err(Error::invalid_argument(format!(
+            "invalid max_staleness value: must be at least {} seconds",
+            smallest_max_staleness.as_secs()
+        )));
     }
 
     Ok(())

@@ -240,7 +240,9 @@ impl TopologyDescription {
         tag_sets: Option<&'a Vec<TagSet>>,
         max_staleness: Option<Duration>,
     ) -> Result<Vec<&ServerDescription>> {
-        super::verify_max_staleness(max_staleness)?;
+        if let Some(max_staleness) = max_staleness {
+            super::verify_max_staleness(max_staleness, self.heartbeat_frequency())?;
+        }
 
         let mut servers = self.servers_with_type(types).collect();
 
