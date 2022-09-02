@@ -79,7 +79,7 @@ impl StreamDescription {
         Self::with_wire_version(8)
     }
 
-    /// Gets a description of a stream for a 4.2 connection.
+    /// Gets a description of a stream for a connection to a server with the provided maxWireVersion.
     #[cfg(test)]
     pub(crate) fn with_wire_version(max_wire_version: i32) -> Self {
         Self {
