@@ -71,7 +71,7 @@ impl TestClient {
         Self::with_options(None).await
     }
 
-    pub(crate) async fn with_options(options: Option<ClientOptions>) -> Self {
+    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
         Self::with_handler(None, options).await
     }
 
@@ -442,6 +442,10 @@ impl TestClient {
             options.hosts = options.hosts.iter().take(1).cloned().collect();
         }
         options
+    }
+
+    pub(crate) fn into_client(self) -> Client {
+        self.client
     }
 }
 

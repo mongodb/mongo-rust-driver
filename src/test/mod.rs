@@ -5,6 +5,7 @@ mod auth_aws;
 mod change_stream;
 mod client;
 mod coll;
+mod csfle;
 mod cursor;
 mod db;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
