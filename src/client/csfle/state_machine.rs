@@ -238,7 +238,13 @@ impl Mongocryptd {
                 return unit_err(&*self.child.lock().await);
             }
         };
-        *child = Self::spawn(&self.opts);
+        let new_child = Self::spawn(&self.opts);
+        if new_child.is_ok() {
+            if let Ok(old_child) = child.as_mut() {
+                let _ = old_child.wait().await;
+            }
+        }
+        *child = new_child;
         unit_err(&*child)
     }
 

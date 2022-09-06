@@ -1,4 +1,7 @@
-use std::{ffi::OsStr, process::Stdio};
+use std::{
+    ffi::OsStr,
+    process::{ExitStatus, Stdio},
+};
 
 #[cfg(feature = "async-std-runtime")]
 use async_std::process::{Child, Command};
@@ -26,6 +29,13 @@ impl Process {
             .stderr(Stdio::null())
             .spawn()?;
         Ok(Self { child })
+    }
+
+    pub(crate) async fn wait(&mut self) -> Result<ExitStatus> {
+        #[cfg(feature = "tokio-runtime")]
+        return Ok(self.child.wait().await?);
+        #[cfg(feature = "async-std-runtime")]
+        return Ok(self.child.status().await?);
     }
 }
 
