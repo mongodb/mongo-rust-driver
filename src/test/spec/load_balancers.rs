@@ -3,16 +3,14 @@ use std::path::PathBuf;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::test::{
-    log_uncaptured,
     run_spec_test_with_path,
     spec::{
+        run_unified_format_test,
         unified_runner::{ExpectedCmapEvent, ExpectedEvent, TestFile},
         ExpectedEventType,
     },
     LOCK,
 };
-
-use super::run_unified_format_test_filtered;
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
@@ -42,15 +40,7 @@ async fn run() {
                 }
             }
         }
-        run_unified_format_test_filtered(path, test_file, |tc| {
-            // TODO RUST-142 unskip this when change streams are implemented.
-            if tc.description == "change streams pin to a connection" {
-                log_uncaptured("skipping due to change streams not being implemented");
-                return false;
-            }
-            true
-        })
-        .await;
+        run_unified_format_test(path, test_file).await;
     }
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test_with_path(&["load-balancers"], run_test).await;
