@@ -156,22 +156,8 @@ impl Connection {
     /// Create a connection intended for monitoring purposes.
     /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
     pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream) -> Self {
-        Self {
-            id: 0, // Monitoring connections don't have ids.
-            server_id: None,
-            generation: ConnectionGeneration::Monitoring,
-            pool_manager: None,
-            command_executing: false,
-            ready_and_available_time: None,
-            stream: BufStream::new(stream),
-            address,
-            handler: None,
-            stream_description: None,
-            error: false,
-            pinned_sender: None,
-            compressor: None,
-            more_to_come: false,
-        }
+        // Monitoring connections don't have IDs, so just use 0 as a placeholder here.
+        Self::new(address, stream, 0, ConnectionGeneration::Monitoring)
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
