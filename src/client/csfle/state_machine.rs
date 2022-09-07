@@ -1,6 +1,7 @@
 use std::{
     convert::TryInto,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use bson::{Document, RawDocument, RawDocumentBuf};
@@ -221,11 +222,14 @@ struct Mongocryptd {
 }
 
 impl Mongocryptd {
+    const DEFAULT_URI: &'static str = "mongodb://localhost:27020";
+    const SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
+
     async fn new(opts: MongocryptdOptions) -> Result<Self> {
         let child = Mutex::new(Ok(Self::spawn(&opts)?));
-        let uri = opts.uri.as_deref().unwrap_or("mongodb://localhost:27020");
+        let uri = opts.uri.as_deref().unwrap_or(Self::DEFAULT_URI);
         let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
-        options.server_selection_timeout = Some(std::time::Duration::from_millis(10_000));
+        options.server_selection_timeout = Some(Self::SERVER_SELECTION_TIMEOUT);
         let client = Client::with_options(options)?;
         Ok(Self {
             opts,
