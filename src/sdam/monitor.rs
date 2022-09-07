@@ -100,7 +100,7 @@ impl Monitor {
             //
             // We only go to sleep when using the polling protocol (i.e. server never returned a
             // topologyVersion) or when the most recent check failed.
-            if (self.topology_version.is_none() || !check_succeeded) && self.is_alive() {
+            if self.topology_version.is_none() || !check_succeeded {
                 #[cfg(test)]
                 let min_frequency = self
                     .client_options
@@ -112,10 +112,8 @@ impl Monitor {
                 #[cfg(not(test))]
                 let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-                let min_sleep = runtime::delay_for(min_frequency);
-                tokio::pin!(min_sleep);
                 tokio::select! {
-                    _ = &mut min_sleep => {},
+                    _ = runtime::delay_for(min_frequency) => {},
                     _ = self.request_receiver.wait_for_server_close() => {
                         break;
                     }
@@ -256,8 +254,6 @@ impl Monitor {
             }
         };
 
-        tokio::pin!(timeout_future);
-
         // Execute the hello while also listening for cancellation and keeping track of the timeout.
         let start = Instant::now();
         let result = tokio::select! {
@@ -272,7 +268,7 @@ impl Monitor {
                 };
                 HelloResult::Cancelled { reason: reason_error }
             }
-            _ = &mut timeout_future => {
+            _ = timeout_future => {
                 HelloResult::Err(Error::network_timeout())
             }
         };
