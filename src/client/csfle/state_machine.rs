@@ -15,7 +15,7 @@ use tokio::{
 use crate::{
     client::{options::ServerAddress, WeakClient},
     cmap::options::StreamOptions,
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     operation::{RawOutput, RunCommand},
     runtime::{AsyncStream, Process},
     Client,
@@ -111,17 +111,21 @@ impl CryptExecutor {
                         .mongocryptd
                         .as_ref()
                         .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
-                    let mut result = mongocryptd.client.execute_operation(op.clone(), None).await;
-                    if let Err(e) = &result {
-                        if matches!(&*e.kind, ErrorKind::ServerSelection { .. }) {
+                    let result = mongocryptd.client.execute_operation(op.clone(), None).await;
+                    let response = match result {
+                        Ok(r) => r,
+                        Err(e) if e.is_server_selection_error() => {
                             mongocryptd.respawn().await?;
-                            let new_result = mongocryptd.client.execute_operation(op, None).await;
-                            if new_result.is_ok() {
-                                result = new_result;
+                            match mongocryptd.client.execute_operation(op, None).await {
+                                Ok(r) => r,
+                                Err(new_e) if !new_e.is_server_selection_error() => {
+                                    return Err(new_e)
+                                }
+                                Err(_) => return Err(e),
                             }
                         }
-                    }
-                    let response = result?;
+                        Err(e) => return Err(e),
+                    };
                     ctx.mongo_feed(response.raw_body())?;
                     ctx.mongo_done()?;
                 }
