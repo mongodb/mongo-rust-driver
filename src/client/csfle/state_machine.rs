@@ -1,4 +1,8 @@
-use std::convert::TryInto;
+use std::{
+    convert::TryInto,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use bson::{Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
@@ -6,7 +10,7 @@ use mongocrypt::ctx::{Ctx, State};
 use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::oneshot,
+    sync::{oneshot, Mutex},
 };
 
 use crate::{
@@ -14,7 +18,7 @@ use crate::{
     cmap::options::StreamOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
-    runtime::AsyncStream,
+    runtime::{AsyncStream, Process},
     Client,
     Namespace,
 };
@@ -25,18 +29,16 @@ use super::options::KmsProvidersTlsOptions;
 pub(crate) struct CryptExecutor {
     key_vault_client: WeakClient,
     key_vault_namespace: Namespace,
-    mongocryptd_client: Option<Client>,
-    metadata_client: Option<WeakClient>,
     tls_options: Option<KmsProvidersTlsOptions>,
     crypto_threads: ThreadPool,
+    mongocryptd: Option<Mongocryptd>,
+    metadata_client: Option<WeakClient>,
 }
 
 impl CryptExecutor {
-    pub(crate) fn new(
+    pub(crate) fn new_explicit(
         key_vault_client: WeakClient,
         key_vault_namespace: Namespace,
-        mongocryptd_client: Option<Client>,
-        metadata_client: Option<WeakClient>,
         tls_options: Option<KmsProvidersTlsOptions>,
     ) -> Result<Self> {
         let num_cpus = std::thread::available_parallelism()?.get();
@@ -47,11 +49,28 @@ impl CryptExecutor {
         Ok(Self {
             key_vault_client,
             key_vault_namespace,
-            mongocryptd_client,
-            metadata_client,
             tls_options,
             crypto_threads,
+            mongocryptd: None,
+            metadata_client: None,
         })
+    }
+
+    pub(crate) async fn new_implicit(
+        key_vault_client: WeakClient,
+        key_vault_namespace: Namespace,
+        tls_options: Option<KmsProvidersTlsOptions>,
+        mongocryptd_opts: Option<MongocryptdOptions>,
+        metadata_client: Option<WeakClient>,
+    ) -> Result<Self> {
+        let mongocryptd = match mongocryptd_opts {
+            Some(opts) => Some(Mongocryptd::new(opts).await?),
+            None => None,
+        };
+        let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
+        exec.mongocryptd = mongocryptd;
+        exec.metadata_client = metadata_client;
+        Ok(exec)
     }
 
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
@@ -89,11 +108,25 @@ impl CryptExecutor {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
                     let op = RawOutput(RunCommand::new_raw(db.to_string(), command, None, None)?);
-                    let mongocryptd_client = self
-                        .mongocryptd_client
+                    let mongocryptd = self
+                        .mongocryptd
                         .as_ref()
                         .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
-                    let response = mongocryptd_client.execute_operation(op, None).await?;
+                    let result = mongocryptd.client.execute_operation(op.clone(), None).await;
+                    let response = match result {
+                        Ok(r) => r,
+                        Err(e) if e.is_server_selection_error() => {
+                            mongocryptd.respawn().await?;
+                            match mongocryptd.client.execute_operation(op, None).await {
+                                Ok(r) => r,
+                                Err(new_e) if !new_e.is_server_selection_error() => {
+                                    return Err(new_e)
+                                }
+                                Err(_) => return Err(e),
+                            }
+                        }
+                        Err(e) => return Err(e),
+                    };
                     ctx.mongo_feed(response.raw_body())?;
                     ctx.mongo_done()?;
                 }
@@ -179,6 +212,80 @@ impl CryptExecutor {
             None => Err(Error::internal("libmongocrypt terminated without output")),
         }
     }
+}
+
+#[derive(Debug)]
+struct Mongocryptd {
+    opts: MongocryptdOptions,
+    client: Client,
+    child: Mutex<Result<Process>>,
+}
+
+impl Mongocryptd {
+    const DEFAULT_URI: &'static str = "mongodb://localhost:27020";
+    const SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
+
+    async fn new(opts: MongocryptdOptions) -> Result<Self> {
+        let child = Mutex::new(Ok(Self::spawn(&opts)?));
+        let uri = opts.uri.as_deref().unwrap_or(Self::DEFAULT_URI);
+        let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
+        options.server_selection_timeout = Some(Self::SERVER_SELECTION_TIMEOUT);
+        let client = Client::with_options(options)?;
+        Ok(Self {
+            opts,
+            client,
+            child,
+        })
+    }
+
+    async fn respawn(&self) -> Result<()> {
+        let mut child = match self.child.try_lock() {
+            Ok(l) => l,
+            _ => {
+                // Another respawn is in progress.  Lock to wait for it.
+                return unit_err(&*self.child.lock().await);
+            }
+        };
+        let new_child = Self::spawn(&self.opts);
+        if new_child.is_ok() {
+            if let Ok(old_child) = child.as_mut() {
+                let _ = old_child.wait().await;
+            }
+        }
+        *child = new_child;
+        unit_err(&*child)
+    }
+
+    fn spawn(opts: &MongocryptdOptions) -> Result<Process> {
+        let bin_path = match &opts.spawn_path {
+            Some(s) => s,
+            None => Path::new("mongocryptd"),
+        };
+        let mut args: Vec<&str> = vec![];
+        let mut has_idle = false;
+        for arg in &opts.spawn_args {
+            has_idle |= arg.starts_with("--idleShutdownTimeoutSecs");
+            args.push(arg);
+        }
+        if !has_idle {
+            args.push("--idleShutdownTimeoutSecs=60");
+        }
+        Process::spawn(bin_path, &args)
+    }
+}
+
+fn unit_err<T>(r: &Result<T>) -> Result<()> {
+    match r {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e.clone()),
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct MongocryptdOptions {
+    pub(crate) spawn_path: Option<PathBuf>,
+    pub(crate) spawn_args: Vec<String>,
+    pub(crate) uri: Option<String>,
 }
 
 fn result_ref<T>(r: &Result<T>) -> Result<&T> {

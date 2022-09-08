@@ -15,7 +15,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
     db: String,
     command: RawDocumentBuf,

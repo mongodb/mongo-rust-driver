@@ -31,6 +31,7 @@ default = ["tokio-runtime"]
 tokio-runtime = [
     "tokio/macros",
     "tokio/net",
+    "tokio/process",
     "tokio/rt",
     "tokio/time",
     "serde_bytes",
@@ -38,6 +39,7 @@ tokio-runtime = [
 async-std-runtime = [
     "async-std",
     "async-std/attributes",
+    "async-std/unstable",
     "async-std-resolver",
     "tokio-util/compat",
 ]
@@ -66,7 +68,7 @@ zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
 
 # DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of CSFLE support in the Rust driver.
-csfle = ["mongocrypt", "which", "rayon"]
+csfle = ["mongocrypt", "rayon"]
 
 [dependencies]
 async-trait = "0.1.42"
@@ -106,7 +108,6 @@ trust-dns-proto = "0.21.2"
 trust-dns-resolver = "0.21.2"
 typed-builder = "0.10.0"
 webpki-roots = "0.22.4"
-which = { version = "4.2.5", optional = true }
 zstd = { version = "0.11.2", optional = true }
 
 [dependencies.async-std]
