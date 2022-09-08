@@ -18,7 +18,12 @@ use std::future::Future;
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
-use crate::{bson::Document, test::log_uncaptured, Collection};
+use crate::{
+    bson::{doc, Document},
+    coll::options::FindOptions,
+    test::log_uncaptured,
+    Collection,
+};
 
 use super::{run_spec_test, Serverless};
 
@@ -58,7 +63,8 @@ pub struct CollectionOutcome {
 }
 
 pub async fn find_all(coll: &Collection<Document>) -> Vec<Document> {
-    coll.find(None, None)
+    let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
+    coll.find(None, options)
         .await
         .unwrap()
         .try_collect()

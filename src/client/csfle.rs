@@ -2,10 +2,7 @@ pub mod client_encryption;
 pub mod options;
 mod state_machine;
 
-use std::{
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::path::Path;
 
 use derivative::Derivative;
 use mongocrypt::Crypt;
@@ -26,7 +23,7 @@ use options::{
     EO_MONGOCRYPTD_URI,
 };
 
-use self::state_machine::CryptExecutor;
+use self::state_machine::{CryptExecutor, MongocryptdOptions};
 
 use super::WeakClient;
 
@@ -49,15 +46,16 @@ struct AuxClients {
 impl ClientState {
     pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
-        let mongocryptd_client = Self::spawn_mongocryptd_if_needed(&opts, &crypt).await?;
+        let mongocryptd_opts = Self::make_mongocryptd_opts(&opts, &crypt)?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
-        let exec = CryptExecutor::new(
+        let exec = CryptExecutor::new_implicit(
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
-            mongocryptd_client,
-            aux_clients.metadata_client,
             opts.tls_options.take(),
-        )?;
+            mongocryptd_opts,
+            aux_clients.metadata_client,
+        )
+        .await?;
 
         Ok(Self {
             crypt,
@@ -98,12 +96,10 @@ impl ClientState {
         Ok(crypt)
     }
 
-    /// If crypt_shared is unavailable and options have not disabled it, spawn mongocryptd.  Returns
-    /// a `Client` connected to the mongocryptd if one was spawned.
-    async fn spawn_mongocryptd_if_needed(
+    fn make_mongocryptd_opts(
         opts: &AutoEncryptionOptions,
         crypt: &Crypt,
-    ) -> Result<Option<Client>> {
+    ) -> Result<Option<MongocryptdOptions>> {
         if opts.bypass_auto_encryption == Some(true)
             || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
@@ -111,44 +107,26 @@ impl ClientState {
         {
             return Ok(None);
         }
-        let which_path;
-        let bin_path = match opts.extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)? {
-            Some(s) => Path::new(s),
-            None => {
-                which_path = which::which("mongocryptd")
-                    .map_err(|e| Error::invalid_argument(format!("{}", e)))?;
-                &which_path
-            }
-        };
-        let mut args: Vec<&str> = vec![];
-        let has_idle = if let Some(spawn_args) = opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)? {
-            let mut has_idle = false;
-            for arg in spawn_args {
+        let spawn_path = opts
+            .extra_option(&EO_MONGOCRYPTD_SPAWN_PATH)?
+            .map(std::path::PathBuf::from);
+        let mut spawn_args = vec![];
+        if let Some(args) = opts.extra_option(&EO_MONGOCRYPTD_SPAWN_ARGS)? {
+            for arg in args {
                 let str_arg = arg.as_str().ok_or_else(|| {
                     Error::invalid_argument("non-string entry in mongocryptdSpawnArgs")
                 })?;
-                has_idle |= str_arg.starts_with("--idleShutdownTimeoutSecs");
-                args.push(str_arg);
+                spawn_args.push(str_arg.to_string());
             }
-            has_idle
-        } else {
-            false
-        };
-        if !has_idle {
-            args.push("--idleShutdownTimeoutSecs=60");
         }
-        Command::new(bin_path)
-            .args(&args)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()?;
-
         let uri = opts
             .extra_option(&EO_MONGOCRYPTD_URI)?
-            .unwrap_or("mongodb://localhost:27020");
-        let mut options = super::options::ClientOptions::parse_uri(uri, None).await?;
-        options.server_selection_timeout = Some(std::time::Duration::from_millis(10_000));
-        Ok(Some(Client::with_options(options)?))
+            .map(|s| s.to_string());
+        Ok(Some(MongocryptdOptions {
+            spawn_path,
+            spawn_args,
+            uri,
+        }))
     }
 
     fn make_aux_clients(

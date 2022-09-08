@@ -3,6 +3,8 @@ mod http;
 #[cfg(feature = "async-std-runtime")]
 mod interval;
 mod join_handle;
+#[cfg(feature = "csfle")]
+mod process;
 mod resolver;
 pub(crate) mod stream;
 mod sync_read_ext;
@@ -14,6 +16,8 @@ mod worker_handle;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
+#[cfg(feature = "csfle")]
+pub(crate) use self::process::Process;
 pub(crate) use self::{
     acknowledged_message::AcknowledgedMessage,
     join_handle::AsyncJoinHandle,
