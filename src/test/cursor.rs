@@ -235,3 +235,59 @@ async fn borrowed_deserialization() {
         i += 1;
     }
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn collect_results() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let client = EventClient::new().await;
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Doc {
+        uid: i32,
+        foo: String,
+    }
+
+    let coll = client
+        .create_fresh_collection("collect_results_db", "collect_results_coll", None)
+        .await;
+
+    let docs = vec![
+        doc! {
+            "uid": 0_i32,
+            "foo": "valid document".to_owned(),
+        },
+        doc! {
+            "uid": 1_i32,
+            "foo": "another valid document".to_owned(),
+        },
+        doc! {
+            "uid": 2_i32,
+            "foo": "extra field OK".to_owned(),
+            "param": 45_f32,
+        },
+        doc! {
+            "foo": "missing field leading to error".to_owned(),
+        },
+        doc! {
+            "uid": "different type in this field".to_owned(),
+            "foo": "wrong type leading to error".to_owned(),
+        },
+    ];
+
+    coll.insert_many(&docs, None).await.unwrap();
+
+    let typed_coll = coll.clone_with_type::<Doc>();
+
+    let cursor = typed_coll.find(None, None).await.unwrap();
+    let valid_docs: Vec<Doc> = cursor.collect_ok().await;
+
+    // We expect only the first three inserted documents to be deserializable
+    assert_eq!(valid_docs.len(), 3);
+
+    let cursor = typed_coll.find(None, None).await.unwrap();
+    let deserialize_errors: Vec<_> = cursor.collect_err().await;
+
+    // We expect errors for the last two documents
+    assert_eq!(deserialize_errors.len(), 2);
+}

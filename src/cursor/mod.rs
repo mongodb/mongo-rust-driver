@@ -13,6 +13,7 @@ use bson::RawDocument;
 #[cfg(test)]
 use bson::RawDocumentBuf;
 use futures_core::{future::BoxFuture, Stream};
+use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
 use tokio::sync::oneshot;
@@ -278,6 +279,21 @@ impl<T> Cursor<T> {
     #[cfg(test)]
     pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
         self.wrapped_cursor.as_ref().unwrap().current_batch()
+    }
+}
+
+impl<T> Cursor<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    /// Collect documents that can be deserialized to `T`.
+    pub async fn collect_ok(self) -> Vec<T> {
+        self.filter_map(|e| async move { e.ok() }).collect().await
+    }
+
+    /// Collect errors of documents that cannot be deserialized to `T`.
+    pub async fn collect_err(self) -> Vec<Error> {
+        self.filter_map(|e| async move { e.err() }).collect().await
     }
 }
 
