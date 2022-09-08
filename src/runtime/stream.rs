@@ -39,7 +39,7 @@ impl AsyncStream {
     ) -> Result<Self> {
         let inner = AsyncTcpStream::connect(&address).await?;
 
-        // If there are TLS options, wrap the inner stream with rustls.
+        // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
         match tls_cfg {
             Some(cfg) => {
                 let host = address.host();
