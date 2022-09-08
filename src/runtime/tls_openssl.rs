@@ -35,7 +35,10 @@ impl TlsConfig {
     /// Create a new `TlsConfig` from the provided options from the user.
     /// This operation is expensive, so the resultant `TlsConfig` should be cached.
     pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
-        let verify_hostname = options.allow_invalid_hostnames.unwrap_or(true);
+        let verify_hostname = match options.allow_invalid_hostnames {
+            Some(b) => !b,
+            None => true,
+        };
 
         let connector = make_openssl_connector(options).map_err(|e| {
             Error::from(ErrorKind::InvalidTlsConfig {
