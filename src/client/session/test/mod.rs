@@ -14,7 +14,17 @@ use crate::{
     runtime,
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        log_uncaptured,
+        Event,
+        EventClient,
+        EventHandler,
+        SdamEvent,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
+    Client,
     Collection,
 };
 
@@ -240,28 +250,57 @@ async fn cluster_time_in_commands() {
 
     let client = TestClient::new().await;
     if client.is_standalone() {
+        log_uncaptured("skipping cluster_time_in_commands test due to standalone topology");
         return;
     }
 
     async fn cluster_time_test<F, G, R>(command_name: &str, operation: F)
     where
-        F: Fn(EventClient) -> G,
+        F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
+        let handler = Arc::new(EventHandler::new());
         let mut options = CLIENT_OPTIONS.get().await.clone();
         options.heartbeat_freq = Some(Duration::from_secs(1000));
-        let client = EventClient::with_options(options).await;
+        options.command_event_handler = Some(handler.clone());
+        options.sdam_event_handler = Some(handler.clone());
+
+        // Ensure we only connect to one server so the monitor checks from other servers
+        // don't affect the TopologyDescription's clusterTime value between commands.
+        options.direct_connection = Some(true);
+        options.hosts.drain(1..);
+
+        let client = Client::with_options(options).unwrap();
+
+        let mut subscriber = handler.subscribe();
+
+        // Wait for initial monitor check to complete.
+        subscriber
+            .wait_for_event(Duration::from_secs(5), |event| match event {
+                Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) => {
+                    !e.previous_description.server_type().is_available()
+                        && e.new_description.server_type().is_available()
+                }
+                _ => false,
+            })
+            .await
+            .expect("server should be discovered");
 
         operation(client.clone())
             .await
             .expect("operation should succeed");
 
-        operation(client.clone())
-            .await
-            .expect("operation should succeed");
+        operation(client).await.expect("operation should succeed");
 
-        let (first_command_started, first_command_succeeded) =
-            client.get_successful_command_execution(command_name);
+        let (first_command_started, first_command_succeeded) = subscriber
+            .wait_for_successful_command_execution(Duration::from_secs(5), command_name)
+            .await
+            .unwrap_or_else(|| {
+                panic!(
+                    "did not see command started and succeeded events for {}",
+                    command_name
+                )
+            });
 
         assert!(first_command_started.command.get("$clusterTime").is_some());
         let response_cluster_time = first_command_succeeded
@@ -269,7 +308,16 @@ async fn cluster_time_in_commands() {
             .get("$clusterTime")
             .expect("should get cluster time from command response");
 
-        let (second_command_started, _) = client.get_successful_command_execution(command_name);
+        // let (second_command_started, _) = client.get_successful_command_execution(command_name);
+        let (second_command_started, _) = subscriber
+            .wait_for_successful_command_execution(Duration::from_secs(5), command_name)
+            .await
+            .unwrap_or_else(|| {
+                panic!(
+                    "did not see command started and succeeded events for {}",
+                    command_name
+                )
+            });
 
         assert_eq!(
             response_cluster_time,

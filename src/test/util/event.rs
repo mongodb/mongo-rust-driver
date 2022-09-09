@@ -482,22 +482,8 @@ impl EventSubscriber<'_> {
     where
         F: FnMut(&Event) -> bool,
     {
-        runtime::timeout(timeout, async {
-            loop {
-                match self.receiver.recv().await {
-                    Ok(event) if filter(&event) => return event.into(),
-                    // the channel hit capacity and missed some events.
-                    Err(RecvError::Lagged(amount_skipped)) => {
-                        panic!("receiver lagged and skipped {} events", amount_skipped)
-                    }
-                    Err(_) => return None,
-                    _ => continue,
-                }
-            }
-        })
-        .await
-        .ok()
-        .flatten()
+        self.filter_map_event(timeout, |e| if filter(&e) { Some(e) } else { None })
+            .await
     }
 
     pub(crate) async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<Event>
@@ -509,6 +495,86 @@ impl EventSubscriber<'_> {
             events.push(event);
         }
         events
+    }
+
+    /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
+    pub(crate) async fn filter_map_event<F, T>(
+        &mut self,
+        timeout: Duration,
+        mut filter_map: F,
+    ) -> Option<T>
+    where
+        F: FnMut(Event) -> Option<T>,
+    {
+        runtime::timeout(timeout, async {
+            loop {
+                match self.receiver.recv().await {
+                    Ok(event) => {
+                        if let Some(e) = filter_map(event) {
+                            return Some(e);
+                        } else {
+                            continue;
+                        }
+                    }
+                    // the channel hit capacity and missed some events.
+                    Err(RecvError::Lagged(amount_skipped)) => {
+                        panic!("receiver lagged and skipped {} events", amount_skipped)
+                    }
+                    Err(_) => return None,
+                }
+            }
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
+    /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
+    /// panic.
+    pub(crate) async fn wait_for_successful_command_execution(
+        &mut self,
+        timeout: Duration,
+        command_name: impl AsRef<str>,
+    ) -> Option<(CommandStartedEvent, CommandSucceededEvent)> {
+        runtime::timeout(timeout, async {
+            let started = self
+                .filter_map_event(Duration::MAX, |event| match event {
+                    Event::Command(CommandEvent::Started(s))
+                        if s.command_name == command_name.as_ref() =>
+                    {
+                        Some(s)
+                    }
+                    _ => None,
+                })
+                .await
+                .unwrap();
+
+            let succeeded = self
+                .filter_map_event(Duration::MAX, |event| match event {
+                    Event::Command(CommandEvent::Succeeded(s))
+                        if s.request_id == started.request_id =>
+                    {
+                        Some(s)
+                    }
+                    Event::Command(CommandEvent::Failed(f))
+                        if f.request_id == started.request_id =>
+                    {
+                        panic!(
+                            "expected {} to succeed but it failed: {:#?}",
+                            command_name.as_ref(),
+                            f
+                        )
+                    }
+                    _ => None,
+                })
+                .await
+                .unwrap();
+
+            (started, succeeded)
+        })
+        .await
+        .ok()
     }
 }
 
