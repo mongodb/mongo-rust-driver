@@ -14,6 +14,7 @@ use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
     bson::{doc, Bson},
+    client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
     selection_criteria::SelectionCriteria,
 };
@@ -374,6 +375,13 @@ impl TestClient {
             Topology::Single => "single",
         }
         .to_string()
+    }
+
+    pub(crate) fn primary(&self) -> Option<ServerAddress> {
+        self.server_info
+            .primary
+            .as_ref()
+            .map(|s| ServerAddress::parse(s).unwrap())
     }
 
     pub(crate) async fn options_for_multiple_mongoses(
