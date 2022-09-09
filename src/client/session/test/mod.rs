@@ -346,6 +346,14 @@ async fn cluster_time_in_commands() {
         .await
         .expect("server should be discovered");
 
+    // LoadBalanced topologies don't have monitors, so the client needs to get a clusterTime from
+    // a command invocation.
+    client
+        .database("admin")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .unwrap();
+
     cluster_time_test("ping", &client, handler.as_ref(), |client| async move {
         client
             .database(function_name!())
