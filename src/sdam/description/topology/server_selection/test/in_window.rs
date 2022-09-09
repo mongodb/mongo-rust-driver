@@ -221,7 +221,7 @@ async fn load_balancing_test() {
     options.local_threshold = Duration::from_secs(30).into();
     options.max_pool_size = Some(max_pool_size);
     options.min_pool_size = Some(max_pool_size);
-    let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
+    let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options, None).await;
 
     // wait for both servers pools to be saturated.
     for address in hosts {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bson::{Document, doc};
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 
-use crate::{error::Result, options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace};
+use crate::{error::Result, options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}};
 
 use super::{TestClient, CLIENT_OPTIONS, LOCK};
 
@@ -51,6 +51,30 @@ async fn custom_key_material() -> Result<()> {
     ).await?;
     let expected = base64::decode("AQAAAAAAAAAAAAAAAAAAAAACz0ZOLuuhEYi807ZXTdhbqhLaS2/t9wLifJnnNYwiw79d75QYIZ6M/aYC1h9nCzCjZ7pGUpAuNnkUhnIXM3PjrA==").unwrap();
     assert_eq!(encrypted.bytes, expected);
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn data_key_double_encryption() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = TestClient::new().await;
+    client.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
+    client.database("db").collection::<Document>("coll").drop(None).await?;
+
+    // TODO: preprocess kms providers for aws temp creds
+    let kms_providers: KmsProviders = bson::from_reader(std::env::var("KMS_PROVIDERS").unwrap().as_bytes())?;
+    // TODO: pass cert file paths
+    let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, TlsOptions::builder().build())].into_iter().collect();
+    // TODO: start up kmip server
+    // TODO: pass shared lib path via extra_options
+    let enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(Namespace::from_str("keyvault.datakeys").unwrap())
+        .kms_providers(kms_providers)
+        .tls_options(tls_options)
+        .build();
 
     Ok(())
 }

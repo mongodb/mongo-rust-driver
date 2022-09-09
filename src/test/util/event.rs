@@ -530,7 +530,7 @@ impl EventClient {
         handler: impl Into<Option<EventHandler>>,
     ) -> Self {
         let handler = Arc::new(handler.into().unwrap_or_else(EventHandler::new));
-        let client = TestClient::with_handler(Some(handler.clone()), options).await;
+        let client = TestClient::with_handler(Some(handler.clone()), options, None).await;
 
         // clear events from commands used to set up client.
         handler.command_events.write().unwrap().clear();

@@ -72,12 +72,13 @@ impl TestClient {
     }
 
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Self::with_handler(None, options).await
+        Self::with_handler(None, options, None).await
     }
 
     pub(crate) async fn with_handler(
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
+        auto_enc: impl Into<Option<crate::client::options::AutoEncryptionOptions>>,
     ) -> Self {
         let mut options = match options.into() {
             Some(options) => options,
@@ -90,7 +91,11 @@ impl TestClient {
             options.sdam_event_handler = Some(handler);
         }
 
-        let client = Client::with_options(options.clone()).unwrap();
+        let client = if let Some(auto_enc) = auto_enc.into() {
+            Client::with_encryption_options(options.clone(), auto_enc).await
+        } else {
+            Client::with_options(options.clone())
+        }.unwrap();
 
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
