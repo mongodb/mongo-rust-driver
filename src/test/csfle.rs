@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bson::{Document, doc};
+use bson::{Document, doc, spec::BinarySubtype};
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
 
@@ -34,7 +34,7 @@ async fn custom_key_material() -> Result<()> {
     )?;
 
     let key = base64::decode("xPTAjBRG5JiPm+d3fj6XLi2q5DMXUS/f1f+SMAlhhwkhDRL0kr8r9GDLIGTAGlvC+HVjSIgdL+RKwZCvpXSyxTICWSXTUYsWYPyu3IoHbuBZdmw2faM3WhcRIgbMReU5").unwrap();
-    let id = enc.create_data_key(KmsProvider::Local, DataKeyOptions::builder()
+    let id = enc.create_data_key(&KmsProvider::Local, DataKeyOptions::builder()
         .master_key(MasterKey::Local)
         .key_material(key)
         .build()
@@ -69,6 +69,7 @@ async fn data_key_double_encryption() -> Result<()> {
         pip3 install pykmip
         python3 ./csfle/kms_kmip_server.py
      */
+    let kv_namespace = Namespace::from_str("keyvault.datakeys").unwrap();
     let kms_providers: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap())?;
     let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
     let kmip_opts = TlsOptions::builder()
@@ -91,14 +92,30 @@ async fn data_key_double_encryption() -> Result<()> {
             }
         })
     ].into_iter().collect();
-    let enc_opts = AutoEncryptionOptions::builder()
-        .key_vault_namespace(Namespace::from_str("keyvault.datakeys").unwrap())
-        .kms_providers(kms_providers)
+    let auto_enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(kv_namespace.clone())
+        .kms_providers(kms_providers.clone())
         .schema_map(schema_map)
-        .tls_options(tls_options)
+        .tls_options(tls_options.clone())
         .extra_options(doc! { "cryptSharedLibPath": crypt_lib_path })
         .build();
-    let _client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), enc_opts).await?;
+    let _client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+
+    let enc_opts = ClientEncryptionOptions::builder()
+        .key_vault_namespace(kv_namespace)
+        .key_vault_client(client.into_client())
+        .kms_providers(kms_providers)
+        .tls_options(tls_options)
+        .build();
+    let client_encryption = ClientEncryption::new(enc_opts)?;
+
+    for provider in [KmsProvider::Local] {
+        let datakey_id = client_encryption.create_data_key(&provider, DataKeyOptions::builder()
+            .key_alt_names(vec![format!("{}_altname", provider.name())])
+            .master_key(MasterKey::Local)  // varies by provider
+        .build()).await?;
+        assert_eq!(BinarySubtype::Uuid, datakey_id.subtype);
+    }
 
     Ok(())
 }

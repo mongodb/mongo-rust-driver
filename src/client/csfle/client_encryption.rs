@@ -64,7 +64,7 @@ impl ClientEncryption {
     /// Returns the _id of the created document as a UUID (BSON binary subtype 0x04).
     pub async fn create_data_key(
         &self,
-        kms_provider: KmsProvider,
+        kms_provider: &KmsProvider,
         opts: impl Into<Option<DataKeyOptions>>,
     ) -> Result<Binary> {
         let ctx = self.create_data_key_ctx(kms_provider, opts.into())?;
@@ -78,7 +78,7 @@ impl ClientEncryption {
 
     fn create_data_key_ctx(
         &self,
-        kms_provider: KmsProvider,
+        kms_provider: &KmsProvider,
         opts: Option<DataKeyOptions>,
     ) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
