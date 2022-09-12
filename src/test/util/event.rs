@@ -490,9 +490,12 @@ impl EventSubscriber<'_> {
         F: FnMut(&Event) -> bool,
     {
         let mut events = Vec::new();
-        while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
-            events.push(event);
-        }
+        let _ = runtime::timeout(timeout, async {
+            while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
+                events.push(event);
+            }
+        })
+        .await;
         events
     }
 }

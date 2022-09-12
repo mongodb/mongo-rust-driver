@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -8,7 +9,10 @@ use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
+    client::options::{ClientOptions, ServerAddress},
+    cmap::RawCommandResponse,
     error::{Error, ErrorKind},
+    event::sdam::SdamEventHandler,
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
     test::{
@@ -27,6 +31,8 @@ use crate::{
     },
     Client,
 };
+
+use super::{ServerDescription, Topology};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
@@ -481,6 +487,93 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
         },
         "Unexpected result {:?}",
         result
+    );
+
+    Ok(())
+}
+
+/// Test verifying that a server's monitor stops after the server has been removed from the
+/// topology.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn removed_server_monitor_stops() -> crate::error::Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let handler = Arc::new(EventHandler::new());
+    let options = ClientOptions::builder()
+        .hosts(vec![
+            ServerAddress::parse("localhost:49152")?,
+            ServerAddress::parse("localhost:49153")?,
+            ServerAddress::parse("localhost:49154")?,
+        ])
+        .heartbeat_freq(Duration::from_millis(50))
+        .sdam_event_handler(handler.clone() as Arc<dyn SdamEventHandler>)
+        .repl_set_name("foo".to_string())
+        .build();
+
+    let hosts = options.hosts.clone();
+    let set_name = options.repl_set_name.clone().unwrap();
+
+    let mut subscriber = handler.subscribe();
+    let topology = Topology::new(options)?;
+
+    // Wait until all three monitors have started.
+    let mut seen_monitors = HashSet::new();
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            if let Event::Sdam(SdamEvent::ServerHeartbeatStarted(e)) = event {
+                seen_monitors.insert(e.server_address.clone());
+            }
+            seen_monitors.len() == hosts.len()
+        })
+        .await
+        .expect("should see all three monitors start");
+
+    // Remove the third host from the topology.
+    let hello = doc! {
+        "ok": 1,
+        "isWritablePrimary": true,
+        "hosts": [
+            hosts[0].clone().to_string(),
+            hosts[1].clone().to_string(),
+        ],
+        "me": hosts[0].clone().to_string(),
+        "setName": set_name,
+        "maxBsonObjectSize": 1234,
+        "maxWriteBatchSize": 1234,
+        "maxMessageSizeBytes": 1234,
+        "minWireVersion": 0,
+        "maxWireVersion": 13,
+    };
+    let hello_reply = Some(Ok(RawCommandResponse::with_document_and_address(
+        hosts[0].clone(),
+        hello,
+    )
+    .unwrap()
+    .into_hello_reply(Duration::from_millis(10))
+    .unwrap()));
+
+    topology
+        .clone_updater()
+        .update(ServerDescription::new(hosts[0].clone(), hello_reply))
+        .await;
+
+    subscriber.wait_for_event(Duration::from_secs(1), |event| {
+        matches!(event, Event::Sdam(SdamEvent::ServerClosed(e)) if e.address == hosts[2])
+    }).await.expect("should see server closed event");
+
+    // Capture heartbeat events for 1 second. The monitor for the removed server should stop
+    // publishing them.
+    let events = subscriber.collect_events(Duration::from_secs(1), |event| {
+        matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(e)) if e.server_address == hosts[2])
+    }).await;
+
+    // Use 3 to account for any heartbeats that happen to start between emitting the ServerClosed
+    // event and actually publishing the state with the closed server.
+    assert!(
+        events.len() < 3,
+        "expected monitor for removed server to stop performing checks, but saw {} heartbeats",
+        events.len()
     );
 
     Ok(())

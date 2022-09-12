@@ -126,7 +126,7 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
-    pub(crate) fn new(options: ClientOptions) -> crate::error::Result<Self> {
+    pub(crate) fn initialized(options: &ClientOptions) -> crate::error::Result<Self> {
         verify_max_staleness(
             options
                 .selection_criteria
@@ -146,8 +146,13 @@ impl TopologyDescription {
 
         let servers: HashMap<_, _> = options
             .hosts
-            .into_iter()
-            .map(|address| (address.clone(), ServerDescription::new(address, None)))
+            .iter()
+            .map(|address| {
+                (
+                    address.clone(),
+                    ServerDescription::new(address.clone(), None),
+                )
+            })
             .collect();
 
         let session_support_status = if topology_type == TopologyType::LoadBalanced {
@@ -164,9 +169,9 @@ impl TopologyDescription {
         };
 
         Ok(Self {
-            single_seed: servers.len() == 1,
+            single_seed: options.hosts.len() == 1,
             topology_type,
-            set_name: options.repl_set_name,
+            set_name: options.repl_set_name.clone(),
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
@@ -435,11 +440,13 @@ impl TopologyDescription {
                 _ => None,
             });
 
-        Some(TopologyDescriptionDiff {
+        let diff = TopologyDescriptionDiff {
             removed_addresses: addresses.difference(&other_addresses).cloned().collect(),
             added_addresses: other_addresses.difference(&addresses).cloned().collect(),
             changed_servers: changed_servers.collect(),
-        })
+        };
+
+        Some(diff)
     }
 
     /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not

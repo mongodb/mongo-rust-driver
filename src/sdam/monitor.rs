@@ -20,7 +20,7 @@ use crate::{
     },
     hello::{hello_command, run_hello, HelloReply},
     options::{ClientOptions, ServerAddress},
-    runtime,
+    runtime::{self, WorkerHandle, WorkerHandleListener},
 };
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -36,6 +36,7 @@ pub(crate) struct Monitor {
     sdam_event_emitter: Option<SdamEventEmitter>,
     update_request_receiver: TopologyCheckRequestReceiver,
     client_options: ClientOptions,
+    server_handle_listener: WorkerHandleListener,
 }
 
 impl Monitor {
@@ -46,8 +47,9 @@ impl Monitor {
         sdam_event_emitter: Option<SdamEventEmitter>,
         update_request_receiver: TopologyCheckRequestReceiver,
         client_options: ClientOptions,
-    ) {
+    ) -> WorkerHandle {
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
+        let (handle, server_handle_listener) = WorkerHandleListener::channel();
         let monitor = Self {
             address,
             client_options,
@@ -57,8 +59,14 @@ impl Monitor {
             sdam_event_emitter,
             update_request_receiver,
             connection: None,
+            server_handle_listener,
         };
-        runtime::execute(monitor.execute())
+        runtime::execute(monitor.execute());
+        handle
+    }
+
+    fn is_alive(&self) -> bool {
+        self.server_handle_listener.is_alive()
     }
 
     async fn execute(mut self) {
@@ -67,7 +75,7 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while self.topology_watcher.is_alive() {
+        while self.is_alive() {
             self.check_server().await;
 
             #[cfg(test)]
@@ -81,10 +89,14 @@ impl Monitor {
             #[cfg(not(test))]
             let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-            runtime::delay_for(min_frequency).await;
-            self.update_request_receiver
-                .wait_for_check_request(heartbeat_frequency - min_frequency)
-                .await;
+            if self.is_alive() {
+                runtime::delay_for(min_frequency).await;
+            }
+            if self.is_alive() {
+                self.update_request_receiver
+                    .wait_for_check_request(heartbeat_frequency - min_frequency)
+                    .await;
+            }
         }
     }
 
