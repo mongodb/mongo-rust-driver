@@ -35,12 +35,8 @@ pub struct ClientEncryption {
 impl ClientEncryption {
     /// Create a new key vault handle with the given options.
     pub fn new(options: ClientEncryptionOptions) -> Result<Self> {
-        let mut kms_providers = doc! { };
-        for (p, p_opts) in &options.kms_providers {
-            kms_providers.insert(p.name(), p_opts);
-        }
         let crypt = Crypt::builder()
-            .kms_providers(&kms_providers)?
+            .kms_providers(&bson::to_document(&options.kms_providers)?)?
             .build()?;
         let exec = CryptExecutor::new_explicit(
             options.key_vault_client.weak(),

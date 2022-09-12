@@ -78,7 +78,11 @@ impl ClientState {
     }
 
     fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
-        let mut builder = Crypt::builder();
+        let mut builder = Crypt::builder()
+            .kms_providers(&bson::to_document(&opts.kms_providers)?)?;
+        if let Some(m) = &opts.schema_map {
+            builder = builder.schema_map(&bson::to_document(m)?)?;
+        }
         if Some(true) != opts.bypass_auto_encryption {
             builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
         }

@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use bson::{Document, doc};
 use mongocrypt::ctx::{KmsProvider, Algorithm};
+use serde::de::DeserializeOwned;
 
-use crate::{error::Result, options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}};
+use crate::{error::{Result, Error}, options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}, Client};
 
 use super::{TestClient, CLIENT_OPTIONS, LOCK};
 
@@ -64,17 +65,46 @@ async fn data_key_double_encryption() -> Result<()> {
     client.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
     client.database("db").collection::<Document>("coll").drop(None).await?;
 
-    // TODO: preprocess kms providers for aws temp creds
-    let kms_providers: KmsProviders = bson::from_reader(std::env::var("KMS_PROVIDERS").unwrap().as_bytes())?;
-    // TODO: pass cert file paths
-    let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, TlsOptions::builder().build())].into_iter().collect();
-    // TODO: start up kmip server
-    // TODO: pass shared lib path via extra_options
+    /* KMIP server:
+        pip3 install pykmip
+        python3 ./csfle/kms_kmip_server.py
+     */
+    let kms_providers: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap())?;
+    let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
+    let kmip_opts = TlsOptions::builder()
+        .ca_file_path(cert_dir.join("ca.pem"))
+        .cert_key_file_path(cert_dir.join("client.pem"))
+        .build();
+    let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
+    let crypt_lib_path = std::env::var("CSFLE_SHARED_LIB_PATH").unwrap();
+    let schema_map: HashMap<String, Document> = [
+        ("db.coll".to_string(), doc! {
+            "bsonType": "object",
+            "properties": {
+                "encrypted_placeholder": {
+                    "encrypt": {
+                        "keyId": "/placeholder",
+                        "bsonType": "string",
+                        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+                    }
+                }
+            }
+        })
+    ].into_iter().collect();
     let enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(Namespace::from_str("keyvault.datakeys").unwrap())
         .kms_providers(kms_providers)
+        .schema_map(schema_map)
         .tls_options(tls_options)
+        .extra_options(doc! { "cryptSharedLibPath": crypt_lib_path })
         .build();
+    let _client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), enc_opts).await?;
 
     Ok(())
+}
+
+fn from_json<T: DeserializeOwned>(text: &str) -> Result<T> {
+    let json: serde_json::Value = serde_json::from_str(text).map_err(|e| Error::invalid_argument(format!("json parse failure: {}", e)))?;
+    let bson: bson::Bson = json.try_into().map_err(|e| Error::invalid_argument(format!("bson parse failure: {}", e)))?;
+    Ok(bson::from_bson(bson)?)
 }
