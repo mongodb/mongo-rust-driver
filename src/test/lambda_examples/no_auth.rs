@@ -46,6 +46,9 @@ async fn test_handler() {
     if std::env::var("MONGODB_API_VERSION").is_ok() {
         return;
     }
+    if std::env::var("MONGODB_URI").is_err() {
+        std::env::set_var("MONGODB_URI", "mongodb://localhost:27017");
+    }
     let event = LambdaEvent::new(Value::Null, Default::default());
     handler(event).await.unwrap();
 }
