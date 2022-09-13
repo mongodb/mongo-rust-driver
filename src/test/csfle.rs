@@ -79,6 +79,7 @@ async fn custom_key_material() -> Result<()> {
 async fn data_key_double_encryption() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
+    // Setup: drop stale data.
     let client = EventClient::new().await;
     client.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
     client.database("db").collection::<Document>("coll").drop(None).await?;
@@ -87,6 +88,7 @@ async fn data_key_double_encryption() -> Result<()> {
         pip3 install pykmip
         python3 ./csfle/kms_kmip_server.py
      */
+    // Setup: build options for test environment.
     let kv_namespace = Namespace::from_str("keyvault.datakeys").unwrap();
     let kms_providers: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap())?;
     let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
@@ -110,6 +112,8 @@ async fn data_key_double_encryption() -> Result<()> {
             }
         })
     ].into_iter().collect();
+
+    // Setup: client with auto encryption.
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(kv_namespace.clone())
         .kms_providers(kms_providers.clone())
@@ -119,6 +123,7 @@ async fn data_key_double_encryption() -> Result<()> {
         .build();
     let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
+    // Setup: manual encryption.
     let enc_opts = ClientEncryptionOptions::builder()
         .key_vault_namespace(kv_namespace)
         .key_vault_client(client.clone().into_client())
@@ -127,7 +132,9 @@ async fn data_key_double_encryption() -> Result<()> {
         .build();
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
+    // Testing each provider:
     for provider in [KmsProvider::Local] {
+        // Create a data key
         let datakey_id = client_encryption.create_data_key(&provider, DataKeyOptions::builder()
             .key_alt_names(vec![format!("{}_altname", provider.name())])
             .master_key(MasterKey::Local)  // varies by provider
@@ -151,6 +158,7 @@ async fn data_key_double_encryption() -> Result<()> {
         })?;
         assert!(found, "no valid event found in {:?}", events);
 
+        // Manually encrypt a value and automatically decrypt it.
         let encrypted = client_encryption.encrypt(
             RawBson::String(format!("hello {}", provider.name())),
             EncryptOptions::builder()
@@ -160,12 +168,23 @@ async fn data_key_double_encryption() -> Result<()> {
         ).await?;
         assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
         let coll = client_encrypted.database("db").collection::<Document>("coll");
-        coll.insert_one(doc! { "_id": provider.name(), "value": encrypted }, None).await?;
+        coll.insert_one(doc! { "_id": provider.name(), "value": encrypted.clone() }, None).await?;
         let found = coll.find_one(doc! { "_id": provider.name() }, None).await?;
         assert_eq!(
             found.as_ref().and_then(|doc| doc.get("value")),
             Some(&Bson::String(format!("hello {}", provider.name()))),
         );
+
+        // Manually encrypt a value via key alt name.
+        let other_encrypted = client_encryption.encrypt(
+            RawBson::String(format!("hello {}", provider.name())),
+            EncryptOptions::builder()
+                .key(EncryptKey::AltName(format!("{}_altname", provider.name())))
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .build(),
+        ).await?;
+        assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
+        assert_eq!(other_encrypted.bytes, encrypted.bytes);
     }
 
     Ok(())
