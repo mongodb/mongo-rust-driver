@@ -639,6 +639,10 @@ impl EventClient {
     pub(crate) fn clear_cached_events(&self) {
         self.handler.clear_cached_events()
     }
+
+    pub(crate) fn into_client(self) -> crate::Client {
+        self.client.into_client()
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

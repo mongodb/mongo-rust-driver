@@ -1,12 +1,30 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bson::{Document, doc, spec::BinarySubtype};
+use bson::{Document, doc, spec::BinarySubtype, RawBson};
+use futures_util::TryStreamExt;
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
+use thiserror::Error;
 
-use crate::{error::{Result, Error}, options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}, Client};
+use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}, Client};
 
-use super::{TestClient, CLIENT_OPTIONS, LOCK};
+use super::{TestClient, CLIENT_OPTIONS, LOCK, EventClient};
+
+#[derive(Error, Debug)]
+enum TestError {
+    #[error("mongodb error: {0}")]
+    Mongodb(#[from] crate::error::Error),
+    #[error("serde_json error: {0}")]
+    SerdeJson(#[from] serde_json::error::Error),
+    #[error("bson error: {0}")]
+    BsonExtjson(#[from] bson::extjson::de::Error),
+    #[error("bson error: {0}")]
+    Bson(#[from] bson::de::Error),
+    #[error("access error: {0}")]
+    ValueAccess(#[from] bson::document::ValueAccessError),
+}
+
+type Result<T> = std::result::Result<T, TestError>;
 
 async fn new_client() -> TestClient {
     let mut options = CLIENT_OPTIONS.get().await.clone();
@@ -61,8 +79,9 @@ async fn custom_key_material() -> Result<()> {
 async fn data_key_double_encryption() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = TestClient::new().await;
-    client.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
+    let client = EventClient::new().await;
+    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
+    datakeys.drop(None).await?;
     client.database("db").collection::<Document>("coll").drop(None).await?;
 
     /* KMIP server:
@@ -103,7 +122,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     let enc_opts = ClientEncryptionOptions::builder()
         .key_vault_namespace(kv_namespace)
-        .key_vault_client(client.into_client())
+        .key_vault_client(client.clone().into_client())
         .kms_providers(kms_providers)
         .tls_options(tls_options)
         .build();
@@ -115,13 +134,33 @@ async fn data_key_double_encryption() -> Result<()> {
             .master_key(MasterKey::Local)  // varies by provider
         .build()).await?;
         assert_eq!(BinarySubtype::Uuid, datakey_id.subtype);
+        let docs: Vec<_> = datakeys.find(doc! { "_id": datakey_id }, None).await?.try_collect().await?;
+        assert_eq!(docs.len(), 1);
+        assert_eq!(docs[0].get_document("masterKey")?.get_str("provider")?, provider.name());
+        let mut found = false;
+        for ev in client.get_command_started_events(&["insert"]) {
+            let cmd = &ev.command;
+            if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
+                continue;
+            }
+            for doc in cmd.get_array("documents")? {
+
+            }
+            dbg!(&ev.command);
+        };
+        /*
+        let encrypted = client_encryption.encrypt(
+            RawBson::String(format!("hello {}", provider.name())),
+            EncryptOptions::builder(),
+        ).await?;
+        */
     }
 
     Ok(())
 }
 
 fn from_json<T: DeserializeOwned>(text: &str) -> Result<T> {
-    let json: serde_json::Value = serde_json::from_str(text).map_err(|e| Error::invalid_argument(format!("json parse failure: {}", e)))?;
-    let bson: bson::Bson = json.try_into().map_err(|e| Error::invalid_argument(format!("bson parse failure: {}", e)))?;
+    let json: serde_json::Value = serde_json::from_str(text)?;
+    let bson: bson::Bson = json.try_into()?;
     Ok(bson::from_bson(bson)?)
 }
