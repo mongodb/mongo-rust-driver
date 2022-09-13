@@ -390,9 +390,6 @@ pub(super) struct DeleteMany {
     filter: Document,
     #[serde(flatten)]
     options: DeleteOptions,
-    // TODO: RUST-1071 add comment to DeleteOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for DeleteMany {
@@ -420,9 +417,6 @@ pub(super) struct DeleteOne {
     session: Option<String>,
     #[serde(flatten)]
     options: DeleteOptions,
-    // TODO: RUST-1071 add comment to DeleteOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for DeleteOne {
@@ -500,18 +494,21 @@ impl Find {
         test_runner: &'a TestRunner,
     ) -> Result<TestCursor> {
         let collection = test_runner.get_collection(id).await;
+
+        let (comment, comment_bson) = match &self.comment {
+            Some(Bson::String(string)) => (Some(string.clone()), None),
+            Some(bson) => (None, Some(bson.clone())),
+            None => (None, None),
+        };
+
         // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
         // compile-time that any new fields added there need to be considered here.
-        let comment = if let Some(Bson::String(s)) = &self.comment {
-            Some(s.clone())
-        } else {
-            None
-        };
         let options = FindOptions {
             allow_disk_use: self.allow_disk_use,
             allow_partial_results: self.allow_partial_results,
             batch_size: self.batch_size,
             comment,
+            comment_bson,
             hint: self.hint.clone(),
             limit: self.limit,
             max: self.max.clone(),
@@ -582,7 +579,7 @@ impl TestOperation for Find {
     }
 
     fn returns_root_documents(&self) -> bool {
-        false
+        true
     }
 }
 
@@ -664,9 +661,6 @@ pub(super) struct InsertMany {
     session: Option<String>,
     #[serde(flatten)]
     options: InsertManyOptions,
-    // TODO: RUST-1071 add comment to InsertManyOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for InsertMany {
@@ -716,9 +710,6 @@ impl TestOperation for InsertMany {
 pub(super) struct InsertOne {
     document: Document,
     session: Option<String>,
-    // TODO: RUST-1071 add comment to InsertOneOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
     #[serde(flatten)]
     options: InsertOneOptions,
 }
@@ -764,9 +755,6 @@ pub(super) struct UpdateMany {
     update: UpdateModifications,
     #[serde(flatten)]
     options: UpdateOptions,
-    // TODO: RUST-1071 add comment to UpdateOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for UpdateMany {
@@ -799,9 +787,6 @@ pub(super) struct UpdateOne {
     #[serde(flatten)]
     options: UpdateOptions,
     session: Option<String>,
-    // TODO: RUST-1071 add comment to UpdateOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for UpdateOne {
@@ -843,16 +828,42 @@ impl TestOperation for UpdateOne {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug)]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     session: Option<String>,
-    #[serde(flatten)]
     options: AggregateOptions,
-    // TODO: RUST-1071 add comment to AggregateOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
+}
+
+// TODO RUST-1364: remove this impl and derive Deserialize instead
+impl<'de> Deserialize<'de> for Aggregate {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Helper {
+            pipeline: Vec<Document>,
+            session: Option<String>,
+            comment: Option<Bson>,
+            #[serde(flatten)]
+            options: AggregateOptions,
+        }
+
+        let mut helper = Helper::deserialize(deserializer)?;
+        match helper.comment {
+            Some(Bson::String(string)) => {
+                helper.options.comment = Some(string);
+            }
+            Some(bson) => {
+                helper.options.comment_bson = Some(bson);
+            }
+            _ => {}
+        }
+
+        Ok(Self {
+            pipeline: helper.pipeline,
+            session: helper.session,
+            options: helper.options,
+        })
+    }
 }
 
 impl TestOperation for Aggregate {
@@ -977,9 +988,6 @@ impl TestOperation for Distinct {
 pub(super) struct CountDocuments {
     filter: Document,
     session: Option<String>,
-    // TODO: RUST-1071 add comment to CountOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -1041,12 +1049,39 @@ impl TestOperation for EstimatedDocumentCount {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Default)]
 pub(super) struct FindOne {
     filter: Option<Document>,
-    #[serde(flatten)]
     options: FindOneOptions,
+}
+
+// TODO RUST-1364: remove this impl and derive Deserialize instead
+impl<'de> Deserialize<'de> for FindOne {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Helper {
+            filter: Option<Document>,
+            comment: Option<Bson>,
+            #[serde(flatten)]
+            options: FindOneOptions,
+        }
+
+        let mut helper = Helper::deserialize(deserializer)?;
+        match helper.comment {
+            Some(Bson::String(string)) => {
+                helper.options.comment = Some(string);
+            }
+            Some(bson) => {
+                helper.options.comment_bson = Some(bson);
+            }
+            _ => {}
+        }
+
+        Ok(Self {
+            filter: helper.filter,
+            options: helper.options,
+        })
+    }
 }
 
 impl TestOperation for FindOne {
@@ -1214,9 +1249,6 @@ pub(super) struct ReplaceOne {
     replacement: Document,
     #[serde(flatten)]
     options: ReplaceOptions,
-    // TODO: RUST-1071 add comment to ReplaceOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for ReplaceOne {
@@ -1249,9 +1281,6 @@ pub(super) struct FindOneAndUpdate {
     session: Option<String>,
     #[serde(flatten)]
     options: FindOneAndUpdateOptions,
-    // TODO: RUST-1071 add comment to FindOneAndUpdateOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndUpdate {
@@ -1300,9 +1329,6 @@ pub(super) struct FindOneAndReplace {
     replacement: Document,
     #[serde(flatten)]
     options: FindOneAndReplaceOptions,
-    // TODO: RUST-1071 add comment to FindOneandReplaceOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndReplace {
@@ -1334,9 +1360,6 @@ pub(super) struct FindOneAndDelete {
     filter: Document,
     #[serde(flatten)]
     options: FindOneAndDeleteOptions,
-    // TODO: RUST-1071 add comment to FindOneAndDeleteOptions.
-    #[serde(rename = "comment")]
-    _comment: Option<Bson>,
 }
 
 impl TestOperation for FindOneAndDelete {
