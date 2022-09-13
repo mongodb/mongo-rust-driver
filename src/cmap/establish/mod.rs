@@ -1,5 +1,7 @@
 pub(super) mod handshake;
 
+use std::time::Duration;
+
 use self::handshake::{Handshaker, HandshakerOptions};
 use super::{
     conn::{ConnectionGeneration, LoadBalancedGeneration, PendingConnection},
@@ -13,7 +15,7 @@ use crate::{
     },
     error::{Error as MongoError, ErrorKind, Result},
     hello::HelloReply,
-    runtime::{AsyncStream, HttpClient, TlsConfig},
+    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, HttpClient, TlsConfig},
     sdam::HandshakePhase,
 };
 
@@ -26,11 +28,14 @@ pub(crate) struct ConnectionEstablisher {
 
     /// Cached configuration needed to create TLS connections, if needed.
     tls_config: Option<TlsConfig>,
+
+    connect_timeout: Duration,
 }
 
 pub(crate) struct EstablisherOptions {
     handshake_options: HandshakerOptions,
     tls_options: Option<TlsOptions>,
+    connect_timeout: Option<Duration>,
 }
 
 impl EstablisherOptions {
@@ -44,6 +49,7 @@ impl EstablisherOptions {
                 load_balanced: opts.load_balanced.unwrap_or(false),
             },
             tls_options: opts.tls_options(),
+            connect_timeout: opts.connect_timeout,
         }
     }
 }
@@ -62,11 +68,17 @@ impl ConnectionEstablisher {
         Ok(Self {
             handshaker,
             tls_config,
+            connect_timeout: options.connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT),
         })
     }
 
     async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
-        AsyncStream::connect(address, self.tls_config.as_ref()).await
+        println!("making stream, timeout {:?}", self.connect_timeout);
+        runtime::timeout(
+            self.connect_timeout,
+            AsyncStream::connect(address, self.tls_config.as_ref()),
+        )
+        .await?
     }
 
     /// Establishes a connection.

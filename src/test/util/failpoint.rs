@@ -4,10 +4,7 @@ use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    error::Result,
-    operation::append_options,
-    runtime,
-    selection_criteria::SelectionCriteria,
+    error::Result, operation::append_options, runtime, selection_criteria::SelectionCriteria,
     Client,
 };
 
@@ -18,6 +15,19 @@ pub struct FailPoint {
 }
 
 impl FailPoint {
+    pub(crate) fn new(name: impl AsRef<str>, mode: FailPointMode, data: impl Into<Option<Document>>) -> Self {
+        let mut command = doc! {
+            "configureFailPoint": name.as_ref(),
+            "mode": bson::to_bson(&mode).unwrap(),
+        };
+
+        if let Some(data) = data.into() {
+            command.insert("data", data);
+        }
+
+        Self { command }
+    }
+
     fn name(&self) -> &str {
         self.command.get_str("configureFailPoint").unwrap()
     }
