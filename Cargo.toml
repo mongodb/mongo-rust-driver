@@ -88,7 +88,6 @@ md-5 = "0.10.1"
 mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
-os_info = { version = "3.0.1", default-features = false }
 percent-encoding = "2.0.0"
 rand = { version = "0.8.3", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
@@ -170,6 +169,7 @@ serde = { version = "*", features = ["rc"] }
 serde_json = "1.0.64"
 semver = "1.0.0"
 time = "0.3.9"
+regex = "1.6.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

@@ -4,9 +4,8 @@ use std::sync::{
 };
 
 use crate::{
-    cmap::{options::ConnectionPoolOptions, ConnectionPool},
+    cmap::{establish::ConnectionEstablisher, options::ConnectionPoolOptions, ConnectionPool},
     options::{ClientOptions, ServerAddress},
-    runtime::HttpClient,
     sdam::TopologyUpdater,
 };
 
@@ -36,13 +35,13 @@ impl Server {
     pub(crate) fn new(
         address: ServerAddress,
         options: ClientOptions,
-        http_client: HttpClient,
+        connection_establisher: ConnectionEstablisher,
         topology_updater: TopologyUpdater,
     ) -> Arc<Server> {
         Arc::new(Self {
             pool: ConnectionPool::new(
                 address.clone(),
-                http_client,
+                connection_establisher,
                 topology_updater,
                 Some(ConnectionPoolOptions::from_client_options(&options)),
             ),

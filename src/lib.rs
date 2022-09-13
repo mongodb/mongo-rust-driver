@@ -298,6 +298,7 @@
         clippy::unreadable_literal,
         clippy::cognitive_complexity,
         clippy::float_cmp,
+        clippy::match_like_matches_macro,
         clippy::derive_partial_eq_without_eq
     )
 )]

@@ -1,96 +1,141 @@
 pub(super) mod handshake;
-#[cfg(test)]
-mod test;
 
-use self::handshake::Handshaker;
+use self::handshake::{Handshaker, HandshakerOptions};
 use super::{
-    conn::{ConnectionGeneration, PendingConnection},
-    options::ConnectionPoolOptions,
+    conn::{ConnectionGeneration, LoadBalancedGeneration, PendingConnection},
     Connection,
     PoolGeneration,
 };
 use crate::{
-    client::{auth::Credential, options::ServerApi},
-    error::{Error as MongoError, ErrorKind},
-    runtime::HttpClient,
+    client::{
+        auth::Credential,
+        options::{ClientOptions, ServerAddress, TlsOptions},
+    },
+    error::{Error as MongoError, ErrorKind, Result},
+    hello::HelloReply,
+    runtime::{AsyncStream, HttpClient, TlsConfig},
     sdam::HandshakePhase,
 };
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.
-#[derive(Clone, Debug)]
-pub(super) struct ConnectionEstablisher {
+#[derive(Clone)]
+pub(crate) struct ConnectionEstablisher {
     /// Contains the logic for handshaking a connection.
     handshaker: Handshaker,
-    http_client: HttpClient,
-    credential: Option<Credential>,
-    server_api: Option<ServerApi>,
+
+    /// Cached configuration needed to create TLS connections, if needed.
+    tls_config: Option<TlsConfig>,
+}
+
+pub(crate) struct EstablisherOptions {
+    handshake_options: HandshakerOptions,
+    tls_options: Option<TlsOptions>,
+}
+
+impl EstablisherOptions {
+    pub(crate) fn from_client_options(opts: &ClientOptions) -> Self {
+        Self {
+            handshake_options: HandshakerOptions {
+                app_name: opts.app_name.clone(),
+                compressors: opts.compressors.clone(),
+                driver_info: opts.driver_info.clone(),
+                server_api: opts.server_api.clone(),
+                load_balanced: opts.load_balanced.unwrap_or(false),
+            },
+            tls_options: opts.tls_options(),
+        }
+    }
 }
 
 impl ConnectionEstablisher {
     /// Creates a new ConnectionEstablisher from the given options.
-    pub(super) fn new(http_client: HttpClient, options: Option<&ConnectionPoolOptions>) -> Self {
-        let handshaker = Handshaker::new(options.cloned().map(Into::into));
+    pub(crate) fn new(http_client: HttpClient, options: EstablisherOptions) -> Result<Self> {
+        let handshaker = Handshaker::new(http_client, options.handshake_options);
 
-        Self {
+        let tls_config = if let Some(tls_options) = options.tls_options {
+            Some(TlsConfig::new(tls_options)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
             handshaker,
-            http_client,
-            credential: options.and_then(|options| options.credential.clone()),
-            server_api: options.and_then(|options| options.server_api.clone()),
-        }
+            tls_config,
+        })
+    }
+
+    async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
+        AsyncStream::connect(address, self.tls_config.as_ref()).await
     }
 
     /// Establishes a connection.
     pub(super) async fn establish_connection(
         &self,
         pending_connection: PendingConnection,
+        credential: Option<&Credential>,
     ) -> std::result::Result<Connection, EstablishError> {
         let pool_gen = pending_connection.generation.clone();
-        let mut connection = Connection::connect(pending_connection)
+        let address = pending_connection.address.clone();
+
+        let stream = self
+            .make_stream(address)
             .await
             .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
 
-        let handshake = self
-            .handshaker
-            .handshake(&mut connection, None, &None)
-            .await
-            .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
-        let service_id = handshake.hello_reply.command_response.service_id;
+        let mut connection = Connection::new_pooled(pending_connection, stream);
+        let handshake_result = self.handshaker.handshake(&mut connection, credential).await;
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.
-        match (pool_gen, service_id) {
+        match (&pool_gen, connection.service_id()) {
             (PoolGeneration::Normal(_), _) => {}
             (PoolGeneration::LoadBalanced(gen_map), Some(service_id)) => {
-                connection.generation = ConnectionGeneration::LoadBalanced {
+                connection.generation = LoadBalancedGeneration {
                     generation: *gen_map.get(&service_id).unwrap_or(&0),
                     service_id,
-                };
+                }
+                .into();
             }
-            _ => {
-                return Err(EstablishError::post_hello(
-                    ErrorKind::Internal {
-                        message: "load-balanced mode mismatch".to_string(),
-                    }
-                    .into(),
-                    connection.generation.clone(),
-                ));
+            (PoolGeneration::LoadBalanced(_), None) => {
+                // If the handshake succeeded and there isn't a service id, return a special error.
+                // If the handshake failed, just return the error from that instead.
+                if handshake_result.is_ok() {
+                    return Err(EstablishError::post_hello(
+                        ErrorKind::IncompatibleServer {
+                            message: "Driver attempted to initialize in load balancing mode, but \
+                                      the server does not support this mode."
+                                .to_string(),
+                        }
+                        .into(),
+                        connection.generation,
+                    ));
+                }
             }
         }
 
-        if let Some(ref credential) = self.credential {
-            credential
-                .authenticate_stream(
-                    &mut connection,
-                    &self.http_client,
-                    self.server_api.as_ref(),
-                    handshake.first_round,
-                )
-                .await
-                .map_err(|e| EstablishError::post_hello(e, connection.generation.clone()))?
-        }
+        handshake_result.map_err(|e| {
+            if connection.stream_description.is_none() {
+                EstablishError::pre_hello(e, pool_gen)
+            } else {
+                EstablishError::post_hello(e, connection.generation)
+            }
+        })?;
 
         Ok(connection)
+    }
+
+    /// Establishes a monitoring connection.
+    pub(crate) async fn establish_monitoring_connection(
+        &self,
+        address: ServerAddress,
+    ) -> Result<(Connection, HelloReply)> {
+        let stream = self.make_stream(address.clone()).await?;
+        let mut connection = Connection::new_monitoring(address, stream);
+
+        let hello_reply = self.handshaker.handshake(&mut connection, None).await?;
+
+        Ok((connection, hello_reply))
     }
 }
 

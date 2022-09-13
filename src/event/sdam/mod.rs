@@ -118,7 +118,9 @@ pub struct TopologyClosedEvent {
 pub struct ServerHeartbeatStartedEvent {
     /// The address of the server.
     pub server_address: ServerAddress,
-    // TODO RUST-560 add awaited field
+
+    /// Determines if this heartbeat event is from an awaitable `hello`.
+    pub awaited: bool,
 }
 
 /// Published when a server monitor's `hello` or legacy hello command succeeds.
@@ -134,7 +136,9 @@ pub struct ServerHeartbeatSucceededEvent {
 
     /// The address of the server.
     pub server_address: ServerAddress,
-    // TODO RUST-560 add awaited field
+
+    /// Determines if this heartbeat event is from an awaitable `hello`.
+    pub awaited: bool,
 }
 
 /// Published when a server monitor's `hello` or legacy hello command fails.
@@ -151,7 +155,9 @@ pub struct ServerHeartbeatFailedEvent {
 
     /// The address of the server.
     pub server_address: ServerAddress,
-    // TODO RUST-560 add awaited field
+
+    /// Determines if this heartbeat event is from an awaitable `hello`.
+    pub awaited: bool,
 }
 
 #[derive(Clone, Debug)]

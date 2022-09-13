@@ -1,5 +1,7 @@
-use std::{fmt::Write, sync::Arc, time::Duration};
+use std::{borrow::Cow, fmt::Write, sync::Arc, time::Duration};
 
+use percent_encoding::NON_ALPHANUMERIC;
+use regex::Regex;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 use tokio::sync::oneshot;
@@ -67,7 +69,7 @@ pub(crate) struct RunOnRequirement {
     auth: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub(crate) enum Topology {
     Single,
@@ -94,7 +96,13 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref topologies) = self.topologies {
-            if !topologies.contains(&client.topology().await) {
+            let client_topology = client.topology().await;
+            if !topologies.iter().any(|expected_topology| {
+                match (expected_topology, client_topology) {
+                    (Topology::Sharded, Topology::Sharded | Topology::ShardedReplicaSet) => true,
+                    _ => expected_topology == &client_topology,
+                }
+            }) {
                 return false;
             }
         }
@@ -157,6 +165,12 @@ pub(crate) struct Client {
     pub(crate) store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
 }
 
+impl Client {
+    pub(crate) fn use_multiple_mongoses(&self) -> bool {
+        self.use_multiple_mongoses.unwrap_or(true)
+    }
+}
+
 pub(crate) fn deserialize_server_api_test_format<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<ServerApi>, D::Error>
@@ -179,11 +193,32 @@ where
     }))
 }
 
-pub(crate) fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> String {
+pub(crate) fn merge_uri_options(
+    given_uri: &str,
+    uri_options: Option<&Document>,
+    use_multiple_hosts: bool,
+) -> String {
+    let given_uri = if !use_multiple_hosts && !given_uri.starts_with("mongodb+srv") {
+        let hosts_regex = Regex::new(r"mongodb://([^/]*)").unwrap();
+        let single_host = hosts_regex
+            .captures(given_uri)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .split(',')
+            .next()
+            .expect("expected URI to contain at least one host, but it had none");
+        hosts_regex.replace(given_uri, format!("mongodb://{}", single_host))
+    } else {
+        Cow::Borrowed(given_uri)
+    };
+
     let uri_options = match uri_options {
         Some(opts) => opts,
         None => return given_uri.to_string(),
     };
+
     let mut given_uri_parts = given_uri.split('?');
 
     let mut uri = String::from(given_uri_parts.next().unwrap());
@@ -212,7 +247,12 @@ pub(crate) fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>)
         let value = value.to_string();
         // to_string() wraps quotations around Bson strings
         let value = value.trim_start_matches('\"').trim_end_matches('\"');
-        let _ = write!(uri, "{}={}&", &key, value);
+        let _ = write!(
+            &mut uri,
+            "{}={}&",
+            &key,
+            percent_encoding::percent_encode(value.as_bytes(), NON_ALPHANUMERIC)
+        );
     }
 
     // remove the trailing '&' from the URI (or '?' if no options are present)
@@ -459,7 +499,7 @@ async fn merged_uri_options() {
         "w": 2,
         "readconcernlevel": "local",
     };
-    let uri = merge_uri_options(&DEFAULT_URI, Some(&options));
+    let uri = merge_uri_options(&DEFAULT_URI, Some(&options), true);
     let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
 
     assert!(options.tls_options().is_some());

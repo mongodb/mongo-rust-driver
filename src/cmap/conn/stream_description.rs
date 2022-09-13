@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use bson::oid::ObjectId;
+
 use crate::{client::options::ServerAddress, hello::HelloReply, sdam::ServerType};
 
 /// Contains information about a given server in a format digestible by a connection.
@@ -38,6 +40,9 @@ pub(crate) struct StreamDescription {
 
     /// The maximum permitted size of a BSON wire protocol message.
     pub(crate) max_message_size_bytes: i32,
+
+    /// If the connection is to a load balancer, the id of the selected backend.
+    pub(crate) service_id: Option<ObjectId>,
 }
 
 impl StreamDescription {
@@ -57,6 +62,7 @@ impl StreamDescription {
             max_write_batch_size: reply.command_response.max_write_batch_size,
             hello_ok: reply.command_response.hello_ok.unwrap_or(false),
             max_message_size_bytes: reply.command_response.max_message_size_bytes,
+            service_id: reply.command_response.service_id,
         }
     }
 
@@ -73,7 +79,8 @@ impl StreamDescription {
         Self::with_wire_version(8)
     }
 
-    /// Gets a description of a stream for a 4.2 connection.
+    /// Gets a description of a stream for a connection to a server with the provided
+    /// maxWireVersion.
     #[cfg(test)]
     pub(crate) fn with_wire_version(max_wire_version: i32) -> Self {
         Self {
@@ -87,6 +94,7 @@ impl StreamDescription {
             max_write_batch_size: 100_000,
             hello_ok: false,
             max_message_size_bytes: Default::default(),
+            service_id: None,
         }
     }
 }

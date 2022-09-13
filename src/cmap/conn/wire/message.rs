@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use bitflags::bitflags;
-use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use super::header::{Header, OpCode};
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
         Command,
     },
     error::{Error, ErrorKind, Result},
-    runtime::{AsyncStream, SyncLittleEndianRead},
+    runtime::SyncLittleEndianRead,
 };
 
 use crate::compression::{Compressor, Decoder};
@@ -37,6 +37,7 @@ impl Message {
                 bytes,
                 target_db: command.target_db,
                 name: command.name,
+                exhaust_allowed: command.exhaust_allowed,
             },
             request_id,
         ))
@@ -46,9 +47,14 @@ impl Message {
     ///
     /// Note that `response_to` will need to be set manually.
     pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Self {
+        let mut flags = MessageFlags::empty();
+        if command.exhaust_allowed {
+            flags |= MessageFlags::EXHAUST_ALLOWED;
+        }
+
         Self {
             response_to: 0,
-            flags: MessageFlags::empty(),
+            flags,
             sections: vec![MessageSection::Document(command.bytes)],
             checksum: None,
             request_id,
@@ -77,11 +83,10 @@ impl Message {
     }
 
     /// Reads bytes from `reader` and deserializes them into a Message.
-    pub(crate) async fn read_from(
-        reader: &mut AsyncStream,
+    pub(crate) async fn read_from<T: AsyncRead + Unpin + Send>(
+        mut reader: T,
         max_message_size_bytes: Option<i32>,
     ) -> Result<Self> {
-        let mut reader = BufReader::new(reader);
         let header = Header::read_from(&mut reader).await?;
         let max_len = max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES);
         if header.length > max_len {
@@ -111,8 +116,8 @@ impl Message {
         ))
     }
 
-    async fn read_from_op_msg(
-        mut reader: BufReader<&mut AsyncStream>,
+    async fn read_from_op_msg<T: AsyncRead + Unpin + Send>(
+        mut reader: T,
         header: &Header,
     ) -> Result<Self> {
         // TODO: RUST-616 ensure length is < maxMessageSizeBytes
@@ -124,8 +129,8 @@ impl Message {
         Self::read_op_common(reader, length_remaining, header)
     }
 
-    async fn read_from_op_compressed(
-        mut reader: BufReader<&mut AsyncStream>,
+    async fn read_from_op_compressed<T: AsyncRead + Unpin + Send>(
+        mut reader: T,
         header: &Header,
     ) -> Result<Self> {
         let length_remaining = header.length - Header::LENGTH as i32;
@@ -221,8 +226,7 @@ impl Message {
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
-        let mut writer = BufWriter::new(stream);
+    pub(crate) async fn write_to<T: AsyncWrite + Send + Unpin>(&self, mut writer: T) -> Result<()> {
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {
@@ -259,15 +263,14 @@ impl Message {
     }
 
     /// Serializes message to bytes, compresses those bytes, and writes the bytes.
-    pub async fn write_compressed_to(
+    pub async fn write_compressed_to<T: AsyncWrite + Unpin + Send>(
         &self,
-        stream: &mut AsyncStream,
+        mut writer: T,
         compressor: &Compressor,
     ) -> Result<()> {
         let mut encoder = compressor.to_encoder()?;
         let compressor_id = compressor.id() as u8;
 
-        let mut writer = BufWriter::new(stream);
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {

@@ -14,6 +14,7 @@ mod ocsp;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
+mod sdam;
 mod sessions;
 mod transactions;
 pub mod unified_runner;

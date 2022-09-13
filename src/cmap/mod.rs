@@ -3,7 +3,7 @@ pub(crate) mod test;
 
 pub(crate) mod conn;
 mod connection_requester;
-mod establish;
+pub(crate) mod establish;
 mod manager;
 pub(crate) mod options;
 mod status;
@@ -18,11 +18,14 @@ use tokio::sync::oneshot;
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
     conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
-    establish::handshake::Handshaker,
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
 };
-use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
+use self::{
+    connection_requester::ConnectionRequestResult,
+    establish::ConnectionEstablisher,
+    options::ConnectionPoolOptions,
+};
 use crate::{
     bson::oid::ObjectId,
     error::{Error, Result},
@@ -34,7 +37,6 @@ use crate::{
         PoolCreatedEvent,
     },
     options::ServerAddress,
-    runtime::HttpClient,
     sdam::TopologyUpdater,
 };
 use connection_requester::ConnectionRequester;
@@ -46,8 +48,9 @@ use crate::runtime::WorkerHandle;
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 
-/// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
-/// internal state that is mutable is additionally wrapped by a lock.
+/// A pool of connections implementing the CMAP spec.
+/// This type is actually a handle to task that manages the connections and is cheap to clone and
+/// pass around.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPool {
@@ -63,13 +66,13 @@ pub(crate) struct ConnectionPool {
 impl ConnectionPool {
     pub(crate) fn new(
         address: ServerAddress,
-        http_client: HttpClient,
+        connection_establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
         let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
             address.clone(),
-            http_client,
+            connection_establisher,
             server_updater,
             options.clone(),
         );
@@ -166,9 +169,9 @@ impl ConnectionPool {
         self.manager.clear(cause, service_id).await
     }
 
-    /// Mark the pool as "ready", allowing connections to be created and checked out.
+    /// Mark the pool as "ready" as per the CMAP specification.
     pub(crate) async fn mark_as_ready(&self) {
-        self.manager.mark_as_ready().await;
+        self.manager.mark_as_ready().await
     }
 
     pub(crate) fn generation(&self) -> PoolGeneration {

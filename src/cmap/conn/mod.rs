@@ -9,16 +9,16 @@ use std::{
 
 use derivative::Derivative;
 use serde::Serialize;
-use tokio::sync::{mpsc, Mutex};
+use tokio::{
+    io::BufStream,
+    sync::{mpsc, Mutex},
+};
 
-use self::wire::Message;
+use self::wire::{Message, MessageFlags};
 use super::manager::PoolManager;
 use crate::{
     bson::oid::ObjectId,
-    cmap::{
-        options::{ConnectionOptions, StreamOptions},
-        PoolGeneration,
-    },
+    cmap::PoolGeneration,
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
@@ -30,7 +30,7 @@ use crate::{
         ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
-    options::{ServerAddress, TlsOptions},
+    options::ServerAddress,
     runtime::AsyncStream,
 };
 pub(crate) use command::{Command, RawCommand, RawCommandResponse};
@@ -86,7 +86,13 @@ pub(crate) struct Connection {
     /// into a pool.
     error: bool,
 
-    stream: AsyncStream,
+    /// Whether the most recently received message included the moreToCome flag, indicating the
+    /// server may send more responses without any additional requests. Attempting to send new
+    /// messages on this connection while this value is true will return an error. This value
+    /// will remain true until a server response does not include the moreToComeFlag.
+    more_to_come: bool,
+
+    stream: BufStream<AsyncStream>,
 
     /// Compressor that the client will use before sending messages.
     /// This compressor does not get used to decompress server messages.
@@ -105,81 +111,53 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    async fn new(
-        id: u32,
+    fn new(
         address: ServerAddress,
-        generation: u32,
-        options: Option<ConnectionOptions>,
-    ) -> Result<Self> {
-        let stream_options = StreamOptions {
-            address: address.clone(),
-            connect_timeout: options.as_ref().and_then(|opts| opts.connect_timeout),
-            tls_options: options.as_ref().and_then(|opts| opts.tls_options.clone()),
-        };
-
-        let conn = Self {
+        stream: AsyncStream,
+        id: u32,
+        generation: ConnectionGeneration,
+    ) -> Self {
+        Self {
             id,
             server_id: None,
-            generation: ConnectionGeneration::Normal(generation),
+            generation,
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
-            stream: AsyncStream::connect(stream_options).await?,
+            stream: BufStream::new(stream),
             address,
-            handler: options.and_then(|options| options.event_handler),
+            handler: None,
             stream_description: None,
             error: false,
             pinned_sender: None,
             compressor: None,
-        };
-
-        Ok(conn)
+            more_to_come: false,
+        }
     }
 
-    /// Constructs and connects a new connection.
-    pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
+    /// Create a connection intended to be stored in a connection pool for operation execution.
+    /// TODO: RUST-1454 Remove this from `Connection`, instead wrap a `Connection` type in a
+    /// separate type specific to pool.
+    pub(crate) fn new_pooled(pending_connection: PendingConnection, stream: AsyncStream) -> Self {
         let generation = match pending_connection.generation {
-            PoolGeneration::Normal(gen) => gen,
-            PoolGeneration::LoadBalanced(_) => 0, /* Placeholder; will be overwritten in
-                                                   * `ConnectionEstablisher::
-                                                   * establish_connection`. */
+            PoolGeneration::Normal(gen) => ConnectionGeneration::Normal(gen),
+            PoolGeneration::LoadBalanced(_) => ConnectionGeneration::LoadBalanced(None),
         };
-        Self::new(
+        let mut conn = Self::new(
+            pending_connection.address,
+            stream,
             pending_connection.id,
-            pending_connection.address.clone(),
             generation,
-            pending_connection.options,
-        )
-        .await
+        );
+        conn.handler = pending_connection.event_handler;
+        conn
     }
 
-    /// Construct and connect a new connection used for monitoring.
-    pub(crate) async fn connect_monitoring(
-        address: ServerAddress,
-        connect_timeout: Option<Duration>,
-        tls_options: Option<TlsOptions>,
-    ) -> Result<Self> {
-        Self::new(
-            0,
-            address,
-            0,
-            Some(ConnectionOptions {
-                connect_timeout,
-                tls_options,
-                event_handler: None,
-            }),
-        )
-        .await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn new_testing(
-        id: u32,
-        address: ServerAddress,
-        generation: u32,
-        options: Option<ConnectionOptions>,
-    ) -> Result<Self> {
-        Self::new(id, address, generation, options).await
+    /// Create a connection intended for monitoring purposes.
+    /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
+    pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream) -> Self {
+        // Monitoring connections don't have IDs, so just use 0 as a placeholder here.
+        Self::new(address, stream, 0, ConnectionGeneration::Monitoring)
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -191,7 +169,9 @@ impl Connection {
     }
 
     pub(crate) fn service_id(&self) -> Option<ObjectId> {
-        self.generation.service_id()
+        self.stream_description
+            .as_ref()
+            .and_then(|sd| sd.service_id)
     }
 
     pub(crate) fn address(&self) -> &ServerAddress {
@@ -272,6 +252,13 @@ impl Connection {
         message: Message,
         to_compress: bool,
     ) -> Result<RawCommandResponse> {
+        if self.more_to_come {
+            return Err(Error::internal(format!(
+                "attempted to send a new message to {} but moreToCome bit was set",
+                self.address()
+            )));
+        }
+
         self.command_executing = true;
 
         // If the client has agreed on a compressor with the server, and the command
@@ -298,7 +285,10 @@ impl Connection {
         self.command_executing = false;
         self.error = response_message_result.is_err();
 
-        RawCommandResponse::new(self.address.clone(), response_message_result?)
+        let response_message = response_message_result?;
+        self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
+
+        RawCommandResponse::new(self.address.clone(), response_message)
     }
 
     /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
@@ -330,6 +320,34 @@ impl Connection {
         let to_compress = command.should_compress();
         let message = Message::with_raw_command(command, request_id.into());
         self.send_message(message, to_compress).await
+    }
+
+    /// Receive the next message from the connection.
+    /// This will return an error if the previous response on this connection did not include the
+    /// moreToCome flag.
+    pub(crate) async fn receive_message(&mut self) -> Result<RawCommandResponse> {
+        if !self.more_to_come {
+            return Err(Error::internal(format!(
+                "attempted to stream response from connection to {} but moreToCome bit was not set",
+                self.address()
+            )));
+        }
+
+        self.command_executing = true;
+        let response_message_result = Message::read_from(
+            &mut self.stream,
+            self.stream_description
+                .as_ref()
+                .map(|d| d.max_message_size_bytes),
+        )
+        .await;
+        self.command_executing = false;
+        self.error = response_message_result.is_err();
+
+        let response_message = response_message_result?;
+        self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
+
+        RawCommandResponse::new(self.address.clone(), response_message)
     }
 
     /// Gets the connection's StreamDescription.
@@ -384,8 +402,8 @@ impl Connection {
             id: self.id,
             server_id: self.server_id,
             address: self.address.clone(),
-            generation: self.generation.clone(),
-            stream: std::mem::replace(&mut self.stream, AsyncStream::Null),
+            generation: self.generation,
+            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
@@ -394,7 +412,14 @@ impl Connection {
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
+            more_to_come: false,
         }
+    }
+
+    /// Whether or not the previous command response indicated that the server may send
+    /// more responses without another request.
+    pub(crate) fn is_streaming(&self) -> bool {
+        self.more_to_come
     }
 }
 
@@ -490,35 +515,50 @@ impl PinnedConnectionHandle {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LoadBalancedGeneration {
+    pub(crate) generation: u32,
+    pub(crate) service_id: ObjectId,
+}
+
+/// TODO: RUST-1454 Once we have separate types for pooled and non-pooled connections, the
+/// monitoring case and the Option<> wrapper can be dropped from this.
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum ConnectionGeneration {
+    Monitoring,
     Normal(u32),
-    LoadBalanced {
-        generation: u32,
-        service_id: ObjectId,
-    },
+    LoadBalanced(Option<LoadBalancedGeneration>),
 }
 
 impl ConnectionGeneration {
-    pub(crate) fn service_id(&self) -> Option<ObjectId> {
+    pub(crate) fn service_id(self) -> Option<ObjectId> {
         match self {
-            ConnectionGeneration::Normal(_) => None,
-            ConnectionGeneration::LoadBalanced { service_id, .. } => Some(*service_id),
+            ConnectionGeneration::LoadBalanced(Some(gen)) => Some(gen.service_id),
+            _ => None,
         }
     }
 
-    pub(crate) fn is_stale(&self, current_generation: &PoolGeneration) -> bool {
+    pub(crate) fn is_stale(self, current_generation: &PoolGeneration) -> bool {
         match (self, current_generation) {
-            (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != pgen,
-            (
-                ConnectionGeneration::LoadBalanced {
-                    generation: cgen,
-                    service_id,
-                },
-                PoolGeneration::LoadBalanced(gen_map),
-            ) => cgen != gen_map.get(service_id).unwrap_or(&0),
+            (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != *pgen,
+            (ConnectionGeneration::LoadBalanced(cgen), PoolGeneration::LoadBalanced(gen_map)) => {
+                if let Some(cgen) = cgen {
+                    cgen.generation != *gen_map.get(&cgen.service_id).unwrap_or(&0)
+                } else {
+                    // In the event that an error occurred during handshake and no serviceId was
+                    // returned, just ignore the error for SDAM purposes, since
+                    // we won't know which serviceId to clear for.
+                    false
+                }
+            }
             _ => load_balanced_mode_mismatch!(false),
         }
+    }
+}
+
+impl From<LoadBalancedGeneration> for ConnectionGeneration {
+    fn from(gen: LoadBalancedGeneration) -> Self {
+        ConnectionGeneration::LoadBalanced(Some(gen))
     }
 }
 
@@ -527,12 +567,11 @@ impl ConnectionGeneration {
 /// Creating a `PendingConnection` contributes towards the total connection count of a pool, despite
 /// not actually making a TCP connection to the pool's endpoint. This models a "pending" Connection
 /// from the CMAP specification.
-#[derive(Debug)]
-pub(super) struct PendingConnection {
-    pub(super) id: u32,
-    pub(super) address: ServerAddress,
-    pub(super) generation: PoolGeneration,
-    pub(super) options: Option<ConnectionOptions>,
+pub(crate) struct PendingConnection {
+    pub(crate) id: u32,
+    pub(crate) address: ServerAddress,
+    pub(crate) generation: PoolGeneration,
+    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 impl PendingConnection {

@@ -15,10 +15,9 @@ use tokio::{
 
 use crate::{
     client::{options::ServerAddress, WeakClient},
-    cmap::options::StreamOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
-    runtime::{AsyncStream, Process},
+    runtime::{AsyncStream, Process, TlsConfig},
     Client,
     Namespace,
 };
@@ -165,13 +164,9 @@ impl CryptExecutor {
                                 .and_then(|tls| tls.get(&provider))
                                 .cloned()
                                 .unwrap_or_default();
-                            let mut stream = AsyncStream::connect(
-                                StreamOptions::builder()
-                                    .address(addr)
-                                    .tls_options(tls_options)
-                                    .build(),
-                            )
-                            .await?;
+                            let mut stream =
+                                AsyncStream::connect(addr, Some(&TlsConfig::new(tls_options)?))
+                                    .await?;
                             stream.write_all(kms_ctx.message()?).await?;
                             let mut buf = vec![0];
                             while kms_ctx.bytes_needed() > 0 {

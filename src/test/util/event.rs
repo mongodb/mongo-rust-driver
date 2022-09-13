@@ -505,9 +505,12 @@ impl EventSubscriber<'_> {
         F: FnMut(&Event) -> bool,
     {
         let mut events = Vec::new();
-        while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
-            events.push(event);
-        }
+        let _ = runtime::timeout(timeout, async {
+            while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
+                events.push(event);
+            }
+        })
+        .await;
         events
     }
 }
@@ -556,7 +559,7 @@ impl EventClient {
 
     pub(crate) async fn with_additional_options(
         options: impl Into<Option<ClientOptions>>,
-        heartbeat_freq: Option<Duration>,
+        min_heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
         event_handler: impl Into<Option<EventHandler>>,
     ) -> Self {
@@ -565,7 +568,7 @@ impl EventClient {
             use_multiple_mongoses.unwrap_or(false),
         )
         .await;
-        options.test_options_mut().heartbeat_freq = heartbeat_freq;
+        options.test_options_mut().min_heartbeat_freq = min_heartbeat_freq;
         EventClient::with_options_and_handler(options, event_handler).await
     }
 

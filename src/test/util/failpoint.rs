@@ -44,7 +44,7 @@ impl FailPoint {
     }
 
     pub async fn enable(
-        self,
+        &self,
         client: &Client,
         criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<FailPointGuard> {

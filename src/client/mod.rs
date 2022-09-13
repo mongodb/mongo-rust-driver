@@ -409,12 +409,12 @@ impl Client {
             if let Some(server) = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
-                &state.servers,
+                &state.servers(),
             )? {
                 return Ok(server);
             }
 
-            self.inner.topology.request_update();
+            watcher.request_immediate_check();
 
             let change_occurred = start_time.elapsed() < timeout
                 && watcher
@@ -422,9 +422,8 @@ impl Client {
                     .await;
             if !change_occurred {
                 return Err(ErrorKind::ServerSelection {
-                    message: self
-                        .inner
-                        .topology
+                    message: state
+                        .description
                         .server_selection_timeout_error_message(criteria),
                 }
                 .into());
@@ -433,12 +432,13 @@ impl Client {
     }
 
     #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
-    pub(crate) async fn get_hosts(&self) -> Vec<String> {
+    pub(crate) fn get_hosts(&self) -> Vec<String> {
         let watcher = self.inner.topology.watch();
         let state = watcher.peek_latest();
 
-        let servers = state.servers.keys();
-        servers
+        state
+            .servers()
+            .keys()
             .map(|stream_address| format!("{}", stream_address))
             .collect()
     }
@@ -458,6 +458,11 @@ impl Client {
             .clone()
     }
 
+    #[cfg(test)]
+    pub(crate) fn topology(&self) -> &crate::sdam::Topology {
+        &self.inner.topology
+    }
+
     #[cfg(feature = "csfle")]
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {
@@ -474,11 +479,6 @@ impl Client {
             csfle.as_ref().map(|cs| cs.opts())
         })
         .ok()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn topology(&self) -> &Topology {
-        &self.inner.topology
     }
 }
 

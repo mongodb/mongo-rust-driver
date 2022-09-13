@@ -12,7 +12,12 @@ use self::{
 };
 
 use crate::{
-    cmap::{Connection, ConnectionPool, ConnectionPoolOptions},
+    cmap::{
+        establish::{ConnectionEstablisher, EstablisherOptions},
+        Connection,
+        ConnectionPool,
+        ConnectionPoolOptions,
+    },
     error::{Error, ErrorKind, Result},
     event::cmap::ConnectionPoolOptions as EventOptions,
     options::TlsOptions,
@@ -29,7 +34,6 @@ use crate::{
         Matchable,
         CLIENT_OPTIONS,
         LOCK,
-        SERVER_API,
     },
 };
 use bson::doc;
@@ -127,9 +131,7 @@ impl Executor {
         let error = test_file.error;
 
         let mut pool_options = test_file.pool_options.unwrap_or_default();
-        pool_options.tls_options = CLIENT_OPTIONS.get().await.tls_options();
         pool_options.cmap_event_handler = Some(handler.clone());
-        pool_options.server_api = SERVER_API.clone();
 
         let state = State {
             handler,
@@ -157,7 +159,11 @@ impl Executor {
 
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.get().await.hosts[0].clone(),
-            Default::default(),
+            ConnectionEstablisher::new(
+                Default::default(),
+                EstablisherOptions::from_client_options(CLIENT_OPTIONS.get().await),
+            )
+            .unwrap(),
             updater,
             Some(self.pool_options),
         );

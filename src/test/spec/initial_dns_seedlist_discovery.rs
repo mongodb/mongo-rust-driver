@@ -177,7 +177,7 @@ async fn run_test(mut test_file: TestFile) {
         // this.
         let start = Instant::now();
         loop {
-            let mut actual_hosts = client.get_hosts().await;
+            let mut actual_hosts = client.get_hosts();
             actual_hosts.sort();
 
             if let Some(ref expected_hosts) = test_file.hosts {

@@ -157,7 +157,7 @@ impl<'a> fmt::Display for ServerInfo<'a> {
                 }
 
                 if let Some(last_update_time) = self.last_update_time() {
-                    write!(f, ", Last Update Time: {:?}", last_update_time)?;
+                    write!(f, ", Last Update Time: {}", last_update_time)?;
                 }
 
                 if let Some(max_wire_version) = self.max_wire_version() {

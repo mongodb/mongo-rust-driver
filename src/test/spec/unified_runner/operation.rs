@@ -1373,7 +1373,6 @@ impl TestOperation for FailPointCommand {
             let client = test_runner.get_client(&self.client).await;
             let guard = self
                 .fail_point
-                .clone()
                 .enable(&client, Some(ReadPreference::Primary.into()))
                 .await
                 .unwrap();
@@ -2430,11 +2429,9 @@ impl TestOperation for WaitForThread {
     ) -> BoxFuture<'a, ()> {
         async {
             let thread = test_runner.get_thread(self.thread.as_str()).await;
-            assert!(
-                thread.wait().await,
-                "thread {:?} did not exit successfully",
-                self.thread
-            );
+            thread.wait().await.unwrap_or_else(|e| {
+                panic!("thread {:?} did not exit successfully: {}", self.thread, e)
+            });
         }
         .boxed()
     }
@@ -2456,13 +2453,20 @@ impl TestOperation for AssertEventCount {
         async {
             let client = test_runner.get_client(self.client.as_str()).await;
             let entities = test_runner.entities.clone();
-            let actual_count = client
+            let actual_events = client
                 .observer
                 .lock()
                 .await
-                .matching_event_count(&self.event, entities)
+                .matching_events(&self.event, entities)
                 .await;
-            assert_eq!(actual_count, self.count);
+            assert_eq!(
+                actual_events.len(),
+                self.count,
+                "expected to see {} events matching: {:#?}, instead saw: {:#?}",
+                self.count,
+                self.event,
+                actual_events
+            );
         }
         .boxed()
     }
@@ -2571,7 +2575,7 @@ impl TestOperation for WaitForPrimaryChange {
                             return;
                         }
                     }
-                    watcher.wait_for_update(Duration::MAX).await;
+                    watcher.wait_for_update(None).await;
                 }
             })
             .await

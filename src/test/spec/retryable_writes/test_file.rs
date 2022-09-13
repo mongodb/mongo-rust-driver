@@ -4,6 +4,7 @@ use super::super::{Operation, RunOn};
 use crate::{
     bson::{Bson, Document},
     options::ClientOptions,
+    test::FailPoint,
 };
 
 #[derive(Debug, Deserialize)]
@@ -20,7 +21,7 @@ pub(crate) struct TestCase {
     pub(crate) description: String,
     pub(crate) client_options: Option<ClientOptions>,
     pub(crate) use_multiple_mongoses: Option<bool>,
-    pub(crate) fail_point: Option<Document>,
+    pub(crate) fail_point: Option<FailPoint>,
     pub(crate) operation: Operation,
     pub(crate) outcome: Outcome,
 }

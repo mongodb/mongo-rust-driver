@@ -1,5 +1,3 @@
-use derivative::Derivative;
-
 #[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{
@@ -14,7 +12,7 @@ use super::{
     establish::ConnectionEstablisher,
     manager,
     manager::{ConnectionSucceeded, ManagementRequestReceiver, PoolManagementRequest, PoolManager},
-    options::{ConnectionOptions, ConnectionPoolOptions},
+    options::ConnectionPoolOptions,
     status,
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
     Connection,
@@ -22,6 +20,7 @@ use super::{
 };
 use crate::{
     bson::oid::ObjectId,
+    client::auth::Credential,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -46,8 +45,6 @@ const MAX_CONNECTING: u32 = 2;
 const MAINTENACE_FREQUENCY: Duration = Duration::from_millis(500);
 
 /// A worker task that manages the shared state of the pool.
-#[derive(Derivative)]
-#[derivative(Debug)]
 pub(crate) struct ConnectionPoolWorker {
     /// The address the pool's connections will connect to.
     address: ServerAddress,
@@ -82,11 +79,10 @@ pub(crate) struct ConnectionPoolWorker {
     /// authenticating a connection when it's first created.
     establisher: ConnectionEstablisher,
 
-    /// The options used to create new connections.
-    connection_options: Option<ConnectionOptions>,
+    /// The credential used to authenticate connections, if any.
+    credential: Option<Credential>,
 
     /// The event handler specified by the user to process CMAP events.
-    #[derivative(Debug = "ignore")]
     event_handler: Option<Arc<dyn CmapEventHandler>>,
 
     /// The time between maintenance tasks.
@@ -141,11 +137,10 @@ impl ConnectionPoolWorker {
     /// and close the pool.
     pub(super) fn start(
         address: ServerAddress,
-        http_client: runtime::HttpClient,
+        establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
-        let establisher = ConnectionEstablisher::new(http_client, options.as_ref());
         let event_handler = options
             .as_ref()
             .and_then(|opts| opts.cmap_event_handler.clone());
@@ -163,10 +158,6 @@ impl ConnectionPoolWorker {
             .unwrap_or(DEFAULT_MAX_POOL_SIZE);
 
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
-
-        let connection_options: Option<ConnectionOptions> = options
-            .as_ref()
-            .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
         let (handle, handle_listener) = WorkerHandleListener::channel();
         let (connection_requester, request_receiver) = connection_requester::channel(handle);
@@ -214,18 +205,20 @@ impl ConnectionPoolWorker {
             state = PoolState::Ready;
         }
 
+        let credential = options.and_then(|o| o.credential);
+
         let worker = ConnectionPoolWorker {
             address,
             event_handler: event_handler.clone(),
             max_idle_time,
             min_pool_size,
+            credential,
             establisher,
             next_connection_id: 1,
             total_connection_count: 0,
             pending_connection_count: 0,
             generation,
             service_connection_count: HashMap::new(),
-            connection_options,
             available_connections: VecDeque::new(),
             max_pool_size,
             request_receiver,
@@ -254,14 +247,20 @@ impl ConnectionPoolWorker {
 
         loop {
             let task = tokio::select! {
-                Some(request) = self.request_receiver.recv() => {
-                    PoolTask::CheckOut(request)
-                },
+                // This marker indicates that the futures will be polled in order from top to
+                // bottom in this select! macro. We use this to ensure checkIn, clear,
+                // and ready always have priority over checkout requests. The pool
+                // exiting also has priority.
+                biased;
+
                 Some(request) = self.management_receiver.recv() => request.into(),
                 _ = self.handle_listener.wait_for_all_handle_drops() => {
                     // all worker handles have been dropped meaning this
                     // pool has no more references and can be dropped itself.
                     break
+                },
+                Some(request) = self.request_receiver.recv() => {
+                    PoolTask::CheckOut(request)
                 },
                 _ = maintenance_interval.tick() => {
                     PoolTask::Maintenance
@@ -298,11 +297,9 @@ impl ConnectionPoolWorker {
                     } => {
                         self.clear(cause, service_id);
                     }
-                    PoolManagementRequest::MarkAsReady {
-                        _completion_handler,
-                    } => {
+                    PoolManagementRequest::MarkAsReady { completion_handler } => {
                         self.mark_as_ready();
-                        _completion_handler.acknowledge(());
+                        completion_handler.acknowledge(());
                     }
                     PoolManagementRequest::HandleConnectionSucceeded(conn) => {
                         self.handle_connection_succeeded(conn);
@@ -322,7 +319,7 @@ impl ConnectionPoolWorker {
 
             if self.can_service_connection_request() {
                 if let Some(request) = self.wait_queue.pop_front() {
-                    self.check_out(request).await;
+                    self.check_out(request);
                 }
             }
         }
@@ -354,7 +351,7 @@ impl ConnectionPoolWorker {
         self.below_max_connections() && self.pending_connection_count < MAX_CONNECTING
     }
 
-    async fn check_out(&mut self, request: ConnectionRequest) {
+    fn check_out(&mut self, request: ConnectionRequest) {
         // first attempt to check out an available connection
         while let Some(mut conn) = self.available_connections.pop_back() {
             // Close the connection if it's stale.
@@ -387,15 +384,17 @@ impl ConnectionPoolWorker {
             let establisher = self.establisher.clone();
             let pending_connection = self.create_pending_connection();
             let manager = self.manager.clone();
-            let mut server_updater = self.server_updater.clone();
+            let server_updater = self.server_updater.clone();
+            let credential = self.credential.clone();
 
             let handle = runtime::spawn(async move {
                 let mut establish_result = establish_connection(
-                    &establisher,
+                    establisher,
                     pending_connection,
-                    &mut server_updater,
+                    server_updater,
                     &manager,
-                    event_handler.as_ref(),
+                    credential,
+                    event_handler,
                 )
                 .await;
 
@@ -428,7 +427,7 @@ impl ConnectionPoolWorker {
             id: self.next_connection_id,
             address: self.address.clone(),
             generation: self.generation.clone(),
-            options: self.connection_options.clone(),
+            event_handler: self.event_handler.clone(),
         };
         self.next_connection_id += 1;
         self.emit_event(|handler| {
@@ -600,14 +599,17 @@ impl ConnectionPoolWorker {
                 let event_handler = self.event_handler.clone();
                 let manager = self.manager.clone();
                 let establisher = self.establisher.clone();
-                let mut updater = self.server_updater.clone();
+                let updater = self.server_updater.clone();
+                let credential = self.credential.clone();
+
                 runtime::execute(async move {
                     let connection = establish_connection(
-                        &establisher,
+                        establisher,
                         pending_connection,
-                        &mut updater,
+                        updater,
                         &manager,
-                        event_handler.as_ref(),
+                        credential,
+                        event_handler,
                     )
                     .await;
 
@@ -626,16 +628,19 @@ impl ConnectionPoolWorker {
 /// connections established in check_out and those established as part of
 /// satisfying min_pool_size.
 async fn establish_connection(
-    establisher: &ConnectionEstablisher,
+    establisher: ConnectionEstablisher,
     pending_connection: PendingConnection,
-    server_updater: &mut TopologyUpdater,
+    server_updater: TopologyUpdater,
     manager: &PoolManager,
-    event_handler: Option<&Arc<dyn CmapEventHandler>>,
+    credential: Option<Credential>,
+    event_handler: Option<Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
     let address = pending_connection.address.clone();
 
-    let mut establish_result = establisher.establish_connection(pending_connection).await;
+    let mut establish_result = establisher
+        .establish_connection(pending_connection, credential.as_ref())
+        .await;
 
     match establish_result {
         Err(ref e) => {
