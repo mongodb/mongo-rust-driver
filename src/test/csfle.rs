@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bson::{Document, doc, spec::BinarySubtype, RawBson};
+use bson::{Document, doc, spec::BinarySubtype, Bson};
 use futures_util::TryStreamExt;
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
@@ -134,20 +134,23 @@ async fn data_key_double_encryption() -> Result<()> {
             .master_key(MasterKey::Local)  // varies by provider
         .build()).await?;
         assert_eq!(BinarySubtype::Uuid, datakey_id.subtype);
-        let docs: Vec<_> = datakeys.find(doc! { "_id": datakey_id }, None).await?.try_collect().await?;
+        let docs: Vec<_> = datakeys.find(doc! { "_id": datakey_id.clone() }, None).await?.try_collect().await?;
         assert_eq!(docs.len(), 1);
         assert_eq!(docs[0].get_document("masterKey")?.get_str("provider")?, provider.name());
-        let mut found = false;
-        for ev in client.get_command_started_events(&["insert"]) {
+        let events = client.get_command_started_events(&["insert"]); 
+        let found = try_any(&events, |ev| {
             let cmd = &ev.command;
             if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
-                continue;
+                return Ok(false);
             }
-            for doc in cmd.get_array("documents")? {
-
-            }
-            dbg!(&ev.command);
-        };
+            Ok(any(cmd.get_array("documents")?, |doc| {
+                matches!(
+                    doc.as_document().and_then(|d| d.get("_id")),
+                    Some(Bson::Binary(id)) if id == &datakey_id
+                )
+            }))
+        })?;
+        assert!(found, "no valid event found in {:?}", events);
         /*
         let encrypted = client_encryption.encrypt(
             RawBson::String(format!("hello {}", provider.name())),
@@ -163,4 +166,22 @@ fn from_json<T: DeserializeOwned>(text: &str) -> Result<T> {
     let json: serde_json::Value = serde_json::from_str(text)?;
     let bson: bson::Bson = json.try_into()?;
     Ok(bson::from_bson(bson)?)
+}
+
+fn any<T>(values: &[T], mut pred: impl FnMut(&T) -> bool) -> bool {
+    for value in values {
+        if pred(value) {
+            return true
+        }
+    }
+    false
+}
+
+fn try_any<T>(values: &[T], mut pred: impl FnMut(&T) -> Result<bool>) -> Result<bool> {
+    for value in values {
+        if pred(value)? {
+            return Ok(true)
+        }
+    }
+    Ok(false)
 }
