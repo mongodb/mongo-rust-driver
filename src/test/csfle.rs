@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bson::{Document, doc, spec::BinarySubtype, Bson};
+use bson::{Document, doc, spec::BinarySubtype, Bson, RawBson};
 use futures_util::TryStreamExt;
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
@@ -80,8 +80,7 @@ async fn data_key_double_encryption() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     let client = EventClient::new().await;
-    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
-    datakeys.drop(None).await?;
+    client.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
     client.database("db").collection::<Document>("coll").drop(None).await?;
 
     /* KMIP server:
@@ -118,7 +117,7 @@ async fn data_key_double_encryption() -> Result<()> {
         .tls_options(tls_options.clone())
         .extra_options(doc! { "cryptSharedLibPath": crypt_lib_path })
         .build();
-    let _client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
     let enc_opts = ClientEncryptionOptions::builder()
         .key_vault_namespace(kv_namespace)
@@ -133,8 +132,8 @@ async fn data_key_double_encryption() -> Result<()> {
             .key_alt_names(vec![format!("{}_altname", provider.name())])
             .master_key(MasterKey::Local)  // varies by provider
         .build()).await?;
-        assert_eq!(BinarySubtype::Uuid, datakey_id.subtype);
-        let docs: Vec<_> = datakeys.find(doc! { "_id": datakey_id.clone() }, None).await?.try_collect().await?;
+        assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
+        let docs: Vec<_> = client.database("keyvault").collection::<Document>("datakeys").find(doc! { "_id": datakey_id.clone() }, None).await?.try_collect().await?;
         assert_eq!(docs.len(), 1);
         assert_eq!(docs[0].get_document("masterKey")?.get_str("provider")?, provider.name());
         let events = client.get_command_started_events(&["insert"]); 
@@ -151,12 +150,22 @@ async fn data_key_double_encryption() -> Result<()> {
             }))
         })?;
         assert!(found, "no valid event found in {:?}", events);
-        /*
+
         let encrypted = client_encryption.encrypt(
             RawBson::String(format!("hello {}", provider.name())),
-            EncryptOptions::builder(),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(datakey_id))
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .build(),
         ).await?;
-        */
+        assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
+        let coll = client_encrypted.database("db").collection::<Document>("coll");
+        coll.insert_one(doc! { "_id": provider.name(), "value": encrypted }, None).await?;
+        let found = coll.find_one(doc! { "_id": provider.name() }, None).await?;
+        assert_eq!(
+            found.as_ref().and_then(|doc| doc.get("value")),
+            Some(&Bson::String(format!("hello {}", provider.name()))),
+        );
     }
 
     Ok(())
