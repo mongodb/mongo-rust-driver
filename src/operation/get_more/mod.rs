@@ -7,7 +7,7 @@ use bson::{Document, RawDocumentBuf};
 use serde::Deserialize;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Bson},
     change_stream::event::ResumeToken,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
@@ -26,6 +26,7 @@ pub(crate) struct GetMore<'conn> {
     batch_size: Option<u32>,
     max_time: Option<Duration>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
+    comment: Option<Bson>,
 }
 
 impl<'conn> GetMore<'conn> {
@@ -40,6 +41,7 @@ impl<'conn> GetMore<'conn> {
             batch_size: info.batch_size,
             max_time: info.max_time,
             pinned_connection: pinned,
+            comment: info.comment,
         }
     }
 }
@@ -69,6 +71,10 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
 
         if let Some(ref max_time) = self.max_time {
             body.insert("maxTimeMS", max_time.as_millis() as i32);
+        }
+
+        if let Some(ref comment) = self.comment {
+            body.insert("comment", comment);
         }
 
         Ok(Command::new(

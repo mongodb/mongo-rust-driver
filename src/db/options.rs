@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::Document,
+    bson::{Bson, Document},
     bson_util,
     concern::{ReadConcern, WriteConcern},
     options::Collation,
@@ -110,6 +110,12 @@ pub struct CreateCollectionOptions {
 
     /// Options for clustered collections.
     pub clustered_index: Option<ClusteredIndex>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 
     /// Map of encrypted fields for the created collection.
     #[cfg(feature = "csfle")]
@@ -230,6 +236,7 @@ pub struct DropDatabaseOptions {
 
 /// Specifies the options to a
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -246,10 +253,17 @@ pub struct ListCollectionsOptions {
         rename(serialize = "cursor")
     )]
     pub batch_size: Option<u32>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
 /// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -258,6 +272,12 @@ pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
     pub authorized_databases: Option<bool>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies how change stream pre- and post-images should be supported.

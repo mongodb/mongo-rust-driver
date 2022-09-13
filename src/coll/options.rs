@@ -95,6 +95,7 @@ pub enum CursorType {
 
 /// Specifies the options to a
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -105,6 +106,12 @@ pub struct InsertOneOptions {
 
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
@@ -127,6 +134,12 @@ pub struct InsertManyOptions {
     /// The write concern for the operation.
     #[serde(skip_deserializing)]
     pub write_concern: Option<WriteConcern>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 impl InsertManyOptions {
@@ -135,6 +148,7 @@ impl InsertManyOptions {
             bypass_document_validation: options.bypass_document_validation,
             ordered: None,
             write_concern: options.write_concern,
+            comment: options.comment,
         }
     }
 }
@@ -180,6 +194,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// Specifies the options to a
 /// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -219,6 +234,12 @@ pub struct UpdateOptions {
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 impl UpdateOptions {
@@ -230,6 +251,7 @@ impl UpdateOptions {
             write_concern: options.write_concern,
             collation: options.collation,
             let_vars: options.let_vars,
+            comment: options.comment,
             ..Default::default()
         }
     }
@@ -237,6 +259,7 @@ impl UpdateOptions {
 
 /// Specifies the options to a
 /// [`Collection::replace_one`](../struct.Collection.html#method.replace_one) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -270,6 +293,12 @@ pub struct ReplaceOptions {
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
@@ -301,11 +330,18 @@ pub struct DeleteOptions {
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
 /// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
 /// operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -343,11 +379,18 @@ pub struct FindOneAndDeleteOptions {
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
 /// operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
@@ -394,11 +437,18 @@ pub struct FindOneAndReplaceOptions {
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -451,6 +501,12 @@ pub struct FindOneAndUpdateOptions {
     /// Only available in MongoDB 5.0+.
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a [`Collection::aggregate`](../struct.Collection.html#method.aggregate)
@@ -486,9 +542,22 @@ pub struct AggregateOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
-    /// Tags the query with an arbitrary string to help trace the operation through the database
-    /// profiler, currentOp and logs.
+    /// Tags the query with an arbitrary string to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
+    // TODO RUST-1364: Update this field to be of type Option<Bson>
+    #[serde(skip_serializing)]
     pub comment: Option<String>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only supported on server versions 4.4+. Use the `comment` option on
+    /// older server versions.
+    // TODO RUST-1364: Remove this field
+    #[serde(rename(serialize = "comment"))]
+    pub comment_bson: Option<Bson>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,
@@ -549,6 +618,7 @@ pub struct AggregateOptions {
 
 /// Specifies the options to a
 /// [`Collection::count_documents`](../struct.Collection.html#method.count_documents) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -587,6 +657,12 @@ pub struct CountOptions {
     /// The level of the read concern.
     #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 // rustfmt tries to split the link up when it's all on one line, which breaks the link, so we wrap
@@ -624,10 +700,12 @@ pub struct EstimatedDocumentCountOptions {
     #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
-    /// Tags the query with an arbitrary BSON object to help trace the operation through the
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only available on server versions 4.4+.
+    /// This option is only supported on server versions 4.4+. The comment can be any [`Bson`]
+    /// value on server versions 4.4.14+. On server versions between 4.4.0 and 4.4.14, only
+    /// [`Bson::String`] values are supported.
     pub comment: Option<Bson>,
 }
 
@@ -666,6 +744,12 @@ pub struct DistinctOptions {
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
     pub collation: Option<Collation>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a [`Collection::find`](../struct.Collection.html#method.find)
@@ -694,9 +778,22 @@ pub struct FindOptions {
     #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
     pub batch_size: Option<u32>,
 
-    /// Tags the query with an arbitrary string to help trace the operation through the database
-    /// profiler, currentOp and logs.
+    /// Tags the query with an arbitrary string to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
+    // TODO RUST-1364: Update this field to be of type Option<Bson>
+    #[serde(skip_serializing)]
     pub comment: Option<String>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only supported on server versions 4.4+. Use the `comment` option on
+    /// older server versions.
+    // TODO RUST-1364: Remove this field
+    #[serde(rename(serialize = "comment"))]
+    pub comment_bson: Option<Bson>,
 
     /// The type of cursor to return.
     #[serde(skip)]
@@ -792,6 +889,7 @@ impl From<FindOneOptions> for FindOptions {
             allow_partial_results: options.allow_partial_results,
             collation: options.collation,
             comment: options.comment,
+            comment_bson: options.comment_bson,
             hint: options.hint,
             max: options.max,
             max_scan: options.max_scan,
@@ -845,9 +943,20 @@ pub struct FindOneOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
-    /// Tags the query with an arbitrary string to help trace the operation through the database
-    /// profiler, currentOp and logs.
+    /// Tags the query with an arbitrary string value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
+    // TODO RUST-1364: Update this field to be of type Option<Bson>
     pub comment: Option<String>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only supported on server versions 4.4+. Use the `comment` option on
+    /// older server versions.
+    // TODO RUST-1364: Remove this field
+    pub comment_bson: Option<Bson>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,
@@ -936,6 +1045,12 @@ pub struct CreateIndexOptions {
 
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
@@ -978,6 +1093,12 @@ pub struct DropIndexOptions {
 
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// Specifies the options to a
@@ -1003,6 +1124,12 @@ pub struct ListIndexesOptions {
     /// The number of indexes the server should return per cursor batch.
     #[serde(default, skip_serializing)]
     pub batch_size: Option<u32>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
 }
 
 /// The minimum number of data-bearing voting replica set members (i.e. commit quorum), including
