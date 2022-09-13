@@ -133,11 +133,42 @@ async fn data_key_double_encryption() -> Result<()> {
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
     // Testing each provider:
-    for provider in [KmsProvider::Local] {
+    let provider_keys = [
+        (
+            KmsProvider::Aws,
+            MasterKey::Aws {
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                endpoint: None,
+            }
+        ),
+        (
+            KmsProvider::Azure,
+            MasterKey::Azure {
+                key_vault_endpoint: "key-vault-csfle.vault.azure.net".to_string(),
+                key_name: "key-name-csfle".to_string(),
+                key_version: None,
+            }
+        ),
+        (
+            KmsProvider::Gcp,
+            MasterKey::Gcp {
+                project_id: "devprod-drivers".to_string(),
+                location: "global".to_string(),
+                key_ring: "key-ring-csfle".to_string(),
+                key_name: "key-name-csfle".to_string(),
+                key_version: None,
+                endpoint: None,
+            }
+        ),
+        (KmsProvider::Local, MasterKey::Local),
+        //(KmsProvider::Kmip, MasterKey::Kmip { key_id: None, endpoint: None }),
+    ];
+    for (provider, master_key) in provider_keys {
         // Create a data key
         let datakey_id = client_encryption.create_data_key(&provider, DataKeyOptions::builder()
             .key_alt_names(vec![format!("{}_altname", provider.name())])
-            .master_key(MasterKey::Local)  // varies by provider
+            .master_key(master_key)  // varies by provider
         .build()).await?;
         assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
         let docs: Vec<_> = client.database("keyvault").collection::<Document>("datakeys").find(doc! { "_id": datakey_id.clone() }, None).await?.try_collect().await?;
@@ -185,6 +216,10 @@ async fn data_key_double_encryption() -> Result<()> {
         ).await?;
         assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
         assert_eq!(other_encrypted.bytes, encrypted.bytes);
+
+        // Attempt to auto-encrypt an already encrypted field.
+        let result = coll.insert_one(doc! { "encrypted_placeholder": encrypted }, None).await;
+        assert!(result.is_err());
     }
 
     Ok(())

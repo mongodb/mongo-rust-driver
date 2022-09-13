@@ -273,42 +273,52 @@ pub struct DataKeyOptions {
 
 /// A KMS-specific key used to encrypt data keys.
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase", untagged)]
+#[serde(untagged)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum MasterKey {
+    #[serde(rename_all = "camelCase")]
     Aws {
         region: String,
         /// The Amazon Resource Name (ARN) to the AWS customer master key (CMK).
         key: String,
         /// An alternate host identifier to send KMS requests to. May include port number. Defaults
         /// to "kms.<region>.amazonaws.com"
+        #[serde(skip_serializing_if = "Option::is_none")]
         endpoint: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
     Azure {
         /// Host with optional port. Example: "example.vault.azure.net".
         key_vault_endpoint: String,
         key_name: String,
         /// A specific version of the named key, defaults to using the key's primary version.
+        #[serde(skip_serializing_if = "Option::is_none")]
         key_version: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
     Gcp {
         project_id: String,
         location: String,
         key_ring: String,
         key_name: String,
         /// A specific version of the named key, defaults to using the key's primary version.
+        #[serde(skip_serializing_if = "Option::is_none")]
         key_version: Option<String>,
         /// Host with optional port. Defaults to "cloudkms.googleapis.com".
+        #[serde(skip_serializing_if = "Option::is_none")]
         endpoint: Option<String>,
     },
     /// Master keys are not applicable to `KmsProvider::Local`.
     Local,
+    #[serde(rename_all = "camelCase")]
     Kmip {
         /// keyId is the KMIP Unique Identifier to a 96 byte KMIP Secret Data managed object.  If
         /// keyId is omitted, the driver creates a random 96 byte KMIP Secret Data managed object.
+        #[serde(skip_serializing_if = "Option::is_none")]
         key_id: Option<String>,
         /// Host with optional port.
+        #[serde(skip_serializing_if = "Option::is_none")]
         endpoint: Option<String>,
     },
 }
