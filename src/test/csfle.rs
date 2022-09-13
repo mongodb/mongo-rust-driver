@@ -134,7 +134,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     // Testing each provider:
     let provider_keys = [
-        (
+        /*(
             KmsProvider::Aws,
             MasterKey::Aws {
                 region: "us-east-1".to_string(),
@@ -161,8 +161,8 @@ async fn data_key_double_encryption() -> Result<()> {
                 endpoint: None,
             }
         ),
-        (KmsProvider::Local, MasterKey::Local),
-        //(KmsProvider::Kmip, MasterKey::Kmip { key_id: None, endpoint: None }),
+        (KmsProvider::Local, MasterKey::Local),*/
+        (KmsProvider::Kmip, MasterKey::Kmip { key_id: None, endpoint: None }),
     ];
     for (provider, master_key) in provider_keys {
         // Create a data key

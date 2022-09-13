@@ -67,6 +67,7 @@ impl AsyncTlsStream {
                 c.set_buffer_limit(None);
             })
             .await?;
+        dbg!("rustls connected");
         Ok(Self { inner: conn })
     }
 }
