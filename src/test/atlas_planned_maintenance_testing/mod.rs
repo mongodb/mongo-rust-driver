@@ -26,6 +26,14 @@ use super::spec::unified_runner::EntityMap;
 
 #[test]
 fn get_exe_name() {
+    if env::var("ATLAS_PLANNED_MAINTENANCE_TESTING").is_err() {
+        // This test should only be run from the workload-executor script.
+        log_uncaptured(
+            "Skipping get_exe_name due to being run outside of planned maintenance testing",
+        );
+        return;
+    }
+
     let mut file = File::create("exe_name.txt").expect("Failed to create file");
     let exe_name = env::current_exe()
         .expect("Failed to determine name of test executable")
@@ -40,6 +48,9 @@ fn get_exe_name() {
 async fn workload_executor() {
     if env::var("ATLAS_PLANNED_MAINTENANCE_TESTING").is_err() {
         // This test should only be run from the workload-executor script.
+        log_uncaptured(
+            "Skipping workload_executor due to being run outside of planned maintenance testing",
+        );
         return;
     }
 
