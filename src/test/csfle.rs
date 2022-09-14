@@ -4,27 +4,12 @@ use bson::{Document, doc, spec::BinarySubtype, Bson, RawBson};
 use futures_util::TryStreamExt;
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
-use thiserror::Error;
 
 use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}, Client};
 
 use super::{TestClient, CLIENT_OPTIONS, LOCK, EventClient};
 
-#[derive(Error, Debug)]
-enum TestError {
-    #[error("mongodb error: {0}")]
-    Mongodb(#[from] crate::error::Error),
-    #[error("serde_json error: {0}")]
-    SerdeJson(#[from] serde_json::error::Error),
-    #[error("bson error: {0}")]
-    BsonExtjson(#[from] bson::extjson::de::Error),
-    #[error("bson error: {0}")]
-    Bson(#[from] bson::de::Error),
-    #[error("access error: {0}")]
-    ValueAccess(#[from] bson::document::ValueAccessError),
-}
-
-type Result<T> = std::result::Result<T, TestError>;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 async fn new_client() -> TestClient {
     let mut options = CLIENT_OPTIONS.get().await.clone();
@@ -248,4 +233,28 @@ fn try_any<T>(values: &[T], mut pred: impl FnMut(&T) -> Result<bool>) -> Result<
         }
     }
     Ok(false)
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn external_key_vault() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = TestClient::new().await;
+    client.database("db").collection::<Document>("coll").drop(None).await?;
+    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
+    datakeys.drop(None).await?;
+    datakeys.insert_one(load_testdata("external-key.json")?, None).await?;
+
+    Ok(())
+}
+
+fn load_testdata(name: &str) -> Result<Document> {
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src/test/csfle_data",
+        name,
+    ].iter().collect();
+    let text = std::fs::read_to_string(path)?;
+    from_json(&text)
 }
