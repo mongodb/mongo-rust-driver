@@ -86,6 +86,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     /* KMIP server:
         pip3 install pykmip
+        # in drivers-evergreen-tools/.evergreen
         python3 ./csfle/kms_kmip_server.py
      */
     // Setup: build options for test environment.
@@ -134,7 +135,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     // Testing each provider:
     let provider_keys = [
-        /*(
+        (
             KmsProvider::Aws,
             MasterKey::Aws {
                 region: "us-east-1".to_string(),
@@ -161,7 +162,7 @@ async fn data_key_double_encryption() -> Result<()> {
                 endpoint: None,
             }
         ),
-        (KmsProvider::Local, MasterKey::Local),*/
+        (KmsProvider::Local, MasterKey::Local),
         (KmsProvider::Kmip, MasterKey::Kmip { key_id: None, endpoint: None }),
     ];
     for (provider, master_key) in provider_keys {

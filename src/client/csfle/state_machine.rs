@@ -80,7 +80,7 @@ impl CryptExecutor {
         let mut ctx = Ok(ctx);
         loop {
             let state = result_ref(&ctx)?.state()?;
-            match dbg!(state) {
+            match state {
                 State::NeedMongoCollinfo => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
@@ -155,9 +155,9 @@ impl CryptExecutor {
                     }
                     stream::iter(kms_ctxen)
                         .try_for_each_concurrent(None, |mut kms_ctx| async move {
-                            let endpoint = dbg!(kms_ctx.endpoint()?);
-                            let addr = dbg!(ServerAddress::parse(endpoint)?);
-                            let provider = dbg!(kms_ctx.kms_provider()?);
+                            let endpoint = kms_ctx.endpoint()?;
+                            let addr = ServerAddress::parse(endpoint)?;
+                            let provider = kms_ctx.kms_provider()?;
                             let tls_options = self
                                 .tls_options
                                 .as_ref()
