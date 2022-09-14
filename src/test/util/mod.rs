@@ -88,7 +88,12 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let hello_cmd = hello_command(options.server_api.as_ref(), options.load_balanced, None);
+        let hello_cmd = hello_command(
+            options.server_api.as_ref(),
+            options.load_balanced,
+            None,
+            None,
+        );
         let hello = RunCommand::new("admin".into(), hello_cmd.body, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(
@@ -153,6 +158,7 @@ impl TestClient {
         Ok(())
     }
 
+    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) async fn drop_and_create_user(
         &self,
         user: &str,
@@ -271,6 +277,10 @@ impl TestClient {
     pub(crate) fn supports_transactions(&self) -> bool {
         self.is_replica_set() && self.server_version_gte(4, 0)
             || self.is_sharded() && self.server_version_gte(4, 2)
+    }
+
+    pub(crate) fn supports_streaming_monitoring_protocol(&self) -> bool {
+        self.server_info.topology_version.is_some()
     }
 
     pub(crate) async fn enable_failpoint(

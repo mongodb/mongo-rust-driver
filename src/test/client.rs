@@ -731,6 +731,11 @@ async fn retry_commit_txn_check_out() {
         return;
     }
 
+    if setup_client.supports_streaming_monitoring_protocol() {
+        log_uncaptured("skipping retry_commit_txn_check_out due to streaming protocol support");
+        return;
+    }
+
     // ensure namespace exists
     setup_client
         .database("retry_commit_txn_check_out")
@@ -790,6 +795,10 @@ async fn retry_commit_txn_check_out() {
         .await
         .expect("should see marked unknown event");
 
+    // If this test were run when using the streaming protocol, this assertion would never succeed.
+    // This is because the monitors are waiting for the next heartbeat from the server for
+    // heartbeatFrequencyMS (which is 2 minutes) and ignore the immediate check requests from the
+    // ping command in the meantime due to already being in the middle of their checks.
     subscriber
         .wait_for_event(Duration::from_secs(1), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {

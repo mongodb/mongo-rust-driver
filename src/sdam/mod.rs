@@ -11,9 +11,10 @@ pub use self::public::{ServerInfo, ServerType, TopologyType};
 
 pub(crate) use self::{
     description::{
-        server::ServerDescription,
+        server::{ServerDescription, TopologyVersion},
         topology::{
-            server_selection::{self, SelectedServer, IDLE_WRITE_PERIOD},
+            server_selection::{self, SelectedServer},
+            verify_max_staleness,
             SessionSupportStatus,
             TopologyDescription,
             TransactionSupportStatus,
@@ -21,13 +22,7 @@ pub(crate) use self::{
     },
     monitor::{Monitor, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     server::Server,
-    topology::{
-        HandshakePhase,
-        Topology,
-        TopologyCheckRequestReceiver,
-        TopologyUpdater,
-        TopologyWatcher,
-    },
+    topology::{HandshakePhase, Topology, TopologyUpdater, TopologyWatcher},
 };
 
 #[cfg(test)]

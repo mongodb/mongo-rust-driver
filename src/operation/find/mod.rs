@@ -6,7 +6,13 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
-    operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
+    operation::{
+        append_options,
+        CursorBody,
+        OperationWithDefaults,
+        Retryability,
+        SERVER_4_4_0_WIRE_VERSION,
+    },
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
@@ -34,8 +40,16 @@ impl Find {
     pub(crate) fn new(
         ns: Namespace,
         filter: Option<Document>,
-        options: Option<FindOptions>,
+        mut options: Option<FindOptions>,
     ) -> Self {
+        if let Some(ref mut options) = options {
+            if let Some(ref comment) = options.comment {
+                if options.comment_bson.is_none() {
+                    options.comment_bson = Some(comment.clone().into());
+                }
+            }
+        }
+
         Self {
             ns,
             filter,
@@ -111,11 +125,21 @@ impl OperationWithDefaults for Find {
     ) -> Result<Self::O> {
         let response: CursorBody = response.body()?;
 
+        // The comment should only be propagated to getMore calls on 4.4+.
+        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+            None
+        } else {
+            self.options
+                .as_ref()
+                .and_then(|opts| opts.comment_bson.clone())
+        };
+
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
+            comment,
         ))
     }
 

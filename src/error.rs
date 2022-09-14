@@ -10,7 +10,7 @@ use bson::Bson;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::{bson::Document, options::ServerAddress};
+use crate::{bson::Document, options::ServerAddress, sdam::TopologyVersion};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -101,6 +101,11 @@ impl Error {
             message: message.into(),
         }
         .into()
+    }
+
+    /// Construct a generic network timeout error.
+    pub(crate) fn network_timeout() -> Error {
+        ErrorKind::Io(Arc::new(std::io::ErrorKind::TimedOut.into())).into()
     }
 
     pub(crate) fn invalid_argument(message: impl Into<String>) -> Error {
@@ -350,9 +355,20 @@ impl Error {
         false
     }
 
+    pub(crate) fn is_incompatible_server(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::IncompatibleServer { .. })
+    }
+
     pub(crate) fn with_source<E: Into<Option<Error>>>(mut self, source: E) -> Self {
         self.source = source.into().map(Box::new);
         self
+    }
+
+    pub(crate) fn topology_version(&self) -> Option<TopologyVersion> {
+        match self.kind.as_ref() {
+            ErrorKind::Command(c) => c.topology_version,
+            _ => None,
+        }
     }
 }
 
@@ -527,6 +543,10 @@ pub struct CommandError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
+
+    /// The topology version reported by the server in the error response.
+    #[serde(rename = "topologyVersion")]
+    pub(crate) topology_version: Option<TopologyVersion>,
 }
 
 impl fmt::Display for CommandError {

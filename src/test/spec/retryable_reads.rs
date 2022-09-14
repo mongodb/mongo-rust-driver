@@ -65,7 +65,9 @@ async fn retry_releases_connection() {
         .collection("retry_releases_connection");
     collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
 
-    let options = FailCommandOptions::builder().error_code(91).build();
+    // Use a connection error to ensure streaming monitor checks get cancelled. Otherwise, we'd have
+    // to wait for the entire heartbeatFrequencyMS before the find succeeds.
+    let options = FailCommandOptions::builder().close_connection(true).build();
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 

@@ -1,21 +1,17 @@
 #[cfg(test)]
 mod test;
 
-use std::sync::Arc;
-
 use lazy_static::lazy_static;
-use os_info::{Type, Version};
 
 use crate::{
     bson::{doc, Bson, Document},
-    client::auth::{ClientFirst, FirstRound},
-    cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
+    client::auth::ClientFirst,
+    cmap::{Command, Connection, StreamDescription},
     compression::Compressor,
-    error::{ErrorKind, Result},
-    event::sdam::SdamEventHandler,
+    error::Result,
     hello::{hello_command, run_hello, HelloReply},
-    options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
-    sdam::Topology,
+    options::{AuthMechanism, Credential, DriverInfo, ServerApi},
+    runtime::HttpClient,
 };
 
 #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
@@ -103,7 +99,7 @@ lazy_static! {
     /// (potentially with additional fields added) can be cloned and put in the `client` field of
     /// the `hello` or legacy hello command.
     static ref BASE_CLIENT_METADATA: ClientMetadata = {
-        let mut metadata = ClientMetadata {
+        ClientMetadata {
             application: None,
             driver: DriverMetadata {
                 name: "mongo-rust-driver".into(),
@@ -116,19 +112,7 @@ lazy_static! {
                 version: None,
             },
             platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
-        };
-
-        let info = os_info::get();
-
-        if info.os_type() != Type::Unknown {
-            let version = info.version();
-
-            if *version != Version::Unknown {
-                metadata.os.version = Some(info.version().to_string());
-            }
         }
-
-        metadata
     };
 }
 
@@ -139,77 +123,70 @@ pub(crate) struct Handshaker {
     /// given the same pool options, so it can be created at the time the Handshaker is created.
     command: Command,
 
-    credential: Option<Credential>,
-
     // This field is not read without a compression feature flag turned on.
     #[allow(dead_code)]
     compressors: Option<Vec<Compressor>>,
+
+    http_client: HttpClient,
+
+    server_api: Option<ServerApi>,
 }
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
+    pub(crate) fn new(http_client: HttpClient, options: HandshakerOptions) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
-        let mut credential = None;
-
-        let mut compressors = None;
+        let compressors = options.compressors;
 
         let mut command = hello_command(
-            options.as_ref().and_then(|opts| opts.server_api.as_ref()),
-            options.as_ref().and_then(|opts| opts.load_balanced.into()),
+            options.server_api.as_ref(),
+            options.load_balanced.into(),
+            None,
             None,
         );
 
-        if let Some(options) = options {
-            if let Some(app_name) = options.app_name {
-                metadata.application = Some(AppMetadata { name: app_name });
+        if let Some(app_name) = options.app_name {
+            metadata.application = Some(AppMetadata { name: app_name });
+        }
+
+        if let Some(driver_info) = options.driver_info {
+            metadata.driver.name.push('|');
+            metadata.driver.name.push_str(&driver_info.name);
+
+            if let Some(ref version) = driver_info.version {
+                metadata.driver.version.push('|');
+                metadata.driver.version.push_str(version);
             }
 
-            if let Some(driver_info) = options.driver_info {
-                metadata.driver.name.push('|');
-                metadata.driver.name.push_str(&driver_info.name);
-
-                if let Some(ref version) = driver_info.version {
-                    metadata.driver.version.push('|');
-                    metadata.driver.version.push_str(version);
-                }
-
-                if let Some(ref driver_info_platform) = driver_info.platform {
-                    metadata.platform.push('|');
-                    metadata.platform.push_str(driver_info_platform);
-                }
+            if let Some(ref driver_info_platform) = driver_info.platform {
+                metadata.platform.push('|');
+                metadata.platform.push_str(driver_info_platform);
             }
+        }
 
-            if let Some(cred) = options.credential {
-                cred.append_needed_mechanism_negotiation(&mut command.body);
-                command.target_db = cred.resolved_source().to_string();
-                credential = Some(cred);
-            }
+        if options.load_balanced {
+            command.body.insert("loadBalanced", true);
+        }
 
-            if options.load_balanced {
-                command.body.insert("loadBalanced", true);
-            }
-
-            // Add compressors to handshake.
-            // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
-            if let Some(ref compressors) = options.compressors {
-                command.body.insert(
-                    "compression",
-                    compressors
-                        .iter()
-                        .map(|x| x.name())
-                        .collect::<Vec<&'static str>>(),
-                );
-            }
-            compressors = options.compressors;
+        // Add compressors to handshake.
+        // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
+        if let Some(ref compressors) = compressors {
+            command.body.insert(
+                "compression",
+                compressors
+                    .iter()
+                    .map(|x| x.name())
+                    .collect::<Vec<&'static str>>(),
+            );
         }
 
         command.body.insert("client", metadata);
 
         Self {
+            http_client,
             command,
-            credential,
             compressors,
+            server_api: options.server_api,
         }
     }
 
@@ -217,25 +194,19 @@ impl Handshaker {
     pub(crate) async fn handshake(
         &self,
         conn: &mut Connection,
-        topology: Option<&Topology>,
-        handler: &Option<Arc<dyn SdamEventHandler>>,
-    ) -> Result<HandshakeResult> {
+        credential: Option<&Credential>,
+    ) -> Result<HelloReply> {
         let mut command = self.command.clone();
 
-        let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
-
-        let mut hello_reply = run_hello(conn, command, topology, handler).await?;
-
-        if self.command.body.contains_key("loadBalanced")
-            && hello_reply.command_response.service_id.is_none()
-        {
-            return Err(ErrorKind::IncompatibleServer {
-                message: "Driver attempted to initialize in load balancing mode, but the server \
-                          does not support this mode."
-                    .to_string(),
-            }
-            .into());
+        if let Some(cred) = credential {
+            cred.append_needed_mechanism_negotiation(&mut command.body);
+            command.target_db = cred.resolved_source().to_string();
         }
+
+        let client_first = set_speculative_auth_info(&mut command.body, credential)?;
+
+        let mut hello_reply = run_hello(conn, command).await?;
+
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
 
         // Record the client's message and the server's response from speculative authentication if
@@ -271,60 +242,43 @@ impl Handshaker {
 
         conn.server_id = hello_reply.command_response.connection_id;
 
-        Ok(HandshakeResult {
-            hello_reply,
-            first_round,
-        })
+        if let Some(credential) = credential {
+            credential
+                .authenticate_stream(
+                    conn,
+                    &self.http_client,
+                    self.server_api.as_ref(),
+                    first_round,
+                )
+                .await?
+        }
+
+        Ok(hello_reply)
     }
-}
-
-/// The information returned from the server as part of the handshake.
-///
-/// Also optionally includes the first round of speculative authentication
-/// if applicable.
-#[derive(Debug)]
-pub(crate) struct HandshakeResult {
-    /// The response from the server.
-    pub(crate) hello_reply: HelloReply,
-
-    /// The first round of speculative authentication, if applicable.
-    pub(crate) first_round: Option<FirstRound>,
 }
 
 #[derive(Debug)]
 pub(crate) struct HandshakerOptions {
-    app_name: Option<String>,
-    credential: Option<Credential>,
-    compressors: Option<Vec<Compressor>>,
-    driver_info: Option<DriverInfo>,
-    server_api: Option<ServerApi>,
-    load_balanced: bool,
-}
+    /// The application name specified by the user. This is sent to the server as part of the
+    /// handshake that each connection makes when it's created.
+    pub(crate) app_name: Option<String>,
 
-impl From<ConnectionPoolOptions> for HandshakerOptions {
-    fn from(options: ConnectionPoolOptions) -> Self {
-        Self {
-            app_name: options.app_name,
-            compressors: options.compressors,
-            credential: options.credential,
-            driver_info: options.driver_info,
-            server_api: options.server_api,
-            load_balanced: options.load_balanced.unwrap_or(false),
-        }
-    }
-}
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
+    pub(crate) compressors: Option<Vec<Compressor>>,
 
-impl From<ClientOptions> for HandshakerOptions {
-    fn from(options: ClientOptions) -> Self {
-        Self {
-            app_name: options.app_name,
-            compressors: options.compressors,
-            credential: options.credential,
-            driver_info: options.driver_info,
-            server_api: options.server_api,
-            load_balanced: options.load_balanced.unwrap_or(false),
-        }
-    }
+    /// Extra information to append to the driver version in the metadata of the handshake with the
+    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
+    pub(crate) driver_info: Option<DriverInfo>,
+
+    /// The declared API version.
+    ///
+    /// The default value is to have no declared API version
+    pub(crate) server_api: Option<ServerApi>,
+
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    pub(crate) load_balanced: bool,
 }
 
 /// Updates the handshake command document with the speculative authenitication info.

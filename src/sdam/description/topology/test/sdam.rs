@@ -21,6 +21,7 @@ use crate::{
         HandshakePhase,
         Topology,
         TopologyDescription,
+        TopologyVersion,
     },
     selection_criteria::TagSet,
     test::{
@@ -92,6 +93,7 @@ pub(crate) struct TestHelloCommandResponse {
     pub max_bson_object_size: Option<i64>,
     pub max_write_batch_size: Option<i64>,
     pub service_id: Option<ObjectId>,
+    pub topology_version: Option<TopologyVersion>,
 }
 
 impl From<TestHelloCommandResponse> for HelloCommandResponse {
@@ -122,7 +124,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
             service_id: test.service_id,
-            topology_version: None,
+            topology_version: test.topology_version,
             compressors: None,
             hello_ok: test.hello_ok,
             max_message_size_bytes: 48 * 1024 * 1024,
@@ -221,6 +223,13 @@ pub struct Server {
     logical_session_timeout_minutes: Option<i32>,
     min_wire_version: Option<i32>,
     max_wire_version: Option<i32>,
+    topology_version: Option<TopologyVersion>,
+    pool: Option<Pool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Pool {
+    generation: u32,
 }
 
 fn server_type_from_str(s: &str) -> Option<ServerType> {
@@ -243,11 +252,9 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 async fn run_test(test_file: TestFile) {
     let test_description = &test_file.description;
 
-    // TODO: RUST-360 unskip tests that rely on topology version
     // TODO: RUST-358 unskip tests
     // TODO: RUST-1081 unskip tests
     let skip_keywords = doc! {
-        "topologyVersion": "(RUST-360)",
         "wrong set name": "(RUST-358)",
         "election Id": "(RUST-1081)",
         "electionId": "(RUST-1081)",
@@ -265,6 +272,8 @@ async fn run_test(test_file: TestFile) {
         }
     }
 
+    log_uncaptured(format!("Executing {}", test_description));
+
     let mut options = ClientOptions::parse_uri(&test_file.uri, None)
         .await
         .expect(test_description);
@@ -274,8 +283,7 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_subscriber = handler.subscribe();
-    let topology = Topology::new(options.clone()).unwrap();
-    let mut servers = topology.servers();
+    let mut topology = Topology::new(options.clone()).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
@@ -292,6 +300,7 @@ async fn run_test(test_file: TestFile) {
                     code: 1234,
                     code_name: "dummy error".to_string(),
                     message: "dummy".to_string(),
+                    topology_version: None,
                 })))
             } else if command_response == Default::default() {
                 Err(Error::from(ErrorKind::Io(Arc::new(
@@ -301,32 +310,31 @@ async fn run_test(test_file: TestFile) {
                 Ok(HelloReply {
                     server_address: address.clone(),
                     command_response: command_response.into(),
-                    round_trip_time: Duration::from_millis(1234), // Doesn't matter for tests.
                     cluster_time: None,
                     raw_command_response: Default::default(), // doesn't matter for tests
                 })
             };
 
-            if let Some(_server) = servers.get(&address) {
-                match hello_reply {
-                    Ok(reply) => {
-                        let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
-                        if topology.clone_updater().update(new_sd).await {
-                            servers = topology.servers();
-                        }
-                    }
-                    Err(e) => {
-                        topology
-                            .clone_updater()
-                            .handle_monitor_error(address, e)
-                            .await;
-                    }
+            match hello_reply {
+                Ok(reply) => {
+                    let new_sd = ServerDescription::new_from_hello_reply(
+                        address.clone(),
+                        reply,
+                        Duration::from_secs(1),
+                    );
+                    topology.clone_updater().update(new_sd).await;
+                }
+                Err(e) => {
+                    topology
+                        .clone_updater()
+                        .handle_monitor_error(address, e)
+                        .await;
                 }
             }
         }
 
         for application_error in phase.application_errors {
-            if let Some(server) = servers.get(&application_error.address) {
+            if let Some(server) = topology.servers().get(&application_error.address) {
                 let error = application_error.to_error();
                 let pool_generation = application_error
                     .generation
@@ -355,7 +363,9 @@ async fn run_test(test_file: TestFile) {
             }
         }
 
+        topology.watch().wait_until_initialized().await;
         let topology_description = topology.description();
+        let servers = topology.servers();
         let phase_description = phase.description.unwrap_or_else(|| format!("{}", i));
 
         match phase.outcome {
@@ -363,6 +373,7 @@ async fn run_test(test_file: TestFile) {
                 verify_description_outcome(
                     outcome,
                     topology_description,
+                    servers,
                     test_description,
                     phase_description,
                 );
@@ -398,6 +409,7 @@ async fn run_test(test_file: TestFile) {
 fn verify_description_outcome(
     outcome: DescriptionOutcome,
     topology_description: TopologyDescription,
+    servers: HashMap<ServerAddress, Arc<crate::sdam::Server>>,
     test_description: &str,
     phase_description: String,
 ) {
@@ -520,6 +532,32 @@ fn verify_description_outcome(
                 phase_description
             );
         }
+
+        if let Some(topology_version) = server.topology_version {
+            assert_eq!(
+                actual_server.topology_version(),
+                Some(topology_version),
+                "{} (phase {})",
+                test_description,
+                phase_description
+            )
+        }
+
+        if let Some(generation) = server.pool.map(|p| p.generation) {
+            assert_eq!(
+                servers
+                    .get(&address)
+                    .unwrap()
+                    .pool
+                    .generation()
+                    .as_normal()
+                    .unwrap(),
+                generation,
+                "{} (phase {})",
+                test_description,
+                phase_description
+            );
+        }
     }
 }
 
@@ -588,7 +626,7 @@ async fn topology_closed_event_last() {
     drop(client);
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::Sdam(SdamEvent::TopologyClosed(_)))
         })
         .await
@@ -596,7 +634,7 @@ async fn topology_closed_event_last() {
 
     // no further SDAM events should be emitted after the TopologyClosedEvent
     let event = subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::Sdam(_))
         })
         .await;
@@ -621,7 +659,7 @@ async fn heartbeat_events() {
     let mut subscriber = event_handler.subscribe();
 
     let client = EventClient::with_additional_options(
-        Some(options),
+        Some(options.clone()),
         Some(Duration::from_millis(50)),
         None,
         event_handler.clone(),
@@ -651,16 +689,20 @@ async fn heartbeat_events() {
         return;
     }
 
-    let options = FailCommandOptions::builder()
+    options.app_name = None;
+    options.heartbeat_freq = None;
+    let fp_client = TestClient::with_options(Some(options)).await;
+
+    let fp_options = FailCommandOptions::builder()
         .error_code(1234)
         .app_name("heartbeat_events".to_string())
         .build();
     let failpoint = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(1),
-        options,
+        FailPointMode::AlwaysOn,
+        fp_options,
     );
-    let _fp_guard = client
+    let _fp_guard = fp_client
         .enable_failpoint(failpoint, None)
         .await
         .expect("enabling failpoint should succeed");
@@ -737,17 +779,11 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .hosts(vec![address.clone()])
         .build();
     options.test_options_mut().disable_monitoring_threads = true;
-    let topology = Topology::new(options).unwrap();
+    let mut topology = Topology::new(options).unwrap();
+    topology.watch().wait_until_initialized().await;
 
     // get the one server in the topology
-    let server = topology
-        .watch()
-        .observe_latest()
-        .servers
-        .into_iter()
-        .next()
-        .unwrap()
-        .1;
+    let server = topology.servers().into_values().next().unwrap();
 
     let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
         "ok": 1,
@@ -763,15 +799,15 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     // discover the node
     topology
         .clone_updater()
-        .update(ServerDescription::new(
+        .update(ServerDescription::new_from_hello_reply(
             address.clone(),
-            Some(Ok(HelloReply {
+            HelloReply {
                 server_address: address.clone(),
                 command_response: heartbeat_response,
-                round_trip_time: Duration::from_secs(1),
                 cluster_time: None,
                 raw_command_response: Default::default(),
-            })),
+            },
+            Duration::from_secs(1),
         ))
         .await;
     assert_eq!(

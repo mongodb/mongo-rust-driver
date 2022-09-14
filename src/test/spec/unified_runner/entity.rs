@@ -12,7 +12,7 @@ use crate::{
     bson::{Bson, Document},
     change_stream::ChangeStream,
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
-    error::Error,
+    error::{Error, Result},
     event::command::CommandStartedEvent,
     runtime,
     sdam::TopologyDescription,
@@ -215,20 +215,20 @@ impl ThreadEntity {
             .unwrap();
     }
 
-    pub(crate) async fn wait(&self) -> bool {
+    pub(crate) async fn wait(&self) -> Result<()> {
         let (tx, rx) = oneshot::channel();
 
         // if the task panicked, this send will fail
         if self.sender.send(ThreadMessage::Stop(tx)).is_err() {
-            return false;
+            return Err(Error::internal("thread stopped before it was waited for"));
         }
 
         // return that both the timeout was satisfied and that the task responded to the
         // acknowledgment request.
         runtime::timeout(Duration::from_secs(10), rx)
             .await
-            .and_then(|r| r.map_err(|_| Error::internal(""))) // flatten tokio error into mongodb::Error
-            .is_ok()
+            .map_err(|_| Error::internal("timeout waiting for thread to stop"))
+            .and_then(|r| r.map_err(|_| Error::internal("thread stopped before it was waited for")))
     }
 }
 

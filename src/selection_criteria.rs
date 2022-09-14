@@ -64,10 +64,6 @@ impl SelectionCriteria {
         matches!(self, Self::ReadPreference(ReadPreference::Primary))
     }
 
-    pub(crate) fn max_staleness(&self) -> Option<Duration> {
-        self.as_read_pref().and_then(|pref| pref.max_staleness())
-    }
-
     pub(crate) fn from_address(address: ServerAddress) -> Self {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }

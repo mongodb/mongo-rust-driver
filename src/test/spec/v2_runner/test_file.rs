@@ -97,7 +97,11 @@ where
     D: Deserializer<'de>,
 {
     let uri_options = Document::deserialize(deserializer)?;
-    Ok(Some(merge_uri_options(&DEFAULT_URI, Some(&uri_options))))
+    Ok(Some(merge_uri_options(
+        &DEFAULT_URI,
+        Some(&uri_options),
+        true,
+    )))
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,13 +1,23 @@
 use super::Handshaker;
 use crate::{
     bson::doc,
-    cmap::options::ConnectionPoolOptions,
-    options::{ClientOptions, DriverInfo},
+    cmap::establish::handshake::HandshakerOptions,
+    options::DriverInfo,
+    runtime::HttpClient,
 };
 
 #[test]
 fn metadata_no_options() {
-    let handshaker = Handshaker::new(None);
+    let handshaker = Handshaker::new(
+        HttpClient::default(),
+        HandshakerOptions {
+            app_name: None,
+            compressors: None,
+            driver_info: None,
+            server_api: None,
+            load_balanced: false,
+        },
+    );
 
     let metadata = handshaker.command.body.get_document("client").unwrap();
     assert!(!metadata.contains_key("application"));
@@ -28,19 +38,20 @@ fn metadata_with_options() {
     let name = "even better Rust driver";
     let version = "the best version, of course";
 
-    let options = ConnectionPoolOptions::from_client_options(
-        &ClientOptions::builder()
-            .app_name(app_name.to_string())
-            .driver_info(
-                DriverInfo::builder()
-                    .name(name.to_string())
-                    .version(version.to_string())
-                    .build(),
-            )
-            .build(),
-    );
+    let options = HandshakerOptions {
+        app_name: Some(app_name.to_string()),
+        driver_info: Some(
+            DriverInfo::builder()
+                .name(name.to_string())
+                .version(version.to_string())
+                .build(),
+        ),
+        compressors: None,
+        server_api: None,
+        load_balanced: false,
+    };
 
-    let handshaker = Handshaker::new(Some(options.into()));
+    let handshaker = Handshaker::new(HttpClient::default(), options);
 
     let metadata = handshaker.command.body.get_document("client").unwrap();
     assert_eq!(

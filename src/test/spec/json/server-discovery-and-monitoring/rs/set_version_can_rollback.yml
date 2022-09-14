@@ -4,7 +4,7 @@ phases:
   - responses:
       - - a:27017
         - ok: 1
-          hello: true
+          helloOk: true
           isWritablePrimary: true
           hosts:
             - a:27017
@@ -33,11 +33,11 @@ phases:
       maxSetVersion: 2
       maxElectionId:
         $oid: '000000000000000000000001'
-  - _comment: Response from new primary with newer election Id
+  - # Response from new primary with newer election Id
     responses:
       - - b:27017
         - ok: 1
-          hello: true
+          helloOk: true
           isWritablePrimary: true
           hosts:
             - a:27017
@@ -66,7 +66,7 @@ phases:
       maxSetVersion: 1
       maxElectionId:
         $oid: '000000000000000000000002'
-  - _comment: Response from stale primary
+  - # Response from stale primary
     responses:
       - - a:27017
         - ok: 1

@@ -22,6 +22,8 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
+use self::server_selection::IDLE_WRITE_PERIOD;
+
 /// The possible types for a topology.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
 #[non_exhaustive]
@@ -126,16 +128,33 @@ impl PartialEq for TopologyDescription {
     }
 }
 
-impl TopologyDescription {
-    pub(crate) fn new(options: ClientOptions) -> crate::error::Result<Self> {
-        verify_max_staleness(
-            options
-                .selection_criteria
-                .as_ref()
-                .and_then(|criteria| criteria.max_staleness()),
-        )?;
+impl Default for TopologyDescription {
+    fn default() -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: Default::default(),
+            max_set_version: Default::default(),
+            max_election_id: Default::default(),
+            compatibility_error: Default::default(),
+            session_support_status: SessionSupportStatus::Undetermined,
+            transaction_support_status: TransactionSupportStatus::Undetermined,
+            cluster_time: Default::default(),
+            local_threshold: Default::default(),
+            heartbeat_freq: Default::default(),
+            servers: Default::default(),
+        }
+    }
+}
 
-        let topology_type = if let Some(true) = options.direct_connection {
+impl TopologyDescription {
+    pub(crate) fn initialize(&mut self, options: &ClientOptions) {
+        debug_assert!(
+            self.servers.is_empty() && self.topology_type == TopologyType::Unknown,
+            "new TopologyDescriptions should start empty"
+        );
+
+        self.topology_type = if let Some(true) = options.direct_connection {
             TopologyType::Single
         } else if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
@@ -145,56 +164,29 @@ impl TopologyDescription {
             TopologyType::Unknown
         };
 
-        let servers: HashMap<_, _> = options
-            .hosts
-            .into_iter()
-            .map(|address| (address.clone(), ServerDescription::new(address, None)))
-            .collect();
-
-        let session_support_status = if topology_type == TopologyType::LoadBalanced {
+        self.session_support_status = if self.topology_type == TopologyType::LoadBalanced {
             SessionSupportStatus::Supported {
                 logical_session_timeout: None,
             }
         } else {
             SessionSupportStatus::Undetermined
         };
-        let transaction_support_status = if topology_type == TopologyType::LoadBalanced {
+
+        self.transaction_support_status = if self.topology_type == TopologyType::LoadBalanced {
             TransactionSupportStatus::Supported
         } else {
             TransactionSupportStatus::Undetermined
         };
 
-        Ok(Self {
-            single_seed: servers.len() == 1,
-            topology_type,
-            set_name: options.repl_set_name,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status,
-            transaction_support_status,
-            cluster_time: None,
-            local_threshold: options.local_threshold,
-            heartbeat_freq: options.heartbeat_freq,
-            servers,
-        })
-    }
-
-    pub(crate) fn new_empty() -> Self {
-        Self {
-            single_seed: false,
-            topology_type: TopologyType::Unknown,
-            set_name: None,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status: SessionSupportStatus::Undetermined,
-            transaction_support_status: TransactionSupportStatus::Undetermined,
-            cluster_time: None,
-            local_threshold: None,
-            heartbeat_freq: None,
-            servers: HashMap::new(),
+        for address in options.hosts.iter() {
+            let description = ServerDescription::new(address.clone());
+            self.servers.insert(address.to_owned(), description);
         }
+
+        self.single_seed = self.servers.len() == 1;
+        self.set_name = options.repl_set_name.clone();
+        self.local_threshold = options.local_threshold;
+        self.heartbeat_freq = options.heartbeat_freq;
     }
 
     /// Gets the topology type of the cluster.
@@ -303,20 +295,6 @@ impl TopologyDescription {
 
     pub(crate) fn compatibility_error(&self) -> Option<&String> {
         self.compatibility_error.as_ref()
-    }
-
-    /// Update the ServerDescription's round trip time based on the rolling average.
-    fn update_round_trip_time(&self, server_description: &mut ServerDescription) {
-        if let Some(old_rtt) = self
-            .servers
-            .get(&server_description.address)
-            .and_then(|server_desc| server_desc.average_round_trip_time)
-        {
-            if let Some(new_rtt) = server_description.average_round_trip_time {
-                server_description.average_round_trip_time =
-                    Some((new_rtt / 5) + (old_rtt * 4 / 5));
-            }
-        }
     }
 
     /// Updates the topology's logical session timeout value based on the server's value for it.
@@ -462,14 +440,47 @@ impl TopologyDescription {
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
     pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
-        // Ignore updates from servers not currently in the cluster.
-        if !self.servers.contains_key(&server_description.address) {
-            return Ok(());
+        match self.servers.get(&server_description.address) {
+            None => return Ok(()),
+            Some(existing_sd) => {
+                // Ignore updates from outdated topology versions.
+                if let Some(existing_tv) = existing_sd.topology_version() {
+                    if let Some(new_tv) = server_description.topology_version() {
+                        if existing_tv.process_id == new_tv.process_id
+                            && new_tv.counter < existing_tv.counter
+                        {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
         }
 
-        // Update the round trip time on the server description to the weighted average as described
-        // by the spec.
-        self.update_round_trip_time(&mut server_description);
+        if let Some(expected_name) = &self.set_name {
+            if server_description.is_available() {
+                let got_name = server_description.set_name();
+                if self.topology_type() == TopologyType::Single
+                    && !matches!(
+                        got_name.as_ref().map(|opt| opt.as_ref()),
+                        Ok(Some(name)) if name == expected_name
+                    )
+                {
+                    let got_display = match got_name {
+                        Ok(Some(s)) => format!("{:?}", s),
+                        Ok(None) => "<none>".to_string(),
+                        Err(s) => format!("<error: {}>", s),
+                    };
+                    // Mark server as unknown.
+                    server_description = ServerDescription::new_from_error(
+                        server_description.address,
+                        Error::invalid_argument(format!(
+                            "Connection string replicaSet name {:?} does not match actual name {}",
+                            expected_name, got_display,
+                        )),
+                    );
+                }
+            }
+        }
 
         // Replace the old info about the server with the new info.
         self.servers.insert(
@@ -676,7 +687,7 @@ impl TopologyDescription {
                         {
                             self.servers.insert(
                                 server_description.address.clone(),
-                                ServerDescription::new(server_description.address, None),
+                                ServerDescription::new(server_description.address),
                             );
                             self.record_primary_state();
                             return Ok(());
@@ -710,7 +721,7 @@ impl TopologyDescription {
 
             if let ServerType::RsPrimary = self.servers.get(&address).unwrap().server_type {
                 self.servers
-                    .insert(address.clone(), ServerDescription::new(address, None));
+                    .insert(address.clone(), ServerDescription::new(address));
             }
         }
 
@@ -760,7 +771,7 @@ impl TopologyDescription {
         for server in servers {
             if !self.servers.contains_key(server) {
                 self.servers
-                    .insert(server.clone(), ServerDescription::new(server.clone(), None));
+                    .insert(server.clone(), ServerDescription::new(server.clone()));
             }
         }
     }
@@ -845,14 +856,22 @@ pub(crate) struct TopologyDescriptionDiff<'a> {
         HashMap<&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription)>,
 }
 
-fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
-    if max_staleness
-        .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
-        .unwrap_or(false)
-    {
-        return Err(Error::invalid_argument(
-            "max staleness cannot be both positive and below 90 seconds",
-        ));
+pub(crate) fn verify_max_staleness(
+    max_staleness: Duration,
+    heartbeat_frequency: Duration,
+) -> crate::error::Result<()> {
+    let smallest_max_staleness = std::cmp::max(
+        Duration::from_secs(90),
+        heartbeat_frequency
+            .checked_add(IDLE_WRITE_PERIOD)
+            .unwrap_or(Duration::MAX),
+    );
+
+    if max_staleness < smallest_max_staleness {
+        return Err(Error::invalid_argument(format!(
+            "invalid max_staleness value: must be at least {} seconds",
+            smallest_max_staleness.as_secs()
+        )));
     }
 
     Ok(())

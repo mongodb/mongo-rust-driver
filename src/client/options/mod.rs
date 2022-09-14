@@ -33,7 +33,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
     options::ReadConcernLevel,
-    sdam::{DEFAULT_HEARTBEAT_FREQUENCY, IDLE_WRITE_PERIOD, MIN_HEARTBEAT_FREQUENCY},
+    sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
@@ -568,7 +568,7 @@ pub struct ClientOptions {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TestOptions {
     /// Override MIN_HEARTBEAT_FREQUENCY.
-    pub(crate) heartbeat_freq: Option<Duration>,
+    pub(crate) min_heartbeat_freq: Option<Duration>,
 
     /// Disable server and SRV-polling monitor threads.
     pub(crate) disable_monitoring_threads: bool,
@@ -1318,17 +1318,10 @@ impl ClientOptions {
 
         if let Some(SelectionCriteria::ReadPreference(ref rp)) = self.selection_criteria {
             if let Some(max_staleness) = rp.max_staleness() {
-                let smallest_max_staleness = std::cmp::max(
-                    Duration::from_secs(90),
-                    self.heartbeat_freq.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY) + IDLE_WRITE_PERIOD,
-                );
-
-                if max_staleness < smallest_max_staleness {
-                    return Err(Error::invalid_argument(format!(
-                        "invalid maxStaleness value: must be at least {} seconds",
-                        smallest_max_staleness.as_secs()
-                    )));
-                }
+                verify_max_staleness(
+                    max_staleness,
+                    self.heartbeat_freq.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
+                )?;
             }
         }
 

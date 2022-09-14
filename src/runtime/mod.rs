@@ -6,7 +6,7 @@ mod join_handle;
 #[cfg(feature = "csfle")]
 mod process;
 mod resolver;
-mod stream;
+pub(crate) mod stream;
 mod sync_read_ext;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
@@ -36,6 +36,8 @@ use tls_openssl as tls;
 use tls_rustls as tls;
 #[cfg(feature = "tokio-runtime")]
 use tokio::time::Interval;
+
+pub(crate) use tls::TlsConfig;
 
 /// Spawn a task in the background to run a future.
 ///

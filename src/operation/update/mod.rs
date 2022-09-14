@@ -101,6 +101,10 @@ impl OperationWithDefaults for Update {
             if let Some(ref let_vars) = options.let_vars {
                 body.insert("let", let_vars);
             }
+
+            if let Some(ref comment) = options.comment {
+                body.insert("comment", comment);
+            }
         };
 
         if let Some(multi) = self.multi {

@@ -12,7 +12,7 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
     runtime,
-    sdam::ServerInfo,
+    sdam::{ServerInfo, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::SelectionCriteria,
     test::{
         assert_matches,
@@ -20,6 +20,7 @@ use crate::{
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
+        CLIENT_OPTIONS,
         SERVERLESS,
     },
 };
@@ -131,13 +132,22 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             }
         }
 
-        let options = match test.client_uri {
-            Some(ref uri) => Some(ClientOptions::parse_uri(uri, None).await.unwrap()),
-            None => None,
+        let mut additional_options = match test.client_uri {
+            Some(ref uri) => ClientOptions::parse_uri(uri, None).await.unwrap(),
+            None => ClientOptions::builder()
+                .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
+                .build(),
         };
-        let client =
-            EventClient::with_additional_options(options, None, test.use_multiple_mongoses, None)
-                .await;
+        if additional_options.heartbeat_freq.is_none() {
+            additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
+        }
+        let client = EventClient::with_additional_options(
+            additional_options,
+            Some(Duration::from_millis(50)),
+            test.use_multiple_mongoses,
+            None,
+        )
+        .await;
 
         // TODO RUST-900: Remove this extraneous call.
         if internal_client.is_sharded()

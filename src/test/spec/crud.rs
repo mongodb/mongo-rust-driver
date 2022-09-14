@@ -19,10 +19,7 @@ fn test_predicate(test: &TestCase) -> bool {
     let lower = test.description.to_lowercase();
 
     !lower.contains("unacknowledged")
-    // TODO: RUST-1071: unskip comment tests
-        && (!lower.contains("comment")
-            || lower.contains("estimateddocumentcount"))
-    // TODO: RUST-663: unskip aggregate $out and $merge tests
+        // TODO: RUST-663: unskip aggregate $out and $merge tests
         && !(lower.contains("aggregate with $out includes read preference for 5.0+ server"))
         && !(lower.contains("aggregate with $out omits read preference for pre-5.0 server"))
         && !(lower.contains("aggregate with $merge includes read preference for 5.0+ server"))
