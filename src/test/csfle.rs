@@ -337,6 +337,7 @@ async fn bson_size_limits() -> Result<()> {
     ).await?;
     let datakeys = client.database("keyvault").collection::<Document>("datakeys");
     datakeys.drop(None).await?;
+    datakeys.insert_one(load_testdata("limits-key.json")?, None).await?;
 
     // Setup: encrypted client.
     let kms_providers: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap())?;
@@ -361,6 +362,14 @@ async fn bson_size_limits() -> Result<()> {
         },
         None,
     ).await?;
+    let mut doc: Document = load_testdata("limits-doc.json")?;
+    doc.insert("_id", "encryption_exceeds_2mib");
+    let mut value = String::new();
+    for _ in 0..(2097152 - 2000) {
+        value.push('a');
+    }
+    doc.insert("unencrypted", value);
+    coll.insert_one(doc, None).await?;
 
     Ok(())
 }
