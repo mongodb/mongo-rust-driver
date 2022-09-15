@@ -65,10 +65,20 @@ impl ConnectionEstablisher {
             None
         };
 
+        let connect_timeout = if let Some(timeout) = options.connect_timeout {
+            if timeout.is_zero() {
+                Duration::MAX
+            } else {
+                timeout
+            }
+        } else {
+            DEFAULT_CONNECT_TIMEOUT
+        };
+
         Ok(Self {
             handshaker,
             tls_config,
-            connect_timeout: options.connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT),
+            connect_timeout,
         })
     }
 

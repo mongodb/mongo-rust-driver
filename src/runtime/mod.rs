@@ -109,7 +109,13 @@ pub(crate) async fn delay_for(delay: Duration) {
 
     #[cfg(feature = "async-std-runtime")]
     {
-        async_std::task::sleep(delay).await
+        // This avoids a panic in async-std when the provided duration is too large.
+        // See: https://github.com/async-rs/async-std/issues/1037.
+        if delay == Duration::MAX {
+            std::future::pending().await
+        } else {
+            async_std::task::sleep(delay).await
+        }
     }
 }
 
@@ -124,9 +130,15 @@ pub(crate) async fn timeout<F: Future>(timeout: Duration, future: F) -> Result<F
 
     #[cfg(feature = "async-std-runtime")]
     {
-        async_std::future::timeout(timeout, future)
-            .await
-            .map_err(|_| std::io::ErrorKind::TimedOut.into())
+        // This avoids a panic on async-std when the provided duration is too large.
+        // See: https://github.com/async-rs/async-std/issues/1037.
+        if timeout == Duration::MAX {
+            Ok(future.await)
+        } else {
+            async_std::future::timeout(timeout, future)
+                .await
+                .map_err(|_| std::io::ErrorKind::TimedOut.into())
+        }
     }
 }
 

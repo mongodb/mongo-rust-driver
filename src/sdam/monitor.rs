@@ -1,5 +1,4 @@
 use std::{
-    future,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -185,7 +184,7 @@ impl Monitor {
         });
 
         let heartbeat_frequency = self.heartbeat_frequency();
-        let timeout = if self.connect_timeout().as_millis() == 0 {
+        let timeout = if self.connect_timeout().is_zero() {
             // If connectTimeoutMS = 0, then the socket timeout for monitoring is unlimited.
             Duration::MAX
         } else if self.topology_version.is_some() {
@@ -197,16 +196,6 @@ impl Monitor {
         } else {
             // Otherwise, just use connectTimeoutMS.
             self.connect_timeout()
-        };
-        let timeout_future = async {
-            // If timeout is infinite, don't bother creating a delay future.
-            // This also avoids a panic on async-std when the provided duration is too large.
-            // See: https://github.com/async-rs/async-std/issues/1037.
-            if timeout == Duration::MAX {
-                future::pending().await
-            } else {
-                runtime::delay_for(timeout).await
-            }
         };
 
         let execute_hello = async {
@@ -268,7 +257,7 @@ impl Monitor {
                 };
                 HelloResult::Cancelled { reason: reason_error }
             }
-            _ = timeout_future => {
+            _ = runtime::delay_for(timeout) => {
                 HelloResult::Err(Error::network_timeout())
             }
         };
