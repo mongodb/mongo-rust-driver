@@ -5,7 +5,7 @@ use futures_util::TryStreamExt;
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
 
-use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}, auth::Credential}, Client};
+use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}, auth::Credential}, Client, db::options::CreateCollectionOptions};
 
 use super::{TestClient, CLIENT_OPTIONS, LOCK, EventClient};
 
@@ -321,4 +321,46 @@ fn load_testdata(name: &str) -> Result<Document> {
     ].iter().collect();
     let text = std::fs::read_to_string(path)?;
     from_json(&text)
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bson_size_limits() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup: db initialization.
+    let client = new_client().await;
+    client.database("db").collection::<Document>("coll").drop(None).await?;
+    client.database("db").create_collection("coll", CreateCollectionOptions::builder()
+        .validator(doc! { "$jsonSchema": load_testdata("limits-schema.json")? })
+        .build()
+    ).await?;
+    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
+    datakeys.drop(None).await?;
+
+    // Setup: encrypted client.
+    let kms_providers: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap())?;
+    let auto_enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(Namespace::from_str("keyvault.datakeys").unwrap())
+        .kms_providers(kms_providers)
+        .extra_options(doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() })
+        .build();
+    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let coll = client_encrypted.database("db").collection::<Document>("coll");
+
+    // Tests
+    let mut value = String::new();
+    // Manually push characters; constructing the array directly explodes the stack.
+    for _ in 0..2097152 {
+        value.push('a');
+    }
+    coll.insert_one(
+        doc! {
+            "_id": "over_2mib_under_16mib",
+            "unencrypted": value,
+        },
+        None,
+    ).await?;
+
+    Ok(())
 }
