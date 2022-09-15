@@ -346,7 +346,6 @@ impl Client {
                     _ => false,
                 };
                 if err.is_pool_cleared() || op_retry {
-                    println!("executing retry: {}", err);
                     return self.execute_retry(&mut op, &mut session, None, err).await;
                 } else {
                     return Err(err);

@@ -73,7 +73,6 @@ impl ConnectionEstablisher {
     }
 
     async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
-        println!("making stream, timeout {:?}", self.connect_timeout);
         runtime::timeout(
             self.connect_timeout,
             AsyncStream::connect(address, self.tls_config.as_ref()),

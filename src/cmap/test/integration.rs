@@ -10,7 +10,8 @@ use crate::{
     cmap::{
         establish::{ConnectionEstablisher, EstablisherOptions},
         options::ConnectionPoolOptions,
-        Command, ConnectionPool,
+        Command,
+        ConnectionPool,
     },
     event::cmap::{CmapEventHandler, ConnectionClosedReason},
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -19,10 +20,14 @@ use crate::{
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
-        log_uncaptured, FailCommandOptions, FailPoint, FailPointMode, SdamEvent, TestClient,
-        CLIENT_OPTIONS, LOCK,
+        log_uncaptured,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
     },
-    Client,
 };
 use semver::VersionReq;
 use std::{sync::Arc, time::Duration};
@@ -283,67 +288,4 @@ async fn connection_error_during_operation() {
         })
         .await
         .expect("closed event with error reason should have been seen");
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn connect_timeout() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
-    let setup_client = TestClient::new().await;
-    if setup_client.server_version_lt(6, 0) {
-        log_uncaptured("skipping connect_timeout test due to transportLayerASIOhangBeforeAccept failpoint not being supported",
-);
-        return;
-    }
-
-    let mut options = CLIENT_OPTIONS.get().await.clone();
-    let handler = Arc::new(crate::test::EventHandler::new());
-    options.hosts.drain(1..);
-    options.connect_timeout = Some(Duration::from_millis(100));
-    options.sdam_event_handler = Some(handler.clone());
-    options.command_event_handler = Some(handler.clone());
-    options.cmap_event_handler = Some(handler.clone());
-    options.retry_reads = Some(false);
-    options.retry_writes = Some(false);
-
-    let mut subscriber = handler.subscribe();
-    let client = Client::with_options(options).unwrap();
-
-    subscriber
-        .wait_for_event(Duration::from_secs(5), |event| match event {
-            crate::test::Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) => {
-                !e.previous_description.server_type().is_available()
-                    && e.new_description.server_type().is_available()
-            },
-            _ => false
-        })
-        .await
-        .expect("should discover server");
-
-    let options = FailCommandOptions::builder().close_connection(true).build();
-    let failpoint = FailPoint::new(
-        "transportLayerASIOhangBeforeAccept",
-        FailPointMode::AlwaysOn,
-        None,
-    );
-    let _fp_guard = setup_client.enable_failpoint(failpoint, None).await.unwrap();
-
-    let err = runtime::timeout(
-        Duration::from_millis(500),
-        client
-            .database("test")
-            .run_command(doc! { "ping": 1 }, None),
-    )
-    .await;
-
-    subscriber.collect_events(Duration::from_secs(5), |event| {
-        println!("{:#?}", event);
-        true
-    }).await;
-
-    // .expect("should hit connecttimeoutms")
-    // .expect_err("ping should fail due to fail point");
-
-    // assert!(err.is_network_timeout());
 }
