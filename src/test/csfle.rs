@@ -5,7 +5,7 @@ use futures_util::TryStreamExt;
 use mongocrypt::ctx::{KmsProvider, Algorithm};
 use serde::de::DeserializeOwned;
 
-use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}}, Client};
+use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}, auth::Credential}, Client};
 
 use super::{TestClient, CLIENT_OPTIONS, LOCK, EventClient};
 
@@ -83,7 +83,6 @@ async fn data_key_double_encryption() -> Result<()> {
         .cert_key_file_path(cert_dir.join("client.pem"))
         .build();
     let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
-    let crypt_lib_path = std::env::var("CSFLE_SHARED_LIB_PATH").unwrap();
     let schema_map: HashMap<String, Document> = [
         ("db.coll".to_string(), doc! {
             "bsonType": "object",
@@ -105,7 +104,7 @@ async fn data_key_double_encryption() -> Result<()> {
         .kms_providers(kms_providers.clone())
         .schema_map(schema_map)
         .tls_options(tls_options.clone())
-        .extra_options(doc! { "cryptSharedLibPath": crypt_lib_path })
+        .extra_options(doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() })
         .build();
     let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
@@ -240,11 +239,76 @@ fn try_any<T>(values: &[T], mut pred: impl FnMut(&T) -> Result<bool>) -> Result<
 async fn external_key_vault() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = TestClient::new().await;
-    client.database("db").collection::<Document>("coll").drop(None).await?;
-    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
-    datakeys.drop(None).await?;
-    datakeys.insert_one(load_testdata("external-key.json")?, None).await?;
+    for with_external_key_vault in [false, true] {
+        // Setup: initialize db.
+        let client = TestClient::new().await;
+        client.database("db").collection::<Document>("coll").drop(None).await?;
+        let datakeys = client.database("keyvault").collection::<Document>("datakeys");
+        datakeys.drop(None).await?;
+        datakeys.insert_one(load_testdata("external-key.json")?, None).await?;
+    
+        // Setup: test options.
+        let kv_namespace = Namespace::from_str("keyvault.datakeys").unwrap();
+        let kms_providers: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap())?;
+        let schema_map: HashMap<String, Document> = [
+            ("db.coll".to_string(), load_testdata("external-schema.json")?)
+        ].into_iter().collect();
+        let kv_client = if with_external_key_vault {
+            let mut opts = CLIENT_OPTIONS.get().await.clone();
+            opts.credential = Some(
+                Credential::builder()
+                    .username("fake-user".to_string())
+                    .password("fake-pwd".to_string())
+                    .build()
+            );
+            Some(Client::with_options(opts)?)
+        } else {
+            None
+        };
+    
+        // Setup: encrypted client.
+        let auto_enc_opts = AutoEncryptionOptions::builder()
+            .key_vault_namespace(kv_namespace.clone())
+            .key_vault_client(kv_client.clone())
+            .kms_providers(kms_providers.clone())
+            .schema_map(schema_map)
+            .extra_options(doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() })
+            .build();
+        let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+
+        // Setup: manual encryption.
+        let enc_opts = ClientEncryptionOptions::builder()
+            .key_vault_namespace(kv_namespace)
+            .key_vault_client(kv_client.unwrap_or_else(|| client.into_client()))
+            .kms_providers(kms_providers)
+            .build();
+        let client_encryption = ClientEncryption::new(enc_opts)?;
+
+        // Test: encrypted client.
+        let result = client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "encrypted": "test" }, None).await;
+        if with_external_key_vault {
+            assert!(result.is_err());
+        } else {
+            assert!(result.is_ok(), "unexpected error: {}", result.err().unwrap());
+        }
+        // Test: manual encryption.
+        let key_id = bson::Binary {
+            subtype: BinarySubtype::Uuid,
+            bytes: base64::decode("LOCALAAAAAAAAAAAAAAAAA==")?,
+        };
+        let result = client_encryption.encrypt(
+            RawBson::String("test".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(key_id))
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .build(),
+        ).await;
+        if with_external_key_vault {
+            assert!(result.is_err());
+        } else {
+            assert!(result.is_ok(), "unexpected error: {}", result.err().unwrap());
+        }
+    }
 
     Ok(())
 }
