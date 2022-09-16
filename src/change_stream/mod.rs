@@ -75,6 +75,10 @@ use crate::{
 /// # }
 /// ```
 ///
+/// If a [`ChangeStream`] is still open when it goes out of scope, it will automatically be closed
+/// via an asynchronous [killCursors](https://www.mongodb.com/docs/manual/reference/command/killCursors/) command executed
+/// from its [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation.
+///
 /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://www.mongodb.com/docs/manual/administration/change-streams-production-recommendations/).
 #[derive(Derivative)]

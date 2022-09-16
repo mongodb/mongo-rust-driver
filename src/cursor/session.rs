@@ -65,6 +65,10 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+///
+/// If a [`SessionCursor`] is still open when it goes out of scope, it will automatically be closed
+/// via an asynchronous [killCursors](https://www.mongodb.com/docs/manual/reference/command/killCursors/) command executed
+/// from its [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation.
 #[derive(Debug)]
 pub struct SessionCursor<T> {
     client: Client,

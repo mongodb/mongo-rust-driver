@@ -99,3 +99,5 @@ while let Some(book) = cursor.try_next().await? {
 }
 # Ok(()) }
 ```
+
+If a [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html) is still open when it goes out of scope, it will automatically be closed via an asynchronous [killCursors](https://www.mongodb.com/docs/manual/reference/command/killCursors/) command executed from its [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation.
