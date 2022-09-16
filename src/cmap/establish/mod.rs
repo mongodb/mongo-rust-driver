@@ -65,14 +65,10 @@ impl ConnectionEstablisher {
             None
         };
 
-        let connect_timeout = if let Some(timeout) = options.connect_timeout {
-            if timeout.is_zero() {
-                Duration::MAX
-            } else {
-                timeout
-            }
-        } else {
-            DEFAULT_CONNECT_TIMEOUT
+        let connect_timeout = match options.connect_timeout {
+            Some(d) if d.is_zero() => Duration::MAX,
+            Some(d) => d,
+            None => DEFAULT_CONNECT_TIMEOUT,
         };
 
         Ok(Self {
