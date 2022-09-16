@@ -389,3 +389,29 @@ async fn bson_size_limits() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn views_prohibited() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup: db initialization.
+    let (client, _) = init_client().await?;
+    client.database("db").collection::<Document>("view").drop(None).await?;
+    client.database("db").run_command(doc! { "create": "view", "viewOn": "coll" }, None).await?;
+
+    // Setup: encrypted client.
+    let auto_enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(LOCAL_KMS.clone())
+        .extra_options(EXTRA_OPTIONS.clone())
+        .build();
+    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+
+    // Test: auto encryption fails on a view
+    let result = client_encrypted.database("db").collection::<Document>("view").insert_one(doc! { }, None).await;
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("cannot auto encrypt a view"), "unexpected error: {}", err);
+
+    Ok(())
+}
