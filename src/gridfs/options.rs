@@ -38,6 +38,7 @@ pub struct GridFsBucketOptions {
 pub struct GridFsUploadOptions {
     /// The number of bytes per chunk of this file. Defaults to the `chunk_size_bytes` specified
     /// in the [`GridFsBucketOptions`].
+    #[serde(rename = "chunkSizeBytes")]
     pub chunk_size_bytes: Option<u32>,
 
     /// User data for the 'metadata' field of the files collection document.
