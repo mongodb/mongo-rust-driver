@@ -75,6 +75,7 @@ async fn custom_key_material() -> Result<()> {
 }
 
 
+// This test requires the `openssl-tls` feature; rustls is incompatible with the driver-tools kmip server.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn data_key_double_encryption() -> Result<()> {
@@ -412,6 +413,24 @@ async fn views_prohibited() -> Result<()> {
     let result = client_encrypted.database("db").collection::<Document>("view").insert_one(doc! { }, None).await;
     let err = result.unwrap_err();
     assert!(err.to_string().contains("cannot auto encrypt a view"), "unexpected error: {}", err);
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn corpus() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup: db initialization.
+    let (client, datakeys) = init_client().await?;
+    client.database("db").create_collection("coll", CreateCollectionOptions::builder()
+        .validator(doc! { "$jsonSchema": load_testdata("corpus/corpus-schema.json")? })
+        .build()
+    ).await?;
+    for f in ["corpus/corpus-key-local.json", "corpus/corpus-key-aws.json", "corpus/corpus-key-azure.json", "corpus/corpus-key-gcp.json", "corpus/corpus-key-kmip.json"] {
+        datakeys.insert_one(load_testdata(f)?, None).await?;
+    }
 
     Ok(())
 }
