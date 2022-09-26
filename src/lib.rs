@@ -326,7 +326,7 @@ mod cursor;
 mod db;
 pub mod error;
 pub mod event;
-mod gridfs;
+pub mod gridfs;
 mod hello;
 mod index;
 mod operation;

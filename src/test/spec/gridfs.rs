@@ -5,10 +5,8 @@ use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 use crate::{
     bson::{doc, Bson, Document},
     error::{Error, ErrorKind, GridFsErrorKind},
-    gridfs::{
-        options::{GridFsBucketOptions, GridFsUploadOptions},
-        GridFsBucket,
-    },
+    gridfs::{GridFsBucket, GridFsUploadStream},
+    options::{GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
         run_spec_test_with_path,
@@ -20,7 +18,6 @@ use crate::{
         CLIENT_OPTIONS,
         LOCK,
     },
-    GridFsUploadStream,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

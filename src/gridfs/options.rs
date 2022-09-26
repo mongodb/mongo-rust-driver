@@ -8,7 +8,7 @@ use crate::{
     options::{FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
 };
 
-/// Contains the options for creating a [`GridFsBucket`].
+/// Contains the options for creating a [`GridFsBucket`](crate::gridfs::GridFsBucket).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
@@ -29,8 +29,7 @@ pub struct GridFsBucketOptions {
     pub selection_criteria: Option<SelectionCriteria>,
 }
 
-/// Contains the options for creating a [`GridFsUploadStream`] to upload a file to a
-/// [`GridFsBucket`].
+/// Contains the options for uploading a file to a [`GridFsBucket`](crate::gridfs::GridFsBucket).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -38,19 +37,20 @@ pub struct GridFsBucketOptions {
 pub struct GridFsUploadOptions {
     /// The number of bytes per chunk of this file. Defaults to the `chunk_size_bytes` specified
     /// in the [`GridFsBucketOptions`].
+    #[serde(rename = "chunkSizeBytes")]
     pub chunk_size_bytes: Option<u32>,
 
     /// User data for the 'metadata' field of the files collection document.
     pub metadata: Option<Document>,
 }
 
-/// Contains the options for creating a [`GridFsDownloadStream`] to retrieve a stored file
-/// from a [`GridFsBucket`].
+/// Contains the options for downloading a file from a [`GridFsBucket`](crate::gridfs::GridFsBucket)
+/// by name.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsDownloadByNameOptions {
-    /// Which revision (documents with the same filename and different `upload_date`)
+    /// Which revision (documents with the same filename and different `upload_date`s)
     /// of the file to retrieve. Defaults to -1 (the most recent revision).
     ///
     /// Revision numbers are defined as follows:
@@ -63,7 +63,9 @@ pub struct GridFsDownloadByNameOptions {
     pub revision: Option<i32>,
 }
 
-/// Contains the options for performing a find operation on a files collection.  
+/// Contains the options for finding
+/// [`FilesCollectionDocument`](crate::gridfs::FilesCollectionDocument)s in a
+/// [`GridFsBucket`](crate::gridfs::GridFsBucket).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]

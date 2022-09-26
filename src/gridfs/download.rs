@@ -74,8 +74,29 @@ impl GridFsBucket {
 
 // User functions for downloading to writers.
 impl GridFsBucket {
-    /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the `destination`.
+    /// Downloads the contents of the stored file specified by `id` and writes the contents to the
+    /// `destination`, which may be any type that implements the [`futures_io::AsyncWrite`] trait.
+    ///
+    /// To download to a type that implements [`tokio::io::AsyncWrite`], use the
+    /// [`tokio_util::compat`] module to convert between types.
+    ///
+    /// ```rust
+    /// # use mongodb::{bson::Bson, error::Result, gridfs::GridFsBucket};
+    /// # async fn compat_example(
+    /// #     bucket: GridFsBucket,
+    /// #     tokio_writer: impl tokio::io::AsyncWrite + Unpin,
+    /// #     id: Bson,
+    /// # ) -> Result<()> {
+    /// use tokio_util::compat::TokioAsyncWriteCompatExt;
+    ///
+    /// let futures_writer = tokio_writer.compat_write();
+    /// bucket.download_to_futures_0_3_writer(id, futures_writer).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Note that once an `AsyncWrite` trait is stabilized in the standard library, this method will
+    /// be deprecated in favor of one that accepts a `std::io::AsyncWrite` source.
     pub async fn download_to_futures_0_3_writer<T>(&self, id: Bson, destination: T) -> Result<()>
     where
         T: AsyncWrite + Unpin,
@@ -85,9 +106,34 @@ impl GridFsBucket {
     }
 
     /// Downloads the contents of the stored file specified by `filename` and writes the contents to
-    /// the `destination`. If there are multiple files with the same filename, the `revision` in the
-    /// options provided is used to determine which one to download. If no `revision` is specified,
-    /// the most recent file with the given filename is chosen.
+    /// the `destination`, which may be any type that implements the [`futures_io::AsyncWrite`]
+    /// trait.
+    ///
+    /// If there are multiple files in the bucket with the given filename, the `revision` in the
+    /// options provided is used to determine which one to download. See the documentation for
+    /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
+    /// provided, the file with `filename` most recently uploaded will be downloaded.
+    ///
+    /// To download to a type that implements [`tokio::io::AsyncWrite`], use the
+    /// [`tokio_util::compat`] module to convert between types.
+    ///
+    /// ```rust
+    /// # use mongodb::{bson::Bson, error::Result, gridfs::GridFsBucket};
+    /// # async fn compat_example(
+    /// #     bucket: GridFsBucket,
+    /// #     tokio_writer: impl tokio::io::AsyncWrite + Unpin,
+    /// #     id: Bson,
+    /// # ) -> Result<()> {
+    /// use tokio_util::compat::TokioAsyncWriteCompatExt;
+    ///
+    /// let futures_writer = tokio_writer.compat_write();
+    /// bucket.download_to_futures_0_3_writer_by_name("example_file", futures_writer, None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Note that once an `AsyncWrite` trait is stabilized in the standard library, this method will
+    /// be deprecated in favor of one that accepts a `std::io::AsyncWrite` source.
     pub async fn download_to_futures_0_3_writer_by_name<T>(
         &self,
         filename: impl AsRef<str>,
@@ -154,6 +200,38 @@ impl GridFsBucket {
     }
 }
 
+/// A stream from which a file stored in a GridFS bucket can be downloaded.
+///
+/// # Downloading from the Stream
+/// The `GridFsDownloadStream` type implements [`futures_io::AsyncRead`]. It is recommended that
+/// users call the utility methods in [`AsyncReadExt`](futures_util::io::AsyncReadExt) to interact
+/// with the stream.
+///
+/// ```rust
+/// # use mongodb::{bson::Bson, error::Result, gridfs::{GridFsBucket, GridFsDownloadStream}};
+/// # async fn download_example(bucket: GridFsBucket, id: Bson) -> Result<()> {
+/// use futures_util::io::AsyncReadExt;
+///
+/// let mut buf = Vec::new();
+/// let mut download_stream = bucket.open_download_stream(id).await?;
+/// download_stream.read_to_end(&mut buf).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Using [`tokio::io::AsyncRead`]
+/// Users who prefer to use tokio's `AsyncRead` trait can use the [`tokio_util::compat`] module.
+///
+/// ```rust
+/// # use mongodb::{bson::Bson, error::Result, gridfs::{GridFsBucket, GridFsUploadStream}};
+/// # async fn compat_example(bucket: GridFsBucket, id: Bson) -> Result<()> {
+/// use tokio_util::compat::FuturesAsyncReadCompatExt;
+///
+/// let futures_upload_stream = bucket.open_download_stream(id).await?;
+/// let tokio_upload_stream = futures_upload_stream.compat();
+/// # Ok(())
+/// # }
+/// ```
 pub struct GridFsDownloadStream {
     state: State,
     current_n: u32,
@@ -206,11 +284,6 @@ impl GridFsDownloadStream {
             file,
         })
     }
-
-    /// Gets the file `id` for the stream.
-    pub fn files_id(&self) -> &Bson {
-        &self.file.id
-    }
 }
 
 impl AsyncRead for GridFsDownloadStream {
@@ -230,7 +303,7 @@ impl AsyncRead for GridFsDownloadStream {
                 } else {
                     let chunks_in_buf = FilesCollectionDocument::n_from_vals(
                         buf.len() as u64,
-                        stream.file.chunk_size,
+                        stream.file.chunk_size_bytes,
                     );
                     // We should read from current_n to chunks_in_buf + current_n, or, if that would
                     // exceed the total number of chunks in the file, to the last chunk in the file.
@@ -244,7 +317,7 @@ impl AsyncRead for GridFsDownloadStream {
                             cursor,
                             buffer,
                             n_range,
-                            stream.file.chunk_size,
+                            stream.file.chunk_size_bytes,
                             stream.file.length,
                         )
                         .boxed(),
@@ -289,7 +362,7 @@ async fn get_bytes(
     mut cursor: Box<Cursor<Chunk<'static>>>,
     mut buffer: Vec<u8>,
     n_range: Range<u32>,
-    chunk_size: u32,
+    chunk_size_bytes: u32,
     file_len: u64,
 ) -> Result<(Vec<u8>, Box<Cursor<Chunk<'static>>>)> {
     for n in n_range {
@@ -305,7 +378,7 @@ async fn get_bytes(
         }
 
         let expected_len =
-            FilesCollectionDocument::expected_chunk_length_from_vals(file_len, chunk_size, n);
+            FilesCollectionDocument::expected_chunk_length_from_vals(file_len, chunk_size_bytes, n);
         if chunk_bytes.len() != (expected_len as usize) {
             return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
                 actual_size: chunk_bytes.len(),
@@ -330,8 +403,12 @@ impl GridFsBucket {
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `filename` and the revision
-    /// in `options`.
+    /// the contents of the stored file specified by `filename`.
+    ///
+    /// If there are multiple files in the bucket with the given filename, the `revision` in the
+    /// options provided is used to determine which one to download. See the documentation for
+    /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
+    /// provided, the file with `filename` most recently uploaded will be downloaded.
     pub async fn open_download_stream_by_name(
         &self,
         filename: impl AsRef<str>,

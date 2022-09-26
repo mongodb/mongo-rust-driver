@@ -5,6 +5,7 @@ mod client;
 mod coll;
 mod cursor;
 mod db;
+pub mod gridfs;
 
 #[cfg(test)]
 mod test;
