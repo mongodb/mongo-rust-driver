@@ -35,6 +35,20 @@ lazy_static! {
     };
     static ref EXTRA_OPTIONS: Document = doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
+    static ref KMIP_TLS_OPTIONS: KmsProvidersTlsOptions = {
+            /* If these options are used, the test will need a running KMIP server:
+                pip3 install pykmip
+                # in drivers-evergreen-tools/.evergreen
+                python3 ./csfle/kms_kmip_server.py
+            */
+        let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
+        let kmip_opts = TlsOptions::builder()
+            .ca_file_path(cert_dir.join("ca.pem"))
+            .cert_key_file_path(cert_dir.join("client.pem"))
+            .build();
+        let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
+        tls_options    
+    };
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -84,18 +98,7 @@ async fn data_key_double_encryption() -> Result<()> {
     // Setup: drop stale data.
     let (client, _) = init_client().await?;
 
-    /* KMIP server:
-        pip3 install pykmip
-        # in drivers-evergreen-tools/.evergreen
-        python3 ./csfle/kms_kmip_server.py
-     */
-    // Setup: build options for test environment.
-    let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
-    let kmip_opts = TlsOptions::builder()
-        .ca_file_path(cert_dir.join("ca.pem"))
-        .cert_key_file_path(cert_dir.join("client.pem"))
-        .build();
-    let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
+    // Setup: client with auto encryption.
     let schema_map: HashMap<String, Document> = [
         ("db.coll".to_string(), doc! {
             "bsonType": "object",
@@ -110,13 +113,11 @@ async fn data_key_double_encryption() -> Result<()> {
             }
         })
     ].into_iter().collect();
-
-    // Setup: client with auto encryption.
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(KMS_PROVIDERS.clone())
         .schema_map(schema_map)
-        .tls_options(tls_options.clone())
+        .tls_options(KMIP_TLS_OPTIONS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
         .build();
     let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
@@ -126,7 +127,7 @@ async fn data_key_double_encryption() -> Result<()> {
         .key_vault_namespace(KV_NAMESPACE.clone())
         .key_vault_client(client.clone().into_client())
         .kms_providers(KMS_PROVIDERS.clone())
-        .tls_options(tls_options)
+        .tls_options(KMIP_TLS_OPTIONS.clone())
         .build();
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
@@ -247,9 +248,17 @@ fn try_any<T>(values: &[T], mut pred: impl FnMut(&T) -> Result<bool>) -> Result<
     Ok(false)
 }
 
+fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
+    Ok(bson::Binary {
+        subtype: BinarySubtype::Uuid,
+        bytes: base64::decode(bytes.as_ref())?,
+    })
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn external_key_vault() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
     let _guard = LOCK.run_exclusively().await;
 
     for with_external_key_vault in [false, true] {
@@ -300,14 +309,10 @@ async fn external_key_vault() -> Result<()> {
             assert!(result.is_ok(), "unexpected error: {}", result.err().unwrap());
         }
         // Test: manual encryption.
-        let key_id = bson::Binary {
-            subtype: BinarySubtype::Uuid,
-            bytes: base64::decode("LOCALAAAAAAAAAAAAAAAAA==")?,
-        };
         let result = client_encryption.encrypt(
             RawBson::String("test".to_string()),
             EncryptOptions::builder()
-                .key(EncryptKey::Id(key_id))
+                .key(EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?))
                 .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
                 .build(),
         ).await;
@@ -420,6 +425,7 @@ async fn views_prohibited() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: db initialization.
@@ -430,6 +436,104 @@ async fn corpus() -> Result<()> {
     ).await?;
     for f in ["corpus/corpus-key-local.json", "corpus/corpus-key-aws.json", "corpus/corpus-key-azure.json", "corpus/corpus-key-gcp.json", "corpus/corpus-key-kmip.json"] {
         datakeys.insert_one(load_testdata(f)?, None).await?;
+    }
+
+    // Setup: encrypted client and manual encryption.
+    let auto_enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(KMS_PROVIDERS.clone())
+        .tls_options(KMIP_TLS_OPTIONS.clone())
+        .extra_options(EXTRA_OPTIONS.clone())
+        .build();
+    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let enc_opts = ClientEncryptionOptions::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .key_vault_client(client.clone().into_client())
+        .kms_providers(KMS_PROVIDERS.clone())
+        .tls_options(KMIP_TLS_OPTIONS.clone())
+        .build();
+    let client_encryption = ClientEncryption::new(enc_opts)?;
+
+    // Test: build corpus.
+    // TODO(RUST-36): use the full corpus with decimal128.
+    let corpus = load_testdata("corpus/corpus-nodecimal.json")?;
+    let mut corpus_copied = doc! { };
+    for (name, field) in &corpus {
+        // Copy simple fields
+        if ["_id", "altname_aws", "altname_local", "altname_azure", "altname_gcp", "altname_kmip"].contains(&name.as_str()) {
+            corpus_copied.insert(name, field);
+            continue;
+        }
+        // Encrypt `value` field in subdocuments.
+        let subdoc = match field.as_document() {
+            Some(d) => d,
+            None => panic!("unexpected field type for {:?}: {:?}", name, field.element_type()),
+        };
+        let method = subdoc.get_str("method")?;
+        if method == "auto" {
+            corpus_copied.insert(name, subdoc);
+            continue;
+        }
+        if method != "explicit" {
+            panic!("Invalid method {:?}", method);
+        }
+        let algo = match subdoc.get_str("algo")? {
+            "rand" => Algorithm::AeadAes256CbcHmacSha512Random,
+            "det" => Algorithm::AeadAes256CbcHmacSha512Deterministic,
+            s => panic!("Invalid algorithm {:?}", s),
+        };
+        let kms = KmsProvider::from_name(subdoc.get_str("kms")?);
+        let key = match subdoc.get_str("identifier")? {
+            "id" => EncryptKey::Id(base64_uuid(match kms {
+                KmsProvider::Local => "LOCALAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Aws => "AWSAAAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Azure => "AZUREAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Gcp => "GCPAAAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Kmip => "KMIPAAAAAAAAAAAAAAAAAA==",
+                _ => panic!("Invalid kms provider {:?}", kms),
+            })?),
+            "altname" => EncryptKey::AltName(kms.name().to_string()),
+            s => panic!("Invalid identifier {:?}", s),
+        };
+        let result = client_encryption.encrypt(
+            bson::from_bson(subdoc.get("value").expect("no value to encrypt").clone())?,  // TODO(aegnor): is this right?
+            EncryptOptions::builder()
+                .key(key)
+                .algorithm(algo)
+                .build(),
+        ).await;
+        let mut subdoc_copied = subdoc.clone();
+        if subdoc.get_bool("allowed")? {
+            subdoc_copied.insert("value", result?);
+        } else {
+            result.expect_err("expected encryption to be disallowed");
+        }
+        corpus_copied.insert(name, subdoc_copied);
+    }
+
+    // Test: insert into and find from collection, with automatic encryption.
+    let coll = client_encrypted.database("db").collection::<Document>("coll");
+    let id = coll.insert_one(corpus_copied, None).await?.inserted_id;
+    let corpus_decrypted = coll.find_one(doc! { "_id": id.clone() }, None).await?.expect("document lookup failed");
+    assert_eq!(corpus, corpus_decrypted);
+
+    // Test: validate encrypted form.
+    let corpus_encrypted_expected = load_testdata("corpus/corpus-encrypted.json")?;
+    let corpus_encrypted_actual = client
+        .database("db")
+        .collection::<Document>("coll")
+        .find_one(doc! { "_id": id }, None)
+        .await?
+        .expect("encrypted document lookup failed");
+    for (name, value) in &corpus_encrypted_expected {
+        let subdoc = match value.as_document() {
+            Some(d) => d,
+            None => continue,
+        };
+        let algo = subdoc.get_str("algo")?;
+        if algo == "det" {
+            assert_eq!(Some(value), corpus_encrypted_actual.get(name));
+        }
     }
 
     Ok(())
