@@ -12,7 +12,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use tokio::io::ReadBuf;
+use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
@@ -42,8 +42,9 @@ struct Chunk<'a> {
 
 /// A collection in which information about stored files is stored. There will be one files
 /// collection document per stored file.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[skip_serializing_none]
 #[non_exhaustive]
 pub struct FilesCollectionDocument {
     #[serde(rename = "_id")]
@@ -52,8 +53,33 @@ pub struct FilesCollectionDocument {
     pub chunk_size: u32,
     pub upload_date: DateTime,
     pub filename: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Document>,
+}
+
+impl FilesCollectionDocument {
+    /// Returns the total number of chunks expected to be in the file.
+    fn n(&self) -> u64 {
+        Self::n_from_vals(self.length, self.chunk_size)
+    }
+
+    fn n_from_vals(length: u64, chunk_size: u32) -> u64 {
+        let chunk_size = chunk_size as u64;
+        length / chunk_size + u64::from(length % chunk_size != 0)
+    }
+
+    /// Returns the expected length of a chunk given its index.
+    fn expected_chunk_length(&self, n: u32) -> u32 {
+        Self::expected_chunk_length_from_vals(self.length, self.chunk_size, n)
+    }
+
+    fn expected_chunk_length_from_vals(length: u64, chunk_size: u32, n: u32) -> u32 {
+        let remainder = length % (chunk_size as u64);
+        if (n as u64) == Self::n_from_vals(length, chunk_size) - 1 && remainder != 0 {
+            remainder as u32
+        } else {
+            chunk_size
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -134,27 +160,6 @@ impl futures_util::AsyncWrite for GridFsUploadStream {
     }
 }
 
-pub struct GridFsDownloadStream {
-    files_id: Bson,
-}
-
-impl GridFsDownloadStream {
-    /// Gets the file `id` for the stream.
-    pub fn files_id(&self) -> &Bson {
-        &self.files_id
-    }
-}
-
-impl tokio::io::AsyncRead for GridFsDownloadStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<tokio::io::Result<()>> {
-        todo!()
-    }
-}
-
 impl GridFsBucket {
     pub(crate) fn new(db: Database, mut options: GridFsBucketOptions) -> GridFsBucket {
         if options.read_concern.is_none() {
@@ -225,7 +230,7 @@ impl GridFsBucket {
     }
 
     /// Gets a handle to the chunks collection for the [`GridFsBucket`].
-    fn chunks(&self) -> &Collection<Chunk> {
+    fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
     }
 
@@ -253,23 +258,6 @@ impl GridFsBucket {
     ) -> Result<GridFsUploadStream> {
         self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
             .await
-    }
-
-    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `id`.
-    pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        todo!()
-    }
-
-    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `filename` and the revision
-    /// in `options`.
-    pub async fn open_download_stream_by_name(
-        &self,
-        filename: String,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) -> Result<GridFsDownloadStream> {
-        todo!()
     }
 
     /// Deletes the [`FilesCollectionDocument`] with the given `id `and its associated chunks from

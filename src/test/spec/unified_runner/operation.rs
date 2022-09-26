@@ -12,6 +12,7 @@ use std::{
 
 use futures::{
     future::BoxFuture,
+    io::AsyncReadExt,
     stream::{StreamExt, TryStreamExt},
     FutureExt,
 };
@@ -2669,12 +2670,24 @@ impl TestOperation for Download {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let bucket = test_runner.get_bucket(id).await;
+
+            // First, read via the download_to_writer API.
             let mut buf: Vec<u8> = vec![];
             bucket
                 .download_to_futures_0_3_writer(self.id.clone(), &mut buf)
                 .await?;
-            let data = hex::encode(buf);
-            Ok(Some(Entity::Bson(data.into())))
+            let writer_data = hex::encode(buf);
+
+            // Next, read via the open_download_stream API.
+            let mut buf: Vec<u8> = vec![];
+            let mut stream = bucket.open_download_stream(self.id.clone()).await?;
+            stream.read_to_end(&mut buf).await?;
+            let stream_data = hex::encode(buf);
+
+            // Assert that both APIs returned the same data.
+            assert_eq!(writer_data, stream_data);
+
+            Ok(Some(Entity::Bson(writer_data.into())))
         }
         .boxed()
     }
@@ -2696,6 +2709,8 @@ impl TestOperation for DownloadByName {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let bucket = test_runner.get_bucket(id).await;
+
+            // First, read via the download_to_writer API.
             let mut buf: Vec<u8> = vec![];
             bucket
                 .download_to_futures_0_3_writer_by_name(
@@ -2704,8 +2719,20 @@ impl TestOperation for DownloadByName {
                     self.options.clone(),
                 )
                 .await?;
-            let data = hex::encode(buf);
-            Ok(Some(Entity::Bson(data.into())))
+            let writer_data = hex::encode(buf);
+
+            // Next, read via the open_download_stream API.
+            let mut buf: Vec<u8> = vec![];
+            let mut stream = bucket
+                .open_download_stream_by_name(self.filename.clone(), self.options.clone())
+                .await?;
+            stream.read_to_end(&mut buf).await?;
+            let stream_data = hex::encode(buf);
+
+            // Assert that both APIs returned the same data.
+            assert_eq!(writer_data, stream_data);
+
+            Ok(Some(Entity::Bson(writer_data.into())))
         }
         .boxed()
     }

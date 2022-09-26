@@ -813,7 +813,7 @@ pub enum GridFsErrorKind {
     /// The chunk was the incorrect size.
     #[non_exhaustive]
     WrongSizeChunk {
-        actual_size: u32,
+        actual_size: usize,
         expected_size: u32,
     },
 
