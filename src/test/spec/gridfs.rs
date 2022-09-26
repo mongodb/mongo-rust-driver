@@ -1,10 +1,19 @@
-use futures_util::io::AsyncReadExt;
+use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
-    gridfs::options::GridFsBucketOptions,
+    bson::{doc, Bson, Document},
+    error::{Error, ErrorKind, GridFsErrorKind},
+    gridfs::{
+        options::{GridFsBucketOptions, GridFsUploadOptions},
+        upload::GridFsUploadStream,
+        GridFsBucket,
+    },
     test::{
         run_spec_test_with_path,
         spec::unified_runner::{run_unified_format_test_filtered, TestCase},
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
         TestClient,
         LOCK,
     },
@@ -72,4 +81,237 @@ async fn download_stream_across_buffers() {
     // read in the rest of the data
     download_stream.read_to_end(&mut buf).await.unwrap();
     assert_eq!(buf, data);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn upload_stream() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let bucket_options = GridFsBucketOptions::builder().chunk_size_bytes(4).build();
+    let bucket = client
+        .database("upload_stream")
+        .gridfs_bucket(bucket_options);
+    bucket.drop().await.unwrap();
+
+    upload_test(&bucket, &[], None).await;
+    upload_test(&bucket, &[11], None).await;
+    upload_test(&bucket, &[11, 22, 33], None).await;
+    upload_test(&bucket, &[11, 22, 33, 44], None).await;
+    upload_test(&bucket, &[11, 22, 33, 44, 55], None).await;
+    upload_test(&bucket, &[11, 22, 33, 44, 55, 66, 77, 88], None).await;
+    upload_test(
+        &bucket,
+        &[11],
+        Some(
+            GridFsUploadOptions::builder()
+                .metadata(doc! { "x": 1 })
+                .build(),
+        ),
+    )
+    .await;
+}
+
+async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsUploadOptions>) {
+    let filename = format!(
+        "length_{}_{}_options",
+        data.len(),
+        if options.is_some() { "with" } else { "without" }
+    );
+    let mut upload_stream = bucket.open_upload_stream(filename, options.clone());
+    upload_stream.write_all(data).await.unwrap();
+    upload_stream.close().await.unwrap();
+
+    let mut uploaded = Vec::new();
+    bucket
+        .download_to_futures_0_3_writer(upload_stream.id().clone(), &mut uploaded)
+        .await
+        .unwrap();
+    assert_eq!(data, &uploaded);
+
+    let file = bucket
+        .files()
+        .find_one(doc! { "_id": upload_stream.id() }, None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(file.metadata, options.and_then(|opts| opts.metadata));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn upload_stream_multiple_buffers() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let bucket_options = GridFsBucketOptions::builder().chunk_size_bytes(3).build();
+    let bucket = client
+        .database("upload_stream_multiple_buffers")
+        .gridfs_bucket(bucket_options);
+    bucket.drop().await.unwrap();
+
+    let mut upload_stream = bucket.open_upload_stream("upload_stream_multiple_buffers", None);
+
+    let data: Vec<u8> = (0..20).collect();
+
+    // exactly one chunk
+    upload_stream.write_all(&data[..3]).await.unwrap();
+
+    // partial chunk
+    upload_stream.write_all(&data[3..5]).await.unwrap();
+
+    // rest of chunk
+    upload_stream.write_all(&data[5..6]).await.unwrap();
+
+    // multiple chunks
+    upload_stream.write_all(&data[6..12]).await.unwrap();
+
+    // one byte
+    upload_stream.write_all(&data[12..13]).await.unwrap();
+
+    // one more byte
+    upload_stream.write_all(&data[13..14]).await.unwrap();
+
+    // rest of chunk and partial chunk
+    upload_stream.write_all(&data[14..18]).await.unwrap();
+
+    // rest of data
+    upload_stream.write_all(&data[18..20]).await.unwrap();
+
+    // flush should do nothing; make sure that's the case
+    upload_stream.flush().await.unwrap();
+
+    // close stream
+    upload_stream.close().await.unwrap();
+
+    let mut uploaded = Vec::new();
+    bucket
+        .download_to_futures_0_3_writer(upload_stream.id().clone(), &mut uploaded)
+        .await
+        .unwrap();
+    assert_eq!(uploaded, data);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn upload_stream_errors() {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = TestClient::new().await;
+    let bucket = client.database("upload_stream_errors").gridfs_bucket(None);
+    bucket.drop().await.unwrap();
+
+    // Error attempting to write to stream after closing.
+    let mut upload_stream = bucket.open_upload_stream("upload_stream_errors", None);
+    upload_stream.close().await.unwrap();
+    assert_closed(&bucket, upload_stream).await;
+
+    // Error attempting to write to stream after abort.
+    let mut upload_stream = bucket.open_upload_stream("upload_stream_errors", None);
+    upload_stream.abort().await.unwrap();
+    assert_closed(&bucket, upload_stream).await;
+
+    if !client.supports_fail_command() {
+        return;
+    }
+
+    // Error attempting to write to stream after write failure.
+    let mut upload_stream = bucket.open_upload_stream(
+        "upload_stream_errors",
+        GridFsUploadOptions::builder().chunk_size_bytes(1).build(),
+    );
+
+    let _fp_guard = FailPoint::fail_command(
+        &["insert"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder().error_code(1234).build(),
+    )
+    .enable(&client, None)
+    .await
+    .unwrap();
+
+    let error = get_mongo_error(upload_stream.write_all(&[11]).await);
+    assert_eq!(error.code(), Some(1234));
+
+    assert_closed(&bucket, upload_stream).await;
+
+    // Error attempting to write to stream after close failure.
+    let mut upload_stream = bucket.open_upload_stream(
+        "upload_stream_errors",
+        GridFsUploadOptions::builder().chunk_size_bytes(1).build(),
+    );
+
+    upload_stream.write_all(&[11]).await.unwrap();
+
+    let _fp_guard = FailPoint::fail_command(
+        &["insert"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder().error_code(1234).build(),
+    )
+    .enable(&client, None)
+    .await
+    .unwrap();
+
+    let error = get_mongo_error(upload_stream.close().await);
+    assert_eq!(error.code(), Some(1234));
+
+    assert_closed(&bucket, upload_stream).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn drop_aborts() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let bucket = client.database("upload_stream_abort").gridfs_bucket(None);
+    bucket.drop().await.unwrap();
+
+    let mut upload_stream = bucket.open_upload_stream("upload_stream_abort", None);
+    let id = upload_stream.id().clone();
+    upload_stream.write_all(&[11]).await.unwrap();
+    drop(upload_stream);
+
+    assert_no_chunks_written(&bucket, &id).await;
+}
+
+async fn assert_closed(bucket: &GridFsBucket, mut upload_stream: GridFsUploadStream) {
+    assert_shut_down_error(upload_stream.write_all(&[11]).await);
+    assert_shut_down_error(upload_stream.close().await);
+    assert_shut_down_error(upload_stream.flush().await);
+    let abort_error = upload_stream.abort().await.unwrap_err();
+    assert!(matches!(
+        *abort_error.kind,
+        ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed)
+    ));
+
+    assert_no_chunks_written(&bucket, upload_stream.id()).await;
+}
+
+fn assert_shut_down_error(result: std::result::Result<(), futures_io::Error>) {
+    let error = get_mongo_error(result);
+    assert!(matches!(
+        *error.kind,
+        ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed)
+    ));
+}
+
+fn get_mongo_error(result: std::result::Result<(), futures_io::Error>) -> Error {
+    *result
+        .unwrap_err()
+        .into_inner()
+        .unwrap()
+        .downcast::<Error>()
+        .unwrap()
+}
+
+async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
+    assert!(bucket
+        .chunks()
+        .clone_with_type::<Document>()
+        .find_one(doc! { "files_id": id }, None)
+        .await
+        .unwrap()
+        .is_none());
 }

@@ -2819,6 +2819,7 @@ impl TestOperation for Upload {
             let bucket = test_runner.get_bucket(id).await;
             let hex_string = self.source.get("$$hexBytes").unwrap().as_str().unwrap();
             let bytes = hex::decode(hex_string).unwrap();
+
             let id = bucket
                 .upload_from_futures_0_3_reader(
                     self.filename.clone(),
@@ -2826,6 +2827,7 @@ impl TestOperation for Upload {
                     self.options.clone(),
                 )
                 .await?;
+
             Ok(Some(Entity::Bson(id.into())))
         }
         .boxed()

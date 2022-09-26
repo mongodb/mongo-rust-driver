@@ -1,7 +1,9 @@
-use std::{marker::Unpin, sync::atomic::Ordering};
+use core::task::{Context, Poll};
+use std::{pin::Pin, sync::atomic::Ordering};
 
 use futures_util::{
-    io::{AsyncRead, AsyncReadExt},
+    future::{BoxFuture, FutureExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite},
     stream::TryStreamExt,
 };
 
@@ -9,9 +11,10 @@ use super::{options::GridFsUploadOptions, Chunk, FilesCollectionDocument, GridFs
 use crate::{
     bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
     bson_util::get_int,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
     options::{CreateCollectionOptions, FindOneOptions, ReadPreference, SelectionCriteria},
+    runtime,
     Collection,
 };
 
@@ -171,5 +174,287 @@ impl GridFsBucket {
         coll.create_index(index_model, None).await?;
 
         Ok(())
+    }
+}
+
+pub struct GridFsUploadStream {
+    bucket: GridFsBucket,
+    state: State,
+    current_n: u32,
+    id: Bson,
+    chunk_size: u32,
+    // Additional metadata for the file. These values are stored as Options so that they can be
+    // taken and inserted into a `FilesCollectionDocument` when the stream is closed.
+    filename: Option<String>,
+    metadata: Option<Option<Document>>,
+}
+
+type WriteBytesFuture = BoxFuture<'static, Result<(u32, Vec<u8>)>>;
+type CloseFuture = BoxFuture<'static, Result<()>>;
+
+enum State {
+    Idle(Option<Vec<u8>>),
+    Writing(WriteBytesFuture),
+    Closing(CloseFuture),
+    Closed,
+}
+
+impl State {
+    fn set_writing(&mut self, new_future: WriteBytesFuture) -> &mut WriteBytesFuture {
+        *self = Self::Writing(new_future);
+        match self {
+            Self::Writing(future) => future,
+            _ => unreachable!(),
+        }
+    }
+
+    fn set_closing(&mut self, new_future: CloseFuture) -> &mut CloseFuture {
+        *self = Self::Closing(new_future);
+        match self {
+            Self::Closing(future) => future,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Error {
+    fn into_futures_io_error(self) -> futures_io::Error {
+        futures_io::Error::new(futures_io::ErrorKind::Other, self)
+    }
+}
+
+impl GridFsUploadStream {
+    /// Gets the file `id` for the stream.
+    pub fn id(&self) -> &Bson {
+        &self.id
+    }
+
+    pub async fn abort(&mut self) -> Result<()> {
+        match self.state {
+            State::Closed => Err(ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed).into()),
+            _ => {
+                self.bucket
+                    .chunks()
+                    .delete_many(doc! { "files_id": &self.id }, None)
+                    .await?;
+                self.state = State::Closed;
+                Ok(())
+            }
+        }
+    }
+}
+
+impl AsyncWrite for GridFsUploadStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::result::Result<usize, futures_io::Error>> {
+        let stream = self.get_mut();
+
+        let future = match &mut stream.state {
+            State::Idle(buffer) => {
+                let buffer_ref = buffer.as_mut().unwrap();
+
+                buffer_ref.extend_from_slice(buf);
+                if buffer_ref.len() < stream.chunk_size as usize {
+                    return Poll::Ready(Ok(buf.len()));
+                }
+
+                let new_future = write_bytes(
+                    stream.bucket.clone(),
+                    buffer.take().unwrap(),
+                    stream.current_n,
+                    stream.chunk_size,
+                    stream.id.clone(),
+                )
+                .boxed();
+                stream.state.set_writing(new_future)
+            }
+            State::Writing(future) => future,
+            State::Closing(_) | State::Closed => return Poll::Ready(Err(get_closed_error())),
+        };
+
+        let result = match future.poll_unpin(cx) {
+            Poll::Ready(result) => result,
+            Poll::Pending => return Poll::Pending,
+        };
+
+        match result {
+            Ok((chunks_written, buffer)) => {
+                stream.current_n += chunks_written;
+                stream.state = State::Idle(Some(buffer));
+                Poll::Ready(Ok(buf.len()))
+            }
+            Err(error) => {
+                stream.state = State::Closed;
+                Poll::Ready(Err(error.into_futures_io_error()))
+            }
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
+        // The buffer only contains leftover bytes that couldn't fill an entire chunk, so there's
+        // nothing to flush.
+        match self.state {
+            State::Closed => Poll::Ready(Err(get_closed_error())),
+            _ => Poll::Ready(Ok(())),
+        }
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
+        let stream = self.get_mut();
+
+        let future = match &mut stream.state {
+            State::Idle(buffer) => {
+                let buffer = buffer.take().unwrap();
+                let file = FilesCollectionDocument {
+                    id: stream.id.clone(),
+                    length: stream.current_n as u64 * stream.chunk_size as u64
+                        + buffer.len() as u64,
+                    chunk_size: stream.chunk_size,
+                    upload_date: DateTime::now(),
+                    filename: stream.filename.take(),
+                    metadata: stream.metadata.take().unwrap(),
+                };
+                let new_future = close(stream.bucket.clone(), buffer, file).boxed();
+                stream.state.set_closing(new_future)
+            }
+            State::Writing(_) => return Poll::Pending,
+            State::Closing(future) => future,
+            State::Closed => return Poll::Ready(Err(get_closed_error())),
+        };
+
+        let result = match future.poll_unpin(cx) {
+            Poll::Ready(result) => result,
+            Poll::Pending => return Poll::Pending,
+        };
+
+        stream.state = State::Closed;
+        match result {
+            Ok(()) => Poll::Ready(Ok(())),
+            Err(error) => Poll::Ready(Err(error.into_futures_io_error())),
+        }
+    }
+}
+
+fn get_closed_error() -> futures_io::Error {
+    let error: Error = ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed).into();
+    error.into_futures_io_error()
+}
+
+impl Drop for GridFsUploadStream {
+    fn drop(&mut self) {
+        if !matches!(self.state, State::Closed) {
+            let chunks = self.bucket.chunks().clone();
+            let id = self.id.clone();
+            runtime::execute(async move {
+                let _result = chunks.delete_many(doc! { "files_id": id }, None).await;
+            })
+        }
+    }
+}
+
+async fn write_bytes(
+    bucket: GridFsBucket,
+    mut buffer: Vec<u8>,
+    starting_n: u32,
+    chunk_size: u32,
+    files_id: Bson,
+) -> Result<(u32, Vec<u8>)> {
+    bucket.create_indexes().await?;
+
+    let mut n = 0;
+    let mut chunks = vec![];
+
+    while buffer.len() as u32 - (n * chunk_size) >= chunk_size {
+        let start = n * chunk_size;
+        let end = (n + 1) * chunk_size;
+        let chunk = Chunk {
+            id: ObjectId::new(),
+            files_id: files_id.clone(),
+            n: starting_n + n,
+            data: RawBinaryRef {
+                subtype: BinarySubtype::Generic,
+                bytes: &buffer[(start as usize)..(end as usize)],
+            },
+        };
+        n += 1;
+        chunks.push(chunk);
+    }
+
+    bucket.chunks().insert_many(chunks, None).await?;
+    buffer.drain(..(n * chunk_size) as usize);
+
+    Ok((n, buffer))
+}
+
+async fn close(bucket: GridFsBucket, buffer: Vec<u8>, file: FilesCollectionDocument) -> Result<()> {
+    let insert_result: Result<()> = async {
+        if !buffer.is_empty() {
+            let final_chunk = Chunk {
+                id: ObjectId::new(),
+                n: file.n() - 1,
+                files_id: file.id.clone(),
+                data: RawBinaryRef {
+                    subtype: BinarySubtype::Generic,
+                    bytes: &buffer[..],
+                },
+            };
+            bucket.chunks().insert_one(final_chunk, None).await?;
+        }
+        bucket.files().insert_one(&file, None).await?;
+        Ok(())
+    }
+    .await;
+
+    match insert_result {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            bucket
+                .chunks()
+                .delete_many(doc! { "files_id": file.id }, None)
+                .await?;
+            Err(error)
+        }
+    }
+}
+
+impl GridFsBucket {
+    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
+    /// The driver generates a unique [`Bson::ObjectId`] for the file id.
+    ///
+    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
+    pub fn open_upload_stream(
+        &self,
+        filename: impl AsRef<str>,
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) -> GridFsUploadStream {
+        self.open_upload_stream_with_id(ObjectId::new().into(), filename, options)
+    }
+
+    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
+    /// The application provides a custom file id.
+    ///
+    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
+    pub fn open_upload_stream_with_id(
+        &self,
+        id: Bson,
+        filename: impl AsRef<str>,
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) -> GridFsUploadStream {
+        let options = options.into();
+        GridFsUploadStream {
+            bucket: self.clone(),
+            state: State::Idle(Some(Vec::new())),
+            current_n: 0,
+            id,
+            filename: Some(filename.as_ref().into()),
+            chunk_size: options
+                .as_ref()
+                .and_then(|opts| opts.chunk_size_bytes)
+                .unwrap_or_else(|| self.chunk_size_bytes()),
+            metadata: Some(options.and_then(|opts| opts.metadata)),
+        }
     }
 }

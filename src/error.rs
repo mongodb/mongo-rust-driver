@@ -815,6 +815,10 @@ pub enum GridFsErrorKind {
     #[non_exhaustive]
     MissingChunk { n: u32 },
 
+    // isabeltodo make this comment better
+    /// A write was attempted on a GridFsUploadStream that has already been shut down.
+    UploadStreamClosed,
+
     /// The chunk was the incorrect size.
     #[non_exhaustive]
     WrongSizeChunk {
