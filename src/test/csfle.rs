@@ -1,28 +1,54 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bson::{Document, doc, spec::BinarySubtype, Bson, RawBson};
+use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson};
 use futures_util::TryStreamExt;
-use mongocrypt::ctx::{KmsProvider, Algorithm};
-use serde::de::DeserializeOwned;
 use lazy_static::lazy_static;
+use mongocrypt::ctx::{Algorithm, KmsProvider};
+use serde::de::DeserializeOwned;
 
-use crate::{options::{ReadConcern, WriteConcern}, client_encryption::{ClientEncryption, ClientEncryptionOptions, DataKeyOptions, MasterKey, EncryptOptions, EncryptKey}, Namespace, client::{options::{AutoEncryptionOptions, TlsOptions}, csfle::options::{KmsProviders, KmsProvidersTlsOptions}, auth::Credential}, Client, db::options::CreateCollectionOptions, coll::options::CollectionOptions, Collection};
+use crate::{
+    client::{
+        auth::Credential,
+        csfle::options::{KmsProviders, KmsProvidersTlsOptions},
+        options::{AutoEncryptionOptions, TlsOptions},
+    },
+    client_encryption::{
+        ClientEncryption,
+        ClientEncryptionOptions,
+        DataKeyOptions,
+        EncryptKey,
+        EncryptOptions,
+        MasterKey,
+    },
+    coll::options::CollectionOptions,
+    db::options::CreateCollectionOptions,
+    options::{ReadConcern, WriteConcern},
+    Client,
+    Collection,
+    Namespace,
+};
 
-use super::{CLIENT_OPTIONS, LOCK, EventClient};
+use super::{EventClient, CLIENT_OPTIONS, LOCK};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = EventClient::new().await;
-    let datakeys = client.database("keyvault").collection_with_options::<Document>(
-        "datakeys",
-        CollectionOptions::builder()
-            .read_concern(ReadConcern::MAJORITY)
-            .write_concern(WriteConcern::MAJORITY)
-            .build(),
-    );
+    let datakeys = client
+        .database("keyvault")
+        .collection_with_options::<Document>(
+            "datakeys",
+            CollectionOptions::builder()
+                .read_concern(ReadConcern::MAJORITY)
+                .write_concern(WriteConcern::MAJORITY)
+                .build(),
+        );
     datakeys.drop(None).await?;
-    client.database("db").collection::<Document>("coll").drop(None).await?;
+    client
+        .database("db")
+        .collection::<Document>("coll")
+        .drop(None)
+        .await?;
     Ok((client, datakeys))
 }
 
@@ -47,7 +73,7 @@ lazy_static! {
             .cert_key_file_path(cert_dir.join("client.pem"))
             .build();
         let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
-        tls_options    
+        tls_options
     };
 }
 
@@ -62,34 +88,49 @@ async fn custom_key_material() -> Result<()> {
             .key_vault_client(client.into_client())
             .key_vault_namespace(KV_NAMESPACE.clone())
             .kms_providers(LOCAL_KMS.clone())
-            .build()
+            .build(),
     )?;
 
     let key = base64::decode("xPTAjBRG5JiPm+d3fj6XLi2q5DMXUS/f1f+SMAlhhwkhDRL0kr8r9GDLIGTAGlvC+HVjSIgdL+RKwZCvpXSyxTICWSXTUYsWYPyu3IoHbuBZdmw2faM3WhcRIgbMReU5").unwrap();
-    let id = enc.create_data_key(&KmsProvider::Local, DataKeyOptions::builder()
-        .master_key(MasterKey::Local)
-        .key_material(key)
-        .build()
-    ).await?;
-    let mut key_doc = datakeys.find_one(doc! { "_id": id.clone() }, None).await?.unwrap();
+    let id = enc
+        .create_data_key(
+            &KmsProvider::Local,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Local)
+                .key_material(key)
+                .build(),
+        )
+        .await?;
+    let mut key_doc = datakeys
+        .find_one(doc! { "_id": id.clone() }, None)
+        .await?
+        .unwrap();
     datakeys.delete_one(doc! { "_id": id}, None).await?;
     let new_key_id = bson::Binary::from_uuid(bson::Uuid::from_bytes([0; 16]));
     key_doc.insert("_id", new_key_id.clone());
     datakeys.insert_one(key_doc, None).await?;
 
-    let encrypted = enc.encrypt(bson::RawBson::String("test".to_string()), EncryptOptions::builder()
-        .key(EncryptKey::Id(new_key_id))
-        .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-        .build()
-    ).await?;
-    let expected = base64::decode("AQAAAAAAAAAAAAAAAAAAAAACz0ZOLuuhEYi807ZXTdhbqhLaS2/t9wLifJnnNYwiw79d75QYIZ6M/aYC1h9nCzCjZ7pGUpAuNnkUhnIXM3PjrA==").unwrap();
+    let encrypted = enc
+        .encrypt(
+            bson::RawBson::String("test".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(new_key_id))
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .build(),
+        )
+        .await?;
+    let expected = base64::decode(
+        "AQAAAAAAAAAAAAAAAAAAAAACz0ZOLuuhEYi807ZXTdhbqhLaS2/t9wLifJnnNYwiw79d75QYIZ6M/\
+         aYC1h9nCzCjZ7pGUpAuNnkUhnIXM3PjrA==",
+    )
+    .unwrap();
     assert_eq!(encrypted.bytes, expected);
 
     Ok(())
 }
 
-
-// This test requires the `openssl-tls` feature; rustls is incompatible with the driver-tools kmip server.
+// This test requires the `openssl-tls` feature; rustls is incompatible with the driver-tools kmip
+// server.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn data_key_double_encryption() -> Result<()> {
@@ -99,8 +140,9 @@ async fn data_key_double_encryption() -> Result<()> {
     let (client, _) = init_client().await?;
 
     // Setup: client with auto encryption.
-    let schema_map: HashMap<String, Document> = [
-        ("db.coll".to_string(), doc! {
+    let schema_map: HashMap<String, Document> = [(
+        "db.coll".to_string(),
+        doc! {
             "bsonType": "object",
             "properties": {
                 "encrypted_placeholder": {
@@ -111,8 +153,10 @@ async fn data_key_double_encryption() -> Result<()> {
                     }
                 }
             }
-        })
-    ].into_iter().collect();
+        },
+    )]
+    .into_iter()
+    .collect();
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(KMS_PROVIDERS.clone())
@@ -120,7 +164,8 @@ async fn data_key_double_encryption() -> Result<()> {
         .tls_options(KMIP_TLS_OPTIONS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
         .build();
-    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let client_encrypted =
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
     // Setup: manual encryption.
     let enc_opts = ClientEncryptionOptions::builder()
@@ -137,9 +182,10 @@ async fn data_key_double_encryption() -> Result<()> {
             KmsProvider::Aws,
             MasterKey::Aws {
                 region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                    .to_string(),
                 endpoint: None,
-            }
+            },
         ),
         (
             KmsProvider::Azure,
@@ -147,7 +193,7 @@ async fn data_key_double_encryption() -> Result<()> {
                 key_vault_endpoint: "key-vault-csfle.vault.azure.net".to_string(),
                 key_name: "key-name-csfle".to_string(),
                 key_version: None,
-            }
+            },
         ),
         (
             KmsProvider::Gcp,
@@ -158,22 +204,42 @@ async fn data_key_double_encryption() -> Result<()> {
                 key_name: "key-name-csfle".to_string(),
                 key_version: None,
                 endpoint: None,
-            }
+            },
         ),
         (KmsProvider::Local, MasterKey::Local),
-        (KmsProvider::Kmip, MasterKey::Kmip { key_id: None, endpoint: None }),
+        (
+            KmsProvider::Kmip,
+            MasterKey::Kmip {
+                key_id: None,
+                endpoint: None,
+            },
+        ),
     ];
     for (provider, master_key) in provider_keys {
         // Create a data key
-        let datakey_id = client_encryption.create_data_key(&provider, DataKeyOptions::builder()
+        let datakey_id = client_encryption
+            .create_data_key(
+                &provider,
+                DataKeyOptions::builder()
             .key_alt_names(vec![format!("{}_altname", provider.name())])
             .master_key(master_key)  // varies by provider
-        .build()).await?;
+        .build(),
+            )
+            .await?;
         assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
-        let docs: Vec<_> = client.database("keyvault").collection::<Document>("datakeys").find(doc! { "_id": datakey_id.clone() }, None).await?.try_collect().await?;
+        let docs: Vec<_> = client
+            .database("keyvault")
+            .collection::<Document>("datakeys")
+            .find(doc! { "_id": datakey_id.clone() }, None)
+            .await?
+            .try_collect()
+            .await?;
         assert_eq!(docs.len(), 1);
-        assert_eq!(docs[0].get_document("masterKey")?.get_str("provider")?, provider.name());
-        let events = client.get_command_started_events(&["insert"]); 
+        assert_eq!(
+            docs[0].get_document("masterKey")?.get_str("provider")?,
+            provider.name()
+        );
+        let events = client.get_command_started_events(&["insert"]);
         let found = try_any(&events, |ev| {
             let cmd = &ev.command;
             if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
@@ -189,16 +255,24 @@ async fn data_key_double_encryption() -> Result<()> {
         assert!(found, "no valid event found in {:?}", events);
 
         // Manually encrypt a value and automatically decrypt it.
-        let encrypted = client_encryption.encrypt(
-            RawBson::String(format!("hello {}", provider.name())),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(datakey_id))
-                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-                .build(),
-        ).await?;
+        let encrypted = client_encryption
+            .encrypt(
+                RawBson::String(format!("hello {}", provider.name())),
+                EncryptOptions::builder()
+                    .key(EncryptKey::Id(datakey_id))
+                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                    .build(),
+            )
+            .await?;
         assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
-        let coll = client_encrypted.database("db").collection::<Document>("coll");
-        coll.insert_one(doc! { "_id": provider.name(), "value": encrypted.clone() }, None).await?;
+        let coll = client_encrypted
+            .database("db")
+            .collection::<Document>("coll");
+        coll.insert_one(
+            doc! { "_id": provider.name(), "value": encrypted.clone() },
+            None,
+        )
+        .await?;
         let found = coll.find_one(doc! { "_id": provider.name() }, None).await?;
         assert_eq!(
             found.as_ref().and_then(|doc| doc.get("value")),
@@ -206,18 +280,22 @@ async fn data_key_double_encryption() -> Result<()> {
         );
 
         // Manually encrypt a value via key alt name.
-        let other_encrypted = client_encryption.encrypt(
-            RawBson::String(format!("hello {}", provider.name())),
-            EncryptOptions::builder()
-                .key(EncryptKey::AltName(format!("{}_altname", provider.name())))
-                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-                .build(),
-        ).await?;
+        let other_encrypted = client_encryption
+            .encrypt(
+                RawBson::String(format!("hello {}", provider.name())),
+                EncryptOptions::builder()
+                    .key(EncryptKey::AltName(format!("{}_altname", provider.name())))
+                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                    .build(),
+            )
+            .await?;
         assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
         assert_eq!(other_encrypted.bytes, encrypted.bytes);
 
         // Attempt to auto-encrypt an already encrypted field.
-        let result = coll.insert_one(doc! { "encrypted_placeholder": encrypted }, None).await;
+        let result = coll
+            .insert_one(doc! { "encrypted_placeholder": encrypted }, None)
+            .await;
         assert!(result.is_err());
     }
 
@@ -233,7 +311,7 @@ fn from_json<T: DeserializeOwned>(text: &str) -> Result<T> {
 fn any<T>(values: &[T], mut pred: impl FnMut(&T) -> bool) -> bool {
     for value in values {
         if pred(value) {
-            return true
+            return true;
         }
     }
     false
@@ -242,7 +320,7 @@ fn any<T>(values: &[T], mut pred: impl FnMut(&T) -> bool) -> bool {
 fn try_any<T>(values: &[T], mut pred: impl FnMut(&T) -> Result<bool>) -> Result<bool> {
     for value in values {
         if pred(value)? {
-            return Ok(true)
+            return Ok(true);
         }
     }
     Ok(false)
@@ -264,25 +342,30 @@ async fn external_key_vault() -> Result<()> {
     for with_external_key_vault in [false, true] {
         // Setup: initialize db.
         let (client, datakeys) = init_client().await?;
-        datakeys.insert_one(load_testdata("external-key.json")?, None).await?;
-    
+        datakeys
+            .insert_one(load_testdata("external-key.json")?, None)
+            .await?;
+
         // Setup: test options.
-        let schema_map: HashMap<String, Document> = [
-            ("db.coll".to_string(), load_testdata("external-schema.json")?)
-        ].into_iter().collect();
+        let schema_map: HashMap<String, Document> = [(
+            "db.coll".to_string(),
+            load_testdata("external-schema.json")?,
+        )]
+        .into_iter()
+        .collect();
         let kv_client = if with_external_key_vault {
             let mut opts = CLIENT_OPTIONS.get().await.clone();
             opts.credential = Some(
                 Credential::builder()
                     .username("fake-user".to_string())
                     .password("fake-pwd".to_string())
-                    .build()
+                    .build(),
             );
             Some(Client::with_options(opts)?)
         } else {
             None
         };
-    
+
         // Setup: encrypted client.
         let auto_enc_opts = AutoEncryptionOptions::builder()
             .key_vault_namespace(KV_NAMESPACE.clone())
@@ -291,7 +374,9 @@ async fn external_key_vault() -> Result<()> {
             .schema_map(schema_map)
             .extra_options(EXTRA_OPTIONS.clone())
             .build();
-        let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+        let client_encrypted =
+            Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
+                .await?;
 
         // Setup: manual encryption.
         let enc_opts = ClientEncryptionOptions::builder()
@@ -302,24 +387,38 @@ async fn external_key_vault() -> Result<()> {
         let client_encryption = ClientEncryption::new(enc_opts)?;
 
         // Test: encrypted client.
-        let result = client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "encrypted": "test" }, None).await;
+        let result = client_encrypted
+            .database("db")
+            .collection::<Document>("coll")
+            .insert_one(doc! { "encrypted": "test" }, None)
+            .await;
         if with_external_key_vault {
             assert!(result.is_err());
         } else {
-            assert!(result.is_ok(), "unexpected error: {}", result.err().unwrap());
+            assert!(
+                result.is_ok(),
+                "unexpected error: {}",
+                result.err().unwrap()
+            );
         }
         // Test: manual encryption.
-        let result = client_encryption.encrypt(
-            RawBson::String("test".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?))
-                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-                .build(),
-        ).await;
+        let result = client_encryption
+            .encrypt(
+                RawBson::String("test".to_string()),
+                EncryptOptions::builder()
+                    .key(EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?))
+                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                    .build(),
+            )
+            .await;
         if with_external_key_vault {
             assert!(result.is_err());
         } else {
-            assert!(result.is_ok(), "unexpected error: {}", result.err().unwrap());
+            assert!(
+                result.is_ok(),
+                "unexpected error: {}",
+                result.err().unwrap()
+            );
         }
     }
 
@@ -327,11 +426,9 @@ async fn external_key_vault() -> Result<()> {
 }
 
 fn load_testdata_raw(name: &str) -> Result<String> {
-    let path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "src/test/csfle_data",
-        name,
-    ].iter().collect();
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src/test/csfle_data", name]
+        .iter()
+        .collect();
     Ok(std::fs::read_to_string(path)?)
 }
 
@@ -346,11 +443,18 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
-    client.database("db").create_collection("coll", CreateCollectionOptions::builder()
-        .validator(doc! { "$jsonSchema": load_testdata("limits-schema.json")? })
-        .build()
-    ).await?;
-    datakeys.insert_one(load_testdata("limits-key.json")?, None).await?;
+    client
+        .database("db")
+        .create_collection(
+            "coll",
+            CreateCollectionOptions::builder()
+                .validator(doc! { "$jsonSchema": load_testdata("limits-schema.json")? })
+                .build(),
+        )
+        .await?;
+    datakeys
+        .insert_one(load_testdata("limits-key.json")?, None)
+        .await?;
 
     // Setup: encrypted client.
     let auto_enc_opts = AutoEncryptionOptions::builder()
@@ -358,8 +462,11 @@ async fn bson_size_limits() -> Result<()> {
         .kms_providers(LOCAL_KMS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
         .build();
-    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
-    let coll = client_encrypted.database("db").collection::<Document>("coll");
+    let client_encrypted =
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let coll = client_encrypted
+        .database("db")
+        .collection::<Document>("coll");
 
     // Tests
     let mut value = String::new();
@@ -373,7 +480,8 @@ async fn bson_size_limits() -> Result<()> {
             "unencrypted": value,
         },
         None,
-    ).await?;
+    )
+    .await?;
 
     let mut doc: Document = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
@@ -406,8 +514,15 @@ async fn views_prohibited() -> Result<()> {
 
     // Setup: db initialization.
     let (client, _) = init_client().await?;
-    client.database("db").collection::<Document>("view").drop(None).await?;
-    client.database("db").run_command(doc! { "create": "view", "viewOn": "coll" }, None).await?;
+    client
+        .database("db")
+        .collection::<Document>("view")
+        .drop(None)
+        .await?;
+    client
+        .database("db")
+        .run_command(doc! { "create": "view", "viewOn": "coll" }, None)
+        .await?;
 
     // Setup: encrypted client.
     let auto_enc_opts = AutoEncryptionOptions::builder()
@@ -415,12 +530,21 @@ async fn views_prohibited() -> Result<()> {
         .kms_providers(LOCAL_KMS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
         .build();
-    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let client_encrypted =
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
     // Test: auto encryption fails on a view
-    let result = client_encrypted.database("db").collection::<Document>("view").insert_one(doc! { }, None).await;
+    let result = client_encrypted
+        .database("db")
+        .collection::<Document>("view")
+        .insert_one(doc! {}, None)
+        .await;
     let err = result.unwrap_err();
-    assert!(err.to_string().contains("cannot auto encrypt a view"), "unexpected error: {}", err);
+    assert!(
+        err.to_string().contains("cannot auto encrypt a view"),
+        "unexpected error: {}",
+        err
+    );
 
     Ok(())
 }
@@ -445,7 +569,7 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
     let bson: bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
     match bson {
         bson::Bson::Document(d) => Ok(d),
-        _ => Err(failure!("expected document, got {:?}", bson))
+        _ => Err(failure!("expected document, got {:?}", bson)),
     }
 }
 
@@ -474,13 +598,23 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     let coll_opts = if local_schema {
         None
     } else {
-        Some(CreateCollectionOptions::builder()
-            .validator(doc! { "$jsonSchema": schema.clone() })
-            .build()
+        Some(
+            CreateCollectionOptions::builder()
+                .validator(doc! { "$jsonSchema": schema.clone() })
+                .build(),
         )
     };
-    client.database("db").create_collection("coll", coll_opts).await?;
-    for f in ["corpus/corpus-key-local.json", "corpus/corpus-key-aws.json", "corpus/corpus-key-azure.json", "corpus/corpus-key-gcp.json", "corpus/corpus-key-kmip.json"] {
+    client
+        .database("db")
+        .create_collection("coll", coll_opts)
+        .await?;
+    for f in [
+        "corpus/corpus-key-local.json",
+        "corpus/corpus-key-aws.json",
+        "corpus/corpus-key-azure.json",
+        "corpus/corpus-key-gcp.json",
+        "corpus/corpus-key-kmip.json",
+    ] {
         datakeys.insert_one(load_testdata(f)?, None).await?;
     }
 
@@ -497,7 +631,8 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         .extra_options(EXTRA_OPTIONS.clone())
         .schema_map(schema_map)
         .build();
-    let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let client_encrypted =
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
     let enc_opts = ClientEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .key_vault_client(client.clone().into_client())
@@ -508,17 +643,32 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
 
     // Test: build corpus.
     let corpus = load_corpus_nodecimal128("corpus/corpus.json")?;
-    let mut corpus_copied = doc! { };
+    let mut corpus_copied = doc! {};
     for (name, field) in &corpus {
         // Copy simple fields
-        if ["_id", "altname_aws", "altname_local", "altname_azure", "altname_gcp", "altname_kmip"].contains(&name.as_str()) {
+        if [
+            "_id",
+            "altname_aws",
+            "altname_local",
+            "altname_azure",
+            "altname_gcp",
+            "altname_kmip",
+        ]
+        .contains(&name.as_str())
+        {
             corpus_copied.insert(name, field);
             continue;
         }
         // Encrypt `value` field in subdocuments.
         let subdoc = match field.as_document() {
             Some(d) => d,
-            None => return Err(failure!("unexpected field type for {:?}: {:?}", name, field.element_type())),
+            None => {
+                return Err(failure!(
+                    "unexpected field type for {:?}: {:?}",
+                    name,
+                    field.element_type()
+                ))
+            }
         };
         let method = subdoc.get_str("method")?;
         if method == "auto" {
@@ -563,9 +713,14 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     }
 
     // Test: insert into and find from collection, with automatic encryption.
-    let coll = client_encrypted.database("db").collection::<Document>("coll");
+    let coll = client_encrypted
+        .database("db")
+        .collection::<Document>("coll");
     let id = coll.insert_one(corpus_copied, None).await?.inserted_id;
-    let corpus_decrypted = coll.find_one(doc! { "_id": id.clone() }, None).await?.expect("document lookup failed");
+    let corpus_decrypted = coll
+        .find_one(doc! { "_id": id.clone() }, None)
+        .await?
+        .expect("document lookup failed");
     assert_eq!(corpus, corpus_decrypted);
 
     // Test: validate encrypted form.
@@ -582,7 +737,10 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             None => continue,
         };
         let value = subdoc.get("value").expect("no expected value");
-        let actual_value = corpus_encrypted_actual.get_document(name)?.get("value").expect("no actual value");
+        let actual_value = corpus_encrypted_actual
+            .get_document(name)?
+            .get("value")
+            .expect("no actual value");
         let algo = subdoc.get_str("algo")?;
         if algo == "det" {
             assert_eq!(value, actual_value);
@@ -594,14 +752,28 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         if allowed {
             let bin = match value {
                 bson::Bson::Binary(b) => b,
-                _ => return Err(failure!("expected value {:?} should be Binary, got {:?}", name, value)),
+                _ => {
+                    return Err(failure!(
+                        "expected value {:?} should be Binary, got {:?}",
+                        name,
+                        value
+                    ))
+                }
             };
             let actual_bin = match actual_value {
                 bson::Bson::Binary(b) => b,
-                _ => return Err(failure!("actual value {:?} should be Binary, got {:?}", name, actual_value)),
+                _ => {
+                    return Err(failure!(
+                        "actual value {:?} should be Binary, got {:?}",
+                        name,
+                        actual_value
+                    ))
+                }
             };
             let dec = client_encryption.decrypt(bin.as_raw_binary()).await?;
-            let actual_dec = client_encryption.decrypt(actual_bin.as_raw_binary()).await?;
+            let actual_dec = client_encryption
+                .decrypt(actual_bin.as_raw_binary())
+                .await?;
             assert_eq!(dec, actual_dec);
         } else {
             assert_eq!(Some(value), corpus.get_document(name)?.get("value"));

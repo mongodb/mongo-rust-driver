@@ -78,8 +78,8 @@ impl ClientState {
     }
 
     fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
-        let mut builder = Crypt::builder()
-            .kms_providers(&bson::to_document(&opts.kms_providers)?)?;
+        let mut builder =
+            Crypt::builder().kms_providers(&bson::to_document(&opts.kms_providers)?)?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
         }

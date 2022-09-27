@@ -95,7 +95,8 @@ impl TestClient {
             Client::with_encryption_options(options.clone(), auto_enc).await
         } else {
             Client::with_options(options.clone())
-        }.unwrap();
+        }
+        .unwrap();
 
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
