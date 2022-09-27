@@ -326,14 +326,17 @@ async fn external_key_vault() -> Result<()> {
     Ok(())
 }
 
-fn load_testdata(name: &str) -> Result<Document> {
+fn load_testdata_raw(name: &str) -> Result<String> {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "src/test/csfle_data",
         name,
     ].iter().collect();
-    let text = std::fs::read_to_string(path)?;
-    from_json(&text)
+    Ok(std::fs::read_to_string(path)?)
+}
+
+fn load_testdata(name: &str) -> Result<Document> {
+    from_json(&load_testdata_raw(name)?)
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -422,6 +425,30 @@ async fn views_prohibited() -> Result<()> {
     Ok(())
 }
 
+macro_rules! failure {
+    ($($arg:tt)*) => {{
+        Box::new(crate::error::Error::internal(format!($($arg)*))) as Box<dyn std::error::Error>
+    }}
+}
+
+// TODO(RUST-36): use the full corpus with decimal128.
+fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
+    let json: serde_json::Value = serde_json::from_str(&load_testdata_raw(name)?)?;
+    let mut new_obj = serde_json::Map::new();
+    let decimal = serde_json::Value::String("decimal".to_string());
+    for (name, value) in json.as_object().expect("expected object") {
+        if value["type"] == decimal {
+            continue;
+        }
+        new_obj.insert(name.clone(), value.clone());
+    }
+    let bson: bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
+    match bson {
+        bson::Bson::Document(d) => Ok(d),
+        _ => Err(failure!("expected document, got {:?}", bson))
+    }
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus() -> Result<()> {
@@ -455,8 +482,7 @@ async fn corpus() -> Result<()> {
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
     // Test: build corpus.
-    // TODO(RUST-36): use the full corpus with decimal128.
-    let corpus = load_testdata("corpus/corpus-nodecimal.json")?;
+    let corpus = load_corpus_nodecimal128("corpus/corpus.json")?;
     let mut corpus_copied = doc! { };
     for (name, field) in &corpus {
         // Copy simple fields
@@ -467,7 +493,7 @@ async fn corpus() -> Result<()> {
         // Encrypt `value` field in subdocuments.
         let subdoc = match field.as_document() {
             Some(d) => d,
-            None => panic!("unexpected field type for {:?}: {:?}", name, field.element_type()),
+            None => return Err(failure!("unexpected field type for {:?}: {:?}", name, field.element_type())),
         };
         let method = subdoc.get_str("method")?;
         if method == "auto" {
@@ -475,12 +501,12 @@ async fn corpus() -> Result<()> {
             continue;
         }
         if method != "explicit" {
-            panic!("Invalid method {:?}", method);
+            return Err(failure!("Invalid method {:?}", method));
         }
         let algo = match subdoc.get_str("algo")? {
             "rand" => Algorithm::AeadAes256CbcHmacSha512Random,
             "det" => Algorithm::AeadAes256CbcHmacSha512Deterministic,
-            s => panic!("Invalid algorithm {:?}", s),
+            s => return Err(failure!("Invalid algorithm {:?}", s)),
         };
         let kms = KmsProvider::from_name(subdoc.get_str("kms")?);
         let key = match subdoc.get_str("identifier")? {
@@ -490,10 +516,10 @@ async fn corpus() -> Result<()> {
                 KmsProvider::Azure => "AZUREAAAAAAAAAAAAAAAAA==",
                 KmsProvider::Gcp => "GCPAAAAAAAAAAAAAAAAAAA==",
                 KmsProvider::Kmip => "KMIPAAAAAAAAAAAAAAAAAA==",
-                _ => panic!("Invalid kms provider {:?}", kms),
+                _ => return Err(failure!("Invalid kms provider {:?}", kms)),
             })?),
             "altname" => EncryptKey::AltName(kms.name().to_string()),
-            s => panic!("Invalid identifier {:?}", s),
+            s => return Err(failure!("Invalid identifier {:?}", s)),
         };
         let result = client_encryption.encrypt(
             bson::from_bson(subdoc.get("value").expect("no value to encrypt").clone())?,  // TODO(aegnor): is this right?
@@ -518,7 +544,7 @@ async fn corpus() -> Result<()> {
     assert_eq!(corpus, corpus_decrypted);
 
     // Test: validate encrypted form.
-    let corpus_encrypted_expected = load_testdata("corpus/corpus-encrypted.json")?;
+    let corpus_encrypted_expected = load_corpus_nodecimal128("corpus/corpus-encrypted.json")?;
     let corpus_encrypted_actual = client
         .database("db")
         .collection::<Document>("coll")
@@ -533,6 +559,9 @@ async fn corpus() -> Result<()> {
         let algo = subdoc.get_str("algo")?;
         if algo == "det" {
             assert_eq!(Some(value), corpus_encrypted_actual.get(name));
+        }
+        if algo == "rand" && subdoc.get_bool("allowed")? {
+
         }
     }
 
