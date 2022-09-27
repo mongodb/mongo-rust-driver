@@ -597,8 +597,8 @@ impl MonitorRequestReceiver {
     /// timeout. If the server associated with this monitor is removed from the topology, this
     /// method will return.
     ///
-    /// The `delay` parameter indicates how long this method should wait before listing to requests.
-    /// It is covered by the provided timeout.
+    /// The `delay` parameter indicates how long this method should wait before listening to
+    /// requests. The time spent in the delay counts toward the provided timeout.
     async fn wait_for_check_request(&mut self, delay: Duration, timeout: Duration) {
         let _ = runtime::timeout(timeout, async {
             let wait_for_check_request = async {
