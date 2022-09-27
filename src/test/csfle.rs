@@ -551,17 +551,35 @@ async fn corpus() -> Result<()> {
         .find_one(doc! { "_id": id }, None)
         .await?
         .expect("encrypted document lookup failed");
-    for (name, value) in &corpus_encrypted_expected {
-        let subdoc = match value.as_document() {
+    for (name, field) in &corpus_encrypted_expected {
+        let subdoc = match field.as_document() {
             Some(d) => d,
             None => continue,
         };
+        let value = subdoc.get("value").expect("no expected value");
+        let actual_value = corpus_encrypted_actual.get_document(name)?.get("value").expect("no actual value");
         let algo = subdoc.get_str("algo")?;
         if algo == "det" {
-            assert_eq!(Some(value), corpus_encrypted_actual.get(name));
+            assert_eq!(value, actual_value);
         }
-        if algo == "rand" && subdoc.get_bool("allowed")? {
-
+        let allowed = subdoc.get_bool("allowed")?;
+        if algo == "rand" && allowed {
+            assert_ne!(value, actual_value);
+        }
+        if allowed {
+            let bin = match value {
+                bson::Bson::Binary(b) => b,
+                _ => return Err(failure!("expected binary, got {:?}", value)),
+            };
+            let actual_bin = match actual_value {
+                bson::Bson::Binary(b) => b,
+                _ => return Err(failure!("expected binary, got {:?}", value)),
+            };
+            let dec = client_encryption.decrypt(bin.as_raw_binary()).await?;
+            let actual_dec = client_encryption.decrypt(actual_bin.as_raw_binary()).await?;
+            assert_eq!(dec, actual_dec);
+        } else {
+            assert_eq!(Some(value), corpus.get_document(name)?.get("value"));
         }
     }
 
