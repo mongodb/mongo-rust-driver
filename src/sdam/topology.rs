@@ -1081,10 +1081,11 @@ pub(crate) struct TopologyCheckRequestReceiver {
 
 impl TopologyCheckRequestReceiver {
     pub(crate) async fn wait_for_check_request(&mut self) {
-        while self.receiver.changed().await.is_ok() {
-            if *self.receiver.borrow() > 0 {
-                break;
-            }
+        while *self.receiver.borrow() == 0 {
+            // If all the requesters hung up, then just return early.
+            if self.receiver.changed().await.is_err() {
+                return;
+            };
         }
     }
 }

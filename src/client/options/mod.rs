@@ -1325,6 +1325,19 @@ impl ClientOptions {
             }
         }
 
+        if let Some(heartbeat_frequency) = self.heartbeat_freq {
+            if heartbeat_frequency < self.min_heartbeat_frequency() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!(
+                        "'heartbeat_freq' must be at least {}ms, but {}ms was given",
+                        self.min_heartbeat_frequency().as_millis(),
+                        heartbeat_frequency.as_millis()
+                    ),
+                }
+                .into());
+            }
+        }
+
         Ok(())
     }
 
@@ -1372,6 +1385,21 @@ impl ClientOptions {
     #[cfg(test)]
     pub(crate) fn test_options_mut(&mut self) -> &mut TestOptions {
         self.test_options.get_or_insert_with(Default::default)
+    }
+
+    pub(crate) fn min_heartbeat_frequency(&self) -> Duration {
+        #[cfg(test)]
+        {
+            self.test_options
+                .as_ref()
+                .and_then(|to| to.min_heartbeat_freq)
+                .unwrap_or(MIN_HEARTBEAT_FREQUENCY)
+        }
+
+        #[cfg(not(test))]
+        {
+            MIN_HEARTBEAT_FREQUENCY
+        }
     }
 }
 
@@ -1865,19 +1893,7 @@ impl ConnectionString {
                 self.direct_connection = Some(get_bool!(value, k));
             }
             k @ "heartbeatfrequencyms" => {
-                let duration = get_duration!(value, k);
-
-                if duration < MIN_HEARTBEAT_FREQUENCY.as_millis() as u64 {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "'heartbeatFrequencyMS' must be at least 500, but {} was given",
-                            duration
-                        ),
-                    }
-                    .into());
-                }
-
-                self.heartbeat_frequency = Some(Duration::from_millis(duration));
+                self.heartbeat_frequency = Some(Duration::from_millis(get_duration!(value, k)));
             }
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);

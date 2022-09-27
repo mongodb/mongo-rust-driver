@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
@@ -7,6 +9,7 @@ use crate::{
     error::ErrorKind,
     options::Compressor,
     test::run_spec_test,
+    Client,
 };
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -281,4 +284,15 @@ async fn options_debug_omits_uri() {
     assert!(!debug_output.contains("username"));
     assert!(!debug_output.contains("password"));
     assert!(!debug_output.contains("uri"));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn options_enforce_min_heartbeat_frequency() {
+    let options = ClientOptions::builder()
+        .hosts(vec![ServerAddress::parse("a:123").unwrap()])
+        .heartbeat_freq(Duration::from_millis(10))
+        .build();
+
+    Client::with_options(options).unwrap_err();
 }

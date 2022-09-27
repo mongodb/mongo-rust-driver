@@ -100,25 +100,11 @@ impl Monitor {
             // We only go to sleep when using the polling protocol (i.e. server never returned a
             // topologyVersion) or when the most recent check failed.
             if self.topology_version.is_none() || !check_succeeded {
-                #[cfg(test)]
-                let min_frequency = self
-                    .client_options
-                    .test_options
-                    .as_ref()
-                    .and_then(|to| to.min_heartbeat_freq)
-                    .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
-
-                #[cfg(not(test))]
-                let min_frequency = MIN_HEARTBEAT_FREQUENCY;
-
-                tokio::select! {
-                    _ = runtime::delay_for(min_frequency) => {},
-                    _ = self.request_receiver.wait_for_server_close() => {
-                        break;
-                    }
-                }
                 self.request_receiver
-                    .wait_for_check_request(heartbeat_frequency - min_frequency)
+                    .wait_for_check_request(
+                        self.client_options.min_heartbeat_frequency(),
+                        heartbeat_frequency,
+                    )
                     .await;
             }
         }
@@ -596,17 +582,28 @@ impl MonitorRequestReceiver {
         err
     }
 
-    /// Wait for a request to immediately check the server to come in, guarded by the provided
-    /// timeout. If a cancellation request is received indicating the topology has closed, this
-    /// method will return. All other cancellation requests will be ignored.
-    async fn wait_for_check_request(&mut self, timeout: Duration) {
+    /// Wait for a request to immediately check the server to be received, guarded by the provided
+    /// timeout. If the server associated with this monitor is removed from the topology, this
+    /// method will return.
+    ///
+    /// The `delay` parameter indicates how long this method should wait before listening to
+    /// requests. The time spent in the delay counts toward the provided timeout.
+    async fn wait_for_check_request(&mut self, delay: Duration, timeout: Duration) {
         let _ = runtime::timeout(timeout, async {
+            let wait_for_check_request = async {
+                runtime::delay_for(delay).await;
+                self.topology_check_request_receiver
+                    .wait_for_check_request()
+                    .await;
+            };
+            tokio::pin!(wait_for_check_request);
+
             loop {
                 tokio::select! {
                     _ = self.individual_check_request_receiver.changed() => {
                         break;
                     }
-                    _ = self.topology_check_request_receiver.wait_for_check_request() => {
+                    _ = &mut wait_for_check_request => {
                         break;
                     }
                     _ = self.handle_listener.wait_for_all_handle_drops() => {
@@ -620,11 +617,6 @@ impl MonitorRequestReceiver {
 
         // clear out ignored cancellation requests while we were waiting to begin a check
         self.cancellation_receiver.borrow_and_update();
-    }
-
-    /// Wait until the server associated with this monitor has been closed.
-    async fn wait_for_server_close(&mut self) {
-        self.handle_listener.wait_for_all_handle_drops().await;
     }
 
     fn is_alive(&self) -> bool {
