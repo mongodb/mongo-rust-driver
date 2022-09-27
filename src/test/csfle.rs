@@ -696,8 +696,10 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             "altname" => EncryptKey::AltName(kms.name().to_string()),
             s => return Err(failure!("Invalid identifier {:?}", s)),
         };
+        let value = subdoc.get("value").expect("no value to encrypt").clone();
         let result = client_encryption.encrypt(
-            bson::from_bson(subdoc.get("value").expect("no value to encrypt").clone())?,  // TODO(aegnor): is this right?
+            bson::from_bson(value)?,  // TODO(aegnor): is this right?
+            //value.try_into()?,
             EncryptOptions::builder()
                 .key(key)
                 .algorithm(algo)
@@ -779,6 +781,28 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             assert_eq!(Some(value), corpus.get_document(name)?.get("value"));
         }
     }
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
+    let _guard = LOCK.run_exclusively().await;
+
+    let (client, _) = init_client().await?;
+    let mut kms_providers = KMS_PROVIDERS.clone();
+    kms_providers
+        .get_mut(&KmsProvider::Azure)
+        .unwrap()
+        .insert("identityPlatformEndpoint", "login.microsoftonline.com:443");
+    let enc_opts = ClientEncryptionOptions::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .key_vault_client(client.into_client())
+        .kms_providers(kms_providers)
+        .tls_options(KMIP_TLS_OPTIONS.clone())
+        .build();
 
     Ok(())
 }
