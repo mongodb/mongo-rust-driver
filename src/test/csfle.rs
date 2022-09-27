@@ -451,26 +451,51 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn corpus() -> Result<()> {
+async fn corpus_coll_schema() -> Result<()> {
     // TODO(aegnor): early-exit if not using openssl-tls
     let _guard = LOCK.run_exclusively().await;
+    run_corpus_test(false).await?;
+    Ok(())
+}
 
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn corpus_local_schema() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
+    let _guard = LOCK.run_exclusively().await;
+    run_corpus_test(true).await?;
+    Ok(())
+}
+
+async fn run_corpus_test(local_schema: bool) -> Result<()> {
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
-    client.database("db").create_collection("coll", CreateCollectionOptions::builder()
-        .validator(doc! { "$jsonSchema": load_testdata("corpus/corpus-schema.json")? })
-        .build()
-    ).await?;
+    let schema = load_testdata("corpus/corpus-schema.json")?;
+    let coll_opts = if local_schema {
+        None
+    } else {
+        Some(CreateCollectionOptions::builder()
+            .validator(doc! { "$jsonSchema": schema.clone() })
+            .build()
+        )
+    };
+    client.database("db").create_collection("coll", coll_opts).await?;
     for f in ["corpus/corpus-key-local.json", "corpus/corpus-key-aws.json", "corpus/corpus-key-azure.json", "corpus/corpus-key-gcp.json", "corpus/corpus-key-kmip.json"] {
         datakeys.insert_one(load_testdata(f)?, None).await?;
     }
 
     // Setup: encrypted client and manual encryption.
+    let schema_map = if local_schema {
+        Some([("db.coll".to_string(), schema)].into_iter().collect())
+    } else {
+        None
+    };
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(KMS_PROVIDERS.clone())
         .tls_options(KMIP_TLS_OPTIONS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
+        .schema_map(schema_map)
         .build();
     let client_encrypted = Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
     let enc_opts = ClientEncryptionOptions::builder()
@@ -569,11 +594,11 @@ async fn corpus() -> Result<()> {
         if allowed {
             let bin = match value {
                 bson::Bson::Binary(b) => b,
-                _ => return Err(failure!("expected binary, got {:?}", value)),
+                _ => return Err(failure!("expected value {:?} should be Binary, got {:?}", name, value)),
             };
             let actual_bin = match actual_value {
                 bson::Bson::Binary(b) => b,
-                _ => return Err(failure!("expected binary, got {:?}", value)),
+                _ => return Err(failure!("actual value {:?} should be Binary, got {:?}", name, actual_value)),
             };
             let dec = client_encryption.decrypt(bin.as_raw_binary()).await?;
             let actual_dec = client_encryption.decrypt(actual_bin.as_raw_binary()).await?;
