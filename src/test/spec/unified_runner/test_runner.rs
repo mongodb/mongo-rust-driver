@@ -57,7 +57,6 @@ use super::{
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
-    "delete",
     "listCollectionObjects",
     "listDatabaseObjects",
     "mapReduce",

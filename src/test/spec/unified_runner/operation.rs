@@ -341,6 +341,7 @@ impl<'de> Deserialize<'de> for Operation {
             "createEntities" => deserialize_op::<CreateEntities>(definition.arguments),
             "download" => deserialize_op::<Download>(definition.arguments),
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
+            "delete" => deserialize_op::<Delete>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -2694,6 +2695,27 @@ impl TestOperation for DownloadByName {
                 .await?;
             let data = hex::encode(buf);
             Ok(Some(Entity::Bson(data.into())))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Delete {
+    id: Bson,
+}
+
+impl TestOperation for Delete {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id).await;
+            bucket.delete(self.id.clone()).await?;
+            Ok(None)
         }
         .boxed()
     }
