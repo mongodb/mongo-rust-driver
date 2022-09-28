@@ -1003,3 +1003,65 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
+    let _guard = LOCK.run_exclusively().await;
+
+    let key_options = DataKeyOptions::builder()
+        .master_key(MasterKey::Kmip {
+            key_id: Some("1".to_string()),
+            endpoint: None,
+        })
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption.create_data_key(&KmsProvider::Kmip, &key_options).await?;
+    validate_roundtrip(&client_encryption, key_id).await?;
+
+    let client_encryption_invalid = custom_endpoint_setup(false).await?;
+    let result = client_encryption_invalid.create_data_key(&KmsProvider::Kmip, &key_options).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
+    let _guard = LOCK.run_exclusively().await;
+
+    let key_options = DataKeyOptions::builder()
+        .master_key(MasterKey::Kmip {
+            key_id: Some("1".to_string()),
+            endpoint: Some("localhost:5698".to_string()),
+        })
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption.create_data_key(&KmsProvider::Kmip, &key_options).await?;
+    validate_roundtrip(&client_encryption, key_id).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
+    // TODO(aegnor): early-exit if not using openssl-tls
+    let _guard = LOCK.run_exclusively().await;
+
+    let key_options = DataKeyOptions::builder()
+        .master_key(MasterKey::Kmip {
+            key_id: Some("1".to_string()),
+            endpoint: Some("doesnotexist.local:5698".to_string()),
+        })
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let result = client_encryption.create_data_key(&KmsProvider::Kmip, &key_options).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
