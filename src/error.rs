@@ -231,6 +231,14 @@ impl Error {
         )
     }
 
+    #[cfg(test)]
+    pub(crate) fn is_csfle_error(&self) -> bool {
+        matches!(
+            self.kind.as_ref(),
+            ErrorKind::Csfle(..),
+        )
+    }
+
     /// Gets the code from this error for performing SDAM updates, if applicable.
     /// Any codes contained in WriteErrors are ignored.
     pub(crate) fn code(&self) -> Option<i32> {

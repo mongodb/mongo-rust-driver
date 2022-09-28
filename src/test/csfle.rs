@@ -808,15 +808,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
     Ok(ClientEncryption::new(enc_opts)?)
 }
 
-async fn custom_endpoint_aws_ok(key: MasterKey) -> Result<()> {
-    let client_encryption = custom_endpoint_setup(true).await?;
-
-    let key_id = client_encryption.create_data_key(
-        &KmsProvider::Aws,
-        &DataKeyOptions::builder()
-            .master_key(key)
-            .build(),
-    ).await?;
+async fn validate_roundtrip(client_encryption: &ClientEncryption, key_id: bson::Binary) -> Result<()> {
     let value = RawBson::String("test".to_string());
     let encrypted = client_encryption.encrypt(
         value.clone(),
@@ -827,6 +819,23 @@ async fn custom_endpoint_aws_ok(key: MasterKey) -> Result<()> {
     ).await?;
     let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
     assert_eq!(value, decrypted);
+    Ok(())
+}
+
+async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
+    let client_encryption = custom_endpoint_setup(true).await?;
+
+    let key_id = client_encryption.create_data_key(
+        &KmsProvider::Aws,
+        &DataKeyOptions::builder()
+            .master_key(MasterKey::Aws {
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                endpoint,
+            })
+            .build(),
+    ).await?;
+    validate_roundtrip(&client_encryption, key_id).await?;
 
     Ok(())
 }
@@ -836,13 +845,7 @@ async fn custom_endpoint_aws_ok(key: MasterKey) -> Result<()> {
 async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    custom_endpoint_aws_ok(
-        MasterKey::Aws {
-            region: "us-east-1".to_string(),
-            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-            endpoint: None,
-        }
-    ).await
+    custom_endpoint_aws_ok(None).await
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -850,13 +853,7 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
 async fn custom_endpoint_aws_no_port() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    custom_endpoint_aws_ok(
-        MasterKey::Aws {
-            region: "us-east-1".to_string(),
-            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-            endpoint: Some("kms.us-east-1.amazonaws.com".to_string()),
-        }
-    ).await
+    custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com".to_string())).await
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -864,13 +861,7 @@ async fn custom_endpoint_aws_no_port() -> Result<()> {
 async fn custom_endpoint_aws_with_port() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    custom_endpoint_aws_ok(
-        MasterKey::Aws {
-            region: "us-east-1".to_string(),
-            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-            endpoint: Some("kms.us-east-1.amazonaws.com:443".to_string()),
-        }
-    ).await
+    custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com:443".to_string())).await
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -890,6 +881,74 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
             })
             .build(),
     ).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_invalid_region() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+
+    let result = client_encryption.create_data_key(
+        &KmsProvider::Aws,
+        &DataKeyOptions::builder()
+            .master_key(MasterKey::Aws {
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                endpoint: Some("kms.us-east-2.amazonaws.com".to_string()),
+            })
+            .build(),
+    ).await;
+    assert!(result.unwrap_err().is_csfle_error());
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+
+    let result = client_encryption.create_data_key(
+        &KmsProvider::Aws,
+        &DataKeyOptions::builder()
+            .master_key(MasterKey::Aws {
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                endpoint: Some("doesnotexist.invalid".to_string()),
+            })
+            .build(),
+    ).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_azure() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let key_options = DataKeyOptions::builder()
+        .master_key(MasterKey::Azure {
+            key_vault_endpoint: "key-vault-csfle.vault.azure.net".to_string(),
+            key_name: "key-name-csfle".to_string(),
+            key_version: None,
+        })
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption.create_data_key(&KmsProvider::Azure, &key_options).await?;
+    validate_roundtrip(&client_encryption, key_id).await?;
+
+    let client_encryption_invalid = custom_endpoint_setup(false).await?;
+    let result = client_encryption_invalid.create_data_key(&KmsProvider::Azure, &key_options).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
