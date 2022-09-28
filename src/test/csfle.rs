@@ -808,20 +808,13 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
     Ok(ClientEncryption::new(enc_opts)?)
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
+async fn custom_endpoint_aws_ok(key: MasterKey) -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
+
     let key_id = client_encryption.create_data_key(
         &KmsProvider::Aws,
         &DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint: None,
-            })
+            .master_key(key)
             .build(),
     ).await?;
     let value = RawBson::String("test".to_string());
@@ -834,6 +827,70 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
     ).await?;
     let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
     assert_eq!(value, decrypted);
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    custom_endpoint_aws_ok(
+        MasterKey::Aws {
+            region: "us-east-1".to_string(),
+            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+            endpoint: None,
+        }
+    ).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_no_port() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    custom_endpoint_aws_ok(
+        MasterKey::Aws {
+            region: "us-east-1".to_string(),
+            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+            endpoint: Some("kms.us-east-1.amazonaws.com".to_string()),
+        }
+    ).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_with_port() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    custom_endpoint_aws_ok(
+        MasterKey::Aws {
+            region: "us-east-1".to_string(),
+            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+            endpoint: Some("kms.us-east-1.amazonaws.com:443".to_string()),
+        }
+    ).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_invalid_port() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+
+    let result = client_encryption.create_data_key(
+        &KmsProvider::Aws,
+        &DataKeyOptions::builder()
+            .master_key(MasterKey::Aws {
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                endpoint: Some("kms.us-east-1.amazonaws.com:12345".to_string()),
+            })
+            .build(),
+    ).await;
+    assert!(result.unwrap_err().is_network_error());
 
     Ok(())
 }
