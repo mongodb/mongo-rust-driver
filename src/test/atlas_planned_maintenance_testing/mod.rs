@@ -1,3 +1,8 @@
+// NOTE: Please run a patch against drivers-atlas-testing repo when making changes within this file.
+//
+// The driver repository and revision can be updated here:
+// https://github.com/mongodb-labs/drivers-atlas-testing/blob/f4601b08598446437d9d7aa286202b1d1400260d/.evergreen/config.yml#L646
+
 mod json_models;
 
 use std::{
