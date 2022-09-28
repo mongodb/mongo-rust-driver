@@ -132,20 +132,19 @@ fn write_json(entities: &mut EntityMap, mut errors: Vec<Bson>) {
     // The events key is expected to be present regardless of whether storeEventsAsEntities was
     // defined.
     write!(&mut writer, ",\"events\":[").unwrap();
-    let event_list_entity = match entities.get("events") {
-        Some(entity) => entity.as_event_list().to_owned(),
-        None => return,
-    };
-    let client = entities
-        .get(&event_list_entity.client_id)
-        .unwrap()
-        .as_client();
-    let names: Vec<&str> = event_list_entity
-        .event_names
-        .iter()
-        .map(String::as_ref)
-        .collect();
-    client.write_events_list_to_file(&names, &mut writer);
+    if let Some(entity) = entities.get("events") {
+        let event_list_entity = entity.as_event_list().to_owned();
+        let client = entities
+            .get(&event_list_entity.client_id)
+            .unwrap()
+            .as_client();
+        let names: Vec<&str> = event_list_entity
+            .event_names
+            .iter()
+            .map(String::as_ref)
+            .collect();
+        client.write_events_list_to_file(&names, &mut writer);
+    }
     write!(&mut writer, "]}}").unwrap();
 
     let mut results_path = PathBuf::from(&path);
