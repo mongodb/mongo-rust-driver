@@ -28,7 +28,7 @@ use crate::{
     Namespace,
 };
 
-use super::{EventClient, CLIENT_OPTIONS, LOCK};
+use super::{EventClient, CLIENT_OPTIONS, LOCK, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -95,7 +95,7 @@ async fn custom_key_material() -> Result<()> {
     let id = enc
         .create_data_key(
             &KmsProvider::Local,
-            DataKeyOptions::builder()
+            &DataKeyOptions::builder()
                 .master_key(MasterKey::Local)
                 .key_material(key)
                 .build(),
@@ -113,7 +113,7 @@ async fn custom_key_material() -> Result<()> {
     let encrypted = enc
         .encrypt(
             bson::RawBson::String("test".to_string()),
-            EncryptOptions::builder()
+            &EncryptOptions::builder()
                 .key(EncryptKey::Id(new_key_id))
                 .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
                 .build(),
@@ -220,10 +220,10 @@ async fn data_key_double_encryption() -> Result<()> {
         let datakey_id = client_encryption
             .create_data_key(
                 &provider,
-                DataKeyOptions::builder()
-            .key_alt_names(vec![format!("{}_altname", provider.name())])
-            .master_key(master_key)  // varies by provider
-        .build(),
+                &DataKeyOptions::builder()
+                    .key_alt_names(vec![format!("{}_altname", provider.name())])
+                    .master_key(master_key)  // varies by provider
+                .build(),
             )
             .await?;
         assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
@@ -258,7 +258,7 @@ async fn data_key_double_encryption() -> Result<()> {
         let encrypted = client_encryption
             .encrypt(
                 RawBson::String(format!("hello {}", provider.name())),
-                EncryptOptions::builder()
+                &EncryptOptions::builder()
                     .key(EncryptKey::Id(datakey_id))
                     .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
                     .build(),
@@ -283,7 +283,7 @@ async fn data_key_double_encryption() -> Result<()> {
         let other_encrypted = client_encryption
             .encrypt(
                 RawBson::String(format!("hello {}", provider.name())),
-                EncryptOptions::builder()
+                &EncryptOptions::builder()
                     .key(EncryptKey::AltName(format!("{}_altname", provider.name())))
                     .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
                     .build(),
@@ -405,7 +405,7 @@ async fn external_key_vault() -> Result<()> {
         let result = client_encryption
             .encrypt(
                 RawBson::String("test".to_string()),
-                EncryptOptions::builder()
+                &EncryptOptions::builder()
                     .key(EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?))
                     .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
                     .build(),
@@ -700,7 +700,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         let result = client_encryption.encrypt(
             bson::from_bson(value)?,  // TODO(aegnor): is this right?
             //value.try_into()?,
-            EncryptOptions::builder()
+            &EncryptOptions::builder()
                 .key(key)
                 .algorithm(algo)
                 .build(),
@@ -785,24 +785,55 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn custom_endpoint() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
-    let _guard = LOCK.run_exclusively().await;
-
-    let (client, _) = init_client().await?;
+async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
     let mut kms_providers = KMS_PROVIDERS.clone();
     kms_providers
         .get_mut(&KmsProvider::Azure)
         .unwrap()
-        .insert("identityPlatformEndpoint", "login.microsoftonline.com:443");
+        .insert("identityPlatformEndpoint", if valid { "login.microsoftonline.com:443" } else { "doesnotexist.invalid:443" });
+    kms_providers
+        .get_mut(&KmsProvider::Gcp)
+        .unwrap()
+        .insert("endpoint", if valid { "oauth2.googleapis.com:443" } else { "doesnotexist.invalid:443" });
+    kms_providers
+        .get_mut(&KmsProvider::Kmip)
+        .unwrap()
+        .insert("endpoint", if valid { "localhost:5698" } else { "doesnotexist.local:5698" });
     let enc_opts = ClientEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
-        .key_vault_client(client.into_client())
+        .key_vault_client(TestClient::new().await.into_client())
         .kms_providers(kms_providers)
         .tls_options(KMIP_TLS_OPTIONS.clone())
         .build();
+    Ok(ClientEncryption::new(enc_opts)?)
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption.create_data_key(
+        &KmsProvider::Aws,
+        &DataKeyOptions::builder()
+            .master_key(MasterKey::Aws {
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                endpoint: None,
+            })
+            .build(),
+    ).await?;
+    let value = RawBson::String("test".to_string());
+    let encrypted = client_encryption.encrypt(
+        value.clone(),
+        &EncryptOptions::builder()
+            .key(EncryptKey::Id(key_id))
+            .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+            .build(),
+    ).await?;
+    let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
+    assert_eq!(value, decrypted);
 
     Ok(())
 }

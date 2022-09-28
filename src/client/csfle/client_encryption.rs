@@ -65,7 +65,7 @@ impl ClientEncryption {
     pub async fn create_data_key(
         &self,
         kms_provider: &KmsProvider,
-        opts: impl Into<Option<DataKeyOptions>>,
+        opts: impl Into<Option<&DataKeyOptions>>,
     ) -> Result<Binary> {
         let ctx = self.create_data_key_ctx(kms_provider, opts.into())?;
         let data_key = self.exec.run_ctx(ctx, None).await?;
@@ -79,7 +79,7 @@ impl ClientEncryption {
     fn create_data_key_ctx(
         &self,
         kms_provider: &KmsProvider,
-        opts: Option<DataKeyOptions>,
+        opts: Option<&DataKeyOptions>,
     ) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
         let mut key_doc = doc! { "provider": kms_provider.name() };
@@ -88,12 +88,12 @@ impl ClientEncryption {
                 let master_doc = bson::to_document(&opts.master_key)?;
                 key_doc.extend(master_doc);
             }
-            if let Some(alt_names) = opts.key_alt_names {
+            if let Some(alt_names) = &opts.key_alt_names {
                 for name in alt_names {
                     builder = builder.key_alt_name(&name)?;
                 }
             }
-            if let Some(material) = opts.key_material {
+            if let Some(material) = &opts.key_material {
                 builder = builder.key_material(&material)?;
             }
         }
@@ -182,7 +182,7 @@ impl ClientEncryption {
 
     /// Encrypts a BsonValue with a given key and algorithm.
     /// Returns an encrypted value (BSON binary of subtype 6).
-    pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
+    pub async fn encrypt(&self, value: bson::RawBson, opts: &EncryptOptions) -> Result<Binary> {
         let ctx = self.encrypt_ctx(value, opts)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
@@ -191,9 +191,9 @@ impl ClientEncryption {
         Ok(bin_ref.to_binary())
     }
 
-    fn encrypt_ctx(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Ctx> {
+    fn encrypt_ctx(&self, value: bson::RawBson, opts: &EncryptOptions) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
-        match opts.key {
+        match &opts.key {
             EncryptKey::Id(id) => {
                 builder = builder.key_id(&id.bytes)?;
             }
@@ -205,7 +205,7 @@ impl ClientEncryption {
         if let Some(factor) = opts.contention_factor {
             builder = builder.contention_factor(factor)?;
         }
-        if let Some(qtype) = opts.query_type {
+        if let Some(qtype) = &opts.query_type {
             builder = builder.query_type(&qtype)?;
         }
         Ok(builder.build_explicit_encrypt(value)?)
