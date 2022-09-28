@@ -28,7 +28,7 @@ use crate::{
     Namespace,
 };
 
-use super::{EventClient, CLIENT_OPTIONS, LOCK, TestClient};
+use super::{EventClient, TestClient, CLIENT_OPTIONS, LOCK};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -697,14 +697,13 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             s => return Err(failure!("Invalid identifier {:?}", s)),
         };
         let value = subdoc.get("value").expect("no value to encrypt").clone();
-        let result = client_encryption.encrypt(
-            bson::from_bson(value)?,  // TODO(aegnor): is this right?
-            //value.try_into()?,
-            &EncryptOptions::builder()
-                .key(key)
-                .algorithm(algo)
-                .build(),
-        ).await;
+        let result = client_encryption
+            .encrypt(
+                bson::from_bson(value)?, // TODO(aegnor): is this right?
+                // value.try_into()?,
+                &EncryptOptions::builder().key(key).algorithm(algo).build(),
+            )
+            .await;
         let mut subdoc_copied = subdoc.clone();
         if subdoc.get_bool("allowed")? {
             subdoc_copied.insert("value", result?);
@@ -787,18 +786,30 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
 
 async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
     let mut kms_providers = KMS_PROVIDERS.clone();
-    kms_providers
-        .get_mut(&KmsProvider::Azure)
-        .unwrap()
-        .insert("identityPlatformEndpoint", if valid { "login.microsoftonline.com:443" } else { "doesnotexist.invalid:443" });
-    kms_providers
-        .get_mut(&KmsProvider::Gcp)
-        .unwrap()
-        .insert("endpoint", if valid { "oauth2.googleapis.com:443" } else { "doesnotexist.invalid:443" });
-    kms_providers
-        .get_mut(&KmsProvider::Kmip)
-        .unwrap()
-        .insert("endpoint", if valid { "localhost:5698" } else { "doesnotexist.local:5698" });
+    kms_providers.get_mut(&KmsProvider::Azure).unwrap().insert(
+        "identityPlatformEndpoint",
+        if valid {
+            "login.microsoftonline.com:443"
+        } else {
+            "doesnotexist.invalid:443"
+        },
+    );
+    kms_providers.get_mut(&KmsProvider::Gcp).unwrap().insert(
+        "endpoint",
+        if valid {
+            "oauth2.googleapis.com:443"
+        } else {
+            "doesnotexist.invalid:443"
+        },
+    );
+    kms_providers.get_mut(&KmsProvider::Kmip).unwrap().insert(
+        "endpoint",
+        if valid {
+            "localhost:5698"
+        } else {
+            "doesnotexist.local:5698"
+        },
+    );
     let enc_opts = ClientEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .key_vault_client(TestClient::new().await.into_client())
@@ -808,15 +819,20 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
     Ok(ClientEncryption::new(enc_opts)?)
 }
 
-async fn validate_roundtrip(client_encryption: &ClientEncryption, key_id: bson::Binary) -> Result<()> {
+async fn validate_roundtrip(
+    client_encryption: &ClientEncryption,
+    key_id: bson::Binary,
+) -> Result<()> {
     let value = RawBson::String("test".to_string());
-    let encrypted = client_encryption.encrypt(
-        value.clone(),
-        &EncryptOptions::builder()
-            .key(EncryptKey::Id(key_id))
-            .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-            .build(),
-    ).await?;
+    let encrypted = client_encryption
+        .encrypt(
+            value.clone(),
+            &EncryptOptions::builder()
+                .key(EncryptKey::Id(key_id))
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .build(),
+        )
+        .await?;
     let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
     assert_eq!(value, decrypted);
     Ok(())
@@ -825,16 +841,20 @@ async fn validate_roundtrip(client_encryption: &ClientEncryption, key_id: bson::
 async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
 
-    let key_id = client_encryption.create_data_key(
-        &KmsProvider::Aws,
-        &DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint,
-            })
-            .build(),
-    ).await?;
+    let key_id = client_encryption
+        .create_data_key(
+            &KmsProvider::Aws,
+            &DataKeyOptions::builder()
+                .master_key(MasterKey::Aws {
+                    region: "us-east-1".to_string(),
+                    key: "arn:aws:kms:us-east-1:579766882180:key/\
+                          89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                        .to_string(),
+                    endpoint,
+                })
+                .build(),
+        )
+        .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     Ok(())
@@ -871,16 +891,20 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
 
     let client_encryption = custom_endpoint_setup(true).await?;
 
-    let result = client_encryption.create_data_key(
-        &KmsProvider::Aws,
-        &DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint: Some("kms.us-east-1.amazonaws.com:12345".to_string()),
-            })
-            .build(),
-    ).await;
+    let result = client_encryption
+        .create_data_key(
+            &KmsProvider::Aws,
+            &DataKeyOptions::builder()
+                .master_key(MasterKey::Aws {
+                    region: "us-east-1".to_string(),
+                    key: "arn:aws:kms:us-east-1:579766882180:key/\
+                          89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                        .to_string(),
+                    endpoint: Some("kms.us-east-1.amazonaws.com:12345".to_string()),
+                })
+                .build(),
+        )
+        .await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -893,16 +917,20 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
 
     let client_encryption = custom_endpoint_setup(true).await?;
 
-    let result = client_encryption.create_data_key(
-        &KmsProvider::Aws,
-        &DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint: Some("kms.us-east-2.amazonaws.com".to_string()),
-            })
-            .build(),
-    ).await;
+    let result = client_encryption
+        .create_data_key(
+            &KmsProvider::Aws,
+            &DataKeyOptions::builder()
+                .master_key(MasterKey::Aws {
+                    region: "us-east-1".to_string(),
+                    key: "arn:aws:kms:us-east-1:579766882180:key/\
+                          89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                        .to_string(),
+                    endpoint: Some("kms.us-east-2.amazonaws.com".to_string()),
+                })
+                .build(),
+        )
+        .await;
     assert!(result.unwrap_err().is_csfle_error());
 
     Ok(())
@@ -915,16 +943,20 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
 
     let client_encryption = custom_endpoint_setup(true).await?;
 
-    let result = client_encryption.create_data_key(
-        &KmsProvider::Aws,
-        &DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint: Some("doesnotexist.invalid".to_string()),
-            })
-            .build(),
-    ).await;
+    let result = client_encryption
+        .create_data_key(
+            &KmsProvider::Aws,
+            &DataKeyOptions::builder()
+                .master_key(MasterKey::Aws {
+                    region: "us-east-1".to_string(),
+                    key: "arn:aws:kms:us-east-1:579766882180:key/\
+                          89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                        .to_string(),
+                    endpoint: Some("doesnotexist.invalid".to_string()),
+                })
+                .build(),
+        )
+        .await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -944,11 +976,15 @@ async fn custom_endpoint_azure() -> Result<()> {
         .build();
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let key_id = client_encryption.create_data_key(&KmsProvider::Azure, &key_options).await?;
+    let key_id = client_encryption
+        .create_data_key(&KmsProvider::Azure, &key_options)
+        .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid.create_data_key(&KmsProvider::Azure, &key_options).await;
+    let result = client_encryption_invalid
+        .create_data_key(&KmsProvider::Azure, &key_options)
+        .await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -971,11 +1007,15 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
         .build();
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let key_id = client_encryption.create_data_key(&KmsProvider::Gcp, &key_options).await?;
+    let key_id = client_encryption
+        .create_data_key(&KmsProvider::Gcp, &key_options)
+        .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid.create_data_key(&KmsProvider::Gcp, &key_options).await;
+    let result = client_encryption_invalid
+        .create_data_key(&KmsProvider::Gcp, &key_options)
+        .await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -998,7 +1038,9 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
         .build();
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let result = client_encryption.create_data_key(&KmsProvider::Gcp, &key_options).await;
+    let result = client_encryption
+        .create_data_key(&KmsProvider::Gcp, &key_options)
+        .await;
     assert!(result.unwrap_err().is_csfle_error());
 
     Ok(())
@@ -1018,11 +1060,15 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
         .build();
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let key_id = client_encryption.create_data_key(&KmsProvider::Kmip, &key_options).await?;
+    let key_id = client_encryption
+        .create_data_key(&KmsProvider::Kmip, &key_options)
+        .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid.create_data_key(&KmsProvider::Kmip, &key_options).await;
+    let result = client_encryption_invalid
+        .create_data_key(&KmsProvider::Kmip, &key_options)
+        .await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -1042,7 +1088,9 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
         .build();
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let key_id = client_encryption.create_data_key(&KmsProvider::Kmip, &key_options).await?;
+    let key_id = client_encryption
+        .create_data_key(&KmsProvider::Kmip, &key_options)
+        .await?;
     validate_roundtrip(&client_encryption, key_id).await
 }
 
@@ -1060,7 +1108,9 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
         .build();
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let result = client_encryption.create_data_key(&KmsProvider::Kmip, &key_options).await;
+    let result = client_encryption
+        .create_data_key(&KmsProvider::Kmip, &key_options)
+        .await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
