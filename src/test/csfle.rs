@@ -953,3 +953,53 @@ async fn custom_endpoint_azure() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_gcp_valid() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let key_options = DataKeyOptions::builder()
+        .master_key(MasterKey::Gcp {
+            project_id: "devprod-drivers".to_string(),
+            location: "global".to_string(),
+            key_ring: "key-ring-csfle".to_string(),
+            key_name: "key-name-csfle".to_string(),
+            key_version: None,
+            endpoint: Some("cloudkms.googleapis.com:443".to_string()),
+        })
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption.create_data_key(&KmsProvider::Gcp, &key_options).await?;
+    validate_roundtrip(&client_encryption, key_id).await?;
+
+    let client_encryption_invalid = custom_endpoint_setup(false).await?;
+    let result = client_encryption_invalid.create_data_key(&KmsProvider::Gcp, &key_options).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn custom_endpoint_gcp_invalid() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let key_options = DataKeyOptions::builder()
+        .master_key(MasterKey::Gcp {
+            project_id: "devprod-drivers".to_string(),
+            location: "global".to_string(),
+            key_ring: "key-ring-csfle".to_string(),
+            key_name: "key-name-csfle".to_string(),
+            key_version: None,
+            endpoint: Some("doesnotexist.invalid:443".to_string()),
+        })
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let result = client_encryption.create_data_key(&KmsProvider::Gcp, &key_options).await;
+    assert!(result.unwrap_err().is_csfle_error());
+
+    Ok(())
+}
