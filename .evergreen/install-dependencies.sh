@@ -58,6 +58,14 @@ for arg; do
         if [ $RESULT -ne 0 ]; then
             exit $RESULT
         fi
+    elif [ $arg == "libmongocrypt" ]; then
+        mkdir ${PROJECT_DIRECTORY}/libmongocrypt
+        cd ${PROJECT_DIRECTORY}/libmongocrypt
+        curl -sSfO https://s3.amazonaws.com/mciuploads/libmongocrypt/all/master/latest/libmongocrypt-all.tar.gz
+        tar xzf libmongocrypt-all.tar.gz
+        if [ "Windows_NT" == "$OS" ]; then
+            chmod +x ${MONGOCRYPT_LIB_DIR}/../bin/*.dll
+        fi
     else
         echo Missing/unknown install option: "$arg"
         exit 1

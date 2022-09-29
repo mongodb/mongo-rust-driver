@@ -28,7 +28,7 @@ use crate::{
     Namespace,
 };
 
-use super::{EventClient, TestClient, CLIENT_OPTIONS, LOCK};
+use super::{EventClient, TestClient, CLIENT_OPTIONS, LOCK, log_uncaptured};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -75,6 +75,7 @@ lazy_static! {
         let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
         tls_options
     };
+    static ref LOCAL_KMIP_AVAILABLE: bool = std::env::var("LOCAL_KMIP_AVAILABLE").is_ok();
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -129,11 +130,12 @@ async fn custom_key_material() -> Result<()> {
     Ok(())
 }
 
-// This test requires the `openssl-tls` feature; rustls is incompatible with the driver-tools kmip
-// server.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn data_key_double_encryption() -> Result<()> {
+    if !check_kmip_test("data_key_double_encryption") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: drop stale data.
@@ -333,10 +335,29 @@ fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
     })
 }
 
+fn check_kmip_test(name: &str) -> bool {
+    #[cfg(not(feature = "openssl-tls"))]
+    {
+        // rustls is incompatible with the driver-tools kmip server.
+        log_uncaptured(format!("skipping {}: KMIP requires openssl", name));
+        return false;
+    }
+    #[cfg(feature = "openssl-tls")]
+    {
+        if !*LOCAL_KMIP_AVAILABLE {
+            log_uncaptured(format!("skipping {}: no KMIP server available", name));
+            return false;
+        }
+        return true;
+    }
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn external_key_vault() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
+    if !check_kmip_test("external_key_vault") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     for with_external_key_vault in [false, true] {
@@ -576,7 +597,9 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus_coll_schema() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
+    if !check_kmip_test("corpus_coll_schema") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
     run_corpus_test(false).await?;
     Ok(())
@@ -585,7 +608,9 @@ async fn corpus_coll_schema() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus_local_schema() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
+    if !check_kmip_test("corpus_local_schema") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
     run_corpus_test(true).await?;
     Ok(())
@@ -1049,7 +1074,9 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
+    if !check_kmip_test("custom_endpoint_kmip_no_endpoint") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let key_options = DataKeyOptions::builder()
@@ -1077,7 +1104,9 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
+    if !check_kmip_test("custom_endpoint_kmip_valid_endpoint") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let key_options = DataKeyOptions::builder()
@@ -1097,7 +1126,9 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
-    // TODO(aegnor): early-exit if not using openssl-tls
+    if !check_kmip_test("custom_endpoint_kmip_invalid_endpoint") {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let key_options = DataKeyOptions::builder()
