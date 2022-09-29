@@ -40,7 +40,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
-#[error("{kind}")]
+#[error("Kind: {kind}, labels: {labels:?}")]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
@@ -370,6 +370,16 @@ impl Error {
             _ => None,
         }
     }
+
+    /// Per the CLAM spec, for sensitive commands we must redact everything besides the
+    /// error labels, error code, and error code name from errors received in response to
+    /// sensitive commands. Currently, the only field besides those that we expose is the
+    /// error message.
+    pub(crate) fn redact(&mut self) {
+        if let ErrorKind::Command(ref mut error) = *self.kind {
+            error.message = "REDACTED".to_string();
+        }
+    }
 }
 
 impl<E> From<E> for Error
@@ -449,7 +459,7 @@ pub enum ErrorKind {
     BulkWrite(BulkWriteFailure),
 
     /// The server returned an error to an attempted operation.
-    #[error("Command failed {0}")]
+    #[error("Command failed: {0}")]
     Command(CommandError),
 
     /// An error occurred during DNS resolution.
@@ -551,7 +561,11 @@ pub struct CommandError {
 
 impl fmt::Display for CommandError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "({}): {})", self.code_name, self.message)
+        write!(
+            fmt,
+            "Error code {} ({}): {})",
+            self.code, self.code_name, self.message
+        )
     }
 }
 

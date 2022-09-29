@@ -14,6 +14,13 @@ use derivative::Derivative;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
+#[cfg(feature = "tracing-unstable")]
+use crate::trace::{
+    command::CommandTracingEventEmitter,
+    trace_or_log_enabled,
+    TracingOrLogLevel,
+    COMMAND_TRACING_EVENT_TARGET,
+};
 use crate::{
     bson::Document,
     change_stream::{
@@ -25,7 +32,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
-    event::command::CommandEventHandler,
+    event::command::{handle_command_event, CommandEvent},
     operation::{AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
@@ -39,6 +46,7 @@ use crate::{
     sdam::{server_selection, SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
+
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
@@ -145,9 +153,30 @@ impl Client {
         Ok(client)
     }
 
-    pub(crate) fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
+    pub(crate) fn emit_command_event(&self, generate_event: impl Fn() -> CommandEvent) {
         if let Some(ref handler) = self.inner.options.command_event_handler {
-            emit(handler);
+            let event = generate_event();
+            handle_command_event(handler.as_ref(), event);
+        }
+
+        #[cfg(feature = "tracing-unstable")]
+        if trace_or_log_enabled!(
+            target: COMMAND_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Debug
+        ) {
+            let tracing_emitter = CommandTracingEventEmitter::new(
+                self.inner.options.tracing_max_document_length_bytes,
+                #[cfg(not(test))]
+                None,
+                #[cfg(test)]
+                self.inner
+                    .options
+                    .test_options
+                    .as_ref()
+                    .and_then(|o| o.client_id.clone()),
+            );
+            let event = generate_event();
+            handle_command_event(&tracing_emitter, event);
         }
     }
 

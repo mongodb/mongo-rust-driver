@@ -8,12 +8,9 @@ use std::{
 
 use serde::Serialize;
 use time::OffsetDateTime;
-use tokio::sync::{
-    broadcast::error::{RecvError, SendError},
-    RwLockReadGuard,
-};
+use tokio::sync::{broadcast::error::SendError, RwLockReadGuard};
 
-use super::TestClient;
+use super::{subscriber::EventSubscriber, TestClient};
 use crate::{
     bson::{doc, to_document, Document},
     event::{
@@ -189,11 +186,8 @@ impl EventHandler {
             self.event_broadcaster.send(event.into());
     }
 
-    pub(crate) fn subscribe(&self) -> EventSubscriber {
-        EventSubscriber {
-            _handler: self,
-            receiver: self.event_broadcaster.subscribe(),
-        }
+    pub(crate) fn subscribe(&self) -> EventSubscriber<EventHandler, Event> {
+        EventSubscriber::new(self, self.event_broadcaster.subscribe())
     }
 
     pub(crate) fn broadcaster(&self) -> &tokio::sync::broadcast::Sender<Event> {
@@ -464,74 +458,7 @@ impl CommandEventHandler for EventHandler {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct EventSubscriber<'a> {
-    /// A reference to the handler this subscriber is receiving events from.
-    /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
-    /// events.
-    _handler: &'a EventHandler,
-    receiver: tokio::sync::broadcast::Receiver<Event>,
-}
-
-impl EventSubscriber<'_> {
-    pub(crate) async fn wait_for_event<F>(
-        &mut self,
-        timeout: Duration,
-        mut filter: F,
-    ) -> Option<Event>
-    where
-        F: FnMut(&Event) -> bool,
-    {
-        self.filter_map_event(timeout, |e| if filter(&e) { Some(e) } else { None })
-            .await
-    }
-
-    pub(crate) async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<Event>
-    where
-        F: FnMut(&Event) -> bool,
-    {
-        let mut events = Vec::new();
-        let _ = runtime::timeout(timeout, async {
-            while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
-                events.push(event);
-            }
-        })
-        .await;
-        events
-    }
-
-    /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
-    pub(crate) async fn filter_map_event<F, T>(
-        &mut self,
-        timeout: Duration,
-        mut filter_map: F,
-    ) -> Option<T>
-    where
-        F: FnMut(Event) -> Option<T>,
-    {
-        runtime::timeout(timeout, async {
-            loop {
-                match self.receiver.recv().await {
-                    Ok(event) => {
-                        if let Some(e) = filter_map(event) {
-                            return Some(e);
-                        } else {
-                            continue;
-                        }
-                    }
-                    // the channel hit capacity and missed some events.
-                    Err(RecvError::Lagged(amount_skipped)) => {
-                        panic!("receiver lagged and skipped {} events", amount_skipped)
-                    }
-                    Err(_) => return None,
-                }
-            }
-        })
-        .await
-        .ok()
-        .flatten()
-    }
-
+impl EventSubscriber<'_, EventHandler, Event> {
     /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
     /// panic.
@@ -713,7 +640,7 @@ impl EventClient {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn subscribe_to_events(&self) -> EventSubscriber<'_> {
+    pub(crate) fn subscribe_to_events(&self) -> EventSubscriber<'_, EventHandler, Event> {
         self.handler.subscribe()
     }
 

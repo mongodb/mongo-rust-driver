@@ -41,6 +41,8 @@ use home::home_dir;
 use lazy_static::lazy_static;
 
 use self::util::TestLock;
+#[cfg(feature = "tracing-unstable")]
+use self::util::TracingHandler;
 use crate::{
     client::{
         auth::Credential,
@@ -85,6 +87,26 @@ lazy_static! {
         std::env::var("SERVERLESS_ATLAS_USER").ok();
     pub(crate) static ref SERVERLESS_ATLAS_PASSWORD: Option<String> =
         std::env::var("SERVERLESS_ATLAS_PASSWORD").ok();
+}
+
+// conditional definitions do not work within the lazy_static! macro, so this
+// needs to be defined separately.
+#[cfg(feature = "tracing-unstable")]
+lazy_static! {
+    /// A global default tracing handler that will be installed the first time this
+    /// value is accessed. A global handler must be used anytime the multi-threaded
+    /// test runtime is in use, as non-global handlers only apply to the thread
+    /// they are registered in.
+    /// By default this handler will collect no tracing events.
+    /// Its minimum severity levels can be configured on a per-component basis using
+    /// [`TracingHandler:set_levels`]. The test lock MUST be acquired in any test
+    /// that will use the handler to avoid mixing events from multiple tests.
+    pub(crate) static ref DEFAULT_GLOBAL_TRACING_HANDLER: TracingHandler = {
+        let handler = TracingHandler::new();
+        tracing::subscriber::set_global_default(handler.clone())
+            .expect("setting global default tracing subscriber failed");
+        handler
+    };
 }
 
 pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
