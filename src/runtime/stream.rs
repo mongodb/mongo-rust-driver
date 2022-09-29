@@ -85,23 +85,24 @@ impl AsyncTcpStream {
 
     #[cfg(feature = "async-std-runtime")]
     async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
-        use async_std::net::TcpStream;
-        use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+        use std::convert::TryInto;
 
-        let domain = Domain::for_address(*address);
-        let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))?;
+        let stream_future = async_std::net::TcpStream::connect(address);
+
+        let stream = if connect_timeout.is_zero() {
+            stream_future.await?
+        } else {
+            runtime::timeout(connect_timeout, stream_future).await??
+        };
+        stream.set_nodelay(true)?;
+
+        let std_stream: std::net::TcpStream = stream.try_into()?;
+
+        let socket = socket2::Socket::from(std_stream);
         let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
         socket.set_tcp_keepalive(&conf)?;
-
-        let address: SockAddr = (*address).into();
-        if connect_timeout == Duration::from_secs(0) {
-            socket.connect(&address)?;
-        } else {
-            socket.connect_timeout(&address, connect_timeout)?;
-        }
-
-        let stream: TcpStream = std::net::TcpStream::from(socket).into();
-        stream.set_nodelay(true)?;
+        let std_stream = std::net::TcpStream::from(socket);
+        let stream = async_std::net::TcpStream::from(std_stream);
 
         Ok(stream.into())
     }
