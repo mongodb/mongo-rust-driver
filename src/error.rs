@@ -231,7 +231,7 @@ impl Error {
         )
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "csfle"))]
     pub(crate) fn is_csfle_error(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::Csfle(..),)
     }

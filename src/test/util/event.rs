@@ -530,7 +530,7 @@ impl EventClient {
         handler: impl Into<Option<EventHandler>>,
     ) -> Self {
         let handler = Arc::new(handler.into().unwrap_or_else(EventHandler::new));
-        let client = TestClient::with_handler(Some(handler.clone()), options, None).await;
+        let client = TestClient::with_handler(Some(handler.clone()), options).await;
 
         // clear events from commands used to set up client.
         handler.command_events.write().unwrap().clear();
@@ -640,6 +640,7 @@ impl EventClient {
         self.handler.clear_cached_events()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn into_client(self) -> crate::Client {
         self.client.into_client()
     }

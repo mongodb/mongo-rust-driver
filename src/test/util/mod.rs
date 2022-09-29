@@ -72,14 +72,13 @@ impl TestClient {
     }
 
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Self::with_handler(None, options, None).await
+        Self::with_handler(None, options).await
     }
 
-    pub(crate) async fn with_handler(
+    async fn build_test_options(
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
-        auto_enc: impl Into<Option<crate::client::options::AutoEncryptionOptions>>,
-    ) -> Self {
+    ) -> ClientOptions {
         let mut options = match options.into() {
             Some(options) => options,
             None => CLIENT_OPTIONS.get().await.clone(),
@@ -91,13 +90,19 @@ impl TestClient {
             options.sdam_event_handler = Some(handler);
         }
 
-        let client = if let Some(auto_enc) = auto_enc.into() {
-            Client::with_encryption_options(options.clone(), auto_enc).await
-        } else {
-            Client::with_options(options.clone())
-        }
-        .unwrap();
+        options
+    }
 
+    pub(crate) async fn with_handler(
+        event_handler: Option<Arc<EventHandler>>,
+        options: impl Into<Option<ClientOptions>>,
+    ) -> Self {
+        let options = Self::build_test_options(event_handler, options).await;
+        let client = Client::with_options(options.clone()).unwrap();
+        Self::from_client(client, options).await
+    }
+
+    async fn from_client(client: Client, options: ClientOptions) -> Self {
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
         let mut session = client
@@ -450,6 +455,7 @@ impl TestClient {
         options
     }
 
+    #[allow(dead_code)]
     pub(crate) fn into_client(self) -> Client {
         self.client
     }
