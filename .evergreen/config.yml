@@ -472,6 +472,37 @@ functions:
           MONGO_OCSP_TESTS=1 \
           .evergreen/run-ocsp-test.sh
 
+  "fetch crypt_shared":
+  - command: shell.exec
+    type: test
+    params:
+      shell: bash
+      working_dir: "src"
+      script: |
+        ${PREPARE_SHELL}
+        ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${MONGODB_VERSION} --out=./crypt_shared/
+        ls -R ${PROJECT_DIRECTORY}/crypt_shared
+
+  "run csfle tests":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          export ASYNC_RUNTIME=${ASYNC_RUNTIME}
+          export CSFLE_SHARED_LIB_PATH="${PROJECT_DIRECTORY}/crypt_shared/${MONGODB_VERSION}/lib/mongo_crypt_v1.dylib"
+          export CSFLE_TLS_CERT_DIR=${DRIVERS_TOOLS_X509}
+          set +o xtrace
+          # Exported without xtrace to avoid leaking credentials
+          export KMS_PROVIDERS=$(cat << EOF
+          ${kms_providers}
+          EOF
+          )
+
+          .evergreen/run-csfle-tests.sh
+
   run-valid-ocsp-server:
     - command: shell.exec
       params:
@@ -1123,6 +1154,12 @@ tasks:
     commands:
       - func: "install junit dependencies"
       - func: "run serverless tests"
+
+  - name: "test-csfle"
+    tags: ["csfle"]
+    commands:
+      - func: "fetch crypt_shared"
+      - func: "run csfle tests"
 
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
@@ -1808,6 +1845,18 @@ buildvariants:
   display_name: "Serverless ${os} with ${async-runtime}"
   tasks:
     - "serverless_task_group"
+
+- matrix_name: "csfle"
+  matrix_spec:
+    os:
+      - ubuntu-18.04
+    mongodb-version:
+      - latest
+      - "6.0"
+    async-runtime: "*"
+  display_name: "CSFLE ${mongodb-version} ${os} with ${async-runtime}"
+  tasks:
+    - "test-csfle"
 
 - matrix_name: "atlas-connect"
   matrix_spec:
