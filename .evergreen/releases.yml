@@ -31,6 +31,14 @@ functions:
       params:
         file: src/expansion.yml
 
+    # Delete the expansion file so cargo release doesn't complain about uncommitted changes
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          rm expansion.yml
+
   "install dependencies":
     command: shell.exec
     params:
