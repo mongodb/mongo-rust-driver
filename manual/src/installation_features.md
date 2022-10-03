@@ -22,7 +22,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.3.0"
+version = "2.3.1"
 features = ["tokio-sync"]
 ```
 Using the `"sync"` feature also requires using `default-features = false`.
