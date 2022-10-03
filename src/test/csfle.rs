@@ -75,12 +75,30 @@ lazy_static! {
         let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
         tls_options
     };
-    static ref LOCAL_KMIP_AVAILABLE: bool = std::env::var("LOCAL_KMIP_AVAILABLE").is_ok();
+}
+
+fn check_env(name: &str, kmip: bool) -> bool {
+    if !std::env::var("KMS_PROVIDERS").is_ok() {
+        log_uncaptured(format!("skipping csfle test {}: no kms providers configured", name));
+        return false;
+    }
+    if kmip {
+        #[cfg(not(feature = "openssl-tls"))]
+        {
+            // rustls is incompatible with the driver-tools kmip server.
+            log_uncaptured(format!("skipping {}: KMIP requires openssl", name));
+            return false;
+        }
+    }
+    true
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_key_material() -> Result<()> {
+    if !check_env("custom_key_material", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let (client, datakeys) = init_client().await?;
@@ -133,7 +151,7 @@ async fn custom_key_material() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn data_key_double_encryption() -> Result<()> {
-    if !check_kmip_test("data_key_double_encryption") {
+    if !check_env("data_key_double_encryption", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -335,27 +353,10 @@ fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
     })
 }
 
-fn check_kmip_test(name: &str) -> bool {
-    #[cfg(not(feature = "openssl-tls"))]
-    {
-        // rustls is incompatible with the driver-tools kmip server.
-        log_uncaptured(format!("skipping {}: KMIP requires openssl", name));
-        return false;
-    }
-    #[cfg(feature = "openssl-tls")]
-    {
-        if !*LOCAL_KMIP_AVAILABLE {
-            log_uncaptured(format!("skipping {}: no KMIP server available", name));
-            return false;
-        }
-        return true;
-    }
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn external_key_vault() -> Result<()> {
-    if !check_kmip_test("external_key_vault") {
+    if !check_env("external_key_vault", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -460,6 +461,9 @@ fn load_testdata(name: &str) -> Result<Document> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn bson_size_limits() -> Result<()> {
+    if !check_env("bson_size_limits", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: db initialization.
@@ -531,6 +535,9 @@ async fn bson_size_limits() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn views_prohibited() -> Result<()> {
+    if !check_env("views_prohibited", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: db initialization.
@@ -597,7 +604,7 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus_coll_schema() -> Result<()> {
-    if !check_kmip_test("corpus_coll_schema") {
+    if !check_env("corpus_coll_schema", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -608,7 +615,7 @@ async fn corpus_coll_schema() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus_local_schema() -> Result<()> {
-    if !check_kmip_test("corpus_local_schema") {
+    if !check_env("corpus_local_schema", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -888,6 +895,9 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
+    if !check_env("custom_endpoint_aws_no_endpoint", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     custom_endpoint_aws_ok(None).await
@@ -896,6 +906,9 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_no_port() -> Result<()> {
+    if !check_env("custom_endpoint_aws_no_port", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com".to_string())).await
@@ -904,6 +917,9 @@ async fn custom_endpoint_aws_no_port() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_with_port() -> Result<()> {
+    if !check_env("custom_endpoint_aws_with_port", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com:443".to_string())).await
@@ -912,6 +928,9 @@ async fn custom_endpoint_aws_with_port() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_invalid_port() -> Result<()> {
+    if !check_env("custom_endpoint_aws_invalid_port", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let client_encryption = custom_endpoint_setup(true).await?;
@@ -938,6 +957,9 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_invalid_region() -> Result<()> {
+    if !check_env("custom_endpoint_aws_invalid_region", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let client_encryption = custom_endpoint_setup(true).await?;
@@ -964,6 +986,9 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
+    if !check_env("custom_endpoint_aws_invalid_domain", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let client_encryption = custom_endpoint_setup(true).await?;
@@ -990,6 +1015,9 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_azure() -> Result<()> {
+    if !check_env("custom_endpoint_azure", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let key_options = DataKeyOptions::builder()
@@ -1018,6 +1046,9 @@ async fn custom_endpoint_azure() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_gcp_valid() -> Result<()> {
+    if !check_env("custom_endpoint_gcp_valid", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let key_options = DataKeyOptions::builder()
@@ -1049,6 +1080,9 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_gcp_invalid() -> Result<()> {
+    if !check_env("custom_endpoint_gcp_invalid", false) {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let key_options = DataKeyOptions::builder()
@@ -1074,7 +1108,7 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
-    if !check_kmip_test("custom_endpoint_kmip_no_endpoint") {
+    if !check_env("custom_endpoint_kmip_no_endpoint", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -1104,7 +1138,7 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
-    if !check_kmip_test("custom_endpoint_kmip_valid_endpoint") {
+    if !check_env("custom_endpoint_kmip_valid_endpoint", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -1126,7 +1160,7 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
-    if !check_kmip_test("custom_endpoint_kmip_invalid_endpoint") {
+    if !check_env("custom_endpoint_kmip_invalid_endpoint", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
