@@ -85,6 +85,7 @@ functions:
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
               export MONGODB_VERSION=${MONGODB_VERSION}
+              export CRYPT_SHARED_VERSION=${CRYPT_SHARED_VERSION}
 
               if [ "Windows_NT" != "$OS" ]; then
                   ulimit -n 64000
@@ -480,7 +481,7 @@ functions:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${MONGODB_VERSION} --out=./crypt_shared/
+        python3 ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
         ls -R ${PROJECT_DIRECTORY}/crypt_shared
 
   "run csfle tests":
@@ -492,14 +493,15 @@ functions:
         script: |
           ${PREPARE_SHELL}
           export ASYNC_RUNTIME=${ASYNC_RUNTIME}
-          export CSFLE_SHARED_LIB_PATH="${PROJECT_DIRECTORY}/crypt_shared/${MONGODB_VERSION}/lib/mongo_crypt_v1.dylib"
-          export CSFLE_TLS_CERT_DIR=${DRIVERS_TOOLS_X509}
-          set +o xtrace
+          export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
+          export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
           # Exported without xtrace to avoid leaking credentials
+          set +o xtrace
           export KMS_PROVIDERS=$(cat << EOF
           ${kms_providers}
           EOF
           )
+          set -o xtrace
 
           .evergreen/run-csfle-tests.sh
 
@@ -1556,6 +1558,7 @@ axes:
         display_name: "6.0"
         variables:
           MONGODB_VERSION: "6.0"
+          CRYPT_SHARED_VERSION: "6.0.0"
       - id: "5.0"
         display_name: "5.0"
         variables:
@@ -1849,11 +1852,10 @@ buildvariants:
 - matrix_name: "csfle"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     mongodb-version:
-      - latest
       - "6.0"
-    async-runtime: "*"
+    async-runtime: "tokio"
   display_name: "CSFLE ${mongodb-version} ${os} with ${async-runtime}"
   tasks:
     - "test-csfle"
