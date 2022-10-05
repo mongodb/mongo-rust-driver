@@ -16,7 +16,7 @@ impl TracingRepresentation for bson::oid::ObjectId {
 
 impl TracingRepresentation for bson::Document {
     fn tracing_representation(self) -> String {
-        Bson::Document(self).into_canonical_extjson().to_string()
+        Bson::Document(self).into_relaxed_extjson().to_string()
     }
 }
 
