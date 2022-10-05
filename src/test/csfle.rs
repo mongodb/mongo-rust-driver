@@ -78,7 +78,7 @@ lazy_static! {
 }
 
 fn check_env(name: &str, kmip: bool) -> bool {
-    if !std::env::var("KMS_PROVIDERS").is_ok() {
+    if std::env::var("KMS_PROVIDERS").is_err() {
         log_uncaptured(format!(
             "skipping csfle test {}: no kms providers configured",
             name

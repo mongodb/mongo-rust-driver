@@ -90,11 +90,11 @@ impl ClientEncryption {
             }
             if let Some(alt_names) = &opts.key_alt_names {
                 for name in alt_names {
-                    builder = builder.key_alt_name(&name)?;
+                    builder = builder.key_alt_name(name)?;
                 }
             }
             if let Some(material) = &opts.key_material {
-                builder = builder.key_material(&material)?;
+                builder = builder.key_material(material)?;
             }
         }
         builder = builder.key_encryption_key(&key_doc)?;
@@ -198,7 +198,7 @@ impl ClientEncryption {
                 builder = builder.key_id(&id.bytes)?;
             }
             EncryptKey::AltName(name) => {
-                builder = builder.key_alt_name(&name)?;
+                builder = builder.key_alt_name(name)?;
             }
         }
         builder = builder.algorithm(opts.algorithm)?;
@@ -206,7 +206,7 @@ impl ClientEncryption {
             builder = builder.contention_factor(factor)?;
         }
         if let Some(qtype) = &opts.query_type {
-            builder = builder.query_type(&qtype)?;
+            builder = builder.query_type(qtype)?;
         }
         Ok(builder.build_explicit_encrypt(value)?)
     }
