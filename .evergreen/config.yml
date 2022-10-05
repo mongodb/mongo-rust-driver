@@ -484,6 +484,20 @@ functions:
         python3 ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
         ls -R ${PROJECT_DIRECTORY}/crypt_shared
 
+  "run kmip server":
+  - command: shell.exec
+    type: test
+    params:
+      shell: bash
+      working_dir: "src"
+      background: true
+      script: |
+        ${PREPARE_SHELL}
+        cd ${DRIVERS_TOOLS}/.evergreen/csfle
+        . ./activate_venv.sh
+        # TMPDIR is required to avoid "AF_UNIX path too long" errors.
+        TMPDIR="$(dirname ${DRIVERS_TOOLS})" python3 kms_kmip_server.py
+
   "run csfle tests":
     - command: shell.exec
       type: test
@@ -1165,6 +1179,7 @@ tasks:
       - func: "bootstrap mongo-orchestration"
         vars:
           TOPOLOGY: "server"
+      - func: "run kmip server"
       - func: "run csfle tests"
 
   - name: "test-atlas-connectivity"
