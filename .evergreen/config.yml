@@ -497,7 +497,7 @@ functions:
           export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
-          export KMS_PROVIDERS=$(cat << EOF
+          export KMS_PROVIDERS=$(cat << "EOF"
           ${kms_providers}
           EOF
           )
@@ -1160,7 +1160,11 @@ tasks:
   - name: "test-csfle"
     tags: ["csfle"]
     commands:
+      - func: "install junit dependencies"
       - func: "fetch crypt_shared"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          TOPOLOGY: "server"
       - func: "run csfle tests"
 
   - name: "test-atlas-connectivity"
@@ -1855,8 +1859,7 @@ buildvariants:
       - ubuntu-20.04
     mongodb-version:
       - "6.0"
-    async-runtime: "tokio"
-  display_name: "CSFLE ${mongodb-version} ${os} with ${async-runtime}"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os}"
   tasks:
     - "test-csfle"
 

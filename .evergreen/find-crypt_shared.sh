@@ -5,7 +5,7 @@ if [ "$1" = "" ]; then
     exit 1
 fi
 
-crypt_shared_glob = ("$1"/*)
+crypt_shared_glob=("$1"/*)
 
 if [ "${#crypt_shared_glob[@]}" != "1" ]; then
     echo "Wrong number of files found: ${crypt_shared_glob[@]}"
