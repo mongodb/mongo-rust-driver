@@ -28,7 +28,7 @@ use crate::{
     Namespace,
 };
 
-use super::{EventClient, TestClient, CLIENT_OPTIONS, LOCK, log_uncaptured};
+use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -79,7 +79,10 @@ lazy_static! {
 
 fn check_env(name: &str, kmip: bool) -> bool {
     if !std::env::var("KMS_PROVIDERS").is_ok() {
-        log_uncaptured(format!("skipping csfle test {}: no kms providers configured", name));
+        log_uncaptured(format!(
+            "skipping csfle test {}: no kms providers configured",
+            name
+        ));
         return false;
     }
     if kmip {
@@ -731,8 +734,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         let value = subdoc.get("value").expect("no value to encrypt").clone();
         let result = client_encryption
             .encrypt(
-                bson::from_bson(value)?, // TODO(aegnor): is this right?
-                // value.try_into()?,
+                value.try_into()?,
                 &EncryptOptions::builder().key(key).algorithm(algo).build(),
             )
             .await;

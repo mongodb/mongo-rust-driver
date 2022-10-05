@@ -1868,6 +1868,7 @@ buildvariants:
   tasks:
     - "serverless_task_group"
 
+# TODO(RUST-1386): Expand the os and version listing
 - matrix_name: "csfle"
   matrix_spec:
     os:
