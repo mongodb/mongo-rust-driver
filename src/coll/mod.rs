@@ -1,6 +1,12 @@
 pub mod options;
 
-use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+    fmt,
+    fmt::Debug,
+    sync::Arc,
+};
 
 use futures_util::{
     future,
@@ -1196,7 +1202,7 @@ where
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
         let mut error_labels: HashSet<String> = Default::default();
-        let mut cumulative_result: Option<InsertManyResult> = None;
+        let mut cumulative_inserted_ids = HashMap::new();
 
         let mut n_attempted = 0;
 
@@ -1211,13 +1217,8 @@ where
             {
                 Ok(result) => {
                     let current_batch_size = result.inserted_ids.len();
-
-                    let cumulative_result =
-                        cumulative_result.get_or_insert_with(InsertManyResult::new);
                     for (index, id) in result.inserted_ids {
-                        cumulative_result
-                            .inserted_ids
-                            .insert(index + n_attempted, id);
+                        cumulative_inserted_ids.insert(index + n_attempted, id);
                     }
 
                     n_attempted += current_batch_size;
@@ -1236,7 +1237,7 @@ where
                             let failure_ref =
                                 cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
                             for (index, id) in bw.inserted_ids {
-                                failure_ref.inserted_ids.insert(index + n_attempted, id);
+                                cumulative_inserted_ids.insert(index + n_attempted, id);
                             }
 
                             if let Some(write_errors) = bw.write_errors {
@@ -1259,7 +1260,8 @@ where
                             if ordered {
                                 // this will always be true since we invoked get_or_insert_with
                                 // above.
-                                if let Some(failure) = cumulative_failure {
+                                if let Some(mut failure) = cumulative_failure {
+                                    failure.inserted_ids = cumulative_inserted_ids;
                                     return Err(Error::new(
                                         ErrorKind::BulkWrite(failure),
                                         Some(error_labels),
@@ -1275,11 +1277,14 @@ where
         }
 
         match cumulative_failure {
-            Some(failure) => Err(Error::new(
-                ErrorKind::BulkWrite(failure),
-                Some(error_labels),
-            )),
-            None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),
+            Some(mut failure) => {
+                failure.inserted_ids = cumulative_inserted_ids;
+                Err(Error::new(
+                    ErrorKind::BulkWrite(failure),
+                    Some(error_labels),
+                ))
+            }
+            None => Ok(InsertManyResult::new(cumulative_inserted_ids)),
         }
     }
 

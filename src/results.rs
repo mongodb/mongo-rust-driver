@@ -41,10 +41,8 @@ pub struct InsertManyResult {
 }
 
 impl InsertManyResult {
-    pub(crate) fn new() -> Self {
-        InsertManyResult {
-            inserted_ids: HashMap::new(),
-        }
+    pub(crate) fn new(inserted_ids: HashMap<usize, Bson>) -> Self {
+        InsertManyResult { inserted_ids }
     }
 }
 

@@ -1204,7 +1204,7 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
 
 async fn run_inserted_ids_test(
     client: &TestClient,
-    docs: Vec<Document>,
+    docs: &Vec<Document>,
     ordered: bool,
 ) -> Result<InsertManyResult> {
     let coll = client.init_db_and_coll("bulk_write_test", "test").await;
@@ -1223,20 +1223,10 @@ async fn bulk_write_failure_has_inserted_ids() {
 
     let client = TestClient::new().await;
 
-    let res = run_inserted_ids_test(&client, [doc! { "_id": 1}, doc! { "_id": 2}].to_vec(), true);
-    let err = res.await.expect_err("insert_many should fail");
-    match *err.kind {
-        ErrorKind::BulkWrite(failure) => {
-            assert_eq!(
-                failure.inserted_ids.len(),
-                0,
-                "inserted_ids should be empty"
-            );
-        }
-        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
-    }
-
-    let res = run_inserted_ids_test(&client, [doc! { "_id": 2}, doc! { "_id": 1}].to_vec(), true);
+    // an ordered, single batch bulk write where the last doc generates a write error:
+    // everything before the last doc should be inserted
+    let docs = vec![doc! { "_id": 2}, doc! { "_id": 1}];
+    let res = run_inserted_ids_test(&client, &docs, true);
     let err = res.await.expect_err("insert_many should fail");
     match *err.kind {
         ErrorKind::BulkWrite(failure) => {
@@ -1258,11 +1248,25 @@ async fn bulk_write_failure_has_inserted_ids() {
         _ => panic!("Expected BulkWrite error, but got: {:?}", err),
     }
 
-    let res = run_inserted_ids_test(
-        &client,
-        [doc! { "_id": 1}, doc! { "_id": 2}].to_vec(),
-        false,
-    );
+    // an ordered, single batch bulk write where the first doc generates a write error:
+    // nothing should be inserted
+    let docs = vec![doc! { "_id": 1}, doc! { "_id": 2}];
+    let res = run_inserted_ids_test(&client, &docs, true);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                0,
+                "inserted_ids should be empty"
+            );
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    // an unordered, single batch bulk write where the first doc generates a write error:
+    // everything after the first doc should be inserted
+    let res = run_inserted_ids_test(&client, &docs, false);
     let err = res.await.expect_err("insert_many should fail");
     match *err.kind {
         ErrorKind::BulkWrite(failure) => {
@@ -1280,6 +1284,131 @@ async fn bulk_write_failure_has_inserted_ids() {
                 &Bson::Int32(2),
                 "inserted document should have _id 2"
             );
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    // an ordered, 2-batch bulk write where a document in the first batch generates write error:
+    // nothing should be inserted
+    let mut docs = Vec::with_capacity(100001);
+    for i in 1..100002 {
+        docs.push(doc! { "_id": Bson::Int32(i) });
+    }
+
+    let res = run_inserted_ids_test(&client, &docs, true);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                0,
+                "0 documents should have been inserted"
+            );
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    // an unordered, 2-batch bulk write where a document in the first batch generates a write error:
+    // everything besides that document should be inserted
+    let res = run_inserted_ids_test(&client, &docs, false);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                100000,
+                "100,000 documents should have been inserted"
+            );
+            // docs at index 1 up to and including 100,000 should have been inserted
+            for i in 1..100001 {
+                assert!(
+                    failure.inserted_ids.contains_key(&i),
+                    "document at index {} should have been inserted",
+                    i,
+                );
+                assert_eq!(
+                    failure.inserted_ids.get(&i).unwrap(),
+                    docs[i].get("_id").unwrap(),
+                    "inserted_id for index {} should be {}",
+                    i,
+                    docs[i].get("_id").unwrap(),
+                )
+            }
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    // an ordered, 2-batch bulk write where the second-to-last document in the second batch
+    // generates a write error: everything before that document should be inserted
+    let mut docs = Vec::with_capacity(100002);
+    for i in 2..100003 {
+        docs.push(doc! { "_id": Bson::Int32(i) });
+    }
+    docs.push(doc! { "_id": 1 });
+    docs.push(doc! { "_id": 100003 });
+
+    let res = run_inserted_ids_test(&client, &docs, true);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                100001,
+                "100001 documents should have been inserted"
+            );
+            // docs at index 0 up to and including 100,000 should have been inserted;
+            // doc at index 100,001 generates a duplicate key error
+            for i in 0..100001 {
+                assert!(
+                    failure.inserted_ids.contains_key(&i),
+                    "document at index {} should have been inserted",
+                    i,
+                );
+                assert_eq!(
+                    failure.inserted_ids.get(&i).unwrap(),
+                    docs[i].get("_id").unwrap(),
+                    "inserted_id for index {} should be {}",
+                    i,
+                    docs[i].get("_id").unwrap(),
+                )
+            }
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    // an unordered, 2-batch bulk write where the second-to-last document in the second batch
+    // generates a write error: everything besides that document should be inserted
+    let res = run_inserted_ids_test(&client, &docs, false);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                100002,
+                "100002 documents should have been inserted"
+            );
+            // docs at index 0 up to and including 100,000 should have been inserted
+            for i in 0..100001 {
+                assert!(
+                    failure.inserted_ids.contains_key(&i),
+                    "document at index {} should have been inserted",
+                    i,
+                );
+                assert_eq!(
+                    failure.inserted_ids.get(&i).unwrap(),
+                    docs[i].get("_id").unwrap(),
+                    "inserted_id for index {} should be {}",
+                    i,
+                    docs[i].get("_id").unwrap(),
+                );
+                // doc at index 100,001 generates a duplicate key error; doc at index
+                // 100,002 should be inserted
+                assert_eq!(
+                    failure.inserted_ids.get(&100002).unwrap(),
+                    docs[100002].get("_id").unwrap(),
+                    "inserted_id for index 1000002 should be 100003",
+                );
+            }
         }
         _ => panic!("Expected BulkWrite error, but got: {:?}", err),
     }
