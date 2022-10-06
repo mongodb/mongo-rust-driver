@@ -40,6 +40,7 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
     ) -> Result<Self> {
+        // TODO(RUST-1492): Replace num_cpus with std::thread::available_parallelism.
         let crypto_threads = rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
             .build()
