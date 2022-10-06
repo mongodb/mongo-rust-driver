@@ -1269,3 +1269,10 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
+
+    Ok(())
+}
