@@ -1235,6 +1235,10 @@ where
 
                             let failure_ref =
                                 cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
+                            for (index, id) in bw.inserted_ids {
+                                failure_ref.inserted_ids.insert(index + n_attempted, id);
+                            }
+
                             if let Some(write_errors) = bw.write_errors {
                                 for err in write_errors {
                                     let index = n_attempted + err.index;

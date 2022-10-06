@@ -27,7 +27,7 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    results::DeleteResult,
+    results::{DeleteResult, InsertManyResult},
     runtime,
     test::{
         log_uncaptured,
@@ -1199,5 +1199,88 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
             "expected ErrorKind::Write or ErrorKind::BulkWrite, got {:?} instead",
             e
         ),
+    }
+}
+
+async fn run_inserted_ids_test(
+    client: &TestClient,
+    docs: Vec<Document>,
+    ordered: bool,
+) -> Result<InsertManyResult> {
+    let coll = client.init_db_and_coll("bulk_write_test", "test").await;
+    coll.insert_one(doc! { "_id": 1}, None).await.unwrap();
+
+    let insert_opts = InsertManyOptions::builder().ordered(ordered).build();
+    coll.insert_many(docs, insert_opts).await
+}
+
+/// Verify that when an insert_many fails, the returned BulkWriteFailure has
+/// its inserted_ids correctly populated.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bulk_write_failure_has_inserted_ids() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let res = run_inserted_ids_test(&client, [doc! { "_id": 1}, doc! { "_id": 2}].to_vec(), true);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                0,
+                "inserted_ids should be empty"
+            );
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    let res = run_inserted_ids_test(&client, [doc! { "_id": 2}, doc! { "_id": 1}].to_vec(), true);
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                1,
+                "one document should have been inserted"
+            );
+            assert!(
+                failure.inserted_ids.contains_key(&0),
+                "document at index 0 should have been inserted"
+            );
+            assert_eq!(
+                failure.inserted_ids.get(&0).unwrap(),
+                &Bson::Int32(2),
+                "inserted document should have _id 2"
+            );
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
+    }
+
+    let res = run_inserted_ids_test(
+        &client,
+        [doc! { "_id": 1}, doc! { "_id": 2}].to_vec(),
+        false,
+    );
+    let err = res.await.expect_err("insert_many should fail");
+    match *err.kind {
+        ErrorKind::BulkWrite(failure) => {
+            assert_eq!(
+                failure.inserted_ids.len(),
+                1,
+                "one document should have been inserted"
+            );
+            assert!(
+                failure.inserted_ids.contains_key(&1),
+                "document at index 1 should have been inserted"
+            );
+            assert_eq!(
+                failure.inserted_ids.get(&1).unwrap(),
+                &Bson::Int32(2),
+                "inserted document should have _id 2"
+            );
+        }
+        _ => panic!("Expected BulkWrite error, but got: {:?}", err),
     }
 }
