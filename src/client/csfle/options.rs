@@ -63,6 +63,10 @@ pub struct AutoEncryptionOptions {
     /// encryption with queryable encryption.
     #[builder(default)]
     pub bypass_query_analysis: Option<bool>,
+    /// Disable loading crypt_shared.
+    #[cfg(test)]
+    #[builder(default)]
+    pub(crate) disable_crypt_shared: Option<bool>,
 }
 
 /// Options specific to each KMS provider.

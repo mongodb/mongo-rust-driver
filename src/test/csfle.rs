@@ -26,7 +26,7 @@ use crate::{
     test::{Event, EventHandler},
     Client,
     Collection,
-    Namespace,
+    Namespace, error::ErrorKind,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -1273,6 +1273,37 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_spawn", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup: encrypted client.
+    let schema_map: HashMap<String, Document> = [(
+        "db.coll".to_string(),
+        load_testdata("external-schema.json")?,
+    )]
+    .into_iter()
+    .collect();
+    let extra_options = doc! {
+        "mongocryptdBypassSpawn": true,
+        "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
+        "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],      
+    };
+    let auto_enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(LOCAL_KMS.clone())
+        .schema_map(schema_map)
+        .extra_options(extra_options)
+        .disable_crypt_shared(true)
+        .build();
+    let client_encrypted =
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
+            .await?;
+
+    // Test: expect failure.
+    let result = client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "encrypted": "test" }, None).await;
+    assert!(matches!(result.unwrap_err().kind.as_ref(), ErrorKind::InvalidArgument { .. }));
 
     Ok(())
 }

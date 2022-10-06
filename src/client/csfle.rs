@@ -83,11 +83,17 @@ impl ClientState {
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
         }
-        if Some(true) != opts.bypass_auto_encryption {
-            builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
-        }
-        if let Some(p) = opts.extra_option(&EO_CRYPT_SHARED_LIB_PATH)? {
-            builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
+        #[cfg(not(test))]
+        let disable_crypt_shared = false;
+        #[cfg(test)]
+        let disable_crypt_shared = opts.disable_crypt_shared.unwrap_or(false);
+        if !disable_crypt_shared {
+            if Some(true) != opts.bypass_auto_encryption {
+                builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
+            }
+            if let Some(p) = opts.extra_option(&EO_CRYPT_SHARED_LIB_PATH)? {
+                builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
+            }
         }
         let crypt = builder.build()?;
         if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)

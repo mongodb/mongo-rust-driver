@@ -110,7 +110,7 @@ impl CryptExecutor {
                     let mongocryptd = self
                         .mongocryptd
                         .as_ref()
-                        .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
+                        .ok_or_else(|| Error::invalid_argument("this operation requires mongocryptd"))?;
                     let result = mongocryptd.client.execute_operation(op.clone(), None).await;
                     let response = match result {
                         Ok(r) => r,
