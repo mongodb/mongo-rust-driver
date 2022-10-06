@@ -1290,6 +1290,7 @@ async fn bulk_write_failure_has_inserted_ids() {
 
     // an ordered, 2-batch bulk write where a document in the first batch generates write error:
     // nothing should be inserted
+    // note: these numbers were chosen because maxWriteBatchSize is 100,000
     let mut docs = Vec::with_capacity(100001);
     for i in 1..100002 {
         docs.push(doc! { "_id": Bson::Int32(i) });
