@@ -1321,19 +1321,14 @@ async fn bulk_write_failure_has_inserted_ids() {
                 "100,000 documents should have been inserted"
             );
             // docs at index 1 up to and including 100,000 should have been inserted
-            for i in 1..100001 {
-                assert!(
-                    failure.inserted_ids.contains_key(&i),
-                    "document at index {} should have been inserted",
-                    i,
-                );
-                assert_eq!(
-                    failure.inserted_ids.get(&i).unwrap(),
-                    docs[i].get("_id").unwrap(),
-                    "inserted_id for index {} should be {}",
-                    i,
-                    docs[i].get("_id").unwrap(),
-                )
+            for (i, doc) in docs.iter().enumerate().take(100001).skip(1) {
+                match failure.inserted_ids.get(&i) {
+                    Some(doc_id) => {
+                        let expected_id = doc.get("_id").unwrap();
+                        assert_eq!(doc_id, expected_id, "Doc at index {} did not have expected _id", i);
+                    },
+                    None => panic!("Document at index {} should have been inserted", i),
+                }
             }
         }
         _ => panic!("Expected BulkWrite error, but got: {:?}", err),
@@ -1359,19 +1354,14 @@ async fn bulk_write_failure_has_inserted_ids() {
             );
             // docs at index 0 up to and including 100,000 should have been inserted;
             // doc at index 100,001 generates a duplicate key error
-            for i in 0..100001 {
-                assert!(
-                    failure.inserted_ids.contains_key(&i),
-                    "document at index {} should have been inserted",
-                    i,
-                );
-                assert_eq!(
-                    failure.inserted_ids.get(&i).unwrap(),
-                    docs[i].get("_id").unwrap(),
-                    "inserted_id for index {} should be {}",
-                    i,
-                    docs[i].get("_id").unwrap(),
-                )
+            for (i, doc) in docs.iter().enumerate().take(100001) {
+                match failure.inserted_ids.get(&i) {
+                    Some(doc_id) => {
+                        let expected_id = doc.get("_id").unwrap();
+                        assert_eq!(doc_id, expected_id, "Doc at index {} did not have expected _id", i);
+                    },
+                    None => panic!("Document at index {} should have been inserted", i),
+                }
             }
         }
         _ => panic!("Expected BulkWrite error, but got: {:?}", err),
@@ -1389,27 +1379,22 @@ async fn bulk_write_failure_has_inserted_ids() {
                 "100002 documents should have been inserted"
             );
             // docs at index 0 up to and including 100,000 should have been inserted
-            for i in 0..100001 {
-                assert!(
-                    failure.inserted_ids.contains_key(&i),
-                    "document at index {} should have been inserted",
-                    i,
-                );
-                assert_eq!(
-                    failure.inserted_ids.get(&i).unwrap(),
-                    docs[i].get("_id").unwrap(),
-                    "inserted_id for index {} should be {}",
-                    i,
-                    docs[i].get("_id").unwrap(),
-                );
-                // doc at index 100,001 generates a duplicate key error; doc at index
-                // 100,002 should be inserted
-                assert_eq!(
-                    failure.inserted_ids.get(&100002).unwrap(),
-                    docs[100002].get("_id").unwrap(),
-                    "inserted_id for index 1000002 should be 100003",
-                );
+            for (i, doc) in docs.iter().enumerate().take(100001) {
+                match failure.inserted_ids.get(&i) {
+                    Some(doc_id) => {
+                        let expected_id = doc.get("_id").unwrap();
+                        assert_eq!(doc_id, expected_id, "Doc at index {} did not have expected _id", i);
+                    },
+                    None => panic!("Document at index {} should have been inserted", i),
+                }
             }
+            // doc at index 100,001 generates a duplicate key error; doc at index
+            // 100,002 should be inserted
+            assert_eq!(
+                failure.inserted_ids.get(&100002).unwrap(),
+                docs[100002].get("_id").unwrap(),
+                "inserted_id for index 1000002 should be 100003",
+            );
         }
         _ => panic!("Expected BulkWrite error, but got: {:?}", err),
     }
