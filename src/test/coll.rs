@@ -1325,8 +1325,12 @@ async fn bulk_write_failure_has_inserted_ids() {
                 match failure.inserted_ids.get(&i) {
                     Some(doc_id) => {
                         let expected_id = doc.get("_id").unwrap();
-                        assert_eq!(doc_id, expected_id, "Doc at index {} did not have expected _id", i);
-                    },
+                        assert_eq!(
+                            doc_id, expected_id,
+                            "Doc at index {} did not have expected _id",
+                            i
+                        );
+                    }
                     None => panic!("Document at index {} should have been inserted", i),
                 }
             }
@@ -1358,8 +1362,12 @@ async fn bulk_write_failure_has_inserted_ids() {
                 match failure.inserted_ids.get(&i) {
                     Some(doc_id) => {
                         let expected_id = doc.get("_id").unwrap();
-                        assert_eq!(doc_id, expected_id, "Doc at index {} did not have expected _id", i);
-                    },
+                        assert_eq!(
+                            doc_id, expected_id,
+                            "Doc at index {} did not have expected _id",
+                            i
+                        );
+                    }
                     None => panic!("Document at index {} should have been inserted", i),
                 }
             }
@@ -1383,8 +1391,12 @@ async fn bulk_write_failure_has_inserted_ids() {
                 match failure.inserted_ids.get(&i) {
                     Some(doc_id) => {
                         let expected_id = doc.get("_id").unwrap();
-                        assert_eq!(doc_id, expected_id, "Doc at index {} did not have expected _id", i);
-                    },
+                        assert_eq!(
+                            doc_id, expected_id,
+                            "Doc at index {} did not have expected _id",
+                            i
+                        );
+                    }
                     None => panic!("Document at index {} should have been inserted", i),
                 }
             }
