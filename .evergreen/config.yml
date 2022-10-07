@@ -1627,6 +1627,13 @@ axes:
           SINGLE_THREAD: true
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
+      - id: macos-11.00
+        display_name: "MacOS 11.00"
+        run_on: macos-1100
+        variables:
+          SINGLE_THREAD: true
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          VENV_BIN_DIR: "bin"
       - id: windows-64-vs2017
         display_name: "Windows (VS 2017)"
         run_on: windows-64-vs2017-test
@@ -1697,6 +1704,7 @@ buildvariants:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
       - macos-10.14
+      - macos-11.00
       - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
