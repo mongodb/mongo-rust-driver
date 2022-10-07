@@ -110,7 +110,7 @@ pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {
     if original_len > new_len {
         // to avoid generating invalid UTF-8, find the first index >= max_length_bytes that is
         // the end of a character.
-        // TODO: eventually we should use ceil_char_boundary here but it's currently nightly-only.
+        // TODO: RUST-1496 we should use ceil_char_boundary here but it's currently nightly-only.
         // see: https://doc.rust-lang.org/std/string/struct.String.html#method.ceil_char_boundary
         let mut truncate_index = new_len;
         // is_char_boundary returns true when the provided value == the length of the string, so
