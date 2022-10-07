@@ -26,7 +26,7 @@ use crate::{
     test::{Event, EventHandler},
     Client,
     Collection,
-    Namespace, error::ErrorKind,
+    Namespace,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -1301,9 +1301,43 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
             .await?;
 
-    // Test: expect failure.
+    // Test: insert fails.
     let result = client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "encrypted": "test" }, None).await;
     assert!(matches!(result.unwrap_err().kind.as_ref(), ErrorKind::InvalidArgument { .. }));
+
+    Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup: encrypted client.
+    let extra_options = doc! {
+        "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],      
+    };
+    let auto_enc_opts = AutoEncryptionOptions::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(LOCAL_KMS.clone())
+        .extra_options(extra_options)
+        .bypass_auto_encryption(true)
+        .disable_crypt_shared(true)
+        .build();
+    let client_encrypted =
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
+            .await?;
+
+    // Test: insert succeeds.
+    client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "unencrypted": "test" }, None).await?;
+    // Test: mongocryptd not spawned.
+    assert!(!client_encrypted.mongocryptd_spawned().await);
+    // Test: attempting to connect fails.
+    let result = Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await;
+    assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
 }
