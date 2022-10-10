@@ -153,18 +153,21 @@ impl Client {
         Ok(client)
     }
 
-    pub(crate) fn emit_command_event(&self, generate_event: impl Fn() -> CommandEvent) {
+    #[cfg(not(feature = "tracing-unstable"))]
+    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
         if let Some(ref handler) = self.inner.options.command_event_handler {
             let event = generate_event();
             handle_command_event(handler.as_ref(), event);
         }
+    }
 
-        #[cfg(feature = "tracing-unstable")]
-        if trace_or_log_enabled!(
+    #[cfg(feature = "tracing-unstable")]
+    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        let tracing_emitter = if trace_or_log_enabled!(
             target: COMMAND_TRACING_EVENT_TARGET,
             TracingOrLogLevel::Debug
         ) {
-            let tracing_emitter = CommandTracingEventEmitter::new(
+            Some(CommandTracingEventEmitter::new(
                 self.inner.options.tracing_max_document_length_bytes,
                 #[cfg(not(test))]
                 None,
@@ -174,9 +177,25 @@ impl Client {
                     .test_options
                     .as_ref()
                     .and_then(|o| o.client_id.clone()),
-            );
-            let event = generate_event();
-            handle_command_event(&tracing_emitter, event);
+            ))
+        } else {
+            None
+        };
+        let apm_event_handler = self.inner.options.command_event_handler.as_ref();
+        if !(tracing_emitter.is_some() || apm_event_handler.is_some()) {
+            return;
+        }
+
+        let event = generate_event();
+        if let (Some(event_handler), Some(ref tracing_emitter)) =
+            (apm_event_handler, &tracing_emitter)
+        {
+            handle_command_event(event_handler.as_ref(), event.clone());
+            handle_command_event(tracing_emitter, event);
+        } else if let Some(event_handler) = apm_event_handler {
+            handle_command_event(event_handler.as_ref(), event);
+        } else if let Some(ref tracing_emitter) = tracing_emitter {
+            handle_command_event(tracing_emitter, event);
         }
     }
 
