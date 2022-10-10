@@ -14,9 +14,13 @@ pub(crate) const DEFAULT_MAX_DOCUMENT_LENGTH_BYTES: usize = 1000;
 /// and emitting them as tracing events.
 pub(crate) struct CommandTracingEventEmitter {
     max_document_length_bytes: usize,
-    /// We always store this so we don't have to branch on whether or not we're in a test
+    /// We always store this re so we don't have to branch on whether or not we're in a test
     /// whenever we emit a tracing event. However, it is only actually added to the events
     /// for tests.
+    /// This property is only used for tests, and will be `None` in all non-test code. However,
+    /// we define this unconditionally and not just in test configuration to avoid having to
+    /// branch on whether we are in test configuration in each place we emit a tracing event
+    /// below.
     #[allow(dead_code)]
     client_id: Option<String>,
 }

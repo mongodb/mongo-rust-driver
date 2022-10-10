@@ -536,6 +536,7 @@ pub struct ClientOptions {
     /// If truncation of a document at the exact specified length would occur in the middle
     /// of a Unicode codepoint, the document will be truncated at the closest larger length
     /// which falls on a boundary between codepoints.
+    /// Note that in cases where truncation occurs the output will not be valid JSON.
     ///
     /// The default value is 1000.
     #[cfg(any(feature = "tracing-unstable", docsrs))]
