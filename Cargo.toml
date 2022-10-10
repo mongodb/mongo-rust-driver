@@ -165,7 +165,6 @@ features = ["v4"]
 [dev-dependencies]
 approx = "0.5.1"
 async_once = "0.2.6"
-convert_case = "0.6.0"
 ctrlc = "3.2.2"
 derive_more = "0.99.13"
 function_name = "0.2.1"

@@ -89,23 +89,9 @@ pub(crate) fn tracing_events_match(
 
     let serialized_fields = bson::to_document(&actual.fields)
         .map_err(|e| format!("Failed to serialize tracing fields to document: {}", e))?;
-    let mut actual_fields = bson::Document::new();
-
-    use convert_case::{Case, Casing};
-
-    for (key, value) in serialized_fields.into_iter() {
-        // the test files expect camelCase but we emit the keys in snake_case.
-        let camel_case_key = match key == "duration_ms" {
-            // convert_case renames this to durationMs rather than durationMS
-            // so we need to special-case it.
-            true => "durationMS".to_string(),
-            false => key.to_case(Case::Camel),
-        };
-        actual_fields.insert(camel_case_key, value);
-    }
 
     results_match(
-        Some(&Bson::Document(actual_fields)),
+        Some(&Bson::Document(serialized_fields)),
         &Bson::Document(expected.data.clone()),
         false,
         None,

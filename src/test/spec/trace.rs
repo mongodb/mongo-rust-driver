@@ -193,7 +193,7 @@ async fn command_logging_truncation_mid_codepoint() {
     let succeeded = tracing_subscriber
         .wait_for_event(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
-                && e.get_value_as_string("command_name") == "find"
+                && e.get_value_as_string("commandName") == "find"
         })
         .await
         .unwrap();
