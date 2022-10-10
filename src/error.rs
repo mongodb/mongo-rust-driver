@@ -376,8 +376,45 @@ impl Error {
     /// sensitive commands. Currently, the only field besides those that we expose is the
     /// error message.
     pub(crate) fn redact(&mut self) {
-        if let ErrorKind::Command(ref mut error) = *self.kind {
-            error.message = "REDACTED".to_string();
+        // This is intentionally written without a catch-all branch so that if new error
+        // kinds are added we remember to reason about whether they need to be redacted.
+        match *self.kind {
+            ErrorKind::BulkWrite(ref mut bwe) => {
+                if let Some(ref mut wes) = bwe.write_errors {
+                    for we in wes {
+                        we.redact();
+                    }
+                }
+                if let Some(ref mut wce) = bwe.write_concern_error {
+                    wce.redact();
+                }
+            }
+            ErrorKind::Command(ref mut command_error) => {
+                command_error.redact();
+            }
+            ErrorKind::Write(ref mut write_error) => match write_error {
+                WriteFailure::WriteConcernError(wce) => {
+                    wce.redact();
+                }
+                WriteFailure::WriteError(we) => {
+                    we.redact();
+                }
+            },
+            ErrorKind::InvalidArgument { .. }
+            | ErrorKind::BsonDeserialization(_)
+            | ErrorKind::BsonSerialization(_)
+            | ErrorKind::DnsResolve { .. }
+            | ErrorKind::Io(_)
+            | ErrorKind::Internal { .. }
+            | ErrorKind::ConnectionPoolCleared { .. }
+            | ErrorKind::InvalidResponse { .. }
+            | ErrorKind::ServerSelection { .. }
+            | ErrorKind::SessionsNotSupported
+            | ErrorKind::InvalidTlsConfig { .. }
+            | ErrorKind::Transaction { .. }
+            | ErrorKind::IncompatibleServer { .. }
+            | ErrorKind::MissingResumeToken
+            | ErrorKind::Authentication { .. } => {}
         }
     }
 }
@@ -559,6 +596,14 @@ pub struct CommandError {
     pub(crate) topology_version: Option<TopologyVersion>,
 }
 
+impl CommandError {
+    // If any new fields are added to CommandError, this implementation must be updated to
+    // redact them per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+    }
+}
+
 impl fmt::Display for CommandError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -595,6 +640,15 @@ pub struct WriteConcernError {
     pub(crate) labels: Vec<String>,
 }
 
+impl WriteConcernError {
+    // If any new fields are added to WriteConcernError, this implementation must be updated to
+    // redact them per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+        self.details = None;
+    }
+}
+
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -618,6 +672,15 @@ pub struct WriteError {
     /// pertaining to document validation).
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+}
+
+impl WriteError {
+    // If any new fields are added to WriteError, this implementation must be updated to redact them
+    // per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+        self.details = None;
+    }
 }
 
 /// An error that occurred during a write operation consisting of multiple writes that wasn't due to
@@ -647,6 +710,15 @@ pub struct BulkWriteError {
     /// pertaining to document validation).
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+}
+
+impl BulkWriteError {
+    // If any new fields are added to BulkWriteError, this implementation must be updated to redact
+    // them per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+        self.details = None;
+    }
 }
 
 /// The set of errors that occurred during a write operation.
