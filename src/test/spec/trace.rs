@@ -203,7 +203,7 @@ async fn command_logging_truncation_mid_codepoint() {
     assert_eq!(reply.len(), 221);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_unified() {
     let _guard = LOCK.run_exclusively().await;

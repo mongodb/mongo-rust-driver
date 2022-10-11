@@ -11,9 +11,16 @@
     {
       "client": {
         "id": "client",
+        "useMultipleMongoses": false,
         "observeLogMessages": {
           "command": "debug"
         }
+      }
+    },
+    {
+      "client": {
+        "id": "failPointClient",
+        "useMultipleMongoses": false
       }
     },
     {
@@ -26,7 +33,7 @@
   ],
   "tests": [
     {
-      "description": "authenticate",
+      "description": "authenticate command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -41,7 +48,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -64,7 +71,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "authenticate"
@@ -75,7 +83,75 @@
       ]
     },
     {
-      "description": "saslStart",
+      "description": "network error in response to authenticate is not redacted",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "authenticate"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "authenticate",
+            "command": {
+              "authenticate": 1,
+              "mechanism": "MONGODB-X509",
+              "user": "CN=myName,OU=myOrgUnit,O=myOrg,L=myLocality,ST=myState,C=myCountry"
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "authenticate",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "authenticate"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "saslStart command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -89,7 +165,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -112,7 +188,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "saslStart"
@@ -123,7 +200,75 @@
       ]
     },
     {
-      "description": "saslContinue",
+      "description": "network error in response to saslStart is not redacted",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "saslStart"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "saslStart",
+            "command": {
+              "saslStart": 1,
+              "payload": "ZmFrZXNhc2xwYXlsb2Fk",
+              "mechanism": "MONGODB-X509"
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "saslStart",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "saslStart"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "saslContinue command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -137,7 +282,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -160,7 +305,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "saslContinue"
@@ -171,7 +317,75 @@
       ]
     },
     {
-      "description": "getnonce",
+      "description": "network error in response to saslContinue is not redacted",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "saslContinue"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "saslContinue",
+            "command": {
+              "saslContinue": 1,
+              "conversationId": 0,
+              "payload": "ZmFrZXNhc2xwYXlsb2Fk"
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "saslContinue",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "saslContinue"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "getnonce command and server reply are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -216,7 +430,73 @@
       ]
     },
     {
-      "description": "createUser",
+      "description": "network error in response to getnonce is not redacted",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "getnonce"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "getnonce",
+            "command": {
+              "getnonce": 1
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "getnonce",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "getnonce"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "createUser command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -230,7 +510,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -253,7 +533,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "createUser"
@@ -264,7 +545,75 @@
       ]
     },
     {
-      "description": "updateUser",
+      "description": "network error in response to createUser is not redacted",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "createUser"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "createUser",
+            "command": {
+              "createUser": "private",
+              "pwd": "pwd",
+              "roles": []
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "createUser",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "createUser"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "updateUser command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -278,7 +627,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -301,7 +650,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "updateUser"
@@ -312,7 +662,75 @@
       ]
     },
     {
-      "description": "copydbgetnonce",
+      "description": "network error in response to updateUser is not redacted",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "updateUser"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "updateUser",
+            "command": {
+              "updateUser": "private",
+              "pwd": "pwd",
+              "roles": []
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "updateUser",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "updateUser"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "copydbgetnonce command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -324,7 +742,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -347,7 +765,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "copydbgetnonce"
@@ -358,7 +777,78 @@
       ]
     },
     {
-      "description": "copydbsaslstart",
+      "description": "network error in response to copydbgetnonce is not redacted",
+      "runOnRequirements": [
+        {
+          "maxServerVersion": "4.0.99"
+        }
+      ],
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "copydbgetnonce"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "copydbgetnonce",
+            "command": {
+              "copydbgetnonce": "private"
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "copydbgetnonce",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "copydbgetnonce"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "copydbsaslstart command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -370,7 +860,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -393,7 +883,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "copydbsaslstart"
@@ -404,7 +895,78 @@
       ]
     },
     {
-      "description": "copydb",
+      "description": "network error in response to copydbsaslstart is not redacted",
+      "runOnRequirements": [
+        {
+          "maxServerVersion": "4.0.99"
+        }
+      ],
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "copydbsaslstart"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "copydbsaslstart",
+            "command": {
+              "copydbsaslstart": "private"
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "copydbgetnonce",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "copydbgetnonce"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "copydb command and resulting server-generated error are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -416,7 +978,7 @@
             }
           },
           "expectError": {
-            "isError": true
+            "isClientError": false
           }
         }
       ],
@@ -439,7 +1001,8 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": false,
+              "hasFailure": true,
+              "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
                 "commandName": "copydb"
@@ -450,7 +1013,78 @@
       ]
     },
     {
-      "description": "hello with speculative authenticate",
+      "description": "network error in response to copydb is not redacted",
+      "runOnRequirements": [
+        {
+          "maxServerVersion": "4.0.99"
+        }
+      ],
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "failPointClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "copydb"
+                ],
+                "closeConnection": true
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "copydb",
+            "command": {
+              "copydb": "private"
+            }
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ],
+      "expectLogMessages": [
+        {
+          "client": "client",
+          "messages": [
+            {
+              "level": "debug",
+              "component": "command",
+              "data": {
+                "message": "Command started",
+                "databaseName": "logging-redaction-tests",
+                "commandName": "copydb",
+                "command": {
+                  "$$matchAsDocument": {}
+                }
+              }
+            },
+            {
+              "level": "debug",
+              "component": "command",
+              "hasFailure": true,
+              "failureIsRedacted": false,
+              "data": {
+                "message": "Command failed",
+                "commandName": "copydb"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "hello with speculative authenticate command and server reply are redacted",
       "runOnRequirements": [
         {
           "minServerVersion": "4.9"
@@ -503,7 +1137,7 @@
       ]
     },
     {
-      "description": "legacy hello with speculative authenticate",
+      "description": "legacy hello with speculative authenticate command and server reply are redacted",
       "operations": [
         {
           "name": "runCommand",
@@ -587,7 +1221,7 @@
       ]
     },
     {
-      "description": "hello without speculative authenticate is not redacted",
+      "description": "hello without speculative authenticate command and server reply are not redacted",
       "runOnRequirements": [
         {
           "minServerVersion": "4.9"
@@ -646,7 +1280,7 @@
       ]
     },
     {
-      "description": "legacy hello without speculative authenticate is not redacted",
+      "description": "legacy hello without speculative authenticate command and server reply are not redacted",
       "operations": [
         {
           "name": "runCommand",

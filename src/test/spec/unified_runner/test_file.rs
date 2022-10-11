@@ -402,13 +402,14 @@ pub(crate) struct ExpectedMessages {
 #[cfg(feature = "tracing-unstable")]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ExpectedMessage {
     #[serde(deserialize_with = "deserialize_tracing_level")]
     pub(crate) level: tracing::Level,
     #[serde(rename = "component", deserialize_with = "deserialize_tracing_target")]
     pub(crate) target: String,
-    #[serde(rename = "hasFailure")]
     pub(crate) has_failure: Option<bool>,
+    pub(crate) failure_is_redacted: Option<bool>,
     pub(crate) data: Document,
 }
 

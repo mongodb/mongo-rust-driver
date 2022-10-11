@@ -14,7 +14,7 @@ pub(crate) use self::{
 };
 
 #[cfg(feature = "tracing-unstable")]
-pub(crate) use self::trace::{max_verbosity_levels_for_test_case, TracingEvent, TracingHandler};
+pub(crate) use self::trace::{max_verbosity_levels_for_test_case, TracingEvent, TracingEventValue, TracingHandler};
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
