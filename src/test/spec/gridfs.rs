@@ -1,6 +1,8 @@
-use crate::test::{run_spec_test_with_path, LOCK};
-
-use super::{run_unified_format_test_filtered, unified_runner::TestCase};
+use crate::test::{
+    run_spec_test_with_path,
+    spec::unified_runner::{run_unified_format_test_filtered, TestCase},
+    LOCK,
+};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]

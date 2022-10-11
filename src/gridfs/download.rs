@@ -1,5 +1,6 @@
-use tokio::io::AsyncWriteExt;
-use tokio_util::compat::FuturesAsyncWriteCompatExt;
+use std::marker::Unpin;
+
+use futures_util::io::{AsyncWrite, AsyncWriteExt};
 
 use super::{options::GridFsDownloadByNameOptions, FilesCollectionDocument, GridFsBucket};
 use crate::{
@@ -11,9 +12,9 @@ use crate::{
 impl GridFsBucket {
     /// Downloads the contents of the stored file specified by `id` and writes
     /// the contents to the `destination`.
-    pub async fn download_to_tokio_writer<T>(&self, id: Bson, destination: T) -> Result<()>
+    pub async fn download_to_futures_0_3_writer<T>(&self, id: Bson, destination: T) -> Result<()>
     where
-        T: tokio::io::AsyncWrite + std::marker::Unpin,
+        T: AsyncWrite + Unpin,
     {
         let options = FindOneOptions::builder()
             .read_concern(self.read_concern().cloned())
@@ -34,32 +35,21 @@ impl GridFsBucket {
                 .into());
             }
         };
-        self.download_to_tokio_writer_common(file, destination)
-            .await
-    }
-
-    /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the `destination`.
-    pub async fn download_to_futures_0_3_writer<T>(&self, id: Bson, destination: T) -> Result<()>
-    where
-        T: futures_util::io::AsyncWrite + std::marker::Unpin,
-    {
-        self.download_to_tokio_writer(id, &mut destination.compat_write())
-            .await
+        self.download_to_writer_common(file, destination).await
     }
 
     /// Downloads the contents of the stored file specified by `filename` and writes the contents to
     /// the `destination`. If there are multiple files with the same filename, the `revision` in the
     /// options provided is used to determine which one to download. If no `revision` is specified,
     /// the most recent file with the given filename is chosen.
-    pub async fn download_to_tokio_writer_by_name<T>(
+    pub async fn download_to_futures_0_3_writer_by_name<T>(
         &self,
         filename: impl AsRef<str>,
         destination: T,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<()>
     where
-        T: tokio::io::AsyncWrite + std::marker::Unpin,
+        T: AsyncWrite + Unpin,
     {
         let revision = options.into().and_then(|opts| opts.revision).unwrap_or(-1);
         let (sort, skip) = if revision >= 0 {
@@ -99,34 +89,16 @@ impl GridFsBucket {
             }
         };
 
-        self.download_to_tokio_writer_common(file, destination)
-            .await
+        self.download_to_writer_common(file, destination).await
     }
 
-    /// Downloads the contents of the stored file specified by `filename` and writes the contents to
-    /// the `destination`. If there are multiple files with the same filename, the `revision` in the
-    /// options provided is used to determine which one to download. If no `revision` is specified,
-    /// the most recent file with the given filename is chosen.
-    pub async fn download_to_futures_0_3_writer_by_name<T>(
-        &self,
-        filename: impl AsRef<str>,
-        destination: T,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) -> Result<()>
-    where
-        T: futures_util::io::AsyncWrite + std::marker::Unpin,
-    {
-        self.download_to_tokio_writer_by_name(filename, &mut destination.compat_write(), options)
-            .await
-    }
-
-    async fn download_to_tokio_writer_common<T>(
+    async fn download_to_writer_common<T>(
         &self,
         file: FilesCollectionDocument,
         mut destination: T,
     ) -> Result<()>
     where
-        T: tokio::io::AsyncWrite + std::marker::Unpin,
+        T: AsyncWrite + Unpin,
     {
         let total_bytes_expected = file.length;
         let chunk_size = file.chunk_size as u64;
