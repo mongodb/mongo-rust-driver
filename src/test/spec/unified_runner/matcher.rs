@@ -73,30 +73,43 @@ pub(crate) fn tracing_events_match(
                             TracingEventValue::String(failure_str) => {
                                 if let Some(redacted) = expected.failure_is_redacted {
                                     if redacted && !failure_str.contains("REDACTED") {
-                                        return Err(format!("Expected failure to be redacted, but was not; got {:?}", failure_str));
+                                        return Err(format!(
+                                            "Expected failure to be redacted, but was not; got \
+                                             {:?}",
+                                            failure_str
+                                        ));
                                     } else if !redacted && failure_str.contains("REDACTED") {
-                                        return Err(format!("Expected failure to not be redacted, but was; got {:?}", failure_str));
+                                        return Err(format!(
+                                            "Expected failure to not be redacted, but was; got \
+                                             {:?}",
+                                            failure_str
+                                        ));
                                     }
                                 }
-                            },
-                            _ => return Err(format!("Expected failure to be a string, but was not; got {:?}", failure)),
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "Expected failure to be a string, but was not; got {:?}",
+                                    failure
+                                ))
+                            }
                         };
-                    },
+                    }
                     None => {
-                        return Err("Expected event to contain a failure, but did not find one".to_string());
-                    },
+                        return Err(
+                            "Expected event to contain a failure, but did not find one".to_string()
+                        );
+                    }
                 };
-            },
+            }
             false => {
                 if actual.fields.contains_key("failure") {
-                    return Err(
-                        format!(
-                            "Expected event to not contain a failure, but found one: {:?}",
-                            actual.fields.get("failure").unwrap(),
-                        )
-                    );
+                    return Err(format!(
+                        "Expected event to not contain a failure, but found one: {:?}",
+                        actual.fields.get("failure").unwrap(),
+                    ));
                 }
-            },
+            }
         };
     }
 
