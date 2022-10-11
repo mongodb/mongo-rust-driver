@@ -68,7 +68,7 @@ zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
 
 # DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of CSFLE support in the Rust driver.
-csfle = ["mongocrypt", "rayon"]
+csfle = ["mongocrypt", "rayon", "num_cpus"]
 
 [dependencies]
 async-trait = "0.1.42"
@@ -86,6 +86,7 @@ hmac = "0.12.1"
 lazy_static = "1.4.0"
 md-5 = "0.10.1"
 mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true }
+num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
 percent-encoding = "2.0.0"

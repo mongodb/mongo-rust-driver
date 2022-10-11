@@ -40,9 +40,9 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
     ) -> Result<Self> {
-        let num_cpus = std::thread::available_parallelism()?.get();
+        // TODO RUST-1492: Replace num_cpus with std::thread::available_parallelism.
         let crypto_threads = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus)
+            .num_threads(num_cpus::get())
             .build()
             .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
         Ok(Self {
