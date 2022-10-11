@@ -1308,25 +1308,20 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
-    if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
-        return Ok(());
-    }
+async fn bypass_mongocryptd_unencrypted_insert(conf: impl FnOnce(&mut AutoEncryptionOptions)) -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: encrypted client.
     let extra_options = doc! {
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],      
     };
-    let auto_enc_opts = AutoEncryptionOptions::builder()
+    let mut auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(LOCAL_KMS.clone())
         .extra_options(extra_options)
-        .bypass_auto_encryption(true)
         .disable_crypt_shared(true)
         .build();
+    conf(&mut auto_enc_opts);
     let client_encrypted =
         Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
             .await?;
@@ -1340,4 +1335,22 @@ async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
     assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
+        return Ok(());
+    }
+    bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_auto_encryption = Some(true); }).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_query_analysis", false) {
+        return Ok(());
+    }
+    bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_query_analysis = Some(true); }).await
 }
