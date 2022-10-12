@@ -71,11 +71,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "authenticate"
+                "commandName": "authenticate",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -139,11 +141,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "authenticate"
+                "commandName": "authenticate",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -188,11 +192,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "saslStart"
+                "commandName": "saslStart",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -256,11 +262,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "saslStart"
+                "commandName": "saslStart",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -305,11 +313,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "saslContinue"
+                "commandName": "saslContinue",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -373,11 +383,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "saslContinue"
+                "commandName": "saslContinue",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -484,11 +496,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "getnonce"
+                "commandName": "getnonce",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -533,11 +547,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "createUser"
+                "commandName": "createUser",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -601,11 +617,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "createUser"
+                "commandName": "createUser",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -650,11 +668,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "updateUser"
+                "commandName": "updateUser",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -718,11 +738,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "updateUser"
+                "commandName": "updateUser",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -765,11 +787,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "copydbgetnonce"
+                "commandName": "copydbgetnonce",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -836,11 +860,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "copydbgetnonce"
+                "commandName": "copydbgetnonce",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -883,11 +909,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "copydbsaslstart"
+                "commandName": "copydbsaslstart",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -954,11 +982,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "copydbgetnonce"
+                "commandName": "copydbgetnonce",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -1001,11 +1031,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": true,
               "data": {
                 "message": "Command failed",
-                "commandName": "copydb"
+                "commandName": "copydb",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]
@@ -1072,11 +1104,13 @@
             {
               "level": "debug",
               "component": "command",
-              "hasFailure": true,
               "failureIsRedacted": false,
               "data": {
                 "message": "Command failed",
-                "commandName": "copydb"
+                "commandName": "copydb",
+                "failure": {
+                  "$$exists": true
+                }
               }
             }
           ]

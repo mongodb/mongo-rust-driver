@@ -49,11 +49,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: authenticate
+              failure: { $$exists: true }
 
   - description: "network error in response to authenticate is not redacted"
     operations:
@@ -90,11 +90,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: authenticate
+              failure: { $$exists: true }
 
   - description: "saslStart command and resulting server-generated error are redacted"
     operations:
@@ -121,11 +121,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: saslStart
+              failure: { $$exists: true }
 
   - description: "network error in response to saslStart is not redacted"
     operations:
@@ -162,11 +162,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: saslStart
+              failure: { $$exists: true }
 
   - description: "saslContinue command and resulting server-generated error are redacted"
     operations:
@@ -193,11 +193,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: saslContinue
+              failure: { $$exists: true }
 
   - description: "network error in response to saslContinue is not redacted"
     operations:
@@ -234,11 +234,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: saslContinue
+              failure: { $$exists: true }
 
   - description: "getnonce command and server reply are redacted"
     operations:
@@ -300,11 +300,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: getnonce
+              failure: { $$exists: true }
 
   - description: "createUser command and resulting server-generated error are redacted"
     operations:
@@ -333,11 +333,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: createUser
+              failure: { $$exists: true }
 
   - description: "network error in response to createUser is not redacted"
     operations:
@@ -374,11 +374,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: createUser
+              failure: { $$exists: true }
 
   - description: "updateUser command and resulting server-generated error are redacted"
     operations:
@@ -405,11 +405,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: updateUser
+              failure: { $$exists: true }
 
   - description: "network error in response to updateUser is not redacted"
     operations:
@@ -446,11 +446,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: updateUser
+              failure: { $$exists: true }
 
   - description: "copydbgetnonce command and resulting server-generated error are redacted"
     operations:
@@ -475,11 +475,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: copydbgetnonce
+              failure: { $$exists: true }
 
   - description: "network error in response to copydbgetnonce is not redacted"
     runOnRequirements:
@@ -516,11 +516,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: copydbgetnonce
+              failure: { $$exists: true }
 
   - description: "copydbsaslstart command and resulting server-generated error are redacted"
     operations:
@@ -545,11 +545,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: copydbsaslstart
+              failure: { $$exists: true }
 
   - description: "network error in response to copydbsaslstart is not redacted"
     runOnRequirements:
@@ -586,11 +586,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
-              commandName: copydbgetnonce  
+              commandName: copydbgetnonce
+              failure: { $$exists: true }
 
   - description: "copydb command and resulting server-generated error are redacted"
     operations:
@@ -615,11 +615,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: true
             data:
               message: "Command failed"
               commandName: copydb
+              failure: { $$exists: true }
 
   - description: "network error in response to copydb is not redacted"
     runOnRequirements:
@@ -656,11 +656,11 @@ tests:
                 $$matchAsDocument: {}
           - level: debug
             component: command
-            hasFailure: true
             failureIsRedacted: false
             data:
               message: "Command failed"
               commandName: copydb
+              failure: { $$exists: true }
 
   - description: "hello with speculative authenticate command and server reply are redacted"
     runOnRequirements:

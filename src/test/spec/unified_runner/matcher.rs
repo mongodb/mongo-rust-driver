@@ -64,51 +64,41 @@ pub(crate) fn tracing_events_match(
         ));
     }
 
-    if let Some(has_failure) = expected.has_failure {
-        match has_failure {
-            true => {
-                match actual.fields.get("failure") {
-                    Some(failure) => {
-                        match failure {
-                            TracingEventValue::String(failure_str) => {
-                                if let Some(redacted) = expected.failure_is_redacted {
-                                    if redacted && !failure_str.contains("REDACTED") {
-                                        return Err(format!(
-                                            "Expected failure to be redacted, but was not; got \
-                                             {:?}",
-                                            failure_str
-                                        ));
-                                    } else if !redacted && failure_str.contains("REDACTED") {
-                                        return Err(format!(
-                                            "Expected failure to not be redacted, but was; got \
-                                             {:?}",
-                                            failure_str
-                                        ));
-                                    }
-                                }
-                            }
-                            _ => {
-                                return Err(format!(
-                                    "Expected failure to be a string, but was not; got {:?}",
-                                    failure
-                                ))
-                            }
-                        };
+    if let Some(failure_is_redacted) = expected.failure_is_redacted {
+        if !expected.data.contains_key("failure") {
+            return Err(
+                "Expected log message uses `failureIsRedacted`, but does not contain assertion \
+                 that failure exists"
+                    .to_string(),
+            );
+        }
+
+        match actual.fields.get("failure") {
+            Some(failure) => {
+                match failure {
+                    TracingEventValue::String(failure_str) => {
+                        if failure_is_redacted && !failure_str.contains("REDACTED") {
+                            return Err(format!(
+                                "Expected failure to be redacted, but was not; got {:?}",
+                                failure_str
+                            ));
+                        } else if !failure_is_redacted && failure_str.contains("REDACTED") {
+                            return Err(format!(
+                                "Expected failure to not be redacted, but was; got {:?}",
+                                failure_str
+                            ));
+                        }
                     }
-                    None => {
-                        return Err(
-                            "Expected event to contain a failure, but did not find one".to_string()
-                        );
+                    _ => {
+                        return Err(format!(
+                            "Expected failure to be a string, but was not; got {:?}",
+                            failure
+                        ))
                     }
                 };
             }
-            false => {
-                if actual.fields.contains_key("failure") {
-                    return Err(format!(
-                        "Expected event to not contain a failure, but found one: {:?}",
-                        actual.fields.get("failure").unwrap(),
-                    ));
-                }
+            None => {
+                return Err("Expected event to contain a failure, but did not find one".to_string());
             }
         };
     }

@@ -408,7 +408,6 @@ pub(crate) struct ExpectedMessage {
     pub(crate) level: tracing::Level,
     #[serde(rename = "component", deserialize_with = "deserialize_tracing_target")]
     pub(crate) target: String,
-    pub(crate) has_failure: Option<bool>,
     pub(crate) failure_is_redacted: Option<bool>,
     pub(crate) data: Document,
 }
