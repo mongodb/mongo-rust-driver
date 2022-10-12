@@ -38,6 +38,7 @@ use crate::{
     coll::options::Hint,
     collation::Collation,
     error::{ErrorKind, Result},
+    gridfs::options::GridFsDownloadByNameOptions,
     options::{
         AggregateOptions,
         CountOptions,
@@ -338,6 +339,8 @@ impl<'de> Deserialize<'de> for Operation {
             "waitForPrimaryChange" => deserialize_op::<WaitForPrimaryChange>(definition.arguments),
             "wait" => deserialize_op::<Wait>(definition.arguments),
             "createEntities" => deserialize_op::<CreateEntities>(definition.arguments),
+            "download" => deserialize_op::<Download>(definition.arguments),
+            "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -2637,6 +2640,62 @@ impl TestOperation for CreateEntities {
         test_runner
             .populate_entity_map(&self.entities[..], "createEntities operation")
             .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Download {
+    id: Bson,
+}
+
+impl TestOperation for Download {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id).await;
+            let mut buf: Vec<u8> = vec![];
+            bucket
+                .download_to_futures_0_3_writer(self.id.clone(), &mut buf)
+                .await?;
+            let data = hex::encode(buf);
+            Ok(Some(Entity::Bson(data.into())))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct DownloadByName {
+    filename: String,
+    #[serde(flatten)]
+    options: GridFsDownloadByNameOptions,
+}
+
+impl TestOperation for DownloadByName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id).await;
+            let mut buf: Vec<u8> = vec![];
+            bucket
+                .download_to_futures_0_3_writer_by_name(
+                    self.filename.clone(),
+                    &mut buf,
+                    self.options.clone(),
+                )
+                .await?;
+            let data = hex::encode(buf);
+            Ok(Some(Entity::Bson(data.into())))
+        }
+        .boxed()
     }
 }
 

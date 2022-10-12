@@ -184,7 +184,7 @@ impl CryptExecutor {
                 State::NeedKmsCredentials => {
                     // TODO(RUST-1314, RUST-1417): support fetching KMS credentials.
                     return Err(Error::internal("KMS credentials are not yet supported"));
-                },
+                }
                 State::Ready => {
                     let (tx, rx) = oneshot::channel();
                     let mut thread_ctx = std::mem::replace(

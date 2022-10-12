@@ -6,6 +6,7 @@ mod command_monitoring;
 mod connection_stepdown;
 mod crud;
 mod crud_v1;
+mod gridfs;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;

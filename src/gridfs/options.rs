@@ -1,16 +1,16 @@
+use std::time::Duration;
+
 use crate::{
+    bson::Document,
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
 use serde::Deserialize;
-use std::time::Duration;
 use typed_builder::TypedBuilder;
-
-use bson::Document;
 
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsBucketOptions {
     /// The bucket name. Defaults to 'fs'.
@@ -32,6 +32,7 @@ pub struct GridFsBucketOptions {
 /// Contains the options for creating a [`GridFsUploadStream`] to upload a file to a
 /// [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct GridFsUploadOptions {

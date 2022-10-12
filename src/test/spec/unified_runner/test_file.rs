@@ -13,6 +13,7 @@ use crate::{
     client::options::{ServerApi, ServerApiVersion, SessionOptions},
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
+    gridfs::options::GridFsBucketOptions,
     options::{
         ClientOptions,
         CollectionOptions,
@@ -287,14 +288,12 @@ pub(crate) struct Session {
     pub(crate) session_options: Option<SessionOptions>,
 }
 
-// TODO: RUST-527 remove the unused annotation
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[allow(unused)]
 pub(crate) struct Bucket {
     pub(crate) id: String,
     pub(crate) database: String,
-    pub(crate) bucket_options: Option<Document>,
+    pub(crate) bucket_options: Option<GridFsBucketOptions>,
 }
 
 #[derive(Debug, Deserialize)]
