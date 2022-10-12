@@ -414,7 +414,8 @@ impl Error {
             | ErrorKind::Transaction { .. }
             | ErrorKind::IncompatibleServer { .. }
             | ErrorKind::MissingResumeToken
-            | ErrorKind::Authentication { .. } => {}
+            | ErrorKind::Authentication { .. }
+            | ErrorKind::GridFs(_) => {}
         }
     }
 }
