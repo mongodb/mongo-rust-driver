@@ -79,6 +79,13 @@ impl Event {
             panic!("expected SDAM event, instead got {:#?}", self)
         }
     }
+
+    pub(crate) fn as_command_started_event(&self) -> Option<&CommandStartedEvent> {
+        match self {
+            Event::Command(CommandEvent::Started(e)) => Some(e),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]

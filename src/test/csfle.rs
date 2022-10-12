@@ -1,10 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson};
 use futures_util::TryStreamExt;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
-use serde::de::DeserializeOwned;
 
 use crate::{
     client::{
@@ -23,6 +22,7 @@ use crate::{
     coll::options::CollectionOptions,
     db::options::CreateCollectionOptions,
     options::{ReadConcern, WriteConcern},
+    test::Event,
     Client,
     Collection,
     Namespace,
@@ -53,7 +53,7 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
 }
 
 lazy_static! {
-    static ref KMS_PROVIDERS: KmsProviders = from_json(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
+    static ref KMS_PROVIDERS: KmsProviders = serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
     static ref LOCAL_KMS: KmsProviders = {
         let mut out = KMS_PROVIDERS.clone();
         out.retain(|k, _| *k == KmsProvider::Local);
@@ -113,7 +113,9 @@ async fn custom_key_material() -> Result<()> {
             .build(),
     )?;
 
-    let key = base64::decode("xPTAjBRG5JiPm+d3fj6XLi2q5DMXUS/f1f+SMAlhhwkhDRL0kr8r9GDLIGTAGlvC+HVjSIgdL+RKwZCvpXSyxTICWSXTUYsWYPyu3IoHbuBZdmw2faM3WhcRIgbMReU5").unwrap();
+    let key = base64::decode(
+        "xPTAjBRG5JiPm+d3fj6XLi2q5DMXUS/f1f+SMAlhhwkhDRL0kr8r9GDLIGTAGlvC+HVjSIgdL+RKw\
+         ZCvpXSyxTICWSXTUYsWYPyu3IoHbuBZdmw2faM3WhcRIgbMReU5").unwrap();
     let id = enc
         .create_data_key(
             &KmsProvider::Local,
@@ -200,6 +202,7 @@ async fn data_key_double_encryption() -> Result<()> {
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
     // Testing each provider:
+    let mut events = client.subscribe_to_events();
     let provider_keys = [
         (
             KmsProvider::Aws,
@@ -262,20 +265,28 @@ async fn data_key_double_encryption() -> Result<()> {
             docs[0].get_document("masterKey")?.get_str("provider")?,
             provider.name()
         );
-        let events = client.get_command_started_events(&["insert"]);
-        let found = try_any(&events, |ev| {
-            let cmd = &ev.command;
-            if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
-                return Ok(false);
-            }
-            Ok(any(cmd.get_array("documents")?, |doc| {
-                matches!(
-                    doc.as_document().and_then(|d| d.get("_id")),
-                    Some(Bson::Binary(id)) if id == &datakey_id
-                )
-            }))
-        })?;
-        assert!(found, "no valid event found in {:?}", events);
+        let found = events
+            .wait_for_event(
+                Duration::from_millis(500),
+                ok_pred(|ev| {
+                    let ev = match ev.as_command_started_event() {
+                        Some(e) => e,
+                        None => return Ok(false),
+                    };
+                    let cmd = &ev.command;
+                    if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
+                        return Ok(false);
+                    }
+                    Ok(cmd.get_array("documents")?.iter().any(|doc| {
+                        matches!(
+                            doc.as_document().and_then(|d| d.get("_id")),
+                            Some(Bson::Binary(id)) if id == &datakey_id
+                        )
+                    }))
+                }),
+            )
+            .await;
+        assert!(found.is_some(), "no valid event found in {:?}", events);
 
         // Manually encrypt a value and automatically decrypt it.
         let encrypted = client_encryption
@@ -325,30 +336,11 @@ async fn data_key_double_encryption() -> Result<()> {
     Ok(())
 }
 
-fn from_json<T: DeserializeOwned>(text: &str) -> Result<T> {
-    let json: serde_json::Value = serde_json::from_str(text)?;
-    let bson: bson::Bson = json.try_into()?;
-    Ok(bson::from_bson(bson)?)
+fn ok_pred(mut f: impl FnMut(&Event) -> Result<bool>) -> impl FnMut(&Event) -> bool {
+    move |ev| f(ev).unwrap_or(false)
 }
 
-fn any<T>(values: &[T], mut pred: impl FnMut(&T) -> bool) -> bool {
-    for value in values {
-        if pred(value) {
-            return true;
-        }
-    }
-    false
-}
-
-fn try_any<T>(values: &[T], mut pred: impl FnMut(&T) -> Result<bool>) -> Result<bool> {
-    for value in values {
-        if pred(value)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
+// TODO RUST-1225: replace this with built-in BSON support.
 fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
     Ok(bson::Binary {
         subtype: BinarySubtype::Uuid,
@@ -458,7 +450,7 @@ fn load_testdata_raw(name: &str) -> Result<String> {
 }
 
 fn load_testdata(name: &str) -> Result<Document> {
-    from_json(&load_testdata_raw(name)?)
+    Ok(serde_json::from_str(&load_testdata_raw(name)?)?)
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -1102,7 +1094,13 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
     let result = client_encryption
         .create_data_key(&KmsProvider::Gcp, &key_options)
         .await;
-    assert!(result.unwrap_err().is_csfle_error());
+    let err = result.unwrap_err();
+    assert!(err.is_csfle_error());
+    assert!(
+        err.to_string().contains("Invalid KMS response"),
+        "unexpected error: {}",
+        err
+    );
 
     Ok(())
 }
