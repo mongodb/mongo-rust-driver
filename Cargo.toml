@@ -68,7 +68,7 @@ zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
 
 # DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of CSFLE support in the Rust driver.
-csfle = ["mongocrypt", "rayon"]
+csfle = ["mongocrypt", "rayon", "num_cpus"]
 
 # DO NOT USE; see https://jira.mongodb.org/browse/RUST-580 for the status of tracing/logging support in the Rust driver.
 # Enables support for emitting tracing events.
@@ -83,6 +83,7 @@ bson = { git = "https://github.com/mongodb/bson-rust", branch = "main" }
 chrono = { version = "0.4.7", default-features = false, features = ["clock", "std"] }
 derivative = "2.1.1"
 flate2 = { version = "1.0", optional = true }
+futures-io = "0.3.21"
 futures-core = "0.3.14"
 futures-util = { version = "0.3.14", features = ["io"] }
 futures-executor = "0.3.14"
@@ -92,6 +93,7 @@ lazy_static = "1.4.0"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
 mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true }
+num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
 percent-encoding = "2.0.0"
@@ -156,7 +158,7 @@ features = ["dangerous_configuration"]
 
 [dependencies.tokio-util]
 version = "0.7.0"
-features = ["io"]
+features = ["io", "compat"]
 
 [dependencies.uuid]
 version = "1.1.2"
@@ -169,6 +171,7 @@ ctrlc = "3.2.2"
 derive_more = "0.99.13"
 function_name = "0.2.1"
 futures = "0.3"
+hex = "0.4"
 home = "0.5"
 lambda_runtime = "0.6.0"
 pretty_assertions = "1.3.0"

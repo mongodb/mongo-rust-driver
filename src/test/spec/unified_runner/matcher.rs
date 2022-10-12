@@ -390,7 +390,23 @@ fn special_operator_matches(
             let id = value.as_str().unwrap();
             entity_matches(id, actual, entities.unwrap())
         }
-        "$$matchesHexBytes" => panic!("GridFS not implemented"),
+        "$$matchesHexBytes" => match (actual, value) {
+            (Some(Bson::String(actual)), Bson::String(expected)) => {
+                if actual.to_lowercase() == expected.to_lowercase() {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "hex bytes do not match: expected {:?} but got {:?}",
+                        actual, expected
+                    ))
+                }
+            }
+            (actual, expected) => Err(format!(
+                "actual and expected should both be BSON strings but got: actual {:?}, expected \
+                 {:?}",
+                actual, expected
+            )),
+        },
         "$$sessionLsid" => match entities {
             Some(entity_map) => {
                 let session_id = value.as_str().unwrap();

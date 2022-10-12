@@ -504,6 +504,11 @@ pub enum ErrorKind {
     #[non_exhaustive]
     DnsResolve { message: String },
 
+    /// A GridFS error occurred.
+    #[error("{0:?}")]
+    #[non_exhaustive]
+    GridFs(GridFsErrorKind),
+
     #[error("Internal error: {message}")]
     #[non_exhaustive]
     Internal { message: String },
@@ -777,6 +782,49 @@ impl WriteFailure {
             .into())
         }
     }
+}
+
+/// An error that occurred during a GridFS operation.
+#[derive(Clone, Debug)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+pub enum GridFsErrorKind {
+    /// The file with the given identifier was not found.
+    #[non_exhaustive]
+    FileNotFound { identifier: GridFsFileIdentifier },
+
+    /// The file with the given revision was not found.
+    #[non_exhaustive]
+    RevisionNotFound { revision: i32 },
+
+    /// The chunk at index 'n' was missing.
+    #[non_exhaustive]
+    MissingChunk { n: u32 },
+
+    /// The chunk was the incorrect size.
+    #[non_exhaustive]
+    WrongSizeChunk {
+        actual_size: u32,
+        expected_size: u32,
+    },
+
+    /// An incorrect number of chunks was present for the file.
+    #[non_exhaustive]
+    WrongNumberOfChunks {
+        actual_number: u32,
+        expected_number: u32,
+    },
+}
+
+/// An identifier for a file stored in a GridFS bucket.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum GridFsFileIdentifier {
+    /// The name of the file. Not guaranteed to be unique.
+    Filename(String),
+
+    /// The file's unique [`Bson`] ID.
+    Id(Bson),
 }
 
 /// Translates ErrorKind::BulkWriteError cases to ErrorKind::WriteErrors, leaving all other errors

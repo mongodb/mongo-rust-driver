@@ -1620,9 +1620,9 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: macos-10.14
-        display_name: "MacOS 10.14"
-        run_on: macos-1014
+      - id: macos-11.00
+        display_name: "MacOS 11.00"
+        run_on: macos-1100
         variables:
           SINGLE_THREAD: true
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
@@ -1696,7 +1696,7 @@ buildvariants:
       - ubuntu-18.04
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-11.00
       - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
@@ -1747,9 +1747,9 @@ buildvariants:
         compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0"]
-    # haproxy isn't installed on windows / ubuntu-arm
+    # haproxy isn't installed on windows / ubuntu-arm / macos 11
     - if:
-        os: ["ubuntu-18.04-arm64", "windows-64-vs2017"]
+        os: ["ubuntu-18.04-arm64", "windows-64-vs2017", "macos-11.00"]
         auth-and-tls: "*"
         async-runtime: "*"
         compressor: "*"
@@ -1760,7 +1760,7 @@ buildvariants:
     os:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-11.00
       - windows-64-vs2017
     auth-and-tls:
       - auth-and-tls
@@ -1775,7 +1775,7 @@ buildvariants:
     os:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-11.00
       - windows-64-vs2017
     async-runtime: "*"
   display_name: "${os} PLAIN auth with ${async-runtime}"
@@ -1796,7 +1796,7 @@ buildvariants:
     os:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-11.00
       - windows-64-vs2017
     async-runtime: "*"
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"

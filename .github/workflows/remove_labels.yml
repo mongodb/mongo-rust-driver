@@ -14,4 +14,4 @@ jobs:
       - name: initial labeling
         uses: andymckay/labeler@master
         with:
-          remove-labels: "waiting-for-reporter"
+          remove-labels: "waiting-for-reporter, Stale"

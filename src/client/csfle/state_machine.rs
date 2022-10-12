@@ -40,9 +40,9 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
     ) -> Result<Self> {
-        let num_cpus = std::thread::available_parallelism()?.get();
+        // TODO RUST-1492: Replace num_cpus with std::thread::available_parallelism.
         let crypto_threads = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus)
+            .num_threads(num_cpus::get())
             .build()
             .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
         Ok(Self {
@@ -181,7 +181,10 @@ impl CryptExecutor {
                         })
                         .await?;
                 }
-                State::NeedKmsCredentials => todo!("RUST-1314"),
+                State::NeedKmsCredentials => {
+                    // TODO(RUST-1314, RUST-1417): support fetching KMS credentials.
+                    return Err(Error::internal("KMS credentials are not yet supported"));
+                }
                 State::Ready => {
                     let (tx, rx) = oneshot::channel();
                     let mut thread_ctx = std::mem::replace(

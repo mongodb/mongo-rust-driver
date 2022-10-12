@@ -8,6 +8,7 @@ use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
     concern::{Acknowledgment, WriteConcern},
+    gridfs::GridFsBucket,
     options::{
         CollectionOptions,
         CreateCollectionOptions,
@@ -63,11 +64,11 @@ use crate::test::{
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
-    "download",
-    "download_by_name",
+    "delete",
     "listCollectionObjects",
     "listDatabaseObjects",
     "mapReduce",
+    "upload",
     "watch",
 ];
 
@@ -135,6 +136,16 @@ impl TestRunner {
         ));
 
         for test_case in &test_file.tests {
+            if let Ok(description) = std::env::var("TEST_DESCRIPTION") {
+                if !test_case
+                    .description
+                    .to_lowercase()
+                    .contains(&description.to_lowercase())
+                {
+                    continue;
+                }
+            }
+
             if let Some(skip_reason) = &test_case.skip_reason {
                 log_uncaptured(format!(
                     "Skipping test case {:?}: {}",
@@ -497,8 +508,13 @@ impl TestRunner {
                         .unwrap();
                     (id, Entity::Session(SessionEntity::new(client_session)))
                 }
-                TestFileEntity::Bucket(_) => {
-                    panic!("GridFS not implemented");
+                TestFileEntity::Bucket(bucket) => {
+                    let id = bucket.id.clone();
+                    let database = self.get_database(&bucket.database).await;
+                    (
+                        id,
+                        Entity::Bucket(database.gridfs_bucket(bucket.bucket_options.clone())),
+                    )
                 }
                 TestFileEntity::Thread(thread) => {
                     let (sender, mut receiver) = mpsc::unbounded_channel::<ThreadMessage>();
@@ -579,6 +595,16 @@ impl TestRunner {
             .get(id)
             .unwrap()
             .as_collection()
+            .clone()
+    }
+
+    pub(crate) async fn get_bucket(&self, id: &str) -> GridFsBucket {
+        self.entities
+            .read()
+            .await
+            .get(id)
+            .unwrap()
+            .as_bucket_entity()
             .clone()
     }
 

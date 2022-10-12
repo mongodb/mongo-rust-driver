@@ -1,52 +1,72 @@
-#![allow(dead_code, unused_variables)]
 // TODO(RUST-1395) Remove these allows.
+#![allow(dead_code, unused_variables)]
 
+mod download;
 pub mod options;
 
 use core::task::{Context, Poll};
-use std::pin::Pin;
+use std::{
+    pin::Pin,
+    sync::{atomic::AtomicBool, Arc},
+};
+
+use serde::{Deserialize, Serialize};
+use tokio::io::ReadBuf;
 
 use crate::{
+    bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::Result,
-    selection_criteria::SelectionCriteria,
+    options::SelectionCriteria,
+    Collection,
     Database,
 };
-use bson::{oid::ObjectId, Bson, DateTime, Document};
+
 use options::*;
-use serde::{Deserialize, Serialize};
-use tokio::io::ReadBuf;
 
 pub const DEFAULT_BUCKET_NAME: &str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
 // Contained in a "chunks" collection for each user file
-struct Chunk {
+#[derive(Debug, Deserialize, Serialize)]
+struct Chunk<'a> {
+    #[serde(rename = "_id")]
     id: ObjectId,
     files_id: Bson,
     n: u32,
-    // default size is 255 KiB
-    data: Vec<u8>,
+    #[serde(borrow)]
+    data: RawBinaryRef<'a>,
 }
 
 /// A collection in which information about stored files is stored. There will be one files
 /// collection document per stored file.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct FilesCollectionDocument {
-    id: Bson,
-    length: i64,
-    chunk_size: u32,
-    upload_date: DateTime,
-    filename: String,
-    metadata: Document,
+    #[serde(rename = "_id")]
+    pub id: Bson,
+    pub length: u64,
+    pub chunk_size: u32,
+    pub upload_date: DateTime,
+    pub filename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Document>,
+}
+
+#[derive(Debug)]
+struct GridFsBucketInner {
+    options: GridFsBucketOptions,
+    files: Collection<FilesCollectionDocument>,
+    chunks: Collection<Chunk<'static>>,
+    created_indexes: AtomicBool,
 }
 
 /// Struct for storing GridFS managed files within a [`Database`].
+#[derive(Debug, Clone)]
 pub struct GridFsBucket {
-    // Contains a "chunks" collection
-    pub(crate) db: Database,
-    pub(crate) options: GridFsBucketOptions,
+    inner: Arc<GridFsBucketInner>,
 }
 
 // TODO: RUST-1395 Add documentation and example code for this struct.
@@ -134,30 +154,67 @@ impl tokio::io::AsyncRead for GridFsDownloadStream {
     }
 }
 
-impl futures_util::io::AsyncRead for GridFsDownloadStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<core::result::Result<usize, futures_util::io::Error>> {
-        todo!()
-    }
-}
-
 impl GridFsBucket {
+    pub(crate) fn new(db: Database, mut options: GridFsBucketOptions) -> GridFsBucket {
+        if options.read_concern.is_none() {
+            options.read_concern = db.read_concern().cloned();
+        }
+        if options.write_concern.is_none() {
+            options.write_concern = db.write_concern().cloned();
+        }
+        if options.selection_criteria.is_none() {
+            options.selection_criteria = db.selection_criteria().cloned();
+        }
+
+        let bucket_name = options
+            .bucket_name
+            .as_deref()
+            .unwrap_or(DEFAULT_BUCKET_NAME);
+
+        let files = db.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
+        let chunks = db.collection::<Chunk>(&format!("{}.chunks", bucket_name));
+
+        GridFsBucket {
+            inner: Arc::new(GridFsBucketInner {
+                options,
+                files,
+                chunks,
+                created_indexes: AtomicBool::new(false),
+            }),
+        }
+    }
+
     /// Gets the read concern of the [`GridFsBucket`].
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        self.options.read_concern.as_ref()
+        self.inner.options.read_concern.as_ref()
     }
 
     /// Gets the write concern of the [`GridFsBucket`].
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        self.options.write_concern.as_ref()
+        self.inner.options.write_concern.as_ref()
     }
 
     /// Gets the selection criteria of the [`GridFsBucket`].
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.options.selection_criteria.as_ref()
+        self.inner.options.selection_criteria.as_ref()
+    }
+
+    /// Gets the chunk size in bytes for the [`GridFsBucket`].
+    fn chunk_size_bytes(&self) -> u32 {
+        self.inner
+            .options
+            .chunk_size_bytes
+            .unwrap_or(DEFAULT_CHUNK_SIZE_BYTES)
+    }
+
+    /// Gets a handle to the files collection for the [`GridFsBucket`].
+    fn files(&self) -> &Collection<FilesCollectionDocument> {
+        &self.inner.files
+    }
+
+    /// Gets a handle to the chunks collection for the [`GridFsBucket`].
+    fn chunks(&self) -> &Collection<Chunk> {
+        &self.inner.chunks
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
@@ -171,19 +228,6 @@ impl GridFsBucket {
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<GridFsUploadStream> {
         todo!()
-    }
-
-    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
-    /// The driver generates a unique [`Bson::ObjectId`] for the file id.
-    ///
-    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
-    pub async fn open_upload_stream(
-        &self,
-        filename: String,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
-        self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
-            .await
     }
 
     /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
@@ -244,6 +288,19 @@ impl GridFsBucket {
         .await
     }
 
+    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
+    /// The driver generates a unique [`Bson::ObjectId`] for the file id.
+    ///
+    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
+    pub async fn open_upload_stream(
+        &self,
+        filename: String,
+        options: impl Into<Option<GridFsUploadOptions>>,
+    ) -> Result<GridFsUploadStream> {
+        self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
+            .await
+    }
+
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
@@ -258,52 +315,6 @@ impl GridFsBucket {
         filename: String,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<GridFsDownloadStream> {
-        todo!()
-    }
-
-    /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the `destination`. Uses the `tokio` crate's `AsyncWrite`
-    /// trait for the `destination`.
-    pub async fn download_to_tokio_writer(
-        &self,
-        id: Bson,
-        destination: impl tokio::io::AsyncWrite,
-    ) {
-        todo!()
-    }
-
-    /// Downloads the contents of the stored file specified by `id` and writes
-    /// the contents to the `destination`. Uses the `futures-0.3` crate's `AsyncWrite`
-    /// trait for the `destination`.
-    pub async fn download_to_futures_0_3_writer(
-        &self,
-        id: Bson,
-        destination: impl futures_util::AsyncWrite,
-    ) {
-        todo!()
-    }
-
-    /// Downloads the contents of the stored file specified by `filename` and by
-    /// the revision in `options` and writes the contents to the `destination`. Uses the
-    /// `tokio` crate's `AsyncWrite` trait for the `destination`.
-    pub async fn download_to_tokio_writer_by_name(
-        &self,
-        filename: String,
-        destination: impl tokio::io::AsyncWrite,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) {
-        todo!()
-    }
-
-    /// Downloads the contents of the stored file specified by `filename` and by
-    /// the revision in `options` and writes the contents to the `destination`. Uses the
-    /// `futures-0.3` crate's `AsyncWrite` trait for the `destination`.
-    pub async fn download_to_futures_0_3_writer_by_name(
-        &self,
-        filename: String,
-        destination: impl futures_util::AsyncWrite,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) {
         todo!()
     }
 
