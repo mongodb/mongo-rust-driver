@@ -17,14 +17,8 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::{ErrorKind, Result},
-    options::{
-        DeleteOptions,
-        DropCollectionOptions,
-        FindOptions,
-        SelectionCriteria,
-        UpdateOptions,
-    },
+    error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
+    options::{CollectionOptions, FindOptions, SelectionCriteria},
     Collection,
     Database,
 };
@@ -177,8 +171,19 @@ impl GridFsBucket {
             .as_deref()
             .unwrap_or(DEFAULT_BUCKET_NAME);
 
-        let files = db.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
-        let chunks = db.collection::<Chunk>(&format!("{}.chunks", bucket_name));
+        let collection_options = CollectionOptions::builder()
+            .read_concern(options.read_concern.clone())
+            .write_concern(options.write_concern.clone())
+            .selection_criteria(options.selection_criteria.clone())
+            .build();
+        let files = db.collection_with_options::<FilesCollectionDocument>(
+            &format!("{}.files", bucket_name),
+            collection_options.clone(),
+        );
+        let chunks = db.collection_with_options::<Chunk>(
+            &format!("{}.chunks", bucket_name),
+            collection_options,
+        );
 
         GridFsBucket {
             inner: Arc::new(GridFsBucketInner {
@@ -327,24 +332,20 @@ impl GridFsBucket {
     /// Deletes the [`FilesCollectionDocument`] with the given `id `and its associated chunks from
     /// this bucket.
     pub async fn delete(&self, id: Bson) -> Result<()> {
-        let delete_options = DeleteOptions::builder()
-            .write_concern(self.write_concern().cloned())
-            .build();
-
         let delete_result = self
             .files()
-            .delete_one(doc! { "_id": id.clone() }, delete_options.clone())
+            .delete_one(doc! { "_id": id.clone() }, None)
             .await?;
         // Delete chunks regardless of whether a file was found. This will remove any possibly
         // orphaned chunks.
         self.chunks()
-            .delete_many(doc! { "files_id": id.clone() }, delete_options)
+            .delete_many(doc! { "files_id": id.clone() }, None)
             .await?;
 
         if delete_result.deleted_count == 0 {
-            return Err(ErrorKind::GridFS {
-                message: format!("no file matching id {} was found", id),
-            }
+            return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
+                identifier: GridFsFileIdentifier::Id(id),
+            })
             .into());
         }
 
@@ -358,22 +359,17 @@ impl GridFsBucket {
         filter: Document,
         options: impl Into<Option<GridFsFindOptions>>,
     ) -> Result<Cursor<FilesCollectionDocument>> {
-        let mut find_options = options.into().map(FindOptions::from);
-        resolve_options!(self, find_options, [read_concern, selection_criteria]);
+        let find_options = options.into().map(FindOptions::from);
         self.files().find(filter, find_options).await
     }
 
     /// Renames the file with the given 'id' to the provided `new_filename`.
     pub async fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
-        let update_options = UpdateOptions::builder()
-            .write_concern(self.write_concern().cloned())
-            .build();
-
         self.files()
             .update_one(
                 doc! { "_id": id },
                 doc! { "$set": { "filename": new_filename.as_ref() } },
-                update_options,
+                None,
             )
             .await?;
 
@@ -382,12 +378,8 @@ impl GridFsBucket {
 
     /// Drops all of the files and their associated chunks in this bucket.
     pub async fn drop(&self) -> Result<()> {
-        let drop_options = DropCollectionOptions::builder()
-            .write_concern(self.write_concern().cloned())
-            .build();
-
-        self.files().drop(drop_options.clone()).await?;
-        self.chunks().drop(drop_options).await?;
+        self.files().drop(None).await?;
+        self.chunks().drop(None).await?;
 
         Ok(())
     }

@@ -38,7 +38,6 @@ pub struct GridFsBucketOptions {
 pub struct GridFsUploadOptions {
     /// The number of bytes per chunk of this file. Defaults to the `chunk_size_bytes` specified
     /// in the [`GridFsBucketOptions`].
-    #[serde(rename = "chunkSizeBytes")]
     pub chunk_size_bytes: Option<u32>,
 
     /// User data for the 'metadata' field of the files collection document.
@@ -87,10 +86,6 @@ pub struct GridFsFindOptions {
     /// memory use. Set this option to prevent that.
     pub no_cursor_timeout: Option<bool>,
 
-    pub read_concern: Option<ReadConcern>,
-
-    pub selection_criteria: Option<SelectionCriteria>,
-
     /// The number of documents to skip before returning.
     pub skip: Option<u64>,
 
@@ -106,8 +101,6 @@ impl From<GridFsFindOptions> for FindOptions {
             limit: options.limit,
             max_time: options.max_time,
             no_cursor_timeout: options.no_cursor_timeout,
-            read_concern: options.read_concern,
-            selection_criteria: options.selection_criteria,
             skip: options.skip,
             sort: options.sort,
             ..Default::default()
