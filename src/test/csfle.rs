@@ -514,6 +514,16 @@ async fn bson_size_limits() -> Result<()> {
 
     // TODO(RUST-583) Test bulk write limit behavior
 
+    let mut value = String::new();
+    for _ in 0..(16777216 - 2000) {
+        value.push('a');
+    }
+    let doc = doc! {
+        "_id": "under_16mib",
+        "unencrypted": value,
+    };
+    coll.insert_one(doc, None).await?;
+
     let mut doc: Document = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_16mib");
     let mut value = String::new();
