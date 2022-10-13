@@ -284,7 +284,7 @@ pub enum MasterKey {
         /// The Amazon Resource Name (ARN) to the AWS customer master key (CMK).
         key: String,
         /// An alternate host identifier to send KMS requests to. May include port number. Defaults
-        /// to "kms.<region>.amazonaws.com"
+        /// to "kms.REGION.amazonaws.com"
         endpoint: Option<String>,
     },
     #[serde(rename_all = "camelCase")]

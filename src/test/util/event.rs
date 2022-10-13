@@ -80,6 +80,7 @@ impl Event {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn as_command_started_event(&self) -> Option<&CommandStartedEvent> {
         match self {
             Event::Command(CommandEvent::Started(e)) => Some(e),
