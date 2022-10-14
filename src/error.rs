@@ -415,7 +415,9 @@ impl Error {
             | ErrorKind::IncompatibleServer { .. }
             | ErrorKind::MissingResumeToken
             | ErrorKind::Authentication { .. }
-            | ErrorKind::GridFs(_) => {}
+            | ErrorKind::GridFs(_) => {},
+            #[cfg(feature = "csfle")]
+            | ErrorKind::Csfle(_) => {},
         }
     }
 }

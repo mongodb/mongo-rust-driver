@@ -20,8 +20,6 @@ use super::test_file::ExpectedMessage;
 #[cfg(feature = "tracing-unstable")]
 use crate::test::util::{TracingEvent, TracingEventValue};
 
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::convert::TryInto;
 
 pub(crate) fn results_match(
@@ -65,6 +63,9 @@ pub(crate) fn tracing_events_match(
             expected.level, actual.level
         ));
     }
+
+    use lazy_static::lazy_static;
+    use regex::Regex;
 
     if let Some(failure_should_be_redacted) = expected.failure_is_redacted {
         match actual.fields.get("failure") {
