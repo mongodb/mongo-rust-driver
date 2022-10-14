@@ -515,7 +515,7 @@ pub enum ErrorKind {
     Internal { message: String },
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
-    #[error("{0}")]
+    #[error("I/O error: {0}")]
     Io(Arc<std::io::Error>),
 
     /// The connection pool for a server was cleared during operation execution due to
@@ -614,7 +614,7 @@ impl fmt::Display for CommandError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(
             fmt,
-            "Error code {} ({}): {})",
+            "Error code {} ({}): {}",
             self.code, self.code_name, self.message
         )
     }

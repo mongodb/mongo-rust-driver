@@ -20,6 +20,8 @@ use super::test_file::ExpectedMessage;
 #[cfg(feature = "tracing-unstable")]
 use crate::test::util::{TracingEvent, TracingEventValue};
 
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::convert::TryInto;
 
 pub(crate) fn results_match(
@@ -64,29 +66,100 @@ pub(crate) fn tracing_events_match(
         ));
     }
 
-    if let Some(failure_is_redacted) = expected.failure_is_redacted {
-        if !expected.data.contains_key("failure") {
-            return Err(
-                "Expected log message uses `failureIsRedacted`, but does not contain assertion \
-                 that failure exists"
-                    .to_string(),
-            );
-        }
-
+    if let Some(failure_should_be_redacted) = expected.failure_is_redacted {
         match actual.fields.get("failure") {
             Some(failure) => {
                 match failure {
                     TracingEventValue::String(failure_str) => {
-                        if failure_is_redacted && !failure_str.contains("REDACTED") {
-                            return Err(format!(
-                                "Expected failure to be redacted, but was not; got {:?}",
-                                failure_str
-                            ));
-                        } else if !failure_is_redacted && failure_str.contains("REDACTED") {
-                            return Err(format!(
-                                "Expected failure to not be redacted, but was; got {:?}",
-                                failure_str
-                            ));
+                        // lazy_static saves us having to recompile this regex every time this
+                        // function is called.
+                        lazy_static! {
+                            static ref COMMAND_FAILED_REGEX: Regex = Regex::new(
+                                r"^Kind: Command failed: Error code (?P<code>\d+) \((?P<codename>.+)\): (?P<message>.+)+, labels: (?P<labels>.+)$"
+                            ).unwrap();
+
+                            static ref IO_ERROR_REGEX: Regex = Regex::new(
+                                r"^Kind: I/O error: (?P<message>.+), labels: (?P<labels>.+)$"
+                            ).unwrap();
+                        }
+
+                        // We redact all server-returned errors, however at this time the only types
+                        // of errors that show up in tracing redaction tests
+                        // are command errors (which should be redacted) and
+                        // I/O errors (which should not redacted). redaction of other errors is
+                        // unit-tested in src/test/spec/trace.rs.
+                        if COMMAND_FAILED_REGEX.is_match(failure_str) {
+                            // this should always be non-optional if `is_match` returned true
+                            let captures = COMMAND_FAILED_REGEX.captures(failure_str).unwrap();
+
+                            let code = captures.name("code").unwrap().as_str();
+                            // code should never be redacted (here we consider "present and
+                            // non-zero" to mean unredacted)
+                            match code.parse::<u32>() {
+                                Ok(code) => {
+                                    if code == 0 {
+                                        return Err(format! {
+                                            "Expected a non-zero error code, but got {}",
+                                            code,
+                                        });
+                                    }
+                                }
+                                Err(err) => {
+                                    return Err(format! {
+                                        "Expected error code {} to be parseable to a u32 but was not; got error {:?}",
+                                        code,
+                                        err,
+                                    })
+                                }
+                            }
+
+                            let codename = captures.name("codename").unwrap().as_str();
+                            // codename should never be redacted (here we consider "non-empty and
+                            // does not contain `REDACTED`" to mean
+                            // unredacted)
+                            if codename.is_empty() {
+                                return Err(format! {
+                                    "Expected a non-empty error codename, but got {}",
+                                    codename,
+                                });
+                            }
+
+                            if codename.contains("REDACTED") {
+                                return Err(format! {
+                                    "Expected error codename to not be redacted, but got {}",
+                                    codename,
+                                });
+                            }
+
+                            // note: we can't really assert on error labels being redacted here
+                            // because they are not always present and
+                            // so a non-redacted error can have empty
+                            // error labels.
+
+                            let errmsg = captures.name("message").unwrap().as_str();
+
+                            if failure_should_be_redacted && errmsg != "REDACTED" {
+                                return Err(format! {
+                                    "Expected command error message to be redacted, but was not; got message {}",
+                                    errmsg,
+                                });
+                            } else if !failure_should_be_redacted && errmsg.contains("REDACTED") {
+                                return Err(format! {
+                                    "Expected command error message to not be redacted, but was; got message {}",
+                                    errmsg,
+                                });
+                            }
+                        } else if IO_ERROR_REGEX.is_match(failure_str) {
+                            // this should always be non-optional if `is_match` returned true
+                            let captures = IO_ERROR_REGEX.captures(failure_str).unwrap();
+
+                            let message = captures.name("message").unwrap().as_str();
+                            if message.is_empty() || message.contains("REDACTED") {
+                                return Err(format! {
+                                    "Expected I/O error message to not be redacted, but was; got message {}",
+                                    message,
+                                });
+                            }
                         }
                     }
                     _ => {

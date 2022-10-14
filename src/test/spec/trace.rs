@@ -1,6 +1,16 @@
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     coll::options::FindOptions,
+    error::{
+        BulkWriteError,
+        BulkWriteFailure,
+        CommandError,
+        Error,
+        ErrorKind,
+        WriteConcernError,
+        WriteError,
+        WriteFailure,
+    },
     test::{
         log_uncaptured,
         run_spec_test_with_path,
@@ -201,6 +211,145 @@ async fn command_logging_truncation_mid_codepoint() {
     // 215 falls in the middle of an emoji (each is 4 bytes), so we should round up to 218, + 3 for
     // trailing "..."
     assert_eq!(reply.len(), 221);
+}
+
+#[test]
+fn error_redaction() {
+    fn assert_is_redacted(error: Error) {
+        fn assert_on_properties(
+            code: i32,
+            code_name: String,
+            message: String,
+            details: Option<Document>,
+        ) {
+            assert!(code != 0, "Error code should be non-zero");
+            assert!(!code_name.is_empty(), "Error code name should be non-empty");
+            assert!(
+                !code_name.contains("REDACTED"),
+                "Error code name should not be redacted"
+            );
+            assert!(message == "REDACTED", "Error message should be redacted");
+            assert!(details.is_none(), "Error details should be redacted");
+        }
+
+        match *error.kind {
+            ErrorKind::Command(CommandError {
+                code,
+                code_name,
+                message,
+                ..
+            }) => {
+                assert_on_properties(code, code_name, message, None);
+            }
+            ErrorKind::Write(write_failure) => match write_failure {
+                WriteFailure::WriteConcernError(WriteConcernError {
+                    code,
+                    code_name,
+                    message,
+                    details,
+                    ..
+                }) => {
+                    assert_on_properties(code, code_name, message, details);
+                }
+                WriteFailure::WriteError(WriteError {
+                    code,
+                    code_name,
+                    message,
+                    details,
+                }) => {
+                    assert_on_properties(code, code_name.unwrap(), message, details);
+                }
+            },
+            ErrorKind::BulkWrite(BulkWriteFailure {
+                write_errors,
+                write_concern_error,
+                ..
+            }) => {
+                if let Some(write_errors) = write_errors {
+                    for BulkWriteError {
+                        code,
+                        code_name,
+                        message,
+                        details,
+                        ..
+                    } in write_errors
+                    {
+                        assert_on_properties(code, code_name.unwrap(), message, details);
+                    }
+                }
+                if let Some(WriteConcernError {
+                    code,
+                    code_name,
+                    message,
+                    details,
+                    ..
+                }) = write_concern_error
+                {
+                    assert_on_properties(code, code_name, message, details);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let labels: Option<Vec<_>> = None;
+
+    let mut command_error = Error::new(
+        ErrorKind::Command(CommandError {
+            code: 123,
+            code_name: "CodeName".to_string(),
+            message: "Hello".to_string(),
+            topology_version: None,
+        }),
+        labels.clone(),
+    );
+    command_error.redact();
+    assert_is_redacted(command_error);
+
+    let wce = WriteConcernError {
+        code: 123,
+        code_name: "CodeName".to_string(),
+        message: "Hello".to_string(),
+        details: Some(doc! { "x" : 1}),
+        labels: vec![],
+    };
+    let wce_copy = wce.clone();
+
+    let mut write_concern_error = Error::new(
+        ErrorKind::Write(WriteFailure::WriteConcernError(wce)),
+        labels.clone(),
+    );
+    write_concern_error.redact();
+    assert_is_redacted(write_concern_error);
+
+    let mut write_error = Error::new(
+        ErrorKind::Write(WriteFailure::WriteError(WriteError {
+            code: 123,
+            code_name: Some("CodeName".to_string()),
+            message: "Hello".to_string(),
+            details: Some(doc! { "x" : 1}),
+        })),
+        labels.clone(),
+    );
+    write_error.redact();
+    assert_is_redacted(write_error);
+
+    let mut bulk_write_error = Error::new(
+        ErrorKind::BulkWrite(BulkWriteFailure {
+            write_errors: Some(vec![BulkWriteError {
+                index: 0,
+                code: 123,
+                code_name: Some("CodeName".to_string()),
+                message: "Hello".to_string(),
+                details: Some(doc! { "x" : 1}),
+            }]),
+            write_concern_error: Some(wce_copy),
+            inserted_ids: HashMap::default(),
+        }),
+        labels,
+    );
+    bulk_write_error.redact();
+    assert_is_redacted(bulk_write_error);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
