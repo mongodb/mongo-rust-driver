@@ -27,7 +27,7 @@ use super::{
     ExpectedEvent,
     TestCursor,
     TestFileEntity,
-    TestRunner,
+    TestRunner, entity::ClientEntityState,
 };
 
 use crate::{
@@ -2120,12 +2120,22 @@ impl TestOperation for Close {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let mut entities = test_runner.entities.write().await;
-            let cursor = entities.get_mut(id).unwrap().as_mut_cursor();
-            let rx = cursor.make_kill_watcher().await;
-            *cursor = TestCursor::Closed;
-            drop(entities);
-            let _ = rx.await;
-            Ok(None)
+            let target_entity = entities.get_mut(id).unwrap();
+            match target_entity {
+                Entity::Client(client) => {
+                    client.client = ClientEntityState::Dropped;
+                    drop(entities);
+                    Ok(None)
+                },
+                Entity::Cursor(cursor) => {
+                    let rx = cursor.make_kill_watcher().await;
+                    *cursor = TestCursor::Closed;
+                    drop(entities);
+                    let _ = rx.await;
+                    Ok(None)
+                },
+                _ => panic!("Unsupported entity {:?} for close operation; expected Client or Cursor", target_entity),
+            }
         }
         .boxed()
     }

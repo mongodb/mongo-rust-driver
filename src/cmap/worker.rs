@@ -23,7 +23,8 @@ use crate::{
     client::auth::Credential,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
+        CmapEvent,
+        CmapEventEmitter,
         ConnectionClosedEvent,
         ConnectionClosedReason,
         PoolClearedEvent,
@@ -37,7 +38,6 @@ use crate::{
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
     time::Duration,
 };
 
@@ -82,8 +82,9 @@ pub(crate) struct ConnectionPoolWorker {
     /// The credential used to authenticate connections, if any.
     credential: Option<Credential>,
 
-    /// The event handler specified by the user to process CMAP events.
-    event_handler: Option<Arc<dyn CmapEventHandler>>,
+    /// The type responsible for emitting CMAP events both to an optional user-specified handler
+    /// and as tracing events.
+    event_emitter: CmapEventEmitter,
 
     /// The time between maintenance tasks.
     maintenance_frequency: Duration,
@@ -139,12 +140,9 @@ impl ConnectionPoolWorker {
         address: ServerAddress,
         establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
+        event_emitter: CmapEventEmitter,
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
-        let event_handler = options
-            .as_ref()
-            .and_then(|opts| opts.cmap_event_handler.clone());
-
         // The CMAP spec indicates that a max idle time of zero means that connections should not be
         // closed due to idleness.
         let mut max_idle_time = options.as_ref().and_then(|opts| opts.max_idle_time);
@@ -209,7 +207,7 @@ impl ConnectionPoolWorker {
 
         let worker = ConnectionPoolWorker {
             address,
-            event_handler: event_handler.clone(),
+            event_emitter,
             max_idle_time,
             min_pool_size,
             credential,
@@ -328,10 +326,10 @@ impl ConnectionPoolWorker {
             connection.close_and_drop(ConnectionClosedReason::PoolClosed);
         }
 
-        self.emit_event(|handler| {
-            handler.handle_pool_closed_event(PoolClosedEvent {
+        self.event_emitter.emit_event(|| {
+            CmapEvent::PoolClosed(PoolClosedEvent {
                 address: self.address.clone(),
-            });
+            })
         });
     }
 
@@ -380,7 +378,7 @@ impl ConnectionPoolWorker {
 
         // otherwise, attempt to create a connection.
         if self.below_max_connections() {
-            let event_handler = self.event_handler.clone();
+            let event_emitter = self.event_emitter.clone();
             let establisher = self.establisher.clone();
             let pending_connection = self.create_pending_connection();
             let manager = self.manager.clone();
@@ -394,7 +392,7 @@ impl ConnectionPoolWorker {
                     server_updater,
                     &manager,
                     credential,
-                    event_handler,
+                    event_emitter,
                 )
                 .await;
 
@@ -427,12 +425,11 @@ impl ConnectionPoolWorker {
             id: self.next_connection_id,
             address: self.address.clone(),
             generation: self.generation.clone(),
-            event_handler: self.event_handler.clone(),
+            event_emitter: self.event_emitter.clone(),
         };
         self.next_connection_id += 1;
-        self.emit_event(|handler| {
-            handler.handle_connection_created_event(pending_connection.created_event())
-        });
+        self.event_emitter
+            .emit_event(|| CmapEvent::ConnectionCreated(pending_connection.created_event()));
 
         pending_connection
     }
@@ -461,9 +458,8 @@ impl ConnectionPoolWorker {
     }
 
     fn check_in(&mut self, mut conn: Connection) {
-        self.emit_event(|handler| {
-            handler.handle_connection_checked_in_event(conn.checked_in_event());
-        });
+        self.event_emitter
+            .emit_event(|| CmapEvent::ConnectionCheckedIn(conn.checked_in_event()));
 
         conn.mark_as_available();
 
@@ -495,13 +491,11 @@ impl ConnectionPoolWorker {
         self.generation_publisher.publish(self.generation.clone());
 
         if was_ready {
-            self.emit_event(|handler| {
-                let event = PoolClearedEvent {
+            self.event_emitter.emit_event(|| {
+                CmapEvent::PoolCleared(PoolClearedEvent {
                     address: self.address.clone(),
                     service_id,
-                };
-
-                handler.handle_pool_cleared_event(event);
+                })
             });
 
             if !matches!(self.generation, PoolGeneration::LoadBalanced(_)) {
@@ -521,22 +515,11 @@ impl ConnectionPoolWorker {
         }
 
         self.state = PoolState::Ready;
-        self.emit_event(|handler| {
-            let event = PoolReadyEvent {
+        self.event_emitter.emit_event(|| {
+            CmapEvent::PoolReady(PoolReadyEvent {
                 address: self.address.clone(),
-            };
-
-            handler.handle_pool_ready_event(event);
+            })
         });
-    }
-
-    fn emit_event<F>(&self, emit: F)
-    where
-        F: FnOnce(&Arc<dyn CmapEventHandler>),
-    {
-        if let Some(ref handler) = self.event_handler {
-            emit(handler);
-        }
     }
 
     /// Close a connection, emit the event for it being closed, and decrement the
@@ -596,7 +579,7 @@ impl ConnectionPoolWorker {
                 && self.pending_connection_count < MAX_CONNECTING
             {
                 let pending_connection = self.create_pending_connection();
-                let event_handler = self.event_handler.clone();
+                let event_handler = self.event_emitter.clone();
                 let manager = self.manager.clone();
                 let establisher = self.establisher.clone();
                 let updater = self.server_updater.clone();
@@ -633,7 +616,7 @@ async fn establish_connection(
     server_updater: TopologyUpdater,
     manager: &PoolManager,
     credential: Option<Credential>,
-    event_handler: Option<Arc<dyn CmapEventHandler>>,
+    event_emitter: CmapEventEmitter,
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
     let address = pending_connection.address.clone();
@@ -651,20 +634,17 @@ async fn establish_connection(
                     e.handshake_phase.clone(),
                 )
                 .await;
-            if let Some(handler) = event_handler {
-                let event = ConnectionClosedEvent {
+            event_emitter.emit_event(|| {
+                CmapEvent::ConnectionClosed(ConnectionClosedEvent {
                     address,
                     reason: ConnectionClosedReason::Error,
                     connection_id,
-                };
-                handler.handle_connection_closed_event(event);
-            }
+                })
+            });
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
-            if let Some(handler) = event_handler {
-                handler.handle_connection_ready_event(connection.ready_event())
-            };
+            event_emitter.emit_event(|| CmapEvent::ConnectionReady(connection.ready_event()));
         }
     }
 

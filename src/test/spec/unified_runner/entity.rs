@@ -49,8 +49,18 @@ pub(crate) enum Entity {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) enum ClientEntityState {
+    /// An underlying Client for the entity.
+    Client(Client),
+    /// Indicates the underlying client has been dropped via a `close` operation.
+    Dropped,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct ClientEntity {
-    client: Client,
+    pub(crate) client: ClientEntityState,
+    #[cfg(feature = "tracing-unstable")]
+    pub(crate) topology_id: bson::oid::ObjectId,
     handler: Arc<EventHandler>,
     pub(crate) observer: Arc<Mutex<EventObserver>>,
     observe_events: Option<Vec<ObserveEvent>>,
@@ -124,8 +134,12 @@ impl ClientEntity {
         observe_sensitive_commands: bool,
     ) -> Self {
         let observer = EventObserver::new(handler.broadcaster().subscribe());
+        #[cfg(feature = "tracing-unstable")]
+        let topology_id = client.topology().id;
         Self {
-            client,
+            client: ClientEntityState::Client(client),
+            #[cfg(feature = "tracing-unstable")]
+            topology_id,
             handler,
             observer: Arc::new(Mutex::new(observer)),
             observe_events,
@@ -200,7 +214,10 @@ impl ClientEntity {
 
     /// Synchronize all connection pool worker threads.
     pub(crate) async fn sync_workers(&self) {
-        self.client.sync_workers().await;
+        match &self.client {
+            ClientEntityState::Client(client) => client.sync_workers().await,
+            ClientEntityState::Dropped => {},
+        };
     }
 }
 
@@ -267,7 +284,10 @@ impl Deref for ClientEntity {
     type Target = Client;
 
     fn deref(&self) -> &Self::Target {
-        &self.client
+        match &self.client {
+            ClientEntityState::Client(c) => c,
+            ClientEntityState::Dropped => panic!("Attempted to deference a client entity which was closed via a `close` test operation"),
+        }
     }
 }
 
@@ -345,13 +365,6 @@ impl Entity {
         match self {
             Self::Bson(bson) => bson,
             _ => panic!("Expected BSON entity, got {:?}", &self),
-        }
-    }
-
-    pub(crate) fn as_mut_cursor(&mut self) -> &mut TestCursor {
-        match self {
-            Self::Cursor(cursor) => cursor,
-            _ => panic!("Expected cursor, got {:?}", &self),
         }
     }
 

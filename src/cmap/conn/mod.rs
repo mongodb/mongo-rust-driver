@@ -22,7 +22,8 @@ use crate::{
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
+        CmapEvent,
+        CmapEventEmitter,
         ConnectionCheckedInEvent,
         ConnectionCheckedOutEvent,
         ConnectionClosedEvent,
@@ -106,8 +107,10 @@ pub(crate) struct Connection {
     /// connection to the pin holder.
     pinned_sender: Option<mpsc::Sender<Connection>>,
 
+    /// Type responsible for emitting events related to this connection. This is None for
+    /// monitoring connections as we do not emit events for those.
     #[derivative(Debug = "ignore")]
-    handler: Option<Arc<dyn CmapEventHandler>>,
+    event_emitter: Option<CmapEventEmitter>,
 }
 
 impl Connection {
@@ -126,7 +129,7 @@ impl Connection {
             ready_and_available_time: None,
             stream: BufStream::new(stream),
             address,
-            handler: None,
+            event_emitter: None,
             stream_description: None,
             error: false,
             pinned_sender: None,
@@ -149,7 +152,7 @@ impl Connection {
             pending_connection.id,
             generation,
         );
-        conn.handler = pending_connection.event_handler;
+        conn.event_emitter = Some(pending_connection.event_emitter);
         conn
     }
 
@@ -390,8 +393,8 @@ impl Connection {
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
     fn close(&mut self, reason: ConnectionClosedReason) {
         self.pool_manager.take();
-        if let Some(ref handler) = self.handler {
-            handler.handle_connection_closed_event(self.closed_event(reason));
+        if let Some(ref event_emitter) = self.event_emitter {
+            event_emitter.emit_event(|| CmapEvent::ConnectionClosed(self.closed_event(reason)));
         }
     }
 
@@ -404,7 +407,7 @@ impl Connection {
             address: self.address.clone(),
             generation: self.generation,
             stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
-            handler: self.handler.take(),
+            event_emitter: self.event_emitter.take(),
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
             error: self.error,
@@ -571,7 +574,7 @@ pub(crate) struct PendingConnection {
     pub(crate) id: u32,
     pub(crate) address: ServerAddress,
     pub(crate) generation: PoolGeneration,
-    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
+    pub(crate) event_emitter: CmapEventEmitter,
 }
 
 impl PendingConnection {

@@ -165,6 +165,7 @@ impl Executor {
             )
             .unwrap(),
             updater,
+            bson::oid::ObjectId::new(),
             Some(self.pool_options),
         );
 
@@ -478,5 +479,9 @@ async fn cmap_spec_tests() {
         }
     }
 
-    run_spec_test(&["connection-monitoring-and-pooling"], run_cmap_spec_tests).await;
+    run_spec_test(
+        &["connection-monitoring-and-pooling", "cmap-format"],
+        run_cmap_spec_tests,
+    )
+    .await;
 }

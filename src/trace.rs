@@ -1,8 +1,10 @@
 use bson::Bson;
 
 pub(crate) mod command;
+pub(crate) mod connection;
 
 pub(crate) const COMMAND_TRACING_EVENT_TARGET: &str = "mongodb::command";
+pub(crate) const CONNECTION_TRACING_EVENT_TARGET: &str = "mongodb::connection";
 
 trait TracingRepresentation {
     fn tracing_representation(self) -> String;

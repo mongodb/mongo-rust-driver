@@ -28,6 +28,8 @@ use crate::{
 };
 use std::{collections::HashMap, iter, time::Duration};
 
+use super::{unified_runner::TestCase, run_unified_format_test_filtered};
+
 #[test]
 fn tracing_truncation() {
     let two_emoji = String::from("🤔🤔");
@@ -361,4 +363,23 @@ async fn command_logging_unified() {
         run_unified_format_test,
     )
     .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn connection_logging_unified() {
+    let test_predicate = |tc: &TestCase|
+        // TODO: RUST-1096 Unskip when configurable maxConnecting is added.
+        tc.description != "maxConnecting should be included in connection pool created message when specified" &&
+        // We don't support any of this options (and are unlikely to ever support them).
+        tc.description != "waitQueueTimeoutMS should be included in connection pool created message when specified" &&
+        tc.description != "waitQueueSize should be included in connection pool created message when specified" &&
+        tc.description != "waitQueueMultiple should be included in connection pool created message when specified";
+
+
+    let _guard = LOCK.run_exclusively().await;
+
+    run_spec_test_with_path(&["connection-monitoring-and-pooling", "logging"], |path, file| {
+        run_unified_format_test_filtered(path, file, test_predicate)
+    }).await;
 }
