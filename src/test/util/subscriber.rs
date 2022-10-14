@@ -45,6 +45,10 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         events
     }
 
+    pub(crate) async fn clear_events(&mut self, timeout: Duration) {
+        self.collect_events(timeout, |_| true).await;
+    }
+
     /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
     pub(crate) async fn filter_map_event<F, T>(
         &mut self,

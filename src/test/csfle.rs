@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson};
 use futures_util::TryStreamExt;
@@ -21,8 +21,9 @@ use crate::{
     },
     coll::options::CollectionOptions,
     db::options::CreateCollectionOptions,
+    error::ErrorKind,
     options::{ReadConcern, WriteConcern},
-    test::Event,
+    test::{Event, EventHandler},
     Client,
     Collection,
     Namespace,
@@ -30,7 +31,7 @@ use crate::{
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+type Result<T> = anyhow::Result<T>;
 
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = EventClient::new().await;
@@ -96,6 +97,7 @@ fn check_env(name: &str, kmip: bool) -> bool {
     true
 }
 
+// Prose test 1. Custom Key Material Test
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_key_material() -> Result<()> {
@@ -153,6 +155,7 @@ async fn custom_key_material() -> Result<()> {
     Ok(())
 }
 
+// Prose test 2. Data Key and Double Encryption
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn data_key_double_encryption() -> Result<()> {
@@ -330,7 +333,12 @@ async fn data_key_double_encryption() -> Result<()> {
         let result = coll
             .insert_one(doc! { "encrypted_placeholder": encrypted }, None)
             .await;
-        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(*err.kind, ErrorKind::Csfle(..)),
+            "unexpected error: {}",
+            err
+        );
     }
 
     Ok(())
@@ -348,6 +356,7 @@ fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
     })
 }
 
+// Prose test 3. External Key Vault Test
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn external_key_vault() -> Result<()> {
@@ -443,9 +452,13 @@ async fn external_key_vault() -> Result<()> {
 }
 
 fn load_testdata_raw(name: &str) -> Result<String> {
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src/test/csfle_data", name]
-        .iter()
-        .collect();
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src/test/spec/json/client-side-encryption/testdata",
+        name,
+    ]
+    .iter()
+    .collect();
     Ok(std::fs::read_to_string(path)?)
 }
 
@@ -453,6 +466,7 @@ fn load_testdata(name: &str) -> Result<Document> {
     Ok(serde_json::from_str(&load_testdata_raw(name)?)?)
 }
 
+// Prose test 4. BSON Size Limits and Batch Splitting
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn bson_size_limits() -> Result<()> {
@@ -477,27 +491,31 @@ async fn bson_size_limits() -> Result<()> {
         .await?;
 
     // Setup: encrypted client.
+    let mut opts = CLIENT_OPTIONS.get().await.clone();
+    let handler = Arc::new(EventHandler::new());
+    let mut events = handler.subscribe();
+    opts.command_event_handler = Some(handler.clone());
+    // TODO: register an event handler
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(LOCAL_KMS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
         .build();
-    let client_encrypted =
-        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+    let client_encrypted = Client::with_encryption_options(opts, auto_enc_opts).await?;
     let coll = client_encrypted
         .database("db")
         .collection::<Document>("coll");
 
     // Tests
-    let mut value = String::new();
-    // Manually push characters; constructing the array directly explodes the stack.
-    for _ in 0..2097152 {
-        value.push('a');
+    fn repeat_a(times: usize) -> String {
+        // Constructing the array directly explodes the stack.
+        std::iter::repeat('a').take(times).collect::<String>()
     }
+
     coll.insert_one(
         doc! {
             "_id": "over_2mib_under_16mib",
-            "unencrypted": value,
+            "unencrypted": repeat_a(2097152),
         },
         None,
     )
@@ -505,38 +523,70 @@ async fn bson_size_limits() -> Result<()> {
 
     let mut doc: Document = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
-    let mut value = String::new();
-    for _ in 0..(2097152 - 2000) {
-        value.push('a');
-    }
-    doc.insert("unencrypted", value);
+    doc.insert("unencrypted", repeat_a(2_097_152 - 2_000));
     coll.insert_one(doc, None).await?;
 
-    // TODO(RUST-583) Test bulk write limit behavior
+    let value = repeat_a(2_097_152);
+    events.clear_events(Duration::from_millis(500)).await;
+    coll.insert_many(
+        vec![
+            doc! {
+                "_id": "over_2mib_1",
+                "unencrypted": value.clone(),
+            },
+            doc! {
+                "_id": "over_2mib_2",
+                "unencrypted": value,
+            },
+        ],
+        None,
+    )
+    .await?;
+    let inserts = events
+        .collect_events(Duration::from_millis(500), |ev| {
+            let ev = match ev.as_command_started_event() {
+                Some(e) => e,
+                None => return false,
+            };
+            ev.command_name == "insert"
+        })
+        .await;
+    assert_eq!(2, inserts.len());
 
-    let mut value = String::new();
-    for _ in 0..(16777216 - 2000) {
-        value.push('a');
-    }
+    let mut doc = load_testdata("limits-doc.json")?;
+    doc.insert("_id", "encryption_exceeds_2mib_1");
+    doc.insert("unencrypted", repeat_a(2_097_152 - 2_000));
+    let mut doc2 = doc.clone();
+    doc2.insert("_id", "encryption_exceeds_2mib_2");
+    events.clear_events(Duration::from_millis(500)).await;
+    coll.insert_many(vec![doc, doc2], None).await?;
+    let inserts = events
+        .collect_events(Duration::from_millis(500), |ev| {
+            let ev = match ev.as_command_started_event() {
+                Some(e) => e,
+                None => return false,
+            };
+            ev.command_name == "insert"
+        })
+        .await;
+    assert_eq!(2, inserts.len());
+
     let doc = doc! {
         "_id": "under_16mib",
-        "unencrypted": value,
+        "unencrypted": repeat_a(16_777_216 - 2_000),
     };
     coll.insert_one(doc, None).await?;
 
     let mut doc: Document = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_16mib");
-    let mut value = String::new();
-    for _ in 0..(16777216 - 2000) {
-        value.push('a');
-    }
-    doc.insert("unencrypted", value);
+    doc.insert("unencrypted", repeat_a(16_777_216 - 2_000));
     let result = coll.insert_one(doc, None).await;
     assert!(result.is_err());
 
     Ok(())
 }
 
+// Prose test 5. Views Are Prohibited
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn views_prohibited() -> Result<()> {
@@ -554,7 +604,12 @@ async fn views_prohibited() -> Result<()> {
         .await?;
     client
         .database("db")
-        .run_command(doc! { "create": "view", "viewOn": "coll" }, None)
+        .create_collection(
+            "view",
+            CreateCollectionOptions::builder()
+                .view_on("coll".to_string())
+                .build(),
+        )
         .await?;
 
     // Setup: encrypted client.
@@ -584,7 +639,7 @@ async fn views_prohibited() -> Result<()> {
 
 macro_rules! failure {
     ($($arg:tt)*) => {{
-        Box::new(crate::error::Error::internal(format!($($arg)*))) as Box<dyn std::error::Error>
+        crate::error::Error::internal(format!($($arg)*)).into()
     }}
 }
 
@@ -606,6 +661,7 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
     }
 }
 
+// Prose test 6. Corpus Test (collection schema)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus_coll_schema() -> Result<()> {
@@ -617,6 +673,7 @@ async fn corpus_coll_schema() -> Result<()> {
     Ok(())
 }
 
+// Prose test 6. Corpus Test (local schema)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn corpus_local_schema() -> Result<()> {
@@ -896,6 +953,7 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 1. aws, no endpoint)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
@@ -907,6 +965,7 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
     custom_endpoint_aws_ok(None).await
 }
 
+// Prose test 7. Custom Endpoint Test (case 2. aws, endpoint without port)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_no_port() -> Result<()> {
@@ -918,6 +977,7 @@ async fn custom_endpoint_aws_no_port() -> Result<()> {
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com".to_string())).await
 }
 
+// Prose test 7. Custom Endpoint Test (case 3. aws, endpoint with port)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_with_port() -> Result<()> {
@@ -929,6 +989,7 @@ async fn custom_endpoint_aws_with_port() -> Result<()> {
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com:443".to_string())).await
 }
 
+// Prose test 7. Custom Endpoint Test (case 4. aws, endpoint with invalid port)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_invalid_port() -> Result<()> {
@@ -958,6 +1019,7 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 5. aws, invalid region)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_invalid_region() -> Result<()> {
@@ -987,6 +1049,7 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 6. aws, invalid domain)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
@@ -1016,6 +1079,7 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 7. azure)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_azure() -> Result<()> {
@@ -1047,6 +1111,7 @@ async fn custom_endpoint_azure() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 8. gcp)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_gcp_valid() -> Result<()> {
@@ -1081,6 +1146,7 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 9. gcp, invalid endpoint)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_gcp_invalid() -> Result<()> {
@@ -1115,6 +1181,7 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 10. kmip, no endpoint)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
@@ -1145,6 +1212,7 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 11. kmip, valid endpoint)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
@@ -1167,6 +1235,7 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
     validate_roundtrip(&client_encryption, key_id).await
 }
 
+// Prose test 7. Custom Endpoint Test (case 12. kmip, invalid endpoint)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
