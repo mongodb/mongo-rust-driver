@@ -195,7 +195,7 @@ pub(crate) fn max_verbosity_levels_for_test_case(
         .iter()
         .filter(|o| o.name == "createEntities")
         .for_each(|o| {
-            o.as_test_file_entities()
+            o.test_file_entities()
                 .unwrap()
                 .iter()
                 .for_each(|e| update_merged_levels(e))

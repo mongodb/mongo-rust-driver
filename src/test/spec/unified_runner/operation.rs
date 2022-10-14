@@ -105,7 +105,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
 
     /// If this operation specifies entities to create, returns those entities. Otherwise,
     /// returns None.
-    fn as_test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
+    fn test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
         None
     }
 }
@@ -2648,7 +2648,7 @@ impl TestOperation for CreateEntities {
             .boxed()
     }
 
-    fn as_test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
+    fn test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
         Some(&self.entities)
     }
 }
