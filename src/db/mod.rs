@@ -305,8 +305,14 @@ impl Database {
         };
 
         #[cfg(feature = "csfle")]
-        self.create_aux_collections(&ns, &mut options, session.as_deref_mut())
-            .await?;
+        let has_encrypted_fields = {
+            self.create_aux_collections(&ns, &mut options, session.as_deref_mut())
+                .await?;
+            options
+                .as_ref()
+                .and_then(|o| o.encrypted_fields.as_ref())
+                .is_some()
+        };
 
         let create = Create::new(ns.clone(), options);
         self.client()
@@ -314,7 +320,7 @@ impl Database {
             .await?;
 
         #[cfg(feature = "csfle")]
-        {
+        if has_encrypted_fields {
             let coll = self.collection::<Document>(&ns.coll);
             coll.create_index_common(
                 crate::IndexModel {
