@@ -23,7 +23,7 @@ use crate::{
     db::options::CreateCollectionOptions,
     error::ErrorKind,
     options::{ReadConcern, WriteConcern},
-    test::{Event, EventHandler},
+    test::{Event, EventHandler, SdamEvent},
     Client,
     Collection,
     Namespace, event::command::CommandStartedEvent,
@@ -1270,6 +1270,7 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     Ok(())
 }
 
+// Prose test 8. Bypass Spawning mongocryptd (Via mongocryptdBypassSpawn)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
@@ -1337,6 +1338,7 @@ async fn bypass_mongocryptd_unencrypted_insert(conf: impl FnOnce(&mut AutoEncryp
     Ok(())
 }
 
+// Prose test 8. Bypass Spawning mongocryptd (Via bypassAutoEncryption)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
@@ -1346,6 +1348,7 @@ async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
     bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_auto_encryption = Some(true); }).await
 }
 
+// Prose test 8. Bypass Spawning mongocryptd (Via bypassQueryAnalysis)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
@@ -1355,6 +1358,7 @@ async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
     bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_query_analysis = Some(true); }).await
 }
 
+// Prose test 9. Deadlock Tests
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn deadlock() -> Result<()> {
@@ -1371,7 +1375,19 @@ async fn deadlock() -> Result<()> {
             DeadlockExpectation {
                 command: "listCollections",
                 db: "db",
-            }
+            },
+            DeadlockExpectation {
+                command: "find",
+                db: "keyvault",
+            },
+            DeadlockExpectation {
+                command: "insert",
+                db: "db",
+            },
+            DeadlockExpectation {
+                command: "find",
+                db: "db",
+            },
         ],
         expected_keyvault_commands: vec![],
         expected_number_of_clients: 2,
@@ -1386,7 +1402,6 @@ struct DeadlockTestCase {
     set_key_vault_client: bool,
     expected_encrypted_commands: Vec<DeadlockExpectation>,
     expected_keyvault_commands: Vec<DeadlockExpectation>,
-    #[allow(dead_code)]
     expected_number_of_clients: usize,
 }
 
@@ -1449,6 +1464,7 @@ impl DeadlockTestCase {
         let mut opts = CLIENT_OPTIONS.get().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
         opts.command_event_handler = Some(event_handler.clone());
+        opts.sdam_event_handler = Some(event_handler.clone());
         let client_encrypted = Client::with_encryption_options(opts, auto_enc_opts).await?;
 
         if self.bypass_auto_encryption == true {
@@ -1469,12 +1485,23 @@ impl DeadlockTestCase {
             .find_one(doc! { "_id": 0 }, None).await?;
         assert_eq!(found, Some(doc! { "_id": 0, "encrypted": "string0" }));
 
-        let encrypted_commands = encrypted_events
-            .collect_events_map(Duration::from_millis(500), |ev| ev.into_command_started_event())
-            .await;
+        let encrypted_events = encrypted_events.collect_events(Duration::from_millis(500), |_| true).await;
+        let client_count = encrypted_events
+            .iter()
+            .filter(|ev| {
+                matches!(ev, Event::Sdam(SdamEvent::TopologyOpening(_)))
+            })
+            .count();
+        assert_eq!(self.expected_number_of_clients, client_count);
+
+        let encrypted_commands: Vec<_> = encrypted_events
+            .into_iter()
+            .filter_map(|ev| ev.into_command_started_event())
+            .collect();
         for expected in &self.expected_encrypted_commands {
             expected.assert_matches_any("encrypted", &encrypted_commands);
         }
+
         let keyvault_commands = keyvault_events
             .collect_events_map(Duration::from_millis(500), |ev| ev.into_command_started_event())
             .await;
