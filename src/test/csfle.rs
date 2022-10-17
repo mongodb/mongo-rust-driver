@@ -19,14 +19,14 @@ use crate::{
         EncryptOptions,
         MasterKey,
     },
-    coll::options::CollectionOptions,
+    coll::options::{CollectionOptions, InsertOneOptions},
     db::options::CreateCollectionOptions,
     error::ErrorKind,
     options::{ReadConcern, WriteConcern},
     test::{Event, EventHandler},
     Client,
     Collection,
-    Namespace,
+    Namespace, event::command::CommandStartedEvent,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -1353,4 +1353,156 @@ async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
         return Ok(());
     }
     bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_query_analysis = Some(true); }).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn deadlock() -> Result<()> {
+    if !check_env("deadlock", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    DeadlockTestCase {
+        max_pool_size: 1,
+        bypass_auto_encryption: false,
+        set_key_vault_client: false,
+        expected_encrypted_commands: vec![
+            DeadlockExpectation {
+                command: "listCollections",
+                db: "db",
+            }
+        ],
+        expected_keyvault_commands: vec![],
+        expected_number_of_clients: 2,
+    }.run().await?;
+
+    Ok(())
+}
+
+struct DeadlockTestCase {
+    max_pool_size: u32,
+    bypass_auto_encryption: bool,
+    set_key_vault_client: bool,
+    expected_encrypted_commands: Vec<DeadlockExpectation>,
+    expected_keyvault_commands: Vec<DeadlockExpectation>,
+    #[allow(dead_code)]
+    expected_number_of_clients: usize,
+}
+
+impl DeadlockTestCase {
+    async fn run(&self) -> Result<()> {
+        // Setup
+        let client_test = TestClient::new().await;
+        let client_keyvault = EventClient::with_options({
+            let mut opts = CLIENT_OPTIONS.get().await.clone();
+            opts.max_pool_size = Some(1);
+            opts
+        }).await;
+        let mut keyvault_events = client_keyvault.subscribe_to_events();
+        client_test.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
+        client_test.database("db").collection::<Document>("coll").drop(None).await?;
+        client_keyvault
+            .database("keyvault")
+            .collection::<Document>("datakeys")
+            .insert_one(
+                load_testdata("external-key.json")?,
+                InsertOneOptions::builder()
+                    .write_concern(WriteConcern::MAJORITY)
+                    .build(),
+            )
+            .await?;
+        client_test
+            .database("db")
+            .create_collection(
+                "coll",
+                CreateCollectionOptions::builder()
+                    .validator(load_testdata("external-schema.json")?)
+                    .build(),
+            )
+            .await?;
+        let client_encryption = ClientEncryption::new(
+            ClientEncryptionOptions::builder()
+                .key_vault_client(client_test.clone().into_client())
+                .key_vault_namespace(KV_NAMESPACE.clone())
+                .kms_providers(LOCAL_KMS.clone())
+                .build()
+        )?;
+        let ciphertext = client_encryption.encrypt(
+            RawBson::String("string0".to_string()),
+            EncryptOptions::builder()
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .key(EncryptKey::AltName("local".to_string()))
+                .build(),
+        ).await?;
+
+        // Run test case
+        let auto_enc_opts = AutoEncryptionOptions::builder()
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())
+            .bypass_auto_encryption(self.bypass_auto_encryption)
+            .key_vault_client(if self.set_key_vault_client { Some(client_keyvault.clone().into_client()) } else { None })
+            .extra_options(EXTRA_OPTIONS.clone())
+            .build();
+        let event_handler = Arc::new(EventHandler::new());
+        let mut encrypted_events = event_handler.subscribe();
+        let mut opts = CLIENT_OPTIONS.get().await.clone();
+        opts.max_pool_size = Some(self.max_pool_size);
+        opts.command_event_handler = Some(event_handler.clone());
+        let client_encrypted = Client::with_encryption_options(opts, auto_enc_opts).await?;
+
+        if self.bypass_auto_encryption == true {
+            client_test
+                .database("db")
+                .collection::<Document>("coll")
+                .insert_one(doc! { "_id": 0, "encrypted": ciphertext }, None).await?;
+        } else {
+            client_encrypted
+                .database("db")
+                .collection::<Document>("coll")
+                .insert_one(doc! { "_id": 0, "encrypted": "string0" }, None).await?;
+        }
+
+        let found = client_encrypted
+            .database("db")
+            .collection::<Document>("coll")
+            .find_one(doc! { "_id": 0 }, None).await?;
+        assert_eq!(found, Some(doc! { "_id": 0, "encrypted": "string0" }));
+
+        let encrypted_commands = encrypted_events
+            .collect_events_map(Duration::from_millis(500), |ev| ev.into_command_started_event())
+            .await;
+        for expected in &self.expected_encrypted_commands {
+            expected.assert_matches_any("encrypted", &encrypted_commands);
+        }
+        let keyvault_commands = keyvault_events
+            .collect_events_map(Duration::from_millis(500), |ev| ev.into_command_started_event())
+            .await;
+        for expected in &self.expected_keyvault_commands {
+            expected.assert_matches_any("keyvault", &keyvault_commands);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct DeadlockExpectation {
+    command: &'static str,
+    db: &'static str,
+}
+
+impl DeadlockExpectation {
+    fn matches(&self, ev: &CommandStartedEvent) -> bool {
+        ev.command_name == self.command && ev.db == self.db
+    }
+
+    fn assert_matches_any(&self, name: &str, commands: &[CommandStartedEvent]) {
+        for actual in commands {
+            if self.matches(actual) {
+                return;
+            }
+        }
+        panic!("No {} command matching {:?} found, events=\n{:?}", name, self, commands);
+    }
 }

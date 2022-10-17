@@ -87,6 +87,14 @@ impl Event {
             _ => None,
         }
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn into_command_started_event(self) -> Option<CommandStartedEvent> {
+        match self {
+            Self::Command(CommandEvent::Started(ev)) => Some(ev),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
