@@ -82,10 +82,6 @@ pub struct GridFsFindOptions {
     /// The maximum amount of time to allow the query to run.
     pub max_time: Option<Duration>,
 
-    /// The server normally times out idle cursors after an inactivity period to prevent excess
-    /// memory use. Set this option to prevent that.
-    pub no_cursor_timeout: Option<bool>,
-
     /// The number of documents to skip before returning.
     pub skip: Option<u64>,
 
@@ -100,7 +96,6 @@ impl From<GridFsFindOptions> for FindOptions {
             batch_size: options.batch_size,
             limit: options.limit,
             max_time: options.max_time,
-            no_cursor_timeout: options.no_cursor_timeout,
             skip: options.skip,
             sort: options.sort,
             ..Default::default()
