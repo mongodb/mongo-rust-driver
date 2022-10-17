@@ -45,6 +45,7 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         events
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn clear_events(&mut self, timeout: Duration) {
         self.collect_events(timeout, |_| true).await;
     }
