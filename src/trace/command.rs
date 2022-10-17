@@ -36,7 +36,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
         tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
-            topology_id = self.topology_id.tracing_representation(),
+            topologyId = self.topology_id.tracing_representation(),
             command =
                 serialize_command_or_reply(event.command, self.max_document_length_bytes).as_str(),
             databaseName = event.db.as_str(),
@@ -57,7 +57,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
         tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
-            topology_id = self.topology_id.tracing_representation(),
+            topologyId = self.topology_id.tracing_representation(),
             reply =
                 serialize_command_or_reply(event.reply, self.max_document_length_bytes).as_str(),
             commandName = event.command_name.as_str(),
@@ -78,7 +78,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
         tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
-            topology_id = self.topology_id.tracing_representation(),
+            topologyId = self.topology_id.tracing_representation(),
             failure = event.failure.tracing_representation(),
             commandName = event.command_name.as_str(),
             requestId = event.request_id,

@@ -32,7 +32,7 @@ impl TracingEvent {
     /// Retrieves the topology_id value for the event. Panics if there is no topology_id or if the
     /// topology_id is not a string.
     pub(crate) fn topology_id(&self) -> String {
-        self.get_value_as_string("topology_id")
+        self.get_value_as_string("topologyId")
     }
 
     /// Retrieves the field with the specified name as a string. Panics if the name is missing or
