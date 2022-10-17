@@ -1367,6 +1367,7 @@ async fn deadlock() -> Result<()> {
     }
     let _guard = LOCK.run_exclusively().await;
 
+    // Case 1
     DeadlockTestCase {
         max_pool_size: 1,
         bypass_auto_encryption: false,
@@ -1392,6 +1393,74 @@ async fn deadlock() -> Result<()> {
         expected_keyvault_commands: vec![],
         expected_number_of_clients: 2,
     }.run().await?;
+    // Case 2
+    DeadlockTestCase {
+        max_pool_size: 1,
+        bypass_auto_encryption: false,
+        set_key_vault_client: true,
+        expected_encrypted_commands: vec![
+            DeadlockExpectation {
+                command: "listCollections",
+                db: "db",
+            },
+            DeadlockExpectation {
+                command: "insert",
+                db: "db",
+            },
+            DeadlockExpectation {
+                command: "find",
+                db: "db",
+            },
+        ],
+        expected_keyvault_commands: vec![
+            DeadlockExpectation {
+                command: "find",
+                db: "keyvault",
+            },
+        ],
+        expected_number_of_clients: 2,
+    }.run().await?;
+    // Case 3
+    DeadlockTestCase {
+        max_pool_size: 1,
+        bypass_auto_encryption: true,
+        set_key_vault_client: false,
+        expected_encrypted_commands: vec![
+            DeadlockExpectation {
+                command: "find",
+                db: "db",
+            },
+            DeadlockExpectation {
+                command: "find",
+                db: "keyvault",
+            },
+        ],
+        expected_keyvault_commands: vec![],
+        expected_number_of_clients: 2,
+    }.run().await?;
+    // Case 4
+    DeadlockTestCase {
+        max_pool_size: 1,
+        bypass_auto_encryption: true,
+        set_key_vault_client: true,
+        expected_encrypted_commands: vec![
+            DeadlockExpectation {
+                command: "find",
+                db: "db",
+            },
+        ],
+        expected_keyvault_commands: vec![
+            DeadlockExpectation {
+                command: "find",
+                db: "keyvault",
+            },
+        ],
+        expected_number_of_clients: 1,
+    }.run().await?;
+    // Case 5: skipped (unlimited max_pool_size not supported)
+    // Case 6: skipped (unlimited max_pool_size not supported)
+    // Case 7: skipped (unlimited max_pool_size not supported)
+    // Case 8: skipped (unlimited max_pool_size not supported)
 
     Ok(())
 }

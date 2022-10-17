@@ -779,12 +779,8 @@ impl Client {
                 let response = {
                     let guard = self.inner.csfle.read().await;
                     if let Some(ref csfle) = *guard {
-                        if csfle.opts().bypass_auto_encryption != Some(true) {
-                            let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
-                            RawCommandResponse::new_raw(response.source, new_body)
-                        } else {
-                            response
-                        }
+                        let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
+                        RawCommandResponse::new_raw(response.source, new_body)
                     } else {
                         response
                     }
