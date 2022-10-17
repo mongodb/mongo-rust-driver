@@ -278,9 +278,12 @@ impl TestRunner {
                     .await;
 
                 for expectation in expected_messages {
+                    let client_topology_id =
+                        self.get_client(&expectation.client).await.topology().id;
+
                     let client_actual_events: Vec<_> = all_tracing_events
                         .iter()
-                        .filter(|e| e.client_id() == Some(expectation.client.clone()))
+                        .filter(|e| e.topology_id() == client_topology_id.to_hex())
                         .collect();
                     let expected_events = &expectation.messages;
 
@@ -456,7 +459,6 @@ impl TestRunner {
                     // used to filter events by client for test assertions.
                     #[cfg(feature = "tracing-unstable")]
                     if client.observe_log_messages.is_some() {
-                        options.test_options_mut().client_id = Some(client.id.clone());
                         // some tests require that an untruncated command/reply is attached to
                         // events so it can be parsed as JSON, but on certain topologies some of
                         // the tests produce replies with extJSON longer than 1000 characters.

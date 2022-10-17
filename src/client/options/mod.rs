@@ -589,12 +589,6 @@ pub(crate) struct TestOptions {
 
     /// Mock response for `SrvPollingMonitor::lookup_hosts`.
     pub(crate) mock_lookup_hosts: Option<Result<LookupHosts>>,
-
-    /// Optionally stores the unified test runner entity ID for this client.
-    /// Used to include client IDs in tracing events which allows correlating
-    /// the events with specific clients.
-    #[cfg(feature = "tracing-unstable")]
-    pub(crate) client_id: Option<String>,
 }
 
 fn default_hosts() -> Vec<ServerAddress> {

@@ -169,14 +169,7 @@ impl Client {
         ) {
             Some(CommandTracingEventEmitter::new(
                 self.inner.options.tracing_max_document_length_bytes,
-                #[cfg(not(test))]
-                None,
-                #[cfg(test)]
-                self.inner
-                    .options
-                    .test_options
-                    .as_ref()
-                    .and_then(|o| o.client_id.clone()),
+                self.inner.topology.id,
             ))
         } else {
             None

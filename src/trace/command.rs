@@ -1,3 +1,5 @@
+use bson::oid::ObjectId;
+
 use crate::{
     event::command::{
         CommandEventHandler,
@@ -5,7 +7,7 @@ use crate::{
         CommandStartedEvent,
         CommandSucceededEvent,
     },
-    trace::{tracing_debug, TracingRepresentation, COMMAND_TRACING_EVENT_TARGET},
+    trace::{TracingRepresentation, COMMAND_TRACING_EVENT_TARGET},
 };
 
 pub(crate) const DEFAULT_MAX_DOCUMENT_LENGTH_BYTES: usize = 1000;
@@ -14,33 +16,29 @@ pub(crate) const DEFAULT_MAX_DOCUMENT_LENGTH_BYTES: usize = 1000;
 /// and emitting them as tracing events.
 pub(crate) struct CommandTracingEventEmitter {
     max_document_length_bytes: usize,
-    /// This property is only used for tests, and will be `None` in all non-test code. However,
-    /// we define this unconditionally and not just in test configuration to avoid having to
-    /// branch on whether we are in test configuration in each place we emit a tracing event
-    /// below.
-    #[allow(dead_code)]
-    client_id: Option<String>,
+    topology_id: ObjectId,
 }
 
 impl CommandTracingEventEmitter {
     pub(crate) fn new(
         max_document_length_bytes: Option<usize>,
-        client_id: Option<String>,
+        topology_id: ObjectId,
     ) -> CommandTracingEventEmitter {
         CommandTracingEventEmitter {
             max_document_length_bytes: max_document_length_bytes
                 .unwrap_or(DEFAULT_MAX_DOCUMENT_LENGTH_BYTES),
-            client_id,
+            topology_id,
         }
     }
 }
 
 impl CommandEventHandler for CommandTracingEventEmitter {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
-        tracing_debug!(
+        tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
-            client_id: self.client_id.as_ref(),
-            command = serialize_command_or_reply(event.command, self.max_document_length_bytes).as_str(),
+            topology_id = self.topology_id.tracing_representation(),
+            command =
+                serialize_command_or_reply(event.command, self.max_document_length_bytes).as_str(),
             databaseName = event.db.as_str(),
             commandName = event.command_name.as_str(),
             requestId = event.request_id,
@@ -57,10 +55,11 @@ impl CommandEventHandler for CommandTracingEventEmitter {
     }
 
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        tracing_debug!(
+        tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
-            client_id: self.client_id.as_ref(),
-            reply = serialize_command_or_reply(event.reply, self.max_document_length_bytes).as_str(),
+            topology_id = self.topology_id.tracing_representation(),
+            reply =
+                serialize_command_or_reply(event.reply, self.max_document_length_bytes).as_str(),
             commandName = event.command_name.as_str(),
             requestId = event.request_id,
             driverConnectionId = event.connection.id,
@@ -77,9 +76,9 @@ impl CommandEventHandler for CommandTracingEventEmitter {
     }
 
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
-        tracing_debug!(
+        tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
-            client_id: self.client_id.as_ref(),
+            topology_id = self.topology_id.tracing_representation(),
             failure = event.failure.tracing_representation(),
             commandName = event.command_name.as_str(),
             requestId = event.request_id,

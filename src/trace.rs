@@ -58,19 +58,6 @@ impl TracingOrLogLevel {
     }
 }
 
-/// Emits a tracing event at debug level. In tests, the provided client ID will be added as field to
-/// each event to enable distinguishing which client produced the event. Outside of tests, the ID
-/// will be ignored.
-macro_rules! tracing_debug {
-    (target: $target:expr, client_id: $client_id:expr, $($field:tt)* ) => (
-        #[cfg(test)]
-        tracing::event!(target: $target, tracing::Level::DEBUG, { client_id = $client_id, $($field)* });
-        #[cfg(not(test))]
-        tracing::event!(target: $target, tracing::Level::DEBUG, { $($field)* });
-    );
-}
-use tracing_debug;
-
 /// Pending https://github.com/tokio-rs/tracing/issues/2036 we can remove this and just use tracing::enabled.
 macro_rules! trace_or_log_enabled {
     (target: $target:expr, $lvl:expr) => {

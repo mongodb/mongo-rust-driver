@@ -29,14 +29,10 @@ impl TracingEvent {
         }
     }
 
-    /// Retrieves the client_id value for the event, if it exists. Returns None if there is no
-    /// client_id present; panics if there is a non-string client_id.
-    pub(crate) fn client_id(&self) -> Option<String> {
-        match self.fields.get("client_id") {
-            Some(TracingEventValue::String(s)) => Some(s.to_string()),
-            Some(v) => panic!("client_id was unexpectedly not a string: got {:?}", v),
-            None => None,
-        }
+    /// Retrieves the topology_id value for the event. Panics if there is no topology_id or if the
+    /// topology_id is not a string.
+    pub(crate) fn topology_id(&self) -> String {
+        self.get_value_as_string("topology_id")
     }
 
     /// Retrieves the field with the specified name as a string. Panics if the name is missing or
