@@ -17,8 +17,8 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::Result,
-    options::SelectionCriteria,
+    error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
+    options::{CollectionOptions, FindOptions, SelectionCriteria},
     Collection,
     Database,
 };
@@ -171,8 +171,19 @@ impl GridFsBucket {
             .as_deref()
             .unwrap_or(DEFAULT_BUCKET_NAME);
 
-        let files = db.collection::<FilesCollectionDocument>(&format!("{}.files", bucket_name));
-        let chunks = db.collection::<Chunk>(&format!("{}.chunks", bucket_name));
+        let collection_options = CollectionOptions::builder()
+            .read_concern(options.read_concern.clone())
+            .write_concern(options.write_concern.clone())
+            .selection_criteria(options.selection_criteria.clone())
+            .build();
+        let files = db.collection_with_options::<FilesCollectionDocument>(
+            &format!("{}.files", bucket_name),
+            collection_options.clone(),
+        );
+        let chunks = db.collection_with_options::<Chunk>(
+            &format!("{}.chunks", bucket_name),
+            collection_options,
+        );
 
         GridFsBucket {
             inner: Arc::new(GridFsBucketInner {
@@ -318,28 +329,58 @@ impl GridFsBucket {
         todo!()
     }
 
-    /// Given an `id`, deletes the stored file's files collection document and
-    /// associated chunks from a [`GridFsBucket`].
-    pub async fn delete(&self, id: Bson) {
-        todo!()
+    /// Deletes the [`FilesCollectionDocument`] with the given `id `and its associated chunks from
+    /// this bucket.
+    pub async fn delete(&self, id: Bson) -> Result<()> {
+        let delete_result = self
+            .files()
+            .delete_one(doc! { "_id": id.clone() }, None)
+            .await?;
+        // Delete chunks regardless of whether a file was found. This will remove any possibly
+        // orphaned chunks.
+        self.chunks()
+            .delete_many(doc! { "files_id": id.clone() }, None)
+            .await?;
+
+        if delete_result.deleted_count == 0 {
+            return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
+                identifier: GridFsFileIdentifier::Id(id),
+            })
+            .into());
+        }
+
+        Ok(())
     }
 
-    /// Finds and returns the files collection documents that match the filter.
+    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
+    /// filter.
     pub async fn find(
         &self,
         filter: Document,
-        options: impl Into<Option<GridFsBucketOptions>>,
+        options: impl Into<Option<GridFsFindOptions>>,
     ) -> Result<Cursor<FilesCollectionDocument>> {
-        todo!()
+        let find_options = options.into().map(FindOptions::from);
+        self.files().find(filter, find_options).await
     }
 
-    /// Renames the stored file with the specified `id`.
-    pub async fn rename(&self, id: Bson, new_filename: String) {
-        todo!()
+    /// Renames the file with the given 'id' to the provided `new_filename`.
+    pub async fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
+        self.files()
+            .update_one(
+                doc! { "_id": id },
+                doc! { "$set": { "filename": new_filename.as_ref() } },
+                None,
+            )
+            .await?;
+
+        Ok(())
     }
 
-    /// Drops the files associated with this bucket.
-    pub async fn drop(&self) {
-        todo!()
+    /// Drops all of the files and their associated chunks in this bucket.
+    pub async fn drop(&self) -> Result<()> {
+        self.files().drop(None).await?;
+        self.chunks().drop(None).await?;
+
+        Ok(())
     }
 }

@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use crate::{
-    bson::Document,
-    concern::{ReadConcern, WriteConcern},
-    selection_criteria::SelectionCriteria,
-};
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
+
+use crate::{
+    bson::Document,
+    options::{FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
+};
 
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
@@ -87,4 +87,18 @@ pub struct GridFsFindOptions {
 
     /// The order by which to sort results. Defaults to not sorting.
     pub sort: Option<Document>,
+}
+
+impl From<GridFsFindOptions> for FindOptions {
+    fn from(options: GridFsFindOptions) -> Self {
+        Self {
+            allow_disk_use: options.allow_disk_use,
+            batch_size: options.batch_size,
+            limit: options.limit,
+            max_time: options.max_time,
+            skip: options.skip,
+            sort: options.sort,
+            ..Default::default()
+        }
+    }
 }
