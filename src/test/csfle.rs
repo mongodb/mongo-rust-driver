@@ -1417,7 +1417,7 @@ impl DeadlockTestCase {
             .create_collection(
                 "coll",
                 CreateCollectionOptions::builder()
-                    .validator(load_testdata("external-schema.json")?)
+                    .validator(doc! { "$jsonSchema": load_testdata("external-schema.json")? })
                     .build(),
             )
             .await?;
