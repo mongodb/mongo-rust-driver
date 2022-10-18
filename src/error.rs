@@ -500,6 +500,8 @@ pub enum ErrorKind {
 
     /// The server returned an error to an attempted operation.
     #[error("Command failed: {0}")]
+    // note that if this Display impl changes, COMMAND_ERROR_REGEX in the unified runner matching
+    // logic will need to be updated.
     Command(CommandError),
 
     /// An error occurred during DNS resolution.
@@ -518,6 +520,8 @@ pub enum ErrorKind {
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error("I/O error: {0}")]
+    // note that if this Display impl changes, IO_ERROR_REGEX in the unified runner matching logic
+    // will need to be updated.
     Io(Arc<std::io::Error>),
 
     /// The connection pool for a server was cleared during operation execution due to
@@ -613,6 +617,8 @@ impl CommandError {
 }
 
 impl fmt::Display for CommandError {
+    // note that if this Display impl changes, COMMAND_ERROR_REGEX in the unified runner matching
+    // logic will need to be updated.
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(
             fmt,

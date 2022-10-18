@@ -3,8 +3,8 @@ use bson::Document;
 use crate::{
     bson::{doc, spec::ElementType, Bson},
     bson_util::get_int,
-    event::sdam::ServerDescription,
-    test::{CmapEvent, CommandEvent, Event, SdamEvent},
+    event::{command::CommandEvent, sdam::ServerDescription},
+    test::{CmapEvent, Event, SdamEvent},
 };
 
 use super::{
@@ -89,10 +89,7 @@ pub(crate) fn tracing_events_match(
                         // are command errors (which should be redacted) and
                         // I/O errors (which should not redacted). redaction of other errors is
                         // unit-tested in src/test/spec/trace.rs.
-                        if COMMAND_FAILED_REGEX.is_match(failure_str) {
-                            // this should always be non-optional if `is_match` returned true
-                            let captures = COMMAND_FAILED_REGEX.captures(failure_str).unwrap();
-
+                        if let Some(captures) = COMMAND_FAILED_REGEX.captures(failure_str) {
                             let code = captures.name("code").unwrap().as_str();
                             // code should never be redacted (here we consider "present and
                             // non-zero" to mean unredacted)
@@ -150,10 +147,7 @@ pub(crate) fn tracing_events_match(
                                     errmsg,
                                 });
                             }
-                        } else if IO_ERROR_REGEX.is_match(failure_str) {
-                            // this should always be non-optional if `is_match` returned true
-                            let captures = IO_ERROR_REGEX.captures(failure_str).unwrap();
-
+                        } else if let Some(captures) = IO_ERROR_REGEX.captures(failure_str) {
                             let message = captures.name("message").unwrap().as_str();
                             if message.is_empty() || message.contains("REDACTED") {
                                 return Err(format! {

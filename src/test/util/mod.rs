@@ -7,7 +7,7 @@ mod subscriber;
 mod trace;
 
 pub(crate) use self::{
-    event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},
+    event::{CmapEvent, Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},

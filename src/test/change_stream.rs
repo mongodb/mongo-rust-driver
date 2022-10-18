@@ -10,9 +10,9 @@ use crate::{
     },
     coll::options::CollectionOptions,
     db::options::{ChangeStreamPreAndPostImages, CreateCollectionOptions},
-    event::command::{CommandStartedEvent, CommandSucceededEvent},
+    event::command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{Acknowledgment, WriteConcern},
-    test::{CommandEvent, FailCommandOptions, FailPoint, FailPointMode},
+    test::{FailCommandOptions, FailPoint, FailPointMode},
     Collection,
 };
 

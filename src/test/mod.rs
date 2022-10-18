@@ -22,7 +22,6 @@ pub(crate) use self::{
         eq_matches,
         log_uncaptured,
         CmapEvent,
-        CommandEvent,
         Event,
         EventClient,
         EventHandler,

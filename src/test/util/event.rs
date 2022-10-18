@@ -29,6 +29,7 @@ use crate::{
             PoolReadyEvent,
         },
         command::{
+            CommandEvent,
             CommandEventHandler,
             CommandFailedEvent,
             CommandStartedEvent,
@@ -108,15 +109,6 @@ impl SdamEvent {
             Self::ServerHeartbeatFailed(_) => "ServerHeartbeatFailedEvent",
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[allow(clippy::large_enum_variant)]
-#[serde(untagged)]
-pub(crate) enum CommandEvent {
-    Started(CommandStartedEvent),
-    Succeeded(CommandSucceededEvent),
-    Failed(CommandFailedEvent),
 }
 
 impl CommandEvent {

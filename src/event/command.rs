@@ -145,7 +145,8 @@ pub trait CommandEventHandler: Send + Sync {
     fn handle_command_failed_event(&self, _event: CommandFailedEvent) {}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
 pub(crate) enum CommandEvent {
     Started(CommandStartedEvent),
     Succeeded(CommandSucceededEvent),
