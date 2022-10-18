@@ -306,7 +306,8 @@ impl Database {
 
         #[cfg(feature = "csfle")]
         let has_encrypted_fields = {
-            self.create_aux_collections(&ns, &mut options, session.as_deref_mut())
+            self.resolve_encrypted_fields(&ns, &mut options).await;
+            self.create_aux_collections(&ns, &options, session.as_deref_mut())
                 .await?;
             options
                 .as_ref()
@@ -337,13 +338,11 @@ impl Database {
     }
 
     #[cfg(feature = "csfle")]
-    #[allow(clippy::needless_option_as_deref)]
-    async fn create_aux_collections(
+    async fn resolve_encrypted_fields(
         &self,
         base_ns: &Namespace,
         options: &mut Option<CreateCollectionOptions>,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<()> {
+    ) {
         let has_encrypted_fields = options
             .as_ref()
             .and_then(|o| o.encrypted_fields.as_ref())
@@ -362,23 +361,36 @@ impl Database {
                     .encrypted_fields = Some(enc_opts_fields.clone());
             }
         }
+    }
 
-        if let Some(opts) = options.as_ref() {
-            if let Some(enc_fields) = opts.encrypted_fields.as_ref() {
-                for ns in crate::client::csfle::aux_collections(base_ns, enc_fields)? {
-                    let mut sub_opts = opts.clone();
-                    sub_opts.clustered_index = Some(self::options::ClusteredIndex {
-                        key: doc! { "_id": 1 },
-                        unique: true,
-                        name: None,
-                        v: None,
-                    });
-                    let create = Create::new(ns, Some(sub_opts));
-                    self.client()
-                        .execute_operation(create, session.as_deref_mut())
-                        .await?;
-                }
-            }
+    #[cfg(feature = "csfle")]
+    #[allow(clippy::needless_option_as_deref)]
+    async fn create_aux_collections(
+        &self,
+        base_ns: &Namespace,
+        options: &Option<CreateCollectionOptions>,
+        mut session: Option<&mut ClientSession>,
+    ) -> Result<()> {
+        let opts = match options {
+            Some(o) => o,
+            None => return Ok(()),
+        };
+        let enc_fields = match &opts.encrypted_fields {
+            Some(f) => f,
+            None => return Ok(()),
+        };
+        for ns in crate::client::csfle::aux_collections(base_ns, enc_fields)? {
+            let mut sub_opts = opts.clone();
+            sub_opts.clustered_index = Some(self::options::ClusteredIndex {
+                key: doc! { "_id": 1 },
+                unique: true,
+                name: None,
+                v: None,
+            });
+            let create = Create::new(ns, Some(sub_opts));
+            self.client()
+                .execute_operation(create, session.as_deref_mut())
+                .await?;
         }
         Ok(())
     }

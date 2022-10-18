@@ -276,6 +276,9 @@ async fn data_key_double_encryption() -> Result<()> {
                         Some(e) => e,
                         None => return Ok(false),
                     };
+                    if ev.command_name != "insert" {
+                        return Ok(false);
+                    }
                     let cmd = &ev.command;
                     if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
                         return Ok(false);
@@ -419,7 +422,8 @@ async fn external_key_vault() -> Result<()> {
             .insert_one(doc! { "encrypted": "test" }, None)
             .await;
         if with_external_key_vault {
-            assert!(result.is_err());
+            let err = result.unwrap_err();
+            assert!(err.is_auth_error(), "unexpected error: {}", err);
         } else {
             assert!(
                 result.is_ok(),
@@ -438,7 +442,8 @@ async fn external_key_vault() -> Result<()> {
             )
             .await;
         if with_external_key_vault {
-            assert!(result.is_err());
+            let err = result.unwrap_err();
+            assert!(err.is_auth_error(), "unexpected error: {}", err);
         } else {
             assert!(
                 result.is_ok(),
@@ -495,7 +500,6 @@ async fn bson_size_limits() -> Result<()> {
     let handler = Arc::new(EventHandler::new());
     let mut events = handler.subscribe();
     opts.command_event_handler = Some(handler.clone());
-    // TODO: register an event handler
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(LOCAL_KMS.clone())
@@ -507,26 +511,24 @@ async fn bson_size_limits() -> Result<()> {
         .collection::<Document>("coll");
 
     // Tests
-    fn repeat_a(times: usize) -> String {
-        // Constructing the array directly explodes the stack.
-        std::iter::repeat('a').take(times).collect::<String>()
-    }
-
+    // Test operation 1
     coll.insert_one(
         doc! {
             "_id": "over_2mib_under_16mib",
-            "unencrypted": repeat_a(2097152),
+            "unencrypted": "a".repeat(2097152),
         },
         None,
     )
     .await?;
 
+    // Test operation 2
     let mut doc: Document = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
-    doc.insert("unencrypted", repeat_a(2_097_152 - 2_000));
+    doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
     coll.insert_one(doc, None).await?;
 
-    let value = repeat_a(2_097_152);
+    // Test operation 3
+    let value = "a".repeat(2_097_152);
     events.clear_events(Duration::from_millis(500)).await;
     coll.insert_many(
         vec![
@@ -553,9 +555,10 @@ async fn bson_size_limits() -> Result<()> {
         .await;
     assert_eq!(2, inserts.len());
 
+    // Test operation 4
     let mut doc = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib_1");
-    doc.insert("unencrypted", repeat_a(2_097_152 - 2_000));
+    doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
     let mut doc2 = doc.clone();
     doc2.insert("_id", "encryption_exceeds_2mib_2");
     events.clear_events(Duration::from_millis(500)).await;
@@ -571,17 +574,24 @@ async fn bson_size_limits() -> Result<()> {
         .await;
     assert_eq!(2, inserts.len());
 
+    // Test operation 5
     let doc = doc! {
         "_id": "under_16mib",
-        "unencrypted": repeat_a(16_777_216 - 2_000),
+        "unencrypted": "a".repeat(16_777_216 - 2_000),
     };
     coll.insert_one(doc, None).await?;
 
+    // Test operation 6
     let mut doc: Document = load_testdata("limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_16mib");
-    doc.insert("unencrypted", repeat_a(16_777_216 - 2_000));
+    doc.insert("unencrypted", "a".repeat(16_777_216 - 2_000));
     let result = coll.insert_one(doc, None).await;
-    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(*err.kind, ErrorKind::Write(_)),
+        "unexpected error: {}",
+        err
+    );
 
     Ok(())
 }
@@ -643,7 +653,7 @@ macro_rules! failure {
     }}
 }
 
-// TODO(RUST-36): use the full corpus with decimal128.
+// TODO RUST-36: use the full corpus with decimal128.
 fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
     let json: serde_json::Value = serde_json::from_str(&load_testdata_raw(name)?)?;
     let mut new_obj = serde_json::Map::new();
