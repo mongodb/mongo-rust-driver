@@ -1843,5 +1843,26 @@ async fn kms_tls_options() -> Result<()> {
     aws_test(&client_encryption_expired, "127.0.0.1:9000", "certificate verify failed").await;
     aws_test(&client_encryption_invalid_hostname, "127.0.0.1:9001", "certificate verify failed").await;
 
+    // Case 2: Azure
+    async fn azure_test(client_encryption: &ClientEncryption, err_str: &str) {
+        let key_opts = DataKeyOptions::builder()
+            .master_key(MasterKey::Azure {
+                    key_vault_endpoint: "doesnotexist.local".to_string(),
+                    key_name: "foo".to_string(),
+                    key_version: None,
+                })
+            .build();
+        let err = client_encryption.create_data_key(
+            &KmsProvider::Azure,
+            &key_opts,
+        ).await.unwrap_err();
+        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+    }
+
+    azure_test(&client_encryption_no_client_cert, "handshake failure").await;
+    azure_test(&client_encryption_with_tls, "HTTP status=404").await;
+    azure_test(&client_encryption_expired, "certificate verify failed").await;
+    azure_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
+
     Ok(())
 }
