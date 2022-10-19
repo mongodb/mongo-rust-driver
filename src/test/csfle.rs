@@ -1864,5 +1864,52 @@ async fn kms_tls_options() -> Result<()> {
     azure_test(&client_encryption_expired, "certificate verify failed").await;
     azure_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
 
+    // Case 3: GCP
+    async fn gcp_test(client_encryption: &ClientEncryption, err_str: &str) {
+        let key_opts = DataKeyOptions::builder()
+            .master_key(MasterKey::Gcp {
+                    project_id: "foo".to_string(),
+                    location: "bar".to_string(),
+                    key_ring: "baz".to_string(),
+                    key_name: "foo".to_string(),
+                    endpoint: None,
+                    key_version: None,
+                })
+            .build();
+        let err = client_encryption.create_data_key(
+            &KmsProvider::Gcp,
+            &key_opts,
+        ).await.unwrap_err();
+        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+    }
+
+    gcp_test(&client_encryption_no_client_cert, "handshake failure").await;
+    gcp_test(&client_encryption_with_tls, "HTTP status=404").await;
+    gcp_test(&client_encryption_expired, "certificate verify failed").await;
+    gcp_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
+
+    // Case 4: KMIP
+    async fn kmip_test(client_encryption: &ClientEncryption, err_str: &str) {
+        let key_opts = DataKeyOptions::builder()
+            .master_key(MasterKey::Kmip { key_id: None, endpoint: None })
+            .build();
+        let err = client_encryption.create_data_key(
+            &KmsProvider::Kmip,
+            &key_opts,
+        ).await.unwrap_err();
+        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+    }
+
+    kmip_test(&client_encryption_no_client_cert, "handshake failure").await;
+    // This one succeeds!
+    client_encryption_with_tls.create_data_key(
+        &KmsProvider::Kmip,
+        &DataKeyOptions::builder()
+            .master_key(MasterKey::Kmip { key_id: None, endpoint: None })
+            .build(),
+    ).await?;
+    kmip_test(&client_encryption_expired, "certificate verify failed").await;
+    kmip_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
+
     Ok(())
 }
