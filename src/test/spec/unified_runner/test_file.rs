@@ -170,7 +170,7 @@ pub(crate) struct Client {
     pub(crate) store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
     #[cfg(feature = "tracing-unstable")]
     #[serde(default, deserialize_with = "deserialize_tracing_level_map")]
-    pub observe_log_messages: Option<HashMap<String, tracing::Level>>,
+    pub(crate) observe_log_messages: Option<HashMap<String, tracing::Level>>,
 }
 
 impl Client {

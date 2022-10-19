@@ -98,8 +98,8 @@ lazy_static! {
     /// they are registered in.
     /// By default this handler will collect no tracing events.
     /// Its minimum severity levels can be configured on a per-component basis using
-    /// [`TracingHandler:set_levels`]. The test lock MUST be acquired in any test
-    /// that will use the handler to avoid mixing events from multiple tests.
+    /// [`TracingHandler:set_levels`]. The test lock MUST be acquired exclusively in
+    /// any test that will use the handler to avoid mixing events from multiple tests.
     pub(crate) static ref DEFAULT_GLOBAL_TRACING_HANDLER: TracingHandler = {
         let handler = TracingHandler::new();
         tracing::subscriber::set_global_default(handler.clone())
