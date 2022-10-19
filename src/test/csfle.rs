@@ -1603,15 +1603,27 @@ impl DeadlockExpectation {
     }
 }
 
-// Prose test 10. KMS TLS Tests (Invalid KMS Certificate)
+// Prose test 10. KMS TLS Tests
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn kms_tls_invalid_certificate() -> Result<()> {
-    if !check_env("kms_tls_invalid_certificate", false) {
+async fn kms_tls() -> Result<()> {
+    if !check_env("kms_tls", false) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
 
+    // Invalid KMS Certificate
+    let err = run_kms_tls_test("127.0.0.1:9000").await.unwrap_err();
+    assert!(err.to_string().contains("certificate verify failed"), "unexpected error: {}", err);
+
+    // Invalid Hostname in KMS Certificate
+    let err = run_kms_tls_test("127.0.0.1:9001").await.unwrap_err();
+    assert!(err.to_string().contains("certificate verify failed"), "unexpected error: {}", err);
+
+    Ok(())
+}
+
+async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<()> {
     // Setup
     let kv_client = TestClient::new().await;
     let enc_opts = ClientEncryptionOptions::builder()
@@ -1622,18 +1634,14 @@ async fn kms_tls_invalid_certificate() -> Result<()> {
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
     // Test
-    let result = client_encryption.create_data_key(
+    client_encryption.create_data_key(
         &KmsProvider::Aws,
         &DataKeyOptions::builder()
             .master_key(MasterKey::Aws {
                 region: "us-east-1".to_string(),
                 key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint: Some("127.0.0.1:9000".to_string()),
+                endpoint: Some(endpoint.into()),
             })
             .build(),
-    ).await;
-    let err = result.unwrap_err();
-    assert!(err.to_string().contains("certificate verify failed"), "unexpected error: {}", err);
-
-    Ok(())
+    ).await.map(|_| ())
 }
