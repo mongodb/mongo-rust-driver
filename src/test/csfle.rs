@@ -22,11 +22,12 @@ use crate::{
     coll::options::{CollectionOptions, InsertOneOptions},
     db::options::CreateCollectionOptions,
     error::ErrorKind,
+    event::command::CommandStartedEvent,
     options::{ReadConcern, WriteConcern},
     test::{Event, EventHandler, SdamEvent},
     Client,
     Collection,
-    Namespace, event::command::CommandStartedEvent,
+    Namespace,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -1289,7 +1290,7 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     let extra_options = doc! {
         "mongocryptdBypassSpawn": true,
         "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
-        "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],      
+        "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
     let auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
@@ -1299,22 +1300,30 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         .disable_crypt_shared(true)
         .build();
     let client_encrypted =
-        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
-            .await?;
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
     // Test: insert fails.
-    let result = client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "encrypted": "test" }, None).await;
-    assert!(matches!(result.unwrap_err().kind.as_ref(), ErrorKind::InvalidArgument { .. }));
+    let result = client_encrypted
+        .database("db")
+        .collection::<Document>("coll")
+        .insert_one(doc! { "encrypted": "test" }, None)
+        .await;
+    assert!(matches!(
+        result.unwrap_err().kind.as_ref(),
+        ErrorKind::InvalidArgument { .. }
+    ));
 
     Ok(())
 }
 
-async fn bypass_mongocryptd_unencrypted_insert(conf: impl FnOnce(&mut AutoEncryptionOptions)) -> Result<()> {
+async fn bypass_mongocryptd_unencrypted_insert(
+    conf: impl FnOnce(&mut AutoEncryptionOptions),
+) -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: encrypted client.
     let extra_options = doc! {
-        "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],      
+        "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
     let mut auto_enc_opts = AutoEncryptionOptions::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
@@ -1324,15 +1333,19 @@ async fn bypass_mongocryptd_unencrypted_insert(conf: impl FnOnce(&mut AutoEncryp
         .build();
     conf(&mut auto_enc_opts);
     let client_encrypted =
-        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
-            .await?;
+        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
     // Test: insert succeeds.
-    client_encrypted.database("db").collection::<Document>("coll").insert_one(doc! { "unencrypted": "test" }, None).await?;
+    client_encrypted
+        .database("db")
+        .collection::<Document>("coll")
+        .insert_one(doc! { "unencrypted": "test" }, None)
+        .await?;
     // Test: mongocryptd not spawned.
     assert!(!client_encrypted.mongocryptd_spawned().await);
     // Test: attempting to connect fails.
-    let result = Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await;
+    let result =
+        Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await;
     assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
@@ -1345,7 +1358,10 @@ async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
         return Ok(());
     }
-    bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_auto_encryption = Some(true); }).await
+    bypass_mongocryptd_unencrypted_insert(|opts| {
+        opts.bypass_auto_encryption = Some(true);
+    })
+    .await
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassQueryAnalysis)
@@ -1355,7 +1371,10 @@ async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_query_analysis", false) {
         return Ok(());
     }
-    bypass_mongocryptd_unencrypted_insert(|opts| { opts.bypass_query_analysis = Some(true); }).await
+    bypass_mongocryptd_unencrypted_insert(|opts| {
+        opts.bypass_query_analysis = Some(true);
+    })
+    .await
 }
 
 // Prose test 9. Deadlock Tests
@@ -1392,7 +1411,9 @@ async fn deadlock() -> Result<()> {
         ],
         expected_keyvault_commands: vec![],
         expected_number_of_clients: 2,
-    }.run().await?;
+    }
+    .run()
+    .await?;
     // Case 2
     DeadlockTestCase {
         max_pool_size: 1,
@@ -1412,14 +1433,14 @@ async fn deadlock() -> Result<()> {
                 db: "db",
             },
         ],
-        expected_keyvault_commands: vec![
-            DeadlockExpectation {
-                command: "find",
-                db: "keyvault",
-            },
-        ],
+        expected_keyvault_commands: vec![DeadlockExpectation {
+            command: "find",
+            db: "keyvault",
+        }],
         expected_number_of_clients: 2,
-    }.run().await?;
+    }
+    .run()
+    .await?;
     // Case 3
     DeadlockTestCase {
         max_pool_size: 1,
@@ -1437,26 +1458,26 @@ async fn deadlock() -> Result<()> {
         ],
         expected_keyvault_commands: vec![],
         expected_number_of_clients: 2,
-    }.run().await?;
+    }
+    .run()
+    .await?;
     // Case 4
     DeadlockTestCase {
         max_pool_size: 1,
         bypass_auto_encryption: true,
         set_key_vault_client: true,
-        expected_encrypted_commands: vec![
-            DeadlockExpectation {
-                command: "find",
-                db: "db",
-            },
-        ],
-        expected_keyvault_commands: vec![
-            DeadlockExpectation {
-                command: "find",
-                db: "keyvault",
-            },
-        ],
+        expected_encrypted_commands: vec![DeadlockExpectation {
+            command: "find",
+            db: "db",
+        }],
+        expected_keyvault_commands: vec![DeadlockExpectation {
+            command: "find",
+            db: "keyvault",
+        }],
         expected_number_of_clients: 1,
-    }.run().await?;
+    }
+    .run()
+    .await?;
     // Case 5: skipped (unlimited max_pool_size not supported)
     // Case 6: skipped (unlimited max_pool_size not supported)
     // Case 7: skipped (unlimited max_pool_size not supported)
@@ -1482,10 +1503,19 @@ impl DeadlockTestCase {
             let mut opts = CLIENT_OPTIONS.get().await.clone();
             opts.max_pool_size = Some(1);
             opts
-        }).await;
+        })
+        .await;
         let mut keyvault_events = client_keyvault.subscribe_to_events();
-        client_test.database("keyvault").collection::<Document>("datakeys").drop(None).await?;
-        client_test.database("db").collection::<Document>("coll").drop(None).await?;
+        client_test
+            .database("keyvault")
+            .collection::<Document>("datakeys")
+            .drop(None)
+            .await?;
+        client_test
+            .database("db")
+            .collection::<Document>("coll")
+            .drop(None)
+            .await?;
         client_keyvault
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1510,22 +1540,30 @@ impl DeadlockTestCase {
                 .key_vault_client(client_test.clone().into_client())
                 .key_vault_namespace(KV_NAMESPACE.clone())
                 .kms_providers(LOCAL_KMS.clone())
-                .build()
-        )?;
-        let ciphertext = client_encryption.encrypt(
-            RawBson::String("string0".to_string()),
-            EncryptOptions::builder()
-                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-                .key(EncryptKey::AltName("local".to_string()))
                 .build(),
-        ).await?;
+        )?;
+        let ciphertext = client_encryption
+            .encrypt(
+                RawBson::String("string0".to_string()),
+                EncryptOptions::builder()
+                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                    .key(EncryptKey::AltName("local".to_string()))
+                    .build(),
+            )
+            .await?;
 
         // Run test case
         let auto_enc_opts = AutoEncryptionOptions::builder()
             .key_vault_namespace(KV_NAMESPACE.clone())
             .kms_providers(LOCAL_KMS.clone())
             .bypass_auto_encryption(self.bypass_auto_encryption)
-            .key_vault_client(if self.set_key_vault_client { Some(client_keyvault.clone().into_client()) } else { None })
+            .key_vault_client(
+                if self.set_key_vault_client {
+                    Some(client_keyvault.clone().into_client())
+                } else {
+                    None
+                },
+            )
             .extra_options(EXTRA_OPTIONS.clone())
             .build();
         let event_handler = Arc::new(EventHandler::new());
@@ -1540,26 +1578,29 @@ impl DeadlockTestCase {
             client_test
                 .database("db")
                 .collection::<Document>("coll")
-                .insert_one(doc! { "_id": 0, "encrypted": ciphertext }, None).await?;
+                .insert_one(doc! { "_id": 0, "encrypted": ciphertext }, None)
+                .await?;
         } else {
             client_encrypted
                 .database("db")
                 .collection::<Document>("coll")
-                .insert_one(doc! { "_id": 0, "encrypted": "string0" }, None).await?;
+                .insert_one(doc! { "_id": 0, "encrypted": "string0" }, None)
+                .await?;
         }
 
         let found = client_encrypted
             .database("db")
             .collection::<Document>("coll")
-            .find_one(doc! { "_id": 0 }, None).await?;
+            .find_one(doc! { "_id": 0 }, None)
+            .await?;
         assert_eq!(found, Some(doc! { "_id": 0, "encrypted": "string0" }));
 
-        let encrypted_events = encrypted_events.collect_events(Duration::from_millis(500), |_| true).await;
+        let encrypted_events = encrypted_events
+            .collect_events(Duration::from_millis(500), |_| true)
+            .await;
         let client_count = encrypted_events
             .iter()
-            .filter(|ev| {
-                matches!(ev, Event::Sdam(SdamEvent::TopologyOpening(_)))
-            })
+            .filter(|ev| matches!(ev, Event::Sdam(SdamEvent::TopologyOpening(_))))
             .count();
         assert_eq!(self.expected_number_of_clients, client_count);
 
@@ -1572,7 +1613,9 @@ impl DeadlockTestCase {
         }
 
         let keyvault_commands = keyvault_events
-            .collect_events_map(Duration::from_millis(500), |ev| ev.into_command_started_event())
+            .collect_events_map(Duration::from_millis(500), |ev| {
+                ev.into_command_started_event()
+            })
             .await;
         for expected in &self.expected_keyvault_commands {
             expected.assert_matches_any("keyvault", &keyvault_commands);
@@ -1599,7 +1642,10 @@ impl DeadlockExpectation {
                 return;
             }
         }
-        panic!("No {} command matching {:?} found, events=\n{:?}", name, self, commands);
+        panic!(
+            "No {} command matching {:?} found, events=\n{:?}",
+            name, self, commands
+        );
     }
 }
 
@@ -1614,11 +1660,19 @@ async fn kms_tls() -> Result<()> {
 
     // Invalid KMS Certificate
     let err = run_kms_tls_test("127.0.0.1:9000").await.unwrap_err();
-    assert!(err.to_string().contains("certificate verify failed"), "unexpected error: {}", err);
+    assert!(
+        err.to_string().contains("certificate verify failed"),
+        "unexpected error: {}",
+        err
+    );
 
     // Invalid Hostname in KMS Certificate
     let err = run_kms_tls_test("127.0.0.1:9001").await.unwrap_err();
-    assert!(err.to_string().contains("certificate verify failed"), "unexpected error: {}", err);
+    assert!(
+        err.to_string().contains("certificate verify failed"),
+        "unexpected error: {}",
+        err
+    );
 
     Ok(())
 }
@@ -1634,14 +1688,160 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
     let client_encryption = ClientEncryption::new(enc_opts)?;
 
     // Test
-    client_encryption.create_data_key(
-        &KmsProvider::Aws,
-        &DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                endpoint: Some(endpoint.into()),
-            })
+    client_encryption
+        .create_data_key(
+            &KmsProvider::Aws,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Aws {
+                    region: "us-east-1".to_string(),
+                    key: "arn:aws:kms:us-east-1:579766882180:key/\
+                          89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                        .to_string(),
+                    endpoint: Some(endpoint.into()),
+                })
+                .build(),
+        )
+        .await
+        .map(|_| ())
+}
+
+// Prose test 10. KMS TLS Options Tests
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn kms_tls_options() -> Result<()> {
+    if !check_env("kms_tls_options", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup
+    let mut providers = KMS_PROVIDERS.clone();
+    providers
+        .get_mut(&KmsProvider::Azure)
+        .unwrap()
+        .insert("identityPlatformEndpoint", "127.0.0.1:9002");
+    providers
+        .get_mut(&KmsProvider::Gcp)
+        .unwrap()
+        .insert("endpoint", "127.0.0.1:9002");
+    let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
+    let ca_path = cert_dir.join("ca.pem");
+    let key_path = cert_dir.join("client.pem");
+
+    fn build_kms_tls_opts(tls_opts: &TlsOptions) -> KmsProvidersTlsOptions {
+        [
+            (KmsProvider::Aws, tls_opts.clone()),
+            (KmsProvider::Azure, tls_opts.clone()),
+            (KmsProvider::Gcp, tls_opts.clone()),
+            (KmsProvider::Kmip, tls_opts.clone()),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    let client_encryption_no_client_cert = ClientEncryption::new(
+        ClientEncryptionOptions::builder()
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .key_vault_client(TestClient::new().await.into_client())
+            .kms_providers(providers.clone())
+            .tls_options(build_kms_tls_opts(
+                &TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
+            ))
             .build(),
-    ).await.map(|_| ())
+    )?;
+
+    let client_encryption_with_tls = ClientEncryption::new(
+        ClientEncryptionOptions::builder()
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .key_vault_client(TestClient::new().await.into_client())
+            .kms_providers(providers.clone())
+            .tls_options(build_kms_tls_opts(
+                &TlsOptions::builder()
+                    .ca_file_path(ca_path.clone())
+                    .cert_key_file_path(key_path.clone())
+                    .build(),
+            ))
+            .build(),
+    )?;
+
+    let client_encryption_expired = {
+        let mut providers = providers.clone();
+        providers
+            .get_mut(&KmsProvider::Azure)
+            .unwrap()
+            .insert("identityPlatformEndpoint", "127.0.0.1:9000");
+        providers
+            .get_mut(&KmsProvider::Gcp)
+            .unwrap()
+            .insert("endpoint", "127.0.0.1:9000");
+        providers
+            .get_mut(&KmsProvider::Kmip)
+            .unwrap()
+            .insert("endpoint", "127.0.0.1:9000");
+
+        ClientEncryption::new(
+            ClientEncryptionOptions::builder()
+                .key_vault_namespace(KV_NAMESPACE.clone())
+                .key_vault_client(TestClient::new().await.into_client())
+                .kms_providers(providers)
+                .tls_options(build_kms_tls_opts(
+                    &TlsOptions::builder()
+                        .ca_file_path(ca_path.clone())
+                        .build(),
+                ))
+                .build(),
+        )?
+    };
+
+    let client_encryption_invalid_hostname = {
+        let mut providers = providers.clone();
+        providers
+            .get_mut(&KmsProvider::Azure)
+            .unwrap()
+            .insert("identityPlatformEndpoint", "127.0.0.1:9001");
+        providers
+            .get_mut(&KmsProvider::Gcp)
+            .unwrap()
+            .insert("endpoint", "127.0.0.1:9001");
+        providers
+            .get_mut(&KmsProvider::Kmip)
+            .unwrap()
+            .insert("endpoint", "127.0.0.1:9001");
+
+        ClientEncryption::new(
+            ClientEncryptionOptions::builder()
+                .key_vault_namespace(KV_NAMESPACE.clone())
+                .key_vault_client(TestClient::new().await.into_client())
+                .kms_providers(providers)
+                .tls_options(build_kms_tls_opts(
+                    &TlsOptions::builder()
+                        .ca_file_path(ca_path.clone())
+                        .build(),
+                ))
+                .build(),
+        )?
+    };
+
+    // Case 1: AWS
+    async fn aws_test(client_encryption: &ClientEncryption, endpoint: impl Into<String>, err_str: &str) {
+        let aws_key_opts = DataKeyOptions::builder()
+            .master_key(MasterKey::Aws {
+                    region: "us-east-1".to_string(),
+                    key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+                    endpoint: Some(endpoint.into()),
+                })
+            .build();
+        let err = client_encryption.create_data_key(
+            &KmsProvider::Aws,
+            aws_key_opts,
+        ).await.unwrap_err();
+        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+    }
+
+    aws_test(&client_encryption_no_client_cert, "127.0.0.1:9002", "handshake failure").await;
+    aws_test(&client_encryption_with_tls, "127.0.0.1:9002", "parse error").await;
+    aws_test(&client_encryption_expired, "127.0.0.1:9000", "certificate verify failed").await;
+    aws_test(&client_encryption_invalid_hostname, "127.0.0.1:9001", "certificate verify failed").await;
+
+    Ok(())
 }
