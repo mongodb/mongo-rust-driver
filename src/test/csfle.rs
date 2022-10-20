@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
-use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson};
+use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson, Binary};
 use futures_util::TryStreamExt;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
@@ -1705,7 +1705,7 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
         .map(|_| ())
 }
 
-// Prose test 10. KMS TLS Options Tests
+// Prose test 11. KMS TLS Options Tests
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn kms_tls_options() -> Result<()> {
@@ -1912,4 +1912,99 @@ async fn kms_tls_options() -> Result<()> {
     kmip_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
 
     Ok(())
+}
+
+// Prose test 11. Explicit Encryption (Case 1: can insert encrypted indexed and find)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn explicit_encryption_case_1() -> Result<()> {
+    if !check_env("explicit_encryption", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let testdata = match explicit_encryption_setup().await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    let find_payload = testdata.client_encryption.encrypt(
+        RawBson::String("encrypted indexed value".to_string()),
+        &EncryptOptions::builder()
+            .key(EncryptKey::Id(testdata.key1_id))
+            .algorithm(Algorithm::Indexed)
+            .contention_factor(0)
+            .build(),
+    ).await?;
+    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+    let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload }, None).await?.try_collect().await?;
+    assert_eq!(1, found.len());
+    assert_eq!("encrypted indexed value", found[0].get_str("encryptedIndexed")?);
+
+    Ok(())
+}
+
+struct ExplicitEncryptionTestData {
+    key1_id: Binary,
+    client_encryption: ClientEncryption,
+    encrypted_client: Client,
+}
+
+async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData>> {
+    let key_vault_client = TestClient::new().await;
+    if key_vault_client.server_version_lt(6, 0) {
+        log_uncaptured("skipping explicit encryption test: server below 6.0");
+        return Ok(None);
+    }
+    if key_vault_client.is_standalone() {
+        log_uncaptured("skipping explicit encryption test: cannot run on standalone");
+        return Ok(None);
+    }
+
+    let encrypted_fields = load_testdata("encryptedFields.json")?;
+    let key1_document = load_testdata("key1-document.json")?;
+    let key1_id = match key1_document.get("_id").unwrap() {
+        Bson::Binary(b) => b.clone(),
+        v => return Err(failure!("expected binary _id, got {:?}", v)),
+    };
+
+    let db = key_vault_client.database("db");
+    db.collection::<Document>("explicit_encryption").drop(None).await?;
+    db.create_collection(
+        "explicit_encryption",
+        CreateCollectionOptions::builder()
+            .encrypted_fields(encrypted_fields)
+            .build(),
+    ).await?;
+    let keyvault = key_vault_client.database("keyvault");
+    keyvault.collection::<Document>("datakeys").drop(None).await?;
+    keyvault.create_collection("datakeys", None).await?;
+    keyvault
+        .collection::<Document>("datakeys")
+        .insert_one(
+            key1_document,
+            InsertOneOptions::builder()
+                .write_concern(WriteConcern::MAJORITY)
+                .build(),
+        )
+        .await?;
+
+    let client_encryption = ClientEncryption::new(
+        ClientEncryptionOptions::builder()
+            .key_vault_client(key_vault_client.into_client())
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())
+            .build()
+    )?;
+    let encrypted_client = Client::with_encryption_options(
+        CLIENT_OPTIONS.get().await.clone(),
+        AutoEncryptionOptions::builder()
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())
+            .bypass_query_analysis(true)
+            .extra_options(EXTRA_OPTIONS.clone())
+            .build(),
+    ).await?;
+
+    Ok(Some(ExplicitEncryptionTestData { key1_id, client_encryption, encrypted_client }))
 }

@@ -493,10 +493,7 @@ functions:
       background: true
       script: |
         ${PREPARE_SHELL}
-        cd ${DRIVERS_TOOLS}/.evergreen/csfle
-        . ./activate_venv.sh
-        # TMPDIR is required to avoid "AF_UNIX path too long" errors.
-        TMPDIR="$(dirname ${DRIVERS_TOOLS})" python3 kms_kmip_server.py
+        .evergreen/run-csfle-kmip-servers.sh
 
   "run csfle tests":
     - command: shell.exec
