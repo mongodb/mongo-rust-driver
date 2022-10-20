@@ -58,6 +58,8 @@ use super::{
 /// When this is dropped, monitors will stop performing checks.
 #[derive(Debug)]
 pub(crate) struct Topology {
+    #[cfg(feature = "tracing-unstable")]
+    pub(crate) id: ObjectId,
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
     _worker_handle: WorkerHandle,
@@ -96,8 +98,10 @@ impl Topology {
             EstablisherOptions::from_client_options(&options),
         )?;
 
+        let id = ObjectId::new();
+
         let worker = TopologyWorker {
-            id: ObjectId::new(),
+            id,
             topology_description: description,
             servers: Default::default(),
             update_receiver,
@@ -113,6 +117,8 @@ impl Topology {
         worker.start();
 
         Ok(Topology {
+            #[cfg(feature = "tracing-unstable")]
+            id,
             watcher,
             updater,
             _worker_handle: worker_handle,

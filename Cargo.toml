@@ -70,6 +70,11 @@ snappy-compression = ["snap"]
 # DO NOT USE; see https://jira.mongodb.org/browse/RUST-569 for the status of CSFLE support in the Rust driver.
 csfle = ["mongocrypt", "rayon", "num_cpus"]
 
+# DO NOT USE; see https://jira.mongodb.org/browse/RUST-580 for the status of tracing/logging support in the Rust driver.
+# Enables support for emitting tracing events.
+# TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
+tracing-unstable = ["tracing", "log"]
+
 [dependencies]
 async-trait = "0.1.42"
 base64 = "0.13.0"
@@ -85,6 +90,7 @@ futures-executor = "0.3.14"
 hex = "0.4.0"
 hmac = "0.12.1"
 lazy_static = "1.4.0"
+log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
 mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true }
 num_cpus = { version = "1.13.1", optional = true }
@@ -105,6 +111,7 @@ strsim = "0.10.0"
 take_mut = "0.2.2"
 thiserror = "1.0.24"
 tokio-openssl = { version = "0.6.3", optional = true }
+tracing = { version = "0.1.36", optional = true }
 trust-dns-proto = "0.21.2"
 trust-dns-resolver = "0.21.2"
 typed-builder = "0.10.0"
@@ -172,6 +179,7 @@ serde = { version = "*", features = ["rc"] }
 serde_json = "1.0.64"
 semver = "1.0.0"
 time = "0.3.9"
+tracing-subscriber = "0.3.16"
 regex = "1.6.0"
 
 [package.metadata.docs.rs]

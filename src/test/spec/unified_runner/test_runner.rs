@@ -54,6 +54,13 @@ use super::{
     TestFileEntity,
 };
 
+#[cfg(feature = "tracing-unstable")]
+use crate::test::{
+    spec::unified_runner::matcher::tracing_events_match,
+    util::max_verbosity_levels_for_test_case,
+    DEFAULT_GLOBAL_TRACING_HANDLER,
+};
+
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
@@ -106,7 +113,7 @@ impl TestRunner {
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| test_file.description.clone());
 
-        if let Some(requirements) = test_file.run_on_requirements {
+        if let Some(ref requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
             for requirement in requirements {
                 if requirement.can_run_on(&self.internal_client).await {
@@ -127,7 +134,7 @@ impl TestRunner {
             file_title
         ));
 
-        for test_case in test_file.tests {
+        for test_case in &test_file.tests {
             if let Ok(description) = std::env::var("TEST_DESCRIPTION") {
                 if !test_case
                     .description
@@ -138,7 +145,7 @@ impl TestRunner {
                 }
             }
 
-            if let Some(skip_reason) = test_case.skip_reason {
+            if let Some(skip_reason) = &test_case.skip_reason {
                 log_uncaptured(format!(
                     "Skipping test case {:?}: {}",
                     &test_case.description, skip_reason
@@ -159,7 +166,7 @@ impl TestRunner {
                 continue;
             }
 
-            if !pred(&test_case) {
+            if !pred(test_case) {
                 log_uncaptured(format!(
                     "Skipping test case {:?}: predicate failed",
                     test_case.description
@@ -167,7 +174,7 @@ impl TestRunner {
                 continue;
             }
 
-            if let Some(requirements) = test_case.run_on_requirements {
+            if let Some(ref requirements) = test_case.run_on_requirements {
                 let mut can_run_on = false;
                 for requirement in requirements {
                     if requirement.can_run_on(&self.internal_client).await {
@@ -197,7 +204,16 @@ impl TestRunner {
                     .await;
             }
 
-            for operation in test_case.operations {
+            #[cfg(feature = "tracing-unstable")]
+            let (mut tracing_subscriber, _levels_guard) = {
+                let tracing_levels =
+                    max_verbosity_levels_for_test_case(&test_file.create_entities, test_case);
+                let guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(tracing_levels);
+                let subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
+                (subscriber, guard)
+            };
+
+            for operation in &test_case.operations {
                 self.sync_workers().await;
                 operation.execute(self, &test_case.description).await;
                 // This test (in src/test/spec/json/sessions/server-support.json) runs two
@@ -246,6 +262,42 @@ impl TestRunner {
                                 "event mismatch: expected = {:#?}, actual = {:#?}\nall \
                                  expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",
                                 expected, actual, expected_events, actual_events, e,
+                            );
+                        }
+                    }
+                }
+            }
+
+            #[cfg(feature = "tracing-unstable")]
+            if let Some(ref expected_messages) = test_case.expect_log_messages {
+                self.sync_workers().await;
+
+                let all_tracing_events = tracing_subscriber
+                    .collect_events(Duration::from_millis(500), |_| true)
+                    .await;
+
+                for expectation in expected_messages {
+                    let client_topology_id =
+                        self.get_client(&expectation.client).await.topology().id;
+
+                    let client_actual_events: Vec<_> = all_tracing_events
+                        .iter()
+                        .filter(|e| e.topology_id() == client_topology_id.to_hex())
+                        .collect();
+                    let expected_events = &expectation.messages;
+
+                    assert_eq!(
+                        client_actual_events.len(),
+                        expected_events.len(),
+                        "Actual tracing event count should match expected"
+                    );
+
+                    for (actual, expected) in client_actual_events.iter().zip(expected_events) {
+                        if let Err(e) = tracing_events_match(actual, expected) {
+                            panic!(
+                                "tracing event mismatch: expected = {:#?}, actual = {:#?}\nall \
+                                 expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",
+                                expected, actual, expected_events, client_actual_events, e,
                             );
                         }
                     }
@@ -399,6 +451,18 @@ impl TestRunner {
                         options.test_options_mut().min_heartbeat_freq =
                             Some(Duration::from_millis(50));
                         options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
+                    }
+
+                    // if we're observing log messages, we need to set the entity ID on the test
+                    // options so that it can be emitted in tracing events and
+                    // used to filter events by client for test assertions.
+                    #[cfg(feature = "tracing-unstable")]
+                    if client.observe_log_messages.is_some() {
+                        // some tests require that an untruncated command/reply is attached to
+                        // events so it can be parsed as JSON, but on certain topologies some of
+                        // the tests produce replies with extJSON longer than 1000 characters.
+                        // to accomodate this, we use a higher default length for unified tests.
+                        options.tracing_max_document_length_bytes = Some(10000);
                     }
 
                     let client = Client::with_options(options).unwrap();

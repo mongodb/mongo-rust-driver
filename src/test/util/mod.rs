@@ -2,12 +2,23 @@ mod event;
 mod failpoint;
 mod lock;
 mod matchable;
+mod subscriber;
+#[cfg(feature = "tracing-unstable")]
+mod trace;
 
 pub(crate) use self::{
-    event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},
+    event::{CmapEvent, Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
+};
+
+#[cfg(feature = "tracing-unstable")]
+pub(crate) use self::trace::{
+    max_verbosity_levels_for_test_case,
+    TracingEvent,
+    TracingEventValue,
+    TracingHandler,
 };
 
 use std::{fmt::Debug, sync::Arc, time::Duration};

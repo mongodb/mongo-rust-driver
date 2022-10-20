@@ -35,7 +35,7 @@ pub(crate) use self::{
 use super::run_spec_test_with_path;
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 10, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 13, 0);
 
 fn file_level_log(message: impl AsRef<str>) {
     log_uncaptured(format!("\n------------\n{}\n", message.as_ref()));

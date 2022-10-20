@@ -40,7 +40,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
-#[error("{kind}")]
+#[error("Kind: {kind}, labels: {labels:?}")]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
@@ -370,6 +370,56 @@ impl Error {
             _ => None,
         }
     }
+
+    /// Per the CLAM spec, for sensitive commands we must redact everything besides the
+    /// error labels, error code, and error code name from errors received in response to
+    /// sensitive commands. Currently, the only field besides those that we expose is the
+    /// error message.
+    pub(crate) fn redact(&mut self) {
+        // This is intentionally written without a catch-all branch so that if new error
+        // kinds are added we remember to reason about whether they need to be redacted.
+        match *self.kind {
+            ErrorKind::BulkWrite(ref mut bwe) => {
+                if let Some(ref mut wes) = bwe.write_errors {
+                    for we in wes {
+                        we.redact();
+                    }
+                }
+                if let Some(ref mut wce) = bwe.write_concern_error {
+                    wce.redact();
+                }
+            }
+            ErrorKind::Command(ref mut command_error) => {
+                command_error.redact();
+            }
+            ErrorKind::Write(ref mut write_error) => match write_error {
+                WriteFailure::WriteConcernError(wce) => {
+                    wce.redact();
+                }
+                WriteFailure::WriteError(we) => {
+                    we.redact();
+                }
+            },
+            ErrorKind::InvalidArgument { .. }
+            | ErrorKind::BsonDeserialization(_)
+            | ErrorKind::BsonSerialization(_)
+            | ErrorKind::DnsResolve { .. }
+            | ErrorKind::Io(_)
+            | ErrorKind::Internal { .. }
+            | ErrorKind::ConnectionPoolCleared { .. }
+            | ErrorKind::InvalidResponse { .. }
+            | ErrorKind::ServerSelection { .. }
+            | ErrorKind::SessionsNotSupported
+            | ErrorKind::InvalidTlsConfig { .. }
+            | ErrorKind::Transaction { .. }
+            | ErrorKind::IncompatibleServer { .. }
+            | ErrorKind::MissingResumeToken
+            | ErrorKind::Authentication { .. }
+            | ErrorKind::GridFs(_) => {}
+            #[cfg(feature = "csfle")]
+            ErrorKind::Csfle(_) => {}
+        }
+    }
 }
 
 impl<E> From<E> for Error
@@ -449,7 +499,9 @@ pub enum ErrorKind {
     BulkWrite(BulkWriteFailure),
 
     /// The server returned an error to an attempted operation.
-    #[error("Command failed {0}")]
+    #[error("Command failed: {0}")]
+    // note that if this Display impl changes, COMMAND_ERROR_REGEX in the unified runner matching
+    // logic will need to be updated.
     Command(CommandError),
 
     /// An error occurred during DNS resolution.
@@ -467,7 +519,9 @@ pub enum ErrorKind {
     Internal { message: String },
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
-    #[error("{0}")]
+    #[error("I/O error: {0}")]
+    // note that if this Display impl changes, IO_ERROR_REGEX in the unified runner matching logic
+    // will need to be updated.
     Io(Arc<std::io::Error>),
 
     /// The connection pool for a server was cleared during operation execution due to
@@ -554,9 +608,23 @@ pub struct CommandError {
     pub(crate) topology_version: Option<TopologyVersion>,
 }
 
+impl CommandError {
+    // If any new fields are added to CommandError, this implementation must be updated to
+    // redact them per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+    }
+}
+
 impl fmt::Display for CommandError {
+    // note that if this Display impl changes, COMMAND_ERROR_REGEX in the unified runner matching
+    // logic will need to be updated.
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "({}): {})", self.code_name, self.message)
+        write!(
+            fmt,
+            "Error code {} ({}): {}",
+            self.code, self.code_name, self.message
+        )
     }
 }
 
@@ -586,6 +654,15 @@ pub struct WriteConcernError {
     pub(crate) labels: Vec<String>,
 }
 
+impl WriteConcernError {
+    // If any new fields are added to WriteConcernError, this implementation must be updated to
+    // redact them per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+        self.details = None;
+    }
+}
+
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -609,6 +686,15 @@ pub struct WriteError {
     /// pertaining to document validation).
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+}
+
+impl WriteError {
+    // If any new fields are added to WriteError, this implementation must be updated to redact them
+    // per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+        self.details = None;
+    }
 }
 
 /// An error that occurred during a write operation consisting of multiple writes that wasn't due to
@@ -638,6 +724,15 @@ pub struct BulkWriteError {
     /// pertaining to document validation).
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+}
+
+impl BulkWriteError {
+    // If any new fields are added to BulkWriteError, this implementation must be updated to redact
+    // them per the CLAM spec.
+    fn redact(&mut self) {
+        self.message = "REDACTED".to_string();
+        self.details = None;
+    }
 }
 
 /// The set of errors that occurred during a write operation.

@@ -6,8 +6,9 @@ use crate::{
     client::options::SessionOptions,
     coll::options::CollectionOptions,
     error::Result,
+    event::command::CommandEvent,
     options::ReadConcern,
-    test::{log_uncaptured, CommandEvent, EventClient, LOCK},
+    test::{log_uncaptured, EventClient, LOCK},
     ClientSession,
     Collection,
 };

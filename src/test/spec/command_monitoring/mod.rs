@@ -11,8 +11,9 @@ async fn command_monitoring_unified() {
         // This test relies on old OP_QUERY behavior that many drivers still use for < 4.4, but we do not use, due to never implementing OP_QUERY.
         tc.description != "A successful find event with a getmore and the server kills the cursor (<= 4.4)";
 
-    run_spec_test_with_path(&["command-monitoring", "unified"], |path, f| {
-        run_unified_format_test_filtered(path, f, pred)
-    })
+    run_spec_test_with_path(
+        &["command-logging-and-monitoring", "monitoring"],
+        |path, f| run_unified_format_test_filtered(path, f, pred),
+    )
     .await;
 }

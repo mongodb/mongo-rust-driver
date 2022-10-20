@@ -14,6 +14,13 @@ use derivative::Derivative;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
+#[cfg(feature = "tracing-unstable")]
+use crate::trace::{
+    command::CommandTracingEventEmitter,
+    trace_or_log_enabled,
+    TracingOrLogLevel,
+    COMMAND_TRACING_EVENT_TARGET,
+};
 use crate::{
     bson::Document,
     change_stream::{
@@ -25,7 +32,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
-    event::command::CommandEventHandler,
+    event::command::{handle_command_event, CommandEvent},
     operation::{AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
@@ -39,6 +46,7 @@ use crate::{
     sdam::{server_selection, SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
+
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
@@ -145,9 +153,42 @@ impl Client {
         Ok(client)
     }
 
-    pub(crate) fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
+    #[cfg(not(feature = "tracing-unstable"))]
+    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
         if let Some(ref handler) = self.inner.options.command_event_handler {
-            emit(handler);
+            let event = generate_event();
+            handle_command_event(handler.as_ref(), event);
+        }
+    }
+
+    #[cfg(feature = "tracing-unstable")]
+    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        let tracing_emitter = if trace_or_log_enabled!(
+            target: COMMAND_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Debug
+        ) {
+            Some(CommandTracingEventEmitter::new(
+                self.inner.options.tracing_max_document_length_bytes,
+                self.inner.topology.id,
+            ))
+        } else {
+            None
+        };
+        let apm_event_handler = self.inner.options.command_event_handler.as_ref();
+        if !(tracing_emitter.is_some() || apm_event_handler.is_some()) {
+            return;
+        }
+
+        let event = generate_event();
+        if let (Some(event_handler), Some(ref tracing_emitter)) =
+            (apm_event_handler, &tracing_emitter)
+        {
+            handle_command_event(event_handler.as_ref(), event.clone());
+            handle_command_event(tracing_emitter, event);
+        } else if let Some(event_handler) = apm_event_handler {
+            handle_command_event(event_handler.as_ref(), event);
+        } else if let Some(ref tracing_emitter) = tracing_emitter {
+            handle_command_event(tracing_emitter, event);
         }
     }
 

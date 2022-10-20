@@ -102,6 +102,12 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
     fn returns_root_documents(&self) -> bool {
         false
     }
+
+    /// If this operation specifies entities to create, returns those entities. Otherwise,
+    /// returns None.
+    fn test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
+        None
+    }
 }
 
 /// To facilitate working with sessions through the lock, this macro pops it out of the entity map,
@@ -2641,6 +2647,10 @@ impl TestOperation for CreateEntities {
         test_runner
             .populate_entity_map(&self.entities[..], "createEntities operation")
             .boxed()
+    }
+
+    fn test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
+        Some(&self.entities)
     }
 }
 

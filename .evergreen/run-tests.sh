@@ -10,7 +10,7 @@ if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
 fi
 
-FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression,${TLS_FEATURE}"
+FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression,tracing-unstable,${TLS_FEATURE}"
 
 if [ "$ASYNC_RUNTIME" = "tokio" ]; then
     ASYNC_FEATURE_FLAGS=${FEATURE_FLAGS}

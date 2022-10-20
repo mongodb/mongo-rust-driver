@@ -548,7 +548,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} MSRV=${MSRV} .evergreen/compile-only.sh
+          RUST_VERSION=${RUST_VERSION} MSRV=${MSRV} .evergreen/compile-only.sh
 
   "check cargo deny":
     - command: shell.exec
@@ -1858,9 +1858,8 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-18.04
-    async-runtime: "*"
     extra-rust-versions: "*"
-  display_name: "! Compile on Rust ${extra-rust-versions} with ${async-runtime}"
+  display_name: "! Compile on Rust ${extra-rust-versions}"
   tasks:
     - "compile-only"
 

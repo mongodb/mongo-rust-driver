@@ -1,7 +1,10 @@
 use crate::{
     bson::Document,
-    event::cmap::{ConnectionCheckoutFailedReason, ConnectionClosedReason},
-    test::{CmapEvent, CommandEvent, Event},
+    event::{
+        cmap::{ConnectionCheckoutFailedReason, ConnectionClosedReason},
+        command::CommandEvent,
+    },
+    test::{CmapEvent, Event},
     ServerType,
 };
 use serde::Deserialize;

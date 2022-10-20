@@ -34,7 +34,12 @@ use crate::{
         TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
-    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+    event::command::{
+        CommandEvent,
+        CommandFailedEvent,
+        CommandStartedEvent,
+        CommandSucceededEvent,
+    },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         AbortTransaction,
@@ -624,23 +629,21 @@ impl Client {
             bytes: serialized,
         };
 
-        self.emit_command_event(|handler| {
+        self.emit_command_event(|| {
             let command_body = if should_redact {
                 Document::new()
             } else {
                 Document::from_reader(raw_cmd.bytes.as_slice())
                     .unwrap_or_else(|e| doc! { "serialization error": e.to_string() })
             };
-            let command_started_event = CommandStartedEvent {
+            CommandEvent::Started(CommandStartedEvent {
                 command: command_body,
                 db: raw_cmd.target_db.clone(),
                 command_name: raw_cmd.name.clone(),
                 request_id,
                 connection: connection_info.clone(),
                 service_id,
-            };
-
-            handler.handle_command_started_event(command_started_event);
+            })
         });
 
         let start_time = Instant::now();
@@ -727,17 +730,20 @@ impl Client {
 
         match command_result {
             Err(mut err) => {
-                self.emit_command_event(|handler| {
-                    let command_failed_event = CommandFailedEvent {
-                        duration,
-                        command_name: cmd_name,
-                        failure: err.clone(),
-                        request_id,
-                        connection: connection_info,
-                        service_id,
-                    };
+                self.emit_command_event(|| {
+                    let mut err = err.clone();
+                    if should_redact {
+                        err.redact();
+                    }
 
-                    handler.handle_command_failed_event(command_failed_event);
+                    CommandEvent::Failed(CommandFailedEvent {
+                        duration,
+                        command_name: cmd_name.clone(),
+                        failure: err,
+                        request_id,
+                        connection: connection_info.clone(),
+                        service_id,
+                    })
                 });
 
                 if let Some(ref mut session) = session {
@@ -750,7 +756,7 @@ impl Client {
                 op.handle_error(err)
             }
             Ok(response) => {
-                self.emit_command_event(|handler| {
+                self.emit_command_event(|| {
                     let reply = if should_redact {
                         Document::new()
                     } else {
@@ -759,15 +765,14 @@ impl Client {
                             .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
                     };
 
-                    let command_succeeded_event = CommandSucceededEvent {
+                    CommandEvent::Succeeded(CommandSucceededEvent {
                         duration,
                         reply,
                         command_name: cmd_name.clone(),
                         request_id,
-                        connection: connection_info,
+                        connection: connection_info.clone(),
                         service_id,
-                    };
-                    handler.handle_command_succeeded_event(command_succeeded_event);
+                    })
                 });
 
                 #[cfg(feature = "csfle")]

@@ -144,3 +144,20 @@ pub trait CommandEventHandler: Send + Sync {
     /// whenever a database command fails to complete successfully.
     fn handle_command_failed_event(&self, _event: CommandFailedEvent) {}
 }
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
+pub(crate) enum CommandEvent {
+    Started(CommandStartedEvent),
+    Succeeded(CommandSucceededEvent),
+    Failed(CommandFailedEvent),
+}
+
+/// Passes the specified event to the corresponding method on the provided handler.
+pub(crate) fn handle_command_event(handler: &dyn CommandEventHandler, event: CommandEvent) {
+    match event {
+        CommandEvent::Started(event) => handler.handle_command_started_event(event),
+        CommandEvent::Succeeded(event) => handler.handle_command_succeeded_event(event),
+        CommandEvent::Failed(event) => handler.handle_command_failed_event(event),
+    }
+}
