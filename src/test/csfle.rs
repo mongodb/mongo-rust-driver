@@ -1955,6 +1955,23 @@ async fn explicit_encryption_case_1() -> Result<()> {
     Ok(())
 }
 
+// Prose test 11. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero contention)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn explicit_encryption_case_2() -> Result<()> {
+    if !check_env("explicit_encryption", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let testdata = match explicit_encryption_setup().await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    Ok(())
+}
+
 struct ExplicitEncryptionTestData {
     key1_id: Binary,
     client_encryption: ClientEncryption,
