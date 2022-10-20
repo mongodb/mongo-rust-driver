@@ -28,7 +28,7 @@ use crate::{
 };
 use std::{collections::HashMap, iter, time::Duration};
 
-use super::{unified_runner::TestCase, run_unified_format_test_filtered};
+use super::{run_unified_format_test_filtered, unified_runner::TestCase};
 
 #[test]
 fn tracing_truncation() {
@@ -376,10 +376,11 @@ async fn connection_logging_unified() {
         tc.description != "waitQueueSize should be included in connection pool created message when specified" &&
         tc.description != "waitQueueMultiple should be included in connection pool created message when specified";
 
-
     let _guard = LOCK.run_exclusively().await;
 
-    run_spec_test_with_path(&["connection-monitoring-and-pooling", "logging"], |path, file| {
-        run_unified_format_test_filtered(path, file, test_predicate)
-    }).await;
+    run_spec_test_with_path(
+        &["connection-monitoring-and-pooling", "logging"],
+        |path, file| run_unified_format_test_filtered(path, file, test_predicate),
+    )
+    .await;
 }

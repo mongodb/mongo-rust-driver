@@ -129,7 +129,8 @@ async fn concurrent_connections() {
     let handler = Arc::new(EventHandler::new());
     let client_options = CLIENT_OPTIONS.get().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
-    options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
+    options.cmap_event_handler =
+        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
@@ -223,7 +224,8 @@ async fn connection_error_during_establishment() {
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
-    options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
+    options.cmap_event_handler =
+        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(

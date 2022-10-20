@@ -216,7 +216,7 @@ impl ClientEntity {
     pub(crate) async fn sync_workers(&self) {
         match &self.client {
             ClientEntityState::Client(client) => client.sync_workers().await,
-            ClientEntityState::Dropped => {},
+            ClientEntityState::Dropped => {}
         };
     }
 }
@@ -286,7 +286,10 @@ impl Deref for ClientEntity {
     fn deref(&self) -> &Self::Target {
         match &self.client {
             ClientEntityState::Client(c) => c,
-            ClientEntityState::Dropped => panic!("Attempted to deference a client entity which was closed via a `close` test operation"),
+            ClientEntityState::Dropped => panic!(
+                "Attempted to deference a client entity which was closed via a `close` test \
+                 operation"
+            ),
         }
     }
 }
