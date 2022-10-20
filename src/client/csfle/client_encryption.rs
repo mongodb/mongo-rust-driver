@@ -65,9 +65,9 @@ impl ClientEncryption {
     pub async fn create_data_key(
         &self,
         kms_provider: &KmsProvider,
-        opts: impl Into<Option<&DataKeyOptions>>,
+        opts: impl Into<Option<DataKeyOptions>>,
     ) -> Result<Binary> {
-        let ctx = self.create_data_key_ctx(kms_provider, opts.into())?;
+        let ctx = self.create_data_key_ctx(kms_provider, opts.into().as_ref())?;
         let data_key = self.exec.run_ctx(ctx, None).await?;
         self.key_vault.insert_one(&data_key, None).await?;
         let bin_ref = data_key
@@ -182,8 +182,8 @@ impl ClientEncryption {
 
     /// Encrypts a BsonValue with a given key and algorithm.
     /// Returns an encrypted value (BSON binary of subtype 6).
-    pub async fn encrypt(&self, value: bson::RawBson, opts: &EncryptOptions) -> Result<Binary> {
-        let ctx = self.encrypt_ctx(value, opts)?;
+    pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
+        let ctx = self.encrypt_ctx(value, &opts)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
             .get_binary("v")
