@@ -1927,16 +1927,27 @@ async fn explicit_encryption_case_1() -> Result<()> {
         Some(t) => t,
         None => return Ok(()),
     };
+    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+
+    let insert_payload = testdata.client_encryption.encrypt(
+        RawBson::String("encrypted indexed value".to_string()),
+        &EncryptOptions::builder()
+            .key(EncryptKey::Id(testdata.key1_id.clone()))
+            .algorithm(Algorithm::Indexed)
+            .contention_factor(0)
+            .build(),
+    ).await?;
+    enc_coll.insert_one(doc! { "encryptedIndexed": insert_payload }, None).await?;
 
     let find_payload = testdata.client_encryption.encrypt(
         RawBson::String("encrypted indexed value".to_string()),
         &EncryptOptions::builder()
             .key(EncryptKey::Id(testdata.key1_id))
             .algorithm(Algorithm::Indexed)
+            .query_type("equality".to_string())
             .contention_factor(0)
             .build(),
     ).await?;
-    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
     let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload }, None).await?.try_collect().await?;
     assert_eq!(1, found.len());
     assert_eq!("encrypted indexed value", found[0].get_str("encryptedIndexed")?);
