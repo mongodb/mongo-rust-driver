@@ -39,8 +39,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
             serverPort = event.address.port(),
-            maxIdleTimeMS =
-                options_ref.and_then(|o| o.max_idle_time.map(|m| m.as_millis())),
+            maxIdleTimeMS = options_ref.and_then(|o| o.max_idle_time.map(|m| m.as_millis())),
             maxPoolSize = options_ref.and_then(|o| o.max_pool_size),
             minPoolSize = options_ref.and_then(|o| o.min_pool_size),
             "Connection pool created",
