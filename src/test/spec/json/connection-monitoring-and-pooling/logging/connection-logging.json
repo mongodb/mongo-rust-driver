@@ -234,7 +234,8 @@
       "description": "Connection checkout fails due to error establishing connection",
       "runOnRequirements": [
         {
-          "auth": true
+          "auth": true,
+          "minServerVersion": "4.0"
         }
       ],
       "operations": [

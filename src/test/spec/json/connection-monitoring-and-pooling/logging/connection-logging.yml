@@ -103,6 +103,7 @@ tests:
   - description: "Connection checkout fails due to error establishing connection"
     runOnRequirements:
       - auth: true
+        minServerVersion: "4.0" # failCommand was added to mongod in 4.0
     operations:
       - name: createEntities
         object: testRunner
