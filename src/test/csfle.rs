@@ -1346,7 +1346,13 @@ async fn bypass_mongocryptd_unencrypted_insert(
     // Test: attempting to connect fails.
     let result =
         Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await;
-    assert!(result.unwrap_err().is_server_selection_error());
+    if let Err(err) = result {
+        assert!(err.is_server_selection_error());
+    } else {
+        let client = result.unwrap();
+        let result = client.list_database_names(None, None).await;
+        assert!(result.unwrap_err().is_server_selection_error());
+    }
 
     Ok(())
 }
@@ -1854,7 +1860,7 @@ async fn kms_tls_options() -> Result<()> {
             .build();
         let err = client_encryption.create_data_key(
             &KmsProvider::Azure,
-            &key_opts,
+            key_opts,
         ).await.unwrap_err();
         assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
     }
@@ -1878,7 +1884,7 @@ async fn kms_tls_options() -> Result<()> {
             .build();
         let err = client_encryption.create_data_key(
             &KmsProvider::Gcp,
-            &key_opts,
+            key_opts,
         ).await.unwrap_err();
         assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
     }
@@ -1895,7 +1901,7 @@ async fn kms_tls_options() -> Result<()> {
             .build();
         let err = client_encryption.create_data_key(
             &KmsProvider::Kmip,
-            &key_opts,
+            key_opts,
         ).await.unwrap_err();
         assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
     }
@@ -1904,7 +1910,7 @@ async fn kms_tls_options() -> Result<()> {
     // This one succeeds!
     client_encryption_with_tls.create_data_key(
         &KmsProvider::Kmip,
-        &DataKeyOptions::builder()
+        DataKeyOptions::builder()
             .master_key(MasterKey::Kmip { key_id: None, endpoint: None })
             .build(),
     ).await?;
@@ -1931,7 +1937,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
 
     let insert_payload = testdata.client_encryption.encrypt(
         RawBson::String("encrypted indexed value".to_string()),
-        &EncryptOptions::builder()
+        EncryptOptions::builder()
             .key(EncryptKey::Id(testdata.key1_id.clone()))
             .algorithm(Algorithm::Indexed)
             .contention_factor(0)
@@ -1941,7 +1947,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
 
     let find_payload = testdata.client_encryption.encrypt(
         RawBson::String("encrypted indexed value".to_string()),
-        &EncryptOptions::builder()
+        EncryptOptions::builder()
             .key(EncryptKey::Id(testdata.key1_id))
             .algorithm(Algorithm::Indexed)
             .query_type("equality".to_string())
@@ -1964,7 +1970,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
     }
     let _guard = LOCK.run_exclusively().await;
 
-    let testdata = match explicit_encryption_setup().await? {
+    let _testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
         None => return Ok(()),
     };
