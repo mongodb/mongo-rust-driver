@@ -2052,6 +2052,35 @@ async fn explicit_encryption_case_3() -> Result<()> {
     Ok(())
 }
 
+// Prose test 11. Explicit Encryption (Case 4: can roundtrip encrypted indexed)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn explicit_encryption_case_4() -> Result<()> {
+    if !check_env("explicit_encryption_case_4", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let testdata = match explicit_encryption_setup().await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    let raw_value = RawBson::String("encrypted indexed value".to_string());
+    let payload = testdata.client_encryption.encrypt(
+        raw_value.clone(),
+        EncryptOptions::builder()
+            .key(EncryptKey::Id(testdata.key1_id.clone()))
+            .algorithm(Algorithm::Indexed)
+            .contention_factor(0)
+            .build(),
+    ).await?;
+    let roundtrip = testdata.client_encryption.decrypt(payload.as_raw_binary()).await?;
+    assert_eq!(raw_value, roundtrip);
+
+    Ok(())
+}
+
 struct ExplicitEncryptionTestData {
     key1_id: Binary,
     client_encryption: ClientEncryption,
