@@ -95,6 +95,9 @@ impl ClientState {
                 builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
             }
         }
+        if opts.bypass_query_analysis == Some(true) {
+            builder = builder.bypass_query_analysis();
+        }
         let crypt = builder.build()?;
         if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)
             && crypt.shared_lib_version().is_none()
@@ -111,6 +114,7 @@ impl ClientState {
         crypt: &Crypt,
     ) -> Result<Option<MongocryptdOptions>> {
         if opts.bypass_auto_encryption == Some(true)
+            || opts.bypass_query_analysis == Some(true)
             || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
             || opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)

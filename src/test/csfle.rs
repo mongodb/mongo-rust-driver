@@ -19,7 +19,7 @@ use crate::{
         EncryptOptions,
         MasterKey,
     },
-    coll::options::{CollectionOptions, InsertOneOptions},
+    coll::options::{CollectionOptions, InsertOneOptions, DropCollectionOptions},
     db::options::CreateCollectionOptions,
     error::ErrorKind,
     event::command::CommandStartedEvent,
@@ -1969,7 +1969,11 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
     };
 
     let db = key_vault_client.database("db");
-    db.collection::<Document>("explicit_encryption").drop(None).await?;
+    db.collection::<Document>("explicit_encryption").drop(
+        DropCollectionOptions::builder()
+            .encrypted_fields(encrypted_fields.clone())
+            .build()
+    ).await?;
     db.create_collection(
         "explicit_encryption",
         CreateCollectionOptions::builder()
