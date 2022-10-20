@@ -1924,7 +1924,7 @@ async fn kms_tls_options() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_1() -> Result<()> {
-    if !check_env("explicit_encryption", false) {
+    if !check_env("explicit_encryption_case_1", false) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -1965,15 +1965,89 @@ async fn explicit_encryption_case_1() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_2() -> Result<()> {
-    if !check_env("explicit_encryption", false) {
+    if !check_env("explicit_encryption_case_2", false) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
 
-    let _testdata = match explicit_encryption_setup().await? {
+    let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
         None => return Ok(()),
     };
+    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+
+    for _ in 0..10 {
+        let insert_payload = testdata.client_encryption.encrypt(
+            RawBson::String("encrypted indexed value".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Indexed)
+                .contention_factor(10)
+                .build(),
+        ).await?;
+        enc_coll.insert_one(doc! { "encryptedIndexed": insert_payload }, None).await?;
+    }
+
+    let find_payload = testdata.client_encryption.encrypt(
+        RawBson::String("encrypted indexed value".to_string()),
+        EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Indexed)
+                .query_type("equality".to_string())
+                .contention_factor(0)
+                .build(),
+    ).await?;
+    let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload }, None).await?.try_collect().await?;
+    assert!(found.len() < 10);
+    for doc in found {
+        assert_eq!("encrypted indexed value", doc.get_str("encryptedIndexed")?);
+    }
+
+    let find_payload2 = testdata.client_encryption.encrypt(
+        RawBson::String("encrypted indexed value".to_string()),
+        EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Indexed)
+                .query_type("equality".to_string())
+                .contention_factor(10)
+                .build(),
+    ).await?;
+    let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload2 }, None).await?.try_collect().await?;
+    assert_eq!(10, found.len());
+    for doc in found {
+        assert_eq!("encrypted indexed value", doc.get_str("encryptedIndexed")?);
+    }
+
+    Ok(())
+}
+
+// Prose test 11. Explicit Encryption (Case 3: can insert encrypted unindexed)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn explicit_encryption_case_3() -> Result<()> {
+    if !check_env("explicit_encryption_case_3", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let testdata = match explicit_encryption_setup().await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+
+    let insert_payload = testdata.client_encryption.encrypt(
+        RawBson::String("encrypted indexed value".to_string()),
+        EncryptOptions::builder()
+            .key(EncryptKey::Id(testdata.key1_id.clone()))
+            .algorithm(Algorithm::Unindexed)
+            .build(),
+    ).await?;
+    enc_coll.insert_one(doc! { "_id": 1, "encryptedIndexed": insert_payload }, None).await?;
+
+    let found: Vec<_> = enc_coll.find(doc! { "_id": 1 }, None).await?.try_collect().await?;
+    assert_eq!(1, found.len());
+    assert_eq!("encrypted indexed value", found[0].get_str("encryptedIndexed")?);
 
     Ok(())
 }
