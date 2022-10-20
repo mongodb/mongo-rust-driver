@@ -38,7 +38,7 @@ use crate::{
     coll::options::Hint,
     collation::Collation,
     error::{ErrorKind, Result},
-    gridfs::options::GridFsDownloadByNameOptions,
+    gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{
         AggregateOptions,
         CountOptions,
@@ -348,6 +348,7 @@ impl<'de> Deserialize<'de> for Operation {
             "download" => deserialize_op::<Download>(definition.arguments),
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
             "delete" => deserialize_op::<Delete>(definition.arguments),
+            "upload" => deserialize_op::<Upload>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -2726,6 +2727,43 @@ impl TestOperation for Delete {
             let bucket = test_runner.get_bucket(id).await;
             bucket.delete(self.id.clone()).await?;
             Ok(None)
+        }
+        .boxed()
+    }
+}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Upload {
+    source: Document,
+    filename: String,
+    // content_type and disableMD5 are deprecated and no longer supported.
+    // Options included for deserialization.
+    #[serde(rename = "contentType")]
+    _content_type: Option<String>,
+    #[serde(rename = "disableMD5")]
+    _disable_md5: Option<bool>,
+    #[serde(flatten)]
+    options: GridFsUploadOptions,
+}
+
+impl TestOperation for Upload {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id).await;
+            let hex_string = self.source.get("$$hexBytes").unwrap().as_str().unwrap();
+            let bytes = hex::decode(hex_string).unwrap();
+            let id = bucket
+                .upload_from_futures_0_3_reader(
+                    self.filename.clone(),
+                    &bytes[..],
+                    self.options.clone(),
+                )
+                .await?;
+            Ok(Some(Entity::Bson(id.into())))
         }
         .boxed()
     }

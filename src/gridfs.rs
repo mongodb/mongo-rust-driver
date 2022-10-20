@@ -3,6 +3,7 @@
 
 mod download;
 pub mod options;
+mod upload;
 
 use core::task::{Context, Poll};
 use std::{
@@ -239,64 +240,6 @@ impl GridFsBucket {
         options: impl Into<Option<GridFsUploadOptions>>,
     ) -> Result<GridFsUploadStream> {
         todo!()
-    }
-
-    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `tokio` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_tokio_reader_with_id(
-        &self,
-        id: Bson,
-        filename: String,
-        source: impl tokio::io::AsyncRead,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
-        todo!()
-    }
-
-    /// Uploads a user file to a GridFS bucket. The application supplies a custom file id. Uses the
-    /// `futures-0.3` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_futures_0_3_reader_with_id(
-        &self,
-        id: Bson,
-        filename: String,
-        source: impl futures_util::AsyncRead,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
-        todo!()
-    }
-
-    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `tokio` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_tokio_reader(
-        &self,
-        filename: String,
-        source: impl tokio::io::AsyncRead,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
-        self.upload_from_tokio_reader_with_id(
-            Bson::ObjectId(ObjectId::new()),
-            filename,
-            source,
-            options,
-        )
-        .await
-    }
-
-    /// Uploads a user file to a GridFS bucket. The driver generates a unique [`Bson::ObjectId`] for
-    /// the file id. Uses the `futures-0.3` crate's `AsyncRead` trait for the `source`.
-    pub async fn upload_from_futures_0_3_reader(
-        &self,
-        filename: String,
-        source: impl futures_util::AsyncRead,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) {
-        self.upload_from_futures_0_3_reader_with_id(
-            Bson::ObjectId(ObjectId::new()),
-            filename,
-            source,
-            options,
-        )
-        .await
     }
 
     /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.

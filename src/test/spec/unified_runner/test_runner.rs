@@ -67,7 +67,6 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listCollectionObjects",
     "listDatabaseObjects",
     "mapReduce",
-    "upload",
     "watch",
 ];
 
