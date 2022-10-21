@@ -74,11 +74,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
     fn build(&mut self, description: &StreamDescription) -> Result<Command<InsertCommand>> {
         let mut docs = RawArrayBuf::new();
         let mut size = 0;
-        let batch_size_limit = if self.encrypted {
-            2_097_152
-        } else {
-            description.max_bson_object_size as u64
-        };
+        let batch_size_limit = description.max_bson_object_size as u64;
 
         for (i, d) in self
             .documents
@@ -113,7 +109,10 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
 
             let doc_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len());
 
-            if (size + doc_size) <= batch_size_limit {
+            if self.encrypted && size > 0 && size + doc_size >= 2_097_152 {
+                break;
+            }
+            if size + doc_size <= batch_size_limit {
                 if self.inserted_ids.len() <= i {
                     self.inserted_ids.push(id);
                 }

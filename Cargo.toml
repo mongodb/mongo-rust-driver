@@ -165,6 +165,7 @@ version = "1.1.2"
 features = ["v4"]
 
 [dev-dependencies]
+anyhow = { version = "1.0", features = ["backtrace"] }
 approx = "0.5.1"
 async_once = "0.2.6"
 ctrlc = "3.2.2"

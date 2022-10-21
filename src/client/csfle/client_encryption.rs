@@ -35,7 +35,9 @@ pub struct ClientEncryption {
 impl ClientEncryption {
     /// Create a new key vault handle with the given options.
     pub fn new(options: ClientEncryptionOptions) -> Result<Self> {
-        let crypt = Crypt::builder().build()?;
+        let crypt = Crypt::builder()
+            .kms_providers(&bson::to_document(&options.kms_providers)?)?
+            .build()?;
         let exec = CryptExecutor::new_explicit(
             options.key_vault_client.weak(),
             options.key_vault_namespace.clone(),
@@ -62,10 +64,10 @@ impl ClientEncryption {
     /// Returns the _id of the created document as a UUID (BSON binary subtype 0x04).
     pub async fn create_data_key(
         &self,
-        kms_provider: KmsProvider,
+        kms_provider: &KmsProvider,
         opts: impl Into<Option<DataKeyOptions>>,
     ) -> Result<Binary> {
-        let ctx = self.create_data_key_ctx(kms_provider, opts.into())?;
+        let ctx = self.create_data_key_ctx(kms_provider, opts.into().as_ref())?;
         let data_key = self.exec.run_ctx(ctx, None).await?;
         self.key_vault.insert_one(&data_key, None).await?;
         let bin_ref = data_key
@@ -76,8 +78,8 @@ impl ClientEncryption {
 
     fn create_data_key_ctx(
         &self,
-        kms_provider: KmsProvider,
-        opts: Option<DataKeyOptions>,
+        kms_provider: &KmsProvider,
+        opts: Option<&DataKeyOptions>,
     ) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
         let mut key_doc = doc! { "provider": kms_provider.name() };
@@ -86,13 +88,13 @@ impl ClientEncryption {
                 let master_doc = bson::to_document(&opts.master_key)?;
                 key_doc.extend(master_doc);
             }
-            if let Some(alt_names) = opts.key_alt_names {
+            if let Some(alt_names) = &opts.key_alt_names {
                 for name in alt_names {
-                    builder = builder.key_alt_name(&name)?;
+                    builder = builder.key_alt_name(name)?;
                 }
             }
-            if let Some(material) = opts.key_material {
-                builder = builder.key_material(&material)?;
+            if let Some(material) = &opts.key_material {
+                builder = builder.key_material(material)?;
             }
         }
         builder = builder.key_encryption_key(&key_doc)?;
@@ -181,7 +183,7 @@ impl ClientEncryption {
     /// Encrypts a BsonValue with a given key and algorithm.
     /// Returns an encrypted value (BSON binary of subtype 6).
     pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
-        let ctx = self.encrypt_ctx(value, opts)?;
+        let ctx = self.encrypt_ctx(value, &opts)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
             .get_binary("v")
@@ -189,22 +191,22 @@ impl ClientEncryption {
         Ok(bin_ref.to_binary())
     }
 
-    fn encrypt_ctx(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Ctx> {
+    fn encrypt_ctx(&self, value: bson::RawBson, opts: &EncryptOptions) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
-        match opts.key {
+        match &opts.key {
             EncryptKey::Id(id) => {
                 builder = builder.key_id(&id.bytes)?;
             }
             EncryptKey::AltName(name) => {
-                builder = builder.key_alt_name(&name)?;
+                builder = builder.key_alt_name(name)?;
             }
         }
         builder = builder.algorithm(opts.algorithm)?;
         if let Some(factor) = opts.contention_factor {
             builder = builder.contention_factor(factor)?;
         }
-        if let Some(qtype) = opts.query_type {
-            builder = builder.query_type(&qtype)?;
+        if let Some(qtype) = &opts.query_type {
+            builder = builder.query_type(qtype)?;
         }
         Ok(builder.build_explicit_encrypt(value)?)
     }
@@ -270,19 +272,22 @@ pub struct DataKeyOptions {
 }
 
 /// A KMS-specific key used to encrypt data keys.
+#[serde_with::skip_serializing_none]
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase", untagged)]
+#[serde(untagged)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum MasterKey {
+    #[serde(rename_all = "camelCase")]
     Aws {
         region: String,
         /// The Amazon Resource Name (ARN) to the AWS customer master key (CMK).
         key: String,
         /// An alternate host identifier to send KMS requests to. May include port number. Defaults
-        /// to "kms.<region>.amazonaws.com"
+        /// to "kms.REGION.amazonaws.com"
         endpoint: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
     Azure {
         /// Host with optional port. Example: "example.vault.azure.net".
         key_vault_endpoint: String,
@@ -290,6 +295,7 @@ pub enum MasterKey {
         /// A specific version of the named key, defaults to using the key's primary version.
         key_version: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
     Gcp {
         project_id: String,
         location: String,
@@ -302,6 +308,7 @@ pub enum MasterKey {
     },
     /// Master keys are not applicable to `KmsProvider::Local`.
     Local,
+    #[serde(rename_all = "camelCase")]
     Kmip {
         /// keyId is the KMIP Unique Identifier to a 96 byte KMIP Secret Data managed object.  If
         /// keyId is omitted, the driver creates a random 96 byte KMIP Secret Data managed object.

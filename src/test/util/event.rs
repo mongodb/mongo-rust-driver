@@ -79,6 +79,14 @@ impl Event {
             panic!("expected SDAM event, instead got {:#?}", self)
         }
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn as_command_started_event(&self) -> Option<&CommandStartedEvent> {
+        match self {
+            Event::Command(CommandEvent::Started(e)) => Some(e),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -638,6 +646,11 @@ impl EventClient {
 
     pub(crate) fn clear_cached_events(&self) {
         self.handler.clear_cached_events()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn into_client(self) -> crate::Client {
+        self.client.into_client()
     }
 }
 

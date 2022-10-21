@@ -55,6 +55,8 @@ functions:
            export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
            export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
+           export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/lib"
+           export LD_LIBRARY_PATH="$MONGOCRYPT_LIB_DIR:$LD_LIBRARY_PATH"
 
            cat <<EOT > expansion.yml
            CURRENT_VERSION: "$CURRENT_VERSION"
@@ -72,6 +74,8 @@ functions:
               export UPLOAD_BUCKET="$UPLOAD_BUCKET"
               export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
               export DRIVERS_TOOLS_X509="$DRIVERS_TOOLS/.evergreen/x509gen"
+              export MONGOCRYPT_LIB_DIR="$MONGOCRYPT_LIB_DIR"
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
 
               export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
               export PATH="$MONGODB_BINARIES:$PATH"
@@ -81,6 +85,7 @@ functions:
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
               export MONGODB_VERSION=${MONGODB_VERSION}
+              export CRYPT_SHARED_VERSION=${CRYPT_SHARED_VERSION}
 
               if [ "Windows_NT" != "$OS" ]; then
                   ulimit -n 64000
@@ -344,6 +349,14 @@ functions:
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh rust
   
+  "install libmongocrypt":
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/install-dependencies.sh libmongocrypt
+  
   "install junit dependencies":
     command: shell.exec
     params:
@@ -459,6 +472,52 @@ functions:
           OCSP_ALGORITHM=${OCSP_ALGORITHM} \
           MONGO_OCSP_TESTS=1 \
           .evergreen/run-ocsp-test.sh
+
+  "fetch crypt_shared":
+  - command: shell.exec
+    type: test
+    params:
+      shell: bash
+      working_dir: "src"
+      script: |
+        ${PREPARE_SHELL}
+        python3 ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
+        ls -R ${PROJECT_DIRECTORY}/crypt_shared
+
+  "run kmip server":
+  - command: shell.exec
+    type: test
+    params:
+      shell: bash
+      working_dir: "src"
+      background: true
+      script: |
+        ${PREPARE_SHELL}
+        cd ${DRIVERS_TOOLS}/.evergreen/csfle
+        . ./activate_venv.sh
+        # TMPDIR is required to avoid "AF_UNIX path too long" errors.
+        TMPDIR="$(dirname ${DRIVERS_TOOLS})" python3 kms_kmip_server.py
+
+  "run csfle tests":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          export ASYNC_RUNTIME=${ASYNC_RUNTIME}
+          export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
+          export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
+          # Exported without xtrace to avoid leaking credentials
+          set +o xtrace
+          export KMS_PROVIDERS=$(cat << "EOF"
+          ${kms_providers}
+          EOF
+          )
+          set -o xtrace
+
+          .evergreen/run-csfle-tests.sh
 
   run-valid-ocsp-server:
     - command: shell.exec
@@ -713,6 +772,7 @@ pre:
   - func: "init test-results"
   - func: "make files executable"
   - func: "install rust"
+  - func: "install libmongocrypt"
 
 post:
   - func: "stop load balancer"
@@ -1111,6 +1171,17 @@ tasks:
       - func: "install junit dependencies"
       - func: "run serverless tests"
 
+  - name: "test-csfle"
+    tags: ["csfle"]
+    commands:
+      - func: "install junit dependencies"
+      - func: "fetch crypt_shared"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          TOPOLOGY: "server"
+      - func: "run kmip server"
+      - func: "run csfle tests"
+
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
     commands:
@@ -1506,6 +1577,7 @@ axes:
         display_name: "6.0"
         variables:
           MONGODB_VERSION: "6.0"
+          CRYPT_SHARED_VERSION: "6.0.0"
       - id: "5.0"
         display_name: "5.0"
         variables:
@@ -1608,18 +1680,21 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "ubuntu1804-64"
       - id: ubuntu-20.04
         display_name: "Ubuntu 20.04"
         run_on: ubuntu2004-test
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "ubuntu2004-64"
       - id: ubuntu-18.04-arm64
         display_name: "ARM64 Ubuntu 18.04"
         run_on: ubuntu1804-arm64-test
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "ubuntu1804-arm64"
       - id: macos-11.00
         display_name: "MacOS 11.00"
         run_on: macos-1100
@@ -1627,12 +1702,14 @@ axes:
           SINGLE_THREAD: true
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "macos"
       - id: windows-64-vs2017
         display_name: "Windows (VS 2017)"
         run_on: windows-64-vs2017-test
         variables:
           PYTHON: "/cygdrive/c/python/Python36/python"
           VENV_BIN_DIR: "Scripts"
+          LIBMONGOCRYPT_OS: "windows-test"
 
   - id: "versioned-api"
     display_name: "Versioned API"
@@ -1790,6 +1867,17 @@ buildvariants:
   display_name: "Serverless ${os} with ${async-runtime}"
   tasks:
     - "serverless_task_group"
+
+# TODO(RUST-1386): Expand the os and version listing
+- matrix_name: "csfle"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+    mongodb-version:
+      - "6.0"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os}"
+  tasks:
+    - "test-csfle"
 
 - matrix_name: "atlas-connect"
   matrix_spec:

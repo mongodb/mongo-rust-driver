@@ -258,7 +258,7 @@ async fn connection_error_during_operation() {
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 
-    let client = TestClient::with_options(options.into()).await;
+    let client = TestClient::with_options(options).await;
     if !client.supports_fail_command() {
         log_uncaptured(format!(
             "skipping {} due to failCommand not being supported",
