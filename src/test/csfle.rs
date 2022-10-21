@@ -1,6 +1,18 @@
-use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use bson::{doc, spec::{BinarySubtype, ElementType}, Bson, Document, RawBson, Binary};
+use bson::{
+    doc,
+    spec::{BinarySubtype, ElementType},
+    Binary,
+    Bson,
+    Document,
+    RawBson,
+};
 use futures_util::TryStreamExt;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
@@ -19,18 +31,38 @@ use crate::{
         EncryptOptions,
         MasterKey,
     },
-    coll::options::{CollectionOptions, InsertOneOptions, DropCollectionOptions, CreateIndexOptions},
+    coll::options::{
+        CollectionOptions,
+        CreateIndexOptions,
+        DropCollectionOptions,
+        InsertOneOptions,
+    },
     db::options::CreateCollectionOptions,
-    error::{ErrorKind, WriteFailure, WriteError},
-    event::command::{CommandStartedEvent, CommandEventHandler, CommandSucceededEvent, CommandFailedEvent},
-    options::{ReadConcern, WriteConcern, IndexOptions},
+    error::{ErrorKind, WriteError, WriteFailure},
+    event::command::{
+        CommandEventHandler,
+        CommandFailedEvent,
+        CommandStartedEvent,
+        CommandSucceededEvent,
+    },
+    options::{IndexOptions, ReadConcern, WriteConcern},
     test::{Event, EventHandler, SdamEvent},
     Client,
     Collection,
-    Namespace, IndexModel,
+    IndexModel,
+    Namespace,
 };
 
-use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK, FailPoint, FailPointMode, FailCommandOptions};
+use super::{
+    log_uncaptured,
+    EventClient,
+    FailCommandOptions,
+    FailPoint,
+    FailPointMode,
+    TestClient,
+    CLIENT_OPTIONS,
+    LOCK,
+};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -1580,7 +1612,7 @@ impl DeadlockTestCase {
         opts.sdam_event_handler = Some(event_handler.clone());
         let client_encrypted = Client::with_encryption_options(opts, auto_enc_opts).await?;
 
-        if self.bypass_auto_encryption == true {
+        if self.bypass_auto_encryption {
             client_test
                 .database("db")
                 .collection::<Document>("coll")
@@ -1791,9 +1823,7 @@ async fn kms_tls_options() -> Result<()> {
                 .key_vault_client(TestClient::new().await.into_client())
                 .kms_providers(providers)
                 .tls_options(build_kms_tls_opts(
-                    &TlsOptions::builder()
-                        .ca_file_path(ca_path.clone())
-                        .build(),
+                    &TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
                 ))
                 .build(),
         )?
@@ -1820,102 +1850,156 @@ async fn kms_tls_options() -> Result<()> {
                 .key_vault_client(TestClient::new().await.into_client())
                 .kms_providers(providers)
                 .tls_options(build_kms_tls_opts(
-                    &TlsOptions::builder()
-                        .ca_file_path(ca_path.clone())
-                        .build(),
+                    &TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
                 ))
                 .build(),
         )?
     };
 
     // Case 1: AWS
-    async fn aws_test(client_encryption: &ClientEncryption, endpoint: impl Into<String>, err_str: &str) {
+    async fn aws_test(
+        client_encryption: &ClientEncryption,
+        endpoint: impl Into<String>,
+        err_str: &str,
+    ) {
         let aws_key_opts = DataKeyOptions::builder()
             .master_key(MasterKey::Aws {
-                    region: "us-east-1".to_string(),
-                    key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-                    endpoint: Some(endpoint.into()),
-                })
+                region: "us-east-1".to_string(),
+                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                    .to_string(),
+                endpoint: Some(endpoint.into()),
+            })
             .build();
-        let err = client_encryption.create_data_key(
-            &KmsProvider::Aws,
-            aws_key_opts,
-        ).await.unwrap_err();
-        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+        let err = client_encryption
+            .create_data_key(&KmsProvider::Aws, aws_key_opts)
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains(err_str),
+            "unexpected error: {}",
+            err
+        );
     }
 
-    aws_test(&client_encryption_no_client_cert, "127.0.0.1:9002", "handshake failure").await;
+    aws_test(
+        &client_encryption_no_client_cert,
+        "127.0.0.1:9002",
+        "handshake failure",
+    )
+    .await;
     aws_test(&client_encryption_with_tls, "127.0.0.1:9002", "parse error").await;
-    aws_test(&client_encryption_expired, "127.0.0.1:9000", "certificate verify failed").await;
-    aws_test(&client_encryption_invalid_hostname, "127.0.0.1:9001", "certificate verify failed").await;
+    aws_test(
+        &client_encryption_expired,
+        "127.0.0.1:9000",
+        "certificate verify failed",
+    )
+    .await;
+    aws_test(
+        &client_encryption_invalid_hostname,
+        "127.0.0.1:9001",
+        "certificate verify failed",
+    )
+    .await;
 
     // Case 2: Azure
     async fn azure_test(client_encryption: &ClientEncryption, err_str: &str) {
         let key_opts = DataKeyOptions::builder()
             .master_key(MasterKey::Azure {
-                    key_vault_endpoint: "doesnotexist.local".to_string(),
-                    key_name: "foo".to_string(),
-                    key_version: None,
-                })
+                key_vault_endpoint: "doesnotexist.local".to_string(),
+                key_name: "foo".to_string(),
+                key_version: None,
+            })
             .build();
-        let err = client_encryption.create_data_key(
-            &KmsProvider::Azure,
-            key_opts,
-        ).await.unwrap_err();
-        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+        let err = client_encryption
+            .create_data_key(&KmsProvider::Azure, key_opts)
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains(err_str),
+            "unexpected error: {}",
+            err
+        );
     }
 
     azure_test(&client_encryption_no_client_cert, "handshake failure").await;
     azure_test(&client_encryption_with_tls, "HTTP status=404").await;
     azure_test(&client_encryption_expired, "certificate verify failed").await;
-    azure_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
+    azure_test(
+        &client_encryption_invalid_hostname,
+        "certificate verify failed",
+    )
+    .await;
 
     // Case 3: GCP
     async fn gcp_test(client_encryption: &ClientEncryption, err_str: &str) {
         let key_opts = DataKeyOptions::builder()
             .master_key(MasterKey::Gcp {
-                    project_id: "foo".to_string(),
-                    location: "bar".to_string(),
-                    key_ring: "baz".to_string(),
-                    key_name: "foo".to_string(),
-                    endpoint: None,
-                    key_version: None,
-                })
+                project_id: "foo".to_string(),
+                location: "bar".to_string(),
+                key_ring: "baz".to_string(),
+                key_name: "foo".to_string(),
+                endpoint: None,
+                key_version: None,
+            })
             .build();
-        let err = client_encryption.create_data_key(
-            &KmsProvider::Gcp,
-            key_opts,
-        ).await.unwrap_err();
-        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+        let err = client_encryption
+            .create_data_key(&KmsProvider::Gcp, key_opts)
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains(err_str),
+            "unexpected error: {}",
+            err
+        );
     }
 
     gcp_test(&client_encryption_no_client_cert, "handshake failure").await;
     gcp_test(&client_encryption_with_tls, "HTTP status=404").await;
     gcp_test(&client_encryption_expired, "certificate verify failed").await;
-    gcp_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
+    gcp_test(
+        &client_encryption_invalid_hostname,
+        "certificate verify failed",
+    )
+    .await;
 
     // Case 4: KMIP
     async fn kmip_test(client_encryption: &ClientEncryption, err_str: &str) {
         let key_opts = DataKeyOptions::builder()
-            .master_key(MasterKey::Kmip { key_id: None, endpoint: None })
+            .master_key(MasterKey::Kmip {
+                key_id: None,
+                endpoint: None,
+            })
             .build();
-        let err = client_encryption.create_data_key(
-            &KmsProvider::Kmip,
-            key_opts,
-        ).await.unwrap_err();
-        assert!(err.to_string().contains(err_str), "unexpected error: {}", err);
+        let err = client_encryption
+            .create_data_key(&KmsProvider::Kmip, key_opts)
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains(err_str),
+            "unexpected error: {}",
+            err
+        );
     }
 
     kmip_test(&client_encryption_no_client_cert, "handshake failure").await;
     // This one succeeds!
-    client_encryption_with_tls.create_data_key(
-        &KmsProvider::Kmip,
-        DataKeyOptions::builder()
-            .master_key(MasterKey::Kmip { key_id: None, endpoint: None })
-            .build(),
-    ).await?;
+    client_encryption_with_tls
+        .create_data_key(
+            &KmsProvider::Kmip,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Kmip {
+                    key_id: None,
+                    endpoint: None,
+                })
+                .build(),
+        )
+        .await?;
     kmip_test(&client_encryption_expired, "certificate verify failed").await;
-    kmip_test(&client_encryption_invalid_hostname, "certificate verify failed").await;
+    kmip_test(
+        &client_encryption_invalid_hostname,
+        "certificate verify failed",
+    )
+    .await;
 
     Ok(())
 }
@@ -1933,35 +2017,54 @@ async fn explicit_encryption_case_1() -> Result<()> {
         Some(t) => t,
         None => return Ok(()),
     };
-    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+    let enc_coll = testdata
+        .encrypted_client
+        .database("db")
+        .collection::<Document>("explicit_encryption");
 
-    let insert_payload = testdata.client_encryption.encrypt(
-        RawBson::String("encrypted indexed value".to_string()),
-        EncryptOptions::builder()
-            .key(EncryptKey::Id(testdata.key1_id.clone()))
-            .algorithm(Algorithm::Indexed)
-            .contention_factor(0)
-            .build(),
-    ).await?;
-    enc_coll.insert_one(doc! { "encryptedIndexed": insert_payload }, None).await?;
+    let insert_payload = testdata
+        .client_encryption
+        .encrypt(
+            RawBson::String("encrypted indexed value".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Indexed)
+                .contention_factor(0)
+                .build(),
+        )
+        .await?;
+    enc_coll
+        .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
+        .await?;
 
-    let find_payload = testdata.client_encryption.encrypt(
-        RawBson::String("encrypted indexed value".to_string()),
-        EncryptOptions::builder()
-            .key(EncryptKey::Id(testdata.key1_id))
-            .algorithm(Algorithm::Indexed)
-            .query_type("equality".to_string())
-            .contention_factor(0)
-            .build(),
-    ).await?;
-    let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload }, None).await?.try_collect().await?;
+    let find_payload = testdata
+        .client_encryption
+        .encrypt(
+            RawBson::String("encrypted indexed value".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id))
+                .algorithm(Algorithm::Indexed)
+                .query_type("equality".to_string())
+                .contention_factor(0)
+                .build(),
+        )
+        .await?;
+    let found: Vec<_> = enc_coll
+        .find(doc! { "encryptedIndexed": find_payload }, None)
+        .await?
+        .try_collect()
+        .await?;
     assert_eq!(1, found.len());
-    assert_eq!("encrypted indexed value", found[0].get_str("encryptedIndexed")?);
+    assert_eq!(
+        "encrypted indexed value",
+        found[0].get_str("encryptedIndexed")?
+    );
 
     Ok(())
 }
 
-// Prose test 12. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero contention)
+// Prose test 12. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero
+// contention)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_2() -> Result<()> {
@@ -1974,45 +2077,67 @@ async fn explicit_encryption_case_2() -> Result<()> {
         Some(t) => t,
         None => return Ok(()),
     };
-    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+    let enc_coll = testdata
+        .encrypted_client
+        .database("db")
+        .collection::<Document>("explicit_encryption");
 
     for _ in 0..10 {
-        let insert_payload = testdata.client_encryption.encrypt(
-            RawBson::String("encrypted indexed value".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Indexed)
-                .contention_factor(10)
-                .build(),
-        ).await?;
-        enc_coll.insert_one(doc! { "encryptedIndexed": insert_payload }, None).await?;
+        let insert_payload = testdata
+            .client_encryption
+            .encrypt(
+                RawBson::String("encrypted indexed value".to_string()),
+                EncryptOptions::builder()
+                    .key(EncryptKey::Id(testdata.key1_id.clone()))
+                    .algorithm(Algorithm::Indexed)
+                    .contention_factor(10)
+                    .build(),
+            )
+            .await?;
+        enc_coll
+            .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
+            .await?;
     }
 
-    let find_payload = testdata.client_encryption.encrypt(
-        RawBson::String("encrypted indexed value".to_string()),
-        EncryptOptions::builder()
+    let find_payload = testdata
+        .client_encryption
+        .encrypt(
+            RawBson::String("encrypted indexed value".to_string()),
+            EncryptOptions::builder()
                 .key(EncryptKey::Id(testdata.key1_id.clone()))
                 .algorithm(Algorithm::Indexed)
                 .query_type("equality".to_string())
                 .contention_factor(0)
                 .build(),
-    ).await?;
-    let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload }, None).await?.try_collect().await?;
+        )
+        .await?;
+    let found: Vec<_> = enc_coll
+        .find(doc! { "encryptedIndexed": find_payload }, None)
+        .await?
+        .try_collect()
+        .await?;
     assert!(found.len() < 10);
     for doc in found {
         assert_eq!("encrypted indexed value", doc.get_str("encryptedIndexed")?);
     }
 
-    let find_payload2 = testdata.client_encryption.encrypt(
-        RawBson::String("encrypted indexed value".to_string()),
-        EncryptOptions::builder()
+    let find_payload2 = testdata
+        .client_encryption
+        .encrypt(
+            RawBson::String("encrypted indexed value".to_string()),
+            EncryptOptions::builder()
                 .key(EncryptKey::Id(testdata.key1_id.clone()))
                 .algorithm(Algorithm::Indexed)
                 .query_type("equality".to_string())
                 .contention_factor(10)
                 .build(),
-    ).await?;
-    let found: Vec<_> = enc_coll.find(doc! { "encryptedIndexed": find_payload2 }, None).await?.try_collect().await?;
+        )
+        .await?;
+    let found: Vec<_> = enc_coll
+        .find(doc! { "encryptedIndexed": find_payload2 }, None)
+        .await?
+        .try_collect()
+        .await?;
     assert_eq!(10, found.len());
     for doc in found {
         assert_eq!("encrypted indexed value", doc.get_str("encryptedIndexed")?);
@@ -2034,20 +2159,35 @@ async fn explicit_encryption_case_3() -> Result<()> {
         Some(t) => t,
         None => return Ok(()),
     };
-    let enc_coll = testdata.encrypted_client.database("db").collection::<Document>("explicit_encryption");
+    let enc_coll = testdata
+        .encrypted_client
+        .database("db")
+        .collection::<Document>("explicit_encryption");
 
-    let insert_payload = testdata.client_encryption.encrypt(
-        RawBson::String("encrypted indexed value".to_string()),
-        EncryptOptions::builder()
-            .key(EncryptKey::Id(testdata.key1_id.clone()))
-            .algorithm(Algorithm::Unindexed)
-            .build(),
-    ).await?;
-    enc_coll.insert_one(doc! { "_id": 1, "encryptedIndexed": insert_payload }, None).await?;
+    let insert_payload = testdata
+        .client_encryption
+        .encrypt(
+            RawBson::String("encrypted indexed value".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Unindexed)
+                .build(),
+        )
+        .await?;
+    enc_coll
+        .insert_one(doc! { "_id": 1, "encryptedIndexed": insert_payload }, None)
+        .await?;
 
-    let found: Vec<_> = enc_coll.find(doc! { "_id": 1 }, None).await?.try_collect().await?;
+    let found: Vec<_> = enc_coll
+        .find(doc! { "_id": 1 }, None)
+        .await?
+        .try_collect()
+        .await?;
     assert_eq!(1, found.len());
-    assert_eq!("encrypted indexed value", found[0].get_str("encryptedIndexed")?);
+    assert_eq!(
+        "encrypted indexed value",
+        found[0].get_str("encryptedIndexed")?
+    );
 
     Ok(())
 }
@@ -2067,15 +2207,21 @@ async fn explicit_encryption_case_4() -> Result<()> {
     };
 
     let raw_value = RawBson::String("encrypted indexed value".to_string());
-    let payload = testdata.client_encryption.encrypt(
-        raw_value.clone(),
-        EncryptOptions::builder()
-            .key(EncryptKey::Id(testdata.key1_id.clone()))
-            .algorithm(Algorithm::Indexed)
-            .contention_factor(0)
-            .build(),
-    ).await?;
-    let roundtrip = testdata.client_encryption.decrypt(payload.as_raw_binary()).await?;
+    let payload = testdata
+        .client_encryption
+        .encrypt(
+            raw_value.clone(),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Indexed)
+                .contention_factor(0)
+                .build(),
+        )
+        .await?;
+    let roundtrip = testdata
+        .client_encryption
+        .decrypt(payload.as_raw_binary())
+        .await?;
     assert_eq!(raw_value, roundtrip);
 
     Ok(())
@@ -2096,14 +2242,20 @@ async fn explicit_encryption_case_5() -> Result<()> {
     };
 
     let raw_value = RawBson::String("encrypted indexed value".to_string());
-    let payload = testdata.client_encryption.encrypt(
-        raw_value.clone(),
-        EncryptOptions::builder()
-            .key(EncryptKey::Id(testdata.key1_id.clone()))
-            .algorithm(Algorithm::Unindexed)
-            .build(),
-    ).await?;
-    let roundtrip = testdata.client_encryption.decrypt(payload.as_raw_binary()).await?;
+    let payload = testdata
+        .client_encryption
+        .encrypt(
+            raw_value.clone(),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(testdata.key1_id.clone()))
+                .algorithm(Algorithm::Unindexed)
+                .build(),
+        )
+        .await?;
+    let roundtrip = testdata
+        .client_encryption
+        .decrypt(payload.as_raw_binary())
+        .await?;
     assert_eq!(raw_value, roundtrip);
 
     Ok(())
@@ -2134,19 +2286,25 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
     };
 
     let db = key_vault_client.database("db");
-    db.collection::<Document>("explicit_encryption").drop(
-        DropCollectionOptions::builder()
-            .encrypted_fields(encrypted_fields.clone())
-            .build()
-    ).await?;
+    db.collection::<Document>("explicit_encryption")
+        .drop(
+            DropCollectionOptions::builder()
+                .encrypted_fields(encrypted_fields.clone())
+                .build(),
+        )
+        .await?;
     db.create_collection(
         "explicit_encryption",
         CreateCollectionOptions::builder()
             .encrypted_fields(encrypted_fields)
             .build(),
-    ).await?;
+    )
+    .await?;
     let keyvault = key_vault_client.database("keyvault");
-    keyvault.collection::<Document>("datakeys").drop(None).await?;
+    keyvault
+        .collection::<Document>("datakeys")
+        .drop(None)
+        .await?;
     keyvault.create_collection("datakeys", None).await?;
     keyvault
         .collection::<Document>("datakeys")
@@ -2163,7 +2321,7 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
             .key_vault_client(key_vault_client.into_client())
             .key_vault_namespace(KV_NAMESPACE.clone())
             .kms_providers(LOCAL_KMS.clone())
-            .build()
+            .build(),
     )?;
     let encrypted_client = Client::with_encryption_options(
         CLIENT_OPTIONS.get().await.clone(),
@@ -2173,9 +2331,14 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
             .bypass_query_analysis(true)
             .extra_options(EXTRA_OPTIONS.clone())
             .build(),
-    ).await?;
+    )
+    .await?;
 
-    Ok(Some(ExplicitEncryptionTestData { key1_id, client_encryption, encrypted_client }))
+    Ok(Some(ExplicitEncryptionTestData {
+        key1_id,
+        client_encryption,
+        encrypted_client,
+    }))
 }
 
 // Prose test 13. Unique Index on keyAltNames (Case 1: createDataKey())
@@ -2190,31 +2353,49 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     let (client_encryption, _) = unique_index_keyaltnames_setup().await?;
 
     // Succeeds
-    client_encryption.create_data_key(
-        &KmsProvider::Local,
-        DataKeyOptions::builder()
-            .master_key(MasterKey::Local)
-            .key_alt_names(vec!["abc".to_string()])
-            .build(),
-    ).await?;
+    client_encryption
+        .create_data_key(
+            &KmsProvider::Local,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Local)
+                .key_alt_names(vec!["abc".to_string()])
+                .build(),
+        )
+        .await?;
     // Fails: duplicate key
-    let err = client_encryption.create_data_key(
-        &KmsProvider::Local,
-        DataKeyOptions::builder()
-            .master_key(MasterKey::Local)
-            .key_alt_names(vec!["abc".to_string()])
-            .build(),
-    ).await.unwrap_err();
-    assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {}", err);
+    let err = client_encryption
+        .create_data_key(
+            &KmsProvider::Local,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Local)
+                .key_alt_names(vec!["abc".to_string()])
+                .build(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        Some(11000),
+        write_err_code(&err),
+        "unexpected error: {}",
+        err
+    );
     // Fails: duplicate key
-    let err = client_encryption.create_data_key(
-        &KmsProvider::Local,
-        DataKeyOptions::builder()
-            .master_key(MasterKey::Local)
-            .key_alt_names(vec!["def".to_string()])
-            .build(),
-    ).await.unwrap_err();
-    assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {}", err);
+    let err = client_encryption
+        .create_data_key(
+            &KmsProvider::Local,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Local)
+                .key_alt_names(vec!["def".to_string()])
+                .build(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        Some(11000),
+        write_err_code(&err),
+        "unexpected error: {}",
+        err
+    );
 
     Ok(())
 }
@@ -2231,16 +2412,32 @@ async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
     let (client_encryption, key) = unique_index_keyaltnames_setup().await?;
 
     // Succeeds
-    let new_key = client_encryption.create_data_key(&KmsProvider::Local, None).await?;
+    let new_key = client_encryption
+        .create_data_key(&KmsProvider::Local, None)
+        .await?;
     client_encryption.add_key_alt_name(&new_key, "abc").await?;
     // Still succeeds, has alt name
-    let prev_key = client_encryption.add_key_alt_name(&new_key, "abc").await?.unwrap();
+    let prev_key = client_encryption
+        .add_key_alt_name(&new_key, "abc")
+        .await?
+        .unwrap();
     assert_eq!("abc", prev_key.get_array("keyAltNames")?.get_str(0)?);
     // Fails: adding alt name used for `key` to `new_key`
-    let err = client_encryption.add_key_alt_name(&new_key, "def").await.unwrap_err();
-    assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {}", err);
+    let err = client_encryption
+        .add_key_alt_name(&new_key, "def")
+        .await
+        .unwrap_err();
+    assert_eq!(
+        Some(11000),
+        write_err_code(&err),
+        "unexpected error: {}",
+        err
+    );
     // Succeds: re-adding alt name to `new_key`
-    let prev_key = client_encryption.add_key_alt_name(&key, "def").await?.unwrap();
+    let prev_key = client_encryption
+        .add_key_alt_name(&key, "def")
+        .await?
+        .unwrap();
     assert_eq!("def", prev_key.get_array("keyAltNames")?.get_str(0)?);
 
     Ok(())
@@ -2259,37 +2456,43 @@ fn write_err_code(err: &crate::error::Error) -> Option<i32> {
 
 async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> {
     let client = TestClient::new().await;
-    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
+    let datakeys = client
+        .database("keyvault")
+        .collection::<Document>("datakeys");
     datakeys.drop(None).await?;
-    datakeys.create_index(
-        IndexModel {
-            keys: doc! { "keyAltNames": 1 },
-            options: Some(
-                IndexOptions::builder()
-                    .name("keyAltNames_1".to_string())
-                    .unique(true)
-                    .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
-                    .build()
-            ),
-        },
-        CreateIndexOptions::builder()
-            .write_concern(WriteConcern::MAJORITY)
-            .build(),
-    ).await?;
+    datakeys
+        .create_index(
+            IndexModel {
+                keys: doc! { "keyAltNames": 1 },
+                options: Some(
+                    IndexOptions::builder()
+                        .name("keyAltNames_1".to_string())
+                        .unique(true)
+                        .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
+                        .build(),
+                ),
+            },
+            CreateIndexOptions::builder()
+                .write_concern(WriteConcern::MAJORITY)
+                .build(),
+        )
+        .await?;
     let client_encryption = ClientEncryption::new(
         ClientEncryptionOptions::builder()
             .key_vault_client(client.into_client())
             .key_vault_namespace(KV_NAMESPACE.clone())
             .kms_providers(LOCAL_KMS.clone())
-            .build()
-    )?;
-    let key = client_encryption.create_data_key(
-        &KmsProvider::Local,
-        DataKeyOptions::builder()
-            .master_key(MasterKey::Local)
-            .key_alt_names(vec!["def".to_string()])
             .build(),
-    ).await?;
+    )?;
+    let key = client_encryption
+        .create_data_key(
+            &KmsProvider::Local,
+            DataKeyOptions::builder()
+                .master_key(MasterKey::Local)
+                .key_alt_names(vec!["def".to_string()])
+                .build(),
+        )
+        .await?;
     Ok((client_encryption, key))
 }
 
@@ -2310,12 +2513,14 @@ async fn decryption_events_command_error() -> Result<()> {
     let fp = FailPoint::fail_command(
         &["aggregate"],
         FailPointMode::Times(1),
-        FailCommandOptions::builder()
-            .error_code(123)
-            .build(),
+        FailCommandOptions::builder().error_code(123).build(),
     );
     let _guard = fp.enable(&td.setup_client, None).await?;
-    let err = td.decryption_events.aggregate(vec![doc! { "$count": "total" }], None).await.unwrap_err();
+    let err = td
+        .decryption_events
+        .aggregate(vec![doc! { "$count": "total" }], None)
+        .await
+        .unwrap_err();
     assert_eq!(Some(123), err.code());
     assert!(td.ev_handler.failed.lock().unwrap().is_some());
 
@@ -2345,7 +2550,11 @@ async fn decryption_events_network_error() -> Result<()> {
             .build(),
     );
     let _guard = fp.enable(&td.setup_client, None).await?;
-    let err = td.decryption_events.aggregate(vec![doc! { "$count": "total" }], None).await.unwrap_err();
+    let err = td
+        .decryption_events
+        .aggregate(vec![doc! { "$count": "total" }], None)
+        .await
+        .unwrap_err();
     assert!(err.is_network_error(), "unexpected error: {}", err);
     assert!(td.ev_handler.failed.lock().unwrap().is_some());
 
@@ -2365,18 +2574,24 @@ async fn decryption_events_decrypt_error() -> Result<()> {
         Some(v) => v,
         None => return Ok(()),
     };
-    td.decryption_events.insert_one(doc! { "encrypted": td.malformed_ciphertext }, None).await?;
-    let err = td.decryption_events.aggregate(vec![], None).await.unwrap_err();
+    td.decryption_events
+        .insert_one(doc! { "encrypted": td.malformed_ciphertext }, None)
+        .await?;
+    let err = td
+        .decryption_events
+        .aggregate(vec![], None)
+        .await
+        .unwrap_err();
     assert!(err.is_csfle_error());
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
     assert_eq!(
         ElementType::Binary,
-        ev.reply
-            .get_document("cursor")?
-            .get_array("firstBatch")?[0]
-            .as_document().unwrap()
-            .get("encrypted").unwrap()
+        ev.reply.get_document("cursor")?.get_array("firstBatch")?[0]
+            .as_document()
+            .unwrap()
+            .get("encrypted")
+            .unwrap()
             .element_type()
     );
 
@@ -2396,17 +2611,19 @@ async fn decryption_events_decrypt_success() -> Result<()> {
         Some(v) => v,
         None => return Ok(()),
     };
-    td.decryption_events.insert_one(doc! { "encrypted": td.ciphertext }, None).await?;
+    td.decryption_events
+        .insert_one(doc! { "encrypted": td.ciphertext }, None)
+        .await?;
     td.decryption_events.aggregate(vec![], None).await?;
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
     assert_eq!(
         ElementType::Binary,
-        ev.reply
-            .get_document("cursor")?
-            .get_array("firstBatch")?[0]
-            .as_document().unwrap()
-            .get("encrypted").unwrap()
+        ev.reply.get_document("cursor")?.get_array("firstBatch")?[0]
+            .as_document()
+            .unwrap()
+            .get("encrypted")
+            .unwrap()
             .element_type()
     );
 
@@ -2426,31 +2643,37 @@ impl DecryptionEventsTestdata {
         let setup_client = TestClient::new().await;
         if !setup_client.is_standalone() {
             log_uncaptured("skipping decryption events test: requires standalone topology");
-            return Ok(None)
+            return Ok(None);
         }
         let db = setup_client.database("db");
-        db.collection::<Document>("decryption_events").drop(None).await?;
+        db.collection::<Document>("decryption_events")
+            .drop(None)
+            .await?;
         db.create_collection("decryption_events", None).await?;
-    
+
         let client_encryption = ClientEncryption::new(
             ClientEncryptionOptions::builder()
                 .key_vault_client(setup_client.clone().into_client())
                 .key_vault_namespace(KV_NAMESPACE.clone())
                 .kms_providers(LOCAL_KMS.clone())
-                .build()
-        )?;
-        let key_id = client_encryption.create_data_key(&KmsProvider::Local, None).await?;
-        let ciphertext = client_encryption.encrypt(
-            RawBson::String("hello".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(key_id))
-                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
                 .build(),
-        ).await?;
+        )?;
+        let key_id = client_encryption
+            .create_data_key(&KmsProvider::Local, None)
+            .await?;
+        let ciphertext = client_encryption
+            .encrypt(
+                RawBson::String("hello".to_string()),
+                EncryptOptions::builder()
+                    .key(EncryptKey::Id(key_id))
+                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                    .build(),
+            )
+            .await?;
         let mut malformed_ciphertext = ciphertext.clone();
         let last = malformed_ciphertext.bytes.last_mut().unwrap();
         *last = last.wrapping_add(1);
-    
+
         let ev_handler = DecryptionEventsHandler::new();
         let mut opts = CLIENT_OPTIONS.get().await.clone();
         opts.retry_reads = Some(false);
@@ -2462,10 +2685,19 @@ impl DecryptionEventsTestdata {
                 .kms_providers(LOCAL_KMS.clone())
                 .extra_options(EXTRA_OPTIONS.clone())
                 .build(),
-        ).await?;
-        let decryption_events = encrypted_client.database("db").collection("decryption_events");
+        )
+        .await?;
+        let decryption_events = encrypted_client
+            .database("db")
+            .collection("decryption_events");
 
-        Ok(Some(Self { setup_client, decryption_events, ev_handler, ciphertext, malformed_ciphertext }))
+        Ok(Some(Self {
+            setup_client,
+            decryption_events,
+            ev_handler,
+            ciphertext,
+            malformed_ciphertext,
+        }))
     }
 }
 

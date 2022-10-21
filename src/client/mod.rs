@@ -155,7 +155,8 @@ impl Client {
 
     #[cfg(all(test, feature = "csfle"))]
     pub(crate) async fn mongocryptd_spawned(&self) -> bool {
-        self.inner.csfle
+        self.inner
+            .csfle
             .read()
             .await
             .as_ref()

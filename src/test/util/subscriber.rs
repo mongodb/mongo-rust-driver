@@ -45,7 +45,12 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         events
     }
 
-    pub(crate) async fn collect_events_map<F, T>(&mut self, timeout: Duration, mut filter: F) -> Vec<T>
+    #[allow(dead_code)]
+    pub(crate) async fn collect_events_map<F, T>(
+        &mut self,
+        timeout: Duration,
+        mut filter: F,
+    ) -> Vec<T>
     where
         F: FnMut(E) -> Option<T>,
     {
