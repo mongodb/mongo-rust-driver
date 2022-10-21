@@ -2497,3 +2497,11 @@ impl CommandEventHandler for DecryptionEventsHandler {
         }
     }
 }
+
+// TODO RUST-1314: implement prose test 15. On-demand AWS Credentials
+
+// TODO RUST-1441: implement prose test 16. Rewrap
+
+// TODO RUST-1417: implement prose test 17. On-demand GCP Credentials
+
+// TODO RUST-1442: implement prose test 18. Azure IMDS Credentials
