@@ -1884,7 +1884,7 @@ async fn kms_tls_options() -> Result<()> {
     aws_test(
         &client_encryption_no_client_cert,
         "127.0.0.1:9002",
-        "handshake failure",
+        "SSL routines",
     )
     .await;
     aws_test(&client_encryption_with_tls, "127.0.0.1:9002", "parse error").await;
@@ -1921,7 +1921,7 @@ async fn kms_tls_options() -> Result<()> {
         );
     }
 
-    azure_test(&client_encryption_no_client_cert, "handshake failure").await;
+    azure_test(&client_encryption_no_client_cert, "SSL routines").await;
     azure_test(&client_encryption_with_tls, "HTTP status=404").await;
     azure_test(&client_encryption_expired, "certificate verify failed").await;
     azure_test(
@@ -1953,7 +1953,7 @@ async fn kms_tls_options() -> Result<()> {
         );
     }
 
-    gcp_test(&client_encryption_no_client_cert, "handshake failure").await;
+    gcp_test(&client_encryption_no_client_cert, "SSL routines").await;
     gcp_test(&client_encryption_with_tls, "HTTP status=404").await;
     gcp_test(&client_encryption_expired, "certificate verify failed").await;
     gcp_test(
@@ -1981,7 +1981,7 @@ async fn kms_tls_options() -> Result<()> {
         );
     }
 
-    kmip_test(&client_encryption_no_client_cert, "handshake failure").await;
+    kmip_test(&client_encryption_no_client_cert, "SSL routines").await;
     // This one succeeds!
     client_encryption_with_tls
         .create_data_key(
