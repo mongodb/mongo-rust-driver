@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
 
-use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson, Binary};
+use bson::{doc, spec::{BinarySubtype, ElementType}, Bson, Document, RawBson, Binary};
 use futures_util::TryStreamExt;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
@@ -2322,11 +2322,103 @@ async fn decryption_events_command_error() -> Result<()> {
     Ok(())
 }
 
+// Prose test 14. Decryption Events (Case 2: Network Error)
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn decryption_events_network_error() -> Result<()> {
+    if !check_env("decryption_events_network_error", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let td = match DecryptionEventsTestdata::setup().await? {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+
+    let fp = FailPoint::fail_command(
+        &["aggregate"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(123)
+            .close_connection(true)
+            .build(),
+    );
+    let _guard = fp.enable(&td.setup_client, None).await?;
+    let err = td.decryption_events.aggregate(vec![doc! { "$count": "total" }], None).await.unwrap_err();
+    assert!(err.is_network_error(), "unexpected error: {}", err);
+    assert!(td.ev_handler.failed.lock().unwrap().is_some());
+
+    Ok(())
+}
+
+// Prose test 14. Decryption Events (Case 3: Decrypt Error)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn decryption_events_decrypt_error() -> Result<()> {
+    if !check_env("decryption_events_decrypt_error", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let td = match DecryptionEventsTestdata::setup().await? {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+    td.decryption_events.insert_one(doc! { "encrypted": td.malformed_ciphertext }, None).await?;
+    let err = td.decryption_events.aggregate(vec![], None).await.unwrap_err();
+    assert!(err.is_csfle_error());
+    let guard = td.ev_handler.succeeded.lock().unwrap();
+    let ev = guard.as_ref().unwrap();
+    assert_eq!(
+        ElementType::Binary,
+        ev.reply
+            .get_document("cursor")?
+            .get_array("firstBatch")?[0]
+            .as_document().unwrap()
+            .get("encrypted").unwrap()
+            .element_type()
+    );
+
+    Ok(())
+}
+
+// Prose test 14. Decryption Events (Case 4: Decrypt Success)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn decryption_events_decrypt_success() -> Result<()> {
+    if !check_env("decryption_events_decrypt_success", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let td = match DecryptionEventsTestdata::setup().await? {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+    td.decryption_events.insert_one(doc! { "encrypted": td.ciphertext }, None).await?;
+    td.decryption_events.aggregate(vec![], None).await?;
+    let guard = td.ev_handler.succeeded.lock().unwrap();
+    let ev = guard.as_ref().unwrap();
+    assert_eq!(
+        ElementType::Binary,
+        ev.reply
+            .get_document("cursor")?
+            .get_array("firstBatch")?[0]
+            .as_document().unwrap()
+            .get("encrypted").unwrap()
+            .element_type()
+    );
+
+    Ok(())
+}
+
 struct DecryptionEventsTestdata {
     setup_client: TestClient,
-    encrypted_client: Client,
     decryption_events: Collection<Document>,
     ev_handler: Arc<DecryptionEventsHandler>,
+    ciphertext: Binary,
+    malformed_ciphertext: Binary,
 }
 
 impl DecryptionEventsTestdata {
@@ -2356,7 +2448,8 @@ impl DecryptionEventsTestdata {
                 .build(),
         ).await?;
         let mut malformed_ciphertext = ciphertext.clone();
-        *malformed_ciphertext.bytes.last_mut().unwrap() += 1;
+        let last = malformed_ciphertext.bytes.last_mut().unwrap();
+        *last = last.wrapping_add(1);
     
         let ev_handler = DecryptionEventsHandler::new();
         let mut opts = CLIENT_OPTIONS.get().await.clone();
@@ -2372,7 +2465,7 @@ impl DecryptionEventsTestdata {
         ).await?;
         let decryption_events = encrypted_client.database("db").collection("decryption_events");
 
-        Ok(Some(Self { setup_client, encrypted_client, decryption_events, ev_handler }))
+        Ok(Some(Self { setup_client, decryption_events, ev_handler, ciphertext, malformed_ciphertext }))
     }
 }
 
