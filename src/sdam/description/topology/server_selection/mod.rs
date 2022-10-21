@@ -34,6 +34,10 @@ impl SelectedServer {
         server.increment_operation_count();
         Self { server }
     }
+
+    pub(crate) fn address(&self) -> &ServerAddress {
+        &self.server.address
+    }
 }
 
 impl Deref for SelectedServer {
@@ -365,12 +369,38 @@ impl TopologyDescription {
 }
 
 impl fmt::Display for TopologyDescription {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ Type: {:?}, Servers: [ ", self.topology_type)?;
-        for server_info in self.servers.values().map(ServerInfo::new_borrowed) {
-            write!(f, "{}, ", server_info)?;
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{{ Type: {}", self.topology_type)?;
+
+        if let Some(ref set_name) = self.set_name {
+            write!(f, ", Set Name: {}", set_name)?;
         }
-        write!(f, "] }}")
+
+        if let Some(max_set_version) = self.max_set_version {
+            write!(f, ", Max Set Version: {}", max_set_version)?;
+        }
+
+        if let Some(max_election_id) = self.max_election_id {
+            write!(f, ", Max Election ID: {}", max_election_id)?;
+        }
+
+        if let Some(ref compatibility_error) = self.compatibility_error {
+            write!(f, ", Compatibility Error: {}", compatibility_error)?;
+        }
+
+        if !self.servers.is_empty() {
+            write!(f, ", Servers: [ ")?;
+            let mut iter = self.servers.values();
+            if let Some(server) = iter.next() {
+                write!(f, "{}", ServerInfo::new_borrowed(server))?;
+            }
+            for server in iter {
+                write!(f, ", {}", ServerInfo::new_borrowed(server))?;
+            }
+            write!(f, " ]")?;
+        }
+
+        write!(f, " }}")
     }
 }
 

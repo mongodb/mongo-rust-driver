@@ -25,7 +25,7 @@ use crate::{
 use self::server_selection::IDLE_WRITE_PERIOD;
 
 /// The possible types for a topology.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, derive_more::Display)]
 #[non_exhaustive]
 pub enum TopologyType {
     /// A single mongod server.

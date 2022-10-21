@@ -21,7 +21,9 @@ use crate::trace::{
     command::CommandTracingEventEmitter,
     trace_or_log_enabled,
     TracingOrLogLevel,
+    TracingRepresentation,
     COMMAND_TRACING_EVENT_TARGET,
+    SERVER_SELECTION_TRACING_EVENT_TARGET,
 };
 use crate::{
     bson::Document,
@@ -33,7 +35,7 @@ use crate::{
     },
     concern::{ReadConcern, WriteConcern},
     db::Database,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::command::{handle_command_event, CommandEvent},
     operation::{AggregateTarget, ListDatabases},
     options::{
@@ -480,13 +482,18 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self.select_server(criteria).await?;
+        let server = self.select_server(criteria, "test_select_server").await?;
         Ok(server.address.clone())
     }
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
-    async fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<SelectedServer> {
+    #[allow(unused_variables)] // we only use the operation_name for tracing.
+    async fn select_server(
+        &self,
+        criteria: Option<&SelectionCriteria>,
+        operation_name: &str,
+    ) -> Result<SelectedServer> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
@@ -497,31 +504,134 @@ impl Client {
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
+        #[cfg(feature = "tracing-unstable")]
+        if trace_or_log_enabled!(
+            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Debug
+        ) {
+            let latest_state = self.inner.topology.watch().observe_latest();
+            tracing::debug!(
+                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                topologyId = self.inner.topology.id.tracing_representation(),
+                operation = operation_name,
+                selector = ?criteria,
+                topologyDescription = latest_state.description.tracing_representation(),
+                "Server selection started"
+            );
+        }
+
+        // We only want to emit this message once per operation at most.
+        #[cfg(feature = "tracing-unstable")]
+        let mut emitted_waiting_message = false;
+
         let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.observe_latest();
 
-            if let Some(server) = server_selection::attempt_to_select_server(
+            let result = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
                 &state.servers(),
-            )? {
-                return Ok(server);
-            }
-
-            watcher.request_immediate_check();
-
-            let change_occurred = start_time.elapsed() < timeout
-                && watcher
-                    .wait_for_update(timeout - start_time.elapsed())
-                    .await;
-            if !change_occurred {
-                return Err(ErrorKind::ServerSelection {
-                    message: state
-                        .description
-                        .server_selection_timeout_error_message(criteria),
+            );
+            match result {
+                Err(error) => {
+                    #[cfg(feature = "tracing-unstable")]
+                    if trace_or_log_enabled!(
+                        target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                        TracingOrLogLevel::Debug
+                    ) {
+                        tracing::debug!(
+                            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                            topologyId = self.inner.topology.id.tracing_representation(),
+                            operation = operation_name,
+                            selector = criteria.tracing_representation(),
+                            topologyDescription = state.description.tracing_representation(),
+                            failure = error.tracing_representation(),
+                            "Server selection failed"
+                        );
+                    }
+                    return Err(error);
                 }
-                .into());
+                Ok(result) => {
+                    if let Some(server) = result {
+                        #[cfg(feature = "tracing-unstable")]
+                        if trace_or_log_enabled!(
+                            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                            TracingOrLogLevel::Debug
+                        ) {
+                            tracing::debug!(
+                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                topologyId = self.inner.topology.id.tracing_representation(),
+                                operation = operation_name,
+                                selector = criteria.tracing_representation(),
+                                topologyDescription = state.description.tracing_representation(),
+                                serverHost = server.address().host(),
+                                serverPort = server.address().port_tracing_representation(),
+                                "Server selection succeeded"
+                            );
+                        }
+
+                        return Ok(server);
+                    } else {
+                        #[cfg(feature = "tracing-unstable")]
+                        {
+                            if !emitted_waiting_message
+                                && trace_or_log_enabled!(
+                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                    TracingOrLogLevel::Info
+                                )
+                            {
+                                let remaining_time = timeout
+                                    .checked_sub(start_time.elapsed())
+                                    .unwrap_or(Duration::ZERO);
+                                tracing::info!(
+                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                    topologyId = self.inner.topology.id.tracing_representation(),
+                                    operation = operation_name,
+                                    selector = criteria.clone().tracing_representation(),
+                                    topologyDescription =
+                                        state.description.tracing_representation(),
+                                    remainingTimeMS = remaining_time.as_millis(),
+                                    "Waiting for suitable server to become available",
+                                );
+                            }
+                            emitted_waiting_message = true;
+                        }
+
+                        watcher.request_immediate_check();
+
+                        let change_occurred = start_time.elapsed() < timeout
+                            && watcher
+                                .wait_for_update(timeout - start_time.elapsed())
+                                .await;
+                        if !change_occurred {
+                            let error: Error = ErrorKind::ServerSelection {
+                                message: state
+                                    .description
+                                    .server_selection_timeout_error_message(criteria),
+                            }
+                            .into();
+
+                            #[cfg(feature = "tracing-unstable")]
+                            if trace_or_log_enabled!(
+                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                TracingOrLogLevel::Debug
+                            ) {
+                                tracing::debug!(
+                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                    topologyId = self.inner.topology.id.tracing_representation(),
+                                    operation = operation_name,
+                                    selector = criteria.tracing_representation(),
+                                    topologyDescription = ?state.description,
+                                    failure = error.tracing_representation(),
+                                    "Server selection failed"
+                                );
+                            }
+
+                            return Err(error);
+                        }
+                    }
+                }
             }
         }
     }

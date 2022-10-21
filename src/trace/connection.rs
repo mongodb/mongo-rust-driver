@@ -160,7 +160,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
 impl TracingRepresentation for ConnectionClosedReason {
     type Representation = &'static str;
 
-    fn tracing_representation(self) -> &'static str {
+    fn tracing_representation(&self) -> &'static str {
         match self {
             ConnectionClosedReason::Stale => "Connection became stale because the pool was cleared",
             ConnectionClosedReason::Idle => {
@@ -177,7 +177,7 @@ impl TracingRepresentation for ConnectionClosedReason {
 impl TracingRepresentation for ConnectionCheckoutFailedReason {
     type Representation = &'static str;
 
-    fn tracing_representation(self) -> &'static str {
+    fn tracing_representation(&self) -> &'static str {
         match self {
             ConnectionCheckoutFailedReason::Timeout => {
                 "Failed to establish a new connection within connectTimeoutMS"

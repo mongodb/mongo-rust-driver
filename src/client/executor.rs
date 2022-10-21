@@ -329,7 +329,7 @@ impl Client {
             .and_then(|s| s.transaction.pinned_mongos())
             .or_else(|| op.selection_criteria());
 
-        let server = match self.select_server(selection_criteria).await {
+        let server = match self.select_server(selection_criteria, op.name()).await {
             Ok(server) => server,
             Err(mut err) => {
                 err.add_labels_and_update_pin(None, &mut session, None)?;
@@ -425,8 +425,7 @@ impl Client {
         first_error: Error,
     ) -> Result<ExecutionOutput<T>> {
         op.update_for_retry();
-
-        let server = match self.select_server(op.selection_criteria()).await {
+        let server = match self.select_server(op.selection_criteria(), op.name()).await {
             Ok(server) => server,
             Err(_) => {
                 return Err(first_error);
@@ -593,9 +592,9 @@ impl Client {
             cmd.set_cluster_time(cluster_time);
         }
 
+        let request_id = crate::cmap::conn::next_request_id();
         let connection_info = connection.info();
         let service_id = connection.service_id();
-        let request_id = crate::cmap::conn::next_request_id();
 
         if let Some(ref server_api) = self.inner.options.server_api {
             cmd.set_server_api(server_api);
@@ -842,14 +841,14 @@ impl Client {
         }
     }
 
-    async fn select_data_bearing_server(&self) -> Result<()> {
+    async fn select_data_bearing_server(&self, operation_name: &str) -> Result<()> {
         let topology_type = self.inner.topology.topology_type();
         let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
             let server_type = server_info.server_type();
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
                 || server_type.is_data_bearing()
         }));
-        let _: SelectedServer = self.select_server(Some(&criteria)).await?;
+        let _: SelectedServer = self.select_server(Some(&criteria), operation_name).await?;
         Ok(())
     }
 
@@ -863,7 +862,8 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
-                self.select_data_bearing_server().await?;
+                self.select_data_bearing_server("Check sessions support status")
+                    .await?;
                 Ok(self.inner.topology.session_support_status())
             }
             _ => Ok(initial_status),
@@ -880,7 +880,8 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             TransactionSupportStatus::Undetermined => {
-                self.select_data_bearing_server().await?;
+                self.select_data_bearing_server("Check transactions support status")
+                    .await?;
                 Ok(self.inner.topology.transaction_support_status())
             }
             _ => Ok(initial_status),

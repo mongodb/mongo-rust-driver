@@ -1,4 +1,8 @@
-use crate::client::options::{ServerAddress, DEFAULT_PORT};
+use crate::{
+    client::options::{ServerAddress, DEFAULT_PORT},
+    sdam::TopologyDescription,
+    selection_criteria::SelectionCriteria,
+};
 use bson::Bson;
 
 pub(crate) mod command;
@@ -6,17 +10,18 @@ pub(crate) mod connection;
 
 pub(crate) const COMMAND_TRACING_EVENT_TARGET: &str = "mongodb::command";
 pub(crate) const CONNECTION_TRACING_EVENT_TARGET: &str = "mongodb::connection";
+pub(crate) const SERVER_SELECTION_TRACING_EVENT_TARGET: &str = "mongodb::server_selection";
 
-trait TracingRepresentation {
+pub(crate) trait TracingRepresentation {
     type Representation;
 
-    fn tracing_representation(self) -> Self::Representation;
+    fn tracing_representation(&self) -> Self::Representation;
 }
 
 impl TracingRepresentation for bson::oid::ObjectId {
     type Representation = String;
 
-    fn tracing_representation(self) -> String {
+    fn tracing_representation(&self) -> String {
         self.to_hex()
     }
 }
@@ -24,22 +29,40 @@ impl TracingRepresentation for bson::oid::ObjectId {
 impl TracingRepresentation for bson::Document {
     type Representation = String;
 
-    fn tracing_representation(self) -> String {
-        Bson::Document(self).into_relaxed_extjson().to_string()
+    fn tracing_representation(&self) -> String {
+        Bson::Document(self.clone())
+            .into_relaxed_extjson()
+            .to_string()
     }
 }
 
 impl TracingRepresentation for crate::error::Error {
     type Representation = String;
 
-    fn tracing_representation(self) -> String {
+    fn tracing_representation(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl TracingRepresentation for SelectionCriteria {
+    type Representation = String;
+
+    fn tracing_representation(&self) -> Self::Representation {
+        self.to_string()
+    }
+}
+
+impl TracingRepresentation for TopologyDescription {
+    type Representation = String;
+
+    fn tracing_representation(&self) -> Self::Representation {
         self.to_string()
     }
 }
 
 impl ServerAddress {
     /// Per spec should populate the port field with 27017 if we are defaulting to that.
-    fn port_tracing_representation(&self) -> Option<u16> {
+    pub(crate) fn port_tracing_representation(&self) -> Option<u16> {
         match self {
             Self::Tcp { port, .. } => Some(port.unwrap_or(DEFAULT_PORT)),
             // TODO: RUST-802 For Unix domain sockets we should return None here, as ports

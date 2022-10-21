@@ -11,7 +11,8 @@ use crate::{
 
 /// A description of the most up-to-date information known about a topology. Further details can
 /// be found in the [Server Discovery and Monitoring specification](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst).
-#[derive(Clone)]
+#[derive(Clone, derive_more::Display)]
+#[display(fmt = "{}", description)]
 pub struct TopologyDescription {
     pub(crate) description: crate::sdam::TopologyDescription,
 }
@@ -100,40 +101,5 @@ impl fmt::Debug for TopologyDescription {
             .field("Compatibility Error", &self.compatibility_error())
             .field("Servers", &self.servers().values())
             .finish()
-    }
-}
-
-impl fmt::Display for TopologyDescription {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
-        write!(f, "{{ Type: {:?}", self.description.topology_type)?;
-
-        if let Some(ref set_name) = self.description.set_name {
-            write!(f, ", Set Name: {}", set_name)?;
-        }
-
-        if let Some(max_set_version) = self.description.max_set_version {
-            write!(f, ", Max Set Version: {}", max_set_version)?;
-        }
-
-        if let Some(max_election_id) = self.description.max_election_id {
-            write!(f, ", Max Election ID: {}", max_election_id)?;
-        }
-
-        if let Some(ref compatibility_error) = self.description.compatibility_error {
-            write!(f, ", Compatibility Error: {}", compatibility_error)?;
-        }
-
-        if !self.description.servers.is_empty() {
-            write!(f, ", Servers: ")?;
-            let mut iter = self.description.servers.values();
-            if let Some(server) = iter.next() {
-                write!(f, "{}", ServerInfo::new_borrowed(server))?;
-            }
-            for server in iter {
-                write!(f, ", {}", ServerInfo::new_borrowed(server))?;
-            }
-        }
-
-        write!(f, " }}")
     }
 }

@@ -1,5 +1,6 @@
 use crate::{
     bson::{doc, Document},
+    client::options::ServerAddress,
     coll::options::FindOptions,
     error::{
         BulkWriteError,
@@ -10,6 +11,13 @@ use crate::{
         WriteConcernError,
         WriteError,
         WriteFailure,
+    },
+    sdam::{ServerDescription, TopologyDescription},
+    selection_criteria::{
+        HedgedReadOptions,
+        ReadPreference,
+        ReadPreferenceOptions,
+        SelectionCriteria,
     },
     test::{
         log_uncaptured,
@@ -23,10 +31,12 @@ use crate::{
     },
     trace::{
         command::{truncate_on_char_boundary, DEFAULT_MAX_DOCUMENT_LENGTH_BYTES},
+        TracingRepresentation,
         COMMAND_TRACING_EVENT_TARGET,
     },
+    TopologyType,
 };
-use std::{collections::HashMap, iter, time::Duration};
+use std::{collections::HashMap, iter, sync::Arc, time::Duration};
 
 use super::{run_unified_format_test_filtered, unified_runner::TestCase};
 
@@ -354,6 +364,133 @@ fn error_redaction() {
     assert_is_redacted(bulk_write_error);
 }
 
+#[test]
+fn selection_criteria_tracing_representation() {
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::Primary).tracing_representation(),
+        "ReadPreference { Mode: Primary }"
+    );
+
+    // non-primary read preferences with empty options - options should be omitted from
+    // representation.
+    let empty_opts = ReadPreferenceOptions::builder().build();
+
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
+            options: empty_opts.clone()
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: PrimaryPreferred }"
+    );
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::Secondary {
+            options: empty_opts.clone()
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: Secondary }"
+    );
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
+            options: empty_opts.clone()
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: SecondaryPreferred }"
+    );
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::Nearest {
+            options: empty_opts
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: Nearest }"
+    );
+
+    let mut tag_set = HashMap::new();
+    tag_set.insert("a".to_string(), "b".to_string());
+    let opts_with_tag_sets = ReadPreferenceOptions::builder()
+        .tag_sets(vec![tag_set.clone()])
+        .build();
+
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
+            options: opts_with_tag_sets
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: PrimaryPreferred, Tag Sets: [{\"a\": \"b\"}] }"
+    );
+
+    let opts_with_max_staleness = ReadPreferenceOptions::builder()
+        .max_staleness(Duration::from_millis(200))
+        .build();
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
+            options: opts_with_max_staleness
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: PrimaryPreferred, Max Staleness: 200ms }"
+    );
+
+    let opts_with_hedge = ReadPreferenceOptions::builder()
+        .hedge(HedgedReadOptions::with_enabled(true))
+        .build();
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
+            options: opts_with_hedge
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: PrimaryPreferred, Hedge: true }"
+    );
+
+    let opts_with_multiple_options = ReadPreferenceOptions::builder()
+        .max_staleness(Duration::from_millis(200))
+        .tag_sets(vec![tag_set])
+        .build();
+    assert_eq!(
+        SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
+            options: opts_with_multiple_options
+        })
+        .tracing_representation(),
+        "ReadPreference { Mode: PrimaryPreferred, Tag Sets: [{\"a\": \"b\"}], Max Staleness: \
+         200ms }"
+    );
+
+    assert_eq!(
+        SelectionCriteria::Predicate(Arc::new(|_s| true)).tracing_representation(),
+        "Custom predicate"
+    );
+}
+
+#[test]
+fn topology_description_tracing_representation() {
+    let mut servers = HashMap::new();
+    servers.insert(ServerAddress::default(), ServerDescription::new(ServerAddress::default()));
+
+    let oid = bson::oid::ObjectId::new();
+    let description = TopologyDescription {
+        single_seed: false,
+        set_name: Some("myReplicaSet".to_string()),
+        topology_type: TopologyType::ReplicaSetWithPrimary,
+        max_set_version: Some(100),
+        max_election_id: Some(oid),
+        compatibility_error: Some("Compat error".to_string()),
+        session_support_status: crate::sdam::SessionSupportStatus::default(),
+        transaction_support_status: crate::sdam::TransactionSupportStatus::default(),
+        cluster_time: None,
+        local_threshold: None,
+        heartbeat_freq: None,
+        servers,
+    };
+
+    assert_eq!(
+        description.tracing_representation(),
+        format!(
+            "{{ Type: ReplicaSetWithPrimary, Set Name: myReplicaSet, Max Set Version: 100, Max \
+             Election ID: {}, Compatibility Error: Compat error, Servers: [ {{ Address: \
+             localhost:27017, Type: Unknown }} ] }}",
+            oid.to_hex()
+        ),
+    )
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_unified() {
@@ -382,5 +519,20 @@ async fn connection_logging_unified() {
         &["connection-monitoring-and-pooling", "logging"],
         |path, file| run_unified_format_test_filtered(path, file, test_predicate),
     )
+    .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_logging_unified() {
+    let test_predicate = |tc: &TestCase|
+        // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite support.
+        tc.description != "Successful bulkWrite operation: log messages have operationIds" &&
+        tc.description != "Failed bulkWrite operation: log messages have operationIds";
+
+    let _guard = LOCK.run_exclusively().await;
+    run_spec_test_with_path(&["server-selection", "logging"], |path, file| {
+        run_unified_format_test_filtered(path, file, test_predicate)
+    })
     .await;
 }
