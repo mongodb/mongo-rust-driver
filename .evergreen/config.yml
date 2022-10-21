@@ -1174,8 +1174,6 @@ tasks:
       - func: "install junit dependencies"
       - func: "fetch crypt_shared"
       - func: "bootstrap mongo-orchestration"
-        vars:
-          TOPOLOGY: "server"
       - func: "run kmip server"
       - func: "run csfle tests"
 
@@ -1865,14 +1863,30 @@ buildvariants:
   tasks:
     - "serverless_task_group"
 
-# TODO(RUST-1386): Expand the os and version listing
 - matrix_name: "csfle"
   matrix_spec:
     os:
       - ubuntu-20.04
     mongodb-version:
       - "6.0"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os}"
+      - "latest"
+    topology:
+      - "standalone"
+      - "replica-set"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology}"
+  tasks:
+    - "test-csfle"
+
+- matrix_name: "csfle-os"
+  matrix_spec:
+    os:
+      - macos-11.00
+      - windows-64-vs2017
+    mongodb-version:
+      - "6.0"
+    topology:
+      - "standalone"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology}"
   tasks:
     - "test-csfle"
 
