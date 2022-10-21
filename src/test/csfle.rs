@@ -19,15 +19,15 @@ use crate::{
         EncryptOptions,
         MasterKey,
     },
-    coll::options::{CollectionOptions, InsertOneOptions, DropCollectionOptions},
+    coll::options::{CollectionOptions, InsertOneOptions, DropCollectionOptions, CreateIndexOptions},
     db::options::CreateCollectionOptions,
-    error::ErrorKind,
+    error::{ErrorKind, WriteFailure, WriteError},
     event::command::CommandStartedEvent,
-    options::{ReadConcern, WriteConcern},
+    options::{ReadConcern, WriteConcern, IndexOptions},
     test::{Event, EventHandler, SdamEvent},
     Client,
     Collection,
-    Namespace,
+    Namespace, IndexModel,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -1920,7 +1920,7 @@ async fn kms_tls_options() -> Result<()> {
     Ok(())
 }
 
-// Prose test 11. Explicit Encryption (Case 1: can insert encrypted indexed and find)
+// Prose test 12. Explicit Encryption (Case 1: can insert encrypted indexed and find)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_1() -> Result<()> {
@@ -1961,7 +1961,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
     Ok(())
 }
 
-// Prose test 11. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero contention)
+// Prose test 12. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero contention)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_2() -> Result<()> {
@@ -2021,7 +2021,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
     Ok(())
 }
 
-// Prose test 11. Explicit Encryption (Case 3: can insert encrypted unindexed)
+// Prose test 12. Explicit Encryption (Case 3: can insert encrypted unindexed)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_3() -> Result<()> {
@@ -2052,7 +2052,7 @@ async fn explicit_encryption_case_3() -> Result<()> {
     Ok(())
 }
 
-// Prose test 11. Explicit Encryption (Case 4: can roundtrip encrypted indexed)
+// Prose test 12. Explicit Encryption (Case 4: can roundtrip encrypted indexed)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_4() -> Result<()> {
@@ -2081,7 +2081,7 @@ async fn explicit_encryption_case_4() -> Result<()> {
     Ok(())
 }
 
-// Prose test 11. Explicit Encryption (Case 5: can roundtrip encrypted unindexed)
+// Prose test 12. Explicit Encryption (Case 5: can roundtrip encrypted unindexed)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_5() -> Result<()> {
@@ -2176,4 +2176,119 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
     ).await?;
 
     Ok(Some(ExplicitEncryptionTestData { key1_id, client_encryption, encrypted_client }))
+}
+
+// Prose test 13. Unique Index on keyAltNames (Case 1: createDataKey())
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
+    if !check_env("unique_index_keyaltnames_create_data_key", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let (client_encryption, _) = unique_index_keyaltnames_setup().await?;
+
+    // Succeeds
+    client_encryption.create_data_key(
+        &KmsProvider::Local,
+        DataKeyOptions::builder()
+            .master_key(MasterKey::Local)
+            .key_alt_names(vec!["abc".to_string()])
+            .build(),
+    ).await?;
+    // Fails: duplicate key
+    let err = client_encryption.create_data_key(
+        &KmsProvider::Local,
+        DataKeyOptions::builder()
+            .master_key(MasterKey::Local)
+            .key_alt_names(vec!["abc".to_string()])
+            .build(),
+    ).await.unwrap_err();
+    assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {}", err);
+    // Fails: duplicate key
+    let err = client_encryption.create_data_key(
+        &KmsProvider::Local,
+        DataKeyOptions::builder()
+            .master_key(MasterKey::Local)
+            .key_alt_names(vec!["def".to_string()])
+            .build(),
+    ).await.unwrap_err();
+    assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {}", err);
+
+    Ok(())
+}
+
+// Prose test 13. Unique Index on keyAltNames (Case 2: addKeyAltName())
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
+    if !check_env("unique_index_keyaltnames_add_key_alt_name", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let (client_encryption, key) = unique_index_keyaltnames_setup().await?;
+
+    // Succeeds
+    let new_key = client_encryption.create_data_key(&KmsProvider::Local, None).await?;
+    client_encryption.add_key_alt_name(&new_key, "abc").await?;
+    // Still succeeds, has alt name
+    let prev_key = client_encryption.add_key_alt_name(&new_key, "abc").await?.unwrap();
+    assert_eq!("abc", prev_key.get_array("keyAltNames")?.get_str(0)?);
+    // Fails: adding alt name used for `key` to `new_key`
+    let err = client_encryption.add_key_alt_name(&new_key, "def").await.unwrap_err();
+    assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {}", err);
+    // Succeds: re-adding alt name to `new_key`
+    let prev_key = client_encryption.add_key_alt_name(&key, "def").await?.unwrap();
+    assert_eq!("def", prev_key.get_array("keyAltNames")?.get_str(0)?);
+
+    Ok(())
+}
+
+// `Error::code` skips write errors per the SDAM spec, but we need those.
+fn write_err_code(err: &crate::error::Error) -> Option<i32> {
+    if let Some(code) = err.code() {
+        return Some(code);
+    }
+    match *err.kind {
+        ErrorKind::Write(WriteFailure::WriteError(WriteError { code, .. })) => Some(code),
+        _ => None,
+    }
+}
+
+async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> {
+    let client = TestClient::new().await;
+    let datakeys = client.database("keyvault").collection::<Document>("datakeys");
+    datakeys.drop(None).await?;
+    datakeys.create_index(
+        IndexModel {
+            keys: doc! { "keyAltNames": 1 },
+            options: Some(
+                IndexOptions::builder()
+                    .name("keyAltNames_1".to_string())
+                    .unique(true)
+                    .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
+                    .build()
+            ),
+        },
+        CreateIndexOptions::builder()
+            .write_concern(WriteConcern::MAJORITY)
+            .build(),
+    ).await?;
+    let client_encryption = ClientEncryption::new(
+        ClientEncryptionOptions::builder()
+            .key_vault_client(client.into_client())
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())
+            .build()
+    )?;
+    let key = client_encryption.create_data_key(
+        &KmsProvider::Local,
+        DataKeyOptions::builder()
+            .master_key(MasterKey::Local)
+            .key_alt_names(vec!["def".to_string()])
+            .build(),
+    ).await?;
+    Ok((client_encryption, key))
 }
