@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
 
 use bson::{doc, spec::BinarySubtype, Bson, Document, RawBson, Binary};
 use futures_util::TryStreamExt;
@@ -22,7 +22,7 @@ use crate::{
     coll::options::{CollectionOptions, InsertOneOptions, DropCollectionOptions, CreateIndexOptions},
     db::options::CreateCollectionOptions,
     error::{ErrorKind, WriteFailure, WriteError},
-    event::command::CommandStartedEvent,
+    event::command::{CommandStartedEvent, CommandEventHandler, CommandSucceededEvent, CommandFailedEvent},
     options::{ReadConcern, WriteConcern, IndexOptions},
     test::{Event, EventHandler, SdamEvent},
     Client,
@@ -30,7 +30,7 @@ use crate::{
     Namespace, IndexModel,
 };
 
-use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
+use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK, FailPoint, FailPointMode, FailCommandOptions};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -2291,4 +2291,116 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
             .build(),
     ).await?;
     Ok((client_encryption, key))
+}
+
+// Prose test 14. Decryption Events (Case 1: Command Error)
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn decryption_events_command_error() -> Result<()> {
+    if !check_env("decryption_events_command_error", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let td = match DecryptionEventsTestdata::setup().await? {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+
+    let fp = FailPoint::fail_command(
+        &["aggregate"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(123)
+            .build(),
+    );
+    let _guard = fp.enable(&td.setup_client, None).await?;
+    let err = td.decryption_events.aggregate(vec![doc! { "$count": "total" }], None).await.unwrap_err();
+    assert_eq!(Some(123), err.code());
+    assert!(td.ev_handler.failed.lock().unwrap().is_some());
+
+    Ok(())
+}
+
+struct DecryptionEventsTestdata {
+    setup_client: TestClient,
+    encrypted_client: Client,
+    decryption_events: Collection<Document>,
+    ev_handler: Arc<DecryptionEventsHandler>,
+}
+
+impl DecryptionEventsTestdata {
+    async fn setup() -> Result<Option<Self>> {
+        let setup_client = TestClient::new().await;
+        if !setup_client.is_standalone() {
+            log_uncaptured("skipping decryption events test: requires standalone topology");
+            return Ok(None)
+        }
+        let db = setup_client.database("db");
+        db.collection::<Document>("decryption_events").drop(None).await?;
+        db.create_collection("decryption_events", None).await?;
+    
+        let client_encryption = ClientEncryption::new(
+            ClientEncryptionOptions::builder()
+                .key_vault_client(setup_client.clone().into_client())
+                .key_vault_namespace(KV_NAMESPACE.clone())
+                .kms_providers(LOCAL_KMS.clone())
+                .build()
+        )?;
+        let key_id = client_encryption.create_data_key(&KmsProvider::Local, None).await?;
+        let ciphertext = client_encryption.encrypt(
+            RawBson::String("hello".to_string()),
+            EncryptOptions::builder()
+                .key(EncryptKey::Id(key_id))
+                .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
+                .build(),
+        ).await?;
+        let mut malformed_ciphertext = ciphertext.clone();
+        *malformed_ciphertext.bytes.last_mut().unwrap() += 1;
+    
+        let ev_handler = DecryptionEventsHandler::new();
+        let mut opts = CLIENT_OPTIONS.get().await.clone();
+        opts.retry_reads = Some(false);
+        opts.command_event_handler = Some(ev_handler.clone());
+        let encrypted_client = Client::with_encryption_options(
+            opts,
+            AutoEncryptionOptions::builder()
+                .key_vault_namespace(KV_NAMESPACE.clone())
+                .kms_providers(LOCAL_KMS.clone())
+                .extra_options(EXTRA_OPTIONS.clone())
+                .build(),
+        ).await?;
+        let decryption_events = encrypted_client.database("db").collection("decryption_events");
+
+        Ok(Some(Self { setup_client, encrypted_client, decryption_events, ev_handler }))
+    }
+}
+
+#[derive(Debug)]
+struct DecryptionEventsHandler {
+    succeeded: Mutex<Option<CommandSucceededEvent>>,
+    failed: Mutex<Option<CommandFailedEvent>>,
+}
+
+impl DecryptionEventsHandler {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            succeeded: Mutex::new(None),
+            failed: Mutex::new(None),
+        })
+    }
+}
+
+impl CommandEventHandler for DecryptionEventsHandler {
+    fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
+        if event.command_name == "aggregate" {
+            *self.succeeded.lock().unwrap() = Some(event);
+        }
+    }
+
+    fn handle_command_failed_event(&self, event: CommandFailedEvent) {
+        if event.command_name == "aggregate" {
+            *self.failed.lock().unwrap() = Some(event);
+        }
+    }
 }

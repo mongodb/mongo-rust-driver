@@ -11,6 +11,8 @@ use crate::{
     Client,
 };
 
+// If you write a tokio test that uses this, make sure to annotate it with
+// tokio::test(flavor = "multi_thread").
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FailPoint {
     #[serde(flatten)]
