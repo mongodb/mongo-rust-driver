@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     path::{Path, PathBuf},
-    time::Duration,
+    time::Duration, ops::DerefMut,
 };
 
 use bson::{Document, RawDocument, RawDocumentBuf};
@@ -250,8 +250,12 @@ impl Mongocryptd {
         };
         let new_child = Self::spawn(&self.opts);
         if new_child.is_ok() {
-            if let Ok(old_child) = child.as_mut() {
-                let _ = old_child.wait().await;
+            let tmp = Err(Error::internal("mongocryptd respawn internal failure"));
+            if let Ok(mut old_child) = std::mem::replace(child.deref_mut(), tmp) {
+                crate::runtime::spawn(async move {
+                    let _ = old_child.kill();
+                    let _ = old_child.wait().await;
+                });
             }
         }
         *child = new_child;

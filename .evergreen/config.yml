@@ -481,7 +481,7 @@ functions:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        python3 ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
+        ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
         ls -R ${PROJECT_DIRECTORY}/crypt_shared
 
   "run kmip server":
@@ -1564,6 +1564,7 @@ axes:
         display_name: "latest"
         variables:
            MONGODB_VERSION: "latest"
+           CRYPT_SHARED_VERSION: "latest"
       - id: "rapid"
         display_name: "rapid"
         variables:
@@ -1673,21 +1674,21 @@ axes:
         display_name: "Ubuntu 18.04"
         run_on: ubuntu1804-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-64"
       - id: ubuntu-20.04
         display_name: "Ubuntu 20.04"
         run_on: ubuntu2004-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu2004-64"
       - id: ubuntu-18.04-arm64
         display_name: "ARM64 Ubuntu 18.04"
         run_on: ubuntu1804-arm64-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-arm64"
       - id: macos-11.00
@@ -1695,7 +1696,7 @@ axes:
         run_on: macos-1100
         variables:
           SINGLE_THREAD: true
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "macos"
       - id: windows-64-vs2017

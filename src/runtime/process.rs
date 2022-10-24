@@ -31,6 +31,13 @@ impl Process {
         Ok(Self { child })
     }
 
+    pub(crate) fn kill(&mut self) -> Result<()> {
+        #[cfg(feature = "tokio-runtime")]
+        return Ok(self.child.start_kill()?);
+        #[cfg(feature = "async-std-runtime")]
+        return Ok(self.child.kill()?);
+    }
+
     pub(crate) async fn wait(&mut self) -> Result<ExitStatus> {
         #[cfg(feature = "tokio-runtime")]
         return Ok(self.child.wait().await?);
