@@ -506,6 +506,7 @@ functions:
           export ASYNC_RUNTIME=${ASYNC_RUNTIME}
           export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
           export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
+          export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
           export KMS_PROVIDERS=$(cat << "EOF"
@@ -1578,6 +1579,7 @@ axes:
         display_name: "5.0"
         variables:
           MONGODB_VERSION: "5.0"
+          DISABLE_CRYPT_SHARED: "true"
       - id: "4.4"
         display_name: "4.4"
         variables:
