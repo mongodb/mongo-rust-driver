@@ -1575,11 +1575,6 @@ axes:
         variables:
           MONGODB_VERSION: "6.0"
           CRYPT_SHARED_VERSION: "6.0.0"
-      - id: "5.0"
-        display_name: "5.0"
-        variables:
-          MONGODB_VERSION: "5.0"
-          DISABLE_CRYPT_SHARED: "true"
       - id: "4.4"
         display_name: "4.4"
         variables:
@@ -1717,6 +1712,18 @@ axes:
         variables:
           REQUIRE_API_VERSION: "1"
           MONGODB_API_VERSION: "1"
+
+  - id: "crypt-shared"
+    display_name: "crypt_shared"
+    values:
+      - id: enabled
+        display_name: "crypt_shared enabled"
+        variables:
+          DISABLE_CRYPT_SHARED: ""
+      - id: disabled
+        display_name: "crypt_shared disabled"
+        variables:
+          DISABLE_CRYPT_SHARED: "true"
 
 task_groups:
   - name: serverless_task_group
@@ -1866,17 +1873,18 @@ buildvariants:
   tasks:
     - "serverless_task_group"
 
-- matrix_name: "csfle"
+- matrix_name: "csfle-topology"
   matrix_spec:
     os:
       - ubuntu-20.04
     mongodb-version:
       - "6.0"
-      - "latest"
     topology:
       - "standalone"
       - "replica-set"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology}"
+    crypt-shared:
+      - "enabled"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology} / ${crypt-shared}"
   tasks:
     - "test-csfle"
 
@@ -1889,7 +1897,23 @@ buildvariants:
       - "6.0"
     topology:
       - "standalone"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology}"
+    crypt-shared:
+      - "enabled"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology} / ${crypt-shared}"
+  tasks:
+    - "test-csfle"
+
+- matrix_name: "csfle-crypt-shared"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+    mongodb-version:
+      - "6.0"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "disabled"
+  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology} / ${crypt-shared}"
   tasks:
     - "test-csfle"
 

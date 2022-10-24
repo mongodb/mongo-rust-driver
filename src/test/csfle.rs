@@ -109,6 +109,8 @@ lazy_static! {
         let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
         tls_options
     };
+    static ref DISABLE_CRYPT_SHARED: bool = std::env::var("DISABLE_CRYPT_SHARED")
+        .map_or(false, |s| s == "true");
 }
 
 fn check_env(name: &str, kmip: bool) -> bool {
@@ -224,6 +226,7 @@ async fn data_key_double_encryption() -> Result<()> {
         .schema_map(schema_map)
         .tls_options(KMIP_TLS_OPTIONS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
         .build();
     let client_encrypted =
         Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
@@ -435,6 +438,7 @@ async fn external_key_vault() -> Result<()> {
             .kms_providers(LOCAL_KMS.clone())
             .schema_map(schema_map)
             .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
             .build();
         let client_encrypted =
             Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts)
@@ -537,6 +541,7 @@ async fn bson_size_limits() -> Result<()> {
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(LOCAL_KMS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
         .build();
     let client_encrypted = Client::with_encryption_options(opts, auto_enc_opts).await?;
     let coll = client_encrypted
@@ -660,6 +665,7 @@ async fn views_prohibited() -> Result<()> {
         .key_vault_namespace(KV_NAMESPACE.clone())
         .kms_providers(LOCAL_KMS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
         .build();
     let client_encrypted =
         Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
@@ -766,6 +772,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         .kms_providers(KMS_PROVIDERS.clone())
         .tls_options(KMIP_TLS_OPTIONS.clone())
         .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
         .schema_map(schema_map)
         .build();
     let client_encrypted =
@@ -1603,6 +1610,7 @@ impl DeadlockTestCase {
                 },
             )
             .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
             .build();
         let event_handler = Arc::new(EventHandler::new());
         let mut encrypted_events = event_handler.subscribe();
@@ -2330,6 +2338,7 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
             .kms_providers(LOCAL_KMS.clone())
             .bypass_query_analysis(true)
             .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
             .build(),
     )
     .await?;
@@ -2684,6 +2693,7 @@ impl DecryptionEventsTestdata {
                 .key_vault_namespace(KV_NAMESPACE.clone())
                 .kms_providers(LOCAL_KMS.clone())
                 .extra_options(EXTRA_OPTIONS.clone())
+                .disable_crypt_shared(DISABLE_CRYPT_SHARED.clone())
                 .build(),
         )
         .await?;
