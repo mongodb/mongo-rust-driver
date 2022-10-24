@@ -157,13 +157,13 @@ pub struct GridFsDownloadStream {
     file: FilesCollectionDocument,
 }
 
-type GetBytesFuture = BoxFuture<'static, (Result<Vec<u8>>, Cursor<Chunk<'static>>)>;
+type GetBytesFuture = BoxFuture<'static, Result<(Vec<u8>, Cursor<Chunk<'static>>)>>;
 
 enum State {
-    // Idle stores an Option<Cursor> so that the cursor can be moved into a GetBytesFuture without
-    // requiring ownership of the state. It will always store a value when the stream's state is
-    // Idle and can be unwrapped safely.
-    Idle(Box<Option<Cursor<Chunk<'static>>>>),
+    Idle {
+        cursor: Box<Option<Cursor<Chunk<'static>>>>,
+        cached_bytes: Option<Vec<u8>>,
+    },
     Busy(GetBytesFuture),
     Done,
 }
@@ -191,60 +191,108 @@ impl AsyncRead for GridFsDownloadStream {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<std::result::Result<usize, futures_util::io::Error>> {
+        dbg!("in poll read");
         let stream = self.get_mut();
 
         let future = match &mut stream.state {
-            State::Idle(ref mut cursor) => {
-                let new_future = get_bytes(
-                    cursor.take().unwrap(),
-                    buf.len(),
-                    stream.file.length,
-                    stream.file.chunk_size,
-                )
-                .boxed();
-                stream.state.set_busy(new_future)
+            State::Idle {
+                cursor,
+                cached_bytes,
+            } => {
+                let bytes_written = match cached_bytes {
+                    Some(bytes) => {
+                        if bytes.len() >= buf.len() {
+                            buf.copy_from_slice(&bytes[..buf.len()]);
+                            bytes.drain(..buf.len());
+                            return Poll::Ready(Ok(buf.len()));
+                        } else {
+                            let len = bytes.len();
+                            buf[..len].copy_from_slice(bytes);
+                            bytes.clear();
+                            len
+                        }
+                    }
+                    None => 0,
+                };
+
+                if let Some(cursor) = cursor.take() {
+                    let chunks_to_read = FilesCollectionDocument::n_from_vals(
+                        (buf.len() - bytes_written) as u64,
+                        stream.file.chunk_size,
+                    );
+                    let new_future = get_bytes(
+                        cursor,
+                        chunks_to_read,
+                        stream.file.length,
+                        stream.file.chunk_size,
+                    )
+                    .boxed();
+                    stream.state.set_busy(new_future)
+                } else {
+                    return Poll::Ready(Ok(bytes_written));
+                }
             }
             State::Busy(future) => future,
             State::Done => return Poll::Ready(Ok(0)),
         };
 
-        let (result, cursor) = match future.poll_unpin(cx) {
+        let result = match future.poll_unpin(cx) {
             Poll::Ready(result) => result,
             Poll::Pending => return Poll::Pending,
         };
 
-        stream.state = if !cursor.is_exhausted() {
-            State::Idle(Box::new(Some(cursor)))
-        } else {
-            State::Done
-        };
+        match result {
+            Ok((mut bytes, cursor)) => {
+                let bytes_to_write = std::cmp::min(bytes.len(), buf.len());
+                buf[..bytes_to_write].copy_from_slice(&bytes[..bytes_to_write]);
 
-        Poll::Ready(match result {
-            Ok(bytes) => {
-                buf[..bytes.len()].copy_from_slice(&bytes);
-                Ok(bytes.len())
+                let leftover = if bytes.len() > bytes_to_write {
+                    bytes.drain(..bytes_to_write);
+                    Some(bytes)
+                } else {
+                    None
+                };
+
+                if !cursor.is_exhausted() {
+                    stream.state = State::Idle {
+                        cursor: Box::new(Some(cursor)),
+                        cached_bytes: leftover,
+                    };
+                } else if leftover.is_some() {
+                    stream.state = State::Idle {
+                        cursor: Box::new(None),
+                        cached_bytes: leftover,
+                    };
+                } else {
+                    stream.state = State::Done;
+                }
+
+                Poll::Ready(Ok(bytes_to_write))
             }
             Err(error) => {
+                stream.state = State::Done;
                 let error = futures_io::Error::new(futures_io::ErrorKind::Other, error);
-                Err(error)
+                Poll::Ready(Err(error))
             }
-        })
+        }
     }
 }
 
 async fn get_bytes(
     mut cursor: Cursor<Chunk<'static>>,
-    buf_size: usize,
+    chunks_to_read: u64,
     expected_file_len: u64,
     chunk_size: u32,
-) -> (Result<Vec<u8>>, Cursor<Chunk<'static>>) {
-    let bytes_result = get_bytes_inner(&mut cursor, buf_size, expected_file_len, chunk_size).await;
-    (bytes_result, cursor)
+) -> Result<(Vec<u8>, Cursor<Chunk<'static>>)> {
+    match get_bytes_inner(&mut cursor, chunks_to_read, expected_file_len, chunk_size).await {
+        Ok(bytes) => Ok((bytes, cursor)),
+        Err(error) => Err(error),
+    }
 }
 
 async fn get_bytes_inner(
     cursor: &mut Cursor<Chunk<'static>>,
-    mut buf_size: usize,
+    chunks_to_read: u64,
     expected_file_len: u64,
     chunk_size: u32,
 ) -> Result<Vec<u8>> {
@@ -252,6 +300,7 @@ async fn get_bytes_inner(
     let mut current_n = 0u32;
     while cursor.advance().await? {
         let chunk = cursor.deserialize_current()?;
+        let chunk_bytes = chunk.data.bytes;
 
         if chunk.n != current_n {
             return Err(ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n: current_n }).into());
@@ -262,7 +311,7 @@ async fn get_bytes_inner(
             chunk_size,
             current_n,
         );
-        if chunk.data.bytes.len() != (expected_len as usize) {
+        if chunk_bytes.len() != (expected_len as usize) {
             return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
                 actual_size: chunk.data.bytes.len(),
                 expected_size: expected_len,
@@ -270,20 +319,16 @@ async fn get_bytes_inner(
             .into());
         }
 
-        let bytes_to_write = std::cmp::min(chunk.data.bytes.len(), buf_size) as usize;
-        bytes.extend_from_slice(&chunk.data.bytes[..bytes_to_write]);
+        bytes.extend_from_slice(chunk_bytes);
 
         current_n += 1;
-
-        buf_size -= bytes_to_write;
-        if buf_size == 0 {
+        if (current_n as u64) == chunks_to_read {
             break;
         }
     }
 
-    if buf_size > 0
-        && (current_n as u64) < FilesCollectionDocument::n_from_vals(expected_file_len, chunk_size)
-    {
+    let total_n = FilesCollectionDocument::n_from_vals(expected_file_len, chunk_size);
+    if (current_n as u64) < chunks_to_read && (current_n as u64) < total_n {
         return Err(ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n: current_n }).into());
     }
 
@@ -325,7 +370,10 @@ impl GridFsBucket {
                 .chunks()
                 .find(doc! { "files_id": &file.id }, options)
                 .await?;
-            State::Idle(Box::new(Some(cursor)))
+            State::Idle {
+                cursor: Box::new(Some(cursor)),
+                cached_bytes: None,
+            }
         };
         Ok(GridFsDownloadStream {
             state: initial_state,
