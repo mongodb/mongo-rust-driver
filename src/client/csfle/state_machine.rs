@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     path::{Path, PathBuf},
-    time::Duration, ops::DerefMut,
+    ops::DerefMut,
 };
 
 use bson::{Document, RawDocument, RawDocumentBuf};
@@ -62,7 +62,7 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
         mongocryptd_opts: Option<MongocryptdOptions>,
-        mongocryptd_connect: bool,
+        mongocryptd_client: Option<Client>,
         metadata_client: Option<WeakClient>,
     ) -> Result<Self> {
         let mongocryptd = match mongocryptd_opts {
@@ -70,10 +70,8 @@ impl CryptExecutor {
             None => None,
         };
         let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
-        if mongocryptd_connect {
-            exec.mongocryptd_client = Some(Mongocryptd::connect(mongocryptd.as_ref().map(|m| &m.opts)).await?);
-        }
         exec.mongocryptd = mongocryptd;
+        exec.mongocryptd_client = mongocryptd_client;
         exec.metadata_client = metadata_client;
         Ok(exec)
     }
@@ -233,22 +231,12 @@ struct Mongocryptd {
 }
 
 impl Mongocryptd {
-    const DEFAULT_URI: &'static str = "mongodb://localhost:27020";
-    const SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
-
     async fn new(opts: MongocryptdOptions) -> Result<Self> {
         let child = Mutex::new(Ok(Self::spawn(&opts)?));
         Ok(Self {
             opts,
             child,
         })
-    }
-
-    async fn connect(opts: Option<&MongocryptdOptions>) -> Result<Client> {
-        let uri = opts.and_then(|o| o.uri.as_deref()).unwrap_or(Self::DEFAULT_URI);
-        let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
-        options.server_selection_timeout = Some(Self::SERVER_SELECTION_TIMEOUT);
-        Client::with_options(options)
     }
 
     async fn respawn(&self) -> Result<()> {
@@ -302,7 +290,6 @@ fn unit_err<T>(r: &Result<T>) -> Result<()> {
 pub(crate) struct MongocryptdOptions {
     pub(crate) spawn_path: Option<PathBuf>,
     pub(crate) spawn_args: Vec<String>,
-    pub(crate) uri: Option<String>,
 }
 
 fn result_ref<T>(r: &Result<T>) -> Result<&T> {

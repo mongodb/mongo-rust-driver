@@ -2,7 +2,7 @@ pub mod client_encryption;
 pub mod options;
 mod state_machine;
 
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use derivative::Derivative;
 use mongocrypt::Crypt;
@@ -44,6 +44,9 @@ struct AuxClients {
 }
 
 impl ClientState {
+    const MONGOCRYPTD_DEFAULT_URI: &'static str = "mongodb://localhost:27020";
+    const MONGOCRYPTD_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
+
     pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_opts = Self::make_mongocryptd_opts(&opts, &crypt)?;
@@ -52,12 +55,20 @@ impl ClientState {
             && opts.bypass_query_analysis != Some(true)
             && crypt.shared_lib_version().is_none()
             && opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? != Some(true);
+        let mongocryptd_client = if mongocryptd_connect {
+            let uri = opts.extra_option(&EO_MONGOCRYPTD_URI)?.unwrap_or(Self::MONGOCRYPTD_DEFAULT_URI);
+            let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
+            options.server_selection_timeout = Some(Self::MONGOCRYPTD_SERVER_SELECTION_TIMEOUT);
+            Some(Client::with_options(options)?)
+        } else {
+            None
+        };
         let exec = CryptExecutor::new_implicit(
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
             opts.tls_options.take(),
             mongocryptd_opts,
-            mongocryptd_connect,
+            mongocryptd_client,
             aux_clients.metadata_client,
         )
         .await?;
@@ -138,13 +149,9 @@ impl ClientState {
                 spawn_args.push(str_arg.to_string());
             }
         }
-        let uri = opts
-            .extra_option(&EO_MONGOCRYPTD_URI)?
-            .map(|s| s.to_string());
         Ok(Some(MongocryptdOptions {
             spawn_path,
             spawn_args,
-            uri,
         }))
     }
 

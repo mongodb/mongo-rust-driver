@@ -1345,15 +1345,13 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
 
     // Test: insert fails.
-    let result = client_encrypted
+    let err = client_encrypted
         .database("db")
         .collection::<Document>("coll")
         .insert_one(doc! { "encrypted": "test" }, None)
-        .await;
-    assert!(matches!(
-        result.unwrap_err().kind.as_ref(),
-        ErrorKind::InvalidArgument { .. }
-    ));
+        .await
+        .unwrap_err();
+    assert!(err.is_server_selection_error(), "unexpected error: {}", err);
 
     Ok(())
 }
