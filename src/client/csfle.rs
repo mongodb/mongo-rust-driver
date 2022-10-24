@@ -48,11 +48,16 @@ impl ClientState {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_opts = Self::make_mongocryptd_opts(&opts, &crypt)?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
+        let mongocryptd_connect = opts.bypass_auto_encryption != Some(true)
+            && opts.bypass_query_analysis != Some(true)
+            && crypt.shared_lib_version().is_none()
+            && opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? != Some(true);
         let exec = CryptExecutor::new_implicit(
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
             opts.tls_options.take(),
             mongocryptd_opts,
+            mongocryptd_connect,
             aux_clients.metadata_client,
         )
         .await?;

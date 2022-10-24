@@ -93,7 +93,10 @@ lazy_static! {
         out.retain(|k, _| *k == KmsProvider::Local);
         out
     };
-    static ref EXTRA_OPTIONS: Document = doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
+    static ref EXTRA_OPTIONS: Document = doc! {
+        "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap(),
+        "mongocryptdBypassSpawn": true,
+    };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
     static ref KMIP_TLS_OPTIONS: KmsProvidersTlsOptions = {
             /* If these options are used, the test will need a running KMIP server:

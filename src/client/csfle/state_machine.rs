@@ -31,6 +31,7 @@ pub(crate) struct CryptExecutor {
     tls_options: Option<KmsProvidersTlsOptions>,
     crypto_threads: ThreadPool,
     mongocryptd: Option<Mongocryptd>,
+    mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
 }
 
@@ -51,6 +52,7 @@ impl CryptExecutor {
             tls_options,
             crypto_threads,
             mongocryptd: None,
+            mongocryptd_client: None,
             metadata_client: None,
         })
     }
@@ -60,6 +62,7 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
         mongocryptd_opts: Option<MongocryptdOptions>,
+        mongocryptd_connect: bool,
         metadata_client: Option<WeakClient>,
     ) -> Result<Self> {
         let mongocryptd = match mongocryptd_opts {
@@ -67,6 +70,9 @@ impl CryptExecutor {
             None => None,
         };
         let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
+        if mongocryptd_connect {
+            exec.mongocryptd_client = Some(Mongocryptd::connect(mongocryptd.as_ref().map(|m| &m.opts)).await?);
+        }
         exec.mongocryptd = mongocryptd;
         exec.metadata_client = metadata_client;
         Ok(exec)
@@ -112,20 +118,24 @@ impl CryptExecutor {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
                     let op = RawOutput(RunCommand::new_raw(db.to_string(), command, None, None)?);
-                    let mongocryptd = self.mongocryptd.as_ref().ok_or_else(|| {
+                    let mongocryptd_client = self.mongocryptd_client.as_ref().ok_or_else(|| {
                         Error::invalid_argument("this operation requires mongocryptd")
                     })?;
-                    let result = mongocryptd.client.execute_operation(op.clone(), None).await;
+                    let result = mongocryptd_client.execute_operation(op.clone(), None).await;
                     let response = match result {
                         Ok(r) => r,
                         Err(e) if e.is_server_selection_error() => {
-                            mongocryptd.respawn().await?;
-                            match mongocryptd.client.execute_operation(op, None).await {
-                                Ok(r) => r,
-                                Err(new_e) if !new_e.is_server_selection_error() => {
-                                    return Err(new_e)
+                            if let Some(mongocryptd) = &self.mongocryptd {
+                                mongocryptd.respawn().await?;
+                                match mongocryptd_client.execute_operation(op, None).await {
+                                    Ok(r) => r,
+                                    Err(new_e) if !new_e.is_server_selection_error() => {
+                                        return Err(new_e)
+                                    }
+                                    Err(_) => return Err(e),
                                 }
-                                Err(_) => return Err(e),
+                            } else {
+                                return Err(e);
                             }
                         }
                         Err(e) => return Err(e),
@@ -219,7 +229,6 @@ impl CryptExecutor {
 #[derive(Debug)]
 struct Mongocryptd {
     opts: MongocryptdOptions,
-    client: Client,
     child: Mutex<Result<Process>>,
 }
 
@@ -229,15 +238,17 @@ impl Mongocryptd {
 
     async fn new(opts: MongocryptdOptions) -> Result<Self> {
         let child = Mutex::new(Ok(Self::spawn(&opts)?));
-        let uri = opts.uri.as_deref().unwrap_or(Self::DEFAULT_URI);
-        let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
-        options.server_selection_timeout = Some(Self::SERVER_SELECTION_TIMEOUT);
-        let client = Client::with_options(options)?;
         Ok(Self {
             opts,
-            client,
             child,
         })
+    }
+
+    async fn connect(opts: Option<&MongocryptdOptions>) -> Result<Client> {
+        let uri = opts.and_then(|o| o.uri.as_deref()).unwrap_or(Self::DEFAULT_URI);
+        let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
+        options.server_selection_timeout = Some(Self::SERVER_SELECTION_TIMEOUT);
+        Client::with_options(options)
     }
 
     async fn respawn(&self) -> Result<()> {
