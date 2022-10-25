@@ -262,14 +262,12 @@ impl RawCommandResponse {
                     raw_command_response: self.into_raw_document_buf(),
                 })
             }
-            err => match self.body::<CommandResponse<CommandErrorBody>>() {
+            _ => match self.body::<CommandResponse<CommandErrorBody>>() {
                 Ok(command_error_body) => Err(Error::new(
                     ErrorKind::Command(command_error_body.body.command_error),
                     command_error_body.body.error_labels,
                 )),
                 Err(_) => {
-                    let _ = dbg!(err);
-                    let _ = dbg!(self.body::<Document>());
                     Err(ErrorKind::InvalidResponse {
                         message: "invalid server response".into(),
                     }
