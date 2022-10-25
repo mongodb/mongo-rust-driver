@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
-    path::{Path, PathBuf},
     ops::DerefMut,
+    path::{Path, PathBuf},
 };
 
 use bson::{Document, RawDocument, RawDocumentBuf};
@@ -233,10 +233,7 @@ struct Mongocryptd {
 impl Mongocryptd {
     async fn new(opts: MongocryptdOptions) -> Result<Self> {
         let child = Mutex::new(Ok(Self::spawn(&opts)?));
-        Ok(Self {
-            opts,
-            child,
-        })
+        Ok(Self { opts, child })
     }
 
     async fn respawn(&self) -> Result<()> {
