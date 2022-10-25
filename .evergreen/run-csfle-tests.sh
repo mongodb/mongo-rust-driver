@@ -7,9 +7,8 @@ source ./.evergreen/env.sh
 
 set -o xtrace
 
-FEATURE_FLAGS="openssl-tls,csfle"
+FEATURE_FLAGS="csfle,${TLS_FEATURE}"
 OPTIONS="-- -Z unstable-options --format json --report-time"
-
 
 if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"

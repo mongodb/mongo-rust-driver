@@ -475,24 +475,27 @@ functions:
 
   "fetch crypt_shared":
   - command: shell.exec
-    type: test
     params:
       shell: bash
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
-        ls -R ${PROJECT_DIRECTORY}/crypt_shared
+        if [ "${DISABLE_CRYPT_SHARED}" == "true" ]; then
+          echo "crypt_shared is disabled, not fetching"
+        else
+          ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
+          ls -R ${PROJECT_DIRECTORY}/crypt_shared
+        fi
 
   "run kmip server":
   - command: shell.exec
-    type: test
     params:
       shell: bash
       working_dir: "src"
       background: true
       script: |
         ${PREPARE_SHELL}
+        export TLS_FEATURE=${TLS_FEATURE}
         .evergreen/run-csfle-kmip-servers.sh
 
   "run csfle tests":
@@ -507,6 +510,7 @@ functions:
           export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
           export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
           export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
+          export TLS_FEATURE=${TLS_FEATURE}
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
           export KMS_PROVIDERS=$(cat << "EOF"
@@ -1575,6 +1579,10 @@ axes:
         variables:
           MONGODB_VERSION: "6.0"
           CRYPT_SHARED_VERSION: "6.0.0"
+      - id: "5.0"
+        display_name: "5.0"
+        variables:
+          MONGODB_VERSION: "5.0"
       - id: "4.4"
         display_name: "4.4"
         variables:
@@ -1645,6 +1653,18 @@ axes:
            AUTH: "noauth"
            SSL: "nossl"
            TLS_FEATURE: ""
+
+  - id: "tls-feature"
+    display_name: "TLS Feature"
+    values:
+      - id: "default"
+        display_name: "default TLS"
+        variables:
+          TLS_FEATURE: ""
+      - id: "openssl"
+        display_name: "OpenSSL TLS"
+        variables:
+          TLS_FEATURE: "openssl-tls"
 
   - id: "compressor"
     display_name: "Compressor"
@@ -1884,7 +1904,9 @@ buildvariants:
       - "replica-set"
     crypt-shared:
       - "enabled"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology} / ${crypt-shared}"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
   tasks:
     - "test-csfle"
 
@@ -1899,7 +1921,9 @@ buildvariants:
       - "standalone"
     crypt-shared:
       - "enabled"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology} / ${crypt-shared}"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
   tasks:
     - "test-csfle"
 
@@ -1908,12 +1932,31 @@ buildvariants:
     os:
       - ubuntu-20.04
     mongodb-version:
+      - "5.0"
       - "6.0"
     topology:
       - "standalone"
     crypt-shared:
       - "disabled"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os} / ${topology} / ${crypt-shared}"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
+- matrix_name: "csfle-tls"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+    mongodb-version:
+      - "6.0"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "openssl"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
   tasks:
     - "test-csfle"
 

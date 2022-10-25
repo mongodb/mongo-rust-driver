@@ -1697,7 +1697,7 @@ impl DeadlockExpectation {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn kms_tls() -> Result<()> {
-    if !check_env("kms_tls", false) {
+    if !check_env("kms_tls", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -1753,7 +1753,7 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn kms_tls_options() -> Result<()> {
-    if !check_env("kms_tls_options", false) {
+    if !check_env("kms_tls_options", true) {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
