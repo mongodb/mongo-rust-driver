@@ -11,7 +11,7 @@ use crate::{
     bson_util::get_int,
     error::{ErrorKind, Result},
     index::IndexModel,
-    options::{FindOneOptions, ReadPreference, SelectionCriteria},
+    options::{CreateCollectionOptions, FindOneOptions, ReadPreference, SelectionCriteria},
     Collection,
 };
 
@@ -116,8 +116,10 @@ impl GridFsBucket {
                 .await?
                 .is_none()
             {
-                Self::create_index(self.files(), doc! { "filename": 1, "uploadDate": 1 }).await?;
-                Self::create_index(self.chunks(), doc! { "files_id": 1, "n": 1 }).await?;
+                self.create_index(self.files(), doc! { "filename": 1, "uploadDate": 1 })
+                    .await?;
+                self.create_index(self.chunks(), doc! { "files_id": 1, "n": 1 })
+                    .await?;
             }
             self.inner.created_indexes.store(true, Ordering::SeqCst);
         }
@@ -125,7 +127,18 @@ impl GridFsBucket {
         Ok(())
     }
 
-    async fn create_index<T>(coll: &Collection<T>, keys: Document) -> Result<()> {
+    async fn create_index<T>(&self, coll: &Collection<T>, keys: Document) -> Result<()> {
+        // listIndexes returns an error if the collection has not yet been created.
+        let options = CreateCollectionOptions::builder()
+            .write_concern(self.write_concern().cloned())
+            .build();
+        // Ignore NamespaceExists errors if the collection has already been created.
+        if let Err(error) = self.inner.db.create_collection(coll.name(), options).await {
+            if error.code() != Some(48) {
+                return Err(error);
+            }
+        }
+
         // From the spec: Drivers MUST check whether the indexes already exist before attempting to
         // create them.
         let mut indexes = coll.list_indexes(None).await?;

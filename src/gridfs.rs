@@ -16,10 +16,9 @@ use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
-    concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    options::{CollectionOptions, FindOptions, SelectionCriteria},
+    options::{CollectionOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
     Collection,
     Database,
 };
@@ -58,13 +57,14 @@ pub struct FilesCollectionDocument {
 
 impl FilesCollectionDocument {
     /// Returns the total number of chunks expected to be in the file.
-    fn n(&self) -> u64 {
+    fn n(&self) -> u32 {
         Self::n_from_vals(self.length, self.chunk_size)
     }
 
-    fn n_from_vals(length: u64, chunk_size: u32) -> u64 {
+    fn n_from_vals(length: u64, chunk_size: u32) -> u32 {
         let chunk_size = chunk_size as u64;
-        length / chunk_size + u64::from(length % chunk_size != 0)
+        let n = length / chunk_size + u64::from(length % chunk_size != 0);
+        u32::try_from(n).unwrap_or(u32::MAX)
     }
 
     /// Returns the expected length of a chunk given its index.
@@ -74,7 +74,7 @@ impl FilesCollectionDocument {
 
     fn expected_chunk_length_from_vals(length: u64, chunk_size: u32, n: u32) -> u32 {
         let remainder = length % (chunk_size as u64);
-        if (n as u64) == Self::n_from_vals(length, chunk_size) - 1 && remainder != 0 {
+        if n == Self::n_from_vals(length, chunk_size) - 1 && remainder != 0 {
             remainder as u32
         } else {
             chunk_size
@@ -84,6 +84,7 @@ impl FilesCollectionDocument {
 
 #[derive(Debug)]
 struct GridFsBucketInner {
+    db: Database,
     options: GridFsBucketOptions,
     files: Collection<FilesCollectionDocument>,
     chunks: Collection<Chunk<'static>>,
@@ -193,6 +194,7 @@ impl GridFsBucket {
 
         GridFsBucket {
             inner: Arc::new(GridFsBucketInner {
+                db: db.clone(),
                 options,
                 files,
                 chunks,
