@@ -496,7 +496,7 @@ async fn external_key_vault() -> Result<()> {
 fn load_testdata_raw(name: &str) -> Result<String> {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "src/test/spec/json/client-side-encryption/testdata",
+        "src/test/spec/json/testdata/client-side-encryption",
         name,
     ]
     .iter()
