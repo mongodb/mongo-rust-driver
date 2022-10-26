@@ -1,10 +1,10 @@
 use crate::{
     bson::Document,
     event::{
-        cmap::{ConnectionCheckoutFailedReason, ConnectionClosedReason},
+        cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
         command::CommandEvent,
     },
-    test::{CmapEvent, Event},
+    test::Event,
     ServerType,
 };
 use serde::Deserialize;
@@ -141,11 +141,11 @@ impl ObserveEvent {
             (Self::ConnectionClosed, Event::Cmap(CmapEvent::ConnectionClosed(_))) => true,
             (
                 Self::ConnectionCheckOutStarted,
-                Event::Cmap(CmapEvent::ConnectionCheckOutStarted(_)),
+                Event::Cmap(CmapEvent::ConnectionCheckoutStarted(_)),
             ) => true,
             (
                 Self::ConnectionCheckOutFailed,
-                Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_)),
+                Event::Cmap(CmapEvent::ConnectionCheckoutFailed(_)),
             ) => true,
             (Self::ConnectionCheckedOut, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
             (Self::ConnectionCheckedIn, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,

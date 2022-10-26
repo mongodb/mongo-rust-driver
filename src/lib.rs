@@ -343,10 +343,6 @@ pub mod sync;
 #[cfg(test)]
 mod test;
 
-#[cfg(test)]
-#[macro_use]
-extern crate derive_more;
-
 pub use crate::{
     client::{session::ClientSession, Client},
     coll::Collection,

@@ -7,7 +7,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::sync::{Mutex, RwLock, RwLockWriteGuard};
 
 use self::{
-    event::{Event, EventHandler},
+    event::EventHandler,
     file::{Operation, TestFile, ThreadedOperation},
 };
 
@@ -19,7 +19,7 @@ use crate::{
         ConnectionPoolOptions,
     },
     error::{Error, ErrorKind, Result},
-    event::cmap::ConnectionPoolOptions as EventOptions,
+    event::cmap::{CmapEvent, ConnectionPoolOptions as EventOptions},
     options::TlsOptions,
     runtime,
     runtime::AsyncJoinHandle,
@@ -63,7 +63,7 @@ struct Executor {
     description: String,
     operations: Vec<ThreadedOperation>,
     error: Option<self::file::Error>,
-    events: Vec<Event>,
+    events: Vec<CmapEvent>,
     state: Arc<State>,
     ignored_event_names: Vec<String>,
     pool_options: ConnectionPoolOptions,
@@ -208,7 +208,7 @@ impl Executor {
 
         let ignored_event_names = self.ignored_event_names;
         let description = self.description;
-        let filter = |e: &Event| !ignored_event_names.iter().any(|name| e.name() == name);
+        let filter = |e: &CmapEvent| !ignored_event_names.iter().any(|name| e.name() == name);
         for expected_event in self.events {
             let actual_event = subscriber
                 .wait_for_event(EVENT_TIMEOUT, filter)
@@ -280,7 +280,7 @@ impl Operation {
                 // wait for event to be emitted to ensure check in has completed.
                 subscriber
                     .wait_for_event(EVENT_TIMEOUT, |e| {
-                        matches!(e, Event::ConnectionCheckedIn(event) if event.connection_id == id)
+                        matches!(e, CmapEvent::ConnectionCheckedIn(event) if event.connection_id == id)
                     })
                     .await
                     .unwrap_or_else(|| {
@@ -315,7 +315,7 @@ impl Operation {
 
                 // wait for event to be emitted to ensure drop has completed.
                 subscriber
-                    .wait_for_event(EVENT_TIMEOUT, |e| matches!(e, Event::PoolClosed(_)))
+                    .wait_for_event(EVENT_TIMEOUT, |e| matches!(e, CmapEvent::PoolClosed(_)))
                     .await
                     .expect("did not receive ConnectionPoolClosed event after closing pool");
             }
@@ -375,19 +375,19 @@ impl Matchable for EventOptions {
     }
 }
 
-impl Matchable for Event {
-    fn content_matches(&self, expected: &Event) -> std::result::Result<(), String> {
+impl Matchable for CmapEvent {
+    fn content_matches(&self, expected: &CmapEvent) -> std::result::Result<(), String> {
         match (self, expected) {
-            (Event::PoolCreated(actual), Event::PoolCreated(ref expected)) => {
+            (CmapEvent::PoolCreated(actual), CmapEvent::PoolCreated(ref expected)) => {
                 actual.options.matches(&expected.options)
             }
-            (Event::ConnectionCreated(actual), Event::ConnectionCreated(ref expected)) => {
+            (CmapEvent::ConnectionCreated(actual), CmapEvent::ConnectionCreated(ref expected)) => {
                 actual.connection_id.matches(&expected.connection_id)
             }
-            (Event::ConnectionReady(actual), Event::ConnectionReady(ref expected)) => {
+            (CmapEvent::ConnectionReady(actual), CmapEvent::ConnectionReady(ref expected)) => {
                 actual.connection_id.matches(&expected.connection_id)
             }
-            (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
+            (CmapEvent::ConnectionClosed(actual), CmapEvent::ConnectionClosed(ref expected)) => {
                 eq_matches("reason", &actual.reason, &expected.reason)?;
                 actual
                     .connection_id
@@ -395,15 +395,17 @@ impl Matchable for Event {
                     .prefix("connection_id")?;
                 Ok(())
             }
-            (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
-                actual.connection_id.matches(&expected.connection_id)
-            }
-            (Event::ConnectionCheckedIn(actual), Event::ConnectionCheckedIn(ref expected)) => {
-                actual.connection_id.matches(&expected.connection_id)
-            }
             (
-                Event::ConnectionCheckOutFailed(actual),
-                Event::ConnectionCheckOutFailed(ref expected),
+                CmapEvent::ConnectionCheckedOut(actual),
+                CmapEvent::ConnectionCheckedOut(ref expected),
+            ) => actual.connection_id.matches(&expected.connection_id),
+            (
+                CmapEvent::ConnectionCheckedIn(actual),
+                CmapEvent::ConnectionCheckedIn(ref expected),
+            ) => actual.connection_id.matches(&expected.connection_id),
+            (
+                CmapEvent::ConnectionCheckoutFailed(actual),
+                CmapEvent::ConnectionCheckoutFailed(ref expected),
             ) => {
                 if actual.reason == expected.reason {
                     Ok(())
@@ -414,10 +416,12 @@ impl Matchable for Event {
                     ))
                 }
             }
-            (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => Ok(()),
-            (Event::PoolCleared(_), Event::PoolCleared(_)) => Ok(()),
-            (Event::PoolReady(_), Event::PoolReady(_)) => Ok(()),
-            (Event::PoolClosed(_), Event::PoolClosed(_)) => Ok(()),
+            (CmapEvent::ConnectionCheckoutStarted(_), CmapEvent::ConnectionCheckoutStarted(_)) => {
+                Ok(())
+            }
+            (CmapEvent::PoolCleared(_), CmapEvent::PoolCleared(_)) => Ok(()),
+            (CmapEvent::PoolReady(_), CmapEvent::PoolReady(_)) => Ok(()),
+            (CmapEvent::PoolClosed(_), CmapEvent::PoolClosed(_)) => Ok(()),
             (actual, expected) => Err(format!("expected event {:?}, got {:?}", actual, expected)),
         }
     }

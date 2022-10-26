@@ -1,10 +1,7 @@
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use super::{
-    event::{Event, EventHandler},
-    EVENT_TIMEOUT,
-};
+use super::{event::EventHandler, EVENT_TIMEOUT};
 use crate::{
     bson::{doc, Document},
     cmap::{
@@ -13,7 +10,7 @@ use crate::{
         Command,
         ConnectionPool,
     },
-    event::cmap::{CmapEventHandler, ConnectionClosedReason},
+    event::cmap::{CmapEvent, CmapEventHandler, ConnectionClosedReason},
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
@@ -159,10 +156,10 @@ async fn concurrent_connections() {
         let mut consecutive_creations = 0;
         for event in events.iter() {
             match event {
-                Event::ConnectionCreated(_) => {
+                CmapEvent::ConnectionCreated(_) => {
                     consecutive_creations += 1;
                 }
-                Event::ConnectionReady(_) => {
+                CmapEvent::ConnectionReady(_) => {
                     assert!(
                         consecutive_creations >= 2,
                         "connections not created concurrently"
@@ -242,7 +239,7 @@ async fn connection_error_during_establishment() {
 
     subscriber
         .wait_for_event(EVENT_TIMEOUT, |e| match e {
-            Event::ConnectionClosed(event) => {
+            CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
             _ => false,
@@ -286,7 +283,7 @@ async fn connection_error_during_operation() {
 
     subscriber
         .wait_for_event(EVENT_TIMEOUT, |e| match e {
-            Event::ConnectionClosed(event) => {
+            CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
             _ => false,

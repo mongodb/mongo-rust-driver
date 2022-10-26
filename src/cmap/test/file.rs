@@ -2,8 +2,14 @@ use std::{sync::Arc, time::Duration};
 
 use serde::Deserialize;
 
-use super::{event::Event, State};
-use crate::{bson_util, cmap::options::ConnectionPoolOptions, error::Result, test::RunOn};
+use super::State;
+use crate::{
+    bson_util,
+    cmap::options::ConnectionPoolOptions,
+    error::Result,
+    event::cmap::CmapEvent,
+    test::RunOn,
+};
 use bson::Document;
 
 #[derive(Debug, Deserialize)]
@@ -17,7 +23,7 @@ pub struct TestFile {
     pub(crate) pool_options: Option<ConnectionPoolOptions>,
     pub operations: Vec<ThreadedOperation>,
     pub error: Option<Error>,
-    pub events: Vec<Event>,
+    pub(crate) events: Vec<CmapEvent>,
     #[serde(default)]
     pub ignore: Vec<String>,
     pub fail_point: Option<Document>,

@@ -10,8 +10,8 @@ use tokio::sync::broadcast::error::{RecvError, SendError};
 
 #[derive(Clone, Debug)]
 pub struct EventHandler {
-    pub events: Arc<RwLock<Vec<Event>>>,
-    channel_sender: tokio::sync::broadcast::Sender<Event>,
+    pub(crate) events: Arc<RwLock<Vec<CmapEvent>>>,
+    channel_sender: tokio::sync::broadcast::Sender<CmapEvent>,
 }
 
 impl EventHandler {
@@ -23,10 +23,10 @@ impl EventHandler {
         }
     }
 
-    fn handle<E: Into<Event>>(&self, event: E) {
+    fn handle<E: Into<CmapEvent>>(&self, event: E) {
         let event = event.into();
         // this only errors if no receivers are listening which isn't a concern here.
-        let _: std::result::Result<usize, SendError<Event>> =
+        let _: std::result::Result<usize, SendError<CmapEvent>> =
             self.channel_sender.send(event.clone());
         self.events.write().unwrap().push(event);
     }
@@ -90,13 +90,17 @@ pub struct EventSubscriber<'a> {
     /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
     /// events.
     _handler: &'a EventHandler,
-    receiver: tokio::sync::broadcast::Receiver<Event>,
+    receiver: tokio::sync::broadcast::Receiver<CmapEvent>,
 }
 
 impl EventSubscriber<'_> {
-    pub async fn wait_for_event<F>(&mut self, timeout: Duration, filter: F) -> Option<Event>
+    pub(crate) async fn wait_for_event<F>(
+        &mut self,
+        timeout: Duration,
+        filter: F,
+    ) -> Option<CmapEvent>
     where
-        F: Fn(&Event) -> bool,
+        F: Fn(&CmapEvent) -> bool,
     {
         runtime::timeout(timeout, async {
             loop {
@@ -115,9 +119,9 @@ impl EventSubscriber<'_> {
     }
 
     /// Returns the received events without waiting for any more.
-    pub fn all<F>(&mut self, filter: F) -> Vec<Event>
+    pub(crate) fn all<F>(&mut self, filter: F) -> Vec<CmapEvent>
     where
-        F: Fn(&Event) -> bool,
+        F: Fn(&CmapEvent) -> bool,
     {
         let mut events = Vec::new();
         while let Ok(event) = self.receiver.try_recv() {
@@ -129,32 +133,7 @@ impl EventSubscriber<'_> {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Deserialize, From, PartialEq)]
-#[serde(tag = "type")]
-pub enum Event {
-    #[serde(
-        deserialize_with = "self::deserialize_pool_created",
-        rename = "ConnectionPoolCreated"
-    )]
-    PoolCreated(PoolCreatedEvent),
-    #[serde(rename = "ConnectionPoolClosed")]
-    PoolClosed(PoolClosedEvent),
-    #[serde(rename = "ConnectionPoolReady")]
-    PoolReady(PoolReadyEvent),
-    ConnectionCreated(ConnectionCreatedEvent),
-    ConnectionReady(ConnectionReadyEvent),
-    ConnectionClosed(ConnectionClosedEvent),
-    ConnectionCheckOutStarted(ConnectionCheckoutStartedEvent),
-    #[serde(deserialize_with = "self::deserialize_checkout_failed")]
-    ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
-    ConnectionCheckedOut(ConnectionCheckedOutEvent),
-    #[serde(rename = "ConnectionPoolCleared")]
-    PoolCleared(PoolClearedEvent),
-    ConnectionCheckedIn(ConnectionCheckedInEvent),
-}
-
-impl Serialize for Event {
+impl Serialize for CmapEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -166,8 +145,8 @@ impl Serialize for Event {
             Self::ConnectionCreated(event) => event.serialize(serializer),
             Self::ConnectionReady(event) => event.serialize(serializer),
             Self::ConnectionClosed(event) => event.serialize(serializer),
-            Self::ConnectionCheckOutStarted(event) => event.serialize(serializer),
-            Self::ConnectionCheckOutFailed(event) => event.serialize(serializer),
+            Self::ConnectionCheckoutStarted(event) => event.serialize(serializer),
+            Self::ConnectionCheckoutFailed(event) => event.serialize(serializer),
             Self::ConnectionCheckedOut(event) => event.serialize(serializer),
             Self::PoolCleared(event) => event.serialize(serializer),
             Self::ConnectionCheckedIn(event) => event.serialize(serializer),
@@ -175,20 +154,64 @@ impl Serialize for Event {
     }
 }
 
-impl Event {
+impl<'de> Deserialize<'de> for CmapEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(tag = "type")]
+        // clippy doesn't like that all variants start with the same name, but we use these
+        // to match the test file names.
+        #[allow(clippy::enum_variant_names)]
+        enum EventHelper {
+            #[serde(deserialize_with = "self::deserialize_pool_created")]
+            ConnectionPoolCreated(PoolCreatedEvent),
+            ConnectionPoolClosed(PoolClosedEvent),
+            ConnectionPoolReady(PoolReadyEvent),
+            ConnectionCreated(ConnectionCreatedEvent),
+            ConnectionReady(ConnectionReadyEvent),
+            ConnectionClosed(ConnectionClosedEvent),
+            ConnectionCheckOutStarted(ConnectionCheckoutStartedEvent),
+            #[serde(deserialize_with = "self::deserialize_checkout_failed")]
+            ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
+            ConnectionCheckedOut(ConnectionCheckedOutEvent),
+            ConnectionPoolCleared(PoolClearedEvent),
+            ConnectionCheckedIn(ConnectionCheckedInEvent),
+        }
+
+        let helper = EventHelper::deserialize(deserializer)?;
+        let event = match helper {
+            EventHelper::ConnectionPoolCreated(e) => CmapEvent::PoolCreated(e),
+            EventHelper::ConnectionPoolClosed(e) => CmapEvent::PoolClosed(e),
+            EventHelper::ConnectionPoolReady(e) => CmapEvent::PoolReady(e),
+            EventHelper::ConnectionCreated(e) => CmapEvent::ConnectionCreated(e),
+            EventHelper::ConnectionReady(e) => CmapEvent::ConnectionReady(e),
+            EventHelper::ConnectionClosed(e) => CmapEvent::ConnectionClosed(e),
+            EventHelper::ConnectionCheckOutStarted(e) => CmapEvent::ConnectionCheckoutStarted(e),
+            EventHelper::ConnectionCheckOutFailed(e) => CmapEvent::ConnectionCheckoutFailed(e),
+            EventHelper::ConnectionCheckedOut(e) => CmapEvent::ConnectionCheckedOut(e),
+            EventHelper::ConnectionPoolCleared(e) => CmapEvent::PoolCleared(e),
+            EventHelper::ConnectionCheckedIn(e) => CmapEvent::ConnectionCheckedIn(e),
+        };
+        Ok(event)
+    }
+}
+
+impl CmapEvent {
     pub fn name(&self) -> &'static str {
         match self {
-            Event::PoolCreated(_) => "ConnectionPoolCreated",
-            Event::PoolReady(_) => "ConnectionPoolReady",
-            Event::PoolClosed(_) => "ConnectionPoolClosed",
-            Event::ConnectionCreated(_) => "ConnectionCreated",
-            Event::ConnectionReady(_) => "ConnectionReady",
-            Event::ConnectionClosed(_) => "ConnectionClosed",
-            Event::ConnectionCheckOutStarted(_) => "ConnectionCheckOutStarted",
-            Event::ConnectionCheckOutFailed(_) => "ConnectionCheckOutFailed",
-            Event::ConnectionCheckedOut(_) => "ConnectionCheckedOut",
-            Event::PoolCleared(_) => "ConnectionPoolCleared",
-            Event::ConnectionCheckedIn(_) => "ConnectionCheckedIn",
+            CmapEvent::PoolCreated(_) => "ConnectionPoolCreated",
+            CmapEvent::PoolReady(_) => "ConnectionPoolReady",
+            CmapEvent::PoolClosed(_) => "ConnectionPoolClosed",
+            CmapEvent::ConnectionCreated(_) => "ConnectionCreated",
+            CmapEvent::ConnectionReady(_) => "ConnectionReady",
+            CmapEvent::ConnectionClosed(_) => "ConnectionClosed",
+            CmapEvent::ConnectionCheckoutStarted(_) => "ConnectionCheckOutStarted",
+            CmapEvent::ConnectionCheckoutFailed(_) => "ConnectionCheckOutFailed",
+            CmapEvent::ConnectionCheckedOut(_) => "ConnectionCheckedOut",
+            CmapEvent::PoolCleared(_) => "ConnectionPoolCleared",
+            CmapEvent::ConnectionCheckedIn(_) => "ConnectionCheckedIn",
         }
     }
 
@@ -196,17 +219,17 @@ impl Event {
     // tests.
     pub fn planned_maintenance_testing_name(&self) -> &'static str {
         match self {
-            Event::PoolCreated(_) => "PoolCreatedEvent",
-            Event::PoolReady(_) => "PoolReadyEvent",
-            Event::PoolCleared(_) => "PoolClearedEvent",
-            Event::PoolClosed(_) => "PoolClosedEvent",
-            Event::ConnectionCreated(_) => "ConnectionCreatedEvent",
-            Event::ConnectionReady(_) => "ConnectionReadyEvent",
-            Event::ConnectionClosed(_) => "ConnectionClosedEvent",
-            Event::ConnectionCheckOutStarted(_) => "ConnectionCheckOutStartedEvent",
-            Event::ConnectionCheckOutFailed(_) => "ConnectionCheckOutFailedEvent",
-            Event::ConnectionCheckedOut(_) => "ConnectionCheckedOutEvent",
-            Event::ConnectionCheckedIn(_) => "ConnectionCheckedInEvent",
+            CmapEvent::PoolCreated(_) => "PoolCreatedEvent",
+            CmapEvent::PoolReady(_) => "PoolReadyEvent",
+            CmapEvent::PoolCleared(_) => "PoolClearedEvent",
+            CmapEvent::PoolClosed(_) => "PoolClosedEvent",
+            CmapEvent::ConnectionCreated(_) => "ConnectionCreatedEvent",
+            CmapEvent::ConnectionReady(_) => "ConnectionReadyEvent",
+            CmapEvent::ConnectionClosed(_) => "ConnectionClosedEvent",
+            CmapEvent::ConnectionCheckoutStarted(_) => "ConnectionCheckOutStartedEvent",
+            CmapEvent::ConnectionCheckoutFailed(_) => "ConnectionCheckOutFailedEvent",
+            CmapEvent::ConnectionCheckedOut(_) => "ConnectionCheckedOutEvent",
+            CmapEvent::ConnectionCheckedIn(_) => "ConnectionCheckedInEvent",
         }
     }
 }

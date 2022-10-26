@@ -6,6 +6,7 @@ use std::{sync::Arc, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{bson::oid::ObjectId, bson_util, options::ServerAddress};
+use derive_more::From;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -336,7 +337,7 @@ pub trait CmapEventHandler: Send + Sync {
     fn handle_connection_checked_in_event(&self, _event: ConnectionCheckedInEvent) {}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, From)]
 pub(crate) enum CmapEvent {
     PoolCreated(PoolCreatedEvent),
     PoolReady(PoolReadyEvent),

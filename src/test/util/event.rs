@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use derive_more::From;
 use serde::Serialize;
 use time::OffsetDateTime;
 use tokio::sync::{broadcast::error::SendError, RwLockReadGuard};
@@ -15,6 +16,7 @@ use crate::{
     bson::{doc, to_document, Document},
     event::{
         cmap::{
+            CmapEvent,
             CmapEventHandler,
             ConnectionCheckedInEvent,
             ConnectionCheckedOutEvent,
@@ -54,7 +56,6 @@ use crate::{
 };
 
 pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
-pub(crate) type CmapEvent = crate::cmap::test::event::Event;
 
 fn add_event_to_queue<T>(event_queue: &EventQueue<T>, event: T) {
     event_queue
@@ -313,7 +314,7 @@ impl CmapEventHandler for EventHandler {
     }
 
     fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
-        let event = CmapEvent::ConnectionCheckOutFailed(event);
+        let event = CmapEvent::ConnectionCheckoutFailed(event);
         self.handle(event.clone());
         add_event_to_queue(&self.cmap_events, event);
     }
@@ -361,7 +362,7 @@ impl CmapEventHandler for EventHandler {
     }
 
     fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
-        let event = CmapEvent::ConnectionCheckOutStarted(event);
+        let event = CmapEvent::ConnectionCheckoutStarted(event);
         self.handle(event.clone());
         add_event_to_queue(&self.cmap_events, event);
     }

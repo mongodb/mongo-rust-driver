@@ -121,9 +121,10 @@ impl ConnectionPool {
     /// pool and the total number of connections is not less than the max pool size.
     pub(crate) async fn check_out(&self) -> Result<Connection> {
         self.event_emitter.emit_event(|| {
-            CmapEvent::ConnectionCheckoutStarted(ConnectionCheckoutStartedEvent {
+            ConnectionCheckoutStartedEvent {
                 address: self.address.clone(),
-            })
+            }
+            .into()
         });
 
         let response = self.connection_requester.request().await;
@@ -139,14 +140,15 @@ impl ConnectionPool {
         match conn {
             Ok(ref conn) => {
                 self.event_emitter
-                    .emit_event(|| CmapEvent::ConnectionCheckedOut(conn.checked_out_event()));
+                    .emit_event(|| conn.checked_out_event().into());
             }
             Err(_) => {
                 self.event_emitter.emit_event(|| {
-                    CmapEvent::ConnectionCheckoutFailed(ConnectionCheckoutFailedEvent {
+                    ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
                         reason: ConnectionCheckoutFailedReason::ConnectionError,
-                    })
+                    }
+                    .into()
                 });
             }
         }

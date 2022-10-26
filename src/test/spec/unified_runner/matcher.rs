@@ -3,8 +3,8 @@ use bson::Document;
 use crate::{
     bson::{doc, spec::ElementType, Bson},
     bson_util::get_int,
-    event::{command::CommandEvent, sdam::ServerDescription},
-    test::{CmapEvent, Event, SdamEvent},
+    event::{cmap::CmapEvent, command::CommandEvent, sdam::ServerDescription},
+    test::{Event, SdamEvent},
 };
 
 use super::{
@@ -290,11 +290,11 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> Result
             },
         ) => match_opt(&actual.reason, expected_reason),
         (
-            CmapEvent::ConnectionCheckOutStarted(_),
+            CmapEvent::ConnectionCheckoutStarted(_),
             ExpectedCmapEvent::ConnectionCheckOutStarted {},
         ) => Ok(()),
         (
-            CmapEvent::ConnectionCheckOutFailed(actual),
+            CmapEvent::ConnectionCheckoutFailed(actual),
             ExpectedCmapEvent::ConnectionCheckOutFailed {
                 reason: expected_reason,
             },

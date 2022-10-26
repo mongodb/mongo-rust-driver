@@ -62,10 +62,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
             serverPort = event.address.port(),
-            serviceId = event
-                .service_id
-                .map(|id| id.tracing_representation())
-                .as_deref(),
+            serviceId = event.service_id.map(|id| id.tracing_representation()),
             "Connection pool cleared",
         );
     }
@@ -109,7 +106,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             serverHost = event.address.host(),
             serverPort = event.address.port(),
             driverConnectionId = event.connection_id,
-            reason = event.reason.tracing_representation().as_str(),
+            reason = event.reason.tracing_representation(),
             "Connection closed",
         );
     }
@@ -130,7 +127,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
             serverPort = event.address.port(),
-            reason = event.reason.tracing_representation().as_str(),
+            reason = event.reason.tracing_representation(),
             "Connection checkout failed",
         );
     }
@@ -159,33 +156,32 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
 }
 
 impl TracingRepresentation for ConnectionClosedReason {
-    fn tracing_representation(self) -> String {
+    type Representation = &'static str;
+
+    fn tracing_representation(self) -> &'static str {
         match self {
-            ConnectionClosedReason::Stale => {
-                "Connection became stale because the pool was cleared".to_string()
+            ConnectionClosedReason::Stale => "Connection became stale because the pool was cleared",
+            ConnectionClosedReason::Idle => {
+                "Connection has been available but unused for longer than the configured max idle \
+                 time"
             }
-            ConnectionClosedReason::Idle => "Connection has been available but unused for longer \
-                                             than the configured max idle time"
-                .to_string(),
-            ConnectionClosedReason::Error => {
-                "An error occurred while using the connection".to_string()
-            }
-            ConnectionClosedReason::Dropped => {
-                "Connection was dropped during an operation".to_string()
-            }
-            ConnectionClosedReason::PoolClosed => "Connection pool was closed".to_string(),
+            ConnectionClosedReason::Error => "An error occurred while using the connection",
+            ConnectionClosedReason::Dropped => "Connection was dropped during an operation",
+            ConnectionClosedReason::PoolClosed => "Connection pool was closed",
         }
     }
 }
 
 impl TracingRepresentation for ConnectionCheckoutFailedReason {
-    fn tracing_representation(self) -> String {
+    type Representation = &'static str;
+
+    fn tracing_representation(self) -> &'static str {
         match self {
             ConnectionCheckoutFailedReason::Timeout => {
-                "Wait queue timeout elapsed without a connection becoming available".to_string()
+                "Wait queue timeout elapsed without a connection becoming available"
             }
             ConnectionCheckoutFailedReason::ConnectionError => {
-                "An error occurred while trying to establish a connection".to_string()
+                "An error occurred while trying to establish a connection"
             }
         }
     }

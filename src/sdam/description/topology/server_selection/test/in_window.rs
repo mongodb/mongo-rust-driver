@@ -9,6 +9,7 @@ use tokio::sync::RwLockWriteGuard;
 use crate::{
     coll::options::FindOptions,
     error::Result,
+    event::cmap::CmapEvent,
     options::ServerAddress,
     runtime,
     runtime::AsyncJoinHandle,
@@ -17,7 +18,6 @@ use crate::{
     test::{
         log_uncaptured,
         run_spec_test,
-        CmapEvent,
         Event,
         EventHandler,
         FailCommandOptions,

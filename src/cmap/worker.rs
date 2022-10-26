@@ -23,7 +23,6 @@ use crate::{
     client::auth::Credential,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEvent,
         CmapEventEmitter,
         ConnectionClosedEvent,
         ConnectionClosedReason,
@@ -327,9 +326,10 @@ impl ConnectionPoolWorker {
         }
 
         self.event_emitter.emit_event(|| {
-            CmapEvent::PoolClosed(PoolClosedEvent {
+            PoolClosedEvent {
                 address: self.address.clone(),
-            })
+            }
+            .into()
         });
     }
 
@@ -429,7 +429,7 @@ impl ConnectionPoolWorker {
         };
         self.next_connection_id += 1;
         self.event_emitter
-            .emit_event(|| CmapEvent::ConnectionCreated(pending_connection.created_event()));
+            .emit_event(|| pending_connection.created_event().into());
 
         pending_connection
     }
@@ -459,7 +459,7 @@ impl ConnectionPoolWorker {
 
     fn check_in(&mut self, mut conn: Connection) {
         self.event_emitter
-            .emit_event(|| CmapEvent::ConnectionCheckedIn(conn.checked_in_event()));
+            .emit_event(|| conn.checked_in_event().into());
 
         conn.mark_as_available();
 
@@ -492,10 +492,11 @@ impl ConnectionPoolWorker {
 
         if was_ready {
             self.event_emitter.emit_event(|| {
-                CmapEvent::PoolCleared(PoolClearedEvent {
+                PoolClearedEvent {
                     address: self.address.clone(),
                     service_id,
-                })
+                }
+                .into()
             });
 
             if !matches!(self.generation, PoolGeneration::LoadBalanced(_)) {
@@ -516,9 +517,10 @@ impl ConnectionPoolWorker {
 
         self.state = PoolState::Ready;
         self.event_emitter.emit_event(|| {
-            CmapEvent::PoolReady(PoolReadyEvent {
+            PoolReadyEvent {
                 address: self.address.clone(),
-            })
+            }
+            .into()
         });
     }
 
@@ -635,16 +637,17 @@ async fn establish_connection(
                 )
                 .await;
             event_emitter.emit_event(|| {
-                CmapEvent::ConnectionClosed(ConnectionClosedEvent {
+                ConnectionClosedEvent {
                     address,
                     reason: ConnectionClosedReason::Error,
                     connection_id,
-                })
+                }
+                .into()
             });
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
-            event_emitter.emit_event(|| CmapEvent::ConnectionReady(connection.ready_event()));
+            event_emitter.emit_event(|| connection.ready_event().into());
         }
     }
 

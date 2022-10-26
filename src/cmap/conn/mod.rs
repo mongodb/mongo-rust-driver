@@ -22,7 +22,6 @@ use crate::{
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEvent,
         CmapEventEmitter,
         ConnectionCheckedInEvent,
         ConnectionCheckedOutEvent,
@@ -394,7 +393,7 @@ impl Connection {
     fn close(&mut self, reason: ConnectionClosedReason) {
         self.pool_manager.take();
         if let Some(ref event_emitter) = self.event_emitter {
-            event_emitter.emit_event(|| CmapEvent::ConnectionClosed(self.closed_event(reason)));
+            event_emitter.emit_event(|| self.closed_event(reason).into());
         }
     }
 

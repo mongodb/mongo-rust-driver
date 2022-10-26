@@ -7,22 +7,30 @@ pub(crate) const COMMAND_TRACING_EVENT_TARGET: &str = "mongodb::command";
 pub(crate) const CONNECTION_TRACING_EVENT_TARGET: &str = "mongodb::connection";
 
 trait TracingRepresentation {
-    fn tracing_representation(self) -> String;
+    type Representation;
+
+    fn tracing_representation(self) -> Self::Representation;
 }
 
 impl TracingRepresentation for bson::oid::ObjectId {
+    type Representation = String;
+
     fn tracing_representation(self) -> String {
         self.to_hex()
     }
 }
 
 impl TracingRepresentation for bson::Document {
+    type Representation = String;
+
     fn tracing_representation(self) -> String {
         Bson::Document(self).into_relaxed_extjson().to_string()
     }
 }
 
 impl TracingRepresentation for crate::error::Error {
+    type Representation = String;
+
     fn tracing_representation(self) -> String {
         self.to_string()
     }
