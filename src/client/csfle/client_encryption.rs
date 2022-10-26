@@ -32,6 +32,12 @@ pub struct ClientEncryption {
     key_vault: Collection<RawDocumentBuf>,
 }
 
+impl std::fmt::Debug for ClientEncryption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientEncryption").finish()
+    }
+}
+
 impl ClientEncryption {
     /// Create a new key vault handle with the given options.
     pub fn new(options: ClientEncryptionOptions) -> Result<Self> {

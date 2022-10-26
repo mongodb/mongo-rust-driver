@@ -45,6 +45,8 @@ pub(crate) enum Entity {
     EventList(EventList),
     Thread(ThreadEntity),
     TopologyDescription(TopologyDescription),
+    #[cfg(feature = "csfle")]
+    ClientEncryption(crate::client_encryption::ClientEncryption),
     None,
 }
 #[derive(Clone, Debug)]
@@ -206,6 +208,10 @@ impl ClientEntity {
         if let Some(client) = &self.client {
             client.sync_workers().await;
         }
+    }
+
+    pub(crate) fn client(&self) -> &Client {
+        &self.client
     }
 }
 

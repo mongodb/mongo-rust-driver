@@ -1,6 +1,8 @@
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod auth;
 mod change_streams;
+#[cfg(feature = "csfle")]
+mod client_side_encryption;
 mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;

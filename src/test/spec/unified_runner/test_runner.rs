@@ -537,6 +537,25 @@ impl TestRunner {
                     });
                     (thread.id.clone(), Entity::Thread(ThreadEntity { sender }))
                 }
+                #[cfg(feature = "csfle")]
+                TestFileEntity::ClientEncryption(client_enc) => {
+                    let id = client_enc.id.clone();
+                    let opts = &client_enc.client_encryption_opts;
+                    let kv_client = self.get_client(&opts.key_vault_client).await.client().clone();
+                    let kv_namespace = crate::Namespace::from_str(&opts.key_vault_namespace).unwrap();
+                    let kms_providers: crate::client::csfle::options::KmsProviders = bson::from_document(opts.kms_providers.clone()).unwrap();
+                    let client_enc = crate::client_encryption::ClientEncryption::new(
+                        crate::client_encryption::ClientEncryptionOptions::builder()
+                            .key_vault_client(kv_client)
+                            .key_vault_namespace(kv_namespace)
+                            .kms_providers(kms_providers)
+                            .build()
+                    ).unwrap();
+                    (
+                        id,
+                        Entity::ClientEncryption(client_enc),
+                    )
+                }
             };
             self.insert_entity(&id, entity).await;
         }

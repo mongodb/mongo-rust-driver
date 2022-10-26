@@ -146,6 +146,8 @@ pub(crate) enum TestFileEntity {
     Session(Session),
     Bucket(Bucket),
     Thread(Thread),
+    #[cfg(feature = "csfle")]
+    ClientEncryption(ClientEncryption),
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,6 +309,23 @@ pub(crate) struct Bucket {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Thread {
     pub(crate) id: String,
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ClientEncryption {
+    pub(crate) id: String,
+    pub(crate) client_encryption_opts: ClientEncryptionOpts,
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ClientEncryptionOpts {
+    pub(crate) key_vault_client: String,
+    pub(crate) key_vault_namespace: String,
+    pub(crate) kms_providers: Document,
 }
 
 /// Messages used for communicating with test runner "threads".
