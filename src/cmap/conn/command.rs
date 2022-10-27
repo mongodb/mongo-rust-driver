@@ -267,12 +267,10 @@ impl RawCommandResponse {
                     ErrorKind::Command(command_error_body.body.command_error),
                     command_error_body.body.error_labels,
                 )),
-                Err(_) => {
-                    Err(ErrorKind::InvalidResponse {
-                        message: "invalid server response".into(),
-                    }
-                    .into())
+                Err(_) => Err(ErrorKind::InvalidResponse {
+                    message: "invalid server response".into(),
                 }
+                .into()),
             },
         }
     }
