@@ -64,7 +64,7 @@ impl FilesCollectionDocument {
     fn n_from_vals(length: u64, chunk_size: u32) -> u32 {
         let chunk_size = chunk_size as u64;
         let n = length / chunk_size + u64::from(length % chunk_size != 0);
-        u32::try_from(n).unwrap_or(u32::MAX)
+        n as u32
     }
 
     /// Returns the expected length of a chunk given its index.

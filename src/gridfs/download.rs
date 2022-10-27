@@ -258,7 +258,7 @@ impl AsyncRead for GridFsDownloadStream {
         match result {
             Ok((mut bytes, cursor)) => {
                 let bytes_to_write = std::cmp::min(bytes.len(), buf.len());
-                buf[..bytes_to_write].copy_from_slice(&bytes.drain(0..bytes_to_write).as_slice());
+                buf[..bytes_to_write].copy_from_slice(bytes.drain(0..bytes_to_write).as_slice());
 
                 // The cache is always drained before creating a future, so we don't need to worry
                 // about overwriting anything.
