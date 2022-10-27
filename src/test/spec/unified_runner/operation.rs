@@ -352,6 +352,12 @@ impl<'de> Deserialize<'de> for Operation {
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
             "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),
+            "deleteKey" => deserialize_op::<DeleteKey>(definition.arguments),
+            "getKey" => deserialize_op::<GetKey>(definition.arguments),
+            "addKeyAltName" => deserialize_op::<AddKeyAltName>(definition.arguments),
+            "createDataKey" => deserialize_op::<CreateDataKey>(definition.arguments),
+            "getKeys" => deserialize_op::<GetKeys>(definition.arguments),
+            "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation { _name: s.to_string() }) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -2859,9 +2865,158 @@ impl TestOperation for GetKeyByAltName {
         }
         .boxed()
     }
+}
 
-    fn returns_root_documents(&self) -> bool {
-        true
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct DeleteKey {
+    id: bson::Binary,
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for DeleteKey {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let result = ce.delete_key(&self.id).await?;
+            Ok(Some(Entity::Bson(Bson::Document(bson::to_document(&result)?))))
+        }
+        .boxed()
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct GetKey {
+    id: bson::Binary,
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for GetKey {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let entity = match ce.get_key(&self.id).await? {
+                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                None => Entity::None,
+            };
+            Ok(Some(entity))
+        }
+        .boxed()
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AddKeyAltName {
+    id: bson::Binary,
+    key_alt_name: String,
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for AddKeyAltName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let entity = match ce.add_key_alt_name(&self.id, &self.key_alt_name).await? {
+                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                None => Entity::None,
+            };
+            Ok(Some(entity))
+        }
+        .boxed()
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct CreateDataKey {
+    kms_provider: mongocrypt::ctx::KmsProvider,
+    opts: Option<crate::client_encryption::DataKeyOptions>,
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for CreateDataKey {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let key = ce.create_data_key(&self.kms_provider, self.opts.clone()).await?;
+            Ok(Some(Entity::Bson(Bson::Binary(key))))
+        }
+        .boxed()
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct GetKeys {
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for GetKeys {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let mut cursor = ce.get_keys().await?;
+            let mut keys = vec![];
+            while let Some(key) = cursor.try_next().await? {
+                keys.push(Bson::Document(key.to_document()?));
+            }
+            Ok(Some(Entity::Bson(Bson::Array(keys))))
+        }
+        .boxed()
+    }
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RemoveKeyAltName {
+    id: bson::Binary,
+    key_alt_name: String,
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for RemoveKeyAltName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let entity = match ce.remove_key_alt_name(&self.id, &self.key_alt_name).await? {
+                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                None => Entity::None,
+            };
+            Ok(Some(entity))
+        }
+        .boxed()
     }
 }
 

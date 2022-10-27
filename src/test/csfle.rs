@@ -46,7 +46,7 @@ use crate::{
         CommandSucceededEvent,
     },
     options::{IndexOptions, ReadConcern, WriteConcern},
-    test::{Event, EventHandler, SdamEvent, KMS_PROVIDERS},
+    test::{Event, EventHandler, SdamEvent, KMS_PROVIDERS, KMIP_TLS_OPTIONS},
     Client,
     Collection,
     IndexModel,
@@ -94,20 +94,6 @@ lazy_static! {
     };
     static ref EXTRA_OPTIONS: Document = doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
-    static ref KMIP_TLS_OPTIONS: KmsProvidersTlsOptions = {
-            /* If these options are used, the test will need a running KMIP server:
-                pip3 install pykmip
-                # in drivers-evergreen-tools/.evergreen
-                python3 ./csfle/kms_kmip_server.py
-            */
-        let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
-        let kmip_opts = TlsOptions::builder()
-            .ca_file_path(cert_dir.join("ca.pem"))
-            .cert_key_file_path(cert_dir.join("client.pem"))
-            .build();
-        let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
-        tls_options
-    };
     static ref DISABLE_CRYPT_SHARED: bool = std::env::var("DISABLE_CRYPT_SHARED")
         .map_or(false, |s| s == "true");
 }

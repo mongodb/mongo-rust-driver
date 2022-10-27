@@ -556,6 +556,7 @@ impl TestRunner {
                             .key_vault_client(kv_client)
                             .key_vault_namespace(kv_namespace)
                             .kms_providers(kms_providers)
+                            .tls_options(crate::test::KMIP_TLS_OPTIONS.clone())
                             .build()
                     ).unwrap();
                     (
@@ -680,12 +681,13 @@ fn fill_kms_placeholders(kms_providers: &mut KmsProviders) {
     for (provider, config) in kms_providers.iter_mut() {
         for (key, value) in config.iter_mut() {
             if *value == placeholder {
-                *value = KMS_PROVIDERS
+                let new_value = KMS_PROVIDERS
                     .get(provider)
                     .expect(&format!("missing config for {:?}", provider))
                     .get(key)
                     .expect(&format!("provider config {:?} missing key {:?}", provider, key))
                     .clone();
+                *value = new_value;
             }
         }
     }
