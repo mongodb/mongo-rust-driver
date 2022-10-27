@@ -72,6 +72,7 @@ pub(crate) struct RunOnRequirement {
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
     auth: Option<bool>,
+    csfle: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -130,6 +131,11 @@ impl RunOnRequirement {
         }
         if let Some(ref auth) = self.auth {
             if *auth != client.auth_enabled() {
+                return false;
+            }
+        }
+        if let Some(csfle) = &self.csfle {
+            if *csfle && std::env::var("KMS_PROVIDERS").is_err() {
                 return false;
             }
         }

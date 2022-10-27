@@ -46,7 +46,7 @@ pub(crate) enum Entity {
     Thread(ThreadEntity),
     TopologyDescription(TopologyDescription),
     #[cfg(feature = "csfle")]
-    ClientEncryption(crate::client_encryption::ClientEncryption),
+    ClientEncryption(Arc<crate::client_encryption::ClientEncryption>),
     None,
 }
 #[derive(Clone, Debug)]
@@ -422,6 +422,14 @@ impl Entity {
                 TestCursor::Closed => None,
             },
             _ => None,
+        }
+    }
+
+    #[cfg(feature = "csfle")]
+    pub fn as_client_encryption(&self) -> &Arc<crate::client_encryption::ClientEncryption> {
+        match self {
+            Self::ClientEncryption(ce) => ce,
+            _ => panic!("Expected ClientEncryption, got {:?}", &self),
         }
     }
 }

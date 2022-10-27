@@ -80,7 +80,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
         &'a self,
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
-        todo!()
+        panic!("execute_test_runner_operation called on unsupported operation {:?}", self)
     }
 
     fn execute_entity_operation<'a>(
@@ -90,7 +90,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             Err(ErrorKind::InvalidArgument {
-                message: "execute_entity_operation called on unsupported operation".into(),
+                message: format!("execute_entity_operation called on unsupported operation {:?}", self),
             }
             .into())
         }
@@ -171,24 +171,25 @@ impl Operation {
                                 panic!("[{}] {} did not return an entity", description, self.name)
                             });
                             if let Some(expected_bson) = expected_value {
-                                if let Entity::Bson(actual) = &entity {
-                                    if let Err(e) = results_match(
-                                        Some(actual),
-                                        expected_bson,
-                                        self.returns_root_documents(),
-                                        Some(&*test_runner.entities.read().await),
-                                    ) {
-                                        panic!(
-                                            "[{}] result mismatch, expected = {:#?}  actual = \
-                                             {:#?}\nmismatch detail: {}",
-                                            description, expected_bson, actual, e
-                                        );
-                                    }
-                                } else {
-                                    panic!(
+                                let actual = match &entity {
+                                    Entity::Bson(bs) => Some(bs),
+                                    Entity::None => None,
+                                    _ => panic!(
                                         "[{}] Incorrect entity type returned from {}, expected \
                                          BSON",
                                         description, self.name
+                                    ),
+                                };
+                                if let Err(e) = results_match(
+                                    actual,
+                                    expected_bson,
+                                    self.returns_root_documents(),
+                                    Some(&*test_runner.entities.read().await),
+                                ) {
+                                    panic!(
+                                        "[{}] result mismatch, expected = {:#?}  actual = \
+                                            {:#?}\nmismatch detail: {}",
+                                        description, expected_bson, actual, e
                                     );
                                 }
                             }
@@ -350,7 +351,8 @@ impl<'de> Deserialize<'de> for Operation {
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
-            _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
+            "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),
+            s => Ok(Box::new(UnimplementedOperation { _name: s.to_string() }) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
 
@@ -2832,7 +2834,40 @@ impl TestOperation for Upload {
     }
 }
 
+#[cfg(feature = "csfle")]
 #[derive(Debug, Deserialize)]
-pub(super) struct UnimplementedOperation;
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct GetKeyByAltName {
+    key_alt_name: String,
+}
+
+#[cfg(feature = "csfle")]
+impl TestOperation for GetKeyByAltName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let ce = test_runner.get_client_encryption(id).await;
+            let key = ce.get_key_by_alt_name(&self.key_alt_name).await?;
+            let ent = match key {
+                Some(rd) => Entity::Bson(Bson::Document(rd.to_document()?)),
+                None => Entity::None,
+            };
+            Ok(Some(ent))
+        }
+        .boxed()
+    }
+
+    fn returns_root_documents(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct UnimplementedOperation {
+    _name: String,
+}
 
 impl TestOperation for UnimplementedOperation {}

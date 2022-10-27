@@ -8,7 +8,7 @@ use super::{run_spec_test_with_path, run_unified_format_test_filtered, unified_r
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test_with_path(&["client_side_encryption", "unified"], |path, file| {
+    run_spec_test_with_path(&["client-side-encryption", "unified"], |path, file| {
         run_unified_format_test_filtered(path, file, test_predicate)
     })
     .await;

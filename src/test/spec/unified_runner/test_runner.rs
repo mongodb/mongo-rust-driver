@@ -71,6 +71,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listDatabaseObjects",
     "mapReduce",
     "watch",
+    "rewrapManyDataKey",
 ];
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
@@ -244,7 +245,8 @@ impl TestRunner {
                     if expected.ignore_extra_events.unwrap_or(false) {
                         assert!(
                             actual_events.len() >= expected_events.len(),
-                            "actual:\n{:#?}\nexpected:\n{:#?}",
+                            "[{}] actual:\n{:#?}\nexpected:\n{:#?}",
+                            test_case.description,
                             actual_events,
                             expected_events
                         )
@@ -252,7 +254,8 @@ impl TestRunner {
                         assert_eq!(
                             actual_events.len(),
                             expected_events.len(),
-                            "actual:\n{:#?}\nexpected:\n{:#?}",
+                            "[{}] actual:\n{:#?}\nexpected:\n{:#?}",
+                            test_case.description,
                             actual_events,
                             expected_events
                         )
@@ -557,7 +560,7 @@ impl TestRunner {
                     ).unwrap();
                     (
                         id,
-                        Entity::ClientEncryption(client_enc),
+                        Entity::ClientEncryption(Arc::new(client_enc)),
                     )
                 }
             };
@@ -650,6 +653,20 @@ impl TestRunner {
             .get(id.as_ref())
             .unwrap()
             .as_topology_description()
+            .clone()
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) async fn get_client_encryption(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Arc<crate::client_encryption::ClientEncryption> {
+        self.entities
+            .read()
+            .await
+            .get(id.as_ref())
+            .unwrap()
+            .as_client_encryption()
             .clone()
     }
 }

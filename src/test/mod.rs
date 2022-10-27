@@ -87,7 +87,10 @@ lazy_static! {
         std::env::var("SERVERLESS_ATLAS_USER").ok();
     pub(crate) static ref SERVERLESS_ATLAS_PASSWORD: Option<String> =
         std::env::var("SERVERLESS_ATLAS_PASSWORD").ok();
-    #[cfg(feature = "csfle")]
+}
+
+#[cfg(feature = "csfle")]
+lazy_static! {
     pub(crate) static ref KMS_PROVIDERS: crate::client::csfle::options::KmsProviders = serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
 }
 
