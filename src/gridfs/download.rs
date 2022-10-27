@@ -157,6 +157,7 @@ impl GridFsBucket {
 pub struct GridFsDownloadStream {
     state: State,
     current_n: u32,
+    cached_bytes: Option<Vec<u8>>,
     file: FilesCollectionDocument,
 }
 
@@ -166,13 +167,7 @@ enum State {
     // Idle stores an Option<Cursor> so that the cursor can be moved into a GetBytesFuture without
     // requiring ownership of the state. It will always store a value when the stream's state is
     // Idle and can be unwrapped safely.
-    //
-    // cached_bytes will be None when there are no bytes currently cached and should NOT be
-    // unwrapped.
-    Idle {
-        cursor: Box<Option<Cursor<Chunk<'static>>>>,
-        cached_bytes: Option<Vec<u8>>,
-    },
+    Idle(Box<Option<Cursor<Chunk<'static>>>>),
     Busy(GetBytesFuture),
     Done,
 }
@@ -197,13 +192,11 @@ impl GridFsDownloadStream {
         } else {
             let options = FindOptions::builder().sort(doc! { "n": 1 }).build();
             let cursor = chunks.find(doc! { "files_id": &file.id }, options).await?;
-            State::Idle {
-                cursor: Box::new(Some(cursor)),
-                cached_bytes: None,
-            }
+            State::Idle(Box::new(Some(cursor)))
         };
         Ok(Self {
             state: initial_state,
+            cached_bytes: None,
             current_n: 0,
             file,
         })
@@ -223,21 +216,17 @@ impl AsyncRead for GridFsDownloadStream {
     ) -> Poll<std::result::Result<usize, futures_util::io::Error>> {
         let stream = self.get_mut();
 
-        let future = match &mut stream.state {
-            State::Idle {
-                cursor,
-                cached_bytes,
-            } => {
-                if let Some(bytes) = cached_bytes {
-                    let bytes_to_write = std::cmp::min(bytes.len(), buf.len());
-                    buf[..bytes_to_write].copy_from_slice(&bytes[..bytes_to_write]);
-                    if bytes_to_write == bytes.len() {
-                        *cached_bytes = None;
-                    }
-                    return Poll::Ready(Ok(bytes_to_write));
-                }
+        if let Some(cache) = &mut stream.cached_bytes {
+            let bytes_to_write = std::cmp::min(cache.len(), buf.len());
+            buf[..bytes_to_write].copy_from_slice(cache.drain(0..bytes_to_write).as_slice());
+            if cache.is_empty() {
+                stream.cached_bytes = None;
+            }
+            return Poll::Ready(Ok(bytes_to_write));
+        }
 
-                // The total number of chunks that would fit inside the buffer.
+        let future = match &mut stream.state {
+            State::Idle(cursor) => {
                 let chunks_in_buf =
                     FilesCollectionDocument::n_from_vals(buf.len() as u64, stream.file.chunk_size);
                 // We should read from current_n to chunks_in_buf + current_n, or, if that would
@@ -268,24 +257,19 @@ impl AsyncRead for GridFsDownloadStream {
 
         match result {
             Ok((mut bytes, cursor)) => {
-                if bytes.is_empty() {
-                    stream.state = State::Done;
-                    return Poll::Ready(Ok(0));
+                let bytes_to_write = std::cmp::min(bytes.len(), buf.len());
+                buf[..bytes_to_write].copy_from_slice(&bytes.drain(0..bytes_to_write).as_slice());
+
+                // The cache is always drained before creating a future, so we don't need to worry
+                // about overwriting anything.
+                if !bytes.is_empty() {
+                    stream.cached_bytes = Some(bytes);
                 }
 
-                let bytes_to_write = std::cmp::min(bytes.len(), buf.len());
-                buf[..bytes_to_write].copy_from_slice(&bytes[..bytes_to_write]);
-
-                let leftover = if bytes.len() > bytes_to_write {
-                    bytes.drain(..bytes_to_write);
-                    Some(bytes)
+                stream.state = if cursor.has_next() {
+                    State::Idle(Box::new(Some(cursor)))
                 } else {
-                    None
-                };
-
-                stream.state = State::Idle {
-                    cursor: Box::new(Some(cursor)),
-                    cached_bytes: leftover,
+                    State::Done
                 };
 
                 Poll::Ready(Ok(bytes_to_write))

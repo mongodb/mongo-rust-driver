@@ -141,8 +141,22 @@ impl<T> Cursor<T> {
             .and_then(|c| c.post_batch_resume_token())
     }
 
+    /// Whether this cursor has exhausted all of its getMore calls. The cursor may have more
+    /// items remaining in the buffer.
     pub(crate) fn is_exhausted(&self) -> bool {
         self.wrapped_cursor.as_ref().unwrap().is_exhausted()
+    }
+
+    /// Whether this cursor has any additional items to return.
+    pub(crate) fn has_next(&self) -> bool {
+        !self.is_exhausted()
+            || !self
+                .wrapped_cursor
+                .as_ref()
+                .unwrap()
+                .state()
+                .buffer
+                .is_empty()
     }
 
     pub(crate) fn client(&self) -> &Client {
