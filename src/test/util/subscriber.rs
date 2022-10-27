@@ -76,4 +76,18 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         .ok()
         .flatten()
     }
+
+    /// Returns the received events without waiting for any more.
+    pub(crate) fn all<F>(&mut self, filter: F) -> Vec<E>
+    where
+        F: Fn(&E) -> bool,
+    {
+        let mut events = Vec::new();
+        while let Ok(event) = self.receiver.try_recv() {
+            if filter(&event) {
+                events.push(event);
+            }
+        }
+        events
+    }
 }

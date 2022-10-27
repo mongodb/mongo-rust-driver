@@ -11,6 +11,7 @@ pub(crate) use self::{
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
+    subscriber::EventSubscriber,
 };
 
 #[cfg(feature = "tracing-unstable")]

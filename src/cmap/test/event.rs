@@ -1,12 +1,9 @@
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::sync::{Arc, RwLock};
 
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 
-use crate::{event::cmap::*, options::ServerAddress, runtime};
-use tokio::sync::broadcast::error::{RecvError, SendError};
+use crate::{event::cmap::*, options::ServerAddress, test::util::EventSubscriber};
+use tokio::sync::broadcast::error::SendError;
 
 #[derive(Clone, Debug)]
 pub struct EventHandler {
@@ -31,11 +28,8 @@ impl EventHandler {
         self.events.write().unwrap().push(event);
     }
 
-    pub fn subscribe(&self) -> EventSubscriber {
-        EventSubscriber {
-            _handler: self,
-            receiver: self.channel_sender.subscribe(),
-        }
+    pub(crate) fn subscribe(&self) -> EventSubscriber<'_, EventHandler, CmapEvent> {
+        EventSubscriber::new(self, self.channel_sender.subscribe())
     }
 }
 
@@ -82,54 +76,6 @@ impl CmapEventHandler for EventHandler {
 
     fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
         self.handle(event);
-    }
-}
-
-pub struct EventSubscriber<'a> {
-    /// A reference to the handler this subscriber is receiving events from.
-    /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
-    /// events.
-    _handler: &'a EventHandler,
-    receiver: tokio::sync::broadcast::Receiver<CmapEvent>,
-}
-
-impl EventSubscriber<'_> {
-    pub(crate) async fn wait_for_event<F>(
-        &mut self,
-        timeout: Duration,
-        filter: F,
-    ) -> Option<CmapEvent>
-    where
-        F: Fn(&CmapEvent) -> bool,
-    {
-        runtime::timeout(timeout, async {
-            loop {
-                match self.receiver.recv().await {
-                    Ok(event) if filter(&event) => return event.into(),
-                    // the channel hit capacity and the channnel will skip a few to catch up.
-                    Err(RecvError::Lagged(_)) => continue,
-                    Err(_) => return None,
-                    _ => continue,
-                }
-            }
-        })
-        .await
-        .ok()
-        .flatten()
-    }
-
-    /// Returns the received events without waiting for any more.
-    pub(crate) fn all<F>(&mut self, filter: F) -> Vec<CmapEvent>
-    where
-        F: Fn(&CmapEvent) -> bool,
-    {
-        let mut events = Vec::new();
-        while let Ok(event) = self.receiver.try_recv() {
-            if filter(&event) {
-                events.push(event);
-            }
-        }
-        events
     }
 }
 
