@@ -210,8 +210,8 @@ impl ClientEntity {
         }
     }
 
-    pub(crate) fn client(&self) -> &Client {
-        &self.client
+    pub(crate) fn client(&self) -> Option<&Client> {
+        self.client.as_ref()
     }
 }
 

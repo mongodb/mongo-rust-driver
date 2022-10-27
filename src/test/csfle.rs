@@ -46,7 +46,7 @@ use crate::{
         CommandSucceededEvent,
     },
     options::{IndexOptions, ReadConcern, WriteConcern},
-    test::{Event, EventHandler, SdamEvent},
+    test::{Event, EventHandler, SdamEvent, KMS_PROVIDERS},
     Client,
     Collection,
     IndexModel,
@@ -87,7 +87,6 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
 }
 
 lazy_static! {
-    static ref KMS_PROVIDERS: KmsProviders = serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
     static ref LOCAL_KMS: KmsProviders = {
         let mut out = KMS_PROVIDERS.clone();
         out.retain(|k, _| *k == KmsProvider::Local);

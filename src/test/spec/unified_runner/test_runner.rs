@@ -54,6 +54,9 @@ use super::{
     TestFileEntity,
 };
 
+#[cfg(feature = "csfle")]
+use crate::client::csfle::options::KmsProviders;
+
 #[cfg(feature = "tracing-unstable")]
 use crate::test::{
     spec::unified_runner::matcher::tracing_events_match,
@@ -541,9 +544,10 @@ impl TestRunner {
                 TestFileEntity::ClientEncryption(client_enc) => {
                     let id = client_enc.id.clone();
                     let opts = &client_enc.client_encryption_opts;
-                    let kv_client = self.get_client(&opts.key_vault_client).await.client().clone();
+                    let kv_client = self.get_client(&opts.key_vault_client).await.client().unwrap().clone();
                     let kv_namespace = crate::Namespace::from_str(&opts.key_vault_namespace).unwrap();
-                    let kms_providers: crate::client::csfle::options::KmsProviders = bson::from_document(opts.kms_providers.clone()).unwrap();
+                    let mut kms_providers: KmsProviders = bson::from_document(opts.kms_providers.clone()).unwrap();
+                    fill_kms_placeholders(&mut kms_providers);
                     let client_enc = crate::client_encryption::ClientEncryption::new(
                         crate::client_encryption::ClientEncryptionOptions::builder()
                             .key_vault_client(kv_client)
@@ -647,5 +651,25 @@ impl TestRunner {
             .unwrap()
             .as_topology_description()
             .clone()
+    }
+}
+
+#[cfg(feature = "csfle")]
+fn fill_kms_placeholders(kms_providers: &mut KmsProviders) {
+    use crate::test::KMS_PROVIDERS;
+
+    let placeholder = bson::Bson::Document(doc! { "$$placeholder": 1 });
+
+    for (provider, config) in kms_providers.iter_mut() {
+        for (key, value) in config.iter_mut() {
+            if *value == placeholder {
+                *value = KMS_PROVIDERS
+                    .get(provider)
+                    .expect(&format!("missing config for {:?}", provider))
+                    .get(key)
+                    .expect(&format!("provider config {:?} missing key {:?}", provider, key))
+                    .clone();
+            }
+        }
     }
 }

@@ -75,6 +75,9 @@ csfle = ["mongocrypt", "rayon", "num_cpus"]
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
 tracing-unstable = ["tracing", "log"]
 
+[patch."https://github.com/mongodb/bson-rust"]
+bson = { path = "../../bson-rust/minor_iter_mut" }
+
 [dependencies]
 async-trait = "0.1.42"
 base64 = "0.13.0"
