@@ -34,30 +34,42 @@ async fn download_stream_across_buffers() {
 
     let client = TestClient::new().await;
 
-    let options = GridFsBucketOptions::builder().chunk_size_bytes(2).build();
+    let options = GridFsBucketOptions::builder().chunk_size_bytes(3).build();
     let bucket = client
         .database("download_stream_across_buffers")
         .gridfs_bucket(options);
     bucket.drop().await.unwrap();
 
-    let data: Vec<u8> = (0..10).collect();
+    let data: Vec<u8> = (0..20).collect();
     let id = bucket
         .upload_from_futures_0_3_reader("test", &data[..], None)
         .await
         .unwrap();
 
     let mut download_stream = bucket.open_download_stream(id.into()).await.unwrap();
-    let mut buf = vec![0u8; 6];
+    let mut buf = vec![0u8; 12];
 
+    // read in a partial chunk
     download_stream.read_exact(&mut buf[..1]).await.unwrap();
     assert_eq!(&buf[..1], &data[..1]);
 
-    download_stream.read_exact(&mut buf[1..4]).await.unwrap();
-    assert_eq!(&buf[1..4], &data[1..4]);
+    // read in the rest of the cached chunk
+    download_stream.read_exact(&mut buf[1..3]).await.unwrap();
+    assert_eq!(&buf[..3], &data[..3]);
 
-    download_stream.read_exact(&mut buf[4..6]).await.unwrap();
-    assert_eq!(&buf[4..6], &data[4..6]);
+    // read in multiple full chunks and one byte of a chunk
+    download_stream.read_exact(&mut buf[3..10]).await.unwrap();
+    assert_eq!(&buf[..10], &data[..10]);
 
+    // read in one more byte from the buffered chunk
+    download_stream.read_exact(&mut buf[10..11]).await.unwrap();
+    assert_eq!(&buf[..11], &data[..11]);
+
+    // read in the last byte from the buffered chunk
+    download_stream.read_exact(&mut buf[11..12]).await.unwrap();
+    assert_eq!(&buf[..12], &data[..12]);
+
+    // read in the rest of the data
     download_stream.read_to_end(&mut buf).await.unwrap();
-    assert_eq!(&buf, &data);
+    assert_eq!(buf, data);
 }
