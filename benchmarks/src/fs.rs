@@ -15,10 +15,36 @@ use tokio::{
     fs::{self, OpenOptions},
     io::{self, AsyncBufReadExt, AsyncWriteExt},
 };
+#[cfg(feature = "tokio-runtime")]
+use tokio_util::compat::TokioAsyncReadCompatExt;
 
 pub(crate) async fn read_to_string(path: &Path) -> Result<String> {
     let s = fs::read_to_string(path).await?;
     Ok(s)
+}
+
+pub(crate) async fn open_async_read_compat(path: &Path) -> Result<impl futures::io::AsyncRead> {
+    let file = File::open_read(path).await?;
+    #[cfg(feature = "tokio-runtime")]
+    {
+        Ok(file.inner.compat())
+    }
+    #[cfg(feature = "async-std-runtime")]
+    {
+        Ok(file.inner)
+    }
+}
+
+pub(crate) async fn open_async_write_compat(path: &Path) -> Result<impl futures::io::AsyncWrite> {
+    let file = File::open_write(path).await?;
+    #[cfg(feature = "tokio-runtime")]
+    {
+        Ok(file.inner.compat())
+    }
+    #[cfg(feature = "async-std-runtime")]
+    {
+        Ok(file.inner)
+    }
 }
 
 pub(crate) struct File {
