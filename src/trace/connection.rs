@@ -38,7 +38,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             maxIdleTimeMS = options_ref.and_then(|o| o.max_idle_time.map(|m| m.as_millis())),
             maxPoolSize = options_ref.and_then(|o| o.max_pool_size),
             minPoolSize = options_ref.and_then(|o| o.min_pool_size),
@@ -51,7 +51,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             "Connection pool ready",
         );
     }
@@ -61,7 +61,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             serviceId = event.service_id.map(|id| id.tracing_representation()),
             "Connection pool cleared",
         );
@@ -72,7 +72,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             "Connection pool closed",
         );
     }
@@ -82,7 +82,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
             "Connection created",
         );
@@ -93,7 +93,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
             "Connection ready",
         );
@@ -104,7 +104,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
             reason = event.reason.tracing_representation(),
             "Connection closed",
@@ -116,7 +116,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             "Connection checkout started",
         );
     }
@@ -126,7 +126,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             reason = event.reason.tracing_representation(),
             "Connection checkout failed",
         );
@@ -137,7 +137,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
             "Connection checked out",
         );
@@ -148,7 +148,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             target: CONNECTION_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             serverHost = event.address.host(),
-            serverPort = event.address.port(),
+            serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
             "Connection checked in",
         );
@@ -181,7 +181,7 @@ impl TracingRepresentation for ConnectionCheckoutFailedReason {
                 "Wait queue timeout elapsed without a connection becoming available"
             }
             ConnectionCheckoutFailedReason::ConnectionError => {
-                "An error occurred while trying to establish a connection"
+                "An error occurred while trying to establish a new connection"
             }
         }
     }

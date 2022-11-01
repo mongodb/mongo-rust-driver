@@ -17,7 +17,8 @@ tests:
                 id: &client client
                 # Observe and wait on a connection ready event for the connection created in the background.
                 # This is to avoid raciness around whether the background thread has created the connection
-                # (and whether corresponding log messages have been generated) by the time we close the client.
+                # (and whether corresponding log messages have been generated) by the time log message assertions
+                # are made.
                 observeEvents:
                   - connectionReadyEvent
                 observeLogMessages:
@@ -34,9 +35,6 @@ tests:
           event:
             connectionReadyEvent: {}
           count: 1
-
-      - name: close
-        object: *client
 
     expectLogMessages:
       - client: *client
@@ -74,22 +72,6 @@ tests:
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }
 
-          - level: debug
-            component: connection
-            data:
-              message: "Connection closed"
-              driverConnectionId: { $$type: [int, long] }
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-              reason: "Connection pool was closed"
-
-          - level: debug
-            component: connection
-            data:
-              message: "Connection pool closed"
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-
   # Drivers who have not done DRIVERS-1943 will need to skip this test.
   - description: "maxConnecting should be included in connection pool created message when specified"
     operations:
@@ -100,8 +82,8 @@ tests:
             - client:
                 id: &client client
                 # Observe and wait for a poolReadyEvent so we can ensure the pool has been created and is
-                # ready by the time we close the client, in order to avoid raciness in which messages
-                # ar eemitted.
+                # ready by the time we assert on log messages, in order to avoid raciness around which messages
+                # are emitted.
                 observeEvents:
                   - poolReadyEvent
                 observeLogMessages:
@@ -116,9 +98,6 @@ tests:
           event:
             poolReadyEvent: {}
           count: 1
-
-      - name: close
-        object: *client
 
     expectLogMessages:
       - client: *client
@@ -138,13 +117,6 @@ tests:
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }
 
-          - level: debug
-            component: connection
-            data:
-              message: "Connection pool closed"
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-
   # Drivers that do not support waitQueueTimeoutMS will need to skip this test.
   - description: "waitQueueTimeoutMS should be included in connection pool created message when specified"
     operations:
@@ -155,8 +127,8 @@ tests:
             - client:
                 id: &client client
                 # Observe and wait for a poolReadyEvent so we can ensure the pool has been created and is
-                # ready by the time we close the client, in order to avoid raciness in which messages
-                # ar eemitted.
+                # ready by the time we assert on log messages, in order to avoid raciness around which messages
+                # are emitted.
                 observeEvents:
                   - poolReadyEvent
                 observeLogMessages:
@@ -171,9 +143,6 @@ tests:
           event:
             poolReadyEvent: {}
           count: 1
-
-      - name: close
-        object: *client
 
     expectLogMessages:
       - client: *client
@@ -193,13 +162,6 @@ tests:
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }
 
-          - level: debug
-            component: connection
-            data:
-              message: "Connection pool closed"
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-
   # Drivers that do not support waitQueueSize will need to skip this test.
   - description: "waitQueueSize should be included in connection pool created message when specified"
     operations:
@@ -210,8 +172,8 @@ tests:
             - client:
                 id: &client client
                 # Observe and wait for a poolReadyEvent so we can ensure the pool has been created and is
-                # ready by the time we close the client, in order to avoid raciness in which messages
-                # ar eemitted.
+                # ready by the time we assert on log messages, in order to avoid raciness around which messages
+                # are emitted.
                 observeEvents:
                   - poolReadyEvent
                 observeLogMessages:
@@ -226,9 +188,6 @@ tests:
           event:
             poolReadyEvent: {}
           count: 1
-
-      - name: close
-        object: *client
 
     expectLogMessages:
       - client: *client
@@ -248,13 +207,6 @@ tests:
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }
 
-          - level: debug
-            component: connection
-            data:
-              message: "Connection pool closed"
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-
   # Drivers that do not support waitQueueMultiple will need to skip this test.
   - description: "waitQueueMultiple should be included in connection pool created message when specified"
     operations:
@@ -265,8 +217,8 @@ tests:
             - client:
                 id: &client client
                 # Observe and wait for a poolReadyEvent so we can ensure the pool has been created and is
-                # ready by the time we close the client, in order to avoid raciness in which messages
-                # ar eemitted.
+                # ready by the time we assert on log messages, in order to avoid raciness around which messages
+                # are emitted.
                 observeEvents:
                   - poolReadyEvent
                 observeLogMessages:
@@ -281,9 +233,6 @@ tests:
           event:
             poolReadyEvent: {}
           count: 1
-
-      - name: close
-        object: *client
 
     expectLogMessages:
       - client: *client
@@ -300,12 +249,5 @@ tests:
             component: connection
             data:
               message: "Connection pool ready"
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-
-          - level: debug
-            component: connection
-            data:
-              message: "Connection pool closed"
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }

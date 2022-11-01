@@ -44,7 +44,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             driverConnectionId = event.connection.id,
             serverConnectionId = event.connection.server_id,
             serverHost = event.connection.address.host(),
-            serverPort = event.connection.address.port(),
+            serverPort = event.connection.address.port_tracing_representation(),
             serviceId = event.service_id.map(|id| id.tracing_representation()),
             "Command started"
         );
@@ -60,7 +60,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             driverConnectionId = event.connection.id,
             serverConnectionId = event.connection.server_id,
             serverHost = event.connection.address.host(),
-            serverPort = event.connection.address.port(),
+            serverPort = event.connection.address.port_tracing_representation(),
             serviceId = event.service_id.map(|id| id.tracing_representation()),
             durationMS = event.duration.as_millis(),
             "Command succeeded"
@@ -77,7 +77,7 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             driverConnectionId = event.connection.id,
             serverConnectionId = event.connection.server_id,
             serverHost = event.connection.address.host(),
-            serverPort = event.connection.address.port(),
+            serverPort = event.connection.address.port_tracing_representation(),
             serviceId = event.service_id.map(|id| id.tracing_representation()),
             durationMS = event.duration.as_millis(),
             "Command failed"

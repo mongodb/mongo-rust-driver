@@ -1,4 +1,5 @@
 use bson::Bson;
+use crate::client::options::{DEFAULT_PORT, ServerAddress};
 
 pub(crate) mod command;
 pub(crate) mod connection;
@@ -33,6 +34,17 @@ impl TracingRepresentation for crate::error::Error {
 
     fn tracing_representation(self) -> String {
         self.to_string()
+    }
+}
+
+impl ServerAddress {
+    /// Per spec should populate the port field with 27017 if we are defaulting to that.
+    fn port_tracing_representation(&self) -> Option<u16> {
+        match self {
+            Self::Tcp { port, .. } => Some(port.unwrap_or(DEFAULT_PORT)),
+            // TODO: RUST-802 For Unix domain sockets we should return None here, as ports
+            // are not meaningful for those.
+        }
     }
 }
 

@@ -418,7 +418,7 @@
                     "long"
                   ]
                 },
-                "reason": "An error occurred while trying to establish a connection"
+                "reason": "An error occurred while trying to establish a new connection"
               }
             }
           ]
