@@ -2173,7 +2173,7 @@ async fn explicit_encryption_case_3() -> Result<()> {
     let insert_payload = testdata
         .client_encryption
         .encrypt(
-            RawBson::String("encrypted indexed value".to_string()),
+            RawBson::String("encrypted unindexed value".to_string()),
             EncryptOptions::builder()
                 .key(EncryptKey::Id(testdata.key1_id.clone()))
                 .algorithm(Algorithm::Unindexed)
@@ -2181,7 +2181,10 @@ async fn explicit_encryption_case_3() -> Result<()> {
         )
         .await?;
     enc_coll
-        .insert_one(doc! { "_id": 1, "encryptedIndexed": insert_payload }, None)
+        .insert_one(
+            doc! { "_id": 1, "encryptedUnindexed": insert_payload },
+            None,
+        )
         .await?;
 
     let found: Vec<_> = enc_coll
@@ -2191,8 +2194,8 @@ async fn explicit_encryption_case_3() -> Result<()> {
         .await?;
     assert_eq!(1, found.len());
     assert_eq!(
-        "encrypted indexed value",
-        found[0].get_str("encryptedIndexed")?
+        "encrypted unindexed value",
+        found[0].get_str("encryptedUnindexed")?
     );
 
     Ok(())
@@ -2247,7 +2250,7 @@ async fn explicit_encryption_case_5() -> Result<()> {
         None => return Ok(()),
     };
 
-    let raw_value = RawBson::String("encrypted indexed value".to_string());
+    let raw_value = RawBson::String("encrypted unindexed value".to_string());
     let payload = testdata
         .client_encryption
         .encrypt(

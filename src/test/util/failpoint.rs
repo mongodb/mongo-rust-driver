@@ -13,6 +13,7 @@ use crate::{
 
 // If you write a tokio test that uses this, make sure to annotate it with
 // tokio::test(flavor = "multi_thread").
+// TODO RUST-1530 Make the error message here better.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FailPoint {
     #[serde(flatten)]
