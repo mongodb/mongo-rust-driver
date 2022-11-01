@@ -100,7 +100,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
 
                     // overwrite old length
                     let new_length = (bytes.len() as i32).to_le_bytes();
-                    (&mut bytes[0..4]).copy_from_slice(&new_length);
+                    bytes[0..4].copy_from_slice(&new_length);
                     doc = RawDocumentBuf::from_bytes(bytes)?;
 
                     Bson::ObjectId(oid)
