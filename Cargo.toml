@@ -76,7 +76,7 @@ csfle = ["mongocrypt", "rayon", "num_cpus"]
 tracing-unstable = ["tracing", "log"]
 
 [patch."https://github.com/mongodb/bson-rust"]
-bson = { path = "../../bson-rust/minor_iter_mut" }
+bson = { git = "https://github.com/abr-egn/bson-rust", branch = "minor/iter_mut" }
 
 [dependencies]
 async-trait = "0.1.42"
