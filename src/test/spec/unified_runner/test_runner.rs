@@ -547,9 +547,16 @@ impl TestRunner {
                 TestFileEntity::ClientEncryption(client_enc) => {
                     let id = client_enc.id.clone();
                     let opts = &client_enc.client_encryption_opts;
-                    let kv_client = self.get_client(&opts.key_vault_client).await.client().unwrap().clone();
-                    let kv_namespace = crate::Namespace::from_str(&opts.key_vault_namespace).unwrap();
-                    let mut kms_providers: KmsProviders = bson::from_document(opts.kms_providers.clone()).unwrap();
+                    let kv_client = self
+                        .get_client(&opts.key_vault_client)
+                        .await
+                        .client()
+                        .unwrap()
+                        .clone();
+                    let kv_namespace =
+                        crate::Namespace::from_str(&opts.key_vault_namespace).unwrap();
+                    let mut kms_providers: KmsProviders =
+                        bson::from_document(opts.kms_providers.clone()).unwrap();
                     fill_kms_placeholders(&mut kms_providers);
                     let client_enc = crate::client_encryption::ClientEncryption::new(
                         crate::client_encryption::ClientEncryptionOptions::builder()
@@ -557,12 +564,10 @@ impl TestRunner {
                             .key_vault_namespace(kv_namespace)
                             .kms_providers(kms_providers)
                             .tls_options(crate::test::KMIP_TLS_OPTIONS.clone())
-                            .build()
-                    ).unwrap();
-                    (
-                        id,
-                        Entity::ClientEncryption(Arc::new(client_enc)),
+                            .build(),
                     )
+                    .unwrap();
+                    (id, Entity::ClientEncryption(Arc::new(client_enc)))
                 }
             };
             self.insert_entity(&id, entity).await;
@@ -683,9 +688,11 @@ fn fill_kms_placeholders(kms_providers: &mut KmsProviders) {
             if *value == placeholder {
                 let new_value = KMS_PROVIDERS
                     .get(provider)
-                    .expect(&format!("missing config for {:?}", provider))
+                    .unwrap_or_else(|| panic!("missing config for {:?}", provider))
                     .get(key)
-                    .expect(&format!("provider config {:?} missing key {:?}", provider, key))
+                    .unwrap_or_else(|| {
+                        panic!("provider config {:?} missing key {:?}", provider, key)
+                    })
                     .clone();
                 *value = new_value;
             }

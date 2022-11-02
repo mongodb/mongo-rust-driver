@@ -80,7 +80,10 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
         &'a self,
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
-        panic!("execute_test_runner_operation called on unsupported operation {:?}", self)
+        panic!(
+            "execute_test_runner_operation called on unsupported operation {:?}",
+            self
+        )
     }
 
     fn execute_entity_operation<'a>(
@@ -90,7 +93,10 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             Err(ErrorKind::InvalidArgument {
-                message: format!("execute_entity_operation called on unsupported operation {:?}", self),
+                message: format!(
+                    "execute_entity_operation called on unsupported operation {:?}",
+                    self
+                ),
             }
             .into())
         }
@@ -188,7 +194,7 @@ impl Operation {
                                 ) {
                                     panic!(
                                         "[{}] result mismatch, expected = {:#?}  actual = \
-                                            {:#?}\nmismatch detail: {}",
+                                         {:#?}\nmismatch detail: {}",
                                         description, expected_bson, actual, e
                                     );
                                 }
@@ -351,14 +357,23 @@ impl<'de> Deserialize<'de> for Operation {
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "deleteKey" => deserialize_op::<DeleteKey>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "getKey" => deserialize_op::<GetKey>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "addKeyAltName" => deserialize_op::<AddKeyAltName>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "createDataKey" => deserialize_op::<CreateDataKey>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "getKeys" => deserialize_op::<GetKeys>(definition.arguments),
+            #[cfg(feature = "csfle")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
-            s => Ok(Box::new(UnimplementedOperation { _name: s.to_string() }) as Box<dyn TestOperation>),
+            s => Ok(Box::new(UnimplementedOperation {
+                _name: s.to_string(),
+            }) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
 
@@ -2884,7 +2899,9 @@ impl TestOperation for DeleteKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let result = ce.delete_key(&self.id).await?;
-            Ok(Some(Entity::Bson(Bson::Document(bson::to_document(&result)?))))
+            Ok(Some(Entity::Bson(Bson::Document(bson::to_document(
+                &result,
+            )?))))
         }
         .boxed()
     }
@@ -2960,7 +2977,9 @@ impl TestOperation for CreateDataKey {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
-            let key = ce.create_data_key(&self.kms_provider, self.opts.clone()).await?;
+            let key = ce
+                .create_data_key(&self.kms_provider, self.opts.clone())
+                .await?;
             Ok(Some(Entity::Bson(Bson::Binary(key))))
         }
         .boxed()
@@ -2970,8 +2989,7 @@ impl TestOperation for CreateDataKey {
 #[cfg(feature = "csfle")]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct GetKeys {
-}
+pub(super) struct GetKeys {}
 
 #[cfg(feature = "csfle")]
 impl TestOperation for GetKeys {

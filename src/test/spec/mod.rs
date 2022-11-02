@@ -71,7 +71,7 @@ where
         .chain(spec.iter())
         .collect();
 
-    for entry in fs::read_dir(&base_path).expect(&format!("reading {:?}", base_path)) {
+    for entry in fs::read_dir(&base_path).unwrap_or_else(|_| panic!("reading {:?}", base_path)) {
         let test_file = entry.unwrap();
 
         if !test_file.file_type().unwrap().is_file() {

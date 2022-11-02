@@ -210,6 +210,7 @@ impl ClientEntity {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn client(&self) -> Option<&Client> {
         self.client.as_ref()
     }

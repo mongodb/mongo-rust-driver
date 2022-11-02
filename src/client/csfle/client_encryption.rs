@@ -16,7 +16,7 @@ use mongocrypt::{
     ctx::{Algorithm, Ctx, KmsProvider},
     Crypt,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use super::{
