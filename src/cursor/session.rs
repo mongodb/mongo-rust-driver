@@ -352,6 +352,11 @@ impl<T> SessionCursor<T> {
     pub(crate) fn is_exhausted(&self) -> bool {
         self.state.as_ref().unwrap().exhausted
     }
+
+    #[cfg(test)]
+    pub(crate) fn client(&self) -> &Client {
+        &self.client
+    }
 }
 
 impl<T> Drop for SessionCursor<T> {

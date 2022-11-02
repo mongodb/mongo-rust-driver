@@ -180,6 +180,11 @@ where
     pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
         self.cursor.current_batch()
     }
+
+    #[cfg(test)]
+    pub(crate) fn client(&self) -> &crate::Client {
+        self.cursor.client()
+    }
 }
 
 /// Arguments passed to a `watch` method, captured to allow resume.

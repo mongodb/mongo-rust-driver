@@ -196,6 +196,11 @@ impl GridFsBucket {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn client(&self) -> &crate::Client {
+        self.inner.files.client()
+    }
+
     /// Gets the read concern of the [`GridFsBucket`].
     pub fn read_concern(&self) -> Option<&ReadConcern> {
         self.inner.options.read_concern.as_ref()

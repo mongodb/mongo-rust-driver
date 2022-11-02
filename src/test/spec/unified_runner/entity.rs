@@ -329,6 +329,13 @@ impl Entity {
         }
     }
 
+    pub(crate) fn as_mut_client(&mut self) -> &mut ClientEntity {
+        match self {
+            Self::Client(client) => client,
+            _ => panic!("Expected client, got {:?}", &self),
+        }
+    }
+
     pub(crate) fn as_database(&self) -> &Database {
         match self {
             Self::Database(database) => database,
@@ -371,6 +378,13 @@ impl Entity {
         }
     }
 
+    pub(crate) fn as_mut_cursor(&mut self) -> &mut TestCursor {
+        match self {
+            Self::Cursor(cursor) => cursor,
+            _ => panic!("Expected cursor, got {:?}", &self),
+        }
+    }
+
     pub(crate) fn as_thread(&self) -> &ThreadEntity {
         match self {
             Self::Thread(thread) => thread,
@@ -396,6 +410,30 @@ impl Entity {
         match self {
             Self::EventList(event_list) => event_list,
             _ => panic!("Expected event list, got {:?}", &self),
+        }
+    }
+
+    /// If this entity is descended from a client entity, returns the topology ID for that client.
+    pub(crate) async fn client_topology_id(&self) -> Option<bson::oid::ObjectId> {
+        match self {
+            Entity::Client(client_entity) => Some(client_entity.topology_id),
+            Entity::Database(database) => Some(database.client().topology().id),
+            Entity::Collection(collection) => Some(collection.client().topology().id),
+            Entity::Session(session) => Some(session.client().topology().id),
+            Entity::Bucket(bucket) => Some(bucket.client().topology().id),
+            Entity::Cursor(cursor) => match cursor {
+                TestCursor::Normal(cursor) => {
+                    Some(cursor.lock().await.client().topology().id)
+                },
+                TestCursor::Session { cursor, .. } => {
+                    Some(cursor.client().topology().id)
+                },
+                TestCursor::ChangeStream(cs) => {
+                    Some(cs.lock().await.client().topology().id)
+                },
+                TestCursor::Closed => None,
+            },
+            _=> None,
         }
     }
 }
