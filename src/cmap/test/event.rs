@@ -266,5 +266,6 @@ where
             port: None,
         },
         reason,
+        error: None,
     })
 }

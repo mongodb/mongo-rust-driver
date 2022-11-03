@@ -107,6 +107,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
             reason = event.reason.tracing_representation(),
+            error = event.error.map(|e| e.tracing_representation()),
             "Connection closed",
         );
     }
@@ -128,6 +129,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             serverHost = event.address.host(),
             serverPort = event.address.port_tracing_representation(),
             reason = event.reason.tracing_representation(),
+            error = event.error.map(|e| e.tracing_representation()),
             "Connection checkout failed",
         );
     }
@@ -178,7 +180,7 @@ impl TracingRepresentation for ConnectionCheckoutFailedReason {
     fn tracing_representation(self) -> &'static str {
         match self {
             ConnectionCheckoutFailedReason::Timeout => {
-                "Wait queue timeout elapsed without a connection becoming available"
+                "Failed to establish a new connection within connectTimeoutMS"
             }
             ConnectionCheckoutFailedReason::ConnectionError => {
                 "An error occurred while trying to establish a new connection"

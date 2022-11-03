@@ -81,10 +81,10 @@ pub(crate) struct Connection {
     /// been read.
     command_executing: bool,
 
-    /// Whether or not this connection has experienced a network error while reading or writing.
-    /// Once the connection has received an error, it should not be used again or checked back
-    /// into a pool.
-    error: bool,
+    /// Stores a network error encountered while reading or writing. Once the connection has
+    /// received an error, it should not be used again and will be closed upon check-in to the
+    /// pool.
+    error: Option<Error>,
 
     /// Whether the most recently received message included the moreToCome flag, indicating the
     /// server may send more responses without any additional requests. Attempting to send new
@@ -130,7 +130,7 @@ impl Connection {
             address,
             event_emitter: None,
             stream_description: None,
-            error: false,
+            error: None,
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
@@ -213,7 +213,7 @@ impl Connection {
 
     /// Checks if the connection experienced a network error and should be closed.
     pub(super) fn has_errored(&self) -> bool {
-        self.error
+        self.error.is_some()
     }
 
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
@@ -246,6 +246,7 @@ impl Connection {
             address: self.address.clone(),
             connection_id: self.id,
             reason,
+            error: self.error.clone(),
         }
     }
 
@@ -274,7 +275,9 @@ impl Connection {
             _ => message.write_to(&mut self.stream).await,
         };
 
-        self.error = write_result.is_err();
+        if let Err(ref err) = write_result {
+            self.error = Some(err.clone());
+        }
         write_result?;
 
         let response_message_result = Message::read_from(
@@ -285,7 +288,9 @@ impl Connection {
         )
         .await;
         self.command_executing = false;
-        self.error = response_message_result.is_err();
+        if let Err(ref err) = response_message_result {
+            self.error = Some(err.clone());
+        }
 
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
@@ -344,7 +349,9 @@ impl Connection {
         )
         .await;
         self.command_executing = false;
-        self.error = response_message_result.is_err();
+        if let Err(ref err) = response_message_result {
+            self.error = Some(err.clone());
+        }
 
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
@@ -409,7 +416,7 @@ impl Connection {
             event_emitter: self.event_emitter.take(),
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
-            error: self.error,
+            error: self.error.take(),
             pool_manager: None,
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),

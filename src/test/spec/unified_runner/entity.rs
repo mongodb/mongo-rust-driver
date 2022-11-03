@@ -47,18 +47,10 @@ pub(crate) enum Entity {
     TopologyDescription(TopologyDescription),
     None,
 }
-
-#[derive(Clone, Debug)]
-pub(crate) enum ClientEntityState {
-    /// An underlying Client for the entity.
-    Client(Client),
-    /// Indicates the underlying client has been dropped via a `close` operation.
-    Dropped,
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct ClientEntity {
-    pub(crate) client: ClientEntityState,
+    /// This is None if a `close` operation has been executed for this entity.
+    pub(crate) client: Option<Client>,
     #[cfg(feature = "tracing-unstable")]
     pub(crate) topology_id: bson::oid::ObjectId,
     handler: Arc<EventHandler>,
@@ -137,7 +129,7 @@ impl ClientEntity {
         #[cfg(feature = "tracing-unstable")]
         let topology_id = client.topology().id;
         Self {
-            client: ClientEntityState::Client(client),
+            client: Some(client),
             #[cfg(feature = "tracing-unstable")]
             topology_id,
             handler,
@@ -214,10 +206,9 @@ impl ClientEntity {
 
     /// Synchronize all connection pool worker threads.
     pub(crate) async fn sync_workers(&self) {
-        match &self.client {
-            ClientEntityState::Client(client) => client.sync_workers().await,
-            ClientEntityState::Dropped => {}
-        };
+        if let Some(client) = &self.client {
+            client.sync_workers().await;
+        }
     }
 }
 
@@ -285,8 +276,8 @@ impl Deref for ClientEntity {
 
     fn deref(&self) -> &Self::Target {
         match &self.client {
-            ClientEntityState::Client(c) => c,
-            ClientEntityState::Dropped => panic!(
+            Some(c) => c,
+            None => panic!(
                 "Attempted to deference a client entity which was closed via a `close` test \
                  operation"
             ),
@@ -422,18 +413,12 @@ impl Entity {
             Entity::Session(session) => Some(session.client().topology().id),
             Entity::Bucket(bucket) => Some(bucket.client().topology().id),
             Entity::Cursor(cursor) => match cursor {
-                TestCursor::Normal(cursor) => {
-                    Some(cursor.lock().await.client().topology().id)
-                },
-                TestCursor::Session { cursor, .. } => {
-                    Some(cursor.client().topology().id)
-                },
-                TestCursor::ChangeStream(cs) => {
-                    Some(cs.lock().await.client().topology().id)
-                },
+                TestCursor::Normal(cursor) => Some(cursor.lock().await.client().topology().id),
+                TestCursor::Session { cursor, .. } => Some(cursor.client().topology().id),
+                TestCursor::ChangeStream(cs) => Some(cs.lock().await.client().topology().id),
                 TestCursor::Closed => None,
             },
-            _=> None,
+            _ => None,
         }
     }
 }

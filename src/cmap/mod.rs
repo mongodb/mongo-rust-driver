@@ -142,11 +142,12 @@ impl ConnectionPool {
                 self.event_emitter
                     .emit_event(|| conn.checked_out_event().into());
             }
-            Err(_) => {
+            Err(ref err) => {
                 self.event_emitter.emit_event(|| {
                     ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
                         reason: ConnectionCheckoutFailedReason::ConnectionError,
+                        error: Some(err.clone()),
                     }
                     .into()
                 });

@@ -184,6 +184,7 @@ tests:
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }
               reason: "An error occurred while using the connection"
+              error: { $$exists: true }
 
           - level: debug
             component: connection
@@ -192,3 +193,4 @@ tests:
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }
               reason: "An error occurred while trying to establish a new connection"
+              error: { $$exists: true }

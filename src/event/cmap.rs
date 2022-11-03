@@ -15,6 +15,8 @@ use crate::trace::{
     TracingOrLogLevel,
     CONNECTION_TRACING_EVENT_TARGET,
 };
+#[cfg(feature = "tracing-unstable")]
+use derivative::Derivative;
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
@@ -137,7 +139,8 @@ pub struct ConnectionReadyEvent {
 }
 
 /// Event emitted when a connection is closed.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Derivative, Serialize)]
+#[derivative(PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionClosedEvent {
@@ -153,6 +156,15 @@ pub struct ConnectionClosedEvent {
 
     /// The reason that the connection was closed.
     pub reason: ConnectionClosedReason,
+
+    /// If the `reason` connection checkout failed was `Error`,the associated
+    /// error is contained here. This is attached so we can include it in log messages;
+    /// in future work we may add this to public API on the event itself. TODO: add
+    /// ticket link here.
+    #[cfg(feature = "tracing-unstable")]
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    pub(crate) error: Option<crate::error::Error>,
 }
 
 /// The reasons that a connection may be closed.
@@ -187,7 +199,8 @@ pub struct ConnectionCheckoutStartedEvent {
 }
 
 /// Event emitted when a thread is unable to check out a connection.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Derivative, Serialize)]
+#[derivative(PartialEq)]
 #[non_exhaustive]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
@@ -197,6 +210,15 @@ pub struct ConnectionCheckoutFailedEvent {
 
     /// The reason a connection was unable to be checked out.
     pub reason: ConnectionCheckoutFailedReason,
+
+    /// If the `reason` connection checkout failed was `ConnectionError`,the associated
+    /// error is contained here. This is attached so we can include it in log messages;
+    /// in future work we may add this to public API on the event itself. TODO: add
+    /// ticket link here.
+    #[cfg(feature = "tracing-unstable")]
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    pub(crate) error: Option<crate::error::Error>,
 }
 
 /// The reasons a connection may not be able to be checked out.
@@ -394,21 +416,22 @@ impl CmapEventEmitter {
             None
         };
 
-        if !(tracing_emitter_to_use.is_some() || self.user_handler.is_some()) {
-            return;
-        }
-
-        let event = generate_event();
-        if let (Some(user_handler), Some(tracing_emitter)) =
-            (&self.user_handler, tracing_emitter_to_use)
-        {
-            handle_cmap_event(user_handler.as_ref(), event.clone());
-            handle_cmap_event(tracing_emitter, event);
-        } else if let Some(user_handler) = &self.user_handler {
-            handle_cmap_event(user_handler.as_ref(), event);
-        } else if let Some(tracing_emitter) = tracing_emitter_to_use {
-            handle_cmap_event(tracing_emitter, event);
-        }
+        match (&self.user_handler, tracing_emitter_to_use) {
+            (None, None) => {}
+            (None, Some(tracing_emitter)) => {
+                let event = generate_event();
+                handle_cmap_event(tracing_emitter, event);
+            }
+            (Some(user_handler), None) => {
+                let event = generate_event();
+                handle_cmap_event(user_handler.as_ref(), event);
+            }
+            (Some(user_handler), Some(tracing_emitter)) => {
+                let event = generate_event();
+                handle_cmap_event(user_handler.as_ref(), event.clone());
+                handle_cmap_event(tracing_emitter, event);
+            }
+        };
     }
 }
 

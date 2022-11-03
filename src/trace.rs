@@ -1,5 +1,5 @@
+use crate::client::options::{ServerAddress, DEFAULT_PORT};
 use bson::Bson;
-use crate::client::options::{DEFAULT_PORT, ServerAddress};
 
 pub(crate) mod command;
 pub(crate) mod connection;

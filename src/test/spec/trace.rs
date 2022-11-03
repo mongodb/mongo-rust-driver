@@ -371,7 +371,7 @@ async fn connection_logging_unified() {
     let test_predicate = |tc: &TestCase|
         // TODO: RUST-1096 Unskip when configurable maxConnecting is added.
         tc.description != "maxConnecting should be included in connection pool created message when specified" &&
-        // We don't support any of this options (and are unlikely to ever support them).
+        // We don't support any of these options (and are unlikely to ever support them).
         tc.description != "waitQueueTimeoutMS should be included in connection pool created message when specified" &&
         tc.description != "waitQueueSize should be included in connection pool created message when specified" &&
         tc.description != "waitQueueMultiple should be included in connection pool created message when specified";

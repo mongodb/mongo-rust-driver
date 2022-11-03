@@ -20,7 +20,6 @@ use time::OffsetDateTime;
 use tokio::sync::Mutex;
 
 use super::{
-    entity::ClientEntityState,
     results_match,
     Entity,
     EntityMap,
@@ -2126,16 +2125,19 @@ impl TestOperation for Close {
                 Entity::Client(_) => {
                     let mut client = entities.get_mut(id).unwrap().as_mut_client();
                     let closed_client_topology_id = client.topology_id;
-                    client.client = ClientEntityState::Dropped;
+                    client.client = None;
 
                     let mut entities_to_remove = vec![];
                     for (key, value) in entities.iter() {
                         match value {
-                            // skip clients so that we don't remove the client entity itself from the map:
-                            // we want to preserve it so we can access the other data stored on the entity.
-                            Entity::Client(_) => {},
+                            // skip clients so that we don't remove the client entity itself from
+                            // the map: we want to preserve it so we can
+                            // access the other data stored on the entity.
+                            Entity::Client(_) => {}
                             _ => {
-                                if value.client_topology_id().await == Some(closed_client_topology_id) {
+                                if value.client_topology_id().await
+                                    == Some(closed_client_topology_id)
+                                {
                                     entities_to_remove.push(key.clone());
                                 }
                             }
