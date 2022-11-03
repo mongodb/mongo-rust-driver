@@ -14,6 +14,10 @@ if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
 fi
 
+if [ "$OS" = "Windows_NT" ]; then
+    CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
+fi
+
 echo "cargo test options: --features ${FEATURE_FLAGS} ${OPTIONS}"
 
 CARGO_RESULT=0

@@ -1658,7 +1658,7 @@ axes:
     display_name: "TLS Feature"
     values:
       - id: "default"
-        display_name: "default TLS"
+        display_name: "rustls TLS"
         variables:
           TLS_FEATURE: ""
       - id: "openssl"
@@ -1948,6 +1948,8 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
+      - macos-11.00
+      - windows-64-vs2017
     mongodb-version:
       - "6.0"
     topology:
