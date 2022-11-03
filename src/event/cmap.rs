@@ -6,6 +6,7 @@ use std::{sync::Arc, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{bson::oid::ObjectId, bson_util, options::ServerAddress};
+use derivative::Derivative;
 use derive_more::From;
 
 #[cfg(feature = "tracing-unstable")]
@@ -15,8 +16,6 @@ use crate::trace::{
     TracingOrLogLevel,
     CONNECTION_TRACING_EVENT_TARGET,
 };
-#[cfg(feature = "tracing-unstable")]
-use derivative::Derivative;
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
