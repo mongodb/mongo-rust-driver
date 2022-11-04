@@ -51,7 +51,6 @@ pub(crate) enum Entity {
 pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
-    #[cfg(feature = "tracing-unstable")]
     pub(crate) topology_id: bson::oid::ObjectId,
     handler: Arc<EventHandler>,
     pub(crate) observer: Arc<Mutex<EventObserver>>,
@@ -126,11 +125,9 @@ impl ClientEntity {
         observe_sensitive_commands: bool,
     ) -> Self {
         let observer = EventObserver::new(handler.broadcaster().subscribe());
-        #[cfg(feature = "tracing-unstable")]
         let topology_id = client.topology().id;
         Self {
             client: Some(client),
-            #[cfg(feature = "tracing-unstable")]
             topology_id,
             handler,
             observer: Arc::new(Mutex::new(observer)),

@@ -142,12 +142,23 @@ impl ConnectionPool {
                 self.event_emitter
                     .emit_event(|| conn.checked_out_event().into());
             }
+            #[cfg(feature = "tracing-unstable")]
             Err(ref err) => {
                 self.event_emitter.emit_event(|| {
                     ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
                         reason: ConnectionCheckoutFailedReason::ConnectionError,
                         error: Some(err.clone()),
+                    }
+                    .into()
+                });
+            }
+            #[cfg(not(feature = "tracing-unstable"))]
+            Err(_) => {
+                self.event_emitter.emit_event(|| {
+                    ConnectionCheckoutFailedEvent {
+                        address: self.address.clone(),
+                        reason: ConnectionCheckoutFailedReason::ConnectionError,
                     }
                     .into()
                 });

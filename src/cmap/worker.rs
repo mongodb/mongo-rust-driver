@@ -641,6 +641,7 @@ async fn establish_connection(
                     address,
                     reason: ConnectionClosedReason::Error,
                     connection_id,
+                    #[cfg(feature = "tracing-unstable")]
                     error: Some(e.cause.clone()),
                 }
                 .into()

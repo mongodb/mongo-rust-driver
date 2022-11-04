@@ -266,6 +266,7 @@ where
             port: None,
         },
         reason,
+        #[cfg(feature = "tracing-unstable")]
         error: None,
     })
 }

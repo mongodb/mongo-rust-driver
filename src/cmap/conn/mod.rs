@@ -246,6 +246,7 @@ impl Connection {
             address: self.address.clone(),
             connection_id: self.id,
             reason,
+            #[cfg(feature = "tracing-unstable")]
             error: self.error.clone(),
         }
     }
