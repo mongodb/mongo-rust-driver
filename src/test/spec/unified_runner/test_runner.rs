@@ -553,15 +553,13 @@ impl TestRunner {
                         .client()
                         .unwrap()
                         .clone();
-                    let kv_namespace =
-                        crate::Namespace::from_str(&opts.key_vault_namespace).unwrap();
                     let mut kms_providers: KmsProviders =
                         bson::from_document(opts.kms_providers.clone()).unwrap();
                     fill_kms_placeholders(&mut kms_providers);
                     let client_enc = crate::client_encryption::ClientEncryption::new(
                         crate::client_encryption::ClientEncryptionOptions::builder()
                             .key_vault_client(kv_client)
-                            .key_vault_namespace(kv_namespace)
+                            .key_vault_namespace(opts.key_vault_namespace.clone())
                             .kms_providers(kms_providers)
                             .tls_options(crate::test::KMIP_TLS_OPTIONS.clone())
                             .build(),

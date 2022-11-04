@@ -330,7 +330,7 @@ pub(crate) struct ClientEncryption {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ClientEncryptionOpts {
     pub(crate) key_vault_client: String,
-    pub(crate) key_vault_namespace: String,
+    pub(crate) key_vault_namespace: crate::Namespace,
     pub(crate) kms_providers: Document,
 }
 
