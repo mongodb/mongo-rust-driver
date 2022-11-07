@@ -158,8 +158,7 @@ pub struct ConnectionClosedEvent {
 
     /// If the `reason` connection checkout failed was `Error`,the associated
     /// error is contained here. This is attached so we can include it in log messages;
-    /// in future work we may add this to public API on the event itself. TODO: add
-    /// ticket link here.
+    /// in future work we may add this to public API on the event itself. TODO: DRIVERS-2495
     #[cfg(feature = "tracing-unstable")]
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
@@ -212,8 +211,7 @@ pub struct ConnectionCheckoutFailedEvent {
 
     /// If the `reason` connection checkout failed was `ConnectionError`,the associated
     /// error is contained here. This is attached so we can include it in log messages;
-    /// in future work we may add this to public API on the event itself. TODO: add
-    /// ticket link here.
+    /// in future work we may add this to public API on the event itself. TODO: DRIVERS-2495
     #[cfg(feature = "tracing-unstable")]
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
