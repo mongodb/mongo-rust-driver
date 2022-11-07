@@ -7,10 +7,11 @@ mod subscriber;
 mod trace;
 
 pub(crate) use self::{
-    event::{CmapEvent, Event, EventClient, EventHandler, SdamEvent},
+    event::{Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
+    subscriber::EventSubscriber,
 };
 
 #[cfg(feature = "tracing-unstable")]

@@ -37,19 +37,15 @@ impl CommandEventHandler for CommandTracingEventEmitter {
         tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
-            command =
-                serialize_command_or_reply(event.command, self.max_document_length_bytes).as_str(),
-            databaseName = event.db.as_str(),
-            commandName = event.command_name.as_str(),
+            command = serialize_command_or_reply(event.command, self.max_document_length_bytes),
+            databaseName = event.db,
+            commandName = event.command_name,
             requestId = event.request_id,
             driverConnectionId = event.connection.id,
             serverConnectionId = event.connection.server_id,
             serverHost = event.connection.address.host(),
-            serverPort = event.connection.address.port(),
-            serviceId = event
-                .service_id
-                .map(|id| id.tracing_representation())
-                .as_deref(),
+            serverPort = event.connection.address.port_tracing_representation(),
+            serviceId = event.service_id.map(|id| id.tracing_representation()),
             "Command started"
         );
     }
@@ -58,18 +54,14 @@ impl CommandEventHandler for CommandTracingEventEmitter {
         tracing::debug!(
             target: COMMAND_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
-            reply =
-                serialize_command_or_reply(event.reply, self.max_document_length_bytes).as_str(),
-            commandName = event.command_name.as_str(),
+            reply = serialize_command_or_reply(event.reply, self.max_document_length_bytes),
+            commandName = event.command_name,
             requestId = event.request_id,
             driverConnectionId = event.connection.id,
             serverConnectionId = event.connection.server_id,
             serverHost = event.connection.address.host(),
-            serverPort = event.connection.address.port(),
-            serviceId = event
-                .service_id
-                .map(|id| id.tracing_representation())
-                .as_deref(),
+            serverPort = event.connection.address.port_tracing_representation(),
+            serviceId = event.service_id.map(|id| id.tracing_representation()),
             durationMS = event.duration.as_millis(),
             "Command succeeded"
         );
@@ -80,16 +72,13 @@ impl CommandEventHandler for CommandTracingEventEmitter {
             target: COMMAND_TRACING_EVENT_TARGET,
             topologyId = self.topology_id.tracing_representation(),
             failure = event.failure.tracing_representation(),
-            commandName = event.command_name.as_str(),
+            commandName = event.command_name,
             requestId = event.request_id,
             driverConnectionId = event.connection.id,
             serverConnectionId = event.connection.server_id,
             serverHost = event.connection.address.host(),
-            serverPort = event.connection.address.port(),
-            serviceId = event
-                .service_id
-                .map(|id| id.tracing_representation())
-                .as_deref(),
+            serverPort = event.connection.address.port_tracing_representation(),
+            serviceId = event.service_id.map(|id| id.tracing_representation()),
             durationMS = event.duration.as_millis(),
             "Command failed"
         );

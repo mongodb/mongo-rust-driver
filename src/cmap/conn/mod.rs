@@ -22,7 +22,7 @@ use crate::{
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
+        CmapEventEmitter,
         ConnectionCheckedInEvent,
         ConnectionCheckedOutEvent,
         ConnectionClosedEvent,
@@ -81,10 +81,10 @@ pub(crate) struct Connection {
     /// been read.
     command_executing: bool,
 
-    /// Whether or not this connection has experienced a network error while reading or writing.
-    /// Once the connection has received an error, it should not be used again or checked back
-    /// into a pool.
-    error: bool,
+    /// Stores a network error encountered while reading or writing. Once the connection has
+    /// received an error, it should not be used again and will be closed upon check-in to the
+    /// pool.
+    error: Option<Error>,
 
     /// Whether the most recently received message included the moreToCome flag, indicating the
     /// server may send more responses without any additional requests. Attempting to send new
@@ -106,8 +106,10 @@ pub(crate) struct Connection {
     /// connection to the pin holder.
     pinned_sender: Option<mpsc::Sender<Connection>>,
 
+    /// Type responsible for emitting events related to this connection. This is None for
+    /// monitoring connections as we do not emit events for those.
     #[derivative(Debug = "ignore")]
-    handler: Option<Arc<dyn CmapEventHandler>>,
+    event_emitter: Option<CmapEventEmitter>,
 }
 
 impl Connection {
@@ -126,9 +128,9 @@ impl Connection {
             ready_and_available_time: None,
             stream: BufStream::new(stream),
             address,
-            handler: None,
+            event_emitter: None,
             stream_description: None,
-            error: false,
+            error: None,
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
@@ -149,7 +151,7 @@ impl Connection {
             pending_connection.id,
             generation,
         );
-        conn.handler = pending_connection.event_handler;
+        conn.event_emitter = Some(pending_connection.event_emitter);
         conn
     }
 
@@ -211,7 +213,7 @@ impl Connection {
 
     /// Checks if the connection experienced a network error and should be closed.
     pub(super) fn has_errored(&self) -> bool {
-        self.error
+        self.error.is_some()
     }
 
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
@@ -244,6 +246,8 @@ impl Connection {
             address: self.address.clone(),
             connection_id: self.id,
             reason,
+            #[cfg(feature = "tracing-unstable")]
+            error: self.error.clone(),
         }
     }
 
@@ -272,7 +276,9 @@ impl Connection {
             _ => message.write_to(&mut self.stream).await,
         };
 
-        self.error = write_result.is_err();
+        if let Err(ref err) = write_result {
+            self.error = Some(err.clone());
+        }
         write_result?;
 
         let response_message_result = Message::read_from(
@@ -283,7 +289,9 @@ impl Connection {
         )
         .await;
         self.command_executing = false;
-        self.error = response_message_result.is_err();
+        if let Err(ref err) = response_message_result {
+            self.error = Some(err.clone());
+        }
 
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
@@ -342,7 +350,9 @@ impl Connection {
         )
         .await;
         self.command_executing = false;
-        self.error = response_message_result.is_err();
+        if let Err(ref err) = response_message_result {
+            self.error = Some(err.clone());
+        }
 
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
@@ -390,8 +400,8 @@ impl Connection {
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
     fn close(&mut self, reason: ConnectionClosedReason) {
         self.pool_manager.take();
-        if let Some(ref handler) = self.handler {
-            handler.handle_connection_closed_event(self.closed_event(reason));
+        if let Some(ref event_emitter) = self.event_emitter {
+            event_emitter.emit_event(|| self.closed_event(reason).into());
         }
     }
 
@@ -404,10 +414,10 @@ impl Connection {
             address: self.address.clone(),
             generation: self.generation,
             stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
-            handler: self.handler.take(),
+            event_emitter: self.event_emitter.take(),
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
-            error: self.error,
+            error: self.error.take(),
             pool_manager: None,
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),
@@ -571,7 +581,7 @@ pub(crate) struct PendingConnection {
     pub(crate) id: u32,
     pub(crate) address: ServerAddress,
     pub(crate) generation: PoolGeneration,
-    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
+    pub(crate) event_emitter: CmapEventEmitter,
 }
 
 impl PendingConnection {

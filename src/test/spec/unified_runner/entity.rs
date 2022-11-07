@@ -47,10 +47,11 @@ pub(crate) enum Entity {
     TopologyDescription(TopologyDescription),
     None,
 }
-
 #[derive(Clone, Debug)]
 pub(crate) struct ClientEntity {
-    client: Client,
+    /// This is None if a `close` operation has been executed for this entity.
+    pub(crate) client: Option<Client>,
+    pub(crate) topology_id: bson::oid::ObjectId,
     handler: Arc<EventHandler>,
     pub(crate) observer: Arc<Mutex<EventObserver>>,
     observe_events: Option<Vec<ObserveEvent>>,
@@ -124,8 +125,10 @@ impl ClientEntity {
         observe_sensitive_commands: bool,
     ) -> Self {
         let observer = EventObserver::new(handler.broadcaster().subscribe());
+        let topology_id = client.topology().id;
         Self {
-            client,
+            client: Some(client),
+            topology_id,
             handler,
             observer: Arc::new(Mutex::new(observer)),
             observe_events,
@@ -200,7 +203,9 @@ impl ClientEntity {
 
     /// Synchronize all connection pool worker threads.
     pub(crate) async fn sync_workers(&self) {
-        self.client.sync_workers().await;
+        if let Some(client) = &self.client {
+            client.sync_workers().await;
+        }
     }
 }
 
@@ -267,7 +272,13 @@ impl Deref for ClientEntity {
     type Target = Client;
 
     fn deref(&self) -> &Self::Target {
-        &self.client
+        match &self.client {
+            Some(c) => c,
+            None => panic!(
+                "Attempted to deference a client entity which was closed via a `close` test \
+                 operation"
+            ),
+        }
     }
 }
 
@@ -303,6 +314,13 @@ impl Entity {
         match self {
             Self::Client(client) => client,
             _ => panic!("Expected client entity, got {:?}", &self),
+        }
+    }
+
+    pub(crate) fn as_mut_client(&mut self) -> &mut ClientEntity {
+        match self {
+            Self::Client(client) => client,
+            _ => panic!("Expected client, got {:?}", &self),
         }
     }
 
@@ -380,6 +398,24 @@ impl Entity {
         match self {
             Self::EventList(event_list) => event_list,
             _ => panic!("Expected event list, got {:?}", &self),
+        }
+    }
+
+    /// If this entity is descended from a client entity, returns the topology ID for that client.
+    pub(crate) async fn client_topology_id(&self) -> Option<bson::oid::ObjectId> {
+        match self {
+            Entity::Client(client_entity) => Some(client_entity.topology_id),
+            Entity::Database(database) => Some(database.client().topology().id),
+            Entity::Collection(collection) => Some(collection.client().topology().id),
+            Entity::Session(session) => Some(session.client().topology().id),
+            Entity::Bucket(bucket) => Some(bucket.client().topology().id),
+            Entity::Cursor(cursor) => match cursor {
+                TestCursor::Normal(cursor) => Some(cursor.lock().await.client().topology().id),
+                TestCursor::Session { cursor, .. } => Some(cursor.client().topology().id),
+                TestCursor::ChangeStream(cs) => Some(cs.lock().await.client().topology().id),
+                TestCursor::Closed => None,
+            },
+            _ => None,
         }
     }
 }

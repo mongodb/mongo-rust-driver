@@ -37,12 +37,14 @@ impl Server {
         options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
         topology_updater: TopologyUpdater,
+        topology_id: bson::oid::ObjectId,
     ) -> Arc<Server> {
         Arc::new(Self {
             pool: ConnectionPool::new(
                 address.clone(),
                 connection_establisher,
                 topology_updater,
+                topology_id,
                 Some(ConnectionPoolOptions::from_client_options(&options)),
             ),
             address,

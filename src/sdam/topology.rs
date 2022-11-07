@@ -58,7 +58,7 @@ use super::{
 /// When this is dropped, monitors will stop performing checks.
 #[derive(Debug)]
 pub(crate) struct Topology {
-    #[cfg(feature = "tracing-unstable")]
+    #[cfg(any(feature = "tracing-unstable", test))]
     pub(crate) id: ObjectId,
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
@@ -117,7 +117,7 @@ impl Topology {
         worker.start();
 
         Ok(Topology {
-            #[cfg(feature = "tracing-unstable")]
+            #[cfg(any(feature = "tracing-unstable", test))]
             id,
             watcher,
             updater,
@@ -545,6 +545,7 @@ impl TopologyWorker {
                     self.options.clone(),
                     self.connection_establisher.clone(),
                     self.topology_updater.clone(),
+                    self.id,
                 );
 
                 self.servers.insert(

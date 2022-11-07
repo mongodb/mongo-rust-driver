@@ -180,7 +180,7 @@ impl<T> Collection<T> {
     }
 
     /// Get the `Client` that this collection descended from.
-    fn client(&self) -> &Client {
+    pub(crate) fn client(&self) -> &Client {
         &self.inner.client
     }
 

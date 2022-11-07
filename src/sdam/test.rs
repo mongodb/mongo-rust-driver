@@ -12,12 +12,11 @@ use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
     error::{Error, ErrorKind},
-    event::sdam::SdamEventHandler,
+    event::{cmap::CmapEvent, sdam::SdamEventHandler},
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     sdam::{ServerDescription, Topology},
     test::{
         log_uncaptured,
-        CmapEvent,
         Event,
         EventClient,
         EventHandler,

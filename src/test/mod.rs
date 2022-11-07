@@ -15,7 +15,7 @@ mod index_management;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod lambda_examples;
 pub mod spec;
-mod util;
+pub(crate) mod util;
 
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
@@ -23,7 +23,6 @@ pub(crate) use self::{
         assert_matches,
         eq_matches,
         log_uncaptured,
-        CmapEvent,
         Event,
         EventClient,
         EventHandler,

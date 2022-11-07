@@ -9,8 +9,6 @@ pub(crate) mod options;
 mod status;
 mod worker;
 
-use std::sync::Arc;
-
 use derivative::Derivative;
 #[cfg(test)]
 use tokio::sync::oneshot;
@@ -30,7 +28,8 @@ use crate::{
     bson::oid::ObjectId,
     error::{Error, Result},
     event::cmap::{
-        CmapEventHandler,
+        CmapEvent,
+        CmapEventEmitter,
         ConnectionCheckoutFailedEvent,
         ConnectionCheckoutFailedReason,
         ConnectionCheckoutStartedEvent,
@@ -60,7 +59,7 @@ pub(crate) struct ConnectionPool {
     generation_subscriber: PoolGenerationSubscriber,
 
     #[derivative(Debug = "ignore")]
-    event_handler: Option<Arc<dyn CmapEventHandler>>,
+    event_emitter: CmapEventEmitter,
 }
 
 impl ConnectionPool {
@@ -68,32 +67,36 @@ impl ConnectionPool {
         address: ServerAddress,
         connection_establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
+        topology_id: ObjectId,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
-        let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
-            address.clone(),
-            connection_establisher,
-            server_updater,
-            options.clone(),
-        );
-
         let event_handler = options
             .as_ref()
             .and_then(|opts| opts.cmap_event_handler.clone());
 
-        if let Some(ref handler) = event_handler {
-            handler.handle_pool_created_event(PoolCreatedEvent {
+        let event_emitter = CmapEventEmitter::new(event_handler, topology_id);
+
+        let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
+            address.clone(),
+            connection_establisher,
+            server_updater,
+            event_emitter.clone(),
+            options.clone(),
+        );
+
+        event_emitter.emit_event(|| {
+            CmapEvent::PoolCreated(PoolCreatedEvent {
                 address: address.clone(),
                 options: options.map(|o| o.to_event_options()),
-            });
-        };
+            })
+        });
 
         Self {
             address,
             manager,
             connection_requester,
             generation_subscriber,
-            event_handler,
+            event_emitter,
         }
     }
 
@@ -109,16 +112,7 @@ impl ConnectionPool {
             manager,
             connection_requester,
             generation_subscriber,
-            event_handler: None,
-        }
-    }
-
-    fn emit_event<F>(&self, emit: F)
-    where
-        F: FnOnce(&Arc<dyn CmapEventHandler>),
-    {
-        if let Some(ref handler) = self.event_handler {
-            emit(handler);
+            event_emitter: CmapEventEmitter::new(None, ObjectId::new()),
         }
     }
 
@@ -126,12 +120,11 @@ impl ConnectionPool {
     /// front of the wait queue, and then will block again if no available connections are in the
     /// pool and the total number of connections is not less than the max pool size.
     pub(crate) async fn check_out(&self) -> Result<Connection> {
-        self.emit_event(|handler| {
-            let event = ConnectionCheckoutStartedEvent {
+        self.event_emitter.emit_event(|| {
+            ConnectionCheckoutStartedEvent {
                 address: self.address.clone(),
-            };
-
-            handler.handle_connection_checkout_started_event(event);
+            }
+            .into()
         });
 
         let response = self.connection_requester.request().await;
@@ -146,16 +139,28 @@ impl ConnectionPool {
 
         match conn {
             Ok(ref conn) => {
-                self.emit_event(|handler| {
-                    handler.handle_connection_checked_out_event(conn.checked_out_event());
-                });
+                self.event_emitter
+                    .emit_event(|| conn.checked_out_event().into());
             }
-            Err(_) => {
-                self.emit_event(|handler| {
-                    handler.handle_connection_checkout_failed_event(ConnectionCheckoutFailedEvent {
+            #[cfg(feature = "tracing-unstable")]
+            Err(ref err) => {
+                self.event_emitter.emit_event(|| {
+                    ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
                         reason: ConnectionCheckoutFailedReason::ConnectionError,
-                    })
+                        error: Some(err.clone()),
+                    }
+                    .into()
+                });
+            }
+            #[cfg(not(feature = "tracing-unstable"))]
+            Err(_) => {
+                self.event_emitter.emit_event(|| {
+                    ConnectionCheckoutFailedEvent {
+                        address: self.address.clone(),
+                        reason: ConnectionCheckoutFailedReason::ConnectionError,
+                    }
+                    .into()
                 });
             }
         }

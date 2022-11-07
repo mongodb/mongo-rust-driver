@@ -276,8 +276,7 @@ impl TestRunner {
                     .await;
 
                 for expectation in expected_messages {
-                    let client_topology_id =
-                        self.get_client(&expectation.client).await.topology().id;
+                    let client_topology_id = self.get_client(&expectation.client).await.topology_id;
 
                     let client_actual_events: Vec<_> = all_tracing_events
                         .iter()

@@ -6,7 +6,7 @@ use tokio::sync::RwLockWriteGuard;
 use crate::{
     error::Result,
     event::{
-        cmap::{CmapEventHandler, ConnectionCheckoutFailedReason},
+        cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
         command::CommandEventHandler,
     },
     runtime,
@@ -14,7 +14,6 @@ use crate::{
     test::{
         log_uncaptured,
         run_spec_test,
-        CmapEvent,
         Event,
         EventHandler,
         FailCommandOptions,
@@ -150,7 +149,7 @@ async fn retry_read_pool_cleared() {
 
     let _ = subscriber
         .wait_for_event(Duration::from_millis(500), |event| match event {
-            Event::Cmap(CmapEvent::ConnectionCheckOutFailed(e)) => {
+            Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => {
                 matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
             }
             _ => false,

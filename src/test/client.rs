@@ -7,6 +7,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
+    event::cmap::CmapEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
     runtime,
@@ -14,7 +15,6 @@ use crate::{
     test::{
         log_uncaptured,
         util::TestClient,
-        CmapEvent,
         Event,
         EventHandler,
         FailCommandOptions,
@@ -832,7 +832,7 @@ async fn retry_commit_txn_check_out() {
     // ensure the first check out attempt fails
     subscriber
         .wait_for_event(Duration::from_secs(1), |e| {
-            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_)))
+            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckoutFailed(_)))
         })
         .await
         .expect("should see check out failed event");

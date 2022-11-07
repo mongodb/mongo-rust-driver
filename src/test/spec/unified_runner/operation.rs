@@ -2120,12 +2120,48 @@ impl TestOperation for Close {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let mut entities = test_runner.entities.write().await;
-            let cursor = entities.get_mut(id).unwrap().as_mut_cursor();
-            let rx = cursor.make_kill_watcher().await;
-            *cursor = TestCursor::Closed;
-            drop(entities);
-            let _ = rx.await;
-            Ok(None)
+            let target_entity = entities.get(id).unwrap();
+            match target_entity {
+                Entity::Client(_) => {
+                    let mut client = entities.get_mut(id).unwrap().as_mut_client();
+                    let closed_client_topology_id = client.topology_id;
+                    client.client = None;
+
+                    let mut entities_to_remove = vec![];
+                    for (key, value) in entities.iter() {
+                        match value {
+                            // skip clients so that we don't remove the client entity itself from
+                            // the map: we want to preserve it so we can
+                            // access the other data stored on the entity.
+                            Entity::Client(_) => {}
+                            _ => {
+                                if value.client_topology_id().await
+                                    == Some(closed_client_topology_id)
+                                {
+                                    entities_to_remove.push(key.clone());
+                                }
+                            }
+                        }
+                    }
+                    for entity_id in entities_to_remove {
+                        entities.remove(&entity_id);
+                    }
+
+                    Ok(None)
+                }
+                Entity::Cursor(_) => {
+                    let cursor = entities.get_mut(id).unwrap().as_mut_cursor();
+                    let rx = cursor.make_kill_watcher().await;
+                    *cursor = TestCursor::Closed;
+                    drop(entities);
+                    let _ = rx.await;
+                    Ok(None)
+                }
+                _ => panic!(
+                    "Unsupported entity {:?} for close operation; expected Client or Cursor",
+                    target_entity
+                ),
+            }
         }
         .boxed()
     }

@@ -1,10 +1,7 @@
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use super::{
-    event::{Event, EventHandler},
-    EVENT_TIMEOUT,
-};
+use super::{event::EventHandler, EVENT_TIMEOUT};
 use crate::{
     bson::{doc, Document},
     cmap::{
@@ -13,7 +10,7 @@ use crate::{
         Command,
         ConnectionPool,
     },
-    event::cmap::{CmapEventHandler, ConnectionClosedReason},
+    event::cmap::{CmapEvent, CmapEventHandler, ConnectionClosedReason},
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
@@ -59,6 +56,7 @@ async fn acquire_connection_and_send_command() {
         )
         .unwrap(),
         TopologyUpdater::channel().0,
+        bson::oid::ObjectId::new(),
         Some(pool_options),
     );
     let mut connection = pool.check_out().await.unwrap();
@@ -128,7 +126,8 @@ async fn concurrent_connections() {
     let handler = Arc::new(EventHandler::new());
     let client_options = CLIENT_OPTIONS.get().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
-    options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    options.cmap_event_handler =
+        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
@@ -139,6 +138,7 @@ async fn concurrent_connections() {
         )
         .unwrap(),
         TopologyUpdater::channel().0,
+        bson::oid::ObjectId::new(),
         Some(options),
     );
 
@@ -156,10 +156,10 @@ async fn concurrent_connections() {
         let mut consecutive_creations = 0;
         for event in events.iter() {
             match event {
-                Event::ConnectionCreated(_) => {
+                CmapEvent::ConnectionCreated(_) => {
                     consecutive_creations += 1;
                 }
-                Event::ConnectionReady(_) => {
+                CmapEvent::ConnectionReady(_) => {
                     assert!(
                         consecutive_creations >= 2,
                         "connections not created concurrently"
@@ -221,7 +221,8 @@ async fn connection_error_during_establishment() {
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
-    options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    options.cmap_event_handler =
+        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(
@@ -230,6 +231,7 @@ async fn connection_error_during_establishment() {
         )
         .unwrap(),
         TopologyUpdater::channel().0,
+        bson::oid::ObjectId::new(),
         Some(options),
     );
 
@@ -237,7 +239,7 @@ async fn connection_error_during_establishment() {
 
     subscriber
         .wait_for_event(EVENT_TIMEOUT, |e| match e {
-            Event::ConnectionClosed(event) => {
+            CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
             _ => false,
@@ -281,7 +283,7 @@ async fn connection_error_during_operation() {
 
     subscriber
         .wait_for_event(EVENT_TIMEOUT, |e| match e {
-            Event::ConnectionClosed(event) => {
+            CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
             _ => false,

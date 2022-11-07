@@ -12,7 +12,7 @@ use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
-        cmap::{CmapEventHandler, ConnectionCheckoutFailedReason},
+        cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
         command::CommandEventHandler,
     },
     options::{ClientOptions, FindOptions, InsertManyOptions},
@@ -24,7 +24,6 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         util::get_default_name,
-        CmapEvent,
         Event,
         EventClient,
         EventHandler,
@@ -481,7 +480,7 @@ async fn retry_write_pool_cleared() {
 
     let _ = subscriber
         .wait_for_event(Duration::from_millis(500), |event| match event {
-            Event::Cmap(CmapEvent::ConnectionCheckOutFailed(e)) => {
+            Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => {
                 matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
             }
             _ => false,
