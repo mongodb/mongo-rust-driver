@@ -15,7 +15,9 @@ if [ "$SINGLE_THREAD" = true ]; then
 fi
 
 if [ "$OS" = "Windows_NT" ]; then
-    CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
+    export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
+    export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)
+    export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
 echo "cargo test options: --features ${FEATURE_FLAGS} ${OPTIONS}"

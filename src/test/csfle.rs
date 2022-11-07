@@ -1381,15 +1381,10 @@ async fn bypass_mongocryptd_unencrypted_insert(
     // Test: mongocryptd not spawned.
     assert!(!client_encrypted.mongocryptd_spawned().await);
     // Test: attempting to connect fails.
-    let result =
-        Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await;
-    if let Err(err) = result {
-        assert!(err.is_server_selection_error());
-    } else {
-        let client = result.unwrap();
-        let result = client.list_database_names(None, None).await;
-        assert!(result.unwrap_err().is_server_selection_error());
-    }
+    let client =
+        Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
+    let result = client.list_database_names(None, None).await;
+    assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
 }
@@ -1862,150 +1857,160 @@ async fn kms_tls_options() -> Result<()> {
         )?
     };
 
-    // Case 1: AWS
-    async fn aws_test(
+    async fn provider_test(
         client_encryption: &ClientEncryption,
-        endpoint: impl Into<String>,
-        err_str: &str,
-    ) {
-        let aws_key_opts = DataKeyOptions::builder()
+        data_key_opts: DataKeyOptions,
+        expected_errs: &[&str],
+    ) -> Result<()> {
+        let err = client_encryption
+            .create_data_key(&data_key_opts.master_key.provider(), data_key_opts)
+            .await
+            .unwrap_err();
+        let err_str = err.to_string();
+        if !expected_errs.iter().any(|s| err_str.contains(s)) {
+            Err(err)?
+        }
+        Ok(())
+    }
+
+    // Case 1: AWS
+    fn aws_key_opts(endpoint: impl Into<String>) -> DataKeyOptions {
+        DataKeyOptions::builder()
             .master_key(MasterKey::Aws {
                 region: "us-east-1".to_string(),
                 key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
                     .to_string(),
                 endpoint: Some(endpoint.into()),
             })
-            .build();
-        let err = client_encryption
-            .create_data_key(&KmsProvider::Aws, aws_key_opts)
-            .await
-            .unwrap_err();
-        assert!(
-            err.to_string().contains(err_str),
-            "unexpected error: {}",
-            err
-        );
+            .build()
     }
 
-    aws_test(
+    provider_test(
         &client_encryption_no_client_cert,
-        "127.0.0.1:9002",
-        "SSL routines",
+        aws_key_opts("127.0.0.1:9002"),
+        &["SSL routines", "connection was forcibly closed"],
     )
-    .await;
-    aws_test(&client_encryption_with_tls, "127.0.0.1:9002", "parse error").await;
-    aws_test(
+    .await?;
+    provider_test(
+        &client_encryption_with_tls,
+        aws_key_opts("127.0.0.1:9002"),
+        &["parse error"],
+    )
+    .await?;
+    provider_test(
         &client_encryption_expired,
-        "127.0.0.1:9000",
-        "certificate verify failed",
+        aws_key_opts("127.0.0.1:9000"),
+        &["certificate verify failed"],
     )
-    .await;
-    aws_test(
+    .await?;
+    provider_test(
         &client_encryption_invalid_hostname,
-        "127.0.0.1:9001",
-        "certificate verify failed",
+        aws_key_opts("127.0.0.1:9001"),
+        &["certificate verify failed"],
     )
-    .await;
+    .await?;
 
     // Case 2: Azure
-    async fn azure_test(client_encryption: &ClientEncryption, err_str: &str) {
-        let key_opts = DataKeyOptions::builder()
-            .master_key(MasterKey::Azure {
-                key_vault_endpoint: "doesnotexist.local".to_string(),
-                key_name: "foo".to_string(),
-                key_version: None,
-            })
-            .build();
-        let err = client_encryption
-            .create_data_key(&KmsProvider::Azure, key_opts)
-            .await
-            .unwrap_err();
-        assert!(
-            err.to_string().contains(err_str),
-            "unexpected error: {}",
-            err
-        );
-    }
+    let azure_key_opts = DataKeyOptions::builder()
+        .master_key(MasterKey::Azure {
+            key_vault_endpoint: "doesnotexist.local".to_string(),
+            key_name: "foo".to_string(),
+            key_version: None,
+        })
+        .build();
 
-    azure_test(&client_encryption_no_client_cert, "SSL routines").await;
-    azure_test(&client_encryption_with_tls, "HTTP status=404").await;
-    azure_test(&client_encryption_expired, "certificate verify failed").await;
-    azure_test(
-        &client_encryption_invalid_hostname,
-        "certificate verify failed",
+    provider_test(
+        &client_encryption_no_client_cert,
+        azure_key_opts.clone(),
+        &["SSL routines", "connection was forcibly closed"],
     )
-    .await;
+    .await?;
+    provider_test(
+        &client_encryption_with_tls,
+        azure_key_opts.clone(),
+        &["HTTP status=404"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_expired,
+        azure_key_opts.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        azure_key_opts.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
 
     // Case 3: GCP
-    async fn gcp_test(client_encryption: &ClientEncryption, err_str: &str) {
-        let key_opts = DataKeyOptions::builder()
-            .master_key(MasterKey::Gcp {
-                project_id: "foo".to_string(),
-                location: "bar".to_string(),
-                key_ring: "baz".to_string(),
-                key_name: "foo".to_string(),
-                endpoint: None,
-                key_version: None,
-            })
-            .build();
-        let err = client_encryption
-            .create_data_key(&KmsProvider::Gcp, key_opts)
-            .await
-            .unwrap_err();
-        assert!(
-            err.to_string().contains(err_str),
-            "unexpected error: {}",
-            err
-        );
-    }
+    let gcp_key_opts = DataKeyOptions::builder()
+        .master_key(MasterKey::Gcp {
+            project_id: "foo".to_string(),
+            location: "bar".to_string(),
+            key_ring: "baz".to_string(),
+            key_name: "foo".to_string(),
+            endpoint: None,
+            key_version: None,
+        })
+        .build();
 
-    gcp_test(&client_encryption_no_client_cert, "SSL routines").await;
-    gcp_test(&client_encryption_with_tls, "HTTP status=404").await;
-    gcp_test(&client_encryption_expired, "certificate verify failed").await;
-    gcp_test(
-        &client_encryption_invalid_hostname,
-        "certificate verify failed",
+    provider_test(
+        &client_encryption_no_client_cert,
+        gcp_key_opts.clone(),
+        &["SSL routines", "connection was forcibly closed"],
     )
-    .await;
+    .await?;
+    provider_test(
+        &client_encryption_with_tls,
+        gcp_key_opts.clone(),
+        &["HTTP status=404"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_expired,
+        gcp_key_opts.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        gcp_key_opts.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
 
     // Case 4: KMIP
-    async fn kmip_test(client_encryption: &ClientEncryption, err_str: &str) {
-        let key_opts = DataKeyOptions::builder()
-            .master_key(MasterKey::Kmip {
-                key_id: None,
-                endpoint: None,
-            })
-            .build();
-        let err = client_encryption
-            .create_data_key(&KmsProvider::Kmip, key_opts)
-            .await
-            .unwrap_err();
-        assert!(
-            err.to_string().contains(err_str),
-            "unexpected error: {}",
-            err
-        );
-    }
+    let kmip_key_opts = DataKeyOptions::builder()
+        .master_key(MasterKey::Kmip {
+            key_id: None,
+            endpoint: None,
+        })
+        .build();
 
-    kmip_test(&client_encryption_no_client_cert, "SSL routines").await;
+    provider_test(
+        &client_encryption_no_client_cert,
+        kmip_key_opts.clone(),
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
     // This one succeeds!
     client_encryption_with_tls
-        .create_data_key(
-            &KmsProvider::Kmip,
-            DataKeyOptions::builder()
-                .master_key(MasterKey::Kmip {
-                    key_id: None,
-                    endpoint: None,
-                })
-                .build(),
-        )
+        .create_data_key(&KmsProvider::Kmip, kmip_key_opts.clone())
         .await?;
-    kmip_test(&client_encryption_expired, "certificate verify failed").await;
-    kmip_test(
-        &client_encryption_invalid_hostname,
-        "certificate verify failed",
+    provider_test(
+        &client_encryption_expired,
+        kmip_key_opts.clone(),
+        &["certificate verify failed"],
     )
-    .await;
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        kmip_key_opts.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
 
     Ok(())
 }

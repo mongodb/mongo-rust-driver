@@ -246,15 +246,15 @@ impl Mongocryptd {
         };
         let new_child = Self::spawn(&self.opts);
         if new_child.is_ok() {
-            let tmp = Err(Error::internal("mongocryptd respawn internal failure"));
-            if let Ok(mut old_child) = std::mem::replace(child.deref_mut(), tmp) {
+            if let Ok(mut old_child) = std::mem::replace(child.deref_mut(), new_child) {
                 crate::runtime::spawn(async move {
                     let _ = old_child.kill();
                     let _ = old_child.wait().await;
                 });
             }
+        } else {
+            *child = new_child;
         }
-        *child = new_child;
         unit_err(&*child)
     }
 

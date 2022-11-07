@@ -31,6 +31,8 @@ impl Process {
         Ok(Self { child })
     }
 
+    /// Issue a kill signal to the child process and immediately return; to wait for the process to
+    /// actually exit, use `wait`.
     pub(crate) fn kill(&mut self) -> Result<()> {
         #[cfg(feature = "tokio-runtime")]
         return Ok(self.child.start_kill()?);

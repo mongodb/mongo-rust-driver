@@ -318,6 +318,19 @@ pub enum MasterKey {
     },
 }
 
+impl MasterKey {
+    /// Returns the `KmsProvider` associated with this key.
+    pub fn provider(&self) -> KmsProvider {
+        match self {
+            MasterKey::Aws { .. } => KmsProvider::Aws,
+            MasterKey::Azure { .. } => KmsProvider::Azure,
+            MasterKey::Gcp { .. } => KmsProvider::Gcp,
+            MasterKey::Kmip { .. } => KmsProvider::Kmip,
+            MasterKey::Local => KmsProvider::Local,
+        }
+    }
+}
+
 // #[non_exhaustive]
 // pub struct RewrapManyDataKeyOptions {
 // pub provider: KmsProvider,
