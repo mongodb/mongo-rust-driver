@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-# This script is used to fetch the latest JSON tests for the CRUD spec. It puts the tests in the
-# direcory $reporoot/data/crud. It should be run from the root of the repository.
+# This script is used to fetch the JSON/YML tests from the drivers specifications repo.
+# The first argument is the specification whose tests should be fetched. It is required.
+# The second argument is the branch/commit hash that the tests should be synced to. If it
+# is omitted, it will default to "master".
+#
+# This script puts the tests in the directory $reporoot/src/test/spec/json/$specname. It
+# must be run from the root of the repository.
 
 set -o errexit
 set -o nounset
@@ -11,14 +16,16 @@ if [ ! -d ".git" ]; then
     exit 1
 fi
 
-if [ $# -ne 1 ]; then
-    echo "$0: This script must be passed exactly one argument for which tests to sync" >&2
+if [ "$#" -eq 0 ]; then
+    echo "Usage: $0 <specification> [branch/commit hash]"
     exit 1
 fi
 
+REF="${2:-master}"
+
 tmpdir=`perl -MFile::Temp=tempdir -wle 'print tempdir(TMPDIR => 1, CLEANUP => 0)'`
-curl -sL https://github.com/mongodb/specifications/archive/master.zip -o "$tmpdir/specs.zip"
-unzip -d "$tmpdir" "$tmpdir/specs.zip" > /dev/null
+curl -sL "https://github.com/mongodb/specifications/archive/$REF.zip" -o "$tmpdir/specs.zip"
+unzip -q -d "$tmpdir" "$tmpdir/specs.zip"
 mkdir -p "src/test/spec/json/$1"
-rsync -ah "$tmpdir/specifications-master/source/$1/tests/" "src/test/spec/json/$1" --delete
+rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/tests/" "src/test/spec/json/$1" --delete
 rm -rf "$tmpdir"
