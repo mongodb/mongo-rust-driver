@@ -28,6 +28,8 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 - [Contributing](#contributing)
 - [Running the tests](#running-the-tests)
 - [Continuous Integration](#continuous-integration)
+- [Minimum supported Rust version (MSRV)](#minimum-supported-rust-version-msrv)
+- [`mongodb` 1.x EOL notice](#mongodb-1x-eol-notice)
 - [License](#license)
 
 ## Installation
@@ -371,6 +373,10 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 The MSRV for this crate is currently 1.57.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
+
+## `mongodb` 1.x EOL notice
+
+The 1.x version of this crate has reached end of life and will no longer be receiving any updates or bug fixes. It is recommended that all users upgrade to the latest 2.x version of `mongodb`. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information.
 
 ## License
 
