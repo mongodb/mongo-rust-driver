@@ -252,10 +252,8 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 async fn run_test(test_file: TestFile) {
     let test_description = &test_file.description;
 
-    // TODO: RUST-358 unskip tests
     // TODO: RUST-1081 unskip tests
     let skip_keywords = doc! {
-        "wrong set name": "(RUST-358)",
         "election Id": "(RUST-1081)",
         "electionId": "(RUST-1081)",
         "ElectionId": "(RUST-1081)"
