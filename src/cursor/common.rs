@@ -96,7 +96,7 @@ where
         self.state.as_mut().unwrap()
     }
 
-    fn state(&self) -> &CursorState {
+    pub(super) fn state(&self) -> &CursorState {
         self.state.as_ref().unwrap()
     }
 
