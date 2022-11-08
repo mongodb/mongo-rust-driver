@@ -73,16 +73,15 @@ axes:
   - id: "os"
     display_name: OS
     values:
-      - id: ubuntu-16.04
-        display_name: "Ubuntu 16.04"
-        run_on: ubuntu1604-test
+      - id: ubuntu-20.04
+        display_name: "Ubuntu 20.04"
+        run_on: ubuntu2004-test
 
 buildvariants:
 -
   matrix_name: "release"
   matrix_spec:
-    os:
-      - ubuntu-16.04
+    os: "*"
   display_name: "Publish driver release"
   tasks:
     - "publish-release"
