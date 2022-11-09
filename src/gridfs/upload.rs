@@ -243,6 +243,18 @@ impl GridFsUploadStream {
     }
 }
 
+impl Drop for GridFsUploadStream {
+    fn drop(&mut self) {
+        if !matches!(self.state, State::Closed) {
+            let chunks = self.bucket.chunks().clone();
+            let id = self.id.clone();
+            runtime::execute(async move {
+                let _result = chunks.delete_many(doc! { "files_id": id }, None).await;
+            })
+        }
+    }
+}
+
 impl AsyncWrite for GridFsUploadStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -335,18 +347,6 @@ impl AsyncWrite for GridFsUploadStream {
         match result {
             Ok(()) => Poll::Ready(Ok(())),
             Err(error) => Poll::Ready(Err(error.into_futures_io_error())),
-        }
-    }
-}
-
-impl Drop for GridFsUploadStream {
-    fn drop(&mut self) {
-        if !matches!(self.state, State::Closed) {
-            let chunks = self.bucket.chunks().clone();
-            let id = self.id.clone();
-            runtime::execute(async move {
-                let _result = chunks.delete_many(doc! { "files_id": id }, None).await;
-            })
         }
     }
 }
