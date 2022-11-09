@@ -81,10 +81,18 @@ impl Event {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "csfle")]
     pub(crate) fn as_command_started_event(&self) -> Option<&CommandStartedEvent> {
         match self {
             Event::Command(CommandEvent::Started(e)) => Some(e),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) fn into_command_started_event(self) -> Option<CommandStartedEvent> {
+        match self {
+            Self::Command(CommandEvent::Started(ev)) => Some(ev),
             _ => None,
         }
     }

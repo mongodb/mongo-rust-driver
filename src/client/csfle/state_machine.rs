@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
+    ops::DerefMut,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use bson::{Document, RawDocument, RawDocumentBuf};
@@ -31,6 +31,7 @@ pub(crate) struct CryptExecutor {
     tls_options: Option<KmsProvidersTlsOptions>,
     crypto_threads: ThreadPool,
     mongocryptd: Option<Mongocryptd>,
+    mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
 }
 
@@ -51,6 +52,7 @@ impl CryptExecutor {
             tls_options,
             crypto_threads,
             mongocryptd: None,
+            mongocryptd_client: None,
             metadata_client: None,
         })
     }
@@ -60,6 +62,7 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         tls_options: Option<KmsProvidersTlsOptions>,
         mongocryptd_opts: Option<MongocryptdOptions>,
+        mongocryptd_client: Option<Client>,
         metadata_client: Option<WeakClient>,
     ) -> Result<Self> {
         let mongocryptd = match mongocryptd_opts {
@@ -68,8 +71,14 @@ impl CryptExecutor {
         };
         let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
         exec.mongocryptd = mongocryptd;
+        exec.mongocryptd_client = mongocryptd_client;
         exec.metadata_client = metadata_client;
         Ok(exec)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn mongocryptd_spawned(&self) -> bool {
+        self.mongocryptd.is_some()
     }
 
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
@@ -107,21 +116,24 @@ impl CryptExecutor {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
                     let op = RawOutput(RunCommand::new_raw(db.to_string(), command, None, None)?);
-                    let mongocryptd = self
-                        .mongocryptd
-                        .as_ref()
-                        .ok_or_else(|| Error::internal("mongocryptd client not found"))?;
-                    let result = mongocryptd.client.execute_operation(op.clone(), None).await;
+                    let mongocryptd_client = self.mongocryptd_client.as_ref().ok_or_else(|| {
+                        Error::invalid_argument("this operation requires mongocryptd")
+                    })?;
+                    let result = mongocryptd_client.execute_operation(op.clone(), None).await;
                     let response = match result {
                         Ok(r) => r,
                         Err(e) if e.is_server_selection_error() => {
-                            mongocryptd.respawn().await?;
-                            match mongocryptd.client.execute_operation(op, None).await {
-                                Ok(r) => r,
-                                Err(new_e) if !new_e.is_server_selection_error() => {
-                                    return Err(new_e)
+                            if let Some(mongocryptd) = &self.mongocryptd {
+                                mongocryptd.respawn().await?;
+                                match mongocryptd_client.execute_operation(op, None).await {
+                                    Ok(r) => r,
+                                    Err(new_e) if !new_e.is_server_selection_error() => {
+                                        return Err(new_e)
+                                    }
+                                    Err(_) => return Err(e),
                                 }
-                                Err(_) => return Err(e),
+                            } else {
+                                return Err(e);
                             }
                         }
                         Err(e) => return Err(e),
@@ -215,25 +227,13 @@ impl CryptExecutor {
 #[derive(Debug)]
 struct Mongocryptd {
     opts: MongocryptdOptions,
-    client: Client,
     child: Mutex<Result<Process>>,
 }
 
 impl Mongocryptd {
-    const DEFAULT_URI: &'static str = "mongodb://localhost:27020";
-    const SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
-
     async fn new(opts: MongocryptdOptions) -> Result<Self> {
         let child = Mutex::new(Ok(Self::spawn(&opts)?));
-        let uri = opts.uri.as_deref().unwrap_or(Self::DEFAULT_URI);
-        let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
-        options.server_selection_timeout = Some(Self::SERVER_SELECTION_TIMEOUT);
-        let client = Client::with_options(options)?;
-        Ok(Self {
-            opts,
-            client,
-            child,
-        })
+        Ok(Self { opts, child })
     }
 
     async fn respawn(&self) -> Result<()> {
@@ -246,11 +246,15 @@ impl Mongocryptd {
         };
         let new_child = Self::spawn(&self.opts);
         if new_child.is_ok() {
-            if let Ok(old_child) = child.as_mut() {
-                let _ = old_child.wait().await;
+            if let Ok(mut old_child) = std::mem::replace(child.deref_mut(), new_child) {
+                crate::runtime::spawn(async move {
+                    let _ = old_child.kill();
+                    let _ = old_child.wait().await;
+                });
             }
+        } else {
+            *child = new_child;
         }
-        *child = new_child;
         unit_err(&*child)
     }
 
@@ -283,7 +287,6 @@ fn unit_err<T>(r: &Result<T>) -> Result<()> {
 pub(crate) struct MongocryptdOptions {
     pub(crate) spawn_path: Option<PathBuf>,
     pub(crate) spawn_args: Vec<String>,
-    pub(crate) uri: Option<String>,
 }
 
 fn result_ref<T>(r: &Result<T>) -> Result<&T> {

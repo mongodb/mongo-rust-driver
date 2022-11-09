@@ -122,7 +122,7 @@ impl From<TestHelloCommandResponse> for HelloCommandResponse {
             sasl_supported_mechs: test.sasl_supported_mechs,
             speculative_authenticate: test.speculative_authenticate,
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
-            max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
+            max_write_batch_size: Some(test.max_write_batch_size.unwrap_or(1234)),
             service_id: test.service_id,
             topology_version: test.topology_version,
             compressors: None,

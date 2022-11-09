@@ -59,7 +59,13 @@ impl StreamDescription {
                 .logical_session_timeout_minutes
                 .map(|mins| Duration::from_secs(mins as u64 * 60)),
             max_bson_object_size: reply.command_response.max_bson_object_size,
-            max_write_batch_size: reply.command_response.max_write_batch_size,
+            // The defaulting to 100,000 is here because mongocryptd doesn't include this field in
+            // hello replies; this should never happen when talking to a real server.
+            // TODO RUST-1532 Remove the defaulting when mongocryptd support is dropped.
+            max_write_batch_size: reply
+                .command_response
+                .max_write_batch_size
+                .unwrap_or(100_000),
             hello_ok: reply.command_response.hello_ok.unwrap_or(false),
             max_message_size_bytes: reply.command_response.max_message_size_bytes,
             service_id: reply.command_response.service_id,

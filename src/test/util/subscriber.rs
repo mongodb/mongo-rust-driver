@@ -45,7 +45,26 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         events
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "csfle")]
+    pub(crate) async fn collect_events_map<F, T>(
+        &mut self,
+        timeout: Duration,
+        mut filter: F,
+    ) -> Vec<T>
+    where
+        F: FnMut(E) -> Option<T>,
+    {
+        let mut events = Vec::new();
+        let _ = runtime::timeout(timeout, async {
+            while let Some(event) = self.filter_map_event(timeout, &mut filter).await {
+                events.push(event);
+            }
+        })
+        .await;
+        events
+    }
+
+    #[cfg(feature = "csfle")]
     pub(crate) async fn clear_events(&mut self, timeout: Duration) {
         self.collect_events(timeout, |_| true).await;
     }

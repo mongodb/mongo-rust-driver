@@ -7,11 +7,17 @@ source ./.evergreen/env.sh
 
 set -o xtrace
 
-FEATURE_FLAGS="openssl-tls,csfle"
+FEATURE_FLAGS="csfle,${TLS_FEATURE}"
 OPTIONS="-- -Z unstable-options --format json --report-time"
 
 if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
+fi
+
+if [ "$OS" = "Windows_NT" ]; then
+    export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
+    export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)
+    export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
 echo "cargo test options: --features ${FEATURE_FLAGS} ${OPTIONS}"

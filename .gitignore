@@ -12,3 +12,4 @@ Cargo.lock
 # we install cargo and rustup in the project directory on Evergreen.
 .cargo
 .rustup
+mongocryptd.pid

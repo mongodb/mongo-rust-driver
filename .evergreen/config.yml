@@ -475,28 +475,28 @@ functions:
 
   "fetch crypt_shared":
   - command: shell.exec
-    type: test
     params:
       shell: bash
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        python3 ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
-        ls -R ${PROJECT_DIRECTORY}/crypt_shared
+        if [ "${DISABLE_CRYPT_SHARED}" == "true" ]; then
+          echo "crypt_shared is disabled, not fetching"
+        else
+          ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
+          ls -R ${PROJECT_DIRECTORY}/crypt_shared
+        fi
 
   "run kmip server":
   - command: shell.exec
-    type: test
     params:
       shell: bash
       working_dir: "src"
       background: true
       script: |
         ${PREPARE_SHELL}
-        cd ${DRIVERS_TOOLS}/.evergreen/csfle
-        . ./activate_venv.sh
-        # TMPDIR is required to avoid "AF_UNIX path too long" errors.
-        TMPDIR="$(dirname ${DRIVERS_TOOLS})" python3 kms_kmip_server.py
+        export TLS_FEATURE=${TLS_FEATURE}
+        .evergreen/run-csfle-kmip-servers.sh
 
   "run csfle tests":
     - command: shell.exec
@@ -509,6 +509,8 @@ functions:
           export ASYNC_RUNTIME=${ASYNC_RUNTIME}
           export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
           export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
+          export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
+          export TLS_FEATURE=${TLS_FEATURE}
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
           export KMS_PROVIDERS=$(cat << "EOF"
@@ -1177,8 +1179,6 @@ tasks:
       - func: "install junit dependencies"
       - func: "fetch crypt_shared"
       - func: "bootstrap mongo-orchestration"
-        vars:
-          TOPOLOGY: "server"
       - func: "run kmip server"
       - func: "run csfle tests"
 
@@ -1569,6 +1569,7 @@ axes:
         display_name: "latest"
         variables:
            MONGODB_VERSION: "latest"
+           CRYPT_SHARED_VERSION: "latest"
       - id: "rapid"
         display_name: "rapid"
         variables:
@@ -1653,6 +1654,18 @@ axes:
            SSL: "nossl"
            TLS_FEATURE: ""
 
+  - id: "tls-feature"
+    display_name: "TLS Feature"
+    values:
+      - id: "default"
+        display_name: "rustls TLS"
+        variables:
+          TLS_FEATURE: ""
+      - id: "openssl"
+        display_name: "OpenSSL TLS"
+        variables:
+          TLS_FEATURE: "openssl-tls"
+
   - id: "compressor"
     display_name: "Compressor"
     values:
@@ -1678,21 +1691,21 @@ axes:
         display_name: "Ubuntu 18.04"
         run_on: ubuntu1804-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-64"
       - id: ubuntu-20.04
         display_name: "Ubuntu 20.04"
         run_on: ubuntu2004-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu2004-64"
       - id: ubuntu-18.04-arm64
         display_name: "ARM64 Ubuntu 18.04"
         run_on: ubuntu1804-arm64-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-arm64"
       - id: macos-11.00
@@ -1700,7 +1713,7 @@ axes:
         run_on: macos-1100
         variables:
           SINGLE_THREAD: true
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "macos"
       - id: windows-64-vs2017
@@ -1719,6 +1732,18 @@ axes:
         variables:
           REQUIRE_API_VERSION: "1"
           MONGODB_API_VERSION: "1"
+
+  - id: "crypt-shared"
+    display_name: "crypt_shared"
+    values:
+      - id: enabled
+        display_name: "crypt_shared enabled"
+        variables:
+          DISABLE_CRYPT_SHARED: ""
+      - id: disabled
+        display_name: "crypt_shared disabled"
+        variables:
+          DISABLE_CRYPT_SHARED: "true"
 
 task_groups:
   - name: serverless_task_group
@@ -1868,14 +1893,72 @@ buildvariants:
   tasks:
     - "serverless_task_group"
 
-# TODO(RUST-1386): Expand the os and version listing
-- matrix_name: "csfle"
+- matrix_name: "csfle-topology"
   matrix_spec:
     os:
       - ubuntu-20.04
     mongodb-version:
       - "6.0"
-  display_name: "CSFLE on mongodb ${mongodb-version} / ${os}"
+    topology:
+      - "standalone"
+      - "replica-set"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
+- matrix_name: "csfle-os"
+  matrix_spec:
+    os:
+      - macos-11.00
+      - windows-64-vs2017
+    mongodb-version:
+      - "6.0"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
+- matrix_name: "csfle-crypt-shared"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+    mongodb-version:
+      - "5.0"
+      - "6.0"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "disabled"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
+- matrix_name: "csfle-tls"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+      - macos-11.00
+      - windows-64-vs2017
+    mongodb-version:
+      - "6.0"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "openssl"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
   tasks:
     - "test-csfle"
 

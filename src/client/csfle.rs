@@ -2,7 +2,7 @@ pub mod client_encryption;
 pub mod options;
 mod state_machine;
 
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use derivative::Derivative;
 use mongocrypt::Crypt;
@@ -44,15 +44,33 @@ struct AuxClients {
 }
 
 impl ClientState {
+    const MONGOCRYPTD_DEFAULT_URI: &'static str = "mongodb://localhost:27020";
+    const MONGOCRYPTD_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
+
     pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_opts = Self::make_mongocryptd_opts(&opts, &crypt)?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
+        let mongocryptd_connect = opts.bypass_auto_encryption != Some(true)
+            && opts.bypass_query_analysis != Some(true)
+            && crypt.shared_lib_version().is_none()
+            && opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? != Some(true);
+        let mongocryptd_client = if mongocryptd_connect {
+            let uri = opts
+                .extra_option(&EO_MONGOCRYPTD_URI)?
+                .unwrap_or(Self::MONGOCRYPTD_DEFAULT_URI);
+            let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
+            options.server_selection_timeout = Some(Self::MONGOCRYPTD_SERVER_SELECTION_TIMEOUT);
+            Some(Client::with_options(options)?)
+        } else {
+            None
+        };
         let exec = CryptExecutor::new_implicit(
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
             opts.tls_options.take(),
             mongocryptd_opts,
+            mongocryptd_client,
             aux_clients.metadata_client,
         )
         .await?;
@@ -83,11 +101,20 @@ impl ClientState {
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
         }
-        if Some(true) != opts.bypass_auto_encryption {
-            builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
+        #[cfg(not(test))]
+        let disable_crypt_shared = false;
+        #[cfg(test)]
+        let disable_crypt_shared = opts.disable_crypt_shared.unwrap_or(false);
+        if !disable_crypt_shared {
+            if Some(true) != opts.bypass_auto_encryption {
+                builder = builder.append_crypt_shared_lib_search_path(Path::new("$SYSTEM"))?;
+            }
+            if let Some(p) = opts.extra_option(&EO_CRYPT_SHARED_LIB_PATH)? {
+                builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
+            }
         }
-        if let Some(p) = opts.extra_option(&EO_CRYPT_SHARED_LIB_PATH)? {
-            builder = builder.set_crypt_shared_lib_path_override(Path::new(p))?;
+        if opts.bypass_query_analysis == Some(true) {
+            builder = builder.bypass_query_analysis();
         }
         let crypt = builder.build()?;
         if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)
@@ -105,6 +132,7 @@ impl ClientState {
         crypt: &Crypt,
     ) -> Result<Option<MongocryptdOptions>> {
         if opts.bypass_auto_encryption == Some(true)
+            || opts.bypass_query_analysis == Some(true)
             || opts.extra_option(&EO_MONGOCRYPTD_BYPASS_SPAWN)? == Some(true)
             || crypt.shared_lib_version().is_some()
             || opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)
@@ -123,13 +151,9 @@ impl ClientState {
                 spawn_args.push(str_arg.to_string());
             }
         }
-        let uri = opts
-            .extra_option(&EO_MONGOCRYPTD_URI)?
-            .map(|s| s.to_string());
         Ok(Some(MongocryptdOptions {
             spawn_path,
             spawn_args,
-            uri,
         }))
     }
 

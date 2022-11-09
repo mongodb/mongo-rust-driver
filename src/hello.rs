@@ -166,7 +166,7 @@ pub(crate) struct HelloCommandResponse {
     pub max_bson_object_size: i64,
 
     /// The maximum number of write operations permitted in a write batch.
-    pub max_write_batch_size: i64,
+    pub max_write_batch_size: Option<i64>,
 
     /// If the connection is to a load balancer, the id of the selected backend.
     pub service_id: Option<ObjectId>,
