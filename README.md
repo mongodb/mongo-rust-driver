@@ -8,6 +8,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 ## Index
 - [Installation](#installation)
     - [Requirements](#requirements)
+      - [Supported platforms](#supported-platforms)
     - [Importing](#importing)
         - [Configuring the async runtime](#configuring-the-async-runtime)
         - [Enabling the sync API](#enabling-the-sync-api)
@@ -20,7 +21,6 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
         - [Finding documents in a collection](#finding-documents-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
 - [Web Framework Examples](#web-framework-examples)
-- [Platforms](#platforms)
 - [Note on connecting to Atlas deployments](#note-on-connecting-to-atlas-deployments)
 - [Windows DNS note](#windows-dns-note)
 - [Warning about timeouts / cancellation](#warning-about-timeouts--cancellation)
@@ -28,12 +28,17 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 - [Contributing](#contributing)
 - [Running the tests](#running-the-tests)
 - [Continuous Integration](#continuous-integration)
+- [Minimum supported Rust version (MSRV) policy](#minimum-supported-rust-version-msrv-policy)
 - [License](#license)
 
 ## Installation
 ### Requirements
-- Rust 1.57+
+- Rust 1.57+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
 - MongoDB 3.6+
+
+#### Supported Platforms
+
+The driver tests against Linux, MacOS, and Windows in CI.
 
 ### Importing
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
@@ -41,6 +46,8 @@ The driver is available on [crates.io](https://crates.io/crates/mongodb). To use
 [dependencies]
 mongodb = "2.3.0"
 ```
+
+Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
 
 #### Configuring the async runtime
 The driver supports both of the most popular async runtime crates, namely [`tokio`](https://crates.io/crates/tokio) and [`async-std`](https://crates.io/crates/async-std). By default, the driver will use [`tokio`](https://crates.io/crates/tokio), but you can explicitly choose a runtime by specifying one of `"tokio-runtime"` or `"async-std-runtime"` feature flags in your `Cargo.toml`.
@@ -244,10 +251,6 @@ The driver can be used easily with the Actix web framework by storing a `Client`
 ### Rocket
 The Rocket web framework provides built-in support for MongoDB via the Rust driver. The documentation for the [`rocket_db_pools`](https://api.rocket.rs/v0.5-rc/rocket_db_pools/index.html) crate contains instructions for using MongoDB with your Rocket application.
 
-## Platforms
-
-The driver tests against Linux, MacOS, and Windows in CI.
-
 ## Note on connecting to Atlas deployments
 
 In order to connect to a pre-4.2 Atlas instance that's M2 or bigger, the `openssl-tls` feature flag must be enabled. The flag is not required for clusters smaller than M2 or running server versions 4.2 or newer.
@@ -367,7 +370,7 @@ bash .evergreen/check-all.sh
 ## Continuous Integration
 Commits to main are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver).
 
-## Minimum supported Rust version (MSRV)
+## Minimum supported Rust version (MSRV) policy
 
 The MSRV for this crate is currently 1.57.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
