@@ -28,13 +28,12 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 - [Contributing](#contributing)
 - [Running the tests](#running-the-tests)
 - [Continuous Integration](#continuous-integration)
-- [Minimum supported Rust version (MSRV)](#minimum-supported-rust-version-msrv)
-- [`mongodb` 1.x EOL notice](#mongodb-1x-eol-notice)
+- [Minimum supported Rust version (MSRV) policy](#minimum-supported-rust-version-msrv-policy)
 - [License](#license)
 
 ## Installation
 ### Requirements
-- Rust 1.57+
+- Rust 1.57+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
 - MongoDB 3.6+
 
 ### Importing
@@ -43,6 +42,8 @@ The driver is available on [crates.io](https://crates.io/crates/mongodb). To use
 [dependencies]
 mongodb = "2.3.0"
 ```
+
+Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
 
 #### Configuring the async runtime
 The driver supports both of the most popular async runtime crates, namely [`tokio`](https://crates.io/crates/tokio) and [`async-std`](https://crates.io/crates/async-std). By default, the driver will use [`tokio`](https://crates.io/crates/tokio), but you can explicitly choose a runtime by specifying one of `"tokio-runtime"` or `"async-std-runtime"` feature flags in your `Cargo.toml`.
@@ -369,14 +370,10 @@ bash .evergreen/check-all.sh
 ## Continuous Integration
 Commits to main are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver).
 
-## Minimum supported Rust version (MSRV)
+## Minimum supported Rust version (MSRV) policy
 
 The MSRV for this crate is currently 1.57.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
-
-## `mongodb` 1.x EOL notice
-
-The 1.x version of this crate has reached end of life and will no longer be receiving any updates or bug fixes. It is recommended that all users upgrade to the latest 2.x version of `mongodb`. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information.
 
 ## License
 
