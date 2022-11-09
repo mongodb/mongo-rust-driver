@@ -88,17 +88,23 @@ pub(crate) enum Topology {
 }
 
 impl RunOnRequirement {
-    pub(crate) async fn can_run_on(&self, client: &TestClient) -> bool {
+    pub(crate) async fn can_run_on(&self, client: &TestClient) -> Result<(), String> {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
-                return false;
+                return Err(format!(
+                    "min server version {:?}, actual {:?}",
+                    min_version, client.server_version
+                ));
             }
         }
         if let Some(ref max_version) = self.max_server_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
             if !req.matches(&client.server_version) {
-                return false;
+                return Err(format!(
+                    "max server version {:?}, actual {:?}",
+                    max_version, client.server_version
+                ));
             }
         }
         if let Some(ref topologies) = self.topologies {
@@ -109,7 +115,10 @@ impl RunOnRequirement {
                     _ => expected_topology == &client_topology,
                 }
             }) {
-                return false;
+                return Err(format!(
+                    "allowed topologies {:?}, actual {:?}",
+                    topologies, client_topology
+                ));
             }
         }
         if let Some(ref actual_server_parameters) = self.server_parameters {
@@ -121,25 +130,28 @@ impl RunOnRequirement {
             )
             .is_err()
             {
-                return false;
+                return Err(format!(
+                    "required server parameters {:?}, actual {:?}",
+                    actual_server_parameters, client.server_parameters
+                ));
             }
         }
         if let Some(ref serverless) = self.serverless {
             if !serverless.can_run() {
-                return false;
+                return Err("requires serverless".to_string());
             }
         }
         if let Some(ref auth) = self.auth {
             if *auth != client.auth_enabled() {
-                return false;
+                return Err("requires auth".to_string());
             }
         }
         if let Some(csfle) = &self.csfle {
             if *csfle && std::env::var("KMS_PROVIDERS").is_err() {
-                return false;
+                return Err("requires csfle env".to_string());
             }
         }
-        true
+        Ok(())
     }
 }
 

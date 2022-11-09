@@ -32,12 +32,6 @@ pub struct ClientEncryption {
     key_vault: Collection<RawDocumentBuf>,
 }
 
-impl std::fmt::Debug for ClientEncryption {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ClientEncryption").finish()
-    }
-}
-
 impl ClientEncryption {
     /// Create a new key vault handle with the given options.
     pub fn new(options: ClientEncryptionOptions) -> Result<Self> {
@@ -275,27 +269,6 @@ pub struct DataKeyOptions {
     /// secure random device.
     #[builder(default)]
     pub key_material: Option<Vec<u8>>,
-}
-
-impl<'de> Deserialize<'de> for DataKeyOptions {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            master_key: Option<MasterKey>,
-            key_alt_names: Option<Vec<String>>,
-            key_material: Option<Binary>,
-        }
-        let h = Helper::deserialize(deserializer)?;
-        Ok(DataKeyOptions {
-            master_key: h.master_key.unwrap_or(MasterKey::Local),
-            key_alt_names: h.key_alt_names,
-            key_material: h.key_material.map(|bin| bin.bytes),
-        })
-    }
 }
 
 /// A KMS-specific key used to encrypt data keys.

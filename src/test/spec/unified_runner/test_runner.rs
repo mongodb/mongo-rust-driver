@@ -118,15 +118,18 @@ impl TestRunner {
 
         if let Some(ref requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
+            let mut run_on_errors = vec![];
             for requirement in requirements {
-                if requirement.can_run_on(&self.internal_client).await {
-                    can_run_on = true;
+                match requirement.can_run_on(&self.internal_client).await {
+                    Ok(()) => can_run_on = true,
+                    Err(e) => run_on_errors.push(e),
                 }
             }
             if !can_run_on {
                 file_level_log(format!(
-                    "Skipping file {}: client topology not compatible with test",
-                    file_title
+                    "Skipping file {}: client topology not compatible with test ({})",
+                    file_title,
+                    run_on_errors.join(","),
                 ));
                 return;
             }
@@ -179,15 +182,18 @@ impl TestRunner {
 
             if let Some(ref requirements) = test_case.run_on_requirements {
                 let mut can_run_on = false;
+                let mut run_on_errors = vec![];
                 for requirement in requirements {
-                    if requirement.can_run_on(&self.internal_client).await {
-                        can_run_on = true;
+                    match requirement.can_run_on(&self.internal_client).await {
+                        Ok(()) => can_run_on = true,
+                        Err(e) => run_on_errors.push(e),
                     }
                 }
                 if !can_run_on {
                     log_uncaptured(format!(
-                        "Skipping test case {:?}: client topology not compatible with test",
-                        &test_case.description
+                        "Skipping test case {:?}: client topology not compatible with test ({})",
+                        &test_case.description,
+                        run_on_errors.join(","),
                     ));
                     continue;
                 }
