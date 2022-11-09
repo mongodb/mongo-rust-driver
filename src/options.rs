@@ -23,6 +23,7 @@ pub use crate::{
     compression::*,
     concern::*,
     db::options::*,
+    gridfs::options::*,
     index::options::*,
     selection_criteria::*,
 };

@@ -163,9 +163,8 @@ pub struct GridFsDownloadStream {
 type GetBytesFuture = BoxFuture<'static, Result<(Vec<u8>, Box<Cursor<Chunk<'static>>>)>>;
 
 enum State {
-    // Idle stores these fields as options so that they can be moved into a GetBytesFuture
-    // without requiring ownership of the state. They will always store values and can be
-    // unwrapped safely.
+    // Idle is stored as an option so that its fields can be moved into a GetBytesFuture
+    // without requiring ownership of the state. It can always be unwrapped safely.
     Idle(Option<Idle>),
     Busy(GetBytesFuture),
     Done,
@@ -280,8 +279,7 @@ impl AsyncRead for GridFsDownloadStream {
             }
             Err(error) => {
                 stream.state = State::Done;
-                let error = futures_io::Error::new(futures_io::ErrorKind::Other, error);
-                Poll::Ready(Err(error))
+                Poll::Ready(Err(error.into_futures_io_error()))
             }
         }
     }

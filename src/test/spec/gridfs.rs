@@ -5,7 +5,6 @@ use crate::{
     error::{Error, ErrorKind, GridFsErrorKind},
     gridfs::{
         options::{GridFsBucketOptions, GridFsUploadOptions},
-        upload::GridFsUploadStream,
         GridFsBucket,
     },
     test::{
@@ -15,8 +14,10 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
+        CLIENT_OPTIONS,
         LOCK,
     },
+    GridFsUploadStream,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -119,7 +120,7 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
         data.len(),
         if options.is_some() { "with" } else { "without" }
     );
-    let mut upload_stream = bucket.open_upload_stream(filename, options.clone());
+    let mut upload_stream = bucket.open_upload_stream(&filename, options.clone());
     upload_stream.write_all(data).await.unwrap();
     upload_stream.close().await.unwrap();
 
@@ -137,6 +138,7 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
         .unwrap()
         .unwrap();
     assert_eq!(file.metadata, options.and_then(|opts| opts.metadata));
+    assert_eq!(file.filename, Some(filename));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -199,6 +201,14 @@ async fn upload_stream_errors() {
     let _guard = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
+    let client = if client.is_sharded() {
+        let mut options = CLIENT_OPTIONS.get().await.clone();
+        options.hosts.drain(1..);
+        TestClient::with_options(options).await
+    } else {
+        client
+    };
+
     let bucket = client.database("upload_stream_errors").gridfs_bucket(None);
     bucket.drop().await.unwrap();
 
@@ -286,7 +296,7 @@ async fn assert_closed(bucket: &GridFsBucket, mut upload_stream: GridFsUploadStr
         ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed)
     ));
 
-    assert_no_chunks_written(&bucket, upload_stream.id()).await;
+    assert_no_chunks_written(bucket, upload_stream.id()).await;
 }
 
 fn assert_shut_down_error(result: std::result::Result<(), futures_io::Error>) {

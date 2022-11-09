@@ -1,9 +1,9 @@
 // TODO(RUST-1395) Remove these allows.
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, missing_docs)]
 
 mod download;
 pub mod options;
-pub mod upload;
+mod upload;
 
 use std::sync::{atomic::AtomicBool, Arc};
 
@@ -13,13 +13,15 @@ use serde_with::skip_serializing_none;
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     cursor::Cursor,
-    error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
+    error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
     options::{CollectionOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
     Collection,
     Database,
 };
 
-use options::*;
+pub use download::GridFsDownloadStream;
+pub use options::*;
+pub use upload::GridFsUploadStream;
 
 pub const DEFAULT_BUCKET_NAME: &str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
@@ -226,5 +228,11 @@ impl GridFsBucket {
         self.chunks().drop(None).await?;
 
         Ok(())
+    }
+}
+
+impl Error {
+    fn into_futures_io_error(self) -> futures_io::Error {
+        futures_io::Error::new(futures_io::ErrorKind::Other, self)
     }
 }

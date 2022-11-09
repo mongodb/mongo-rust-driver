@@ -1,13 +1,12 @@
 use std::time::Duration;
 
-use crate::{
-    bson::Document,
-    concern::{ReadConcern, WriteConcern},
-    options::FindOptions,
-    selection_criteria::SelectionCriteria,
-};
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
+
+use crate::{
+    bson::Document,
+    options::{FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
+};
 
 /// Contains the options for creating a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]

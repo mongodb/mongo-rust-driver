@@ -1,5 +1,8 @@
-use core::task::{Context, Poll};
-use std::{pin::Pin, sync::atomic::Ordering};
+use std::{
+    pin::Pin,
+    sync::atomic::Ordering,
+    task::{Context, Poll},
+};
 
 use futures_util::{
     future::{BoxFuture, FutureExt},
@@ -193,6 +196,8 @@ type WriteBytesFuture = BoxFuture<'static, Result<(u32, Vec<u8>)>>;
 type CloseFuture = BoxFuture<'static, Result<()>>;
 
 enum State {
+    // The buffer is stored as an option so that it can be moved into futures without requiring
+    // ownership of the state. It can always be unwrapped safely.
     Idle(Option<Vec<u8>>),
     Writing(WriteBytesFuture),
     Closing(CloseFuture),
@@ -214,12 +219,6 @@ impl State {
             Self::Closing(future) => future,
             _ => unreachable!(),
         }
-    }
-}
-
-impl Error {
-    fn into_futures_io_error(self) -> futures_io::Error {
-        futures_io::Error::new(futures_io::ErrorKind::Other, self)
     }
 }
 
@@ -308,6 +307,7 @@ impl AsyncWrite for GridFsUploadStream {
         let future = match &mut stream.state {
             State::Idle(buffer) => {
                 let buffer = buffer.take().unwrap();
+
                 let file = FilesCollectionDocument {
                     id: stream.id.clone(),
                     length: stream.current_n as u64 * stream.chunk_size as u64
@@ -317,6 +317,7 @@ impl AsyncWrite for GridFsUploadStream {
                     filename: stream.filename.take(),
                     metadata: stream.metadata.take().unwrap(),
                 };
+
                 let new_future = close(stream.bucket.clone(), buffer, file).boxed();
                 stream.state.set_closing(new_future)
             }
@@ -336,11 +337,6 @@ impl AsyncWrite for GridFsUploadStream {
             Err(error) => Poll::Ready(Err(error.into_futures_io_error())),
         }
     }
-}
-
-fn get_closed_error() -> futures_io::Error {
-    let error: Error = ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed).into();
-    error.into_futures_io_error()
 }
 
 impl Drop for GridFsUploadStream {
@@ -418,6 +414,11 @@ async fn close(bucket: GridFsBucket, buffer: Vec<u8>, file: FilesCollectionDocum
             Err(error)
         }
     }
+}
+
+fn get_closed_error() -> futures_io::Error {
+    let error: Error = ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed).into();
+    error.into_futures_io_error()
 }
 
 impl GridFsBucket {
