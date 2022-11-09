@@ -45,7 +45,7 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         events
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "csfle")]
     pub(crate) async fn collect_events_map<F, T>(
         &mut self,
         timeout: Duration,
@@ -64,7 +64,7 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         events
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "csfle")]
     pub(crate) async fn clear_events(&mut self, timeout: Duration) {
         self.collect_events(timeout, |_| true).await;
     }
