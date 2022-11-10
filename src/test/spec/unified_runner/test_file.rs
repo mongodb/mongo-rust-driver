@@ -72,6 +72,7 @@ pub(crate) struct RunOnRequirement {
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
     auth: Option<bool>,
+    csfle: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -87,17 +88,23 @@ pub(crate) enum Topology {
 }
 
 impl RunOnRequirement {
-    pub(crate) async fn can_run_on(&self, client: &TestClient) -> bool {
+    pub(crate) async fn can_run_on(&self, client: &TestClient) -> Result<(), String> {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
-                return false;
+                return Err(format!(
+                    "min server version {:?}, actual {:?}",
+                    min_version, client.server_version
+                ));
             }
         }
         if let Some(ref max_version) = self.max_server_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
             if !req.matches(&client.server_version) {
-                return false;
+                return Err(format!(
+                    "max server version {:?}, actual {:?}",
+                    max_version, client.server_version
+                ));
             }
         }
         if let Some(ref topologies) = self.topologies {
@@ -108,7 +115,10 @@ impl RunOnRequirement {
                     _ => expected_topology == &client_topology,
                 }
             }) {
-                return false;
+                return Err(format!(
+                    "allowed topologies {:?}, actual {:?}",
+                    topologies, client_topology
+                ));
             }
         }
         if let Some(ref actual_server_parameters) = self.server_parameters {
@@ -120,20 +130,28 @@ impl RunOnRequirement {
             )
             .is_err()
             {
-                return false;
+                return Err(format!(
+                    "required server parameters {:?}, actual {:?}",
+                    actual_server_parameters, client.server_parameters
+                ));
             }
         }
         if let Some(ref serverless) = self.serverless {
             if !serverless.can_run() {
-                return false;
+                return Err("requires serverless".to_string());
             }
         }
         if let Some(ref auth) = self.auth {
             if *auth != client.auth_enabled() {
-                return false;
+                return Err("requires auth".to_string());
             }
         }
-        true
+        if let Some(csfle) = &self.csfle {
+            if *csfle && std::env::var("KMS_PROVIDERS").is_err() {
+                return Err("requires csfle env".to_string());
+            }
+        }
+        Ok(())
     }
 }
 
@@ -146,6 +164,8 @@ pub(crate) enum TestFileEntity {
     Session(Session),
     Bucket(Bucket),
     Thread(Thread),
+    #[cfg(feature = "csfle")]
+    ClientEncryption(ClientEncryption),
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,6 +327,23 @@ pub(crate) struct Bucket {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Thread {
     pub(crate) id: String,
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ClientEncryption {
+    pub(crate) id: String,
+    pub(crate) client_encryption_opts: ClientEncryptionOpts,
+}
+
+#[cfg(feature = "csfle")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ClientEncryptionOpts {
+    pub(crate) key_vault_client: String,
+    pub(crate) key_vault_namespace: crate::Namespace,
+    pub(crate) kms_providers: Document,
 }
 
 /// Messages used for communicating with test runner "threads".

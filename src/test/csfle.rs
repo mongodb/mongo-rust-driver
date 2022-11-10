@@ -46,7 +46,7 @@ use crate::{
         CommandSucceededEvent,
     },
     options::{IndexOptions, ReadConcern, WriteConcern},
-    test::{Event, EventHandler, SdamEvent},
+    test::{Event, EventHandler, SdamEvent, KMIP_TLS_OPTIONS, KMS_PROVIDERS},
     Client,
     Collection,
     IndexModel,
@@ -87,30 +87,16 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
 }
 
 lazy_static! {
-    static ref KMS_PROVIDERS: KmsProviders = serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
     static ref LOCAL_KMS: KmsProviders = {
         let mut out = KMS_PROVIDERS.clone();
         out.retain(|k, _| *k == KmsProvider::Local);
         out
     };
-    static ref EXTRA_OPTIONS: Document = doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
+    static ref EXTRA_OPTIONS: Document =
+        doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
-    static ref KMIP_TLS_OPTIONS: KmsProvidersTlsOptions = {
-            /* If these options are used, the test will need a running KMIP server:
-                pip3 install pykmip
-                # in drivers-evergreen-tools/.evergreen
-                python3 ./csfle/kms_kmip_server.py
-            */
-        let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
-        let kmip_opts = TlsOptions::builder()
-            .ca_file_path(cert_dir.join("ca.pem"))
-            .cert_key_file_path(cert_dir.join("client.pem"))
-            .build();
-        let tls_options: KmsProvidersTlsOptions = [(KmsProvider::Kmip, kmip_opts)].into_iter().collect();
-        tls_options
-    };
-    static ref DISABLE_CRYPT_SHARED: bool = std::env::var("DISABLE_CRYPT_SHARED")
-        .map_or(false, |s| s == "true");
+    static ref DISABLE_CRYPT_SHARED: bool =
+        std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true");
 }
 
 fn check_env(name: &str, kmip: bool) -> bool {
@@ -496,7 +482,7 @@ async fn external_key_vault() -> Result<()> {
 fn load_testdata_raw(name: &str) -> Result<String> {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "src/test/spec/json/client-side-encryption/testdata",
+        "src/test/spec/json/testdata/client-side-encryption",
         name,
     ]
     .iter()

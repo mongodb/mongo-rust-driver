@@ -45,8 +45,18 @@ pub(crate) enum Entity {
     EventList(EventList),
     Thread(ThreadEntity),
     TopologyDescription(TopologyDescription),
+    #[cfg(feature = "csfle")]
+    ClientEncryption(Arc<crate::client_encryption::ClientEncryption>),
     None,
 }
+
+#[cfg(feature = "csfle")]
+impl std::fmt::Debug for crate::client_encryption::ClientEncryption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientEncryption").finish()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
@@ -206,6 +216,11 @@ impl ClientEntity {
         if let Some(client) = &self.client {
             client.sync_workers().await;
         }
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) fn client(&self) -> Option<&Client> {
+        self.client.as_ref()
     }
 }
 
@@ -416,6 +431,14 @@ impl Entity {
                 TestCursor::Closed => None,
             },
             _ => None,
+        }
+    }
+
+    #[cfg(feature = "csfle")]
+    pub fn as_client_encryption(&self) -> &Arc<crate::client_encryption::ClientEncryption> {
+        match self {
+            Self::ClientEncryption(ce) => ce,
+            _ => panic!("Expected ClientEncryption, got {:?}", &self),
         }
     }
 }

@@ -54,6 +54,9 @@ use super::{
     TestFileEntity,
 };
 
+#[cfg(feature = "csfle")]
+use crate::client::csfle::options::KmsProviders;
+
 #[cfg(feature = "tracing-unstable")]
 use crate::test::{
     spec::unified_runner::matcher::tracing_events_match,
@@ -68,6 +71,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listDatabaseObjects",
     "mapReduce",
     "watch",
+    "rewrapManyDataKey",
 ];
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
@@ -114,15 +118,18 @@ impl TestRunner {
 
         if let Some(ref requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
+            let mut run_on_errors = vec![];
             for requirement in requirements {
-                if requirement.can_run_on(&self.internal_client).await {
-                    can_run_on = true;
+                match requirement.can_run_on(&self.internal_client).await {
+                    Ok(()) => can_run_on = true,
+                    Err(e) => run_on_errors.push(e),
                 }
             }
             if !can_run_on {
                 file_level_log(format!(
-                    "Skipping file {}: client topology not compatible with test",
-                    file_title
+                    "Skipping file {}: client topology not compatible with test ({})",
+                    file_title,
+                    run_on_errors.join(","),
                 ));
                 return;
             }
@@ -175,15 +182,18 @@ impl TestRunner {
 
             if let Some(ref requirements) = test_case.run_on_requirements {
                 let mut can_run_on = false;
+                let mut run_on_errors = vec![];
                 for requirement in requirements {
-                    if requirement.can_run_on(&self.internal_client).await {
-                        can_run_on = true;
+                    match requirement.can_run_on(&self.internal_client).await {
+                        Ok(()) => can_run_on = true,
+                        Err(e) => run_on_errors.push(e),
                     }
                 }
                 if !can_run_on {
                     log_uncaptured(format!(
-                        "Skipping test case {:?}: client topology not compatible with test",
-                        &test_case.description
+                        "Skipping test case {:?}: client topology not compatible with test ({})",
+                        &test_case.description,
+                        run_on_errors.join(","),
                     ));
                     continue;
                 }
@@ -241,7 +251,8 @@ impl TestRunner {
                     if expected.ignore_extra_events.unwrap_or(false) {
                         assert!(
                             actual_events.len() >= expected_events.len(),
-                            "actual:\n{:#?}\nexpected:\n{:#?}",
+                            "[{}] actual:\n{:#?}\nexpected:\n{:#?}",
+                            test_case.description,
                             actual_events,
                             expected_events
                         )
@@ -249,7 +260,8 @@ impl TestRunner {
                         assert_eq!(
                             actual_events.len(),
                             expected_events.len(),
-                            "actual:\n{:#?}\nexpected:\n{:#?}",
+                            "[{}] actual:\n{:#?}\nexpected:\n{:#?}",
+                            test_case.description,
                             actual_events,
                             expected_events
                         )
@@ -537,6 +549,30 @@ impl TestRunner {
                     });
                     (thread.id.clone(), Entity::Thread(ThreadEntity { sender }))
                 }
+                #[cfg(feature = "csfle")]
+                TestFileEntity::ClientEncryption(client_enc) => {
+                    let id = client_enc.id.clone();
+                    let opts = &client_enc.client_encryption_opts;
+                    let kv_client = self
+                        .get_client(&opts.key_vault_client)
+                        .await
+                        .client()
+                        .unwrap()
+                        .clone();
+                    let mut kms_providers: KmsProviders =
+                        bson::from_document(opts.kms_providers.clone()).unwrap();
+                    fill_kms_placeholders(&mut kms_providers);
+                    let client_enc = crate::client_encryption::ClientEncryption::new(
+                        crate::client_encryption::ClientEncryptionOptions::builder()
+                            .key_vault_client(kv_client)
+                            .key_vault_namespace(opts.key_vault_namespace.clone())
+                            .kms_providers(kms_providers)
+                            .tls_options(crate::test::KMIP_TLS_OPTIONS.clone())
+                            .build(),
+                    )
+                    .unwrap();
+                    (id, Entity::ClientEncryption(Arc::new(client_enc)))
+                }
             };
             self.insert_entity(&id, entity).await;
         }
@@ -628,5 +664,42 @@ impl TestRunner {
             .unwrap()
             .as_topology_description()
             .clone()
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) async fn get_client_encryption(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Arc<crate::client_encryption::ClientEncryption> {
+        self.entities
+            .read()
+            .await
+            .get(id.as_ref())
+            .unwrap()
+            .as_client_encryption()
+            .clone()
+    }
+}
+
+#[cfg(feature = "csfle")]
+fn fill_kms_placeholders(kms_providers: &mut KmsProviders) {
+    use crate::test::KMS_PROVIDERS;
+
+    let placeholder = bson::Bson::Document(doc! { "$$placeholder": 1 });
+
+    for (provider, config) in kms_providers.iter_mut() {
+        for (key, value) in config.iter_mut() {
+            if *value == placeholder {
+                let new_value = KMS_PROVIDERS
+                    .get(provider)
+                    .unwrap_or_else(|| panic!("missing config for {:?}", provider))
+                    .get(key)
+                    .unwrap_or_else(|| {
+                        panic!("provider config {:?} missing key {:?}", provider, key)
+                    })
+                    .clone();
+                *value = new_value;
+            }
+        }
     }
 }

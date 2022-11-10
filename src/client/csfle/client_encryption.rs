@@ -16,7 +16,7 @@ use mongocrypt::{
     ctx::{Algorithm, Ctx, KmsProvider},
     Crypt,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use super::{
@@ -273,7 +273,7 @@ pub struct DataKeyOptions {
 
 /// A KMS-specific key used to encrypt data keys.
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 #[non_exhaustive]
 #[allow(missing_docs)]

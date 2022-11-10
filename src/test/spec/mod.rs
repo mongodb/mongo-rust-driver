@@ -1,6 +1,8 @@
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod auth;
 mod change_streams;
+#[cfg(feature = "csfle")]
+mod client_side_encryption;
 mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
@@ -69,7 +71,7 @@ where
         .chain(spec.iter())
         .collect();
 
-    for entry in fs::read_dir(&base_path).unwrap() {
+    for entry in fs::read_dir(&base_path).unwrap_or_else(|_| panic!("reading {:?}", base_path)) {
         let test_file = entry.unwrap();
 
         if !test_file.file_type().unwrap().is_file() {
