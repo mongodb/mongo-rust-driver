@@ -46,7 +46,7 @@ use crate::{
         CommandSucceededEvent,
     },
     options::{IndexOptions, ReadConcern, WriteConcern},
-    test::{Event, EventHandler, SdamEvent, KMS_PROVIDERS, KMIP_TLS_OPTIONS},
+    test::{Event, EventHandler, SdamEvent, KMIP_TLS_OPTIONS, KMS_PROVIDERS},
     Client,
     Collection,
     IndexModel,
@@ -95,8 +95,8 @@ lazy_static! {
     static ref EXTRA_OPTIONS: Document =
         doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
-    static ref DISABLE_CRYPT_SHARED: bool = std::env::var("DISABLE_CRYPT_SHARED")
-        .map_or(false, |s| s == "true");
+    static ref DISABLE_CRYPT_SHARED: bool =
+        std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true");
 }
 
 fn check_env(name: &str, kmip: bool) -> bool {
