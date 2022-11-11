@@ -18,15 +18,8 @@ use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
 
 use crate::{
-    client::{
-        auth::Credential,
-        options::{TlsOptions},
-    },
-    client_encryption::{
-        ClientEncryption,
-        EncryptKey,
-        MasterKey,
-    },
+    client::{auth::Credential, options::TlsOptions},
+    client_encryption::{ClientEncryption, EncryptKey, MasterKey},
     coll::options::{
         CollectionOptions,
         CreateIndexOptions,
@@ -109,7 +102,10 @@ lazy_static! {
         .filter(|(p, ..)| p == &KmsProvider::Local)
         .cloned()
         .collect();
-    pub(crate) static ref KMS_PROVIDERS_MAP: HashMap<mongocrypt::ctx::KmsProvider, (bson::Document, Option<crate::client::options::TlsOptions>)> = {
+    pub(crate) static ref KMS_PROVIDERS_MAP: HashMap<
+        mongocrypt::ctx::KmsProvider,
+        (bson::Document, Option<crate::client::options::TlsOptions>),
+    > = {
         let mut map = HashMap::new();
         for (prov, conf, tls) in KMS_PROVIDERS.clone() {
             map.insert(prov, (conf, tls));
@@ -1319,9 +1315,7 @@ enum Bypass {
     QueryAnalysis,
 }
 
-async fn bypass_mongocryptd_unencrypted_insert(
-    bypass: Bypass,
-) -> Result<()> {
+async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: encrypted client.
@@ -1685,15 +1679,12 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
 
     // Test
     client_encryption
-        .create_data_key(
-            MasterKey::Aws {
-                    region: "us-east-1".to_string(),
-                    key: "arn:aws:kms:us-east-1:579766882180:key/\
-                          89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
-                        .to_string(),
-                    endpoint: Some(endpoint.into()),
-                }
-        )
+        .create_data_key(MasterKey::Aws {
+            region: "us-east-1".to_string(),
+            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                .to_string(),
+            endpoint: Some(endpoint.into()),
+        })
         .run()
         .await
         .map(|_| ())
@@ -1708,14 +1699,19 @@ async fn kms_tls_options() -> Result<()> {
     }
     let _guard = LOCK.run_exclusively().await;
 
-    fn providers_with_tls(mut providers: HashMap<KmsProvider, (Document, Option<TlsOptions>)>, tls_opts: TlsOptions) -> KmsProviderList {
-        for provider in [KmsProvider::Aws, KmsProvider::Azure, KmsProvider::Gcp, KmsProvider::Kmip] {
+    fn providers_with_tls(
+        mut providers: HashMap<KmsProvider, (Document, Option<TlsOptions>)>,
+        tls_opts: TlsOptions,
+    ) -> KmsProviderList {
+        for provider in [
+            KmsProvider::Aws,
+            KmsProvider::Azure,
+            KmsProvider::Gcp,
+            KmsProvider::Kmip,
+        ] {
             providers.get_mut(&provider).unwrap().1 = Some(tls_opts.clone());
         }
-        providers
-            .into_iter()
-            .map(|(p, (o, t))| (p, o, t))
-            .collect()
+        providers.into_iter().map(|(p, (o, t))| (p, o, t)).collect()
     }
 
     // Setup
@@ -1740,7 +1736,7 @@ async fn kms_tls_options() -> Result<()> {
         .key_vault_client(TestClient::new().await.into_client())
         .kms_providers(providers_with_tls(
             base_providers.clone(),
-            TlsOptions::builder().ca_file_path(ca_path.clone()).build()
+            TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
         ))?
         .build()?;
 
@@ -1987,7 +1983,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
         .encrypt(
             "encrypted indexed value",
             EncryptKey::Id(testdata.key1_id.clone()),
-            Algorithm::Indexed
+            Algorithm::Indexed,
         )
         .contention_factor(0)
         .run()

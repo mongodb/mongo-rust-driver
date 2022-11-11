@@ -52,7 +52,7 @@ struct Optional {
     encrypted_fields_map: Option<HashMap<String, Document>>,
     bypass_query_analysis: Option<bool>,
     #[cfg(test)]
-    disable_crypt_shared: Option<bool>,    
+    disable_crypt_shared: Option<bool>,
 }
 
 impl EncryptedClientBuilder<BUILDER_UNSET, BUILDER_UNSET> {

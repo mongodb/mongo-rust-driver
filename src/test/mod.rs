@@ -17,6 +17,8 @@ mod lambda_examples;
 pub mod spec;
 pub(crate) mod util;
 
+#[cfg(feature = "csfle")]
+pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
     util::{
@@ -35,8 +37,6 @@ pub(crate) use self::{
         TestClient,
     },
 };
-#[cfg(feature = "csfle")]
-pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 
 use async_once::AsyncOnce;
 use home::home_dir;
