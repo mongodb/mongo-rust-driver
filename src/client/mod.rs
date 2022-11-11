@@ -155,12 +155,14 @@ impl Client {
     /// # let key_vault_namespace = todo!();
     /// # let key_vault_client: Client = todo!();
     /// # let local_key: bson::Binary = todo!();
-    /// let encrypted_client = Client::encrypted_builder(client_options)
-    ///     .key_vault_namespace(key_vault_namespace)
-    ///     .kms_providers([(KmsProvider::Local, doc! { "key": local_key }, None)])?
-    ///     .key_vault_client(key_vault_client)
-    ///     .build()
-    ///     .await?;
+    /// let encrypted_client = Client::encrypted_builder(
+    ///     client_options,
+    ///     key_vault_namespace,
+    ///     [(KmsProvider::Local, doc! { "key": local_key }, None)],
+    /// )?
+    /// .key_vault_client(key_vault_client)
+    /// .build()
+    /// .await?;
     /// # Ok(())
     /// # }
     /// ```
