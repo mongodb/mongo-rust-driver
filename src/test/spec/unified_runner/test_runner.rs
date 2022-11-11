@@ -562,13 +562,12 @@ impl TestRunner {
                     let kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document> =
                         bson::from_document(opts.kms_providers.clone()).unwrap();
                     let kms_providers = fill_kms_placeholders(kms_providers);
-                    let client_enc = crate::client_encryption::ClientEncryption::builder()
-                        .key_vault_client(kv_client)
-                        .key_vault_namespace(opts.key_vault_namespace.clone())
-                        .kms_providers(kms_providers)
-                        .unwrap()
-                        .build()
-                        .unwrap();
+                    let client_enc = crate::client_encryption::ClientEncryption::new(
+                        kv_client,
+                        opts.key_vault_namespace.clone(),
+                        kms_providers,
+                    )
+                    .unwrap();
                     (id, Entity::ClientEncryption(Arc::new(client_enc)))
                 }
             };

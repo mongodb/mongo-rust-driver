@@ -12,8 +12,6 @@ use std::{
 
 #[cfg(feature = "csfle")]
 pub use self::csfle::client_builder::*;
-#[cfg(feature = "csfle")]
-use crate::client_encryption::BUILDER_UNSET;
 use derivative::Derivative;
 
 #[cfg(test)]
@@ -146,7 +144,6 @@ impl Client {
     }
 
     /// Return an `EncryptedClientBuilder` for constructing a `Client` with auto-encryption enabled.
-    /// At least one KMS provider will need to be set to complete the build.
     ///
     /// ```no_run
     /// # use bson::doc;
@@ -170,8 +167,20 @@ impl Client {
     #[cfg(feature = "csfle")]
     pub fn encrypted_builder(
         client_options: ClientOptions,
-    ) -> EncryptedClientBuilder<BUILDER_UNSET, BUILDER_UNSET> {
-        EncryptedClientBuilder::new(client_options)
+        key_vault_namespace: crate::Namespace,
+        kms_providers: impl IntoIterator<
+            Item = (
+                mongocrypt::ctx::KmsProvider,
+                bson::Document,
+                Option<options::TlsOptions>,
+            ),
+        >,
+    ) -> Result<EncryptedClientBuilder> {
+        Ok(EncryptedClientBuilder::new(
+            client_options,
+            key_vault_namespace,
+            csfle::options::KmsProviders::new(kms_providers)?,
+        ))
     }
 
     #[cfg(all(test, feature = "csfle"))]

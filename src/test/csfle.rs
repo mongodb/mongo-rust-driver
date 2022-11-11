@@ -148,11 +148,11 @@ async fn custom_key_material() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     let (client, datakeys) = init_client().await?;
-    let enc = ClientEncryption::builder()
-        .key_vault_client(client.into_client())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .build()?;
+    let enc = ClientEncryption::new(
+        client.into_client(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?;
 
     let key = base64::decode(
         "xPTAjBRG5JiPm+d3fj6XLi2q5DMXUS/f1f+SMAlhhwkhDRL0kr8r9GDLIGTAGlvC+HVjSIgdL+RKw\
@@ -219,21 +219,23 @@ async fn data_key_double_encryption() -> Result<()> {
     )]
     .into_iter()
     .collect();
-    let client_encrypted = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(KMS_PROVIDERS.clone())?
-        .schema_map(schema_map)
-        .extra_options(EXTRA_OPTIONS.clone())
-        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-        .build()
-        .await?;
+    let client_encrypted = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        KMS_PROVIDERS.clone(),
+    )?
+    .schema_map(schema_map)
+    .extra_options(EXTRA_OPTIONS.clone())
+    .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+    .build()
+    .await?;
 
     // Setup: manual encryption.
-    let client_encryption = ClientEncryption::builder()
-        .key_vault_client(client.clone().into_client())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(KMS_PROVIDERS.clone())?
-        .build()?;
+    let client_encryption = ClientEncryption::new(
+        client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        KMS_PROVIDERS.clone(),
+    )?;
 
     // Testing each provider:
     let mut events = client.subscribe_to_events();
@@ -421,21 +423,23 @@ async fn external_key_vault() -> Result<()> {
         };
 
         // Setup: encrypted client.
-        let client_encrypted = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .key_vault_client(kv_client.clone())
-            .kms_providers(LOCAL_KMS.clone())?
-            .schema_map(schema_map)
-            .extra_options(EXTRA_OPTIONS.clone())
-            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-            .build()
-            .await?;
+        let client_encrypted = Client::encrypted_builder(
+            CLIENT_OPTIONS.get().await.clone(),
+            KV_NAMESPACE.clone(),
+            LOCAL_KMS.clone(),
+        )?
+        .key_vault_client(kv_client.clone())
+        .schema_map(schema_map)
+        .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+        .build()
+        .await?;
         // Setup: manual encryption.
-        let client_encryption = ClientEncryption::builder()
-            .key_vault_client(kv_client.unwrap_or_else(|| client.into_client()))
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())?
-            .build()?;
+        let client_encryption = ClientEncryption::new(
+            kv_client.unwrap_or_else(|| client.into_client()),
+            KV_NAMESPACE.clone(),
+            LOCAL_KMS.clone(),
+        )?;
 
         // Test: encrypted client.
         let result = client_encrypted
@@ -521,13 +525,12 @@ async fn bson_size_limits() -> Result<()> {
     let handler = Arc::new(EventHandler::new());
     let mut events = handler.subscribe();
     opts.command_event_handler = Some(handler.clone());
-    let client_encrypted = Client::encrypted_builder(opts)
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .extra_options(EXTRA_OPTIONS.clone())
-        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-        .build()
-        .await?;
+    let client_encrypted =
+        Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
+            .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+            .build()
+            .await?;
     let coll = client_encrypted
         .database("db")
         .collection::<Document>("coll");
@@ -645,13 +648,15 @@ async fn views_prohibited() -> Result<()> {
         .await?;
 
     // Setup: encrypted client.
-    let client_encrypted = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .extra_options(EXTRA_OPTIONS.clone())
-        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-        .build()
-        .await?;
+    let client_encrypted = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .extra_options(EXTRA_OPTIONS.clone())
+    .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+    .build()
+    .await?;
 
     // Test: auto encryption fails on a view
     let result = client_encrypted
@@ -746,21 +751,23 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
 
     // Setup: encrypted client and manual encryption.
     let client_encrypted = {
-        let mut enc_builder = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(KMS_PROVIDERS.clone())?
-            .extra_options(EXTRA_OPTIONS.clone())
-            .disable_crypt_shared(*DISABLE_CRYPT_SHARED);
+        let mut enc_builder = Client::encrypted_builder(
+            CLIENT_OPTIONS.get().await.clone(),
+            KV_NAMESPACE.clone(),
+            KMS_PROVIDERS.clone(),
+        )?
+        .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(*DISABLE_CRYPT_SHARED);
         if local_schema {
             enc_builder = enc_builder.schema_map([("db.coll".to_string(), schema)]);
         }
         enc_builder.build().await?
     };
-    let client_encryption = ClientEncryption::builder()
-        .key_vault_client(client.clone().into_client())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(KMS_PROVIDERS.clone())?
-        .build()?;
+    let client_encryption = ClientEncryption::new(
+        client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        KMS_PROVIDERS.clone(),
+    )?;
 
     // Test: build corpus.
     let corpus = load_corpus_nodecimal128("corpus/corpus.json")?;
@@ -946,11 +953,11 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
         .into_iter()
         .map(update_provider)
         .collect();
-    Ok(ClientEncryption::builder()
-        .key_vault_client(TestClient::new().await.into_client())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(kms_providers)?
-        .build()?)
+    Ok(ClientEncryption::new(
+        TestClient::new().await.into_client(),
+        KV_NAMESPACE.clone(),
+        kms_providers,
+    )?)
 }
 
 async fn validate_roundtrip(
@@ -1289,14 +1296,16 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
-    let client_encrypted = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .schema_map(schema_map)
-        .extra_options(extra_options)
-        .disable_crypt_shared(true)
-        .build()
-        .await?;
+    let client_encrypted = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .schema_map(schema_map)
+    .extra_options(extra_options)
+    .disable_crypt_shared(true)
+    .build()
+    .await?;
 
     // Test: insert fails.
     let err = client_encrypted
@@ -1322,11 +1331,13 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
     let extra_options = doc! {
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
-    let builder = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .extra_options(extra_options)
-        .disable_crypt_shared(true);
+    let builder = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .extra_options(extra_options)
+    .disable_crypt_shared(true);
     let builder = match bypass {
         Bypass::AutoEncryption => builder.bypass_auto_encryption(true),
         Bypass::QueryAnalysis => builder.bypass_query_analysis(true),
@@ -1528,11 +1539,11 @@ impl DeadlockTestCase {
                     .build(),
             )
             .await?;
-        let client_encryption = ClientEncryption::builder()
-            .key_vault_client(client_test.clone().into_client())
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())?
-            .build()?;
+        let client_encryption = ClientEncryption::new(
+            client_test.clone().into_client(),
+            KV_NAMESPACE.clone(),
+            LOCAL_KMS.clone(),
+        )?;
         let ciphertext = client_encryption
             .encrypt(
                 RawBson::String("string0".to_string()),
@@ -1549,21 +1560,20 @@ impl DeadlockTestCase {
         opts.max_pool_size = Some(self.max_pool_size);
         opts.command_event_handler = Some(event_handler.clone());
         opts.sdam_event_handler = Some(event_handler.clone());
-        let client_encrypted = Client::encrypted_builder(opts)
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())?
-            .bypass_auto_encryption(self.bypass_auto_encryption)
-            .key_vault_client(
-                if self.set_key_vault_client {
-                    Some(client_keyvault.clone().into_client())
-                } else {
-                    None
-                },
-            )
-            .extra_options(EXTRA_OPTIONS.clone())
-            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-            .build()
-            .await?;
+        let client_encrypted =
+            Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
+                .bypass_auto_encryption(self.bypass_auto_encryption)
+                .key_vault_client(
+                    if self.set_key_vault_client {
+                        Some(client_keyvault.clone().into_client())
+                    } else {
+                        None
+                    },
+                )
+                .extra_options(EXTRA_OPTIONS.clone())
+                .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+                .build()
+                .await?;
 
         if self.bypass_auto_encryption {
             client_test
@@ -1671,11 +1681,11 @@ async fn kms_tls() -> Result<()> {
 async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<()> {
     // Setup
     let kv_client = TestClient::new().await;
-    let client_encryption = ClientEncryption::builder()
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .key_vault_client(kv_client.clone().into_client())
-        .kms_providers(KMS_PROVIDERS.clone())?
-        .build()?;
+    let client_encryption = ClientEncryption::new(
+        kv_client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        KMS_PROVIDERS.clone(),
+    )?;
 
     // Test
     client_encryption
@@ -1731,26 +1741,26 @@ async fn kms_tls_options() -> Result<()> {
     let ca_path = cert_dir.join("ca.pem");
     let key_path = cert_dir.join("client.pem");
 
-    let client_encryption_no_client_cert = ClientEncryption::builder()
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .key_vault_client(TestClient::new().await.into_client())
-        .kms_providers(providers_with_tls(
+    let client_encryption_no_client_cert = ClientEncryption::new(
+        TestClient::new().await.into_client(),
+        KV_NAMESPACE.clone(),
+        providers_with_tls(
             base_providers.clone(),
             TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
-        ))?
-        .build()?;
+        ),
+    )?;
 
-    let client_encryption_with_tls = ClientEncryption::builder()
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .key_vault_client(TestClient::new().await.into_client())
-        .kms_providers(providers_with_tls(
+    let client_encryption_with_tls = ClientEncryption::new(
+        TestClient::new().await.into_client(),
+        KV_NAMESPACE.clone(),
+        providers_with_tls(
             base_providers.clone(),
             TlsOptions::builder()
                 .ca_file_path(ca_path.clone())
                 .cert_key_file_path(key_path.clone())
                 .build(),
-        ))?
-        .build()?;
+        ),
+    )?;
 
     let client_encryption_expired = {
         let mut providers = base_providers.clone();
@@ -1770,14 +1780,14 @@ async fn kms_tls_options() -> Result<()> {
             .0
             .insert("endpoint", "127.0.0.1:9000");
 
-        ClientEncryption::builder()
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .key_vault_client(TestClient::new().await.into_client())
-            .kms_providers(providers_with_tls(
+        ClientEncryption::new(
+            TestClient::new().await.into_client(),
+            KV_NAMESPACE.clone(),
+            providers_with_tls(
                 providers,
                 TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
-            ))?
-            .build()?
+            ),
+        )?
     };
 
     let client_encryption_invalid_hostname = {
@@ -1798,14 +1808,14 @@ async fn kms_tls_options() -> Result<()> {
             .0
             .insert("endpoint", "127.0.0.1:9001");
 
-        ClientEncryption::builder()
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .key_vault_client(TestClient::new().await.into_client())
-            .kms_providers(providers_with_tls(
+        ClientEncryption::new(
+            TestClient::new().await.into_client(),
+            KV_NAMESPACE.clone(),
+            providers_with_tls(
                 providers,
                 TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
-            ))?
-            .build()?
+            ),
+        )?
     };
 
     async fn provider_test(
@@ -2267,19 +2277,21 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
         )
         .await?;
 
-    let client_encryption = ClientEncryption::builder()
-        .key_vault_client(key_vault_client.into_client())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .build()?;
-    let encrypted_client = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .bypass_query_analysis(true)
-        .extra_options(EXTRA_OPTIONS.clone())
-        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-        .build()
-        .await?;
+    let client_encryption = ClientEncryption::new(
+        key_vault_client.into_client(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?;
+    let encrypted_client = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .bypass_query_analysis(true)
+    .extra_options(EXTRA_OPTIONS.clone())
+    .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+    .build()
+    .await?;
 
     Ok(Some(ExplicitEncryptionTestData {
         key1_id,
@@ -2413,11 +2425,11 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
                 .build(),
         )
         .await?;
-    let client_encryption = ClientEncryption::builder()
-        .key_vault_client(client.into_client())
-        .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())?
-        .build()?;
+    let client_encryption = ClientEncryption::new(
+        client.into_client(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?;
     let key = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["def".to_string()])
@@ -2581,11 +2593,11 @@ impl DecryptionEventsTestdata {
             .await?;
         db.create_collection("decryption_events", None).await?;
 
-        let client_encryption = ClientEncryption::builder()
-            .key_vault_client(setup_client.clone().into_client())
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())?
-            .build()?;
+        let client_encryption = ClientEncryption::new(
+            setup_client.clone().into_client(),
+            KV_NAMESPACE.clone(),
+            LOCAL_KMS.clone(),
+        )?;
         let key_id = client_encryption
             .create_data_key(MasterKey::Local)
             .run()
@@ -2606,13 +2618,12 @@ impl DecryptionEventsTestdata {
         let mut opts = CLIENT_OPTIONS.get().await.clone();
         opts.retry_reads = Some(false);
         opts.command_event_handler = Some(ev_handler.clone());
-        let encrypted_client = Client::encrypted_builder(opts)
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())?
-            .extra_options(EXTRA_OPTIONS.clone())
-            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-            .build()
-            .await?;
+        let encrypted_client =
+            Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
+                .extra_options(EXTRA_OPTIONS.clone())
+                .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+                .build()
+                .await?;
         let decryption_events = encrypted_client
             .database("db")
             .collection("decryption_events");

@@ -1,21 +1,8 @@
-use std::collections::HashMap;
+use crate::{bson::Document, error::Result, options::ClientOptions, Client, Namespace};
 
-use mongocrypt::ctx::KmsProvider;
+use super::options::{AutoEncryptionOptions, KmsProviders};
 
-use crate::{
-    bson::Document,
-    client::options::TlsOptions,
-    client_encryption::{BUILDER_SET, BUILDER_UNSET},
-    error::{Error, Result},
-    options::ClientOptions,
-    Client,
-    Namespace,
-};
-
-use super::options::KmsProviders;
-
-/// A builder for constructing a `Client` with auto-encryption enabled.  At least one KMS provider
-/// will need to be set to complete the build.
+/// A builder for constructing a `Client` with auto-encryption enabled.
 ///
 /// ```no_run
 /// # use bson::doc;
@@ -36,73 +23,26 @@ use super::options::KmsProviders;
 /// # Ok(())
 /// # }
 /// ```
-pub struct EncryptedClientBuilder<const KV_NAMESPACE_SET: bool, const KMS_PROVIDERS_SET: bool> {
+pub struct EncryptedClientBuilder {
     client_options: ClientOptions,
-    key_vault_namespace: Option<Namespace>,
-    kms_providers: Option<KmsProviders>,
-    optional: Optional,
+    enc_opts: AutoEncryptionOptions,
 }
 
-#[derive(Default)]
-struct Optional {
-    key_vault_client: Option<crate::Client>,
-    schema_map: Option<HashMap<String, Document>>,
-    bypass_auto_encryption: Option<bool>,
-    extra_options: Option<Document>,
-    encrypted_fields_map: Option<HashMap<String, Document>>,
-    bypass_query_analysis: Option<bool>,
-    #[cfg(test)]
-    disable_crypt_shared: Option<bool>,
-}
-
-impl EncryptedClientBuilder<BUILDER_UNSET, BUILDER_UNSET> {
-    pub(crate) fn new(client_options: ClientOptions) -> Self {
+impl EncryptedClientBuilder {
+    pub(crate) fn new(
+        client_options: ClientOptions,
+        key_vault_namespace: Namespace,
+        kms_providers: KmsProviders,
+    ) -> Self {
         EncryptedClientBuilder {
             client_options,
-            key_vault_namespace: None,
-            kms_providers: None,
-            optional: Optional::default(),
+            enc_opts: AutoEncryptionOptions::new(key_vault_namespace, kms_providers),
         }
     }
-}
 
-impl<const KMS_PROVIDERS: bool> EncryptedClientBuilder<BUILDER_UNSET, KMS_PROVIDERS> {
-    /// Set the key vault `Namespace`, referring to a collection that contains all data keys used
-    /// for encryption and decryption.
-    pub fn key_vault_namespace(
-        self,
-        namespace: Namespace,
-    ) -> EncryptedClientBuilder<BUILDER_SET, KMS_PROVIDERS> {
-        EncryptedClientBuilder {
-            client_options: self.client_options,
-            key_vault_namespace: Some(namespace),
-            kms_providers: self.kms_providers,
-            optional: self.optional,
-        }
-    }
-}
-
-impl<const KV_NAMESPACE: bool> EncryptedClientBuilder<KV_NAMESPACE, BUILDER_UNSET> {
-    /// Add configuration for multiple KMS providers.
-    pub fn kms_providers(
-        self,
-        providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
-    ) -> Result<EncryptedClientBuilder<KV_NAMESPACE, BUILDER_SET>> {
-        Ok(EncryptedClientBuilder {
-            client_options: self.client_options,
-            key_vault_namespace: self.key_vault_namespace,
-            kms_providers: Some(KmsProviders::new(providers)?),
-            optional: self.optional,
-        })
-    }
-}
-
-impl<const KV_NAMESPACE: bool, const KMS_PROVIDERS: bool>
-    EncryptedClientBuilder<KV_NAMESPACE, KMS_PROVIDERS>
-{
     /// Set the client used for data key queries.  Will default to an internal client if not set.
     pub fn key_vault_client(mut self, client: impl Into<Option<Client>>) -> Self {
-        self.optional.key_vault_client = client.into();
+        self.enc_opts.key_vault_client = client.into();
         self
     }
 
@@ -116,19 +56,19 @@ impl<const KV_NAMESPACE: bool, const KMS_PROVIDERS: bool>
     /// client side encryption. Other validation rules in the JSON schema will not be enforced by
     /// the driver and will result in an error.
     pub fn schema_map(mut self, map: impl IntoIterator<Item = (String, Document)>) -> Self {
-        self.optional.schema_map = Some(map.into_iter().collect());
+        self.enc_opts.schema_map = Some(map.into_iter().collect());
         self
     }
 
     /// Disable automatic encryption and do not spawn mongocryptd.  Defaults to false.
     pub fn bypass_auto_encryption(mut self, bypass: impl Into<Option<bool>>) -> Self {
-        self.optional.bypass_auto_encryption = bypass.into();
+        self.enc_opts.bypass_auto_encryption = bypass.into();
         self
     }
 
     /// Set options related to mongocryptd.
     pub fn extra_options(mut self, extra_opts: impl Into<Option<Document>>) -> Self {
-        self.optional.extra_options = extra_opts.into();
+        self.enc_opts.extra_options = extra_opts.into();
         self
     }
 
@@ -141,48 +81,30 @@ impl<const KV_NAMESPACE: bool, const KMS_PROVIDERS: bool>
         mut self,
         map: impl IntoIterator<Item = (String, Document)>,
     ) -> Self {
-        self.optional.encrypted_fields_map = Some(map.into_iter().collect());
+        self.enc_opts.encrypted_fields_map = Some(map.into_iter().collect());
         self
     }
 
     /// Disable serverside processing of encrypted indexed fields, allowing use of explicit
     /// encryption with queryable encryption.
     pub fn bypass_query_analysis(mut self, bypass: impl Into<Option<bool>>) -> Self {
-        self.optional.bypass_query_analysis = bypass.into();
+        self.enc_opts.bypass_query_analysis = bypass.into();
         self
     }
 
     /// Disable loading crypt_shared.
     #[cfg(test)]
     pub(crate) fn disable_crypt_shared(mut self, disable: bool) -> Self {
-        self.optional.disable_crypt_shared = Some(disable);
+        self.enc_opts.disable_crypt_shared = Some(disable);
         self
     }
-}
 
-impl EncryptedClientBuilder<BUILDER_SET, BUILDER_SET> {
     /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups as part of
     /// `Client` initialization.
     pub async fn build(self) -> Result<Client> {
         let client = Client::with_options(self.client_options)?;
-        let enc_options = super::options::AutoEncryptionOptions {
-            key_vault_client: self.optional.key_vault_client,
-            key_vault_namespace: self
-                .key_vault_namespace
-                .ok_or_else(|| Error::internal("missing key_vault_namespace"))?,
-            kms_providers: self
-                .kms_providers
-                .ok_or_else(|| Error::internal("missing kms_providers"))?,
-            schema_map: self.optional.schema_map,
-            bypass_auto_encryption: self.optional.bypass_auto_encryption,
-            extra_options: self.optional.extra_options,
-            encrypted_fields_map: self.optional.encrypted_fields_map,
-            bypass_query_analysis: self.optional.bypass_query_analysis,
-            #[cfg(test)]
-            disable_crypt_shared: self.optional.disable_crypt_shared,
-        };
         *client.inner.csfle.write().await =
-            Some(super::ClientState::new(&client, enc_options).await?);
+            Some(super::ClientState::new(&client, self.enc_opts).await?);
         Ok(client)
     }
 }

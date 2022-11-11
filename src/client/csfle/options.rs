@@ -57,6 +57,23 @@ pub(crate) struct AutoEncryptionOptions {
     pub(crate) disable_crypt_shared: Option<bool>,
 }
 
+impl AutoEncryptionOptions {
+    pub(crate) fn new(key_vault_namespace: Namespace, kms_providers: KmsProviders) -> Self {
+        Self {
+            key_vault_namespace,
+            kms_providers,
+            key_vault_client: None,
+            schema_map: None,
+            bypass_auto_encryption: None,
+            extra_options: None,
+            encrypted_fields_map: None,
+            bypass_query_analysis: None,
+            #[cfg(test)]
+            disable_crypt_shared: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct KmsProviders {
     credentials: HashMap<KmsProvider, Document>,

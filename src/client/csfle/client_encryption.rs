@@ -41,23 +41,45 @@ impl ClientEncryption {
     /// # let kv_client = todo!();
     /// # let kv_namespace = todo!();
     /// # let local_key = doc! { };
-    /// let enc = ClientEncryption::builder()
-    ///     .key_vault_client(kv_client)
-    ///     .key_vault_namespace(kv_namespace)
-    ///     .kms_providers([
+    /// let enc = ClientEncryption::new(
+    ///     kv_client,
+    ///     kv_namespace,
+    ///     [
     ///         (KmsProvider::Local, doc! { "key": local_key }, None),
     ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
-    ///     ])?
-    ///     .build();
+    ///     ]
+    /// )?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn builder() -> ClientEncryptionBuilder<BUILDER_UNSET, BUILDER_UNSET, BUILDER_UNSET> {
-        ClientEncryptionBuilder {
-            key_vault_client: None,
-            key_vault_namespace: None,
-            kms_providers: None,
-        }
+    pub fn new(
+        key_vault_client: Client,
+        key_vault_namespace: Namespace,
+        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+    ) -> Result<Self> {
+        let kms_providers = KmsProviders::new(kms_providers)?;
+        let crypt = Crypt::builder()
+            .kms_providers(&kms_providers.credentials()?)?
+            .build()?;
+        let exec = CryptExecutor::new_explicit(
+            key_vault_client.weak(),
+            key_vault_namespace.clone(),
+            kms_providers.tls_options().clone(),
+        )?;
+        let key_vault = key_vault_client
+            .database(&key_vault_namespace.db)
+            .collection_with_options(
+                &key_vault_namespace.coll,
+                CollectionOptions::builder()
+                    .write_concern(WriteConcern::MAJORITY)
+                    .read_concern(ReadConcern::MAJORITY)
+                    .build(),
+            );
+        Ok(ClientEncryption {
+            crypt,
+            exec,
+            key_vault,
+        })
     }
 
     /// Creates a new key document and inserts into the key vault collection.
@@ -300,134 +322,6 @@ impl ClientEncryption {
             .get("v")?
             .ok_or_else(|| Error::internal("invalid decryption result"))?
             .to_raw_bson())
-    }
-}
-
-/// The `ClientEncryptionBuilder` has this required field unset.
-pub const BUILDER_UNSET: bool = false;
-/// The `ClientEncryptionBuilder` has this required field set.
-pub const BUILDER_SET: bool = true;
-
-/// Builder for convenient construction of a new `ClientEncryption`.
-#[derive(Debug)]
-pub struct ClientEncryptionBuilder<
-    const KV_CLIENT: bool,
-    const KV_NAMESPACE: bool,
-    const KMS_PROVIDERS: bool,
-> {
-    key_vault_client: Option<Client>,
-    key_vault_namespace: Option<Namespace>,
-    kms_providers: Option<KmsProviders>,
-}
-
-impl<const KV_NAMESPACE: bool, const KMS_PROVIDERS: bool>
-    ClientEncryptionBuilder<BUILDER_UNSET, KV_NAMESPACE, KMS_PROVIDERS>
-{
-    /// Set the key vault `Client`.
-    ///
-    /// Typically this is the same as the main client; it can be different in order to route data
-    /// key queries to a separate MongoDB cluster, or the same cluster but with a different
-    /// credential.
-    pub fn key_vault_client(
-        self,
-        client: Client,
-    ) -> ClientEncryptionBuilder<BUILDER_SET, KV_NAMESPACE, KMS_PROVIDERS> {
-        ClientEncryptionBuilder {
-            key_vault_client: Some(client),
-            key_vault_namespace: self.key_vault_namespace,
-            kms_providers: self.kms_providers,
-        }
-    }
-}
-
-impl<const KV_CLIENT: bool, const KMS_PROVIDERS: bool>
-    ClientEncryptionBuilder<KV_CLIENT, BUILDER_UNSET, KMS_PROVIDERS>
-{
-    /// Set the key vault `Namespace`, referring to a collection that contains all data keys used
-    /// for encryption and decryption.
-    pub fn key_vault_namespace(
-        self,
-        namespace: Namespace,
-    ) -> ClientEncryptionBuilder<KV_CLIENT, BUILDER_SET, KMS_PROVIDERS> {
-        ClientEncryptionBuilder {
-            key_vault_client: self.key_vault_client,
-            key_vault_namespace: Some(namespace),
-            kms_providers: self.kms_providers,
-        }
-    }
-}
-
-impl<const KV_CLIENT: bool, const KV_NAMESPACE: bool>
-    ClientEncryptionBuilder<KV_CLIENT, KV_NAMESPACE, BUILDER_UNSET>
-{
-    /// Add configuration for multiple KMS providers.
-    ///
-    /// ```no_run
-    /// # use bson::doc;
-    /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
-    /// # fn func() -> Result<()> {
-    /// # let kv_client = todo!();
-    /// # let kv_namespace = todo!();
-    /// # let local_key = doc! { };
-    /// let enc = ClientEncryption::builder()
-    ///     .key_vault_client(kv_client)
-    ///     .key_vault_namespace(kv_namespace)
-    ///     .kms_providers([
-    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
-    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
-    ///      ])?
-    ///     .build();
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn kms_providers(
-        self,
-        providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
-    ) -> Result<ClientEncryptionBuilder<KV_CLIENT, KV_NAMESPACE, BUILDER_SET>> {
-        Ok(ClientEncryptionBuilder {
-            key_vault_client: self.key_vault_client,
-            key_vault_namespace: self.key_vault_namespace,
-            kms_providers: Some(KmsProviders::new(providers)?),
-        })
-    }
-}
-
-impl ClientEncryptionBuilder<BUILDER_SET, BUILDER_SET, BUILDER_SET> {
-    /// Create a new key vault handle with the given options.
-    pub fn build(self) -> Result<ClientEncryption> {
-        let key_vault_client = self
-            .key_vault_client
-            .ok_or_else(|| Error::internal("missing key_vault_client"))?;
-        let key_vault_namespace = self
-            .key_vault_namespace
-            .ok_or_else(|| Error::internal("misisng key_vault_namespace"))?;
-        let kms_providers = self
-            .kms_providers
-            .ok_or_else(|| Error::internal("missing kms_providedrs"))?;
-        let crypt = Crypt::builder()
-            .kms_providers(&kms_providers.credentials()?)?
-            .build()?;
-        let exec = CryptExecutor::new_explicit(
-            key_vault_client.weak(),
-            key_vault_namespace.clone(),
-            kms_providers.tls_options().clone(),
-        )?;
-        let key_vault = key_vault_client
-            .database(&key_vault_namespace.db)
-            .collection_with_options(
-                &key_vault_namespace.coll,
-                CollectionOptions::builder()
-                    .write_concern(WriteConcern::MAJORITY)
-                    .read_concern(ReadConcern::MAJORITY)
-                    .build(),
-            );
-        Ok(ClientEncryption {
-            crypt,
-            exec,
-            key_vault,
-        })
     }
 }
 
