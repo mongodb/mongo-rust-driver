@@ -145,7 +145,7 @@ impl TestOperation for CreateDataKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let key = ce
-                .create_data_key(&self.kms_provider, self.opts.clone())
+                .create_data_key_final(&self.kms_provider, self.opts.clone())
                 .await?;
             Ok(Some(Entity::Bson(Bson::Binary(key))))
         }

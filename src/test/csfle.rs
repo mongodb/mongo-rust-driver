@@ -20,14 +20,11 @@ use mongocrypt::ctx::{Algorithm, KmsProvider};
 use crate::{
     client::{
         auth::Credential,
-        csfle::options::{KmsProviders, KmsProvidersTlsOptions},
         options::{TlsOptions},
     },
     client_encryption::{
         ClientEncryption,
-        DataKeyOptions,
         EncryptKey,
-        EncryptOptions,
         MasterKey,
     },
     coll::options::{
@@ -85,10 +82,10 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     Ok((client, datakeys))
 }
 
-type KmsProviderList = Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>;
+pub(crate) type KmsProviderList = Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>;
 
 lazy_static! {
-    pub(crate) static ref KMS_PROVIDERS: KmsProviderList = {
+    static ref KMS_PROVIDERS: KmsProviderList = {
         let credentials: HashMap<KmsProvider, bson::Document> =
             serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
         let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
@@ -107,21 +104,18 @@ lazy_static! {
         }
         providers
     };
-    pub(crate) static ref KMIP_TLS_OPTIONS: crate::client::csfle::options::KmsProvidersTlsOptions = {
-        let cert_dir = std::path::PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
-        let kmip_opts = crate::client::options::TlsOptions::builder()
-            .ca_file_path(cert_dir.join("ca.pem"))
-            .cert_key_file_path(cert_dir.join("client.pem"))
-            .build();
-        [(mongocrypt::ctx::KmsProvider::Kmip, kmip_opts)]
-            .into_iter()
-            .collect()
-    };
     static ref LOCAL_KMS: KmsProviderList = KMS_PROVIDERS
         .iter()
         .filter(|(p, ..)| p == &KmsProvider::Local)
         .cloned()
         .collect();
+    pub(crate) static ref KMS_PROVIDERS_MAP: HashMap<mongocrypt::ctx::KmsProvider, (bson::Document, Option<crate::client::options::TlsOptions>)> = {
+        let mut map = HashMap::new();
+        for (prov, conf, tls) in KMS_PROVIDERS.clone() {
+            map.insert(prov, (conf, tls));
+        }
+        map
+    };
     static ref EXTRA_OPTIONS: Document =
         doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
@@ -1299,15 +1293,14 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
-    let auto_enc_opts = AutoEncryptionOptions::builder()
+    let client_encrypted = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
         .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())
+        .kms_providers(LOCAL_KMS.clone())?
         .schema_map(schema_map)
         .extra_options(extra_options)
         .disable_crypt_shared(true)
-        .build();
-    let client_encrypted =
-        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+        .build()
+        .await?;
 
     // Test: insert fails.
     let err = client_encrypted
@@ -1321,8 +1314,13 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     Ok(())
 }
 
+enum Bypass {
+    AutoEncryption,
+    QueryAnalysis,
+}
+
 async fn bypass_mongocryptd_unencrypted_insert(
-    conf: impl FnOnce(&mut AutoEncryptionOptions),
+    bypass: Bypass,
 ) -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
@@ -1330,15 +1328,16 @@ async fn bypass_mongocryptd_unencrypted_insert(
     let extra_options = doc! {
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
-    let mut auto_enc_opts = AutoEncryptionOptions::builder()
+    let builder = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
         .key_vault_namespace(KV_NAMESPACE.clone())
-        .kms_providers(LOCAL_KMS.clone())
+        .kms_providers(LOCAL_KMS.clone())?
         .extra_options(extra_options)
-        .disable_crypt_shared(true)
-        .build();
-    conf(&mut auto_enc_opts);
-    let client_encrypted =
-        Client::with_encryption_options(CLIENT_OPTIONS.get().await.clone(), auto_enc_opts).await?;
+        .disable_crypt_shared(true);
+    let builder = match bypass {
+        Bypass::AutoEncryption => builder.bypass_auto_encryption(true),
+        Bypass::QueryAnalysis => builder.bypass_query_analysis(true),
+    };
+    let client_encrypted = builder.build().await?;
 
     // Test: insert succeeds.
     client_encrypted
@@ -1364,10 +1363,7 @@ async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
         return Ok(());
     }
-    bypass_mongocryptd_unencrypted_insert(|opts| {
-        opts.bypass_auto_encryption = Some(true);
-    })
-    .await
+    bypass_mongocryptd_unencrypted_insert(Bypass::AutoEncryption).await
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassQueryAnalysis)
@@ -1377,10 +1373,7 @@ async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_query_analysis", false) {
         return Ok(());
     }
-    bypass_mongocryptd_unencrypted_insert(|opts| {
-        opts.bypass_query_analysis = Some(true);
-    })
-    .await
+    bypass_mongocryptd_unencrypted_insert(Bypass::QueryAnalysis).await
 }
 
 // Prose test 9. Deadlock Tests
@@ -1541,27 +1534,30 @@ impl DeadlockTestCase {
                     .build(),
             )
             .await?;
-        let client_encryption = ClientEncryption::new(
-            ClientEncryptionOptions::builder()
-                .key_vault_client(client_test.clone().into_client())
-                .key_vault_namespace(KV_NAMESPACE.clone())
-                .kms_providers(LOCAL_KMS.clone())
-                .build(),
-        )?;
+        let client_encryption = ClientEncryption::builder()
+            .key_vault_client(client_test.clone().into_client())
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())?
+            .build()?;
         let ciphertext = client_encryption
             .encrypt(
                 RawBson::String("string0".to_string()),
-                EncryptOptions::builder()
-                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-                    .key(EncryptKey::AltName("local".to_string()))
-                    .build(),
+                EncryptKey::AltName("local".to_string()),
+                Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
+            .run()
             .await?;
 
         // Run test case
-        let auto_enc_opts = AutoEncryptionOptions::builder()
+        let event_handler = Arc::new(EventHandler::new());
+        let mut encrypted_events = event_handler.subscribe();
+        let mut opts = CLIENT_OPTIONS.get().await.clone();
+        opts.max_pool_size = Some(self.max_pool_size);
+        opts.command_event_handler = Some(event_handler.clone());
+        opts.sdam_event_handler = Some(event_handler.clone());
+        let client_encrypted = Client::encrypted_builder(opts)
             .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())
+            .kms_providers(LOCAL_KMS.clone())?
             .bypass_auto_encryption(self.bypass_auto_encryption)
             .key_vault_client(
                 if self.set_key_vault_client {
@@ -1572,14 +1568,8 @@ impl DeadlockTestCase {
             )
             .extra_options(EXTRA_OPTIONS.clone())
             .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-            .build();
-        let event_handler = Arc::new(EventHandler::new());
-        let mut encrypted_events = event_handler.subscribe();
-        let mut opts = CLIENT_OPTIONS.get().await.clone();
-        opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.clone());
-        opts.sdam_event_handler = Some(event_handler.clone());
-        let client_encrypted = Client::with_encryption_options(opts, auto_enc_opts).await?;
+            .build()
+            .await?;
 
         if self.bypass_auto_encryption {
             client_test
@@ -1687,27 +1677,24 @@ async fn kms_tls() -> Result<()> {
 async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<()> {
     // Setup
     let kv_client = TestClient::new().await;
-    let enc_opts = ClientEncryptionOptions::builder()
+    let client_encryption = ClientEncryption::builder()
         .key_vault_namespace(KV_NAMESPACE.clone())
         .key_vault_client(kv_client.clone().into_client())
-        .kms_providers(KMS_PROVIDERS.clone())
-        .build();
-    let client_encryption = ClientEncryption::new(enc_opts)?;
+        .kms_providers(KMS_PROVIDERS.clone())?
+        .build()?;
 
     // Test
     client_encryption
         .create_data_key(
-            &KmsProvider::Aws,
-            DataKeyOptions::builder()
-                .master_key(MasterKey::Aws {
+            MasterKey::Aws {
                     region: "us-east-1".to_string(),
                     key: "arn:aws:kms:us-east-1:579766882180:key/\
                           89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
                         .to_string(),
                     endpoint: Some(endpoint.into()),
-                })
-                .build(),
+                }
         )
+        .run()
         .await
         .map(|_| ())
 }
@@ -1721,117 +1708,118 @@ async fn kms_tls_options() -> Result<()> {
     }
     let _guard = LOCK.run_exclusively().await;
 
+    fn providers_with_tls(mut providers: HashMap<KmsProvider, (Document, Option<TlsOptions>)>, tls_opts: TlsOptions) -> KmsProviderList {
+        for provider in [KmsProvider::Aws, KmsProvider::Azure, KmsProvider::Gcp, KmsProvider::Kmip] {
+            providers.get_mut(&provider).unwrap().1 = Some(tls_opts.clone());
+        }
+        providers
+            .into_iter()
+            .map(|(p, (o, t))| (p, o, t))
+            .collect()
+    }
+
     // Setup
-    let mut providers = KMS_PROVIDERS.clone();
-    providers
+    let mut base_providers = KMS_PROVIDERS_MAP.clone();
+    base_providers
         .get_mut(&KmsProvider::Azure)
         .unwrap()
+        .0
         .insert("identityPlatformEndpoint", "127.0.0.1:9002");
-    providers
+    base_providers
         .get_mut(&KmsProvider::Gcp)
         .unwrap()
+        .0
         .insert("endpoint", "127.0.0.1:9002");
+
     let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
     let ca_path = cert_dir.join("ca.pem");
     let key_path = cert_dir.join("client.pem");
 
-    fn build_kms_tls_opts(tls_opts: &TlsOptions) -> KmsProvidersTlsOptions {
-        [
-            (KmsProvider::Aws, tls_opts.clone()),
-            (KmsProvider::Azure, tls_opts.clone()),
-            (KmsProvider::Gcp, tls_opts.clone()),
-            (KmsProvider::Kmip, tls_opts.clone()),
-        ]
-        .into_iter()
-        .collect()
-    }
+    let client_encryption_no_client_cert = ClientEncryption::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .key_vault_client(TestClient::new().await.into_client())
+        .kms_providers(providers_with_tls(
+            base_providers.clone(),
+            TlsOptions::builder().ca_file_path(ca_path.clone()).build()
+        ))?
+        .build()?;
 
-    let client_encryption_no_client_cert = ClientEncryption::new(
-        ClientEncryptionOptions::builder()
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .key_vault_client(TestClient::new().await.into_client())
-            .kms_providers(providers.clone())
-            .tls_options(build_kms_tls_opts(
-                &TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
-            ))
-            .build(),
-    )?;
-
-    let client_encryption_with_tls = ClientEncryption::new(
-        ClientEncryptionOptions::builder()
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .key_vault_client(TestClient::new().await.into_client())
-            .kms_providers(providers.clone())
-            .tls_options(build_kms_tls_opts(
-                &TlsOptions::builder()
-                    .ca_file_path(ca_path.clone())
-                    .cert_key_file_path(key_path.clone())
-                    .build(),
-            ))
-            .build(),
-    )?;
+    let client_encryption_with_tls = ClientEncryption::builder()
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .key_vault_client(TestClient::new().await.into_client())
+        .kms_providers(providers_with_tls(
+            base_providers.clone(),
+            TlsOptions::builder()
+                .ca_file_path(ca_path.clone())
+                .cert_key_file_path(key_path.clone())
+                .build(),
+        ))?
+        .build()?;
 
     let client_encryption_expired = {
-        let mut providers = providers.clone();
+        let mut providers = base_providers.clone();
         providers
             .get_mut(&KmsProvider::Azure)
             .unwrap()
+            .0
             .insert("identityPlatformEndpoint", "127.0.0.1:9000");
         providers
             .get_mut(&KmsProvider::Gcp)
             .unwrap()
+            .0
             .insert("endpoint", "127.0.0.1:9000");
         providers
             .get_mut(&KmsProvider::Kmip)
             .unwrap()
+            .0
             .insert("endpoint", "127.0.0.1:9000");
 
-        ClientEncryption::new(
-            ClientEncryptionOptions::builder()
-                .key_vault_namespace(KV_NAMESPACE.clone())
-                .key_vault_client(TestClient::new().await.into_client())
-                .kms_providers(providers)
-                .tls_options(build_kms_tls_opts(
-                    &TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
-                ))
-                .build(),
-        )?
+        ClientEncryption::builder()
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .key_vault_client(TestClient::new().await.into_client())
+            .kms_providers(providers_with_tls(
+                providers,
+                TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
+            ))?
+            .build()?
     };
 
     let client_encryption_invalid_hostname = {
-        let mut providers = providers.clone();
+        let mut providers = base_providers.clone();
         providers
             .get_mut(&KmsProvider::Azure)
             .unwrap()
+            .0
             .insert("identityPlatformEndpoint", "127.0.0.1:9001");
         providers
             .get_mut(&KmsProvider::Gcp)
             .unwrap()
+            .0
             .insert("endpoint", "127.0.0.1:9001");
         providers
             .get_mut(&KmsProvider::Kmip)
             .unwrap()
+            .0
             .insert("endpoint", "127.0.0.1:9001");
 
-        ClientEncryption::new(
-            ClientEncryptionOptions::builder()
-                .key_vault_namespace(KV_NAMESPACE.clone())
-                .key_vault_client(TestClient::new().await.into_client())
-                .kms_providers(providers)
-                .tls_options(build_kms_tls_opts(
-                    &TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
-                ))
-                .build(),
-        )?
+        ClientEncryption::builder()
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .key_vault_client(TestClient::new().await.into_client())
+            .kms_providers(providers_with_tls(
+                providers,
+                TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
+            ))?
+            .build()?
     };
 
     async fn provider_test(
         client_encryption: &ClientEncryption,
-        data_key_opts: DataKeyOptions,
+        master_key: MasterKey,
         expected_errs: &[&str],
     ) -> Result<()> {
         let err = client_encryption
-            .create_data_key(&data_key_opts.master_key.provider(), data_key_opts)
+            .create_data_key(master_key)
+            .run()
             .await
             .unwrap_err();
         let err_str = err.to_string();
@@ -1842,140 +1830,133 @@ async fn kms_tls_options() -> Result<()> {
     }
 
     // Case 1: AWS
-    fn aws_key_opts(endpoint: impl Into<String>) -> DataKeyOptions {
-        DataKeyOptions::builder()
-            .master_key(MasterKey::Aws {
-                region: "us-east-1".to_string(),
-                key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
-                    .to_string(),
-                endpoint: Some(endpoint.into()),
-            })
-            .build()
+    fn aws_key(endpoint: impl Into<String>) -> MasterKey {
+        MasterKey::Aws {
+            region: "us-east-1".to_string(),
+            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                .to_string(),
+            endpoint: Some(endpoint.into()),
+        }
     }
 
     provider_test(
         &client_encryption_no_client_cert,
-        aws_key_opts("127.0.0.1:9002"),
+        aws_key("127.0.0.1:9002"),
         &["SSL routines", "connection was forcibly closed"],
     )
     .await?;
     provider_test(
         &client_encryption_with_tls,
-        aws_key_opts("127.0.0.1:9002"),
+        aws_key("127.0.0.1:9002"),
         &["parse error"],
     )
     .await?;
     provider_test(
         &client_encryption_expired,
-        aws_key_opts("127.0.0.1:9000"),
+        aws_key("127.0.0.1:9000"),
         &["certificate verify failed"],
     )
     .await?;
     provider_test(
         &client_encryption_invalid_hostname,
-        aws_key_opts("127.0.0.1:9001"),
+        aws_key("127.0.0.1:9001"),
         &["certificate verify failed"],
     )
     .await?;
 
     // Case 2: Azure
-    let azure_key_opts = DataKeyOptions::builder()
-        .master_key(MasterKey::Azure {
-            key_vault_endpoint: "doesnotexist.local".to_string(),
-            key_name: "foo".to_string(),
-            key_version: None,
-        })
-        .build();
+    let azure_key = MasterKey::Azure {
+        key_vault_endpoint: "doesnotexist.local".to_string(),
+        key_name: "foo".to_string(),
+        key_version: None,
+    };
 
     provider_test(
         &client_encryption_no_client_cert,
-        azure_key_opts.clone(),
+        azure_key.clone(),
         &["SSL routines", "connection was forcibly closed"],
     )
     .await?;
     provider_test(
         &client_encryption_with_tls,
-        azure_key_opts.clone(),
+        azure_key.clone(),
         &["HTTP status=404"],
     )
     .await?;
     provider_test(
         &client_encryption_expired,
-        azure_key_opts.clone(),
+        azure_key.clone(),
         &["certificate verify failed"],
     )
     .await?;
     provider_test(
         &client_encryption_invalid_hostname,
-        azure_key_opts.clone(),
+        azure_key.clone(),
         &["certificate verify failed"],
     )
     .await?;
 
     // Case 3: GCP
-    let gcp_key_opts = DataKeyOptions::builder()
-        .master_key(MasterKey::Gcp {
-            project_id: "foo".to_string(),
-            location: "bar".to_string(),
-            key_ring: "baz".to_string(),
-            key_name: "foo".to_string(),
-            endpoint: None,
-            key_version: None,
-        })
-        .build();
+    let gcp_key = MasterKey::Gcp {
+        project_id: "foo".to_string(),
+        location: "bar".to_string(),
+        key_ring: "baz".to_string(),
+        key_name: "foo".to_string(),
+        endpoint: None,
+        key_version: None,
+    };
 
     provider_test(
         &client_encryption_no_client_cert,
-        gcp_key_opts.clone(),
+        gcp_key.clone(),
         &["SSL routines", "connection was forcibly closed"],
     )
     .await?;
     provider_test(
         &client_encryption_with_tls,
-        gcp_key_opts.clone(),
+        gcp_key.clone(),
         &["HTTP status=404"],
     )
     .await?;
     provider_test(
         &client_encryption_expired,
-        gcp_key_opts.clone(),
+        gcp_key.clone(),
         &["certificate verify failed"],
     )
     .await?;
     provider_test(
         &client_encryption_invalid_hostname,
-        gcp_key_opts.clone(),
+        gcp_key.clone(),
         &["certificate verify failed"],
     )
     .await?;
 
     // Case 4: KMIP
-    let kmip_key_opts = DataKeyOptions::builder()
-        .master_key(MasterKey::Kmip {
-            key_id: None,
-            endpoint: None,
-        })
-        .build();
+    let kmip_key = MasterKey::Kmip {
+        key_id: None,
+        endpoint: None,
+    };
 
     provider_test(
         &client_encryption_no_client_cert,
-        kmip_key_opts.clone(),
+        kmip_key.clone(),
         &["SSL routines", "connection was forcibly closed"],
     )
     .await?;
     // This one succeeds!
     client_encryption_with_tls
-        .create_data_key(&KmsProvider::Kmip, kmip_key_opts.clone())
+        .create_data_key(kmip_key.clone())
+        .run()
         .await?;
     provider_test(
         &client_encryption_expired,
-        kmip_key_opts.clone(),
+        kmip_key.clone(),
         &["certificate verify failed"],
     )
     .await?;
     provider_test(
         &client_encryption_invalid_hostname,
-        kmip_key_opts.clone(),
+        kmip_key.clone(),
         &["certificate verify failed"],
     )
     .await?;
@@ -2004,13 +1985,12 @@ async fn explicit_encryption_case_1() -> Result<()> {
     let insert_payload = testdata
         .client_encryption
         .encrypt(
-            RawBson::String("encrypted indexed value".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Indexed)
-                .contention_factor(0)
-                .build(),
+            "encrypted indexed value",
+            EncryptKey::Id(testdata.key1_id.clone()),
+            Algorithm::Indexed
         )
+        .contention_factor(0)
+        .run()
         .await?;
     enc_coll
         .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
@@ -2019,14 +1999,13 @@ async fn explicit_encryption_case_1() -> Result<()> {
     let find_payload = testdata
         .client_encryption
         .encrypt(
-            RawBson::String("encrypted indexed value".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id))
-                .algorithm(Algorithm::Indexed)
-                .query_type("equality".to_string())
-                .contention_factor(0)
-                .build(),
+            "encrypted indexed value",
+            EncryptKey::Id(testdata.key1_id),
+            Algorithm::Indexed,
         )
+        .query_type("equality".to_string())
+        .contention_factor(0)
+        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload }, None)
@@ -2065,13 +2044,12 @@ async fn explicit_encryption_case_2() -> Result<()> {
         let insert_payload = testdata
             .client_encryption
             .encrypt(
-                RawBson::String("encrypted indexed value".to_string()),
-                EncryptOptions::builder()
-                    .key(EncryptKey::Id(testdata.key1_id.clone()))
-                    .algorithm(Algorithm::Indexed)
-                    .contention_factor(10)
-                    .build(),
+                "encrypted indexed value",
+                EncryptKey::Id(testdata.key1_id.clone()),
+                Algorithm::Indexed,
             )
+            .contention_factor(10)
+            .run()
             .await?;
         enc_coll
             .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
@@ -2081,14 +2059,13 @@ async fn explicit_encryption_case_2() -> Result<()> {
     let find_payload = testdata
         .client_encryption
         .encrypt(
-            RawBson::String("encrypted indexed value".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Indexed)
-                .query_type("equality".to_string())
-                .contention_factor(0)
-                .build(),
+            "encrypted indexed value",
+            EncryptKey::Id(testdata.key1_id.clone()),
+            Algorithm::Indexed,
         )
+        .query_type("equality".to_string())
+        .contention_factor(0)
+        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload }, None)
@@ -2103,14 +2080,13 @@ async fn explicit_encryption_case_2() -> Result<()> {
     let find_payload2 = testdata
         .client_encryption
         .encrypt(
-            RawBson::String("encrypted indexed value".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Indexed)
-                .query_type("equality".to_string())
-                .contention_factor(10)
-                .build(),
+            "encrypted indexed value",
+            EncryptKey::Id(testdata.key1_id.clone()),
+            Algorithm::Indexed,
         )
+        .query_type("equality")
+        .contention_factor(10)
+        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload2 }, None)
@@ -2146,12 +2122,11 @@ async fn explicit_encryption_case_3() -> Result<()> {
     let insert_payload = testdata
         .client_encryption
         .encrypt(
-            RawBson::String("encrypted unindexed value".to_string()),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Unindexed)
-                .build(),
+            "encrypted unindexed value",
+            EncryptKey::Id(testdata.key1_id.clone()),
+            Algorithm::Unindexed,
         )
+        .run()
         .await?;
     enc_coll
         .insert_one(
@@ -2193,12 +2168,11 @@ async fn explicit_encryption_case_4() -> Result<()> {
         .client_encryption
         .encrypt(
             raw_value.clone(),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Indexed)
-                .contention_factor(0)
-                .build(),
+            EncryptKey::Id(testdata.key1_id.clone()),
+            Algorithm::Indexed,
         )
+        .contention_factor(0)
+        .run()
         .await?;
     let roundtrip = testdata
         .client_encryption
@@ -2228,11 +2202,10 @@ async fn explicit_encryption_case_5() -> Result<()> {
         .client_encryption
         .encrypt(
             raw_value.clone(),
-            EncryptOptions::builder()
-                .key(EncryptKey::Id(testdata.key1_id.clone()))
-                .algorithm(Algorithm::Unindexed)
-                .build(),
+            EncryptKey::Id(testdata.key1_id.clone()),
+            Algorithm::Unindexed,
         )
+        .run()
         .await?;
     let roundtrip = testdata
         .client_encryption
@@ -2298,24 +2271,19 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
         )
         .await?;
 
-    let client_encryption = ClientEncryption::new(
-        ClientEncryptionOptions::builder()
-            .key_vault_client(key_vault_client.into_client())
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())
-            .build(),
-    )?;
-    let encrypted_client = Client::with_encryption_options(
-        CLIENT_OPTIONS.get().await.clone(),
-        AutoEncryptionOptions::builder()
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())
-            .bypass_query_analysis(true)
-            .extra_options(EXTRA_OPTIONS.clone())
-            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-            .build(),
-    )
-    .await?;
+    let client_encryption = ClientEncryption::builder()
+        .key_vault_client(key_vault_client.into_client())
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(LOCAL_KMS.clone())?
+        .build()?;
+    let encrypted_client = Client::encrypted_builder(CLIENT_OPTIONS.get().await.clone())
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(LOCAL_KMS.clone())?
+        .bypass_query_analysis(true)
+        .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+        .build()
+        .await?;
 
     Ok(Some(ExplicitEncryptionTestData {
         key1_id,
@@ -2337,23 +2305,15 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
 
     // Succeeds
     client_encryption
-        .create_data_key(
-            &KmsProvider::Local,
-            DataKeyOptions::builder()
-                .master_key(MasterKey::Local)
-                .key_alt_names(vec!["abc".to_string()])
-                .build(),
-        )
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(vec!["abc".to_string()])
+        .run()
         .await?;
     // Fails: duplicate key
     let err = client_encryption
-        .create_data_key(
-            &KmsProvider::Local,
-            DataKeyOptions::builder()
-                .master_key(MasterKey::Local)
-                .key_alt_names(vec!["abc".to_string()])
-                .build(),
-        )
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(vec!["abc".to_string()])
+        .run()
         .await
         .unwrap_err();
     assert_eq!(
@@ -2364,13 +2324,9 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     );
     // Fails: duplicate key
     let err = client_encryption
-        .create_data_key(
-            &KmsProvider::Local,
-            DataKeyOptions::builder()
-                .master_key(MasterKey::Local)
-                .key_alt_names(vec!["def".to_string()])
-                .build(),
-        )
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(vec!["def".to_string()])
+        .run()
         .await
         .unwrap_err();
     assert_eq!(
@@ -2396,7 +2352,8 @@ async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
 
     // Succeeds
     let new_key = client_encryption
-        .create_data_key(&KmsProvider::Local, None)
+        .create_data_key(MasterKey::Local)
+        .run()
         .await?;
     client_encryption.add_key_alt_name(&new_key, "abc").await?;
     // Still succeeds, has alt name
@@ -2460,21 +2417,15 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
                 .build(),
         )
         .await?;
-    let client_encryption = ClientEncryption::new(
-        ClientEncryptionOptions::builder()
-            .key_vault_client(client.into_client())
-            .key_vault_namespace(KV_NAMESPACE.clone())
-            .kms_providers(LOCAL_KMS.clone())
-            .build(),
-    )?;
+    let client_encryption = ClientEncryption::builder()
+        .key_vault_client(client.into_client())
+        .key_vault_namespace(KV_NAMESPACE.clone())
+        .kms_providers(LOCAL_KMS.clone())?
+        .build()?;
     let key = client_encryption
-        .create_data_key(
-            &KmsProvider::Local,
-            DataKeyOptions::builder()
-                .master_key(MasterKey::Local)
-                .key_alt_names(vec!["def".to_string()])
-                .build(),
-        )
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(vec!["def".to_string()])
+        .run()
         .await?;
     Ok((client_encryption, key))
 }
@@ -2634,24 +2585,22 @@ impl DecryptionEventsTestdata {
             .await?;
         db.create_collection("decryption_events", None).await?;
 
-        let client_encryption = ClientEncryption::new(
-            ClientEncryptionOptions::builder()
-                .key_vault_client(setup_client.clone().into_client())
-                .key_vault_namespace(KV_NAMESPACE.clone())
-                .kms_providers(LOCAL_KMS.clone())
-                .build(),
-        )?;
+        let client_encryption = ClientEncryption::builder()
+            .key_vault_client(setup_client.clone().into_client())
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())?
+            .build()?;
         let key_id = client_encryption
-            .create_data_key(&KmsProvider::Local, None)
+            .create_data_key(MasterKey::Local)
+            .run()
             .await?;
         let ciphertext = client_encryption
             .encrypt(
-                RawBson::String("hello".to_string()),
-                EncryptOptions::builder()
-                    .key(EncryptKey::Id(key_id))
-                    .algorithm(Algorithm::AeadAes256CbcHmacSha512Deterministic)
-                    .build(),
+                "hello",
+                EncryptKey::Id(key_id),
+                Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
+            .run()
             .await?;
         let mut malformed_ciphertext = ciphertext.clone();
         let last = malformed_ciphertext.bytes.last_mut().unwrap();
@@ -2661,16 +2610,13 @@ impl DecryptionEventsTestdata {
         let mut opts = CLIENT_OPTIONS.get().await.clone();
         opts.retry_reads = Some(false);
         opts.command_event_handler = Some(ev_handler.clone());
-        let encrypted_client = Client::with_encryption_options(
-            opts,
-            AutoEncryptionOptions::builder()
-                .key_vault_namespace(KV_NAMESPACE.clone())
-                .kms_providers(LOCAL_KMS.clone())
-                .extra_options(EXTRA_OPTIONS.clone())
-                .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-                .build(),
-        )
-        .await?;
+        let encrypted_client = Client::encrypted_builder(opts)
+            .key_vault_namespace(KV_NAMESPACE.clone())
+            .kms_providers(LOCAL_KMS.clone())?
+            .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+            .build()
+            .await?;
         let decryption_events = encrypted_client
             .database("db")
             .collection("decryption_events");

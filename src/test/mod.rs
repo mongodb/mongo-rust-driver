@@ -35,8 +35,8 @@ pub(crate) use self::{
         TestClient,
     },
 };
-#[cfg(csfle)]
-pub(crate) use self::csfle::{KMIP_TLS_OPTIONS, KMS_PROVIDERS};
+#[cfg(feature = "csfle")]
+pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 
 use async_once::AsyncOnce;
 use home::home_dir;

@@ -36,7 +36,7 @@ use super::options::KmsProviders;
 /// # Ok(())
 /// # }
 /// ```
-pub struct EncryptedClientBuilder<const KV_NAMESPACE: bool, const KMS_PROVIDERS: bool> {
+pub struct EncryptedClientBuilder<const KV_NAMESPACE_SET: bool, const KMS_PROVIDERS_SET: bool> {
     client_options: ClientOptions,
     key_vault_namespace: Option<Namespace>,
     kms_providers: Option<KmsProviders>,

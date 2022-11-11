@@ -90,7 +90,7 @@ impl ClientEncryption {
         }
     }
 
-    async fn create_data_key_final(
+    pub(crate) async fn create_data_key_final(
         &self,
         kms_provider: &KmsProvider,
         opts: impl Into<Option<DataKeyOptions>>,
@@ -572,8 +572,8 @@ impl<'a> EncryptAction<'a> {
 
     /// Set the query type.
     #[allow(clippy::redundant_clone)]
-    pub fn query_type(mut self, qtype: impl ToOwned<Owned = String>) -> Self {
-        self.opts.query_type = Some(qtype.to_owned());
+    pub fn query_type(mut self, qtype: impl Into<String>) -> Self {
+        self.opts.query_type = Some(qtype.into());
         self
     }
 }
