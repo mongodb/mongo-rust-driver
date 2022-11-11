@@ -244,6 +244,7 @@ impl GridFsUploadStream {
 }
 
 impl Drop for GridFsUploadStream {
+    // TODO RUST-1493: pre-create this task
     fn drop(&mut self) {
         if !matches!(self.state, State::Closed) {
             let chunks = self.bucket.chunks().clone();
@@ -333,6 +334,9 @@ impl AsyncWrite for GridFsUploadStream {
                 let new_future = close(stream.bucket.clone(), buffer, file).boxed();
                 stream.state.set_closing(new_future)
             }
+            // This case is effectively unreachable, as the AsyncWriteExt methods take &mut self and
+            // poll the futures to completion. If a user were to call these polling methods directly
+            // and intersperse futures, we should just pend here until the writing future resolves.
             State::Writing(_) => return Poll::Pending,
             State::Closing(future) => future,
             State::Closed => return Poll::Ready(Err(get_closed_error())),
