@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
@@ -7,6 +9,7 @@ use crate::{
         options::{GridFsBucketOptions, GridFsUploadOptions},
         GridFsBucket,
     },
+    runtime,
     test::{
         run_spec_test_with_path,
         spec::unified_runner::{run_unified_format_test_filtered, TestCase},
@@ -284,6 +287,33 @@ async fn drop_aborts() {
     drop(upload_stream);
 
     assert_no_chunks_written(&bucket, &id).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn write_future_dropped() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let bucket = client
+        .database("upload_stream_abort")
+        .gridfs_bucket(GridFsBucketOptions::builder().chunk_size_bytes(1).build());
+    bucket.drop().await.unwrap();
+
+    let mut upload_stream = bucket.open_upload_stream("upload_stream_abort", None);
+    let chunks = vec![0u8; 100_000];
+
+    assert!(
+        runtime::timeout(Duration::from_millis(1), upload_stream.write(&chunks))
+            .await
+            .is_err()
+    );
+
+    let close_error = get_mongo_error(upload_stream.close().await);
+    assert!(matches!(
+        *close_error.kind,
+        ErrorKind::GridFs(GridFsErrorKind::WriteInProgress)
+    ));
 }
 
 async fn assert_closed(bucket: &GridFsBucket, mut upload_stream: GridFsUploadStream) {

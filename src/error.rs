@@ -831,6 +831,14 @@ pub enum GridFsErrorKind {
         actual_number: u32,
         expected_number: u32,
     },
+
+    /// An error occurred when aborting a file upload.
+    #[non_exhaustive]
+    AbortError { message: String },
+
+    /// A close operation was attempted on a [`GridFsUploadStream`] while a write was still in
+    /// progress.
+    WriteInProgress,
 }
 
 /// An identifier for a file stored in a GridFS bucket.

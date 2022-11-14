@@ -74,10 +74,12 @@ impl GridFsBucket {
                 Ok(0) => break,
                 Ok(n) => n,
                 Err(error) => {
-                    self.chunks()
-                        .delete_many(doc! { "files_id": &files_id }, None)
-                        .await?;
-                    return Err(ErrorKind::Io(error.into()).into());
+                    return clean_up_chunks(
+                        files_id.clone(),
+                        self.chunks().clone(),
+                        Some(ErrorKind::Io(error.into()).into()),
+                    )
+                    .await;
                 }
             };
 
@@ -232,12 +234,8 @@ impl GridFsUploadStream {
         match self.state {
             State::Closed => Err(ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed).into()),
             _ => {
-                self.bucket
-                    .chunks()
-                    .delete_many(doc! { "files_id": &self.id }, None)
-                    .await?;
                 self.state = State::Closed;
-                Ok(())
+                clean_up_chunks(self.id.clone(), self.bucket.chunks().clone(), None).await
             }
         }
     }
@@ -337,7 +335,16 @@ impl AsyncWrite for GridFsUploadStream {
             // This case is effectively unreachable, as the AsyncWriteExt methods take &mut self and
             // poll the futures to completion. If a user were to call these polling methods directly
             // and intersperse futures, we should just pend here until the writing future resolves.
-            State::Writing(_) => return Poll::Pending,
+            State::Writing(_) => {
+                let error: Error = ErrorKind::GridFs(GridFsErrorKind::WriteInProgress).into();
+                let new_future = clean_up_chunks(
+                    stream.id.clone(),
+                    stream.bucket.chunks().clone(),
+                    Some(error),
+                )
+                .boxed();
+                stream.state.set_closing(new_future)
+            }
             State::Closing(future) => future,
             State::Closed => return Poll::Ready(Err(get_closed_error())),
         };
@@ -355,6 +362,8 @@ impl AsyncWrite for GridFsUploadStream {
     }
 }
 
+// Writes the data in the buffer to the database and returns the number of chunks written and any
+// leftover bytes that didn't fill an entire chunk.
 async fn write_bytes(
     bucket: GridFsBucket,
     mut buffer: Vec<u8>,
@@ -383,15 +392,24 @@ async fn write_bytes(
         chunks.push(chunk);
     }
 
-    bucket.chunks().insert_many(chunks, None).await?;
-    buffer.drain(..(n * chunk_size) as usize);
-
-    Ok((n, buffer))
+    match bucket.chunks().insert_many(chunks, None).await {
+        Ok(_) => {
+            buffer.drain(..(n * chunk_size) as usize);
+            Ok((n, buffer))
+        }
+        Err(error) => match clean_up_chunks(files_id, bucket.chunks().clone(), Some(error)).await {
+            // clean_up_chunks will always return an error if one is passed in, so this case is
+            // unreachable
+            Ok(()) => unreachable!(),
+            Err(error) => Err(error),
+        },
+    }
 }
 
 async fn close(bucket: GridFsBucket, buffer: Vec<u8>, file: FilesCollectionDocument) -> Result<()> {
     let insert_result: Result<()> = async {
         if !buffer.is_empty() {
+            debug_assert!(buffer.len() < file.chunk_size as usize);
             let final_chunk = Chunk {
                 id: ObjectId::new(),
                 n: file.n() - 1,
@@ -410,12 +428,27 @@ async fn close(bucket: GridFsBucket, buffer: Vec<u8>, file: FilesCollectionDocum
 
     match insert_result {
         Ok(()) => Ok(()),
+        Err(error) => clean_up_chunks(file.id.clone(), bucket.chunks().clone(), Some(error)).await,
+    }
+}
+
+async fn clean_up_chunks(
+    id: Bson,
+    chunks: Collection<Chunk<'static>>,
+    original_error: Option<Error>,
+) -> Result<()> {
+    match chunks.delete_many(doc! { "files_id": id }, None).await {
+        Ok(_) => match original_error {
+            Some(error) => Err(error),
+            None => Ok(()),
+        },
         Err(error) => {
-            bucket
-                .chunks()
-                .delete_many(doc! { "files_id": file.id }, None)
-                .await?;
-            Err(error)
+            let mut message = String::new();
+            if let Some(original_error) = original_error {
+                message.push_str(&format!("failed operation: {}, then ", original_error));
+            };
+            message.push_str("failed to delete orphaned chunks: {}");
+            Err(ErrorKind::GridFs(GridFsErrorKind::AbortError { message }).into())
         }
     }
 }
