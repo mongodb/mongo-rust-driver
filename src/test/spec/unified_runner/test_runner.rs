@@ -702,7 +702,10 @@ fn fill_kms_placeholders(
                 *value = new_value;
             }
         }
-        out.push((provider, config, None))
+        let tls = KMS_PROVIDERS_MAP
+            .get(&provider)
+            .and_then(|(_, t)| t.clone());
+        out.push((provider, config, tls));
     }
     out
 }
