@@ -169,7 +169,7 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             && internal_client.server_version_lte(4, 2)
             && test.operations.iter().any(|op| op.name == "distinct")
         {
-            for server_address in internal_client.options.hosts.clone() {
+            for server_address in internal_client.options().hosts.clone() {
                 let options = DistinctOptions::builder()
                     .selection_criteria(Some(SelectionCriteria::Predicate(Arc::new(
                         move |server_info: &ServerInfo| *server_info.address() == server_address,

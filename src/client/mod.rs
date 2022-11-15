@@ -562,6 +562,11 @@ impl Client {
         })
         .ok()
     }
+
+    #[cfg(test)]
+    pub(crate) fn options(&self) -> &ClientOptions {
+        &self.inner.options
+    }
 }
 
 #[cfg(feature = "csfle")]

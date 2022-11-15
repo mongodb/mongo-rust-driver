@@ -34,5 +34,5 @@ fn spec_predicate(test: &TestCase) -> bool {
 async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    run_spec_test(&["client-side-encryption", "legacy"], run_v2_test).await;
+    //run_spec_test(&["client-side-encryption", "legacy"], run_v2_test).await;
 }

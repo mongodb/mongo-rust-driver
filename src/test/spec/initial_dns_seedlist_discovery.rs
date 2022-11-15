@@ -131,7 +131,7 @@ async fn run_test(mut test_file: TestFile) {
         None => true,
     };
     let client = TestClient::new().await;
-    if requires_tls != client.options.tls_options().is_some() {
+    if requires_tls != client.options().tls_options().is_some() {
         log_uncaptured(
             "skipping initial_dns_seedlist_discovery test case due to TLS requirement mismatch",
         )
@@ -228,7 +228,7 @@ async fn replica_set() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     let skip =
-        if client.is_replica_set() && client.options.repl_set_name.as_deref() != Some("repl0") {
+        if client.is_replica_set() && client.options().repl_set_name.as_deref() != Some("repl0") {
             Some("repl_set_name != repl0")
         } else if !client.is_replica_set() {
             Some("not a replica set")

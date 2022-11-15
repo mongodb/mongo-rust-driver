@@ -53,7 +53,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub(crate) struct TestClient {
     client: Client,
-    pub(crate) options: ClientOptions,
     pub(crate) server_info: HelloCommandResponse,
     pub(crate) server_version: Version,
     pub(crate) server_parameters: Document,
@@ -100,10 +99,10 @@ impl TestClient {
     ) -> Self {
         let options = Self::build_test_options(event_handler, options).await;
         let client = Client::with_options(options.clone()).unwrap();
-        Self::from_client(client, options).await
+        Self::from_client(client).await
     }
 
-    async fn from_client(client: Client, options: ClientOptions) -> Self {
+    async fn from_client(client: Client) -> Self {
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
         let mut session = client
@@ -112,8 +111,8 @@ impl TestClient {
         session.mark_dirty();
 
         let hello_cmd = hello_command(
-            options.server_api.as_ref(),
-            options.load_balanced,
+            client.options().server_api.as_ref(),
+            client.options().load_balanced,
             None,
             None,
         );
@@ -145,7 +144,6 @@ impl TestClient {
 
         Self {
             client,
-            options,
             server_info,
             server_version,
             server_parameters,
@@ -315,7 +313,7 @@ impl TestClient {
     }
 
     pub(crate) fn auth_enabled(&self) -> bool {
-        self.options.credential.is_some()
+        self.client.options().credential.is_some()
     }
 
     pub(crate) fn is_standalone(&self) -> bool {
@@ -368,7 +366,7 @@ impl TestClient {
     /// Returns the `Topology' that can be determined without a server query, i.e. all except
     /// `Toplogy::ShardedReplicaSet`.
     fn base_topology(&self) -> Topology {
-        if self.options.load_balanced.unwrap_or(false) {
+        if self.client.options().load_balanced.unwrap_or(false) {
             return Topology::LoadBalanced;
         }
         if self.server_info.msg.as_deref() == Some("isdbgrid") {
