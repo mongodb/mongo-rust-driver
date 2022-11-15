@@ -332,9 +332,6 @@ impl AsyncWrite for GridFsUploadStream {
                 let new_future = close(stream.bucket.clone(), buffer, file).boxed();
                 stream.state.set_closing(new_future)
             }
-            // This case is effectively unreachable, as the AsyncWriteExt methods take &mut self and
-            // poll the futures to completion. If a user were to call these polling methods directly
-            // and intersperse futures, we should just pend here until the writing future resolves.
             State::Writing(_) => {
                 let error: Error = ErrorKind::GridFs(GridFsErrorKind::WriteInProgress).into();
                 let new_future = clean_up_chunks(
@@ -442,14 +439,11 @@ async fn clean_up_chunks(
             Some(error) => Err(error),
             None => Ok(()),
         },
-        Err(error) => {
-            let mut message = String::new();
-            if let Some(original_error) = original_error {
-                message.push_str(&format!("failed operation: {}, then ", original_error));
-            };
-            message.push_str("failed to delete orphaned chunks: {}");
-            Err(ErrorKind::GridFs(GridFsErrorKind::AbortError { message }).into())
-        }
+        Err(delete_error) => Err(ErrorKind::GridFs(GridFsErrorKind::AbortError {
+            original_error,
+            delete_error,
+        })
+        .into()),
     }
 }
 

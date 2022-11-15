@@ -834,7 +834,14 @@ pub enum GridFsErrorKind {
 
     /// An error occurred when aborting a file upload.
     #[non_exhaustive]
-    AbortError { message: String },
+    AbortError {
+        /// The original error. Only present if the abort occurred because of an error during a
+        /// GridFS operation.
+        original_error: Option<Error>,
+
+        /// The error that occurred when attempting to remove any orphaned chunks.
+        delete_error: Error,
+    },
 
     /// A close operation was attempted on a [`GridFsUploadStream`] while a write was still in
     /// progress.
