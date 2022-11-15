@@ -8,7 +8,7 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
-    coll::options::{DistinctOptions, DropCollectionOptions},
+    coll::options::{DistinctOptions, DropCollectionOptions, CollectionOptions},
     concern::{Acknowledgment, WriteConcern},
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
     runtime,
@@ -88,6 +88,12 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             }
         }
 
+        if let Some(kv_data) = &test_file.key_vault_data {
+            let datakeys = internal_client.database("keyvault").collection_with_options::<bson::Document>("datakeys", CollectionOptions::builder().write_concern(WriteConcern::MAJORITY).build());
+            datakeys.drop(None).await.unwrap();
+            datakeys.insert_many(kv_data, None).await.unwrap();
+        }
+
         let db_name = test_file
             .database_name
             .clone()
@@ -98,9 +104,12 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             .unwrap_or_else(|| get_default_name(&test.description));
 
         let coll = internal_client.database(&db_name).collection(&coll_name);
-        let options = DropCollectionOptions::builder()
+        let mut options = DropCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
+        if let Some(enc_fields) = &test_file.encrypted_fields {
+            options.encrypted_fields = Some(enc_fields.clone());
+        }
         let req = VersionReq::parse(">=4.7").unwrap();
         if !(db_name.as_str() == "admin"
             && internal_client.is_sharded()
@@ -109,9 +118,15 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             coll.drop(options).await.unwrap();
         }
 
-        let options = CreateCollectionOptions::builder()
+        let mut options = CreateCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
+        if let Some(schema) = &test_file.json_schema {
+            options.validator = Some(doc! { "$jsonSchema": schema });
+        }
+        if let Some(enc_fields) = &test_file.encrypted_fields {
+            options.encrypted_fields = Some(enc_fields.clone());
+        }
         internal_client
             .database(&db_name)
             .create_collection(&coll_name, options)
@@ -132,8 +147,8 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             }
         }
 
-        let mut additional_options = match test.client_uri {
-            Some(ref uri) => ClientOptions::parse_uri(uri, None).await.unwrap(),
+        let mut additional_options = match &test.client_options {
+            Some(opts) => ClientOptions::parse_uri(&opts.uri, None).await.unwrap(),
             None => ClientOptions::builder()
                 .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
                 .build(),

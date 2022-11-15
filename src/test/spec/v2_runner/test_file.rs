@@ -23,6 +23,9 @@ pub(crate) struct TestFile {
     #[allow(unused)]
     pub(crate) bucket_name: Option<String>,
     pub(crate) data: Option<TestData>,
+    pub(crate) json_schema: Option<Document>,
+    pub(crate) encrypted_fields: Option<Document>,
+    pub(crate) key_vault_data: Option<Vec<Document>>,
     pub(crate) tests: Vec<Test>,
 }
 
@@ -76,12 +79,8 @@ pub(crate) struct Test {
     pub(crate) description: String,
     pub(crate) skip_reason: Option<String>,
     pub(crate) use_multiple_mongoses: Option<bool>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_uri_options_to_uri_string_option",
-        rename = "clientOptions"
-    )]
-    pub(crate) client_uri: Option<String>,
+    #[serde(default, rename = "clientOptions")]
+    pub(crate) client_options: Option<ClientOptions>,
     pub(crate) fail_point: Option<FailPoint>,
     pub(crate) session_options: Option<HashMap<String, SessionOptions>>,
     pub(crate) operations: Vec<Operation>,
@@ -90,18 +89,33 @@ pub(crate) struct Test {
     pub(crate) outcome: Option<Outcome>,
 }
 
-fn deserialize_uri_options_to_uri_string_option<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let uri_options = Document::deserialize(deserializer)?;
-    Ok(Some(merge_uri_options(
-        &DEFAULT_URI,
-        Some(&uri_options),
-        true,
-    )))
+#[derive(Debug)]
+pub(crate) struct ClientOptions {
+    pub(crate) uri: String,
+    pub(crate) auto_encrypt_opts: Option<Document>,
+}
+
+impl<'de> Deserialize<'de> for ClientOptions {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de> {
+        use serde::de::Error;
+        let mut uri_options = Document::deserialize(deserializer)?;
+        let auto_encrypt_opts = match uri_options.remove("autoEncryptOpts") {
+            None => None,
+            Some(bson::Bson::Document(d)) => Some(d),
+            _ => return Err(D::Error::custom("invalid autoEncryptOpts value")),
+        };
+        let uri = merge_uri_options(
+            &DEFAULT_URI,
+            Some(&uri_options),
+            true,
+        );
+        Ok(Self {
+            uri,
+            auto_encrypt_opts,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]
