@@ -101,7 +101,7 @@ impl EncryptedClientBuilder {
         self
     }
 
-    /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups as part of
+    /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups and/or spawn mongocryptd as part of
     /// `Client` initialization.
     pub async fn build(self) -> Result<Client> {
         let client = Client::with_options(self.client_options)?;

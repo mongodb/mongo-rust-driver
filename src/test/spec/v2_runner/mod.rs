@@ -107,6 +107,7 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
         let mut options = DropCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
+        #[cfg(feature = "csfle")]
         if let Some(enc_fields) = &test_file.encrypted_fields {
             options.encrypted_fields = Some(enc_fields.clone());
         }
@@ -124,6 +125,7 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
         if let Some(schema) = &test_file.json_schema {
             options.validator = Some(doc! { "$jsonSchema": schema });
         }
+        #[cfg(feature = "csfle")]
         if let Some(enc_fields) = &test_file.encrypted_fields {
             options.encrypted_fields = Some(enc_fields.clone());
         }

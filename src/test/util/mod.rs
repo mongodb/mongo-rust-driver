@@ -26,7 +26,7 @@ use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
     bson::{doc, Bson},
-    client::options::ServerAddress,
+    client::{options::ServerAddress, EncryptedClientBuilder},
     hello::{hello_command, HelloCommandResponse},
     selection_criteria::SelectionCriteria,
 };
@@ -34,7 +34,7 @@ use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::CLIENT_OPTIONS;
+use super::{CLIENT_OPTIONS, KmsProviderList};
 use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
@@ -66,6 +66,79 @@ impl std::ops::Deref for TestClient {
     }
 }
 
+impl Client {
+    pub(crate) fn test_builder() -> TestClientBuilder {
+        TestClientBuilder { options: None, handler: None, encrypted: None }
+    }
+}
+
+pub(crate) struct TestClientBuilder {
+    options: Option<ClientOptions>,
+    handler: Option<Arc<EventHandler>>,
+    encrypted: Option<EncryptedOptions>,
+}
+
+struct EncryptedOptions {
+    key_vault_namespace: crate::Namespace,
+    kms_providers: KmsProviderList,
+    builder_options: Box<dyn FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder>,
+}
+
+impl TestClientBuilder {
+    pub(crate) fn options(mut self, options: impl Into<Option<ClientOptions>>) -> Self {
+        self.options = options.into();
+        self
+    }
+
+    pub(crate) fn event_handler(mut self, handler: impl Into<Option<Arc<EventHandler>>>) -> Self {
+        self.handler = handler.into();
+        self
+    }
+
+    pub(crate) fn encrypted_options(
+        mut self,
+        key_vault_namespace: crate::Namespace,
+        kms_providers: impl IntoIterator<
+            Item = (
+                mongocrypt::ctx::KmsProvider,
+                bson::Document,
+                Option<crate::client::options::TlsOptions>,
+            ),
+        >,
+        builder_options: impl FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder,
+    ) -> Self {
+        self.encrypted = Some(EncryptedOptions {
+            key_vault_namespace,
+            kms_providers: kms_providers.into_iter().collect(),
+            builder_options: Box::new(builder_options),
+        });
+        self
+    }
+
+    pub(crate) async fn build(self) -> TestClient {
+        let mut options = match self.options {
+            Some(options) => options,
+            None => CLIENT_OPTIONS.get().await.clone(),
+        };
+
+        if let Some(handler) = self.handler {
+            options.command_event_handler = Some(handler.clone());
+            options.cmap_event_handler = Some(handler.clone());
+            options.sdam_event_handler = Some(handler);
+        }
+
+        let client = match self.encrypted {
+            None => Client::with_options(options).unwrap(),
+            Some(eo) => {
+                let builder = Client::encrypted_builder(options, eo.key_vault_namespace, eo.kms_providers).unwrap();
+                (eo.builder_options)(builder).build().await.unwrap()
+            }
+        };
+
+        TestClient::from_client(client).await
+    }
+}
+
 impl TestClient {
     pub(crate) async fn new() -> Self {
         Self::with_options(None).await
@@ -75,31 +148,15 @@ impl TestClient {
         Self::with_handler(None, options).await
     }
 
-    async fn build_test_options(
-        event_handler: Option<Arc<EventHandler>>,
-        options: impl Into<Option<ClientOptions>>,
-    ) -> ClientOptions {
-        let mut options = match options.into() {
-            Some(options) => options,
-            None => CLIENT_OPTIONS.get().await.clone(),
-        };
-
-        if let Some(handler) = event_handler {
-            options.command_event_handler = Some(handler.clone());
-            options.cmap_event_handler = Some(handler.clone());
-            options.sdam_event_handler = Some(handler);
-        }
-
-        options
-    }
-
     pub(crate) async fn with_handler(
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
     ) -> Self {
-        let options = Self::build_test_options(event_handler, options).await;
-        let client = Client::with_options(options.clone()).unwrap();
-        Self::from_client(client).await
+        Client::test_builder()
+            .options(options)
+            .event_handler(event_handler)
+            .build()
+            .await
     }
 
     async fn from_client(client: Client) -> Self {
