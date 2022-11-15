@@ -17,6 +17,8 @@ mod lambda_examples;
 pub mod spec;
 pub(crate) mod util;
 
+#[cfg(feature = "csfle")]
+pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
     util::{
@@ -87,22 +89,6 @@ lazy_static! {
         std::env::var("SERVERLESS_ATLAS_USER").ok();
     pub(crate) static ref SERVERLESS_ATLAS_PASSWORD: Option<String> =
         std::env::var("SERVERLESS_ATLAS_PASSWORD").ok();
-}
-
-#[cfg(feature = "csfle")]
-lazy_static! {
-    pub(crate) static ref KMS_PROVIDERS: crate::client::csfle::options::KmsProviders =
-        serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
-    pub(crate) static ref KMIP_TLS_OPTIONS: crate::client::csfle::options::KmsProvidersTlsOptions = {
-        let cert_dir = std::path::PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
-        let kmip_opts = crate::client::options::TlsOptions::builder()
-            .ca_file_path(cert_dir.join("ca.pem"))
-            .cert_key_file_path(cert_dir.join("client.pem"))
-            .build();
-        [(mongocrypt::ctx::KmsProvider::Kmip, kmip_opts)]
-            .into_iter()
-            .collect()
-    };
 }
 
 // conditional definitions do not work within the lazy_static! macro, so this

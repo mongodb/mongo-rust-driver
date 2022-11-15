@@ -43,9 +43,6 @@ use crate::runtime;
 
 pub use resolver_config::ResolverConfig;
 
-#[cfg(feature = "csfle")]
-pub use crate::client::csfle::options::AutoEncryptionOptions;
-
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
 const URI_OPTIONS: &[&str] = &[

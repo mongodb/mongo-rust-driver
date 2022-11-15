@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use bson::Array;
 use mongocrypt::ctx::KmsProvider;
-use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{Bson, Document},
     client::options::TlsOptions,
     error::{Error, Result},
     Namespace,
@@ -20,18 +19,16 @@ use crate::{
 /// https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list
 /// )). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
 /// AutoEncryptionOpts.
-#[derive(Debug, TypedBuilder, Clone)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
-#[builder(field_defaults(setter(into)))]
-pub struct AutoEncryptionOptions {
+pub(crate) struct AutoEncryptionOptions {
     /// Used for data key queries.  Will default to an internal client if not set.
-    #[builder(default)]
-    pub key_vault_client: Option<crate::Client>,
+    pub(crate) key_vault_client: Option<crate::Client>,
     /// A collection that contains all data keys used for encryption and decryption (aka the key
     /// vault collection).
-    pub key_vault_namespace: Namespace,
+    pub(crate) key_vault_namespace: Namespace,
     /// Options individual to each KMS provider.
-    pub kms_providers: KmsProviders,
+    pub(crate) kms_providers: KmsProviders,
     /// Specify a JSONSchema locally.
     ///
     /// Supplying a `schema_map` provides more security than relying on JSON Schemas obtained from
@@ -41,38 +38,81 @@ pub struct AutoEncryptionOptions {
     /// Schemas supplied in the `schema_map` only apply to configuring automatic encryption for
     /// client side encryption. Other validation rules in the JSON schema will not be enforced by
     /// the driver and will result in an error.
-    #[builder(default)]
-    pub schema_map: Option<HashMap<String, Document>>,
+    pub(crate) schema_map: Option<HashMap<String, Document>>,
     /// Disable automatic encryption and do not spawn mongocryptd.  Defaults to false.
-    #[builder(default)]
-    pub bypass_auto_encryption: Option<bool>,
+    pub(crate) bypass_auto_encryption: Option<bool>,
     /// Options related to mongocryptd.
-    #[builder(default)]
-    pub extra_options: Option<Document>,
-    /// Configure TLS for connections to KMS providers.
-    #[builder(default)]
-    pub tls_options: Option<KmsProvidersTlsOptions>,
+    pub(crate) extra_options: Option<Document>,
     /// Maps namespace to encrypted fields.
     ///
     /// Supplying an `encrypted_fields_map` provides more security than relying on an
     /// encryptedFields obtained from the server. It protects against a malicious server
     /// advertising a false encryptedFields.
-    #[builder(default)]
-    pub encrypted_fields_map: Option<HashMap<String, Document>>,
+    pub(crate) encrypted_fields_map: Option<HashMap<String, Document>>,
     /// Disable serverside processing of encrypted indexed fields, allowing use of explicit
     /// encryption with queryable encryption.
-    #[builder(default)]
-    pub bypass_query_analysis: Option<bool>,
+    pub(crate) bypass_query_analysis: Option<bool>,
     /// Disable loading crypt_shared.
     #[cfg(test)]
-    #[builder(default)]
     pub(crate) disable_crypt_shared: Option<bool>,
 }
 
-/// Options specific to each KMS provider.
-pub type KmsProviders = HashMap<KmsProvider, Document>;
-/// TLS options for connections to each KMS provider.
-pub type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
+impl AutoEncryptionOptions {
+    pub(crate) fn new(key_vault_namespace: Namespace, kms_providers: KmsProviders) -> Self {
+        Self {
+            key_vault_namespace,
+            kms_providers,
+            key_vault_client: None,
+            schema_map: None,
+            bypass_auto_encryption: None,
+            extra_options: None,
+            encrypted_fields_map: None,
+            bypass_query_analysis: None,
+            #[cfg(test)]
+            disable_crypt_shared: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct KmsProviders {
+    credentials: HashMap<KmsProvider, Document>,
+    tls_options: Option<KmsProvidersTlsOptions>,
+}
+
+pub(crate) type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
+
+impl KmsProviders {
+    pub(crate) fn new(
+        providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+    ) -> Result<Self> {
+        let mut credentials = HashMap::new();
+        let mut tls_options = None;
+        for (provider, conf, tls) in providers.into_iter() {
+            credentials.insert(provider.clone(), conf);
+            if let Some(tls) = tls {
+                tls_options
+                    .get_or_insert_with(KmsProvidersTlsOptions::new)
+                    .insert(provider, tls);
+            }
+        }
+        if credentials.is_empty() {
+            return Err(crate::error::Error::invalid_argument("empty kms_providers"));
+        }
+        Ok(Self {
+            credentials,
+            tls_options,
+        })
+    }
+
+    pub(crate) fn credentials(&self) -> Result<Document> {
+        Ok(bson::to_document(&self.credentials)?)
+    }
+
+    pub(crate) fn tls_options(&self) -> &Option<KmsProvidersTlsOptions> {
+        &self.tls_options
+    }
+}
 
 impl AutoEncryptionOptions {
     pub(crate) fn extra_option<'a, Opt: ExtraOption<'a>>(

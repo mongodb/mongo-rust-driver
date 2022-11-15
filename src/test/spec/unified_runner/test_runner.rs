@@ -55,7 +55,7 @@ use super::{
 };
 
 #[cfg(feature = "csfle")]
-use crate::client::csfle::options::KmsProviders;
+use crate::test::KmsProviderList;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::test::{
@@ -559,16 +559,13 @@ impl TestRunner {
                         .client()
                         .unwrap()
                         .clone();
-                    let mut kms_providers: KmsProviders =
+                    let kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document> =
                         bson::from_document(opts.kms_providers.clone()).unwrap();
-                    fill_kms_placeholders(&mut kms_providers);
+                    let kms_providers = fill_kms_placeholders(kms_providers);
                     let client_enc = crate::client_encryption::ClientEncryption::new(
-                        crate::client_encryption::ClientEncryptionOptions::builder()
-                            .key_vault_client(kv_client)
-                            .key_vault_namespace(opts.key_vault_namespace.clone())
-                            .kms_providers(kms_providers)
-                            .tls_options(crate::test::KMIP_TLS_OPTIONS.clone())
-                            .build(),
+                        kv_client,
+                        opts.key_vault_namespace.clone(),
+                        kms_providers,
                     )
                     .unwrap();
                     (id, Entity::ClientEncryption(Arc::new(client_enc)))
@@ -682,17 +679,21 @@ impl TestRunner {
 }
 
 #[cfg(feature = "csfle")]
-fn fill_kms_placeholders(kms_providers: &mut KmsProviders) {
-    use crate::test::KMS_PROVIDERS;
+fn fill_kms_placeholders(
+    kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document>,
+) -> KmsProviderList {
+    use crate::test::KMS_PROVIDERS_MAP;
 
     let placeholder = bson::Bson::Document(doc! { "$$placeholder": 1 });
 
-    for (provider, config) in kms_providers.iter_mut() {
+    let mut out = vec![];
+    for (provider, mut config) in kms_providers {
         for (key, value) in config.iter_mut() {
             if *value == placeholder {
-                let new_value = KMS_PROVIDERS
-                    .get(provider)
+                let new_value = KMS_PROVIDERS_MAP
+                    .get(&provider)
                     .unwrap_or_else(|| panic!("missing config for {:?}", provider))
+                    .0
                     .get(key)
                     .unwrap_or_else(|| {
                         panic!("provider config {:?} missing key {:?}", provider, key)
@@ -701,5 +702,10 @@ fn fill_kms_placeholders(kms_providers: &mut KmsProviders) {
                 *value = new_value;
             }
         }
+        let tls = KMS_PROVIDERS_MAP
+            .get(&provider)
+            .and_then(|(_, t)| t.clone());
+        out.push((provider, config, tls));
     }
+    out
 }

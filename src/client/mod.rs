@@ -10,6 +10,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(feature = "csfle")]
+pub use self::csfle::client_builder::*;
 use derivative::Derivative;
 
 #[cfg(test)]
@@ -141,16 +143,46 @@ impl Client {
         Ok(Self { inner })
     }
 
-    /// Creates a new `Client` connected to the cluster specified by `options` with auto-encryption
-    /// enabled.
+    /// Return an `EncryptedClientBuilder` for constructing a `Client` with auto-encryption enabled.
+    ///
+    /// ```no_run
+    /// # use bson::doc;
+    /// # use mongocrypt::ctx::KmsProvider;
+    /// # use mongodb::Client;
+    /// # use mongodb::error::Result;
+    /// # async fn func() -> Result<()> {
+    /// # let client_options = todo!();
+    /// # let key_vault_namespace = todo!();
+    /// # let key_vault_client: Client = todo!();
+    /// # let local_key: bson::Binary = todo!();
+    /// let encrypted_client = Client::encrypted_builder(
+    ///     client_options,
+    ///     key_vault_namespace,
+    ///     [(KmsProvider::Local, doc! { "key": local_key }, None)],
+    /// )?
+    /// .key_vault_client(key_vault_client)
+    /// .build()
+    /// .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg(feature = "csfle")]
-    pub async fn with_encryption_options(
-        options: ClientOptions,
-        auto_enc: options::AutoEncryptionOptions,
-    ) -> Result<Self> {
-        let client = Self::with_options(options)?;
-        *client.inner.csfle.write().await = Some(csfle::ClientState::new(&client, auto_enc).await?);
-        Ok(client)
+    pub fn encrypted_builder(
+        client_options: ClientOptions,
+        key_vault_namespace: crate::Namespace,
+        kms_providers: impl IntoIterator<
+            Item = (
+                mongocrypt::ctx::KmsProvider,
+                bson::Document,
+                Option<options::TlsOptions>,
+            ),
+        >,
+    ) -> Result<EncryptedClientBuilder> {
+        Ok(EncryptedClientBuilder::new(
+            client_options,
+            key_vault_namespace,
+            csfle::options::KmsProviders::new(kms_providers)?,
+        ))
     }
 
     #[cfg(all(test, feature = "csfle"))]
@@ -522,10 +554,9 @@ impl Client {
     }
 
     #[cfg(feature = "csfle")]
-    #[allow(dead_code)]
     pub(crate) async fn auto_encryption_opts(
         &self,
-    ) -> Option<tokio::sync::RwLockReadGuard<'_, options::AutoEncryptionOptions>> {
+    ) -> Option<tokio::sync::RwLockReadGuard<'_, csfle::options::AutoEncryptionOptions>> {
         tokio::sync::RwLockReadGuard::try_map(self.inner.csfle.read().await, |csfle| {
             csfle.as_ref().map(|cs| cs.opts())
         })

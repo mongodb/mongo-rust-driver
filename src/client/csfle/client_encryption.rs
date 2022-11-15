@@ -2,6 +2,7 @@
 
 use crate::{
     bson::Binary,
+    client::options::TlsOptions,
     coll::options::CollectionOptions,
     error::{Error, Result},
     options::{ReadConcern, WriteConcern},
@@ -17,12 +18,8 @@ use mongocrypt::{
     Crypt,
 };
 use serde::{Deserialize, Serialize};
-use typed_builder::TypedBuilder;
 
-use super::{
-    options::{KmsProviders, KmsProvidersTlsOptions},
-    state_machine::CryptExecutor,
-};
+use super::{options::KmsProviders, state_machine::CryptExecutor};
 
 /// A handle to the key vault.  Used to create data encryption keys, and to explicitly encrypt and
 /// decrypt values when auto-encryption is not an option.
@@ -33,27 +30,52 @@ pub struct ClientEncryption {
 }
 
 impl ClientEncryption {
-    /// Create a new key vault handle with the given options.
-    pub fn new(options: ClientEncryptionOptions) -> Result<Self> {
+    /// Construct a `ClientEncryptionBuilder` to initialize a new `ClientEncryption`.
+    ///
+    /// ```no_run
+    /// # use bson::doc;
+    /// # use mongocrypt::ctx::KmsProvider;
+    /// # use mongodb::client_encryption::ClientEncryption;
+    /// # use mongodb::error::Result;
+    /// # fn func() -> Result<()> {
+    /// # let kv_client = todo!();
+    /// # let kv_namespace = todo!();
+    /// # let local_key = doc! { };
+    /// let enc = ClientEncryption::new(
+    ///     kv_client,
+    ///     kv_namespace,
+    ///     [
+    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
+    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
+    ///     ]
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(
+        key_vault_client: Client,
+        key_vault_namespace: Namespace,
+        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+    ) -> Result<Self> {
+        let kms_providers = KmsProviders::new(kms_providers)?;
         let crypt = Crypt::builder()
-            .kms_providers(&bson::to_document(&options.kms_providers)?)?
+            .kms_providers(&kms_providers.credentials()?)?
             .build()?;
         let exec = CryptExecutor::new_explicit(
-            options.key_vault_client.weak(),
-            options.key_vault_namespace.clone(),
-            options.tls_options,
+            key_vault_client.weak(),
+            key_vault_namespace.clone(),
+            kms_providers.tls_options().clone(),
         )?;
-        let key_vault = options
-            .key_vault_client
-            .database(&options.key_vault_namespace.db)
+        let key_vault = key_vault_client
+            .database(&key_vault_namespace.db)
             .collection_with_options(
-                &options.key_vault_namespace.coll,
+                &key_vault_namespace.coll,
                 CollectionOptions::builder()
                     .write_concern(WriteConcern::MAJORITY)
                     .read_concern(ReadConcern::MAJORITY)
                     .build(),
             );
-        Ok(Self {
+        Ok(ClientEncryption {
             crypt,
             exec,
             key_vault,
@@ -61,8 +83,36 @@ impl ClientEncryption {
     }
 
     /// Creates a new key document and inserts into the key vault collection.
-    /// Returns the _id of the created document as a UUID (BSON binary subtype 0x04).
-    pub async fn create_data_key(
+    /// `CreateDataKeyAction::run` returns a `Binary` (subtype 0x04) with the _id of the created
+    /// document as a UUID.
+    ///
+    /// The returned `CreateDataKeyAction` must be executed via `run`, e.g.
+    /// ```no_run
+    /// # use mongocrypt::ctx::Algorithm;
+    /// # use mongodb::client_encryption::ClientEncryption;
+    /// # use mongodb::error::Result;
+    /// # async fn func() -> Result<()> {
+    /// # let client_encryption: ClientEncryption = todo!();
+    /// # let master_key = todo!();
+    /// let key = client_encryption
+    ///     .create_data_key(master_key)
+    ///     .key_alt_names(["altname1".to_string(), "altname2".to_string()])
+    ///     .run().await?;
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn create_data_key(&self, master_key: MasterKey) -> CreateDataKeyAction {
+        CreateDataKeyAction {
+            client_enc: self,
+            opts: DataKeyOptions {
+                master_key,
+                key_alt_names: None,
+                key_material: None,
+            },
+        }
+    }
+
+    pub(crate) async fn create_data_key_final(
         &self,
         kms_provider: &KmsProvider,
         opts: impl Into<Option<DataKeyOptions>>,
@@ -181,8 +231,50 @@ impl ClientEncryption {
     }
 
     /// Encrypts a BsonValue with a given key and algorithm.
-    /// Returns an encrypted value (BSON binary of subtype 6).
-    pub async fn encrypt(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
+    /// `EncryptAction::run` returns a `Binary` (subtype 6) containing the encrypted value.
+    ///
+    /// To insert or query with an "Indexed" encrypted payload, use a `Client` configured with
+    /// `AutoEncryptionOptions`. `AutoEncryptionOptions.bypass_query_analysis` may be true.
+    /// `AutoEncryptionOptions.bypass_auto_encryption` must be false.
+    ///
+    /// The returned `EncryptAction` must be executed via `run`, e.g.
+    /// ```no_run
+    /// # use mongocrypt::ctx::Algorithm;
+    /// # use mongodb::client_encryption::ClientEncryption;
+    /// # use mongodb::error::Result;
+    /// # async fn func() -> Result<()> {
+    /// # let client_encryption: ClientEncryption = todo!();
+    /// # let key = todo!();
+    /// let encrypted = client_encryption
+    ///     .encrypt(
+    ///         "plaintext",
+    ///         key,
+    ///         Algorithm::AeadAes256CbcHmacSha512Deterministic,
+    ///     )
+    ///     .contention_factor(10)
+    ///     .run().await?;
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn encrypt(
+        &self,
+        value: impl Into<bson::RawBson>,
+        key: EncryptKey,
+        algorithm: Algorithm,
+    ) -> EncryptAction {
+        EncryptAction {
+            client_enc: self,
+            value: value.into(),
+            opts: EncryptOptions {
+                key,
+                algorithm,
+                contention_factor: None,
+                query_type: None,
+            },
+        }
+    }
+
+    async fn encrypt_final(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
         let ctx = self.encrypt_ctx(value, &opts)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
@@ -233,42 +325,42 @@ impl ClientEncryption {
     }
 }
 
-/// Options for initializing a new `ClientEncryption`.
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+/// Options for creating a data key.
+#[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct ClientEncryptionOptions {
-    /// The key vault `Client`.
-    ///
-    /// Typically this is the same as the main client; it can be different in order to route data
-    /// key queries to a separate MongoDB cluster, or the same cluster but with a different
-    /// credential.
-    pub key_vault_client: Client,
-    /// The key vault `Namespace`, referring to a collection that contains all data keys used for
-    /// encryption and decryption.
-    pub key_vault_namespace: Namespace,
-    /// Map of KMS provider properties; multiple KMS providers may be specified.
-    pub kms_providers: KmsProviders,
-    /// TLS options for connecting to KMS providers.  If not given, default options will be used.
-    #[builder(default)]
-    pub tls_options: Option<KmsProvidersTlsOptions>,
+pub(crate) struct DataKeyOptions {
+    pub(crate) master_key: MasterKey,
+    pub(crate) key_alt_names: Option<Vec<String>>,
+    pub(crate) key_material: Option<Vec<u8>>,
 }
 
-/// Options for creating a data key.
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
-#[non_exhaustive]
-pub struct DataKeyOptions {
-    /// The master key document, a KMS-specific key used to encrypt the new data key.
-    pub master_key: MasterKey,
-    /// An optional list of alternate names used to reference a key.
-    #[builder(default)]
-    pub key_alt_names: Option<Vec<String>>,
-    /// An optional buffer of 96 bytes to use as custom key material for the data key being
+/// A pending `ClientEncryption::create_data_key` action.
+pub struct CreateDataKeyAction<'a> {
+    client_enc: &'a ClientEncryption,
+    opts: DataKeyOptions,
+}
+
+impl<'a> CreateDataKeyAction<'a> {
+    /// Execute the pending data key creation.
+    pub async fn run(self) -> Result<Binary> {
+        self.client_enc
+            .create_data_key_final(&self.opts.master_key.provider(), self.opts)
+            .await
+    }
+
+    /// Set an optional list of alternate names that can be used to reference the key.
+    pub fn key_alt_names(mut self, names: impl IntoIterator<Item = String>) -> Self {
+        self.opts.key_alt_names = Some(names.into_iter().collect());
+        self
+    }
+
+    /// Set a buffer of 96 bytes to use as custom key material for the data key being
     /// created.  If unset, key material for the new data key is generated from a cryptographically
     /// secure random device.
-    #[builder(default)]
-    pub key_material: Option<Vec<u8>>,
+    pub fn key_material(mut self, material: impl IntoIterator<Item = u8>) -> Self {
+        self.opts.key_material = Some(material.into_iter().collect());
+        self
+    }
 }
 
 /// A KMS-specific key used to encrypt data keys.
@@ -344,24 +436,40 @@ impl MasterKey {
 // }
 
 /// The options for explicit encryption.
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct EncryptOptions {
-    /// The key to use.
-    pub key: EncryptKey,
-    /// The encryption algorithm.
-    ///
-    /// To insert or query with an "Indexed" encrypted payload, use a `Client` configured with
-    /// `AutoEncryptionOptions`. `AutoEncryptionOptions.bypass_query_analysis may be true.
-    /// `AutoEncryptionOptions.bypass_auto_encryption` must be false.
-    pub algorithm: Algorithm,
-    /// The contention factor.
-    #[builder(default)]
-    pub contention_factor: Option<i64>,
-    /// The query type.
-    #[builder(default)]
-    pub query_type: Option<String>,
+pub(crate) struct EncryptOptions {
+    pub(crate) key: EncryptKey,
+    pub(crate) algorithm: Algorithm,
+    pub(crate) contention_factor: Option<i64>,
+    pub(crate) query_type: Option<String>,
+}
+
+/// A pending `ClientEncryption::encrypt` action.
+pub struct EncryptAction<'a> {
+    client_enc: &'a ClientEncryption,
+    value: bson::RawBson,
+    opts: EncryptOptions,
+}
+
+impl<'a> EncryptAction<'a> {
+    /// Execute the encryption.
+    pub async fn run(self) -> Result<Binary> {
+        self.client_enc.encrypt_final(self.value, self.opts).await
+    }
+
+    /// Set the contention factor.
+    pub fn contention_factor(mut self, factor: impl Into<Option<i64>>) -> Self {
+        self.opts.contention_factor = factor.into();
+        self
+    }
+
+    /// Set the query type.
+    #[allow(clippy::redundant_clone)]
+    pub fn query_type(mut self, qtype: impl Into<String>) -> Self {
+        self.opts.query_type = Some(qtype.into());
+        self
+    }
 }
 
 /// An encryption key reference.

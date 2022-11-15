@@ -1,3 +1,4 @@
+pub(crate) mod client_builder;
 pub mod client_encryption;
 pub mod options;
 mod state_machine;
@@ -47,7 +48,7 @@ impl ClientState {
     const MONGOCRYPTD_DEFAULT_URI: &'static str = "mongodb://localhost:27020";
     const MONGOCRYPTD_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
 
-    pub(super) async fn new(client: &Client, mut opts: AutoEncryptionOptions) -> Result<Self> {
+    pub(super) async fn new(client: &Client, opts: AutoEncryptionOptions) -> Result<Self> {
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_opts = Self::make_mongocryptd_opts(&opts, &crypt)?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
@@ -68,7 +69,7 @@ impl ClientState {
         let exec = CryptExecutor::new_implicit(
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
-            opts.tls_options.take(),
+            opts.kms_providers.tls_options().clone(),
             mongocryptd_opts,
             mongocryptd_client,
             aux_clients.metadata_client,
@@ -96,8 +97,7 @@ impl ClientState {
     }
 
     fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
-        let mut builder =
-            Crypt::builder().kms_providers(&bson::to_document(&opts.kms_providers)?)?;
+        let mut builder = Crypt::builder().kms_providers(&opts.kms_providers.credentials()?)?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
         }
