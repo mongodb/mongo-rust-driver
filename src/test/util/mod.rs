@@ -26,15 +26,20 @@ use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
     bson::{doc, Bson},
-    client::{options::ServerAddress, EncryptedClientBuilder},
+    client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
     selection_criteria::SelectionCriteria,
+};
+#[cfg(feature = "csfle")]
+use crate::{
+    client::EncryptedClientBuilder,
+    test::KmsProviderList,
 };
 use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::{CLIENT_OPTIONS, KmsProviderList};
+use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
@@ -68,16 +73,25 @@ impl std::ops::Deref for TestClient {
 
 impl Client {
     pub(crate) fn test_builder() -> TestClientBuilder {
-        TestClientBuilder { options: None, handler: None, encrypted: None }
+        TestClientBuilder {
+            options: None,
+            handler: None,
+            min_heartbeat_freq: None,
+            #[cfg(feature = "csfle")]
+            encrypted: None,
+        }
     }
 }
 
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
     handler: Option<Arc<EventHandler>>,
+    min_heartbeat_freq: Option<Duration>,
+    #[cfg(feature = "csfle")]
     encrypted: Option<EncryptedOptions>,
 }
 
+#[cfg(feature = "csfle")]
 struct EncryptedOptions {
     key_vault_namespace: crate::Namespace,
     kms_providers: KmsProviderList,
@@ -86,15 +100,31 @@ struct EncryptedOptions {
 
 impl TestClientBuilder {
     pub(crate) fn options(mut self, options: impl Into<Option<ClientOptions>>) -> Self {
-        self.options = options.into();
+        let options = options.into();
+        assert!(self.options.is_none() || options.is_none());
+        self.options = options;
+        self
+    }
+
+    pub(crate) async fn additional_options(
+        mut self,
+        options: impl Into<Option<ClientOptions>>,
+        use_multiple_mongoses: bool,
+    ) -> Self {
+        let options = options.into();
+        assert!(self.options.is_none() || options.is_none());
+        self.options = Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
         self
     }
 
     pub(crate) fn event_handler(mut self, handler: impl Into<Option<Arc<EventHandler>>>) -> Self {
+        let handler = handler.into();
+        assert!(self.handler.is_none() || handler.is_none());
         self.handler = handler.into();
         self
     }
 
+    #[cfg(feature = "csfle")]
     pub(crate) fn encrypted_options(
         mut self,
         key_vault_namespace: crate::Namespace,
@@ -107,11 +137,19 @@ impl TestClientBuilder {
         >,
         builder_options: impl FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder,
     ) -> Self {
+        assert!(self.encrypted.is_none());
         self.encrypted = Some(EncryptedOptions {
             key_vault_namespace,
             kms_providers: kms_providers.into_iter().collect(),
             builder_options: Box::new(builder_options),
         });
+        self
+    }
+
+    pub(crate) fn min_heartbeat_freq(mut self, min_heartbeat_freq: impl Into<Option<Duration>>) -> Self {
+        let min_heartbeat_freq = min_heartbeat_freq.into();
+        assert!(self.min_heartbeat_freq.is_none() || min_heartbeat_freq.is_none());
+        self.min_heartbeat_freq = min_heartbeat_freq;
         self
     }
 
@@ -127,6 +165,11 @@ impl TestClientBuilder {
             options.sdam_event_handler = Some(handler);
         }
 
+        if let Some(freq) = self.min_heartbeat_freq {
+            options.test_options_mut().min_heartbeat_freq = Some(freq);
+        }
+
+        #[cfg(feature = "csfle")]
         let client = match self.encrypted {
             None => Client::with_options(options).unwrap(),
             Some(eo) => {
@@ -134,8 +177,14 @@ impl TestClientBuilder {
                 (eo.builder_options)(builder).build().await.unwrap()
             }
         };
+        #[cfg(not(feature = "csfle"))]
+        let client = Client::with_options(options).unwrap();
 
         TestClient::from_client(client).await
+    }
+
+    pub(crate) fn handler(&self) -> Option<&Arc<EventHandler>> {
+        self.handler.as_ref()
     }
 }
 
@@ -208,8 +257,11 @@ impl TestClient {
     }
 
     pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
-        let options = Self::options_for_multiple_mongoses(options, false).await;
-        Self::with_options(Some(options)).await
+        Client::test_builder()
+            .additional_options(options, false)
+            .await
+            .build()
+            .await
     }
 
     pub(crate) async fn create_user(

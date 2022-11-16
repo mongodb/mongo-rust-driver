@@ -11,7 +11,7 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use tokio::sync::{broadcast::error::SendError, RwLockReadGuard};
 
-use super::{subscriber::EventSubscriber, TestClient};
+use super::{subscriber::EventSubscriber, TestClient, TestClientBuilder};
 use crate::{
     bson::{doc, to_document, Document},
     event::{
@@ -52,7 +52,7 @@ use crate::{
     },
     options::ClientOptions,
     runtime,
-    test::{spec::ExpectedEventType, LOCK},
+    test::{spec::ExpectedEventType, LOCK}, Client,
 };
 
 pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
@@ -537,6 +537,32 @@ impl std::ops::DerefMut for EventClient {
     }
 }
 
+impl TestClientBuilder {
+    pub(crate) fn event_client(self) -> EventClientBuilder {
+        EventClientBuilder { inner: self }
+    }
+}
+
+pub(crate) struct EventClientBuilder {
+    inner: TestClientBuilder,
+}
+
+impl EventClientBuilder {
+    pub(crate) async fn build(self) -> EventClient {
+        let mut inner = self.inner;
+        if inner.handler.is_none() {
+            inner = inner.event_handler(Arc::new(EventHandler::new()));
+        }
+        let handler = inner.handler().unwrap().clone();
+        let client = inner.build().await;
+
+        // clear events from commands used to set up client.
+        handler.command_events.write().unwrap().clear();
+
+        EventClient { client, handler }
+    }
+}
+
 impl EventClient {
     pub(crate) async fn new() -> Self {
         EventClient::with_options(None).await
@@ -546,13 +572,12 @@ impl EventClient {
         options: impl Into<Option<ClientOptions>>,
         handler: impl Into<Option<EventHandler>>,
     ) -> Self {
-        let handler = Arc::new(handler.into().unwrap_or_else(EventHandler::new));
-        let client = TestClient::with_handler(Some(handler.clone()), options).await;
-
-        // clear events from commands used to set up client.
-        handler.command_events.write().unwrap().clear();
-
-        Self { client, handler }
+        Client::test_builder()
+            .options(options)
+            .event_handler(handler.into().map(Arc::new))
+            .event_client()
+            .build()
+            .await
     }
 
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
@@ -565,13 +590,14 @@ impl EventClient {
         use_multiple_mongoses: Option<bool>,
         event_handler: impl Into<Option<EventHandler>>,
     ) -> Self {
-        let mut options = TestClient::options_for_multiple_mongoses(
-            options.into(),
-            use_multiple_mongoses.unwrap_or(false),
-        )
-        .await;
-        options.test_options_mut().min_heartbeat_freq = min_heartbeat_freq;
-        EventClient::with_options_and_handler(options, event_handler).await
+        Client::test_builder()
+            .additional_options(options, use_multiple_mongoses.unwrap_or(false))
+            .await
+            .min_heartbeat_freq(min_heartbeat_freq)
+            .event_handler(event_handler.into().map(Arc::new))
+            .event_client()
+            .build()
+            .await
     }
 
     /// Gets the first started/succeeded pair of events for the given command name, popping off all
