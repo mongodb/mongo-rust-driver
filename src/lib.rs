@@ -351,6 +351,7 @@ pub use crate::{
         Cursor,
     },
     db::Database,
+    gridfs::{GridFsDownloadStream, GridFsBucket, GridFsUploadStream},
 };
 #[cfg(feature = "csfle")]
 pub use crate::client::csfle::client_encryption;

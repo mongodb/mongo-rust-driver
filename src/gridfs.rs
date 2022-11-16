@@ -1,15 +1,11 @@
 // TODO(RUST-1395) Remove these allows.
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, missing_docs)]
 
 mod download;
 pub mod options;
 mod upload;
 
-use core::task::{Context, Poll};
-use std::{
-    pin::Pin,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -17,20 +13,22 @@ use serde_with::skip_serializing_none;
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     cursor::Cursor,
-    error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
+    error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
     options::{CollectionOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
     Collection,
     Database,
 };
 
-use options::*;
+pub use download::GridFsDownloadStream;
+pub use options::*;
+pub use upload::GridFsUploadStream;
 
 pub const DEFAULT_BUCKET_NAME: &str = "fs";
 pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
 // Contained in a "chunks" collection for each user file
 #[derive(Debug, Deserialize, Serialize)]
-struct Chunk<'a> {
+pub(crate) struct Chunk<'a> {
     #[serde(rename = "_id")]
     id: ObjectId,
     files_id: Bson,
@@ -95,70 +93,6 @@ struct GridFsBucketInner {
 #[derive(Debug, Clone)]
 pub struct GridFsBucket {
     inner: Arc<GridFsBucketInner>,
-}
-
-// TODO: RUST-1395 Add documentation and example code for this struct.
-pub struct GridFsUploadStream {
-    files_id: Bson,
-}
-
-impl GridFsUploadStream {
-    /// Gets the file `id` for the stream.
-    pub fn files_id(&self) -> &Bson {
-        &self.files_id
-    }
-
-    /// Consumes the stream and uploads data in the stream to the server.
-    pub async fn finish(self) {
-        todo!()
-    }
-
-    /// Aborts the upload and discards the upload stream.
-    pub async fn abort(self) {
-        todo!()
-    }
-}
-
-impl tokio::io::AsyncWrite for GridFsUploadStream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<tokio::io::Result<usize>> {
-        todo!()
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
-        todo!()
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
-        todo!()
-    }
-}
-
-impl futures_util::AsyncWrite for GridFsUploadStream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<core::result::Result<usize, futures_util::io::Error>> {
-        todo!()
-    }
-
-    fn poll_flush(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<core::result::Result<(), futures_util::io::Error>> {
-        todo!()
-    }
-
-    fn poll_close(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<core::result::Result<(), futures_util::io::Error>> {
-        todo!()
-    }
 }
 
 impl GridFsBucket {
@@ -232,39 +166,13 @@ impl GridFsBucket {
     }
 
     /// Gets a handle to the files collection for the [`GridFsBucket`].
-    fn files(&self) -> &Collection<FilesCollectionDocument> {
+    pub(crate) fn files(&self) -> &Collection<FilesCollectionDocument> {
         &self.inner.files
     }
 
     /// Gets a handle to the chunks collection for the [`GridFsBucket`].
-    fn chunks(&self) -> &Collection<Chunk<'static>> {
+    pub(crate) fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
-    }
-
-    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
-    /// The application provides a custom file id.
-    ///
-    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
-    pub async fn open_upload_stream_with_id(
-        &self,
-        id: Bson,
-        filename: String,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
-        todo!()
-    }
-
-    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
-    /// The driver generates a unique [`Bson::ObjectId`] for the file id.
-    ///
-    /// Returns a [`GridFsUploadStream`] to which the application will write the contents.
-    pub async fn open_upload_stream(
-        &self,
-        filename: String,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<GridFsUploadStream> {
-        self.open_upload_stream_with_id(Bson::ObjectId(ObjectId::new()), filename, options)
-            .await
     }
 
     /// Deletes the [`FilesCollectionDocument`] with the given `id `and its associated chunks from
@@ -320,5 +228,11 @@ impl GridFsBucket {
         self.chunks().drop(None).await?;
 
         Ok(())
+    }
+}
+
+impl Error {
+    fn into_futures_io_error(self) -> futures_io::Error {
+        futures_io::Error::new(futures_io::ErrorKind::Other, self)
     }
 }

@@ -33,7 +33,7 @@ pub struct GridFsBucketOptions {
 /// [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsUploadOptions {
     /// The number of bytes per chunk of this file. Defaults to the `chunk_size_bytes` specified
@@ -47,7 +47,7 @@ pub struct GridFsUploadOptions {
 /// Contains the options for creating a [`GridFsDownloadStream`] to retrieve a stored file
 /// from a [`GridFsBucket`].
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsDownloadByNameOptions {
     /// Which revision (documents with the same filename and different `upload_date`)
@@ -65,7 +65,7 @@ pub struct GridFsDownloadByNameOptions {
 
 /// Contains the options for performing a find operation on a files collection.  
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsFindOptions {
     /// Enables writing to temporary files on the server. When set to true, the

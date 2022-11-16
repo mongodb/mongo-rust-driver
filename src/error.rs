@@ -815,6 +815,9 @@ pub enum GridFsErrorKind {
     #[non_exhaustive]
     MissingChunk { n: u32 },
 
+    /// An operation was attempted on a `GridFsUploadStream` that has already been shut down.
+    UploadStreamClosed,
+
     /// The chunk was the incorrect size.
     #[non_exhaustive]
     WrongSizeChunk {
@@ -828,6 +831,21 @@ pub enum GridFsErrorKind {
         actual_number: u32,
         expected_number: u32,
     },
+
+    /// An error occurred when aborting a file upload.
+    #[non_exhaustive]
+    AbortError {
+        /// The original error. Only present if the abort occurred because of an error during a
+        /// GridFS operation.
+        original_error: Option<Error>,
+
+        /// The error that occurred when attempting to remove any orphaned chunks.
+        delete_error: Error,
+    },
+
+    /// A close operation was attempted on a [`GridFsUploadStream`] while a write was still in
+    /// progress.
+    WriteInProgress,
 }
 
 /// An identifier for a file stored in a GridFS bucket.
