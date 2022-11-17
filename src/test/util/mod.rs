@@ -95,7 +95,7 @@ pub(crate) struct TestClientBuilder {
 struct EncryptedOptions {
     key_vault_namespace: crate::Namespace,
     kms_providers: KmsProviderList,
-    builder_options: Box<dyn FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder>,
+    builder_options: Box<dyn FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder + Send>,
 }
 
 impl TestClientBuilder {
@@ -135,7 +135,7 @@ impl TestClientBuilder {
                 Option<crate::client::options::TlsOptions>,
             ),
         >,
-        builder_options: impl FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder,
+        builder_options: impl FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder + Send + 'static,
     ) -> Self {
         assert!(self.encrypted.is_none());
         self.encrypted = Some(EncryptedOptions {

@@ -162,13 +162,12 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
         if additional_options.heartbeat_freq.is_none() {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
         }
-        #[allow(unused_mut)]
-        let mut builder = Client::test_builder()
+        let builder = Client::test_builder()
             .additional_options(additional_options, test.use_multiple_mongoses.unwrap_or(false))
             .await
             .min_heartbeat_freq(Some(Duration::from_millis(50)));
         #[cfg(feature = "csfle")]
-        csfle::set_auto_enc(&mut builder, &test);
+        let builder = csfle::set_auto_enc(builder, &test);
         let client = builder
             .event_client()
             .build()
@@ -399,7 +398,13 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(outcome) = test.outcome {
-            assert!(outcome.matches_actual(db_name, coll_name, &client).await);
+            assert!(outcome.matches_actual(
+                db_name,
+                coll_name,
+                &client,
+                #[cfg(feature = "csfle")]
+                &internal_client,
+            ).await);
         }
     }
 }

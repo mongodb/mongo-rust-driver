@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::merge_uri_options, EventClient, FailPoint, Serverless, TestClient, DEFAULT_URI},
+    test::{spec::merge_uri_options, FailPoint, Serverless, TestClient, DEFAULT_URI}, Client,
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -135,11 +135,19 @@ impl Outcome {
         self,
         db_name: String,
         coll_name: String,
-        client: &EventClient,
+        client: &Client,
+        #[cfg(feature = "csfle")]
+        internal_client: &Client,
     ) -> bool {
         let coll_name = match self.collection.name {
             Some(name) => name,
             None => coll_name,
+        };
+        #[cfg(feature = "csfle")]
+        let client = if coll_name == "collection" {
+            internal_client
+        } else {
+            client
         };
         let coll = client.database(&db_name).collection(&coll_name);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
