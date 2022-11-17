@@ -23,8 +23,11 @@ pub(crate) struct TestFile {
     #[allow(unused)]
     pub(crate) bucket_name: Option<String>,
     pub(crate) data: Option<TestData>,
+    #[cfg(feature = "csfle")]
     pub(crate) json_schema: Option<Document>,
+    #[cfg(feature = "csfle")]
     pub(crate) encrypted_fields: Option<Document>,
+    #[cfg(feature = "csfle")]
     pub(crate) key_vault_data: Option<Vec<Document>>,
     pub(crate) tests: Vec<Test>,
 }
@@ -92,20 +95,23 @@ pub(crate) struct Test {
 #[derive(Debug)]
 pub(crate) struct ClientOptions {
     pub(crate) uri: String,
-    pub(crate) auto_encrypt_opts: Option<Document>,
+    #[cfg(feature = "csfle")]
+    pub(crate) auto_encrypt_opts: Option<super::csfle::AutoEncryptOpts>,
 }
 
 impl<'de> Deserialize<'de> for ClientOptions {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de> {
+        #[cfg(feature = "csfle")]
         use serde::de::Error;
+        #[allow(unused_mut)]
         let mut uri_options = Document::deserialize(deserializer)?;
-        let auto_encrypt_opts = match uri_options.remove("autoEncryptOpts") {
-            None => None,
-            Some(bson::Bson::Document(d)) => Some(d),
-            _ => return Err(D::Error::custom("invalid autoEncryptOpts value")),
-        };
+        #[cfg(feature = "csfle")]
+        let auto_encrypt_opts = uri_options.remove("autoEncryptOpts")
+            .map(bson::from_bson)
+            .transpose()
+            .map_err(D::Error::custom)?;
         let uri = merge_uri_options(
             &DEFAULT_URI,
             Some(&uri_options),
@@ -113,6 +119,7 @@ impl<'de> Deserialize<'de> for ClientOptions {
         );
         Ok(Self {
             uri,
+            #[cfg(feature = "csfle")]
             auto_encrypt_opts,
         })
     }

@@ -1,6 +1,8 @@
 pub(crate) mod operation;
 pub(crate) mod test_event;
 pub(crate) mod test_file;
+#[cfg(feature = "csfle")]
+mod csfle;
 
 use std::{ops::Deref, sync::Arc, time::Duration};
 
@@ -8,7 +10,7 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
-    coll::options::{DistinctOptions, DropCollectionOptions, CollectionOptions},
+    coll::options::{DistinctOptions, DropCollectionOptions},
     concern::{Acknowledgment, WriteConcern},
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
     runtime,
@@ -22,7 +24,7 @@ use crate::{
         TestClient,
         CLIENT_OPTIONS,
         SERVERLESS,
-    },
+    }, Client,
 };
 
 use operation::{OperationObject, OperationResult};
@@ -88,11 +90,8 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             }
         }
 
-        if let Some(kv_data) = &test_file.key_vault_data {
-            let datakeys = internal_client.database("keyvault").collection_with_options::<bson::Document>("datakeys", CollectionOptions::builder().write_concern(WriteConcern::MAJORITY).build());
-            datakeys.drop(None).await.unwrap();
-            datakeys.insert_many(kv_data, None).await.unwrap();
-        }
+        #[cfg(feature = "csfle")]
+        csfle::populate_key_vault(&internal_client, test_file.key_vault_data.as_ref()).await;
 
         let db_name = test_file
             .database_name
@@ -104,6 +103,7 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             .unwrap_or_else(|| get_default_name(&test.description));
 
         let coll = internal_client.database(&db_name).collection(&coll_name);
+        #[allow(unused_mut)]
         let mut options = DropCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
@@ -119,15 +119,19 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
             coll.drop(options).await.unwrap();
         }
 
+        #[allow(unused_mut)]
         let mut options = CreateCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
-        if let Some(schema) = &test_file.json_schema {
-            options.validator = Some(doc! { "$jsonSchema": schema });
-        }
         #[cfg(feature = "csfle")]
-        if let Some(enc_fields) = &test_file.encrypted_fields {
-            options.encrypted_fields = Some(enc_fields.clone());
+        {
+            if let Some(schema) = &test_file.json_schema {
+                options.validator = Some(doc! { "$jsonSchema": schema });
+            }
+            if let Some(enc_fields) = &test_file.encrypted_fields {
+                options.encrypted_fields = Some(enc_fields.clone());
+            }
+    
         }
         internal_client
             .database(&db_name)
@@ -158,13 +162,17 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
         if additional_options.heartbeat_freq.is_none() {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
         }
-        let client = EventClient::with_additional_options(
-            additional_options,
-            Some(Duration::from_millis(50)),
-            test.use_multiple_mongoses,
-            None,
-        )
-        .await;
+        #[allow(unused_mut)]
+        let mut builder = Client::test_builder()
+            .additional_options(additional_options, test.use_multiple_mongoses.unwrap_or(false))
+            .await
+            .min_heartbeat_freq(Some(Duration::from_millis(50)));
+        #[cfg(feature = "csfle")]
+        csfle::set_auto_enc(&mut builder, &test);
+        let client = builder
+            .event_client()
+            .build()
+            .await;
 
         // TODO RUST-900: Remove this extraneous call.
         if internal_client.is_sharded()
