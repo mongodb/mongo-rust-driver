@@ -1,5 +1,7 @@
 use std::{any::Any, fmt::Debug, time::Duration};
 
+use bson::spec::ElementType;
+
 use crate::{
     bson::{Bson, Document},
     bson_util,
@@ -53,6 +55,45 @@ pub fn eq_matches<T: PartialEq + Debug>(
     Ok(())
 }
 
+pub(crate) fn is_expected_type(expected: &Bson) -> Option<Vec<ElementType>> {
+    let d = if let Some(d) = expected.as_document() { d } else { return None; };
+    if d.len() != 1 {
+        return None;
+    }
+    match d.get("$$type") {
+        Some(Bson::String(s)) => Some(vec![type_from_name(s)]),
+        Some(Bson::Array(arr)) => Some(arr.iter().filter_map(|bs| bs.as_str().map(type_from_name)).collect()),
+        _ => None,
+    }
+}
+
+fn type_from_name(name: &str) -> ElementType {
+    match name {
+        "double" => ElementType::Double,
+        "string" => ElementType::String,
+        "object" => ElementType::EmbeddedDocument,
+        "array" => ElementType::Array,
+        "binData" => ElementType::Binary,
+        "undefined" => ElementType::Undefined,
+        "objectId" => ElementType::ObjectId,
+        "bool" => ElementType::Boolean,
+        "date" => ElementType::DateTime,
+        "null" => ElementType::Null,
+        "regex" => ElementType::RegularExpression,
+        "dbPointer" => ElementType::DbPointer,
+        "javascript" => ElementType::JavaScriptCode,
+        "symbol" => ElementType::Symbol,
+        "javascriptWithScope" => ElementType::JavaScriptCodeWithScope,
+        "int" => ElementType::Int32,
+        "timestamp" => ElementType::Timestamp,
+        "long" => ElementType::Int64,
+        "decimal" => ElementType::Decimal128,
+        "minKey" => ElementType::MinKey,
+        "maxKey" => ElementType::MaxKey,
+        _ => panic!("invalid type name {:?}", name),
+    }
+}
+
 impl Matchable for Bson {
     fn is_placeholder(&self) -> bool {
         if let Bson::String(string) = self {
@@ -63,6 +104,13 @@ impl Matchable for Bson {
     }
 
     fn content_matches(&self, expected: &Bson) -> Result<(), String> {
+        if let Some(types) = is_expected_type(expected) {
+            if types.contains(&self.element_type()) {
+                return Ok(());
+            } else {
+                return Err(format!("expected type {:?}, actual value {:?}", types, self));
+            }
+        }
         match (self, expected) {
             (Bson::Document(actual_doc), Bson::Document(expected_doc)) => {
                 actual_doc.matches(expected_doc)

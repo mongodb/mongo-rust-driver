@@ -3,7 +3,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, Document},
-    test::{log_uncaptured, run_spec_test, TestClient, LOCK},
+    test::{log_uncaptured, TestClient, LOCK},
     Collection,
 };
 
@@ -14,7 +14,7 @@ use super::{run_spec_test_with_path, run_unified_format_test, run_v2_test};
 async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    run_spec_test(&["transactions", "legacy"], run_v2_test).await;
+    run_spec_test_with_path(&["transactions", "legacy"], run_v2_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]

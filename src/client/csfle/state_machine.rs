@@ -19,7 +19,7 @@ use crate::{
     operation::{RawOutput, RunCommand},
     runtime::{AsyncStream, Process, TlsConfig},
     Client,
-    Namespace,
+    Namespace, coll::options::FindOptions, options::ReadConcern,
 };
 
 use super::options::KmsProvidersTlsOptions;
@@ -152,7 +152,7 @@ impl CryptExecutor {
                     let kv_coll = kv_client
                         .database(&kv_ns.db)
                         .collection::<RawDocumentBuf>(&kv_ns.coll);
-                    let mut cursor = kv_coll.find(filter, None).await?;
+                    let mut cursor = kv_coll.find(filter, FindOptions::builder().read_concern(ReadConcern::MAJORITY).build()).await?;
                     while cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;
                     }

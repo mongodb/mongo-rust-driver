@@ -12,7 +12,7 @@ use futures::future::FutureExt;
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{log_uncaptured, run_single_test, LOCK};
+use crate::test::{run_single_test, LOCK, file_level_log};
 
 pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
@@ -36,10 +36,6 @@ use super::run_spec_test_with_path;
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
 static MAX_SPEC_VERSION: Version = Version::new(1, 13, 0);
-
-fn file_level_log(message: impl AsRef<str>) {
-    log_uncaptured(format!("\n------------\n{}\n", message.as_ref()));
-}
 
 pub(crate) async fn run_unified_format_test(path: PathBuf, test_file: TestFile) {
     run_unified_format_test_filtered(path, test_file, |_| true).await

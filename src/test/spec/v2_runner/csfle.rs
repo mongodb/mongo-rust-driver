@@ -36,7 +36,7 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
     let mut kms_providers = vec![];
     for (prov, opts) in &enc_opts.kms_providers {
         // dbg! handle awsTemporary / awsTemporaryNoSessionToken
-        let (opts, tls) = if [KmsProvider::Aws].contains(prov) {
+        let (opts, tls) = if [KmsProvider::Aws, KmsProvider::Azure, KmsProvider::Gcp, KmsProvider::Kmip].contains(prov) {
             KMS_PROVIDERS_MAP.get(prov).unwrap().clone()
         } else {
             (opts.clone(), None)

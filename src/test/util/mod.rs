@@ -10,7 +10,7 @@ pub(crate) use self::{
     event::{Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
-    matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
+    matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
     subscriber::EventSubscriber,
 };
 
@@ -603,4 +603,8 @@ pub(crate) fn log_uncaptured<S: AsRef<str>>(text: S) {
     let mut stderr = std::io::stderr();
     stderr.write_all(text.as_ref().as_bytes()).unwrap();
     stderr.write_all(b"\n").unwrap();
+}
+
+pub(crate) fn file_level_log(message: impl AsRef<str>) {
+    log_uncaptured(format!("\n------------\n{}\n", message.as_ref()));
 }

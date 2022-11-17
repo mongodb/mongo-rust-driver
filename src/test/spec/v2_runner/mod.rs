@@ -23,7 +23,7 @@ use crate::{
         EventClient,
         TestClient,
         CLIENT_OPTIONS,
-        SERVERLESS,
+        SERVERLESS, file_level_log,
     }, Client,
 };
 
@@ -41,8 +41,17 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "mapReduce",
 ];
 
-pub(crate) async fn run_v2_test(test_file: TestFile) {
+pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     let internal_client = TestClient::new().await;
+
+    file_level_log(format!(
+        "Running tests from {}",
+        path.display(),
+    ));
+    #[cfg(not(feature = "csfle"))]
+    let is_csfle_test = false;
+    #[cfg(feature = "csfle")]
+    let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
     if let Some(requirements) = test_file.run_on {
         let can_run_on = requirements
@@ -367,6 +376,10 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
                                 .iter()
                                 .for_each(|label| assert!(!labels.contains(label)));
                         }
+                        #[cfg(feature = "csfle")]
+                        if let Some(t) = operation_error.is_timeout_error {
+                            assert_eq!(t, error.is_network_timeout() || error.is_non_timeout_network_error())
+                        }
                     }
                 }
             }
@@ -389,22 +402,21 @@ pub(crate) async fn run_v2_test(test_file: TestFile) {
 
             assert!(events.len() >= expectations.len(), "{}", test.description);
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
-                assert!(actual_event.matches_expected(
+                let result = actual_event.matches_expected(
                     expected_event,
                     &session0_lsid,
                     &session1_lsid
-                ));
+                );
+                assert!(result.is_ok(), "[{}] {}", test.description, result.unwrap_err());
             }
         }
 
         if let Some(outcome) = test.outcome {
-            assert!(outcome.matches_actual(
+            outcome.assert_matches_actual(
                 db_name,
                 coll_name,
-                &client,
-                #[cfg(feature = "csfle")]
-                &internal_client,
-            ).await);
+                if is_csfle_test { &internal_client } else { &client },
+            ).await;
         }
     }
 }

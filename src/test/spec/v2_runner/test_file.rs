@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bson::{doc, from_document};
+use bson::{doc, from_document, Bson};
 use futures::TryStreamExt;
 use semver::VersionReq;
 use serde::{Deserialize, Deserializer};
@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::merge_uri_options, FailPoint, Serverless, TestClient, DEFAULT_URI}, Client,
+    test::{spec::merge_uri_options, FailPoint, Serverless, TestClient, DEFAULT_URI, util::is_expected_type}, Client,
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -131,25 +131,23 @@ pub(crate) struct Outcome {
 }
 
 impl Outcome {
-    pub(crate) async fn matches_actual(
+    pub(crate) async fn assert_matches_actual(
         self,
         db_name: String,
         coll_name: String,
         client: &Client,
-        #[cfg(feature = "csfle")]
-        internal_client: &Client,
-    ) -> bool {
+    ) {
+        use crate::coll::options::CollectionOptions;
+
         let coll_name = match self.collection.name {
             Some(name) => name,
             None => coll_name,
         };
+        #[cfg(not(feature = "csfle"))]
+        let coll_opts = CollectionOptions::default();
         #[cfg(feature = "csfle")]
-        let client = if coll_name == "collection" {
-            internal_client
-        } else {
-            client
-        };
-        let coll = client.database(&db_name).collection(&coll_name);
+        let coll_opts = CollectionOptions::builder().read_concern(crate::options::ReadConcern::LOCAL).build();
+        let coll = client.database(&db_name).collection_with_options(&coll_name, coll_opts);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         let options = FindOptions::builder()
             .sort(doc! { "_id": 1 })
@@ -162,7 +160,32 @@ impl Outcome {
             .try_collect()
             .await
             .unwrap();
-        actual_data == self.collection.data
+        assert_data_matches(&actual_data, &self.collection.data);
+    }
+}
+
+fn assert_data_matches(actual: &[Document], expected: &[Document]) {
+    assert_eq!(actual.len(), expected.len(), "data length mismatch, expected {:?}, got {:?}", expected, actual);
+    for (a, e) in actual.iter().zip(expected.iter()) {
+        assert_doc_matches(a, e);
+    }
+}
+
+fn assert_doc_matches(actual: &Document, expected: &Document) {
+    assert_eq!(actual.len(), expected.len(), "doc length mismatch, expected {:?}, got {:?}", expected, actual);
+    for (k, expected_val) in expected {
+        let actual_val = if let Some(v) = actual.get(k) { v } else { panic!("no value for {:?}, expected {:?}", k, expected_val); };
+        if let Some(types) = is_expected_type(expected_val) {
+            if types.contains(&actual_val.element_type()) {
+                continue;
+            } else {
+                panic!("expected type {:?}, actual value {:?}", types, actual_val);
+            }
+        }
+        match (expected_val, actual_val) {
+            (Bson::Document(exp_d), Bson::Document(act_d)) => assert_doc_matches(act_d, exp_d),
+            (e, a) => assert_eq!(e, a, "mismatch for {:?}, expected {:?} got {:?}", k, e, a),
+        }
     }
 }
 

@@ -135,8 +135,8 @@ impl TestRunner {
             }
         }
 
-        log_uncaptured(format!(
-            "\n------------\nRunning tests from {}\n",
+        file_level_log(format!(
+            "Running tests from {}",
             file_title
         ));
 
