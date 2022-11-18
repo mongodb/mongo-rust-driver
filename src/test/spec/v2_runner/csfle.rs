@@ -1,4 +1,4 @@
-use bson::Document;
+use bson::{Document, doc};
 use mongocrypt::ctx::KmsProvider;
 
 use crate::{test::{util::TestClientBuilder, KMS_PROVIDERS_MAP}, Client, coll::options::CollectionOptions, options::WriteConcern};
@@ -21,12 +21,38 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
     } else {
         return builder;
     };
-    // dbg! handle awsTemporary / awsTemporaryNoSessionToken
+    let kms_providers = &mut enc_opts.kms_providers;
     for prov in [KmsProvider::Aws, KmsProvider::Azure, KmsProvider::Gcp, KmsProvider::Kmip] {
-        if enc_opts.kms_providers.credentials().contains_key(&prov) {
+        if kms_providers.credentials().contains_key(&prov) {
             let opts = KMS_PROVIDERS_MAP.get(&prov).unwrap().clone();
-            enc_opts.kms_providers.set(prov, opts.0, opts.1);
+            kms_providers.set(prov, opts.0, opts.1);
         }
+    }
+    let aws_tls = KMS_PROVIDERS_MAP.get(&KmsProvider::Aws).and_then(|(_, t)| t.as_ref());
+    let aws_id = std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").ok();
+    let aws_key = std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").ok();
+    let aws_token = std::env::var("CSFLE_AWS_TEMP_SESSION_TOKEN").ok();
+    if kms_providers.credentials().contains_key(&KmsProvider::Other("awsTemporary".to_string())) {
+        kms_providers.set(
+            KmsProvider::Aws,
+            doc! {
+                "accessKeyId": aws_id.unwrap(),
+                "secretAccessKey": aws_key.unwrap(),
+                "sessionToken": aws_token.unwrap(),
+            },
+            aws_tls.cloned(),
+        );
+        kms_providers.clear(&KmsProvider::Other("awsTemporary".to_string()));
+    } else if kms_providers.credentials().contains_key(&KmsProvider::Other("awsTemporaryNoSessionToken".to_string())) {
+        kms_providers.set(
+            KmsProvider::Aws,
+            doc! {
+                "accessKeyId": aws_id.unwrap(),
+                "secretAccessKey": aws_key.unwrap(),
+            },
+            aws_tls.cloned(),
+        );
+        kms_providers.clear(&KmsProvider::Other("awsTemporaryNoSessionToken".to_string()));
     }
     builder.encrypted_options(enc_opts)
 }

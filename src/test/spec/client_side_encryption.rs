@@ -35,15 +35,6 @@ async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     run_spec_test_with_path(&["client-side-encryption", "legacy"], |path, test| async {
-        /*
-        if !path.ends_with("fle2-BypassQueryAnalysis.json") {
-            return;
-        }
-        */
-        if path.ends_with("awsTemporary.json") {
-            dbg!("skip");
-            return;
-        }
         if path.ends_with("client-side-encryption/legacy/timeoutMS.json") {
             log_uncaptured(format!("Skipping {}: requires client side operations timeout", path.display()));
             return;

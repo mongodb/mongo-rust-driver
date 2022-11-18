@@ -136,6 +136,14 @@ impl KmsProviders {
             self.tls_options.get_or_insert_with(KmsProvidersTlsOptions::new).insert(provider, tls);
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn clear(&mut self, provider: &KmsProvider) {
+        self.credentials.remove(provider);
+        if let Some(tls_opts) = &mut self.tls_options {
+            tls_opts.remove(provider);
+        }
+    }
 }
 
 impl AutoEncryptionOptions {
