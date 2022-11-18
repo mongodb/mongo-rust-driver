@@ -265,7 +265,7 @@ pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(
     let result = actual.matches(expected);
     assert!(
         result.is_ok(),
-        "{}\n{:#?}\n did not MATCH \n{:#?}\n MATCH failure: {}",
+        "[{}] actual\n{:#?}\n did not MATCH expected\n{:#?}\n MATCH failure: {}",
         description.unwrap_or(""),
         actual,
         expected,

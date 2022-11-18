@@ -97,9 +97,12 @@ impl ClientState {
     }
 
     fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
-        let mut builder = Crypt::builder().kms_providers(&opts.kms_providers.credentials()?)?;
+        let mut builder = Crypt::builder().kms_providers(&opts.kms_providers.credentials_doc()?)?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
+        }
+        if let Some(m) = &opts.encrypted_fields_map {
+            builder = builder.encrypted_field_config_map(&bson::to_document(m)?)?;
         }
         #[cfg(not(test))]
         let disable_crypt_shared = false;

@@ -31,10 +31,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 #[cfg(feature = "csfle")]
-use crate::{
-    client::EncryptedClientBuilder,
-    test::KmsProviderList,
-};
+use crate::client::EncryptedClientBuilder;
 use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -88,14 +85,7 @@ pub(crate) struct TestClientBuilder {
     handler: Option<Arc<EventHandler>>,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "csfle")]
-    encrypted: Option<EncryptedOptions>,
-}
-
-#[cfg(feature = "csfle")]
-struct EncryptedOptions {
-    key_vault_namespace: crate::Namespace,
-    kms_providers: KmsProviderList,
-    builder_options: Box<dyn FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder + Send>,
+    encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
 }
 
 impl TestClientBuilder {
@@ -127,22 +117,10 @@ impl TestClientBuilder {
     #[cfg(feature = "csfle")]
     pub(crate) fn encrypted_options(
         mut self,
-        key_vault_namespace: crate::Namespace,
-        kms_providers: impl IntoIterator<
-            Item = (
-                mongocrypt::ctx::KmsProvider,
-                bson::Document,
-                Option<crate::client::options::TlsOptions>,
-            ),
-        >,
-        builder_options: impl FnOnce(EncryptedClientBuilder) -> EncryptedClientBuilder + Send + 'static,
+        encrypted: crate::client::csfle::options::AutoEncryptionOptions,
     ) -> Self {
         assert!(self.encrypted.is_none());
-        self.encrypted = Some(EncryptedOptions {
-            key_vault_namespace,
-            kms_providers: kms_providers.into_iter().collect(),
-            builder_options: Box::new(builder_options),
-        });
+        self.encrypted = Some(encrypted);
         self
     }
 
@@ -172,9 +150,8 @@ impl TestClientBuilder {
         #[cfg(feature = "csfle")]
         let client = match self.encrypted {
             None => Client::with_options(options).unwrap(),
-            Some(eo) => {
-                let builder = Client::encrypted_builder(options, eo.key_vault_namespace, eo.kms_providers).unwrap();
-                (eo.builder_options)(builder).build().await.unwrap()
+            Some(aeo) => {
+                EncryptedClientBuilder::new(options, aeo).build().await.unwrap()
             }
         };
         #[cfg(not(feature = "csfle"))]

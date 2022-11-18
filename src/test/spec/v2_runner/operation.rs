@@ -32,7 +32,7 @@ use crate::{
         ReplaceOptions,
         TransactionOptions,
         UpdateModifications,
-        UpdateOptions,
+        UpdateOptions, ReadConcern,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{FailPoint, TestClient},
@@ -1214,11 +1214,12 @@ impl TestOperation for AssertCollectionExists {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let collections = client
-                .database(&self.database)
+                .database_with_options(&self.database, DatabaseOptions::builder().read_concern(ReadConcern::MAJORITY).build())
+                //.database(&self.database)
                 .list_collection_names(None)
                 .await
                 .unwrap();
-            assert!(collections.contains(&self.collection));
+            assert!(collections.contains(&self.collection), "Collection {}.{} should exist, but does not (collections: {:?}).", self.database, self.collection, collections);
             Ok(None)
         }
         .boxed()

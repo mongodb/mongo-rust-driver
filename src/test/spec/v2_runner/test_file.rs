@@ -96,7 +96,7 @@ pub(crate) struct Test {
 pub(crate) struct ClientOptions {
     pub(crate) uri: String,
     #[cfg(feature = "csfle")]
-    pub(crate) auto_encrypt_opts: Option<super::csfle::AutoEncryptOpts>,
+    pub(crate) auto_encrypt_opts: Option<crate::client::csfle::options::AutoEncryptionOptions>,
 }
 
 impl<'de> Deserialize<'de> for ClientOptions {

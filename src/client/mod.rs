@@ -180,8 +180,10 @@ impl Client {
     ) -> Result<EncryptedClientBuilder> {
         Ok(EncryptedClientBuilder::new(
             client_options,
-            key_vault_namespace,
-            csfle::options::KmsProviders::new(kms_providers)?,
+            csfle::options::AutoEncryptionOptions::new(
+                key_vault_namespace,
+                csfle::options::KmsProviders::new(kms_providers)?,
+            ),
         ))
     }
 

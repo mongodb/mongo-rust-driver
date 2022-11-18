@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bson::Array;
 use mongocrypt::ctx::KmsProvider;
+use serde::Deserialize;
 
 use crate::{
     bson::{Bson, Document},
@@ -19,13 +20,15 @@ use crate::{
 /// https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list
 /// )). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
 /// AutoEncryptionOpts.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct AutoEncryptionOptions {
     /// Used for data key queries.  Will default to an internal client if not set.
+    #[serde(skip)]
     pub(crate) key_vault_client: Option<crate::Client>,
     /// A collection that contains all data keys used for encryption and decryption (aka the key
     /// vault collection).
+    #[serde(default = "default_key_vault_namespace")]
     pub(crate) key_vault_namespace: Namespace,
     /// Options individual to each KMS provider.
     pub(crate) kms_providers: KmsProviders,
@@ -54,7 +57,12 @@ pub(crate) struct AutoEncryptionOptions {
     pub(crate) bypass_query_analysis: Option<bool>,
     /// Disable loading crypt_shared.
     #[cfg(test)]
+    #[serde(skip)]
     pub(crate) disable_crypt_shared: Option<bool>,
+}
+
+fn default_key_vault_namespace() -> Namespace {
+    Namespace { db: "keyvault".to_string(), coll: "datakeys".to_string() }
 }
 
 impl AutoEncryptionOptions {
@@ -74,9 +82,12 @@ impl AutoEncryptionOptions {
     }
 }
 
+#[derive(Deserialize)]
 #[derive(Debug, Clone)]
 pub(crate) struct KmsProviders {
+    #[serde(flatten)]
     credentials: HashMap<KmsProvider, Document>,
+    #[serde(skip)]
     tls_options: Option<KmsProvidersTlsOptions>,
 }
 
@@ -105,12 +116,25 @@ impl KmsProviders {
         })
     }
 
-    pub(crate) fn credentials(&self) -> Result<Document> {
+    pub(crate) fn credentials_doc(&self) -> Result<Document> {
         Ok(bson::to_document(&self.credentials)?)
     }
 
     pub(crate) fn tls_options(&self) -> &Option<KmsProvidersTlsOptions> {
         &self.tls_options
+    }
+
+    #[cfg(test)]
+    pub(crate) fn credentials(&self) -> &HashMap<KmsProvider, Document> {
+        &self.credentials
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set(&mut self, provider: KmsProvider, creds: Document, tls: Option<TlsOptions>) {
+        self.credentials.insert(provider.clone(), creds);
+        if let Some(tls) = tls {
+            self.tls_options.get_or_insert_with(KmsProvidersTlsOptions::new).insert(provider, tls);
+        }
     }
 }
 

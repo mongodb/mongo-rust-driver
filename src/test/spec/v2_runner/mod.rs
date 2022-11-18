@@ -336,6 +336,10 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                 }
             };
 
+            if operation.error.is_none() && operation.result.is_none() && result.is_err() {
+                log_uncaptured(format!("Ignoring operation error: {}", result.clone().unwrap_err()));
+            }
+
             if let Some(error) = operation.error {
                 assert_eq!(error, result.is_err(), "{}", &test.description);
             }
@@ -400,7 +404,7 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                 .map(Into::into)
                 .collect();
 
-            assert!(events.len() >= expectations.len(), "{}", test.description);
+            assert!(events.len() >= expectations.len(), "[{}] expected events \n{:#?}\n got events\n{:#?}", test.description, expectations, events);
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
                 let result = actual_event.matches_expected(
                     expected_event,

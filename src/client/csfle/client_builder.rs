@@ -1,6 +1,6 @@
-use crate::{bson::Document, error::Result, options::ClientOptions, Client, Namespace};
+use crate::{bson::Document, error::Result, options::ClientOptions, Client};
 
-use super::options::{AutoEncryptionOptions, KmsProviders};
+use super::options::AutoEncryptionOptions;
 
 /// A builder for constructing a `Client` with auto-encryption enabled.
 ///
@@ -33,12 +33,11 @@ pub struct EncryptedClientBuilder {
 impl EncryptedClientBuilder {
     pub(crate) fn new(
         client_options: ClientOptions,
-        key_vault_namespace: Namespace,
-        kms_providers: KmsProviders,
+        enc_opts: AutoEncryptionOptions,
     ) -> Self {
         EncryptedClientBuilder {
             client_options,
-            enc_opts: AutoEncryptionOptions::new(key_vault_namespace, kms_providers),
+            enc_opts,
         }
     }
 
