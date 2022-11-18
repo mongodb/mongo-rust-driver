@@ -40,6 +40,10 @@ async fn run_legacy() {
             return;
         }
         */
+        if path.ends_with("awsTemporary.json") {
+            dbg!("skip");
+            return;
+        }
         if path.ends_with("client-side-encryption/legacy/timeoutMS.json") {
             log_uncaptured(format!("Skipping {}: requires client side operations timeout", path.display()));
             return;
