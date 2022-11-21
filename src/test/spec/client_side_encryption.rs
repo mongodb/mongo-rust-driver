@@ -35,8 +35,13 @@ async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     run_spec_test_with_path(&["client-side-encryption", "legacy"], |path, test| async {
-        if path.ends_with("client-side-encryption/legacy/timeoutMS.json") {
+        if path.ends_with("timeoutMS.json") {
             log_uncaptured(format!("Skipping {}: requires client side operations timeout", path.display()));
+            return;
+        }
+        #[cfg(not(feature = "openssl-tls"))]
+        if path.ends_with("kmipKMS.json") {
+            log_uncaptured(format!("Skipping {}: KMIP requires openssl", path.display()));
             return;
         }
         run_v2_test(path, test).await;
