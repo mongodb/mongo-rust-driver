@@ -303,6 +303,7 @@ impl Database {
             db: self.name().to_string(),
             coll: name.as_ref().to_string(),
         };
+
         #[cfg(feature = "csfle")]
         let has_encrypted_fields = {
             self.resolve_encrypted_fields(&ns, &mut options).await;
