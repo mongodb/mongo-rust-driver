@@ -513,10 +513,14 @@ functions:
           export TLS_FEATURE=${TLS_FEATURE}
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
-          export KMS_PROVIDERS=$(cat << "EOF"
-          ${kms_providers}
-          EOF
-          )
+          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          export AZURE_TENANT_ID=${AZURE_TENANT_ID}
+          export AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+          export AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+          export GCP_EMAIL=${GCP_EMAIL}
+          export GCP_PRIVATE_KEY=${GCP_PRIVATE_KEY}
+          export CSFLE_LOCAL_KEY=${CSFLE_LOCAL_KEY}
           set -o xtrace
 
           .evergreen/run-csfle-tests.sh
