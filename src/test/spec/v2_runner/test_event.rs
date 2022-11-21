@@ -18,10 +18,16 @@ impl CommandStartedEvent {
         session1_lsid: &Document,
     ) -> Result<(), String> {
         if expected.command_name.is_some() && self.command_name != expected.command_name {
-            return Err(format!("command name mismatch, expected {:?} got {:?}", expected.command_name, self.command));
+            return Err(format!(
+                "command name mismatch, expected {:?} got {:?}",
+                expected.command_name, self.command
+            ));
         }
         if expected.database_name.is_some() && self.database_name != expected.database_name {
-            return Err(format!("database name mismatch, expected {:?} got {:?}", expected.database_name, self.database_name));
+            return Err(format!(
+                "database name mismatch, expected {:?} got {:?}",
+                expected.database_name, self.database_name
+            ));
         }
         let mut expected = expected.command.clone();
         if let Some(Bson::String(session)) = expected.remove("lsid") {

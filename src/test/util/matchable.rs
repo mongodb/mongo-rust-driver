@@ -56,13 +56,17 @@ pub fn eq_matches<T: PartialEq + Debug>(
 }
 
 pub(crate) fn is_expected_type(expected: &Bson) -> Option<Vec<ElementType>> {
-    let d = if let Some(d) = expected.as_document() { d } else { return None; };
+    let d = expected.as_document()?;
     if d.len() != 1 {
         return None;
     }
-    match d.get("$$type") {
-        Some(Bson::String(s)) => Some(vec![type_from_name(s)]),
-        Some(Bson::Array(arr)) => Some(arr.iter().filter_map(|bs| bs.as_str().map(type_from_name)).collect()),
+    match d.get("$$type")? {
+        Bson::String(s) => Some(vec![type_from_name(s)]),
+        Bson::Array(arr) => Some(
+            arr.iter()
+                .filter_map(|bs| bs.as_str().map(type_from_name))
+                .collect(),
+        ),
         _ => None,
     }
 }
@@ -108,7 +112,10 @@ impl Matchable for Bson {
             if types.contains(&self.element_type()) {
                 return Ok(());
             } else {
-                return Err(format!("expected type {:?}, actual value {:?}", types, self));
+                return Err(format!(
+                    "expected type {:?}, actual value {:?}",
+                    types, self
+                ));
             }
         }
         match (self, expected) {

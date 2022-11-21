@@ -52,7 +52,8 @@ use crate::{
     },
     options::ClientOptions,
     runtime,
-    test::{spec::ExpectedEventType, LOCK}, Client,
+    test::{spec::ExpectedEventType, LOCK},
+    Client,
 };
 
 pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;

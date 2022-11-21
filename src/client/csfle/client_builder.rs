@@ -31,10 +31,7 @@ pub struct EncryptedClientBuilder {
 }
 
 impl EncryptedClientBuilder {
-    pub(crate) fn new(
-        client_options: ClientOptions,
-        enc_opts: AutoEncryptionOptions,
-    ) -> Self {
+    pub(crate) fn new(client_options: ClientOptions, enc_opts: AutoEncryptionOptions) -> Self {
         EncryptedClientBuilder {
             client_options,
             enc_opts,
@@ -100,8 +97,8 @@ impl EncryptedClientBuilder {
         self
     }
 
-    /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups and/or spawn mongocryptd as part of
-    /// `Client` initialization.
+    /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups and/or spawn
+    /// mongocryptd as part of `Client` initialization.
     pub async fn build(self) -> Result<Client> {
         let client = Client::with_options(self.client_options)?;
         *client.inner.csfle.write().await =

@@ -1,8 +1,8 @@
+#[cfg(feature = "csfle")]
+mod csfle;
 pub(crate) mod operation;
 pub(crate) mod test_event;
 pub(crate) mod test_file;
-#[cfg(feature = "csfle")]
-mod csfle;
 
 use std::{ops::Deref, sync::Arc, time::Duration};
 
@@ -18,13 +18,15 @@ use crate::{
     selection_criteria::SelectionCriteria,
     test::{
         assert_matches,
+        file_level_log,
         log_uncaptured,
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
         CLIENT_OPTIONS,
-        SERVERLESS, file_level_log,
-    }, Client,
+        SERVERLESS,
+    },
+    Client,
 };
 
 use operation::{OperationObject, OperationResult};
@@ -44,10 +46,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     let internal_client = TestClient::new().await;
 
-    file_level_log(format!(
-        "Running tests from {}",
-        path.display(),
-    ));
+    file_level_log(format!("Running tests from {}", path.display(),));
     #[cfg(not(feature = "csfle"))]
     let is_csfle_test = false;
     #[cfg(feature = "csfle")]
@@ -140,7 +139,6 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             if let Some(enc_fields) = &test_file.encrypted_fields {
                 options.encrypted_fields = Some(enc_fields.clone());
             }
-    
         }
         internal_client
             .database(&db_name)
@@ -172,15 +170,15 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
         }
         let builder = Client::test_builder()
-            .additional_options(additional_options, test.use_multiple_mongoses.unwrap_or(false))
+            .additional_options(
+                additional_options,
+                test.use_multiple_mongoses.unwrap_or(false),
+            )
             .await
             .min_heartbeat_freq(Some(Duration::from_millis(50)));
         #[cfg(feature = "csfle")]
         let builder = csfle::set_auto_enc(builder, &test);
-        let client = builder
-            .event_client()
-            .build()
-            .await;
+        let client = builder.event_client().build().await;
 
         // TODO RUST-900: Remove this extraneous call.
         if internal_client.is_sharded()
@@ -337,7 +335,10 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             };
 
             if operation.error.is_none() && operation.result.is_none() && result.is_err() {
-                log_uncaptured(format!("Ignoring operation error: {}", result.clone().unwrap_err()));
+                log_uncaptured(format!(
+                    "Ignoring operation error: {}",
+                    result.clone().unwrap_err()
+                ));
             }
 
             if let Some(error) = operation.error {
@@ -382,7 +383,10 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                         }
                         #[cfg(feature = "csfle")]
                         if let Some(t) = operation_error.is_timeout_error {
-                            assert_eq!(t, error.is_network_timeout() || error.is_non_timeout_network_error())
+                            assert_eq!(
+                                t,
+                                error.is_network_timeout() || error.is_non_timeout_network_error()
+                            )
                         }
                     }
                 }
@@ -404,23 +408,37 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                 .map(Into::into)
                 .collect();
 
-            assert!(events.len() >= expectations.len(), "[{}] expected events \n{:#?}\n got events\n{:#?}", test.description, expectations, events);
+            assert!(
+                events.len() >= expectations.len(),
+                "[{}] expected events \n{:#?}\n got events\n{:#?}",
+                test.description,
+                expectations,
+                events
+            );
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
-                let result = actual_event.matches_expected(
-                    expected_event,
-                    &session0_lsid,
-                    &session1_lsid
+                let result =
+                    actual_event.matches_expected(expected_event, &session0_lsid, &session1_lsid);
+                assert!(
+                    result.is_ok(),
+                    "[{}] {}",
+                    test.description,
+                    result.unwrap_err()
                 );
-                assert!(result.is_ok(), "[{}] {}", test.description, result.unwrap_err());
             }
         }
 
         if let Some(outcome) = test.outcome {
-            outcome.assert_matches_actual(
-                db_name,
-                coll_name,
-                if is_csfle_test { &internal_client } else { &client },
-            ).await;
+            outcome
+                .assert_matches_actual(
+                    db_name,
+                    coll_name,
+                    if is_csfle_test {
+                        &internal_client
+                    } else {
+                        &client
+                    },
+                )
+                .await;
         }
     }
 }

@@ -125,10 +125,12 @@ lazy_static! {
                 },
                 {
                     let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
-                    Some(TlsOptions::builder()
-                        .ca_file_path(cert_dir.join("ca.pem"))
-                        .cert_key_file_path(cert_dir.join("client.pem"))
-                        .build())
+                    Some(
+                        TlsOptions::builder()
+                            .ca_file_path(cert_dir.join("ca.pem"))
+                            .cert_key_file_path(cert_dir.join("client.pem"))
+                            .build(),
+                    )
                 },
             ),
         ]

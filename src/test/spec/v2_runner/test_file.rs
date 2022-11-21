@@ -8,7 +8,15 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::merge_uri_options, FailPoint, Serverless, TestClient, DEFAULT_URI, util::is_expected_type}, Client,
+    test::{
+        spec::merge_uri_options,
+        util::is_expected_type,
+        FailPoint,
+        Serverless,
+        TestClient,
+        DEFAULT_URI,
+    },
+    Client,
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -102,21 +110,19 @@ pub(crate) struct ClientOptions {
 impl<'de> Deserialize<'de> for ClientOptions {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
-        D: Deserializer<'de> {
+        D: Deserializer<'de>,
+    {
         #[cfg(feature = "csfle")]
         use serde::de::Error;
         #[allow(unused_mut)]
         let mut uri_options = Document::deserialize(deserializer)?;
         #[cfg(feature = "csfle")]
-        let auto_encrypt_opts = uri_options.remove("autoEncryptOpts")
+        let auto_encrypt_opts = uri_options
+            .remove("autoEncryptOpts")
             .map(bson::from_bson)
             .transpose()
             .map_err(D::Error::custom)?;
-        let uri = merge_uri_options(
-            &DEFAULT_URI,
-            Some(&uri_options),
-            true,
-        );
+        let uri = merge_uri_options(&DEFAULT_URI, Some(&uri_options), true);
         Ok(Self {
             uri,
             #[cfg(feature = "csfle")]
@@ -146,8 +152,12 @@ impl Outcome {
         #[cfg(not(feature = "csfle"))]
         let coll_opts = CollectionOptions::default();
         #[cfg(feature = "csfle")]
-        let coll_opts = CollectionOptions::builder().read_concern(crate::options::ReadConcern::LOCAL).build();
-        let coll = client.database(&db_name).collection_with_options(&coll_name, coll_opts);
+        let coll_opts = CollectionOptions::builder()
+            .read_concern(crate::options::ReadConcern::LOCAL)
+            .build();
+        let coll = client
+            .database(&db_name)
+            .collection_with_options(&coll_name, coll_opts);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         let options = FindOptions::builder()
             .sort(doc! { "_id": 1 })
@@ -165,16 +175,32 @@ impl Outcome {
 }
 
 fn assert_data_matches(actual: &[Document], expected: &[Document]) {
-    assert_eq!(actual.len(), expected.len(), "data length mismatch, expected {:?}, got {:?}", expected, actual);
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "data length mismatch, expected {:?}, got {:?}",
+        expected,
+        actual
+    );
     for (a, e) in actual.iter().zip(expected.iter()) {
         assert_doc_matches(a, e);
     }
 }
 
 fn assert_doc_matches(actual: &Document, expected: &Document) {
-    assert_eq!(actual.len(), expected.len(), "doc length mismatch, expected {:?}, got {:?}", expected, actual);
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "doc length mismatch, expected {:?}, got {:?}",
+        expected,
+        actual
+    );
     for (k, expected_val) in expected {
-        let actual_val = if let Some(v) = actual.get(k) { v } else { panic!("no value for {:?}, expected {:?}", k, expected_val); };
+        let actual_val = if let Some(v) = actual.get(k) {
+            v
+        } else {
+            panic!("no value for {:?}, expected {:?}", k, expected_val);
+        };
         if let Some(types) = is_expected_type(expected_val) {
             if types.contains(&actual_val.element_type()) {
                 continue;

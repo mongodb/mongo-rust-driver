@@ -62,7 +62,10 @@ pub(crate) struct AutoEncryptionOptions {
 }
 
 fn default_key_vault_namespace() -> Namespace {
-    Namespace { db: "keyvault".to_string(), coll: "datakeys".to_string() }
+    Namespace {
+        db: "keyvault".to_string(),
+        coll: "datakeys".to_string(),
+    }
 }
 
 impl AutoEncryptionOptions {
@@ -82,8 +85,7 @@ impl AutoEncryptionOptions {
     }
 }
 
-#[derive(Deserialize)]
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub(crate) struct KmsProviders {
     #[serde(flatten)]
     credentials: HashMap<KmsProvider, Document>,
@@ -133,7 +135,9 @@ impl KmsProviders {
     pub(crate) fn set(&mut self, provider: KmsProvider, creds: Document, tls: Option<TlsOptions>) {
         self.credentials.insert(provider.clone(), creds);
         if let Some(tls) = tls {
-            self.tls_options.get_or_insert_with(KmsProvidersTlsOptions::new).insert(provider, tls);
+            self.tls_options
+                .get_or_insert_with(KmsProvidersTlsOptions::new)
+                .insert(provider, tls);
         }
     }
 

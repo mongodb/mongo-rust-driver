@@ -105,7 +105,7 @@ where
 {
     let mut json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap())
         .unwrap_or_else(|err| panic!("{}: {}", path.display(), err));
-    
+
     // TODO RUST-??? Remove this when decimal128 support is implemented
     if path.ends_with("client-side-encryption/legacy/types.json") {
         strip_decimal128_test(&mut json);
@@ -122,7 +122,10 @@ where
 }
 
 fn strip_decimal128_test(json: &mut Value) {
-    json["tests"].as_array_mut().unwrap().retain(|test| test["description"] != "type=decimal");
+    json["tests"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|test| test["description"] != "type=decimal");
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

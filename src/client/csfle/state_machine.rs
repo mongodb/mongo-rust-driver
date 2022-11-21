@@ -15,11 +15,13 @@ use tokio::{
 
 use crate::{
     client::{options::ServerAddress, WeakClient},
+    coll::options::FindOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
+    options::ReadConcern,
     runtime::{AsyncStream, Process, TlsConfig},
     Client,
-    Namespace, coll::options::FindOptions, options::ReadConcern,
+    Namespace,
 };
 
 use super::options::KmsProvidersTlsOptions;
@@ -152,7 +154,14 @@ impl CryptExecutor {
                     let kv_coll = kv_client
                         .database(&kv_ns.db)
                         .collection::<RawDocumentBuf>(&kv_ns.coll);
-                    let mut cursor = kv_coll.find(filter, FindOptions::builder().read_concern(ReadConcern::MAJORITY).build()).await?;
+                    let mut cursor = kv_coll
+                        .find(
+                            filter,
+                            FindOptions::builder()
+                                .read_concern(ReadConcern::MAJORITY)
+                                .build(),
+                        )
+                        .await?;
                     while cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;
                     }

@@ -24,14 +24,14 @@ pub(crate) use self::trace::{
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
+#[cfg(feature = "csfle")]
+use crate::client::EncryptedClientBuilder;
 use crate::{
     bson::{doc, Bson},
     client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
     selection_criteria::SelectionCriteria,
 };
-#[cfg(feature = "csfle")]
-use crate::client::EncryptedClientBuilder;
 use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -103,14 +103,15 @@ impl TestClientBuilder {
     ) -> Self {
         let options = options.into();
         assert!(self.options.is_none() || options.is_none());
-        self.options = Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
+        self.options =
+            Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
         self
     }
 
     pub(crate) fn event_handler(mut self, handler: impl Into<Option<Arc<EventHandler>>>) -> Self {
         let handler = handler.into();
         assert!(self.handler.is_none() || handler.is_none());
-        self.handler = handler.into();
+        self.handler = handler;
         self
     }
 
@@ -124,7 +125,10 @@ impl TestClientBuilder {
         self
     }
 
-    pub(crate) fn min_heartbeat_freq(mut self, min_heartbeat_freq: impl Into<Option<Duration>>) -> Self {
+    pub(crate) fn min_heartbeat_freq(
+        mut self,
+        min_heartbeat_freq: impl Into<Option<Duration>>,
+    ) -> Self {
         let min_heartbeat_freq = min_heartbeat_freq.into();
         assert!(self.min_heartbeat_freq.is_none() || min_heartbeat_freq.is_none());
         self.min_heartbeat_freq = min_heartbeat_freq;
@@ -150,9 +154,10 @@ impl TestClientBuilder {
         #[cfg(feature = "csfle")]
         let client = match self.encrypted {
             None => Client::with_options(options).unwrap(),
-            Some(aeo) => {
-                EncryptedClientBuilder::new(options, aeo).build().await.unwrap()
-            }
+            Some(aeo) => EncryptedClientBuilder::new(options, aeo)
+                .build()
+                .await
+                .unwrap(),
         };
         #[cfg(not(feature = "csfle"))]
         let client = Client::with_options(options).unwrap();
