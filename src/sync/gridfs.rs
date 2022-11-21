@@ -177,7 +177,7 @@ impl GridFsBucket {
 /// stream after `abort` has been called.
 ///
 /// ```rust
-/// # use mongodb::{error::Result, gridfs::{GridFsBucket, GridFsUploadStream}};
+/// # use mongodb::{error::Result, sync::gridfs::{GridFsBucket, GridFsUploadStream}};
 /// # fn abort_example(bucket: GridFsBucket) -> Result<()> {
 /// use std::io::Write;
 ///
