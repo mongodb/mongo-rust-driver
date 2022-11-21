@@ -153,10 +153,9 @@ impl GridFsBucket {
 ///  The `GridFsUploadStream` type implements [`std::io::Write`].
 ///
 /// Bytes can be written to the stream using the write methods in the `Write` trait. When
-/// [`close`](std::io::Write::close) is invoked on the stream, any remaining bytes in the buffer are
-/// written to the chunks collection and a corresponding [`FilesCollectionDocument`] is written to
-/// the files collection. It is an error to write to, abort, or close the stream after `close` has
-/// been called.
+/// `close` is invoked on the stream, any remaining bytes in the buffer are written to the chunks
+/// collection and a corresponding [`FilesCollectionDocument`] is written to the files collection.
+/// It is an error to write to, abort, or close the stream after `close` has been called.
 ///
 /// ```rust
 /// # use mongodb::{error::Result, sync::gridfs::{GridFsBucket, GridFsUploadStream}};

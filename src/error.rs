@@ -843,7 +843,7 @@ pub enum GridFsErrorKind {
         delete_error: Error,
     },
 
-    /// A close operation was attempted on a [`GridFsUploadStream`] while a write was still in
+    /// A close operation was attempted on a `GridFsUploadStream` while a write was still in
     /// progress.
     WriteInProgress,
 }
