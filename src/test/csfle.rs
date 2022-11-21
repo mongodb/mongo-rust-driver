@@ -79,23 +79,59 @@ pub(crate) type KmsProviderList = Vec<(KmsProvider, bson::Document, Option<TlsOp
 
 lazy_static! {
     static ref KMS_PROVIDERS: KmsProviderList = {
-        let credentials: HashMap<KmsProvider, bson::Document> =
-            serde_json::from_str(&std::env::var("KMS_PROVIDERS").unwrap()).unwrap();
-        let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
-        let kmip_opts = TlsOptions::builder()
-            .ca_file_path(cert_dir.join("ca.pem"))
-            .cert_key_file_path(cert_dir.join("client.pem"))
-            .build();
-        let mut providers = vec![];
-        for (provider, conf) in credentials.into_iter() {
-            let tls_opts = if provider == KmsProvider::Kmip {
-                Some(kmip_opts.clone())
-            } else {
-                None
-            };
-            providers.push((provider, conf, tls_opts))
+        fn env(name: &str) -> String {
+            std::env::var(name).unwrap()
         }
-        providers
+        vec![
+            (
+                KmsProvider::Aws,
+                doc! {
+                    "accessKeyId": env("AWS_ACCESS_KEY_ID"),
+                    "secretAccessKey": env("AWS_SECRET_ACCESS_KEY"),
+                },
+                None,
+            ),
+            (
+                KmsProvider::Azure,
+                doc! {
+                    "tenantId": env("AZURE_TENANT_ID"),
+                    "clientId": env("AZURE_CLIENT_ID"),
+                    "clientSecret": env("AZURE_CLIENT_SECRET"),
+                },
+                None,
+            ),
+            (
+                KmsProvider::Gcp,
+                doc! {
+                    "email": env("GCP_EMAIL"),
+                    "privateKey": env("GCP_PRIVATE_KEY"),
+                },
+                None,
+            ),
+            (
+                KmsProvider::Local,
+                doc! {
+                    "key": bson::Binary {
+                        subtype: bson::spec::BinarySubtype::Generic,
+                        bytes: base64::decode(env("CSFLE_LOCAL_KEY")).unwrap(),
+                    },
+                },
+                None,
+            ),
+            (
+                KmsProvider::Kmip,
+                doc! {
+                    "endpoint": "localhost:5698",
+                },
+                {
+                    let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
+                    Some(TlsOptions::builder()
+                        .ca_file_path(cert_dir.join("ca.pem"))
+                        .cert_key_file_path(cert_dir.join("client.pem"))
+                        .build())
+                },
+            ),
+        ]
     };
     static ref LOCAL_KMS: KmsProviderList = KMS_PROVIDERS
         .iter()
@@ -120,7 +156,7 @@ lazy_static! {
 }
 
 fn check_env(name: &str, kmip: bool) -> bool {
-    if std::env::var("KMS_PROVIDERS").is_err() {
+    if std::env::var("CSFLE_LOCAL_KEY").is_err() {
         log_uncaptured(format!(
             "skipping csfle test {}: no kms providers configured",
             name

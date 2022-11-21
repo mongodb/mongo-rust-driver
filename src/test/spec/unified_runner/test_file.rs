@@ -147,7 +147,7 @@ impl RunOnRequirement {
             }
         }
         if let Some(csfle) = &self.csfle {
-            if *csfle && std::env::var("KMS_PROVIDERS").is_err() {
+            if *csfle && std::env::var("CSFLE_LOCAL_KEY").is_err() {
                 return Err("requires csfle env".to_string());
             }
         }
