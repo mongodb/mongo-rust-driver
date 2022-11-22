@@ -815,7 +815,8 @@ pub enum GridFsErrorKind {
     #[non_exhaustive]
     MissingChunk { n: u32 },
 
-    /// An operation was attempted on a `GridFsUploadStream` that has already been shut down.
+    /// An operation was attempted on a [`GridFsUploadStream`](crate::gridfs::GridFsUploadStream)
+    /// that has already been shut down.
     UploadStreamClosed,
 
     /// The chunk was the incorrect size.
@@ -843,7 +844,8 @@ pub enum GridFsErrorKind {
         delete_error: Error,
     },
 
-    /// A close operation was attempted on a `GridFsUploadStream` while a write was still in
+    /// A close operation was attempted on a
+    /// [`GridFsUploadStream`](crate::gridfs::GridFsUploadStream) while a write was still in
     /// progress.
     WriteInProgress,
 }
