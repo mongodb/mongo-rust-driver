@@ -47,9 +47,6 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     let internal_client = TestClient::new().await;
 
     file_level_log(format!("Running tests from {}", path.display(),));
-    #[cfg(not(feature = "csfle"))]
-    let is_csfle_test = false;
-    #[cfg(feature = "csfle")]
     let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
     if let Some(requirements) = test_file.run_on {

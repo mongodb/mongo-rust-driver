@@ -1215,11 +1215,22 @@ impl TestOperation for AssertCollectionExists {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let collections = client
-                .database_with_options(&self.database, DatabaseOptions::builder().read_concern(ReadConcern::MAJORITY).build())
+                .database_with_options(
+                    &self.database,
+                    DatabaseOptions::builder()
+                        .read_concern(ReadConcern::MAJORITY)
+                        .build(),
+                )
                 .list_collection_names(None)
                 .await
                 .unwrap();
-            assert!(collections.contains(&self.collection), "Collection {}.{} should exist, but does not (collections: {:?}).", self.database, self.collection, collections);
+            assert!(
+                collections.contains(&self.collection),
+                "Collection {}.{} should exist, but does not (collections: {:?}).",
+                self.database,
+                self.collection,
+                collections
+            );
             Ok(None)
         }
         .boxed()

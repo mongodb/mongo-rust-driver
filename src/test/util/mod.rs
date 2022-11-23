@@ -96,6 +96,8 @@ impl TestClientBuilder {
         self
     }
 
+    /// Modify options via `TestClient::options_for_multiple_mongoses` before setting them.
+    // TODO RUST-1449 Simplify or remove this entirely.
     pub(crate) async fn additional_options(
         mut self,
         options: impl Into<Option<ClientOptions>>,
@@ -171,6 +173,7 @@ impl TestClientBuilder {
 }
 
 impl TestClient {
+    // TODO RUST-1449 Remove uses of direct constructors in favor of `TestClientBuilder`.
     pub(crate) async fn new() -> Self {
         Self::with_options(None).await
     }
