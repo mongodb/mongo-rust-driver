@@ -1216,7 +1216,6 @@ impl TestOperation for AssertCollectionExists {
         async move {
             let collections = client
                 .database_with_options(&self.database, DatabaseOptions::builder().read_concern(ReadConcern::MAJORITY).build())
-                //.database(&self.database)
                 .list_collection_names(None)
                 .await
                 .unwrap();
