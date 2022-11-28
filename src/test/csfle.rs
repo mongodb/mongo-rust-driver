@@ -2800,6 +2800,7 @@ async fn bypass_mongocryptd_client() -> Result<()> {
         let listener = bind("127.0.0.1:27021").await?;
         runtime::spawn(async move {
             let _ = listener.accept().await;
+            log_uncaptured("test failure: connection accepted");
             connected.store(true, Ordering::SeqCst);
         })
     };
@@ -2822,6 +2823,7 @@ async fn bypass_mongocryptd_client() -> Result<()> {
         .insert_one(doc! { "unencrypted": "test" }, None)
         .await?;
 
+    assert!(!client_encrypted.mongocryptd_spawned().await);
     assert!(!connected.load(Ordering::SeqCst));
 
     Ok(())
