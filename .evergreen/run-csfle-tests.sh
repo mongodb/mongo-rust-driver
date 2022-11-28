@@ -29,7 +29,7 @@ CARGO_RESULT=0
 
 cargo_test() {
     RUST_BACKTRACE=1 \
-        cargo test --features ${FEATURE_FLAGS} $1 ${OPTIONS} | cargo2junit
+        cargo test --features ${FEATURE_FLAGS} $1 ${OPTIONS} | grep -v '{"t":' | cargo2junit
     (( CARGO_RESULT = ${CARGO_RESULT} || $? ))
 }
 
