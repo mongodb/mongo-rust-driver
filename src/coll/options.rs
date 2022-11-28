@@ -975,7 +975,10 @@ pub struct FindOneOptions {
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
+    #[serde(
+        default,
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
