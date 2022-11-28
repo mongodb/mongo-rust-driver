@@ -1,8 +1,7 @@
-// TODO(RUST-1395) Remove these allows.
-#![allow(dead_code, unused_variables, missing_docs)]
+//! Contains the functionality for GridFS operations.
 
 mod download;
-pub mod options;
+pub(crate) mod options;
 mod upload;
 
 use std::sync::{atomic::AtomicBool, Arc};
@@ -20,13 +19,13 @@ use crate::{
 };
 
 pub use download::GridFsDownloadStream;
-pub use options::*;
+pub(crate) use options::*;
 pub use upload::GridFsUploadStream;
 
-pub const DEFAULT_BUCKET_NAME: &str = "fs";
-pub const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
+const DEFAULT_BUCKET_NAME: &str = "fs";
+const DEFAULT_CHUNK_SIZE_BYTES: u32 = 255 * 1024;
 
-// Contained in a "chunks" collection for each user file
+/// A model for the documents stored in the chunks collection.
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Chunk<'a> {
     #[serde(rename = "_id")]
@@ -37,45 +36,57 @@ pub(crate) struct Chunk<'a> {
     data: RawBinaryRef<'a>,
 }
 
-/// A collection in which information about stored files is stored. There will be one files
-/// collection document per stored file.
+/// A model for the documents stored in a GridFS bucket's files
+/// collection.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
 #[non_exhaustive]
 pub struct FilesCollectionDocument {
+    /// The file's unique identifier.
     #[serde(rename = "_id")]
     pub id: Bson,
+
+    /// The length of the file in bytes.
     pub length: u64,
-    pub chunk_size: u32,
+
+    /// The size of the file's chunks in bytes.
+    #[serde(rename = "chunkSize")]
+    pub chunk_size_bytes: u32,
+
+    /// The time at which the file was uploaded.
     pub upload_date: DateTime,
+
+    /// The name of the file.
     pub filename: Option<String>,
+
+    /// User-provided metadata associated with the file.
     pub metadata: Option<Document>,
 }
 
 impl FilesCollectionDocument {
     /// Returns the total number of chunks expected to be in the file.
     fn n(&self) -> u32 {
-        Self::n_from_vals(self.length, self.chunk_size)
+        Self::n_from_vals(self.length, self.chunk_size_bytes)
     }
 
-    fn n_from_vals(length: u64, chunk_size: u32) -> u32 {
-        let chunk_size = chunk_size as u64;
-        let n = length / chunk_size + u64::from(length % chunk_size != 0);
+    fn n_from_vals(length: u64, chunk_size_bytes: u32) -> u32 {
+        let chunk_size_bytes = chunk_size_bytes as u64;
+        let n = length / chunk_size_bytes + u64::from(length % chunk_size_bytes != 0);
         n as u32
     }
 
     /// Returns the expected length of a chunk given its index.
     fn expected_chunk_length(&self, n: u32) -> u32 {
-        Self::expected_chunk_length_from_vals(self.length, self.chunk_size, n)
+        Self::expected_chunk_length_from_vals(self.length, self.chunk_size_bytes, n)
     }
 
-    fn expected_chunk_length_from_vals(length: u64, chunk_size: u32, n: u32) -> u32 {
-        let remainder = length % (chunk_size as u64);
-        if n == Self::n_from_vals(length, chunk_size) - 1 && remainder != 0 {
+    fn expected_chunk_length_from_vals(length: u64, chunk_size_bytes: u32, n: u32) -> u32 {
+        let remainder = length % (chunk_size_bytes as u64);
+        if n == Self::n_from_vals(length, chunk_size_bytes) - 1 && remainder != 0 {
             remainder as u32
         } else {
-            chunk_size
+            chunk_size_bytes
         }
     }
 }
@@ -89,7 +100,15 @@ struct GridFsBucketInner {
     created_indexes: AtomicBool,
 }
 
-/// Struct for storing GridFS managed files within a [`Database`].
+/// A `GridFsBucket` provides the functionality for storing and retrieving binary BSON data that
+/// exceeds the 16 MiB size limit of a MongoDB document. Users may upload and download large amounts
+/// of data, called files, to the bucket. When a file is uploaded, its contents are divided into
+/// chunks and stored in a chunks collection. A corresponding [`FilesCollectionDocument`] is also
+/// stored in a files collection. When a user downloads a file, the bucket finds and returns the
+/// data stored in its chunks.
+///
+/// `GridFsBucket` uses [`std::sync::Arc`] internally, so it can be shared safely across threads or
+/// async tasks.
 #[derive(Debug, Clone)]
 pub struct GridFsBucket {
     inner: Arc<GridFsBucketInner>,
@@ -142,22 +161,22 @@ impl GridFsBucket {
         self.inner.files.client()
     }
 
-    /// Gets the read concern of the [`GridFsBucket`].
+    /// Gets the read concern of the bucket.
     pub fn read_concern(&self) -> Option<&ReadConcern> {
         self.inner.options.read_concern.as_ref()
     }
 
-    /// Gets the write concern of the [`GridFsBucket`].
+    /// Gets the write concern of the bucket.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.options.write_concern.as_ref()
     }
 
-    /// Gets the selection criteria of the [`GridFsBucket`].
+    /// Gets the selection criteria of the bucket.
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.inner.options.selection_criteria.as_ref()
     }
 
-    /// Gets the chunk size in bytes for the [`GridFsBucket`].
+    /// Gets the chunk size in bytes for the bucket.
     fn chunk_size_bytes(&self) -> u32 {
         self.inner
             .options
@@ -165,18 +184,19 @@ impl GridFsBucket {
             .unwrap_or(DEFAULT_CHUNK_SIZE_BYTES)
     }
 
-    /// Gets a handle to the files collection for the [`GridFsBucket`].
+    /// Gets a handle to the files collection for the bucket.
     pub(crate) fn files(&self) -> &Collection<FilesCollectionDocument> {
         &self.inner.files
     }
 
-    /// Gets a handle to the chunks collection for the [`GridFsBucket`].
+    /// Gets a handle to the chunks collection for the bucket.
     pub(crate) fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
     }
 
-    /// Deletes the [`FilesCollectionDocument`] with the given `id `and its associated chunks from
-    /// this bucket.
+    /// Deletes the [`FilesCollectionDocument`] with the given `id` and its associated chunks from
+    /// this bucket. This method returns an error if the `id` does not match any files in the
+    /// bucket.
     pub async fn delete(&self, id: Bson) -> Result<()> {
         let delete_result = self
             .files()
@@ -209,7 +229,8 @@ impl GridFsBucket {
         self.files().find(filter, find_options).await
     }
 
-    /// Renames the file with the given 'id' to the provided `new_filename`.
+    /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
+    /// error if the `id` does not match any files in the bucket.
     pub async fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
         self.files()
             .update_one(
@@ -222,7 +243,7 @@ impl GridFsBucket {
         Ok(())
     }
 
-    /// Drops all of the files and their associated chunks in this bucket.
+    /// Removes all of the files and their associated chunks from this bucket.
     pub async fn drop(&self) -> Result<()> {
         self.files().drop(None).await?;
         self.chunks().drop(None).await?;

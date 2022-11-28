@@ -1,6 +1,14 @@
 use std::fmt::Debug;
 
-use super::{ChangeStream, ClientSession, Collection, Cursor, SessionChangeStream, SessionCursor};
+use super::{
+    gridfs::GridFsBucket,
+    ChangeStream,
+    ClientSession,
+    Collection,
+    Cursor,
+    SessionChangeStream,
+    SessionCursor,
+};
 use crate::{
     bson::Document,
     change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
@@ -10,6 +18,7 @@ use crate::{
         CollectionOptions,
         CreateCollectionOptions,
         DropDatabaseOptions,
+        GridFsBucketOptions,
         ListCollectionsOptions,
         ReadConcern,
         SelectionCriteria,
@@ -315,5 +324,10 @@ impl Database {
             &mut session.async_client_session,
         ))
         .map(SessionChangeStream::new)
+    }
+
+    /// Creates a new [`GridFsBucket`] in the database with the given options.
+    pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
+        GridFsBucket::new(self.async_database.gridfs_bucket(options))
     }
 }

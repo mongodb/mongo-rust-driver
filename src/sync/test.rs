@@ -1,4 +1,7 @@
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    io::{Read, Write},
+};
 
 use lazy_static::lazy_static;
 use pretty_assertions::assert_eq;
@@ -396,4 +399,25 @@ fn mixed_sync_and_async() -> Result<()> {
     assert_eq!(found, doc! { "a": 1 });
 
     Ok(())
+}
+
+#[test]
+fn gridfs() {
+    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
+    let client = Client::with_options(CLIENT_OPTIONS.clone()).unwrap();
+    let bucket = client.database("gridfs").gridfs_bucket(None);
+
+    let upload = vec![0u8; 100];
+    let mut download = vec![];
+
+    let mut upload_stream = bucket.open_upload_stream("sync gridfs", None);
+    upload_stream.write_all(&upload[..]).unwrap();
+    upload_stream.close().unwrap();
+
+    let mut download_stream = bucket
+        .open_download_stream(upload_stream.id().clone())
+        .unwrap();
+    download_stream.read_to_end(&mut download).unwrap();
+
+    assert_eq!(upload, download);
 }
