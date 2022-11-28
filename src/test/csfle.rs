@@ -1331,6 +1331,13 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     }
     let _guard = LOCK.run_exclusively().await;
 
+    if *DISABLE_CRYPT_SHARED {
+        log_uncaptured(
+            "Skipping bypass mongocryptd via shared library test: crypt_shared is disabled.",
+        );
+        return Ok(());
+    }
+
     // Setup: encrypted client.
     let client_encrypted = Client::encrypted_builder(
         CLIENT_OPTIONS.get().await.clone(),
@@ -2783,7 +2790,7 @@ async fn bypass_mongocryptd_client() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     if *DISABLE_CRYPT_SHARED {
-        log_uncaptured("Skipping test: crypt_shared is disabled.");
+        log_uncaptured("Skipping bypass mongocryptd client test: crypt_shared is disabled.");
         return Ok(());
     }
 
