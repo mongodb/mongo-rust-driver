@@ -113,16 +113,11 @@ impl GridFsBucket {
 
         let mut buf = vec![0u8; chunk_size_bytes as usize];
         loop {
-            let bytes_read = match source.read(&mut buf).await {
+            let bytes_read = match read_exact_or_to_end(&mut buf, &mut source).await {
                 Ok(0) => break,
                 Ok(n) => n,
                 Err(error) => {
-                    return clean_up_chunks(
-                        id.clone(),
-                        self.chunks().clone(),
-                        Some(ErrorKind::Io(error.into()).into()),
-                    )
-                    .await;
+                    return clean_up_chunks(id.clone(), self.chunks().clone(), Some(error)).await;
                 }
             };
 
@@ -223,6 +218,22 @@ impl GridFsBucket {
 
         Ok(())
     }
+}
+
+async fn read_exact_or_to_end<T>(buf: &mut [u8], source: &mut T) -> Result<usize>
+where
+    T: AsyncRead + Unpin,
+{
+    let mut total_bytes_read = 0;
+    loop {
+        let bytes_read = match source.read(&mut buf[total_bytes_read..]).await? {
+            0 => break,
+            n => n,
+        };
+        total_bytes_read += bytes_read;
+    }
+
+    Ok(total_bytes_read)
 }
 
 /// A stream to which bytes can be written to be uploaded to a GridFS bucket.

@@ -180,6 +180,7 @@ impl GridFsBucket {
                 return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
                     actual_size: chunk_length,
                     expected_size: expected_length,
+                    n,
                 })
                 .into());
             }
@@ -383,6 +384,7 @@ async fn get_bytes(
             return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
                 actual_size: chunk_bytes.len(),
                 expected_size: expected_len,
+                n,
             })
             .into());
         }

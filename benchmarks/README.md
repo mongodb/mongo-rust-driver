@@ -20,27 +20,31 @@ When running the benchmarks with the `--ids` flag, you can refer to each benchma
 benchmarks by separating each benchmark's id with a comma. For example `cargo run --release -- --ids 1,2,3,4` would run all 
 the single-doc benchmarks. By default, all benchmarks are executed. The table below lists each benchmark's id.
 
-| Benchmark                      | ID |
-|--------------------------------|----|
-| Run command                    | 1  |
-| Find one by ID                 | 2  |
-| Small doc insertOne            | 3  |
-| Large doc insertOne            | 4  |
-| Find many and empty the cursor | 5  |
-| Small doc bulk insert          | 6  |
-| Large doc bulk insert          | 7  |
-| LDJSON multi-file import       | 8  |
-| LDJSON multi-file export       | 9  |
-| BSON flat decode               | 10 |
-| BSON flat encode               | 11 |
-| BSON deeply nested decode      | 12 |
-| BSON deeply nested encode      | 13 |
-| BSON full document decode      | 14 |
-| BSON full document encode      | 15 |  
-| All benchmarks                 | all|
+| Benchmark                                      | ID |
+|----------------------------------------------- |----|
+| Run command                                    | 1  |
+| Find one by ID                                 | 2  |
+| Small doc insertOne                            | 3  |
+| Large doc insertOne                            | 4  |
+| Find many and empty the cursor                 | 5  |
+| Small doc bulk insert                          | 6  |
+| Large doc bulk insert                          | 7  |
+| LDJSON multi-file import                       | 8  |
+| LDJSON multi-file export                       | 9  |
+| BSON flat decode                               | 10 |
+| BSON flat encode                               | 11 |
+| BSON deeply nested decode                      | 12 |
+| BSON deeply nested encode                      | 13 |
+| BSON full document decode                      | 14 |
+| BSON full document encode                      | 15 |
+| Find many and empty the cursor (raw BSON)      | 16 |
+| Find many and empty the cursor (serde structs) | 17 |
+| GridFS download                                | 18 |
+| GridFS upload                                  | 19 |
+| GridFS multi-file download                     | 20 |
+| GridFS multi-file upload                       | 21 |
+| All benchmarks                                 | all|
 
 Note that in order to compare against the other drivers, an inMemory mongod instance should be used.
-
-At this point, GridFS benchmarks are not implemented because it has not been implemented in the driver.
 
 Also note that the parallel benchmarks are implemented to mirror the C++ driver's interpretation of the spec.

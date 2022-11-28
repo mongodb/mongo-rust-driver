@@ -115,7 +115,7 @@ impl CompositeScore {
     }
 
     /// Get a vec of the individual benchmark results.
-    pub(crate) fn to_invidivdual_results(&self) -> Vec<BenchmarkResult> {
+    pub(crate) fn to_individual_results(&self) -> Vec<BenchmarkResult> {
         self.benchmarks
             .clone()
             .into_iter()

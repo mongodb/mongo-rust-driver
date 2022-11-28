@@ -811,7 +811,7 @@ pub enum GridFsErrorKind {
     #[non_exhaustive]
     RevisionNotFound { revision: i32 },
 
-    /// The chunk at index 'n' was missing.
+    /// The chunk at index `n` was missing.
     #[non_exhaustive]
     MissingChunk { n: u32 },
 
@@ -819,11 +819,12 @@ pub enum GridFsErrorKind {
     /// that has already been shut down.
     UploadStreamClosed,
 
-    /// The chunk was the incorrect size.
+    /// The chunk at index `n` was the incorrect size.
     #[non_exhaustive]
     WrongSizeChunk {
         actual_size: usize,
         expected_size: u32,
+        n: u32,
     },
 
     /// An incorrect number of chunks was present for the file.

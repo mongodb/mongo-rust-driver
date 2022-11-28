@@ -55,6 +55,10 @@ use crate::{
         bson_encode::BsonEncodeBenchmark,
         find_many::FindManyBenchmark,
         find_one::FindOneBenchmark,
+        gridfs_download::GridFsDownloadBenchmark,
+        gridfs_multi_download::GridFsMultiDownloadBenchmark,
+        gridfs_multi_upload::GridFsMultiUploadBenchmark,
+        gridfs_upload::GridFsUploadBenchmark,
         insert_many::InsertManyBenchmark,
         insert_one::InsertOneBenchmark,
         json_multi_export::JsonMultiExportBenchmark,
@@ -112,6 +116,10 @@ enum BenchmarkId {
     BsonFullDocumentEncode,
     FindManyRawBson,
     FindManySerde,
+    GridFsDownload,
+    GridFsUpload,
+    GridFsMultiDownload,
+    GridFsMultiUpload,
 }
 
 impl BenchmarkId {
@@ -134,6 +142,10 @@ impl BenchmarkId {
             BenchmarkId::BsonFullDocumentEncode => FULL_BSON_ENCODING,
             BenchmarkId::FindManyRawBson => FIND_MANY_BENCH_RAW,
             BenchmarkId::FindManySerde => FIND_MANY_BENCH_SERDE,
+            BenchmarkId::GridFsDownload => GRIDFS_DOWNLOAD_BENCH,
+            BenchmarkId::GridFsUpload => GRIDFS_UPLOAD_BENCH,
+            BenchmarkId::GridFsMultiDownload => GRIDFS_MULTI_DOWNLOAD_BENCH,
+            BenchmarkId::GridFsMultiUpload => GRIDFS_MULTI_UPLOAD_BENCH,
         }
     }
 }
@@ -193,7 +205,7 @@ const WRITE_BENCHES: &[&'static str] = &[
     GRIDFS_MULTI_UPLOAD_BENCH,
 ];
 
-const MAX_ID: u8 = BenchmarkId::FindManySerde as u8;
+const MAX_ID: u8 = BenchmarkId::GridFsMultiUpload as u8;
 
 async fn run_benchmarks(
     uri: &str,
@@ -456,6 +468,62 @@ async fn run_benchmarks(
 
                 comp_score += score_test(find_many, id.name(), 16.22, more_info);
             }
+
+            // GridFS download
+            BenchmarkId::GridFsDownload => {
+                let gridfs_download_options = bench::gridfs_download::Options {
+                    uri: uri.to_string(),
+                    path: DATA_PATH
+                        .join("single_and_multi_document")
+                        .join("gridfs_large.bin"),
+                };
+                let gridfs_download =
+                    bench::run_benchmark::<GridFsDownloadBenchmark>(gridfs_download_options)
+                        .await?;
+
+                comp_score += score_test(gridfs_download, id.name(), 52.43, more_info);
+            }
+
+            // GridFS upload
+            BenchmarkId::GridFsUpload => {
+                let gridfs_upload_options = bench::gridfs_upload::Options {
+                    uri: uri.to_string(),
+                    path: DATA_PATH
+                        .join("single_and_multi_document")
+                        .join("gridfs_large.bin"),
+                };
+                let gridfs_upload =
+                    bench::run_benchmark::<GridFsUploadBenchmark>(gridfs_upload_options).await?;
+
+                comp_score += score_test(gridfs_upload, id.name(), 52.43, more_info);
+            }
+
+            // GridFS multi download
+            BenchmarkId::GridFsMultiDownload => {
+                let gridfs_multi_download_options = bench::gridfs_multi_download::Options {
+                    uri: uri.to_string(),
+                    path: DATA_PATH.join("parallel").join("gridfs_multi"),
+                };
+                let gridfs_multi_download = bench::run_benchmark::<GridFsMultiDownloadBenchmark>(
+                    gridfs_multi_download_options,
+                )
+                .await?;
+
+                comp_score += score_test(gridfs_multi_download, id.name(), 262.144, more_info);
+            }
+
+            // GridFS multi upload
+            BenchmarkId::GridFsMultiUpload => {
+                let gridfs_multi_upload_options = bench::gridfs_multi_upload::Options {
+                    uri: uri.to_string(),
+                    path: DATA_PATH.join("parallel").join("gridfs_multi"),
+                };
+                let gridfs_multi_upload =
+                    bench::run_benchmark::<GridFsMultiUploadBenchmark>(gridfs_multi_upload_options)
+                        .await?;
+
+                comp_score += score_test(gridfs_multi_upload, id.name(), 262.144, more_info);
+            }
         }
     }
 
@@ -489,10 +557,14 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::FindManyRawBson);
         ids.insert(BenchmarkId::SmallDocBulkInsert);
         ids.insert(BenchmarkId::LargeDocBulkInsert);
+        ids.insert(BenchmarkId::GridFsDownload);
+        ids.insert(BenchmarkId::GridFsUpload);
     }
     if matches.is_present("parallel") {
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
         ids.insert(BenchmarkId::LdJsonMultiFileExport);
+        ids.insert(BenchmarkId::GridFsMultiDownload);
+        ids.insert(BenchmarkId::GridFsMultiUpload);
     }
     if matches.is_present("bson") {
         ids.insert(BenchmarkId::BsonFlatDocumentDecode);
@@ -514,6 +586,10 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::LargeDocBulkInsert);
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
         ids.insert(BenchmarkId::LdJsonMultiFileExport);
+        ids.insert(BenchmarkId::GridFsDownload);
+        ids.insert(BenchmarkId::GridFsUpload);
+        ids.insert(BenchmarkId::GridFsMultiDownload);
+        ids.insert(BenchmarkId::GridFsMultiUpload);
     }
 
     // if none were enabled, that means no arguments were provided and all should be enabled.
@@ -601,6 +677,10 @@ Run benchmarks by id number (comma-separated):
     15: BSON full document encode
     16: Find many and empty the cursor (raw BSON)
     17: Find many and empty the cursor (serde structs)
+    18: GridFS download
+    19: GridFS upload
+    20: GridFS multi-file download
+    21: GridFS multi-file upload
     all: All benchmarks
                     ",
                 ),
@@ -656,7 +736,7 @@ Run benchmarks by id number (comma-separated):
 
     if let Some(output_file) = output_file {
         // attach the individual benchmark results
-        let mut results: Vec<BenchmarkResult> = scores.to_invidivdual_results();
+        let mut results: Vec<BenchmarkResult> = scores.to_individual_results();
 
         // then the composite ones
         results.extend(
