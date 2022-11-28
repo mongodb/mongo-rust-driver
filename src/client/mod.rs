@@ -197,6 +197,16 @@ impl Client {
             .map_or(false, |cs| cs.exec().mongocryptd_spawned())
     }
 
+    #[cfg(all(test, feature = "csfle"))]
+    pub(crate) async fn has_mongocryptd_client(&self) -> bool {
+        self.inner
+            .csfle
+            .read()
+            .await
+            .as_ref()
+            .map_or(false, |cs| cs.exec().has_mongocryptd_client())
+    }
+
     #[cfg(not(feature = "tracing-unstable"))]
     pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
         if let Some(ref handler) = self.inner.options.command_event_handler {

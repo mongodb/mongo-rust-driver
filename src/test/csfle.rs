@@ -2823,7 +2823,7 @@ async fn bypass_mongocryptd_client() -> Result<()> {
         .insert_one(doc! { "unencrypted": "test" }, None)
         .await?;
 
-    assert!(!client_encrypted.mongocryptd_spawned().await);
+    assert!(!client_encrypted.has_mongocryptd_client().await);
     assert!(!connected.load(Ordering::SeqCst));
 
     Ok(())
