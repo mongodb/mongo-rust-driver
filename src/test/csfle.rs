@@ -1322,6 +1322,55 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     Ok(())
 }
 
+// Prose test 8. Bypass Spawning mongocryptd (Via loading shared library)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_shared_library", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    // Setup: encrypted client.
+    let client_encrypted = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .schema_map({
+        [(
+            "db.coll".to_string(),
+            load_testdata("external-schema.json")?,
+        )]
+        .into_iter()
+        .collect::<HashMap<String, Document>>()
+    })
+    .extra_options(doc! {
+        "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
+        "mongocryptdSpawnArgs": ["--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
+        "cryptSharedLibPath": EXTRA_OPTIONS.get("cryptSharedLibPath").unwrap(),
+        "cryptSharedRequired": true,
+    })
+    .build()
+    .await?;
+
+    // Test: insert succeeds.
+    client_encrypted
+        .database("db")
+        .collection::<Document>("coll")
+        .insert_one(doc! { "unencrypted": "test" }, None)
+        .await?;
+    // Test: mongocryptd not spawned.
+    assert!(!client_encrypted.mongocryptd_spawned().await);
+    // Test: attempting to connect fails.
+    let client =
+        Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
+    let result = client.list_database_names(None, None).await;
+    assert!(result.unwrap_err().is_server_selection_error());
+
+    Ok(())
+}
+
 // Prose test 8. Bypass Spawning mongocryptd (Via mongocryptdBypassSpawn)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
