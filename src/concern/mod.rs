@@ -329,7 +329,7 @@ impl WriteConcern {
     /// Whether the write concern was created with no values specified. If true, the write concern
     /// should be considered the server's default.
     pub(crate) fn is_empty(&self) -> bool {
-        self.w == None && self.w_timeout == None && self.journal == None
+        self.w.is_none() && self.w_timeout.is_none() && self.journal.is_none()
     }
 
     /// Validates that the write concern. A write concern is invalid if both the `w` field is 0

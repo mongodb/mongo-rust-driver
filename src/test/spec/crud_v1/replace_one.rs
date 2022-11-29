@@ -82,7 +82,7 @@ async fn run_replace_one_test(test_file: TestFile) {
 
         assert_eq!(
             outcome.result.upserted_count.unwrap_or(0),
-            if result.upserted_id.is_some() { 1 } else { 0 },
+            u64::from(result.upserted_id.is_some()),
             "{}",
             test_case.description
         );
