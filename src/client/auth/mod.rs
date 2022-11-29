@@ -512,7 +512,7 @@ pub(crate) fn generate_nonce_bytes() -> [u8; 32] {
 
 pub(crate) fn generate_nonce() -> String {
     let result = generate_nonce_bytes();
-    base64::encode(&result)
+    base64::encode(result)
 }
 
 fn mac<M: Mac + KeyInit>(

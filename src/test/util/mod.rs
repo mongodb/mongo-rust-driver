@@ -480,10 +480,7 @@ struct BuildInfo {
 }
 
 pub(crate) fn get_default_name(description: &str) -> String {
-    let mut db_name = description
-        .replace('$', "%")
-        .replace(' ', "_")
-        .replace('.', "_");
+    let mut db_name = description.replace('$', "%").replace([' ', '.'], "_");
     // database names must have fewer than 38 characters
     db_name.truncate(37);
     db_name
