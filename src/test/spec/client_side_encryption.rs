@@ -40,6 +40,7 @@ async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     run_spec_test_with_path(&["client-side-encryption", "legacy"], |path, test| async {
+        // TODO RUST-582 Unskip this when we have csot implemented.
         if path.ends_with("timeoutMS.json") {
             log_uncaptured(format!(
                 "Skipping {}: requires client side operations timeout",
