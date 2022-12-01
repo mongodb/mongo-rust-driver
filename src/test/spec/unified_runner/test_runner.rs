@@ -135,10 +135,7 @@ impl TestRunner {
             }
         }
 
-        log_uncaptured(format!(
-            "\n------------\nRunning tests from {}\n",
-            file_title
-        ));
+        file_level_log(format!("Running tests from {}", file_title));
 
         for test_case in &test_file.tests {
             if let Ok(description) = std::env::var("TEST_DESCRIPTION") {

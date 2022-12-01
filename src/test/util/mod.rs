@@ -10,7 +10,7 @@ pub(crate) use self::{
     event::{Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
-    matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
+    matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
     subscriber::EventSubscriber,
 };
 
@@ -24,6 +24,8 @@ pub(crate) use self::trace::{
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
+#[cfg(feature = "csfle")]
+use crate::client::EncryptedClientBuilder;
 use crate::{
     bson::{doc, Bson},
     client::options::ServerAddress,
@@ -53,7 +55,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub(crate) struct TestClient {
     client: Client,
-    pub(crate) options: ClientOptions,
     pub(crate) server_info: HelloCommandResponse,
     pub(crate) server_version: Version,
     pub(crate) server_parameters: Document,
@@ -67,7 +68,112 @@ impl std::ops::Deref for TestClient {
     }
 }
 
+impl Client {
+    pub(crate) fn test_builder() -> TestClientBuilder {
+        TestClientBuilder {
+            options: None,
+            handler: None,
+            min_heartbeat_freq: None,
+            #[cfg(feature = "csfle")]
+            encrypted: None,
+        }
+    }
+}
+
+pub(crate) struct TestClientBuilder {
+    options: Option<ClientOptions>,
+    handler: Option<Arc<EventHandler>>,
+    min_heartbeat_freq: Option<Duration>,
+    #[cfg(feature = "csfle")]
+    encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
+}
+
+impl TestClientBuilder {
+    pub(crate) fn options(mut self, options: impl Into<Option<ClientOptions>>) -> Self {
+        let options = options.into();
+        assert!(self.options.is_none() || options.is_none());
+        self.options = options;
+        self
+    }
+
+    /// Modify options via `TestClient::options_for_multiple_mongoses` before setting them.
+    // TODO RUST-1449 Simplify or remove this entirely.
+    pub(crate) async fn additional_options(
+        mut self,
+        options: impl Into<Option<ClientOptions>>,
+        use_multiple_mongoses: bool,
+    ) -> Self {
+        let options = options.into();
+        assert!(self.options.is_none() || options.is_none());
+        self.options =
+            Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
+        self
+    }
+
+    pub(crate) fn event_handler(mut self, handler: impl Into<Option<Arc<EventHandler>>>) -> Self {
+        let handler = handler.into();
+        assert!(self.handler.is_none() || handler.is_none());
+        self.handler = handler;
+        self
+    }
+
+    #[cfg(feature = "csfle")]
+    pub(crate) fn encrypted_options(
+        mut self,
+        encrypted: crate::client::csfle::options::AutoEncryptionOptions,
+    ) -> Self {
+        assert!(self.encrypted.is_none());
+        self.encrypted = Some(encrypted);
+        self
+    }
+
+    pub(crate) fn min_heartbeat_freq(
+        mut self,
+        min_heartbeat_freq: impl Into<Option<Duration>>,
+    ) -> Self {
+        let min_heartbeat_freq = min_heartbeat_freq.into();
+        assert!(self.min_heartbeat_freq.is_none() || min_heartbeat_freq.is_none());
+        self.min_heartbeat_freq = min_heartbeat_freq;
+        self
+    }
+
+    pub(crate) async fn build(self) -> TestClient {
+        let mut options = match self.options {
+            Some(options) => options,
+            None => CLIENT_OPTIONS.get().await.clone(),
+        };
+
+        if let Some(handler) = self.handler {
+            options.command_event_handler = Some(handler.clone());
+            options.cmap_event_handler = Some(handler.clone());
+            options.sdam_event_handler = Some(handler);
+        }
+
+        if let Some(freq) = self.min_heartbeat_freq {
+            options.test_options_mut().min_heartbeat_freq = Some(freq);
+        }
+
+        #[cfg(feature = "csfle")]
+        let client = match self.encrypted {
+            None => Client::with_options(options).unwrap(),
+            Some(aeo) => EncryptedClientBuilder::new(options, aeo)
+                .build()
+                .await
+                .unwrap(),
+        };
+        #[cfg(not(feature = "csfle"))]
+        let client = Client::with_options(options).unwrap();
+
+        TestClient::from_client(client).await
+    }
+
+    pub(crate) fn handler(&self) -> Option<&Arc<EventHandler>> {
+        self.handler.as_ref()
+    }
+}
+
 impl TestClient {
+    // TODO RUST-1449 Remove uses of direct constructors in favor of `TestClientBuilder`.
     pub(crate) async fn new() -> Self {
         Self::with_options(None).await
     }
@@ -76,34 +182,18 @@ impl TestClient {
         Self::with_handler(None, options).await
     }
 
-    async fn build_test_options(
-        event_handler: Option<Arc<EventHandler>>,
-        options: impl Into<Option<ClientOptions>>,
-    ) -> ClientOptions {
-        let mut options = match options.into() {
-            Some(options) => options,
-            None => CLIENT_OPTIONS.get().await.clone(),
-        };
-
-        if let Some(handler) = event_handler {
-            options.command_event_handler = Some(handler.clone());
-            options.cmap_event_handler = Some(handler.clone());
-            options.sdam_event_handler = Some(handler);
-        }
-
-        options
-    }
-
     pub(crate) async fn with_handler(
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
     ) -> Self {
-        let options = Self::build_test_options(event_handler, options).await;
-        let client = Client::with_options(options.clone()).unwrap();
-        Self::from_client(client, options).await
+        Client::test_builder()
+            .options(options)
+            .event_handler(event_handler)
+            .build()
+            .await
     }
 
-    async fn from_client(client: Client, options: ClientOptions) -> Self {
+    async fn from_client(client: Client) -> Self {
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
         let mut session = client
@@ -112,8 +202,8 @@ impl TestClient {
         session.mark_dirty();
 
         let hello_cmd = hello_command(
-            options.server_api.as_ref(),
-            options.load_balanced,
+            client.options().server_api.as_ref(),
+            client.options().load_balanced,
             None,
             None,
         );
@@ -145,7 +235,6 @@ impl TestClient {
 
         Self {
             client,
-            options,
             server_info,
             server_version,
             server_parameters,
@@ -153,8 +242,11 @@ impl TestClient {
     }
 
     pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
-        let options = Self::options_for_multiple_mongoses(options, false).await;
-        Self::with_options(Some(options)).await
+        Client::test_builder()
+            .additional_options(options, false)
+            .await
+            .build()
+            .await
     }
 
     pub(crate) async fn create_user(
@@ -315,7 +407,7 @@ impl TestClient {
     }
 
     pub(crate) fn auth_enabled(&self) -> bool {
-        self.options.credential.is_some()
+        self.client.options().credential.is_some()
     }
 
     pub(crate) fn is_standalone(&self) -> bool {
@@ -368,7 +460,7 @@ impl TestClient {
     /// Returns the `Topology' that can be determined without a server query, i.e. all except
     /// `Toplogy::ShardedReplicaSet`.
     fn base_topology(&self) -> Topology {
-        if self.options.load_balanced.unwrap_or(false) {
+        if self.client.options().load_balanced.unwrap_or(false) {
             return Topology::LoadBalanced;
         }
         if self.server_info.msg.as_deref() == Some("isdbgrid") {
@@ -493,4 +585,8 @@ pub(crate) fn log_uncaptured<S: AsRef<str>>(text: S) {
     let mut stderr = std::io::stderr();
     stderr.write_all(text.as_ref().as_bytes()).unwrap();
     stderr.write_all(b"\n").unwrap();
+}
+
+pub(crate) fn file_level_log(message: impl AsRef<str>) {
+    log_uncaptured(format!("\n------------\n{}\n", message.as_ref()));
 }

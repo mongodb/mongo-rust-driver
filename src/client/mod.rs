@@ -180,8 +180,10 @@ impl Client {
     ) -> Result<EncryptedClientBuilder> {
         Ok(EncryptedClientBuilder::new(
             client_options,
-            key_vault_namespace,
-            csfle::options::KmsProviders::new(kms_providers)?,
+            csfle::options::AutoEncryptionOptions::new(
+                key_vault_namespace,
+                csfle::options::KmsProviders::new(kms_providers)?,
+            ),
         ))
     }
 
@@ -561,6 +563,11 @@ impl Client {
             csfle.as_ref().map(|cs| cs.opts())
         })
         .ok()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn options(&self) -> &ClientOptions {
+        &self.inner.options
     }
 }
 

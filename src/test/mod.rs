@@ -24,6 +24,7 @@ pub(crate) use self::{
     util::{
         assert_matches,
         eq_matches,
+        file_level_log,
         log_uncaptured,
         Event,
         EventClient,

@@ -1,6 +1,6 @@
-use crate::{bson::Document, error::Result, options::ClientOptions, Client, Namespace};
+use crate::{bson::Document, error::Result, options::ClientOptions, Client};
 
-use super::options::{AutoEncryptionOptions, KmsProviders};
+use super::options::AutoEncryptionOptions;
 
 /// A builder for constructing a `Client` with auto-encryption enabled.
 ///
@@ -31,14 +31,10 @@ pub struct EncryptedClientBuilder {
 }
 
 impl EncryptedClientBuilder {
-    pub(crate) fn new(
-        client_options: ClientOptions,
-        key_vault_namespace: Namespace,
-        kms_providers: KmsProviders,
-    ) -> Self {
+    pub(crate) fn new(client_options: ClientOptions, enc_opts: AutoEncryptionOptions) -> Self {
         EncryptedClientBuilder {
             client_options,
-            enc_opts: AutoEncryptionOptions::new(key_vault_namespace, kms_providers),
+            enc_opts,
         }
     }
 
@@ -101,8 +97,8 @@ impl EncryptedClientBuilder {
         self
     }
 
-    /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups as part of
-    /// `Client` initialization.
+    /// Constructs a new `Client` using automatic encryption.  May perform DNS lookups and/or spawn
+    /// mongocryptd as part of `Client` initialization.
     pub async fn build(self) -> Result<Client> {
         let client = Client::with_options(self.client_options)?;
         *client.inner.csfle.write().await =

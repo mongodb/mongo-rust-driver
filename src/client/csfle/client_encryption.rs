@@ -59,7 +59,7 @@ impl ClientEncryption {
     ) -> Result<Self> {
         let kms_providers = KmsProviders::new(kms_providers)?;
         let crypt = Crypt::builder()
-            .kms_providers(&kms_providers.credentials()?)?
+            .kms_providers(&kms_providers.credentials_doc()?)?
             .build()?;
         let exec = CryptExecutor::new_explicit(
             key_vault_client.weak(),

@@ -20,6 +20,9 @@ if [ "$OS" = "Windows_NT" ]; then
     export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
+export AWS_DEFAULT_REGION=us-east-1
+. ${DRIVERS_TOOLS}/.evergreen/csfle/set-temp-creds.sh
+
 echo "cargo test options: --features ${FEATURE_FLAGS} ${OPTIONS}"
 
 CARGO_RESULT=0

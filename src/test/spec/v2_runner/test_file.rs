@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bson::{doc, from_document};
+use bson::{doc, from_document, Bson};
 use futures::TryStreamExt;
 use semver::VersionReq;
 use serde::{Deserialize, Deserializer};
@@ -8,7 +8,15 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::merge_uri_options, EventClient, FailPoint, Serverless, TestClient, DEFAULT_URI},
+    test::{
+        spec::merge_uri_options,
+        util::is_expected_type,
+        FailPoint,
+        Serverless,
+        TestClient,
+        DEFAULT_URI,
+    },
+    Client,
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -23,6 +31,12 @@ pub(crate) struct TestFile {
     #[allow(unused)]
     pub(crate) bucket_name: Option<String>,
     pub(crate) data: Option<TestData>,
+    #[cfg(feature = "csfle")]
+    pub(crate) json_schema: Option<Document>,
+    #[cfg(feature = "csfle")]
+    pub(crate) encrypted_fields: Option<Document>,
+    #[cfg(feature = "csfle")]
+    pub(crate) key_vault_data: Option<Vec<Document>>,
     pub(crate) tests: Vec<Test>,
 }
 
@@ -76,12 +90,8 @@ pub(crate) struct Test {
     pub(crate) description: String,
     pub(crate) skip_reason: Option<String>,
     pub(crate) use_multiple_mongoses: Option<bool>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_uri_options_to_uri_string_option",
-        rename = "clientOptions"
-    )]
-    pub(crate) client_uri: Option<String>,
+    #[serde(default, rename = "clientOptions")]
+    pub(crate) client_options: Option<ClientOptions>,
     pub(crate) fail_point: Option<FailPoint>,
     pub(crate) session_options: Option<HashMap<String, SessionOptions>>,
     pub(crate) operations: Vec<Operation>,
@@ -90,18 +100,35 @@ pub(crate) struct Test {
     pub(crate) outcome: Option<Outcome>,
 }
 
-fn deserialize_uri_options_to_uri_string_option<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let uri_options = Document::deserialize(deserializer)?;
-    Ok(Some(merge_uri_options(
-        &DEFAULT_URI,
-        Some(&uri_options),
-        true,
-    )))
+#[derive(Debug)]
+pub(crate) struct ClientOptions {
+    pub(crate) uri: String,
+    #[cfg(feature = "csfle")]
+    pub(crate) auto_encrypt_opts: Option<crate::client::csfle::options::AutoEncryptionOptions>,
+}
+
+impl<'de> Deserialize<'de> for ClientOptions {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[cfg(feature = "csfle")]
+        use serde::de::Error;
+        #[allow(unused_mut)]
+        let mut uri_options = Document::deserialize(deserializer)?;
+        #[cfg(feature = "csfle")]
+        let auto_encrypt_opts = uri_options
+            .remove("autoEncryptOpts")
+            .map(bson::from_bson)
+            .transpose()
+            .map_err(D::Error::custom)?;
+        let uri = merge_uri_options(&DEFAULT_URI, Some(&uri_options), true);
+        Ok(Self {
+            uri,
+            #[cfg(feature = "csfle")]
+            auto_encrypt_opts,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,17 +137,27 @@ pub(crate) struct Outcome {
 }
 
 impl Outcome {
-    pub(crate) async fn matches_actual(
+    pub(crate) async fn assert_matches_actual(
         self,
         db_name: String,
         coll_name: String,
-        client: &EventClient,
-    ) -> bool {
+        client: &Client,
+    ) {
+        use crate::coll::options::CollectionOptions;
+
         let coll_name = match self.collection.name {
             Some(name) => name,
             None => coll_name,
         };
-        let coll = client.database(&db_name).collection(&coll_name);
+        #[cfg(not(feature = "csfle"))]
+        let coll_opts = CollectionOptions::default();
+        #[cfg(feature = "csfle")]
+        let coll_opts = CollectionOptions::builder()
+            .read_concern(crate::options::ReadConcern::LOCAL)
+            .build();
+        let coll = client
+            .database(&db_name)
+            .collection_with_options(&coll_name, coll_opts);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         let options = FindOptions::builder()
             .sort(doc! { "_id": 1 })
@@ -133,7 +170,48 @@ impl Outcome {
             .try_collect()
             .await
             .unwrap();
-        actual_data == self.collection.data
+        assert_data_matches(&actual_data, &self.collection.data);
+    }
+}
+
+fn assert_data_matches(actual: &[Document], expected: &[Document]) {
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "data length mismatch, expected {:?}, got {:?}",
+        expected,
+        actual
+    );
+    for (a, e) in actual.iter().zip(expected.iter()) {
+        assert_doc_matches(a, e);
+    }
+}
+
+fn assert_doc_matches(actual: &Document, expected: &Document) {
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "doc length mismatch, expected {:?}, got {:?}",
+        expected,
+        actual
+    );
+    for (k, expected_val) in expected {
+        let actual_val = if let Some(v) = actual.get(k) {
+            v
+        } else {
+            panic!("no value for {:?}, expected {:?}", k, expected_val);
+        };
+        if let Some(types) = is_expected_type(expected_val) {
+            if types.contains(&actual_val.element_type()) {
+                continue;
+            } else {
+                panic!("expected type {:?}, actual value {:?}", types, actual_val);
+            }
+        }
+        match (expected_val, actual_val) {
+            (Bson::Document(exp_d), Bson::Document(act_d)) => assert_doc_matches(act_d, exp_d),
+            (e, a) => assert_eq!(e, a, "mismatch for {:?}, expected {:?} got {:?}", k, e, a),
+        }
     }
 }
 

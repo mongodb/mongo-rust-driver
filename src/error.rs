@@ -286,6 +286,9 @@ impl Error {
             }
             ErrorKind::Transaction { message } => Some(message.clone()),
             ErrorKind::IncompatibleServer { message } => Some(message.clone()),
+            ErrorKind::InvalidArgument { message } => Some(message.clone()),
+            #[cfg(feature = "csfle")]
+            ErrorKind::Csfle(err) => err.message.clone(),
             _ => None,
         }
     }

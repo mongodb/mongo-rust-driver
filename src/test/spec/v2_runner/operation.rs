@@ -29,6 +29,7 @@ use crate::{
         ListCollectionsOptions,
         ListDatabasesOptions,
         ListIndexesOptions,
+        ReadConcern,
         ReplaceOptions,
         TransactionOptions,
         UpdateModifications,
@@ -114,6 +115,8 @@ pub(crate) struct OperationError {
     pub(crate) error_code: Option<i32>,
     pub(crate) error_labels_contain: Option<Vec<String>>,
     pub(crate) error_labels_omit: Option<Vec<String>>,
+    #[cfg(feature = "csfle")]
+    pub(crate) is_timeout_error: Option<bool>,
 }
 
 impl<'de> Deserialize<'de> for Operation {
@@ -1212,11 +1215,22 @@ impl TestOperation for AssertCollectionExists {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let collections = client
-                .database(&self.database)
+                .database_with_options(
+                    &self.database,
+                    DatabaseOptions::builder()
+                        .read_concern(ReadConcern::MAJORITY)
+                        .build(),
+                )
                 .list_collection_names(None)
                 .await
                 .unwrap();
-            assert!(collections.contains(&self.collection));
+            assert!(
+                collections.contains(&self.collection),
+                "Collection {}.{} should exist, but does not (collections: {:?}).",
+                self.database,
+                self.collection,
+                collections
+            );
             Ok(None)
         }
         .boxed()
