@@ -85,7 +85,6 @@ functions:
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
               export MONGODB_VERSION=${MONGODB_VERSION}
-              export CRYPT_SHARED_VERSION=${CRYPT_SHARED_VERSION}
 
               if [ "Windows_NT" != "$OS" ]; then
                   ulimit -n 64000
@@ -473,20 +472,6 @@ functions:
           MONGO_OCSP_TESTS=1 \
           .evergreen/run-ocsp-test.sh
 
-  "fetch crypt_shared":
-  - command: shell.exec
-    params:
-      shell: bash
-      working_dir: "src"
-      script: |
-        ${PREPARE_SHELL}
-        if [ "${DISABLE_CRYPT_SHARED}" == "true" ]; then
-          echo "crypt_shared is disabled, not fetching"
-        else
-          ${PYTHON} ${DRIVERS_TOOLS}/.evergreen/mongodl.py --component=crypt_shared --version=${CRYPT_SHARED_VERSION} --out=./crypt_shared/
-          ls -R ${PROJECT_DIRECTORY}/crypt_shared
-        fi
-
   "run kmip server":
   - command: shell.exec
     params:
@@ -508,7 +493,7 @@ functions:
           ${PREPARE_SHELL}
           export ASYNC_RUNTIME=${ASYNC_RUNTIME}
           export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
-          export CSFLE_SHARED_LIB_PATH=$(.evergreen/find-crypt_shared.sh "$PROJECT_DIRECTORY/crypt_shared/lib/")
+          export CRYPT_SHARED_LIB_PATH=${CRYPT_SHARED_LIB_PATH}
           export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
           export TLS_FEATURE=${TLS_FEATURE}
           export PYTHON=${PYTHON}
@@ -1184,7 +1169,6 @@ tasks:
     tags: ["csfle"]
     commands:
       - func: "install junit dependencies"
-      - func: "fetch crypt_shared"
       - func: "bootstrap mongo-orchestration"
       - func: "run kmip server"
       - func: "run csfle tests"
@@ -1576,7 +1560,6 @@ axes:
         display_name: "latest"
         variables:
            MONGODB_VERSION: "latest"
-           CRYPT_SHARED_VERSION: "latest"
       - id: "rapid"
         display_name: "rapid"
         variables:
@@ -1585,7 +1568,6 @@ axes:
         display_name: "6.0"
         variables:
           MONGODB_VERSION: "6.0"
-          CRYPT_SHARED_VERSION: "6.0.0"
       - id: "5.0"
         display_name: "5.0"
         variables:

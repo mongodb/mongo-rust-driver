@@ -151,7 +151,7 @@ lazy_static! {
         map
     };
     static ref EXTRA_OPTIONS: Document =
-        doc! { "cryptSharedLibPath": std::env::var("CSFLE_SHARED_LIB_PATH").unwrap() };
+        doc! { "cryptSharedLibPath": std::env::var("CRYPT_SHARED_LIB_PATH").unwrap() };
     static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
     static ref DISABLE_CRYPT_SHARED: bool =
         std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true");
