@@ -1937,8 +1937,9 @@ buildvariants:
     crypt-shared:
       - "enabled"
     tls-feature:
+      - "default"
       - "openssl"
-  display_name: "Serverless ${os} with ${async-runtime}"
+  display_name: "Serverless ${os} with ${async-runtime} ${tls-feature}"
   tasks:
     - "serverless_task_group"
 
