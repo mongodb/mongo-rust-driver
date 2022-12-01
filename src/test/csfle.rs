@@ -1,10 +1,16 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+        Mutex,
+    },
     time::Duration,
 };
 
+#[cfg(not(feature = "tokio-runtime"))]
+use async_std::net::TcpListener;
 use bson::{
     doc,
     spec::{BinarySubtype, ElementType},
@@ -16,6 +22,8 @@ use bson::{
 use futures_util::TryStreamExt;
 use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
+#[cfg(feature = "tokio-runtime")]
+use tokio::net::TcpListener;
 
 use crate::{
     client::{auth::Credential, options::TlsOptions},
@@ -35,6 +43,7 @@ use crate::{
         CommandSucceededEvent,
     },
     options::{IndexOptions, ReadConcern, WriteConcern},
+    runtime,
     test::{Event, EventHandler, SdamEvent},
     Client,
     Collection,
@@ -1309,6 +1318,62 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let result = client_encryption.create_data_key(master_key).run().await;
     assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
+// Prose test 8. Bypass Spawning mongocryptd (Via loading shared library)
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_shared_library", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    if *DISABLE_CRYPT_SHARED {
+        log_uncaptured(
+            "Skipping bypass mongocryptd via shared library test: crypt_shared is disabled.",
+        );
+        return Ok(());
+    }
+
+    // Setup: encrypted client.
+    let client_encrypted = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .schema_map({
+        [(
+            "db.coll".to_string(),
+            load_testdata("external-schema.json")?,
+        )]
+        .into_iter()
+        .collect::<HashMap<String, Document>>()
+    })
+    .extra_options(doc! {
+        "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
+        "mongocryptdSpawnArgs": ["--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
+        "cryptSharedLibPath": EXTRA_OPTIONS.get("cryptSharedLibPath").unwrap(),
+        "cryptSharedRequired": true,
+    })
+    .build()
+    .await?;
+
+    // Test: insert succeeds.
+    client_encrypted
+        .database("db")
+        .collection::<Document>("coll")
+        .insert_one(doc! { "unencrypted": "test" }, None)
+        .await?;
+    // Test: mongocryptd not spawned.
+    assert!(!client_encrypted.mongocryptd_spawned().await);
+    // Test: attempting to connect fails.
+    let client =
+        Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
+    let result = client.list_database_names(None, None).await;
+    assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
 }
@@ -2712,3 +2777,65 @@ impl CommandEventHandler for DecryptionEventsHandler {
 // TODO RUST-1417: implement prose test 17. On-demand GCP Credentials
 
 // TODO RUST-1442: implement prose test 18. Azure IMDS Credentials
+
+// TODO RUST-1442: implement prose test 19. Azure IMDS Credentials Integration Test
+
+// Prose test 20. Bypass creating mongocryptd client when shared library is loaded
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn bypass_mongocryptd_client() -> Result<()> {
+    if !check_env("bypass_mongocryptd_client", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    if *DISABLE_CRYPT_SHARED {
+        log_uncaptured("Skipping bypass mongocryptd client test: crypt_shared is disabled.");
+        return Ok(());
+    }
+
+    let connected = Arc::new(AtomicBool::new(false));
+    {
+        let connected = Arc::clone(&connected);
+        let listener = bind("127.0.0.1:27021").await?;
+        runtime::spawn(async move {
+            let _ = listener.accept().await;
+            log_uncaptured("test failure: connection accepted");
+            connected.store(true, Ordering::SeqCst);
+        })
+    };
+
+    let client_encrypted = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .extra_options({
+        let mut extra_options = EXTRA_OPTIONS.clone();
+        extra_options.insert("mongocryptdURI", "mongodb://localhost:27021");
+        extra_options
+    })
+    .build()
+    .await?;
+    client_encrypted
+        .database("db")
+        .collection::<Document>("coll")
+        .insert_one(doc! { "unencrypted": "test" }, None)
+        .await?;
+
+    assert!(!client_encrypted.has_mongocryptd_client().await);
+    assert!(!connected.load(Ordering::SeqCst));
+
+    Ok(())
+}
+
+async fn bind(addr: &str) -> Result<TcpListener> {
+    #[cfg(feature = "tokio-runtime")]
+    {
+        Ok(TcpListener::bind(addr.parse::<std::net::SocketAddr>()?).await?)
+    }
+    #[cfg(not(feature = "tokio-runtime"))]
+    {
+        Ok(TcpListener::bind(addr).await?)
+    }
+}

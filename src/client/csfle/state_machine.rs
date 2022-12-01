@@ -83,6 +83,11 @@ impl CryptExecutor {
         self.mongocryptd.is_some()
     }
 
+    #[cfg(test)]
+    pub(crate) fn has_mongocryptd_client(&self) -> bool {
+        self.mongocryptd_client.is_some()
+    }
+
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
