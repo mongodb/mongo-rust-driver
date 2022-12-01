@@ -1070,7 +1070,7 @@ pub struct DropCollectionOptions {
     /// Map of encrypted fields for the collection.
     // Serialization is skipped because the server doesn't accept this option; it's needed for
     // preprocessing.  Deserialization needs to remain because it's used in test files.
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     #[serde(skip_serializing)]
     pub encrypted_fields: Option<Document>,
 }

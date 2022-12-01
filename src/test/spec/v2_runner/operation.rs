@@ -115,7 +115,7 @@ pub(crate) struct OperationError {
     pub(crate) error_code: Option<i32>,
     pub(crate) error_labels_contain: Option<Vec<String>>,
     pub(crate) error_labels_omit: Option<Vec<String>>,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) is_timeout_error: Option<bool>,
 }
 

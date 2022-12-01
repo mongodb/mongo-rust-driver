@@ -5,7 +5,7 @@ mod auth_aws;
 mod change_stream;
 mod client;
 mod coll;
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
 mod cursor;
 mod db;
@@ -17,7 +17,7 @@ mod lambda_examples;
 pub mod spec;
 pub(crate) mod util;
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},

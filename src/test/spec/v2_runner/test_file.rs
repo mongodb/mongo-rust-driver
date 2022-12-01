@@ -31,11 +31,11 @@ pub(crate) struct TestFile {
     #[allow(unused)]
     pub(crate) bucket_name: Option<String>,
     pub(crate) data: Option<TestData>,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) json_schema: Option<Document>,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) encrypted_fields: Option<Document>,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) key_vault_data: Option<Vec<Document>>,
     pub(crate) tests: Vec<Test>,
 }
@@ -103,7 +103,7 @@ pub(crate) struct Test {
 #[derive(Debug)]
 pub(crate) struct ClientOptions {
     pub(crate) uri: String,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) auto_encrypt_opts: Option<crate::client::csfle::options::AutoEncryptionOptions>,
 }
 
@@ -112,11 +112,11 @@ impl<'de> Deserialize<'de> for ClientOptions {
     where
         D: Deserializer<'de>,
     {
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         use serde::de::Error;
         #[allow(unused_mut)]
         let mut uri_options = Document::deserialize(deserializer)?;
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let auto_encrypt_opts = uri_options
             .remove("autoEncryptOpts")
             .map(bson::from_bson)
@@ -125,7 +125,7 @@ impl<'de> Deserialize<'de> for ClientOptions {
         let uri = merge_uri_options(&DEFAULT_URI, Some(&uri_options), true);
         Ok(Self {
             uri,
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             auto_encrypt_opts,
         })
     }
@@ -149,9 +149,9 @@ impl Outcome {
             Some(name) => name,
             None => coll_name,
         };
-        #[cfg(not(feature = "csfle"))]
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
         let coll_opts = CollectionOptions::default();
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let coll_opts = CollectionOptions::builder()
             .read_concern(crate::options::ReadConcern::LOCAL)
             .build();

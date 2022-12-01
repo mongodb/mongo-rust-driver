@@ -1,5 +1,5 @@
 pub mod auth;
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) mod csfle;
 mod executor;
 pub mod options;
@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
 
@@ -113,7 +113,7 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
 }
 
@@ -136,7 +136,7 @@ impl Client {
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
             options,
         });
@@ -166,7 +166,7 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub fn encrypted_builder(
         client_options: ClientOptions,
         key_vault_namespace: crate::Namespace,
@@ -187,7 +187,7 @@ impl Client {
         ))
     }
 
-    #[cfg(all(test, feature = "csfle"))]
+    #[cfg(all(test, feature = "in-use-encryption-unstable"))]
     pub(crate) async fn mongocryptd_spawned(&self) -> bool {
         self.inner
             .csfle
@@ -558,14 +558,14 @@ impl Client {
         &self.inner.topology
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {
             inner: Arc::downgrade(&self.inner),
         }
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) async fn auto_encryption_opts(
         &self,
     ) -> Option<tokio::sync::RwLockReadGuard<'_, csfle::options::AutoEncryptionOptions>> {
@@ -581,13 +581,13 @@ impl Client {
     }
 }
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 #[derive(Clone, Debug)]
 pub(crate) struct WeakClient {
     inner: std::sync::Weak<ClientInner>,
 }
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 impl WeakClient {
     #[allow(dead_code)]
     pub(crate) fn upgrade(&self) -> Option<Client> {

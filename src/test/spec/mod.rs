@@ -1,7 +1,7 @@
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod auth;
 mod change_streams;
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 mod client_side_encryption;
 mod collection_management;
 mod command_monitoring;

@@ -412,7 +412,7 @@ async fn data_key_double_encryption() -> Result<()> {
             .await;
         let err = result.unwrap_err();
         assert!(
-            matches!(*err.kind, ErrorKind::Csfle(..)) || err.is_command_error(),
+            matches!(*err.kind, ErrorKind::Encryption(..)) || err.is_command_error(),
             "unexpected error: {}",
             err
         );

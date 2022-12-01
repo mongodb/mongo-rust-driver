@@ -1,7 +1,7 @@
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 use bson::RawDocumentBuf;
 use bson::{doc, RawBsonRef, RawDocument, Timestamp};
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
@@ -607,7 +607,7 @@ impl Client {
         let target_db = cmd.target_db.clone();
 
         let serialized = op.serialize_command(cmd)?;
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let serialized = {
             let guard = self.inner.csfle.read().await;
             if let Some(ref csfle) = *guard {
@@ -775,7 +775,7 @@ impl Client {
                     })
                 });
 
-                #[cfg(feature = "csfle")]
+                #[cfg(feature = "in-use-encryption-unstable")]
                 let response = {
                     let guard = self.inner.csfle.read().await;
                     if let Some(ref csfle) = *guard {
@@ -801,7 +801,7 @@ impl Client {
         }
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     fn auto_encrypt<'a>(
         &'a self,
         csfle: &'a super::csfle::ClientState,
@@ -817,7 +817,7 @@ impl Client {
         })
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     fn auto_decrypt<'a>(
         &'a self,
         csfle: &'a super::csfle::ClientState,

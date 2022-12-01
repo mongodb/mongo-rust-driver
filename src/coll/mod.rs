@@ -228,7 +228,7 @@ impl<T> Collection<T> {
         let mut options: Option<DropCollectionOptions> = options.into();
         resolve_options!(self, options, [write_concern]);
 
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         self.drop_aux_collections(options.as_ref(), session.as_deref_mut())
             .await?;
 
@@ -253,7 +253,7 @@ impl<T> Collection<T> {
         self.drop_common(options, session).await
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     #[allow(clippy::needless_option_as_deref)]
     async fn drop_aux_collections(
         &self,
@@ -1189,9 +1189,9 @@ where
         }
 
         let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let encrypted = self.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "csfle"))]
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
         let encrypted = false;
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;

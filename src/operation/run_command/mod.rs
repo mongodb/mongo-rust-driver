@@ -45,7 +45,7 @@ impl<'conn> RunCommand<'conn> {
         })
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn new_raw(
         db: String,
         command: RawDocumentBuf,

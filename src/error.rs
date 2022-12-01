@@ -231,9 +231,9 @@ impl Error {
         )
     }
 
-    #[cfg(all(test, feature = "csfle"))]
+    #[cfg(all(test, feature = "in-use-encryption-unstable"))]
     pub(crate) fn is_csfle_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::Csfle(..),)
+        matches!(self.kind.as_ref(), ErrorKind::Encryption(..))
     }
 
     /// Gets the code from this error for performing SDAM updates, if applicable.
@@ -287,8 +287,8 @@ impl Error {
             ErrorKind::Transaction { message } => Some(message.clone()),
             ErrorKind::IncompatibleServer { message } => Some(message.clone()),
             ErrorKind::InvalidArgument { message } => Some(message.clone()),
-            #[cfg(feature = "csfle")]
-            ErrorKind::Csfle(err) => err.message.clone(),
+            #[cfg(feature = "in-use-encryption-unstable")]
+            ErrorKind::Encryption(err) => err.message.clone(),
             _ => None,
         }
     }
@@ -424,8 +424,8 @@ impl Error {
             | ErrorKind::MissingResumeToken
             | ErrorKind::Authentication { .. }
             | ErrorKind::GridFs(_) => {}
-            #[cfg(feature = "csfle")]
-            ErrorKind::Csfle(_) => {}
+            #[cfg(feature = "in-use-encryption-unstable")]
+            ErrorKind::Encryption(_) => {}
         }
     }
 }
@@ -471,10 +471,10 @@ impl From<std::io::ErrorKind> for ErrorKind {
     }
 }
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 impl From<mongocrypt::error::Error> for ErrorKind {
     fn from(err: mongocrypt::error::Error) -> Self {
-        Self::Csfle(err)
+        Self::Encryption(err)
     }
 }
 
@@ -575,9 +575,9 @@ pub enum ErrorKind {
     MissingResumeToken,
 
     /// An error occurred during encryption or decryption.
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     #[error("An error occurred during client-side encryption: {0}")]
-    Csfle(mongocrypt::error::Error),
+    Encryption(mongocrypt::error::Error),
 }
 
 impl ErrorKind {
