@@ -483,6 +483,39 @@ functions:
         export TLS_FEATURE=${TLS_FEATURE}
         .evergreen/run-csfle-kmip-servers.sh
 
+  "build csfle expansions":
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          set +o xtrace
+          cat <<EOT > csfle-expansions.yml
+          PREPARE_CSFLE: |
+            export ASYNC_RUNTIME=${ASYNC_RUNTIME}
+            export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
+            export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
+            export TLS_FEATURE=${TLS_FEATURE}
+            export CRYPT_SHARED_LIB_PATH=${CRYPT_SHARED_LIB_PATH}
+            export PYTHON=${PYTHON}
+            ${PYTHON} -m pip install boto3
+            # Exported without xtrace to avoid leaking credentials
+            set +o xtrace
+            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            export AZURE_TENANT_ID=${AZURE_TENANT_ID}
+            export AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+            export AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+            export GCP_EMAIL=${GCP_EMAIL}
+            export GCP_PRIVATE_KEY=${GCP_PRIVATE_KEY}
+            export CSFLE_LOCAL_KEY=${CSFLE_LOCAL_KEY}
+            set -o xtrace
+          EOT
+    - command: expansions.update
+      params:
+        file: src/csfle-expansions.yml
+
   "run csfle tests":
     - command: shell.exec
       type: test
@@ -491,25 +524,29 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          export ASYNC_RUNTIME=${ASYNC_RUNTIME}
-          export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
-          export CRYPT_SHARED_LIB_PATH=${CRYPT_SHARED_LIB_PATH}
-          export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
-          export TLS_FEATURE=${TLS_FEATURE}
-          export PYTHON=${PYTHON}
-          ${PYTHON} -m pip install boto3
+          ${PREPARE_CSFLE}
+          
+          .evergreen/run-csfle-tests.sh
+
+  "run csfle serverless tests":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          ${PREPARE_CSFLE}
 
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
-          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-          export AZURE_TENANT_ID=${AZURE_TENANT_ID}
-          export AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-          export AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-          export GCP_EMAIL=${GCP_EMAIL}
-          export GCP_PRIVATE_KEY=${GCP_PRIVATE_KEY}
-          export CSFLE_LOCAL_KEY=${CSFLE_LOCAL_KEY}
+          export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
+          export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
           set -o xtrace
+
+          export SINGLE_MONGOS_LB_URI="${SERVERLESS_URI}"
+          . .evergreen/generate-uri.sh
+          export SERVERLESS=serverless
 
           .evergreen/run-csfle-tests.sh
 
@@ -699,6 +736,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
+          set +o xtrace
           for filename in $(find ${DRIVERS_TOOLS} -name \*.json); do
             perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|${DRIVERS_TOOLS}|g" $filename
           done
@@ -708,6 +746,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
+          set +o xtrace
           for i in $(find ${DRIVERS_TOOLS}/.evergreen ${PROJECT_DIRECTORY}/.evergreen -name \*.sh); do
             cat $i | tr -d '\r' > $i.new
             mv $i.new $i
@@ -723,6 +762,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
+          set +o xtrace
           for i in $(find ${DRIVERS_TOOLS}/.evergreen ${PROJECT_DIRECTORY}/.evergreen -name \*.sh); do
             chmod +x $i
           done
@@ -1171,7 +1211,23 @@ tasks:
       - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
       - func: "run kmip server"
+      - func: "build csfle expansions"
       - func: "run csfle tests"
+
+  - name: "test-csfle-serverless"
+    tags: ["csfle", "serverless"]
+    commands:
+      - command: expansions.update
+        params:
+          file: src/expansion.yml
+      - command: expansions.update
+        params:
+          file: serverless-expansion.yml
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "run kmip server"
+      - func: "build csfle expansions"
+      - func: "run csfle serverless tests"
 
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
@@ -1878,7 +1934,12 @@ buildvariants:
     os:
       - ubuntu-18.04
     async-runtime: "*"
-  display_name: "Serverless ${os} with ${async-runtime}"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "default"
+      - "openssl"
+  display_name: "Serverless ${os} with ${async-runtime} ${tls-feature}"
   tasks:
     - "serverless_task_group"
 
