@@ -2818,3 +2818,120 @@ async fn bind(addr: &str) -> Result<TcpListener> {
         Ok(TcpListener::bind(addr).await?)
     }
 }
+
+// FLE 2.0 Documentation Example
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn fle2_example() -> Result<()> {
+    if !check_env("fle2_example", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    // FLE 2 is not supported on Standalone topology.
+    let test_client = Client::test_builder().build().await;
+    if test_client.server_version_lt(6, 0) {
+        log_uncaptured("skipping fle2 example: server below 6.0");
+        return Ok(());
+    }
+    if test_client.is_standalone() {
+        log_uncaptured("skipping fle2 example: cannot run on standalone");
+        return Ok(());
+    }
+
+    // Drop data from prior test runs.
+    test_client
+        .database("keyvault")
+        .collection::<Document>("datakeys")
+        .drop(None)
+        .await?;
+    test_client.database("docsExamples").drop(None).await?;
+
+    // Create two data keys.
+    let ce = ClientEncryption::new(
+        test_client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?;
+    let key1_id = ce.create_data_key(MasterKey::Local).run().await?;
+    let key2_id = ce.create_data_key(MasterKey::Local).run().await?;
+
+    // Create an encryptedFieldsMap.
+    let encrypted_fields_map = vec![(
+        "docsExamples.encrypted".to_string(),
+        doc! {
+            "fields": [
+                {
+                    "path":     "encryptedIndexed",
+                    "bsonType": "string",
+                    "keyId":    key1_id,
+                    "queries": { "queryType": "equality" },
+                },
+                {
+                    "path":     "encryptedUnindexed",
+                    "bsonType": "string",
+                    "keyId":    key2_id,
+                },
+            ]
+        },
+    )];
+
+    // Create an FLE 2 collection.
+    let encrypted_client = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .encrypted_fields_map(encrypted_fields_map)
+    .build()
+    .await?;
+    let db = encrypted_client.database("docsExamples");
+    db.create_collection("encrypted", None).await?;
+    let encrypted_coll = db.collection::<Document>("encrypted");
+
+    // Auto encrypt an insert and find.
+
+    // Encrypt an insert.
+    encrypted_coll
+        .insert_one(
+            doc! {
+                "_id":                1,
+                "encryptedIndexed":   "indexedValue",
+                "encryptedUnindexed": "unindexedValue",
+            },
+            None,
+        )
+        .await?;
+
+    // Encrypt a find.
+    let found = encrypted_coll
+        .find_one(
+            doc! {
+                "encryptedIndexed": "indexedValue",
+            },
+            None,
+        )
+        .await?
+        .unwrap();
+    assert_eq!("indexedValue", found.get_str("encryptedIndexed")?);
+    assert_eq!("unindexedValue", found.get_str("encryptedUnindexed")?);
+
+    // Find documents without decryption.
+    let unencrypted_coll = test_client
+        .database("docsExamples")
+        .collection::<Document>("encrypted");
+    let found = unencrypted_coll
+        .find_one(doc! { "_id": 1 }, None)
+        .await?
+        .unwrap();
+    assert_eq!(
+        Some(ElementType::Binary),
+        found.get("encryptedIndexed").map(Bson::element_type)
+    );
+    assert_eq!(
+        Some(ElementType::Binary),
+        found.get("encryptedUnindexed").map(Bson::element_type)
+    );
+
+    Ok(())
+}
