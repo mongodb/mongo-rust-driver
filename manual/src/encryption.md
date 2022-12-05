@@ -22,17 +22,68 @@ By default, the `mongodb` crate attempts to load crypt_shared from the system an
 # use mongodb::{bson::doc, Client, error::Result};
 #
 # async fn func() -> Result<()> {
-# let client_options = todo!();
-# let key_vault_namespace = todo!();
+# let options = todo!();
+# let kv_namespace = todo!();
 # let kms_providers: Vec<_> = todo!();
-let client = Client::encrypted_builder(
-    client_options,
-    key_vault_namespace,
-    kms_providers
-)?
-.extra_options(doc! {
-    "cryptSharedLibPath": "/path/to/crypt/shared",
-});
+let client = Client::encrypted_builder(options, kv_namespace, kms_providers)?
+    .extra_options(doc! {
+        "cryptSharedLibPath": "/path/to/crypt/shared",
+    })
+    .build();
 #
 # Ok(())
 # }
+```
+If the `mongodb` crate load crypt_shared it will attempt to fallback to using mongocryptd by default.  Include `"cryptSharedRequired": true` in the `extra_options` document to always use crypt_shared and fail if it could not be loaded.
+
+For detailed installation instructions see the [MongoDB documentation on Automatic Encryption Shared Library](https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library).
+
+### mongocryptd
+
+The `mongocryptd` binary is required for automatic client-side encryption and is included as a component in the [MongoDB Enterprise Server package](https://dochub.mongodb.org/core/install-mongodb-enterprise). For detailed installation instructions see the [MongoDB documentation on mongocryptd](https://dochub.mongodb.org/core/client-side-field-level-encryption-mongocryptd).
+
+`mongocryptd` performs the following:
+* Parses the automatic encryption rules specified to the database connection. If the JSON schema contains invalid automatic encryption syntax or any document validation syntax, `mongocryptd` returns an error.
+* Uses the specified automatic encryption rules to mark fields in read and write operations for encryption.
+* Rejects read/write operations that may return unexpected or incorrect results when applied to an encrypted field. For supported and unsupported operations, see [Read/Write Support with Automatic Field Level Encryption](https://dochub.mongodb.org/core/client-side-field-level-encryption-read-write-support).
+
+A `Client` configured with auto encryption will automatically spawn the `mongocryptd` process from the application's `PATH`. Applications can control the spawning behavior as part of the automatic encryption options:
+```rust,no_run
+# extern crate mongodb;
+# use mongodb::{bson::doc, Client, error::Result};
+#
+# async fn func() -> Result<()> {
+# let options = todo!();
+# let kv_namespace = todo!();
+# let kms_providers: Vec<_> = todo!();
+let client = Client::encrypted_builder(options, kv_namespace, kms_providers)?
+    .extra_options(doc! {
+        "mongocryptdSpawnPath": "/path/to/mongocryptd",
+        "mongocryptdSpawnArgs": ["--logpath=/path/to/mongocryptd.log", "--logappend"],
+    })
+    .build();
+#
+# Ok(())
+# }
+```
+If your application wishes to manage the `mongocryptd` process manually, it is possible to disable spawning `mongocryptd`:
+```rust,no_run
+# extern crate mongodb;
+# use mongodb::{bson::doc, Client, error::Result};
+#
+# async fn func() -> Result<()> {
+# let options = todo!();
+# let kv_namespace = todo!();
+# let kms_providers: Vec<_> = todo!();
+let client = Client::encrypted_builder(options, kv_namespace, kms_providers)?
+    .extra_options(doc! {
+        "mongocryptdBypassSpawn": true,
+        "mongocryptdURI": "mongodb://localhost:27020",
+    })
+    .build();
+#
+# Ok(())
+# }
+```
+`mongocryptd` is only responsible for supporting automatic client-side field level encryption and does not itself perform any encryption or decryption.
+
