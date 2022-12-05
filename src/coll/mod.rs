@@ -1444,6 +1444,14 @@ pub struct Namespace {
 }
 
 impl Namespace {
+    /// Construct a `Namespace` with the given database and collection.
+    pub fn new(db: impl Into<String>, coll: impl Into<String>) -> Self {
+        Self {
+            db: db.into(),
+            coll: coll.into(),
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Self {

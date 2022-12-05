@@ -355,6 +355,8 @@ pub use crate::{
 };
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use crate::client::csfle::client_encryption;
+#[cfg(feature = "csfle")]
+pub use ::mongocrypt;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 

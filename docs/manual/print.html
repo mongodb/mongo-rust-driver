@@ -575,6 +575,116 @@ for i in 0..5 {
 </span><span class="boring">}
 </span><span class="boring">}</span></code></pre></pre>
 <p><code>mongocryptd</code> is only responsible for supporting automatic client-side field level encryption and does not itself perform any encryption or decryption.</p>
+<h2 id="automatic-client-side-field-level-encryption"><a class="header" href="#automatic-client-side-field-level-encryption">Automatic Client-Side Field Level Encryption</a></h2>
+<p>Automatic client-side field level encryption is enabled by using the <code>Client::encrypted_builder</code> constructor method.  The following examples show how to setup automatic client-side field level encryption using <code>ClientEncryption</code> to create a new encryption data key.</p>
+<p><em>Note</em>: Automatic client-side field level encryption requires MongoDB 4.2 enterprise or a MongoDB 4.2 Atlas cluster. The community version of the server supports automatic decryption as well as explicit client-side encryption.</p>
+<h3 id="providing-local-automatic-encryption-rules"><a class="header" href="#providing-local-automatic-encryption-rules">Providing Local Automatic Encryption Rules</a></h3>
+<p>The following example shows how to specify automatic encryption rules via the <code>schema_map</code> option. The automatic encryption rules are expressed using a <a href="https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules">strict subset of the JSON Schema syntax</a>.</p>
+<p>Supplying a <code>schema_map</code> provides more security than relying on JSON Schemas obtained from the server. It protects against a malicious server advertising a false JSON Schema, which could trick the client into sending unencrypted data that should be encrypted.</p>
+<p>JSON Schemas supplied in the <code>schema_map</code> only apply to configuring automatic client-side field level encryption. Other validation rules in the JSON schema will not be enforced by the driver and will result in an error.</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate rand;
+</span>use mongodb::{
+    Client,
+    Namespace,
+    bson::{self, Document, doc},
+    client_encryption::{ClientEncryption, MasterKey},
+    error::Result,
+    mongocrypt::ctx::{Algorithm, KmsProvider},
+    options::ClientOptions,
+};
+use rand::Rng;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // The MongoDB namespace (db.collection) used to store the
+    // encrypted documents in this example.
+    let encrypted_namespace = Namespace::new(&quot;test&quot;, &quot;coll&quot;);
+
+    // This must be the same master key that was used to create
+    // the encryption key.
+    //let local_master_key = os.urandom(96)
+    let mut key_bytes = vec![0u8; 96];
+    rand::thread_rng().fill(&amp;mut key_bytes[..]);
+    let local_master_key = bson::Binary {
+        subtype: bson::spec::BinarySubtype::Generic,
+        bytes: key_bytes,
+    };
+    let kms_providers = vec![
+        (KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None),
+    ];
+
+    // The MongoDB namespace (db.collection) used to store
+    // the encryption data keys.
+    let key_vault_namespace = Namespace::new(&quot;encryption&quot;, &quot;__pymongoTestKeyVault&quot;);
+
+    // The MongoClient used to access the key vault (key_vault_namespace).
+    let key_vault_client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+    let key_vault = key_vault_client
+        .database(&amp;key_vault_namespace.db)
+        .collection::&lt;Document&gt;(&amp;key_vault_namespace.coll);
+    // Ensure that two data keys cannot share the same keyAltName.
+    key_vault.drop(None).await?;
+    key_vault.create_index(
+        mongodb::IndexModel::builder()
+            .options(mongodb::options::IndexOptions::builder()
+                .name(&quot;keyAltNames&quot;.to_string())
+                .unique(true)
+                .partial_filter_expression(doc! { &quot;keyAltNames&quot;: {&quot;$exists&quot;: true} })
+                .build()
+            )
+            .build(),
+        None,
+    ).await?;
+
+    let client_encryption = ClientEncryption::new(
+        key_vault_client,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?;
+    // Create a new data key and json schema for the encryptedField.
+    // https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules
+    let data_key_id = client_encryption.create_data_key(MasterKey::Local)
+        .key_alt_names([&quot;pymongo_encryption_example_1&quot;.to_string()])
+        .run()
+        .await?;
+    let schema = doc! {
+        &quot;properties&quot;: {
+            &quot;encryptedField&quot;: {
+                &quot;encrypt&quot;: {
+                    &quot;keyId&quot;: [data_key_id],
+                    &quot;bsonType&quot;: &quot;string&quot;,
+                    &quot;algorithm&quot;: &quot;AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic&quot;,
+                }
+            }
+        },
+        &quot;bsonType&quot;: &quot;object&quot;,
+    };
+
+    let client = Client::encrypted_builder(
+        ClientOptions::parse(&quot;mongodb://example.com&quot;).await?,
+        key_vault_namespace,
+        kms_providers,
+    )?
+    .schema_map([(encrypted_namespace.to_string(), schema)])
+    .build()
+    .await?;
+    let coll = client
+        .database(&amp;encrypted_namespace.db)
+        .collection::&lt;Document&gt;(&amp;encrypted_namespace.coll);
+    // Clear old data.
+    coll.drop(None).await?;
+
+    coll.insert_one(doc! { &quot;encryptedField&quot;: &quot;123456789&quot; }, None).await?;
+    println!(&quot;Decrypted document: {:?}&quot;, coll.find_one(None, None).await?);
+    let unencrypted_coll = Client::from_uri(&quot;mongodb://example.com&quot;).await?
+        .database(&amp;encrypted_namespace.db)
+        .collection::&lt;Document&gt;(&amp;encrypted_namespace.coll);
+    println!(&quot;Encrypted document: {:?}&quot;, unencrypted_coll.find_one(None, None).await?);
+
+    Ok(())
+}</code></pre></pre>
 
                     </main>
 
