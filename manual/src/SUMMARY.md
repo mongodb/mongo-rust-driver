@@ -11,6 +11,7 @@
 - [Change Streams]()
 - [Monitoring]()
 - [Web Framework Examples](web_framework_examples.md)
+- [Encryption](encryption.md)
 
 # Development
 
