@@ -544,6 +544,150 @@ async fn main() -&gt; Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
+<h3 id="explicit-queryable-encryption"><a class="header" href="#explicit-queryable-encryption">Explicit Queryable Encryption</a></h3>
+<p>Verison 2.4.0 of the <code>mongodb</code> crate brings support for Queryable Encryption with MongoDB &gt;=6.0.</p>
+<p>Queryable Encryption is the second version of Client-Side Field Level Encryption. Data is encrypted client-side. Queryable Encryption supports indexed encrypted fields, which are further processed server-side.</p>
+<p>Explicit encryption in Queryable Encryption is performed using the <code>encrypt</code> and <code>decrypt</code> methods. Automatic encryption (to allow the <code>find_one</code> to automatically decrypt) is configured using an <code>encrypted_fields</code> mapping, as demonstrated by the following example:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate rand;
+</span><span class="boring">static URI: &amp;str = &quot;mongodb://example.com&quot;;
+</span>use mongodb::{
+    bson::{self, doc, Document},
+    client_encryption::{ClientEncryption, MasterKey},
+    error::Result,
+    mongocrypt::ctx::{KmsProvider, Algorithm},
+    options::{ClientOptions, CreateCollectionOptions},
+    Client,
+    Namespace,
+};
+use rand::Rng;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // This must be the same master key that was used to create
+    // the encryption key.
+    let mut key_bytes = vec![0u8; 96];
+    rand::thread_rng().fill(&amp;mut key_bytes[..]);
+    let local_master_key = bson::Binary {
+        subtype: bson::spec::BinarySubtype::Generic,
+        bytes: key_bytes,
+    };
+    let kms_providers = vec![(KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None)];
+
+    // The MongoDB namespace (db.collection) used to store
+    // the encryption data keys.
+    let key_vault_namespace = Namespace::new(&quot;keyvault&quot;, &quot;datakeys&quot;);
+
+    // Set up the key vault (key_vault_namespace) for this example.
+    let client = Client::with_uri_str(URI).await?;
+    let key_vault = client
+        .database(&amp;key_vault_namespace.db)
+        .collection::&lt;Document&gt;(&amp;key_vault_namespace.coll);
+    key_vault.drop(None).await?;
+    let client_encryption = ClientEncryption::new(
+        // The MongoClient to use for reading/writing to the key vault.
+        // This can be the same MongoClient used by the main application.
+        client,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?;
+
+    // Create a new data key for the encryptedField.
+    let indexed_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .run()
+        .await?;
+    let unindexed_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .run()
+        .await?;
+
+    let encrypted_fields = doc! {
+      &quot;escCollection&quot;: &quot;enxcol_.default.esc&quot;,
+      &quot;eccCollection&quot;: &quot;enxcol_.default.ecc&quot;,
+      &quot;ecocCollection&quot;: &quot;enxcol_.default.ecoc&quot;,
+      &quot;fields&quot;: [
+        {
+          &quot;keyId&quot;: indexed_key_id.clone(),
+          &quot;path&quot;: &quot;encryptedIndexed&quot;,
+          &quot;bsonType&quot;: &quot;string&quot;,
+          &quot;queries&quot;: {
+            &quot;queryType&quot;: &quot;equality&quot;
+          }
+        },
+        {
+          &quot;keyId&quot;: unindexed_key_id.clone(),
+          &quot;path&quot;: &quot;encryptedUnindexed&quot;,
+          &quot;bsonType&quot;: &quot;string&quot;,
+        }
+      ]
+    };
+
+    // The MongoClient used to read/write application data.
+    let encrypted_client = Client::encrypted_builder(
+        ClientOptions::parse(URI).await?,
+        key_vault_namespace,
+        kms_providers,
+    )?
+    .bypass_query_analysis(true)
+    .build()
+    .await?;
+    let db = encrypted_client.database(&quot;test&quot;);
+    db.drop(None).await?;
+
+    // Create the collection with encrypted fields.
+    db.create_collection(
+        &quot;coll&quot;,
+        CreateCollectionOptions::builder()
+            .encrypted_fields(encrypted_fields)
+            .build(),
+    )
+    .await?;
+    let coll = db.collection::&lt;Document&gt;(&quot;coll&quot;);
+
+    // Create and encrypt an indexed and unindexed value.
+    let val = &quot;encrypted indexed value&quot;;
+    let unindexed_val = &quot;encrypted unindexed value&quot;;
+    let insert_payload_indexed = client_encryption
+        .encrypt(val, indexed_key_id.clone(), Algorithm::Indexed)
+        .contention_factor(1)
+        .run()
+        .await?;
+    let insert_payload_unindexed = client_encryption
+        .encrypt(unindexed_val, unindexed_key_id, Algorithm::Unindexed)
+        .run()
+        .await?;
+
+    // Insert the payloads.
+    coll.insert_one(
+        doc! {
+            &quot;encryptedIndexed&quot;: insert_payload_indexed,
+            &quot;encryptedUnindexed&quot;: insert_payload_unindexed,
+        },
+        None,
+    )
+    .await?;
+
+    // Encrypt our find payload using QueryType.EQUALITY.
+    // The value of `data_key_id` must be the same as used to encrypt the values
+    // above.
+    let find_payload = client_encryption
+        .encrypt(val, indexed_key_id, Algorithm::Indexed)
+        .query_type(&quot;equality&quot;)
+        .contention_factor(1)
+        .run()
+        .await?;
+
+    // Find the document we inserted using the encrypted payload.
+    // The returned document is automatically decrypted.
+    let doc = coll
+        .find_one(doc! { &quot;encryptedIndexed&quot;: find_payload }, None)
+        .await?;
+    println!(&quot;Returned document: {:?}&quot;, doc);
+
+    Ok(())
+}</code></pre></pre>
 
                     </main>
 

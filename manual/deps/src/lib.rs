@@ -8,6 +8,7 @@ mod tests {
         super::example::local_rules::example().await?;
         super::example::server_side_enforcement::example().await?;
         super::example::automatic_queryable_encryption::example().await?;
+        super::example::explicit_queryable_encryption::example().await?;
         Ok(())
     }
 }
