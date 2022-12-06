@@ -147,7 +147,7 @@
 <p>See also the MongoDB documentation on <a href="https://dochub.mongodb.org/core/client-side-field-level-encryption">Client Side Field Level Encryption</a>.</p>
 <h2 id="dependencies"><a class="header" href="#dependencies">Dependencies</a></h2>
 <p>To get started using client-side field level encryption in your project, you will need to install <a href="https://github.com/mongodb/libmongocrypt">libmongocrypt</a>, which can be compiled from source or fetched from a variety of package repositories; for more information, see the libmongocrypt <a href="https://github.com/mongodb/libmongocrypt/blob/master/README.md">README</a>.  If you install libmongocrypt in a location outside of the system library search path, the <code>MONGOCRYPT_LIB_DIR</code> environment variable will need to be set when compiling your project.</p>
-<p>Additionally, either <a href="https://github.com/mongodb/mongo-python-driver/blob/master/doc/examples/encryption.rst#crypt-shared">crypt_shared</a> or <a href="https://github.com/mongodb/mongo-python-driver/blob/master/doc/examples/encryption.rst#mongocryptd">mongocryptd</a> are required in order to use automatic client-side encryption.</p>
+<p>Additionally, either <code>crypt_shared</code> or <code>mongocryptd</code> are required in order to use automatic client-side encryption.</p>
 <h3 id="crypt_shared"><a class="header" href="#crypt_shared">crypt_shared</a></h3>
 <p>The Automatic Encryption Shared Library (crypt_shared) provides the same functionality as mongocryptd, but does not require you to spawn another process to perform automatic encryption.</p>
 <p>By default, the <code>mongodb</code> crate attempts to load crypt_shared from the system and if found uses it automatically. To load crypt_shared from another location, set the <code>&quot;cryptSharedLibPath&quot;</code> field in <code>extra_options</code>:</p>
@@ -230,14 +230,15 @@
 <pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
 </span><span class="boring">extern crate tokio;
 </span><span class="boring">extern crate rand;
+</span><span class="boring">static URI: &amp;str = &quot;mongodb://example.com&quot;;
 </span>use mongodb::{
-    Client,
-    Namespace,
-    bson::{self, Document, doc},
+    bson::{self, doc, Document},
     client_encryption::{ClientEncryption, MasterKey},
     error::Result,
-    mongocrypt::ctx::{Algorithm, KmsProvider},
+    mongocrypt::ctx::KmsProvider,
     options::ClientOptions,
+    Client,
+    Namespace,
 };
 use rand::Rng;
 
@@ -249,39 +250,39 @@ async fn main() -&gt; Result&lt;()&gt; {
 
     // This must be the same master key that was used to create
     // the encryption key.
-    //let local_master_key = os.urandom(96)
     let mut key_bytes = vec![0u8; 96];
     rand::thread_rng().fill(&amp;mut key_bytes[..]);
     let local_master_key = bson::Binary {
         subtype: bson::spec::BinarySubtype::Generic,
         bytes: key_bytes,
     };
-    let kms_providers = vec![
-        (KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None),
-    ];
+    let kms_providers = vec![(KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None)];
 
     // The MongoDB namespace (db.collection) used to store
     // the encryption data keys.
-    let key_vault_namespace = Namespace::new(&quot;encryption&quot;, &quot;__pymongoTestKeyVault&quot;);
+    let key_vault_namespace = Namespace::new(&quot;encryption&quot;, &quot;__testKeyVault&quot;);
 
     // The MongoClient used to access the key vault (key_vault_namespace).
-    let key_vault_client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+    let key_vault_client = Client::with_uri_str(URI).await?;
     let key_vault = key_vault_client
         .database(&amp;key_vault_namespace.db)
         .collection::&lt;Document&gt;(&amp;key_vault_namespace.coll);
     // Ensure that two data keys cannot share the same keyAltName.
     key_vault.drop(None).await?;
-    key_vault.create_index(
-        mongodb::IndexModel::builder()
-            .options(mongodb::options::IndexOptions::builder()
-                .name(&quot;keyAltNames&quot;.to_string())
-                .unique(true)
-                .partial_filter_expression(doc! { &quot;keyAltNames&quot;: {&quot;$exists&quot;: true} })
-                .build()
-            )
-            .build(),
-        None,
-    ).await?;
+    key_vault
+        .create_index(
+            mongodb::IndexModel::builder()
+                .options(
+                    mongodb::options::IndexOptions::builder()
+                        .name(&quot;keyAltNames&quot;.to_string())
+                        .unique(true)
+                        .partial_filter_expression(doc! { &quot;keyAltNames&quot;: {&quot;$exists&quot;: true} })
+                        .build(),
+                )
+                .build(),
+            None,
+        )
+        .await?;
 
     let client_encryption = ClientEncryption::new(
         key_vault_client,
@@ -290,8 +291,9 @@ async fn main() -&gt; Result&lt;()&gt; {
     )?;
     // Create a new data key and json schema for the encryptedField.
     // https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules
-    let data_key_id = client_encryption.create_data_key(MasterKey::Local)
-        .key_alt_names([&quot;pymongo_encryption_example_1&quot;.to_string()])
+    let data_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names([&quot;encryption_example_1&quot;.to_string()])
         .run()
         .await?;
     let schema = doc! {
@@ -308,7 +310,7 @@ async fn main() -&gt; Result&lt;()&gt; {
     };
 
     let client = Client::encrypted_builder(
-        ClientOptions::parse(&quot;mongodb://example.com&quot;).await?,
+        ClientOptions::parse(URI).await?,
         key_vault_namespace,
         kms_providers,
     )?
@@ -321,13 +323,122 @@ async fn main() -&gt; Result&lt;()&gt; {
     // Clear old data.
     coll.drop(None).await?;
 
-    coll.insert_one(doc! { &quot;encryptedField&quot;: &quot;123456789&quot; }, None).await?;
+    coll.insert_one(doc! { &quot;encryptedField&quot;: &quot;123456789&quot; }, None)
+        .await?;
     println!(&quot;Decrypted document: {:?}&quot;, coll.find_one(None, None).await?);
-    let unencrypted_coll = Client::from_uri(&quot;mongodb://example.com&quot;).await?
+    let unencrypted_coll = Client::with_uri_str(URI)
+        .await?
         .database(&amp;encrypted_namespace.db)
         .collection::&lt;Document&gt;(&amp;encrypted_namespace.coll);
-    println!(&quot;Encrypted document: {:?}&quot;, unencrypted_coll.find_one(None, None).await?);
+    println!(
+        &quot;Encrypted document: {:?}&quot;,
+        unencrypted_coll.find_one(None, None).await?
+    );
 
+    Ok(())
+}</code></pre></pre>
+<h3 id="server-side-field-level-encryption-enforcement"><a class="header" href="#server-side-field-level-encryption-enforcement">Server-Side Field Level Encryption Enforcement</a></h3>
+<p>The MongoDB 4.2 server supports using schema validation to enforce encryption of specific fields in a collection. This schema validation will prevent an application from inserting unencrypted values for any fields marked with the <code>&quot;encrypt&quot;</code> JSON schema keyword.</p>
+<p>The following example shows how to setup automatic client-side field level encryption using <code>ClientEncryption</code> to create a new encryption data key and create a collection with the <a href="https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules">Automatic Encryption JSON Schema Syntax</a>:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate rand;
+</span><span class="boring">static URI: &amp;str = &quot;mongodb://example.com&quot;;
+</span>use mongodb::{
+    bson::{self, doc, Document},
+    client_encryption::{ClientEncryption, MasterKey},
+    error::Result,
+    mongocrypt::ctx::KmsProvider,
+    options::{ClientOptions, CreateCollectionOptions, WriteConcern},
+    Client,
+    Namespace,
+};
+use rand::Rng;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // The MongoDB namespace (db.collection) used to store the
+    // encrypted documents in this example.
+    let encrypted_namespace = Namespace::new(&quot;test&quot;, &quot;coll&quot;);
+
+    // This must be the same master key that was used to create
+    // the encryption key.
+    let mut key_bytes = vec![0u8; 96];
+    rand::thread_rng().fill(&amp;mut key_bytes[..]);
+    let local_master_key = bson::Binary {
+        subtype: bson::spec::BinarySubtype::Generic,
+        bytes: key_bytes,
+    };
+    let kms_providers = vec![(KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None)];
+
+    // The MongoDB namespace (db.collection) used to store
+    // the encryption data keys.
+    let key_vault_namespace = Namespace::new(&quot;encryption&quot;, &quot;__testKeyVault&quot;);
+
+    // The MongoClient used to access the key vault (key_vault_namespace).
+    let key_vault_client = Client::with_uri_str(URI).await?;
+    let key_vault = key_vault_client
+        .database(&amp;key_vault_namespace.db)
+        .collection::&lt;Document&gt;(&amp;key_vault_namespace.coll);
+    key_vault.drop(None).await?;
+    
+    let client_encryption = ClientEncryption::new(
+        key_vault_client,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?;
+
+    // Create a new data key and json schema for the encryptedField.
+    let data_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names([&quot;encryption_example_2&quot;.to_string()])
+        .run()
+        .await?;
+    let schema = doc! {
+        &quot;properties&quot;: {
+            &quot;encryptedField&quot;: {
+                &quot;encrypt&quot;: {
+                    &quot;keyId&quot;: [data_key_id],
+                    &quot;bsonType&quot;: &quot;string&quot;,
+                    &quot;algorithm&quot;: &quot;AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic&quot;,
+                }
+            }
+        },
+        &quot;bsonType&quot;: &quot;object&quot;,
+    };
+    
+    let client = Client::encrypted_builder(
+        ClientOptions::parse(URI).await?,
+        key_vault_namespace,
+        kms_providers,
+    )?
+    .build()
+    .await?;
+    let db = client.database(&amp;encrypted_namespace.db);
+    let coll = db.collection::&lt;Document&gt;(&amp;encrypted_namespace.coll);
+    // Clear old data
+    coll.drop(None).await?;
+    // Create the collection with the encryption JSON Schema.
+    db.create_collection(
+        &amp;encrypted_namespace.coll,
+        CreateCollectionOptions::builder()
+            .write_concern(WriteConcern::MAJORITY)
+            .validator(doc! { &quot;$jsonSchema&quot;: schema })
+            .build(),
+    ).await?;
+
+    coll.insert_one(doc! { &quot;encryptedField&quot;: &quot;123456789&quot; }, None)
+        .await?;
+    println!(&quot;Decrypted document: {:?}&quot;, coll.find_one(None, None).await?);
+    let unencrypted_coll = Client::with_uri_str(URI)
+        .await?
+        .database(&amp;encrypted_namespace.db)
+        .collection::&lt;Document&gt;(&amp;encrypted_namespace.coll);
+    println!(
+        &quot;Encrypted document: {:?}&quot;,
+        unencrypted_coll.find_one(None, None).await?
+    );
+    
     Ok(())
 }</code></pre></pre>
 

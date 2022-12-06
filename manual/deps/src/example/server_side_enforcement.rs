@@ -83,5 +83,17 @@ pub async fn example() -> Result<()> {
             .build(),
     ).await?;
 
+    coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+        .await?;
+    println!("Decrypted document: {:?}", coll.find_one(None, None).await?);
+    let unencrypted_coll = Client::with_uri_str(URI)
+        .await?
+        .database(&encrypted_namespace.db)
+        .collection::<Document>(&encrypted_namespace.coll);
+    println!(
+        "Encrypted document: {:?}",
+        unencrypted_coll.find_one(None, None).await?
+    );
+    
     Ok(())
 }
