@@ -10,7 +10,7 @@ See also the MongoDB documentation on [Client Side Field Level Encryption](https
 
 To get started using client-side field level encryption in your project, you will need to install [libmongocrypt](https://github.com/mongodb/libmongocrypt), which can be compiled from source or fetched from a variety of package repositories; for more information, see the libmongocrypt [README](https://github.com/mongodb/libmongocrypt/blob/master/README.md).  If you install libmongocrypt in a location outside of the system library search path, the `MONGOCRYPT_LIB_DIR` environment variable will need to be set when compiling your project.
 
-Additionally, either [crypt_shared](https://github.com/mongodb/mongo-python-driver/blob/master/doc/examples/encryption.rst#crypt-shared) or [mongocryptd](https://github.com/mongodb/mongo-python-driver/blob/master/doc/examples/encryption.rst#mongocryptd) are required in order to use automatic client-side encryption.
+Additionally, either `crypt_shared` or `mongocryptd` are required in order to use automatic client-side encryption.
 
 ### crypt_shared
 
@@ -105,14 +105,15 @@ JSON Schemas supplied in the `schema_map` only apply to configuring automatic cl
 # extern crate mongodb;
 # extern crate tokio;
 # extern crate rand;
+# static URI: &str = "mongodb://example.com";
 use mongodb::{
-    Client,
-    Namespace,
-    bson::{self, Document, doc},
+    bson::{self, doc, Document},
     client_encryption::{ClientEncryption, MasterKey},
     error::Result,
-    mongocrypt::ctx::{Algorithm, KmsProvider},
+    mongocrypt::ctx::KmsProvider,
     options::ClientOptions,
+    Client,
+    Namespace,
 };
 use rand::Rng;
 
@@ -124,39 +125,39 @@ async fn main() -> Result<()> {
 
     // This must be the same master key that was used to create
     // the encryption key.
-    //let local_master_key = os.urandom(96)
     let mut key_bytes = vec![0u8; 96];
     rand::thread_rng().fill(&mut key_bytes[..]);
     let local_master_key = bson::Binary {
         subtype: bson::spec::BinarySubtype::Generic,
         bytes: key_bytes,
     };
-    let kms_providers = vec![
-        (KmsProvider::Local, doc! { "key": local_master_key }, None),
-    ];
+    let kms_providers = vec![(KmsProvider::Local, doc! { "key": local_master_key }, None)];
 
     // The MongoDB namespace (db.collection) used to store
     // the encryption data keys.
-    let key_vault_namespace = Namespace::new("encryption", "__pymongoTestKeyVault");
+    let key_vault_namespace = Namespace::new("encryption", "__testKeyVault");
 
     // The MongoClient used to access the key vault (key_vault_namespace).
-    let key_vault_client = Client::with_uri_str("mongodb://example.com").await?;
+    let key_vault_client = Client::with_uri_str(URI).await?;
     let key_vault = key_vault_client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
     // Ensure that two data keys cannot share the same keyAltName.
     key_vault.drop(None).await?;
-    key_vault.create_index(
-        mongodb::IndexModel::builder()
-            .options(mongodb::options::IndexOptions::builder()
-                .name("keyAltNames".to_string())
-                .unique(true)
-                .partial_filter_expression(doc! { "keyAltNames": {"$exists": true} })
-                .build()
-            )
-            .build(),
-        None,
-    ).await?;
+    key_vault
+        .create_index(
+            mongodb::IndexModel::builder()
+                .options(
+                    mongodb::options::IndexOptions::builder()
+                        .name("keyAltNames".to_string())
+                        .unique(true)
+                        .partial_filter_expression(doc! { "keyAltNames": {"$exists": true} })
+                        .build(),
+                )
+                .build(),
+            None,
+        )
+        .await?;
 
     let client_encryption = ClientEncryption::new(
         key_vault_client,
@@ -165,8 +166,9 @@ async fn main() -> Result<()> {
     )?;
     // Create a new data key and json schema for the encryptedField.
     // https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules
-    let data_key_id = client_encryption.create_data_key(MasterKey::Local)
-        .key_alt_names(["pymongo_encryption_example_1".to_string()])
+    let data_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(["encryption_example_1".to_string()])
         .run()
         .await?;
     let schema = doc! {
@@ -183,7 +185,7 @@ async fn main() -> Result<()> {
     };
 
     let client = Client::encrypted_builder(
-        ClientOptions::parse("mongodb://example.com").await?,
+        ClientOptions::parse(URI).await?,
         key_vault_namespace,
         kms_providers,
     )?
@@ -196,13 +198,24 @@ async fn main() -> Result<()> {
     // Clear old data.
     coll.drop(None).await?;
 
-    coll.insert_one(doc! { "encryptedField": "123456789" }, None).await?;
+    coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+        .await?;
     println!("Decrypted document: {:?}", coll.find_one(None, None).await?);
-    let unencrypted_coll = Client::from_uri("mongodb://example.com").await?
+    let unencrypted_coll = Client::with_uri_str(URI)
+        .await?
         .database(&encrypted_namespace.db)
         .collection::<Document>(&encrypted_namespace.coll);
-    println!("Encrypted document: {:?}", unencrypted_coll.find_one(None, None).await?);
+    println!(
+        "Encrypted document: {:?}",
+        unencrypted_coll.find_one(None, None).await?
+    );
 
     Ok(())
 }
 ```
+
+### Server-Side Field Level Encryption Enforcement
+
+The MongoDB 4.2 server supports using schema validation to enforce encryption of specific fields in a collection. This schema validation will prevent an application from inserting unencrypted values for any fields marked with the `"encrypt"` JSON schema keyword.
+
+The following example shows how to setup automatic client-side field level encryption using `ClientEncryption` to create a new encryption data key and create a collection with the [Automatic Encryption JSON Schema Syntax](https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules):
