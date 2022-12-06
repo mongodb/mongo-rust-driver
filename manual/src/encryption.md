@@ -146,22 +146,7 @@ async fn main() -> Result<()> {
     let key_vault = key_vault_client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    // Ensure that two data keys cannot share the same keyAltName.
     key_vault.drop(None).await?;
-    key_vault
-        .create_index(
-            mongodb::IndexModel::builder()
-                .options(
-                    mongodb::options::IndexOptions::builder()
-                        .name("keyAltNames".to_string())
-                        .unique(true)
-                        .partial_filter_expression(doc! { "keyAltNames": {"$exists": true} })
-                        .build(),
-                )
-                .build(),
-            None,
-        )
-        .await?;
 
     let client_encryption = ClientEncryption::new(
         key_vault_client,
