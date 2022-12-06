@@ -1043,6 +1043,187 @@ async fn main() -&gt; Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
+<h2 id="explicit-encryption"><a class="header" href="#explicit-encryption">Explicit Encryption</a></h2>
+<p>Explicit encryption is a MongoDB community feature and does not use the mongocryptd process. Explicit encryption is provided by the <code>ClientEncryption</code> struct, for example:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate rand;
+</span><span class="boring">static URI: &amp;str = &quot;mongodb://example.com&quot;;
+</span>use mongodb::{
+    bson::{self, doc, Bson, Document},
+    client_encryption::{ClientEncryption, MasterKey},
+    error::Result,
+    mongocrypt::ctx::{Algorithm, KmsProvider},
+    Client,
+    Namespace,
+};
+use rand::Rng;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // This must be the same master key that was used to create
+    // the encryption key.
+    let mut key_bytes = vec![0u8; 96];
+    rand::thread_rng().fill(&amp;mut key_bytes[..]);
+    let local_master_key = bson::Binary {
+        subtype: bson::spec::BinarySubtype::Generic,
+        bytes: key_bytes,
+    };
+    let kms_providers = vec![(KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None)];
+
+    // The MongoDB namespace (db.collection) used to store
+    // the encryption data keys.
+    let key_vault_namespace = Namespace::new(&quot;keyvault&quot;, &quot;datakeys&quot;);
+
+    // The MongoClient used to read/write application data.
+    let client = Client::with_uri_str(URI).await?;
+    let coll = client.database(&quot;test&quot;).collection::&lt;Document&gt;(&quot;coll&quot;);
+    // Clear old data
+    coll.drop(None).await?;
+
+    // Set up the key vault (key_vault_namespace) for this example.
+    let key_vault = client
+        .database(&amp;key_vault_namespace.db)
+        .collection::&lt;Document&gt;(&amp;key_vault_namespace.coll);
+    key_vault.drop(None).await?;
+
+    let client_encryption = ClientEncryption::new(
+        // The MongoClient to use for reading/writing to the key vault.
+        // This can be the same MongoClient used by the main application.
+        client,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?;
+
+    // Create a new data key for the encryptedField.
+    let data_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names([&quot;encryption_example_3&quot;.to_string()])
+        .run()
+        .await?;
+
+    // Explicitly encrypt a field:
+    let encrypted_field = client_encryption
+        .encrypt(
+            &quot;123456789&quot;,
+            data_key_id,
+            Algorithm::AeadAes256CbcHmacSha512Deterministic,
+        )
+        .run()
+        .await?;
+    coll.insert_one(doc! { &quot;encryptedField&quot;: encrypted_field }, None)
+        .await?;
+    let mut doc = coll.find_one(None, None).await?.unwrap();
+    println!(&quot;Encrypted document: {:?}&quot;, doc);
+
+    // Explicitly decrypt the field:
+    let field = match doc.get(&quot;encryptedField&quot;) {
+        Some(Bson::Binary(bin)) =&gt; bin,
+        _ =&gt; panic!(&quot;invalid field&quot;),
+    };
+    let decrypted: Bson = client_encryption
+        .decrypt(field.as_raw_binary())
+        .await?
+        .try_into()?;
+    doc.insert(&quot;encryptedField&quot;, decrypted);
+    println!(&quot;Decrypted document: {:?}&quot;, doc);
+
+    Ok(())
+}</code></pre></pre>
+<h2 id="explicit-encryption-with-automatic-decryption"><a class="header" href="#explicit-encryption-with-automatic-decryption">Explicit Encryption with Automatic Decryption</a></h2>
+<p>Although automatic encryption requires MongoDB 4.2 enterprise or a MongoDB 4.2 Atlas cluster, automatic decryption is supported for all users. To configure automatic decryption without automatic encryption set <code>bypass_auto_encryption</code> to <code>true</code> in the <code>EncryptedClientBuilder</code>:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate rand;
+</span><span class="boring">static URI: &amp;str = &quot;mongodb://example.com&quot;;
+</span>use mongodb::{
+    bson::{self, doc, Document},
+    client_encryption::{ClientEncryption, MasterKey},
+    error::Result,
+    mongocrypt::ctx::{Algorithm, KmsProvider},
+    options::ClientOptions,
+    Client,
+    Namespace,
+};
+use rand::Rng;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // This must be the same master key that was used to create
+    // the encryption key.
+    let mut key_bytes = vec![0u8; 96];
+    rand::thread_rng().fill(&amp;mut key_bytes[..]);
+    let local_master_key = bson::Binary {
+        subtype: bson::spec::BinarySubtype::Generic,
+        bytes: key_bytes,
+    };
+    let kms_providers = vec![(KmsProvider::Local, doc! { &quot;key&quot;: local_master_key }, None)];
+
+    // The MongoDB namespace (db.collection) used to store
+    // the encryption data keys.
+    let key_vault_namespace = Namespace::new(&quot;keyvault&quot;, &quot;datakeys&quot;);
+
+    // `bypass_auto_encryption(true)` disables automatic encryption but keeps
+    // the automatic _decryption_ behavior. bypass_auto_encryption will
+    // also disable spawning mongocryptd.
+    let client = Client::encrypted_builder(
+        ClientOptions::parse(URI).await?,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?
+    .bypass_auto_encryption(true)
+    .build()
+    .await?;
+    let coll = client.database(&quot;test&quot;).collection::&lt;Document&gt;(&quot;coll&quot;);
+    // Clear old data
+    coll.drop(None).await?;
+
+    // Set up the key vault (key_vault_namespace) for this example.
+    let key_vault = client
+        .database(&amp;key_vault_namespace.db)
+        .collection::&lt;Document&gt;(&amp;key_vault_namespace.coll);
+    key_vault.drop(None).await?;
+
+    let client_encryption = ClientEncryption::new(
+        // The MongoClient to use for reading/writing to the key vault.
+        // This can be the same MongoClient used by the main application.
+        client,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?;
+
+    // Create a new data key for the encryptedField.
+    let data_key_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names([&quot;encryption_example_4&quot;.to_string()])
+        .run()
+        .await?;
+
+    // Explicitly encrypt a field:
+    let encrypted_field = client_encryption
+        .encrypt(
+            &quot;123456789&quot;,
+            data_key_id,
+            Algorithm::AeadAes256CbcHmacSha512Deterministic,
+        )
+        .run()
+        .await?;
+    coll.insert_one(doc! { &quot;encryptedField&quot;: encrypted_field }, None)
+        .await?;
+    // Automatically decrypts any encrypted fields.
+    let doc = coll.find_one(None, None).await?.unwrap();
+    println!(&quot;Decrypted document: {:?}&quot;, doc);
+    let unencrypted_coll = Client::with_uri_str(URI)
+        .await?
+        .database(&quot;test&quot;)
+        .collection::&lt;Document&gt;(&quot;coll&quot;);
+    println!(
+        &quot;Encrypted document: {:?}&quot;,
+        unencrypted_coll.find_one(None, None).await?
+    );
+
+    Ok(())
+}</code></pre></pre>
 
                     </main>
 
