@@ -358,7 +358,17 @@ pub use crate::client::csfle::client_encryption;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
-#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime",))]
+#[cfg(all(feature = "tokio-runtime", feature = "sync",))]
+compile_error!(
+    "`tokio-runtime` and `sync` can't both be enabled; either switch to using `tokio-sync` or set \
+     `default-features = false` in your Cargo.toml"
+);
+
+#[cfg(all(
+    feature = "tokio-runtime",
+    feature = "async-std-runtime",
+    not(feature = "sync")
+))]
 compile_error!(
     "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
