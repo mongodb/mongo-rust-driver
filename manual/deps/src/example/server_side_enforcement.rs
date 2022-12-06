@@ -37,7 +37,7 @@ pub async fn example() -> Result<()> {
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
     key_vault.drop(None).await?;
-    
+
     let client_encryption = ClientEncryption::new(
         key_vault_client,
         key_vault_namespace.clone(),
@@ -62,7 +62,7 @@ pub async fn example() -> Result<()> {
         },
         "bsonType": "object",
     };
-    
+
     let client = Client::encrypted_builder(
         ClientOptions::parse(URI).await?,
         key_vault_namespace,
@@ -81,7 +81,8 @@ pub async fn example() -> Result<()> {
             .write_concern(WriteConcern::MAJORITY)
             .validator(doc! { "$jsonSchema": schema })
             .build(),
-    ).await?;
+    )
+    .await?;
 
     coll.insert_one(doc! { "encryptedField": "123456789" }, None)
         .await?;
@@ -94,6 +95,6 @@ pub async fn example() -> Result<()> {
         "Encrypted document: {:?}",
         unencrypted_coll.find_one(None, None).await?
     );
-    
+
     Ok(())
 }

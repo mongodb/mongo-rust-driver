@@ -1,3 +1,7 @@
+# Unstable API
+
+To enable support for in-use encryption (client-side field level encryption and queryable encryption), enable the `"in-use-encryption-unstable"` feature of the `mongodb` crate.  As the name implies, the API for this feature is unstable, and may change in backwards-incompatible ways in minor releases.
+
 # Client-Side Field Level Encryption
 
 Starting with MongoDB 4.2, client-side field level encryption allows an application to encrypt specific data fields in addition to pre-existing MongoDB encryption features such as [Encryption at Rest](https://dochub.mongodb.org/core/security-encryption-at-rest) and [TLS/SSL (Transport Encryption)](https://dochub.mongodb.org/core/security-tls-transport-encryption).
@@ -320,6 +324,115 @@ async fn main() -> Result<()> {
         unencrypted_coll.find_one(None, None).await?
     );
     
+    Ok(())
+}
+```
+
+### Automatic Queryable Encryption
+
+Verison 2.4.0 of the `mongodb` crate brings support for Queryable Encryption with MongoDB >=6.0.
+
+Queryable Encryption is the second version of Client-Side Field Level Encryption. Data is encrypted client-side. Queryable Encryption supports indexed encrypted fields, which are further processed server-side.
+
+You must have MongoDB 6.0 Enterprise to preview the capability.
+
+Automatic encryption in Queryable Encryption is configured with an `encrypted_fields` mapping, as demonstrated by the following example:
+
+```rust,no_run
+# extern crate mongodb;
+# extern crate tokio;
+# extern crate rand;
+# extern crate futures;
+# static URI: &str = "mongodb://example.com";
+use futures::TryStreamExt;
+use mongodb::{
+    bson::{self, doc, Document},
+    client_encryption::{ClientEncryption, MasterKey},
+    error::Result,
+    mongocrypt::ctx::KmsProvider,
+    options::ClientOptions,
+    Client,
+    Namespace,
+};
+use rand::Rng;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut key_bytes = vec![0u8; 96];
+    rand::thread_rng().fill(&mut key_bytes[..]);
+    let local_master_key = bson::Binary {
+        subtype: bson::spec::BinarySubtype::Generic,
+        bytes: key_bytes,
+    };
+    let kms_providers = vec![(KmsProvider::Local, doc! { "key": local_master_key }, None)];
+    let key_vault_namespace = Namespace::new("keyvault", "datakeys");
+    let key_vault_client = Client::with_uri_str(URI).await?;
+    let key_vault = key_vault_client
+        .database(&key_vault_namespace.db)
+        .collection::<Document>(&key_vault_namespace.coll);
+    key_vault.drop(None).await?;
+    let client_encryption = ClientEncryption::new(
+        key_vault_client,
+        key_vault_namespace.clone(),
+        kms_providers.clone(),
+    )?;
+    let key1_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(["firstName".to_string()])
+        .run()
+        .await?;
+    let key2_id = client_encryption
+        .create_data_key(MasterKey::Local)
+        .key_alt_names(["lastName".to_string()])
+        .run()
+        .await?;
+
+    let encrypted_fields_map = vec![(
+        "example.encryptedCollection".to_string(),
+        doc! {
+            "escCollection": "encryptedCollection.esc",
+            "eccCollection": "encryptedCollection.ecc",
+            "ecocCollection": "encryptedCollection.ecoc",
+            "fields": [
+              {
+                "path": "firstName",
+                "bsonType": "string",
+                "keyId": key1_id,
+                "queries": [{"queryType": "equality"}],
+              },
+                {
+                  "path": "lastName",
+                  "bsonType": "string",
+                  "keyId": key2_id,
+                }
+            ]
+        },
+    )];
+
+    let client = Client::encrypted_builder(
+        ClientOptions::parse(URI).await?,
+        key_vault_namespace,
+        kms_providers,
+    )?
+    .encrypted_fields_map(encrypted_fields_map)
+    .build()
+    .await?;
+    let db = client.database("example");
+    let coll = db.collection::<Document>("encryptedCollection");
+    coll.drop(None).await?;
+    db.create_collection("encryptedCollection", None).await?;
+    coll.insert_one(
+        doc! { "_id": 1, "firstName": "Jane", "lastName": "Doe" },
+        None,
+    )
+    .await?;
+    let docs: Vec<_> = coll
+        .find(doc! {"firstName": "Jane"}, None)
+        .await?
+        .try_collect()
+        .await?;
+    println!("{:?}", docs);
+
     Ok(())
 }
 ```
