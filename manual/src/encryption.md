@@ -105,6 +105,7 @@ Supplying a `schema_map` provides more security than relying on JSON Schemas obt
 
 JSON Schemas supplied in the `schema_map` only apply to configuring automatic client-side field level encryption. Other validation rules in the JSON schema will not be enforced by the driver and will result in an error.
 
+<!--- Changes to this example should also be made to manual/deps/src/example/local_rules.rs --->
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
@@ -209,6 +210,7 @@ The MongoDB 4.2+ server supports using schema validation to enforce encryption o
 
 The following example shows how to setup automatic client-side field level encryption using `ClientEncryption` to create a new encryption data key and create a collection with the [Automatic Encryption JSON Schema Syntax](https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules):
 
+<!--- Changes to this example should also be made to manual/deps/src/example/server_side_enforcement.rs --->
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
@@ -323,6 +325,7 @@ You must have MongoDB 6.0 Enterprise to preview the feature.
 
 Automatic encryption in Queryable Encryption is configured with an `encrypted_fields` mapping, as demonstrated by the following example:
 
+<!--- Changes to this example should also be made to manual/deps/src/example/automatic_queryable_encryption.rs --->
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
@@ -430,6 +433,7 @@ Queryable Encryption is the second version of Client-Side Field Level Encryption
 
 Explicit encryption in Queryable Encryption is performed using the `encrypt` and `decrypt` methods. Automatic encryption (to allow the `find_one` to automatically decrypt) is configured using an `encrypted_fields` mapping, as demonstrated by the following example:
 
+<!--- Changes to this example should also be made to manual/deps/src/example/explicit_queryable_encryption.rs --->
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
@@ -577,6 +581,7 @@ async fn main() -> Result<()> {
 
 Explicit encryption is a MongoDB community feature and does not use the mongocryptd process. Explicit encryption is provided by the `ClientEncryption` struct, for example:
 
+<!--- Changes to this example should also be made to manual/deps/src/example/explicit_encryption.rs --->
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
@@ -669,6 +674,7 @@ async fn main() -> Result<()> {
 
 Although automatic encryption requires MongoDB 4.2+ enterprise or a MongoDB 4.2+ Atlas cluster, automatic decryption is supported for all users. To configure automatic decryption without automatic encryption set `bypass_auto_encryption` to `true` in the `EncryptedClientBuilder`:
 
+<!--- Changes to this example should also be made to manual/deps/src/example/explicit_encryption_auto_decryption.rs --->
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
