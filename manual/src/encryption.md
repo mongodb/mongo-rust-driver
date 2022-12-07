@@ -205,7 +205,7 @@ async fn main() -> Result<()> {
 
 ### Server-Side Field Level Encryption Enforcement
 
-The MongoDB 4.2 server supports using schema validation to enforce encryption of specific fields in a collection. This schema validation will prevent an application from inserting unencrypted values for any fields marked with the `"encrypt"` JSON schema keyword.
+The MongoDB 4.2+ server supports using schema validation to enforce encryption of specific fields in a collection. This schema validation will prevent an application from inserting unencrypted values for any fields marked with the `"encrypt"` JSON schema keyword.
 
 The following example shows how to setup automatic client-side field level encryption using `ClientEncryption` to create a new encryption data key and create a collection with the [Automatic Encryption JSON Schema Syntax](https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules):
 
@@ -667,7 +667,7 @@ async fn main() -> Result<()> {
 
 ## Explicit Encryption with Automatic Decryption
 
-Although automatic encryption requires MongoDB 4.2 enterprise or a MongoDB 4.2 Atlas cluster, automatic decryption is supported for all users. To configure automatic decryption without automatic encryption set `bypass_auto_encryption` to `true` in the `EncryptedClientBuilder`:
+Although automatic encryption requires MongoDB 4.2+ enterprise or a MongoDB 4.2+ Atlas cluster, automatic decryption is supported for all users. To configure automatic decryption without automatic encryption set `bypass_auto_encryption` to `true` in the `EncryptedClientBuilder`:
 
 ```rust,no_run
 # extern crate mongodb;
