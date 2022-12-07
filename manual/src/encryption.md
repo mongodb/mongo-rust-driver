@@ -38,7 +38,7 @@ let client = Client::encrypted_builder(options, kv_namespace, kms_providers)?
 # Ok(())
 # }
 ```
-If the `mongodb` crate load crypt_shared it will attempt to fallback to using mongocryptd by default.  Include `"cryptSharedRequired": true` in the `extra_options` document to always use crypt_shared and fail if it could not be loaded.
+If the `mongodb` crate cannot load crypt_shared it will attempt to fallback to using mongocryptd by default.  Include `"cryptSharedRequired": true` in the `extra_options` document to always use crypt_shared and fail if it could not be loaded.
 
 For detailed installation instructions see the [MongoDB documentation on Automatic Encryption Shared Library](https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library).
 
