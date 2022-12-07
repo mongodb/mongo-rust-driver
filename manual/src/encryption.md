@@ -319,7 +319,7 @@ Verison 2.4.0 of the `mongodb` crate brings support for Queryable Encryption wit
 
 Queryable Encryption is the second version of Client-Side Field Level Encryption. Data is encrypted client-side. Queryable Encryption supports indexed encrypted fields, which are further processed server-side.
 
-You must have MongoDB 6.0 Enterprise to preview the capability.
+You must have MongoDB 6.0 Enterprise to preview the feature.
 
 Automatic encryption in Queryable Encryption is configured with an `encrypted_fields` mapping, as demonstrated by the following example:
 
