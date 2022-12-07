@@ -93,7 +93,7 @@ let client = Client::encrypted_builder(options, kv_namespace, kms_providers)?
 
 ## Automatic Client-Side Field Level Encryption
 
-Automatic client-side field level encryption is enabled by using the `Client::encrypted_builder` constructor method.  The following examples show how to setup automatic client-side field level encryption using `ClientEncryption` to create a new encryption data key.
+Automatic client-side field level encryption is enabled by using the `Client::encrypted_builder` constructor method. The following examples show how to setup automatic client-side field level encryption using `ClientEncryption` to create a new encryption data key.
 
 _Note_: Automatic client-side field level encryption requires MongoDB 4.2+ enterprise or a MongoDB 4.2+ Atlas cluster. The community version of the server supports automatic decryption as well as explicit client-side encryption.
 
