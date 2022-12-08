@@ -179,7 +179,7 @@ async fn main() -> Result<()> {
         key_vault_namespace,
         kms_providers,
     )?
-    .schema_map([(encrypted_namespace, schema)])
+    .schema_map([(encrypted_namespace.to_string(), schema)])
     .build()
     .await?;
     let coll = client
@@ -310,7 +310,10 @@ async fn main() -> Result<()> {
         "Encrypted document: {:?}",
         unencrypted_coll.find_one(None, None).await?
     );
-    
+    // This would return a Write error with the message "Document failed validation".
+    // unencrypted_coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+    //    .await?;
+
     Ok(())
 }
 ```

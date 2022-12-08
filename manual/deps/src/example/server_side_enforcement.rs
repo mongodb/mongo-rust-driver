@@ -95,6 +95,9 @@ pub async fn example() -> Result<()> {
         "Encrypted document: {:?}",
         unencrypted_coll.find_one(None, None).await?
     );
+    // This would return a Write error with the message "Document failed validation".
+    // unencrypted_coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+    //    .await?;
 
     Ok(())
 }

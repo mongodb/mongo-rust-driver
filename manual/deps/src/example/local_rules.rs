@@ -68,7 +68,7 @@ pub async fn example() -> Result<()> {
         key_vault_namespace,
         kms_providers,
     )?
-    .schema_map([(encrypted_namespace, schema)])
+    .schema_map([(encrypted_namespace.to_string(), schema)])
     .build()
     .await?;
     let coll = client
