@@ -44,7 +44,7 @@ pub async fn example() -> Result<()> {
         .await?;
 
     let encrypted_fields_map = vec![(
-        "example.encryptedCollection".to_string(),
+        "example.encryptedCollection",
         doc! {
             "escCollection": "encryptedCollection.esc",
             "eccCollection": "encryptedCollection.ecc",

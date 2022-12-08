@@ -179,7 +179,7 @@ async fn main() -> Result<()> {
         key_vault_namespace,
         kms_providers,
     )?
-    .schema_map([(encrypted_namespace.to_string(), schema)])
+    .schema_map([(encrypted_namespace, schema)])
     .build()
     .await?;
     let coll = client
@@ -376,7 +376,7 @@ async fn main() -> Result<()> {
         .await?;
 
     let encrypted_fields_map = vec![(
-        "example.encryptedCollection".to_string(),
+        "example.encryptedCollection",
         doc! {
             "escCollection": "encryptedCollection.esc",
             "eccCollection": "encryptedCollection.ecc",

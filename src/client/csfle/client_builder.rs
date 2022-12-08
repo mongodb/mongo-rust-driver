@@ -53,8 +53,11 @@ impl EncryptedClientBuilder {
     /// Schemas supplied in the `schema_map` only apply to configuring automatic encryption for
     /// client side encryption. Other validation rules in the JSON schema will not be enforced by
     /// the driver and will result in an error.
-    pub fn schema_map(mut self, map: impl IntoIterator<Item = (String, Document)>) -> Self {
-        self.enc_opts.schema_map = Some(map.into_iter().collect());
+    pub fn schema_map(
+        mut self,
+        map: impl IntoIterator<Item = (impl Into<String>, Document)>,
+    ) -> Self {
+        self.enc_opts.schema_map = Some(map.into_iter().map(|(is, d)| (is.into(), d)).collect());
         self
     }
 
@@ -77,9 +80,10 @@ impl EncryptedClientBuilder {
     /// advertising a false encryptedFields.
     pub fn encrypted_fields_map(
         mut self,
-        map: impl IntoIterator<Item = (String, Document)>,
+        map: impl IntoIterator<Item = (impl Into<String>, Document)>,
     ) -> Self {
-        self.enc_opts.encrypted_fields_map = Some(map.into_iter().collect());
+        self.enc_opts.encrypted_fields_map =
+            Some(map.into_iter().map(|(is, d)| (is.into(), d)).collect());
         self
     }
 

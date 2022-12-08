@@ -249,8 +249,8 @@ async fn data_key_double_encryption() -> Result<()> {
     let (client, _) = init_client().await?;
 
     // Setup: client with auto encryption.
-    let schema_map: HashMap<String, Document> = [(
-        "db.coll".to_string(),
+    let schema_map = [(
+        "db.coll",
         doc! {
             "bsonType": "object",
             "properties": {
@@ -263,9 +263,7 @@ async fn data_key_double_encryption() -> Result<()> {
                 }
             }
         },
-    )]
-    .into_iter()
-    .collect();
+    )];
     let client_encrypted = Client::encrypted_builder(
         CLIENT_OPTIONS.get().await.clone(),
         KV_NAMESPACE.clone(),
@@ -450,12 +448,6 @@ async fn external_key_vault() -> Result<()> {
             .await?;
 
         // Setup: test options.
-        let schema_map: HashMap<String, Document> = [(
-            "db.coll".to_string(),
-            load_testdata("external-schema.json")?,
-        )]
-        .into_iter()
-        .collect();
         let kv_client = if with_external_key_vault {
             let mut opts = CLIENT_OPTIONS.get().await.clone();
             opts.credential = Some(
@@ -476,7 +468,7 @@ async fn external_key_vault() -> Result<()> {
             LOCAL_KMS.clone(),
         )?
         .key_vault_client(kv_client.clone())
-        .schema_map(schema_map)
+        .schema_map([("db.coll", load_testdata("external-schema.json")?)])
         .extra_options(EXTRA_OPTIONS.clone())
         .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
         .build()
@@ -806,7 +798,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         .extra_options(EXTRA_OPTIONS.clone())
         .disable_crypt_shared(*DISABLE_CRYPT_SHARED);
         if local_schema {
-            enc_builder = enc_builder.schema_map([("db.coll".to_string(), schema)]);
+            enc_builder = enc_builder.schema_map([("db.coll", schema)]);
         }
         enc_builder.build().await?
     };
@@ -1344,14 +1336,7 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
-    .schema_map({
-        [(
-            "db.coll".to_string(),
-            load_testdata("external-schema.json")?,
-        )]
-        .into_iter()
-        .collect::<HashMap<String, Document>>()
-    })
+    .schema_map([("db.coll", load_testdata("external-schema.json")?)])
     .extra_options(doc! {
         "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
         "mongocryptdSpawnArgs": ["--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
@@ -1388,12 +1373,6 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     // Setup: encrypted client.
-    let schema_map: HashMap<String, Document> = [(
-        "db.coll".to_string(),
-        load_testdata("external-schema.json")?,
-    )]
-    .into_iter()
-    .collect();
     let extra_options = doc! {
         "mongocryptdBypassSpawn": true,
         "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
@@ -1404,7 +1383,7 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
-    .schema_map(schema_map)
+    .schema_map([("db.coll", load_testdata("external-schema.json")?)])
     .extra_options(extra_options)
     .disable_crypt_shared(true)
     .build()
