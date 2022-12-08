@@ -197,7 +197,7 @@ impl Client {
             .map_or(false, |cs| cs.exec().mongocryptd_spawned())
     }
 
-    #[cfg(all(test, feature = "csfle"))]
+    #[cfg(all(test, feature = "in-use-encryption-unstable"))]
     pub(crate) async fn has_mongocryptd_client(&self) -> bool {
         self.inner
             .csfle
