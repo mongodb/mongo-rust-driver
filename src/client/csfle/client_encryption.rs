@@ -30,7 +30,7 @@ pub struct ClientEncryption {
 }
 
 impl ClientEncryption {
-    /// Initialize a new `ClientEncryptionB`.
+    /// Initialize a new `ClientEncryption`.
     ///
     /// ```no_run
     /// # use bson::doc;
