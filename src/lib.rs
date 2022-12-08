@@ -353,7 +353,7 @@ pub use crate::{
     db::Database,
     gridfs::{GridFsDownloadStream, GridFsBucket, GridFsUploadStream},
 };
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 pub use crate::client::csfle::client_encryption;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};

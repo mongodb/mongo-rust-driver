@@ -7,7 +7,7 @@ source ./.evergreen/env.sh
 
 set -o xtrace
 
-FEATURE_FLAGS="csfle,${TLS_FEATURE}"
+FEATURE_FLAGS="in-use-encryption-unstable,${TLS_FEATURE}"
 OPTIONS="-- -Z unstable-options --format json --report-time"
 
 if [ "$SINGLE_THREAD" = true ]; then

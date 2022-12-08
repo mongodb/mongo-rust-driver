@@ -1,4 +1,4 @@
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
 pub(crate) mod operation;
 pub(crate) mod test_event;
@@ -95,7 +95,7 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             }
         }
 
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         csfle::populate_key_vault(&internal_client, test_file.key_vault_data.as_ref()).await;
 
         let db_name = test_file
@@ -112,7 +112,7 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         let mut options = DropCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         if let Some(enc_fields) = &test_file.encrypted_fields {
             options.encrypted_fields = Some(enc_fields.clone());
         }
@@ -128,7 +128,7 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         let mut options = CreateCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         {
             if let Some(schema) = &test_file.json_schema {
                 options.validator = Some(doc! { "$jsonSchema": schema });
@@ -173,7 +173,7 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             )
             .await
             .min_heartbeat_freq(Some(Duration::from_millis(50)));
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let builder = csfle::set_auto_enc(builder, &test);
         let client = builder.event_client().build().await;
 
@@ -378,7 +378,7 @@ pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                                 .iter()
                                 .for_each(|label| assert!(!labels.contains(label)));
                         }
-                        #[cfg(feature = "csfle")]
+                        #[cfg(feature = "in-use-encryption-unstable")]
                         if let Some(t) = operation_error.is_timeout_error {
                             assert_eq!(
                                 t,

@@ -2,7 +2,7 @@ pub mod options;
 
 use std::{fmt::Debug, sync::Arc};
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 use bson::doc;
 use futures_util::stream::TryStreamExt;
 
@@ -304,7 +304,7 @@ impl Database {
             coll: name.as_ref().to_string(),
         };
 
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let has_encrypted_fields = {
             self.resolve_encrypted_fields(&ns, &mut options).await;
             self.create_aux_collections(&ns, &options, session.as_deref_mut())
@@ -320,7 +320,7 @@ impl Database {
             .execute_operation(create, session.as_deref_mut())
             .await?;
 
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         if has_encrypted_fields {
             let coll = self.collection::<Document>(&ns.coll);
             coll.create_index_common(
@@ -337,7 +337,7 @@ impl Database {
         Ok(())
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     async fn resolve_encrypted_fields(
         &self,
         base_ns: &Namespace,
@@ -363,7 +363,7 @@ impl Database {
         }
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     #[allow(clippy::needless_option_as_deref)]
     async fn create_aux_collections(
         &self,

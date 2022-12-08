@@ -24,7 +24,7 @@ pub(crate) use self::trace::{
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
 use crate::{
     bson::{doc, Bson},
@@ -74,7 +74,7 @@ impl Client {
             options: None,
             handler: None,
             min_heartbeat_freq: None,
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             encrypted: None,
         }
     }
@@ -84,7 +84,7 @@ pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
     handler: Option<Arc<EventHandler>>,
     min_heartbeat_freq: Option<Duration>,
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
 }
 
@@ -117,7 +117,7 @@ impl TestClientBuilder {
         self
     }
 
-    #[cfg(feature = "csfle")]
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn encrypted_options(
         mut self,
         encrypted: crate::client::csfle::options::AutoEncryptionOptions,
@@ -153,7 +153,7 @@ impl TestClientBuilder {
             options.test_options_mut().min_heartbeat_freq = Some(freq);
         }
 
-        #[cfg(feature = "csfle")]
+        #[cfg(feature = "in-use-encryption-unstable")]
         let client = match self.encrypted {
             None => Client::with_options(options).unwrap(),
             Some(aeo) => EncryptedClientBuilder::new(options, aeo)
@@ -161,7 +161,7 @@ impl TestClientBuilder {
                 .await
                 .unwrap(),
         };
-        #[cfg(not(feature = "csfle"))]
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
         let client = Client::with_options(options).unwrap();
 
         TestClient::from_client(client).await

@@ -1,6 +1,6 @@
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
-#[cfg(feature = "csfle")]
+#[cfg(feature = "in-use-encryption-unstable")]
 use self::csfle::*;
 
 use std::{
@@ -362,19 +362,19 @@ impl<'de> Deserialize<'de> for Operation {
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "deleteKey" => deserialize_op::<DeleteKey>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "getKey" => deserialize_op::<GetKey>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "addKeyAltName" => deserialize_op::<AddKeyAltName>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "createDataKey" => deserialize_op::<CreateDataKey>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "getKeys" => deserialize_op::<GetKeys>(definition.arguments),
-            #[cfg(feature = "csfle")]
+            #[cfg(feature = "in-use-encryption-unstable")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
