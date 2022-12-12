@@ -30,7 +30,7 @@ pub struct ClientEncryption {
 }
 
 impl ClientEncryption {
-    /// Construct a `ClientEncryptionBuilder` to initialize a new `ClientEncryption`.
+    /// Initialize a new `ClientEncryption`.
     ///
     /// ```no_run
     /// # use bson::doc;
@@ -259,14 +259,14 @@ impl ClientEncryption {
     pub fn encrypt(
         &self,
         value: impl Into<bson::RawBson>,
-        key: EncryptKey,
+        key: impl Into<EncryptKey>,
         algorithm: Algorithm,
     ) -> EncryptAction {
         EncryptAction {
             client_enc: self,
             value: value.into(),
             opts: EncryptOptions {
-                key,
+                key: key.into(),
                 algorithm,
                 contention_factor: None,
                 query_type: None,
@@ -480,4 +480,16 @@ pub enum EncryptKey {
     Id(Binary),
     /// Find the key by alternate name.
     AltName(String),
+}
+
+impl From<Binary> for EncryptKey {
+    fn from(bin: Binary) -> Self {
+        Self::Id(bin)
+    }
+}
+
+impl From<String> for EncryptKey {
+    fn from(s: String) -> Self {
+        Self::AltName(s)
+    }
 }

@@ -3,8 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>MongoDB Rust Driver</title>
-        <meta name="robots" content="noindex" />
+        <title>Encryption - MongoDB Rust Driver</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +80,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><a href="performance.html"><strong aria-hidden="true">6.</strong> Performance</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded "><a href="web_framework_examples.html"><strong aria-hidden="true">11.</strong> Web Framework Examples</a></li><li class="chapter-item expanded "><a href="encryption.html"><strong aria-hidden="true">12.</strong> Encryption</a></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">13.</strong> Writing Tests</div></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><a href="performance.html"><strong aria-hidden="true">6.</strong> Performance</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded "><a href="web_framework_examples.html"><strong aria-hidden="true">11.</strong> Web Framework Examples</a></li><li class="chapter-item expanded "><a href="encryption.html" class="active"><strong aria-hidden="true">12.</strong> Encryption</a></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">13.</strong> Writing Tests</div></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -142,361 +141,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p><a href="https://crates.io/crates/mongodb"><img src="https://img.shields.io/crates/v/mongodb.svg" alt="Crates.io" /></a> <a href="https://docs.rs/mongodb"><img src="https://docs.rs/mongodb/badge.svg" alt="docs.rs" /></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a></p>
-<p>This is the manual for the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the <a href="https://docs.rs/bson/latest"><code>bson</code></a> crate for BSON support. The driver contains a fully async API that supports either <a href="https://crates.io/crates/tokio"><code>tokio</code></a> (default) or <a href="https://crates.io/crates/async-std"><code>async-std</code></a>, depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.</p>
-<h2 id="warning-about-timeouts--cancellation"><a class="header" href="#warning-about-timeouts--cancellation">Warning about timeouts / cancellation</a></h2>
-<p>In async Rust, it is common to implement cancellation and timeouts by dropping a future after a certain period of time instead of polling it to completion. This is how <a href="https://docs.rs/tokio/latest/tokio/time/fn.timeout.html"><code>tokio::time::timeout</code></a> works, for example. However, doing this with futures returned by the driver can leave the driver's internals in an inconsistent state, which may lead to unpredictable or incorrect behavior (see <a href="https://jira.mongodb.org/browse/RUST-937">RUST-937</a> for more details). As such, it is <strong><em>highly</em></strong> recommended to poll all futures returned from the driver to completion. In order to still use timeout mechanisms like <code>tokio::time::timeout</code> with the driver, one option is to spawn tasks and time out on their <a href="https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html"><code>JoinHandle</code></a> futures instead of on the driver's futures directly. This will ensure the driver's futures will always be completely polled while also allowing the application to continue in the event of a timeout.</p>
-<p>e.g.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use std::time::Duration;
-</span><span class="boring">use mongodb::{
-</span><span class="boring">    Client,
-</span><span class="boring">    bson::doc,
-</span><span class="boring">};
-</span><span class="boring">
-</span><span class="boring">async fn foo() -&gt; std::result::Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
-</span><span class="boring">
-</span><span class="boring">let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-</span>let collection = client.database(&quot;foo&quot;).collection(&quot;bar&quot;);
-let handle = tokio::task::spawn(async move {
-    collection.insert_one(doc! { &quot;x&quot;: 1 }, None).await
-});
-
-tokio::time::timeout(Duration::from_secs(5), handle).await???;
-<span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<h2 id="minimum-supported-rust-version-msrv"><a class="header" href="#minimum-supported-rust-version-msrv">Minimum supported Rust version (MSRV)</a></h2>
-<p>The MSRV for this crate is currently 1.57.0. This will be rarely be increased, and if it ever is,
-it will only happen in a minor or major version release.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="installation-and-features"><a class="header" href="#installation-and-features">Installation and Features</a></h1>
-<h2 id="importing"><a class="header" href="#importing">Importing</a></h2>
-<p>The driver is available on <a href="https://crates.io/crates/mongodb">crates.io</a>. To use the driver in your application, simply add it to your project's <code>Cargo.toml</code>.</p>
-<pre><code class="language-toml">[dependencies]
-mongodb = &quot;2.1.0&quot;
-</code></pre>
-<h2 id="configuring-the-async-runtime"><a class="header" href="#configuring-the-async-runtime">Configuring the async runtime</a></h2>
-<p>The driver supports both of the most popular async runtime crates, namely <a href="https://crates.io/crates/tokio"><code>tokio</code></a> and <a href="https://crates.io/crates/async-std"><code>async-std</code></a>. By default, the driver will use <a href="https://crates.io/crates/tokio"><code>tokio</code></a>, but you can explicitly choose a runtime by specifying one of <code>&quot;tokio-runtime&quot;</code> or <code>&quot;async-std-runtime&quot;</code> feature flags in your <code>Cargo.toml</code>.</p>
-<p>For example, to instruct the driver to work with <a href="https://crates.io/crates/async-std"><code>async-std</code></a>, add the following to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies.mongodb]
-version = &quot;2.1.0&quot;
-default-features = false
-features = [&quot;async-std-runtime&quot;]
-</code></pre>
-<h2 id="enabling-the-sync-api"><a class="header" href="#enabling-the-sync-api">Enabling the sync API</a></h2>
-<p>The driver also provides a blocking sync API. To enable this, add the <code>&quot;sync&quot;</code> or <code>&quot;tokio-sync&quot;</code> feature to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies.mongodb]
-version = &quot;2.3.0&quot;
-features = [&quot;tokio-sync&quot;]
-</code></pre>
-<p>Using the <code>&quot;sync&quot;</code> feature also requires using <code>default-features = false</code>.
-<strong>Note:</strong> The sync-specific types can be imported from <code>mongodb::sync</code> (e.g. <code>mongodb::sync::Client</code>).</p>
-<h2 id="all-feature-flags"><a class="header" href="#all-feature-flags">All Feature Flags</a></h2>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Extra dependencies</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>tokio-runtime</code></td><td style="text-align: left">Enable support for the <code>tokio</code> async runtime</td><td style="text-align: left"><code>tokio</code> 1.0 with the <code>full</code> feature</td><td style="text-align: left">yes</td></tr>
-<tr><td style="text-align: left"><code>async-std-runtime</code></td><td style="text-align: left">Enable support for the <code>async-std</code> runtime</td><td style="text-align: left"><code>async-std</code> 1.0</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>sync</code></td><td style="text-align: left">Expose the synchronous API (<code>mongodb::sync</code>), using an async-std backend. Cannot be used with the <code>tokio-runtime</code> feature flag.</td><td style="text-align: left"><code>async-std</code> 1.0</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>tokio-sync</code></td><td style="text-align: left">Expose the synchronous API (<code>mongodb::sync</code>), using a tokio backend. Cannot be used with the <code>async-std-runtime</code> feature flag.</td><td style="text-align: left"><code>tokio</code> 1.0 with the <code>full</code> feature</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>aws-auth</code></td><td style="text-align: left">Enable support for the MONGODB-AWS authentication mechanism.</td><td style="text-align: left"><code>reqwest</code> 0.11</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>bson-uuid-0_8</code></td><td style="text-align: left">Enable support for v0.8 of the <a href="docs.rs/uuid/0.8"><code>uuid</code></a> crate in the public API of the re-exported <code>bson</code> crate.</td><td style="text-align: left">n/a</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>bson-uuid-1</code></td><td style="text-align: left">Enable support for v1.x of the <a href="docs.rs/uuid/1.0"><code>uuid</code></a> crate in the public API of the re-exported <code>bson</code> crate.</td><td style="text-align: left">n/a</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>bson-chrono-0_4</code></td><td style="text-align: left">Enable support for v0.4 of the <a href="docs.rs/chrono/0.4"><code>chrono</code></a> crate in the public API of the re-exported <code>bson</code> crate.</td><td style="text-align: left">n/a</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>bson-serde_with</code></td><td style="text-align: left">Enable support for the <a href="docs.rs/serde_with/latest"><code>serde_with</code></a> crate in the public API of the re-exported <code>bson</code> crate.</td><td style="text-align: left"><code>serde_with</code> 1.0</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>zlib-compression</code></td><td style="text-align: left">Enable support for compressing messages with <a href="https://zlib.net/"><code>zlib</code></a></td><td style="text-align: left"><code>flate2</code> 1.0</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>zstd-compression</code></td><td style="text-align: left">Enable support for compressing messages with <a href="http://facebook.github.io/zstd/"><code>zstd</code></a>.  This flag requires Rust version 1.54.</td><td style="text-align: left"><code>zstd</code> 0.9.0</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>snappy-compression</code></td><td style="text-align: left">Enable support for compressing messages with <a href="http://google.github.io/snappy/"><code>snappy</code></a></td><td style="text-align: left"><code>snap</code> 1.0.5</td><td style="text-align: left">no</td></tr>
-<tr><td style="text-align: left"><code>openssl-tls</code></td><td style="text-align: left">Switch TLS connection handling to use <a href="https://docs.rs/openssl/0.10.38/">'openssl'</a>.</td><td style="text-align: left"><code>openssl</code> 0.10.38</td><td style="text-align: left">no</td></tr>
-</tbody></table>
-</div><div style="break-before: page; page-break-before: always;"></div><h1 id="connecting-to-the-database"><a class="header" href="#connecting-to-the-database">Connecting to the Database</a></h1>
-<h2 id="connection-string"><a class="header" href="#connection-string">Connection String</a></h2>
-<p>Connecting to a MongoDB database requires using a <a href="https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats">connection string</a>, a URI of the form:</p>
-<pre><code class="language-uri">mongodb://[username:password@]host1[:port1][,...hostN[:portN]][/[defaultauthdb][?options]]
-</code></pre>
-<p>At its simplest this can just specify the host and port, e.g.</p>
-<pre><code class="language-uri">mongodb://mongodb0.example.com:27017
-</code></pre>
-<p>For the full range of options supported by the Rust driver, see the documentation for the <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse"><code>ClientOptions::parse</code></a> method.  That method will return a <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html"><code>ClientOptions</code></a> struct, allowing for directly querying or setting any of the options supported by the Rust driver:</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">use mongodb::options::ClientOptions;
-</span><span class="boring">async fn run() -&gt; mongodb::error::Result&lt;()&gt; {
-</span>let mut options = ClientOptions::parse(&quot;mongodb://mongodb0.example.com:27017&quot;).await?;
-options.app_name = Some(&quot;My App&quot;.to_string());
-<span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<h2 id="creating-a-client"><a class="header" href="#creating-a-client">Creating a <code>Client</code></a></h2>
-<p>The <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html"><code>Client</code></a> struct is the main entry point for the driver.  You can create one from a <code>ClientOptions</code> struct:</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">use mongodb::{Client, options::ClientOptions};
-</span><span class="boring">async fn run() -&gt; mongodb::error::Result&lt;()&gt; {
-</span><span class="boring">let options = ClientOptions::parse(&quot;mongodb://mongodb0.example.com:27017&quot;).await?;
-</span>let client = Client::with_options(options)?;
-<span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<p>As a convenience, if you don't need to modify the <code>ClientOptions</code> before creating the <code>Client</code>, you can directly create one from the connection string:</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">use mongodb::Client;
-</span><span class="boring">async fn run() -&gt; mongodb::error::Result&lt;()&gt; {
-</span>let client = Client::with_uri_str(&quot;mongodb://mongodb0.example.com:27017&quot;).await?;
-<span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<p><code>Client</code> uses <a href="https://doc.rust-lang.org/std/sync/struct.Arc.html"><code>std::sync::Arc</code></a> internally, so it can safely be shared across threads or async tasks. For example:</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use mongodb::{bson::Document, Client, error::Result};
-</span><span class="boring">use tokio::task;
-</span><span class="boring">
-</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
-</span>let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-
-for i in 0..5 {
-    let client_ref = client.clone();
-
-    task::spawn(async move {
-        let collection = client_ref.database(&quot;items&quot;).collection::&lt;Document&gt;(&amp;format!(&quot;coll{}&quot;, i));
-
-        // Do something with the collection
-    });
-}
-<span class="boring">
-</span><span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<h2 id="client-performance"><a class="header" href="#client-performance">Client Performance</a></h2>
-<p>While cloning a <code>Client</code> is very lightweight, creating a new one is an expensive operation.  For most use cases, it is highly recommended to create a single <code>Client</code> and persist it for the lifetime of your application.  For more information, see the <a href="performance.html">Performance</a> chapter.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="reading-from-the-database"><a class="header" href="#reading-from-the-database">Reading From the Database</a></h1>
-<h2 id="database-and-collection-handles"><a class="header" href="#database-and-collection-handles">Database and Collection Handles</a></h2>
-<p>Once you have a <code>Client</code>, you can call <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database"><code>Client::database</code></a> to create a handle to a particular database on the server, and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection"><code>Database::collection</code></a> to create a handle to a particular collection in that database.  <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html"><code>Database</code></a> and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html"><code>Collection</code></a> handles are lightweight - creating them requires no IO, <code>clone</code>ing them is cheap, and they can be safely shared across threads or async tasks.  For example:</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use mongodb::{bson::Document, Client, error::Result};
-</span><span class="boring">use tokio::task;
-</span><span class="boring">
-</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
-</span><span class="boring">let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-</span>let db = client.database(&quot;items&quot;);
-
-for i in 0..5 {
-    let db_ref = db.clone();
-
-    task::spawn(async move {
-        let collection = db_ref.collection::&lt;Document&gt;(&amp;format!(&quot;coll{}&quot;, i));
-
-        // Do something with the collection
-    });
-}
-<span class="boring">
-</span><span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<p>A <code>Collection</code> can be parameterized with a type for the documents in the collection; this includes but is not limited to just <code>Document</code>.  The various methods that accept instances of the documents (e.g. <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one"><code>Collection::insert_one</code></a>) require that it implement the <code>Serialize</code> trait from the <a href="http://serde.rs/"><code>serde</code></a> crate.  Similarly, the methods that return instances (e.g. <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one"><code>Collection::find_one</code></a>) require that it implement <code>Deserialize</code>.</p>
-<p><code>Document</code> implements both and can always be used as the type parameter.  However, it is recommended to define types that model your data which you can parameterize your <code>Collection</code>s with instead, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">extern crate serde;
-</span><span class="boring">use mongodb::{
-</span><span class="boring">    bson::doc,
-</span><span class="boring">    error::Result,
-</span><span class="boring">};
-</span><span class="boring">use tokio::task;
-</span><span class="boring">
-</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
-</span><span class="boring">use mongodb::Client;
-</span><span class="boring">
-</span><span class="boring">let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-</span>use serde::{Deserialize, Serialize};
-
-// Define a type that models our data.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct Item {
-    id: u32,
-}
-
-// Parameterize our collection with the model.
-let coll = client.database(&quot;items&quot;).collection::&lt;Item&gt;(&quot;in_stock&quot;);
-
-for i in 0..5 {
-    // Perform operations that work with directly our model.
-    coll.insert_one(Item { id: i }, None).await;
-}
-<span class="boring">
-</span><span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<p>For more information, see the <a href="serde_integration.html">Serde Integration</a> section.</p>
-<h2 id="cursors"><a class="header" href="#cursors">Cursors</a></h2>
-<p>Results from queries are generally returned via <a href="https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html"><code>Cursor</code></a>, a struct which streams the results back from the server as requested. The <code>Cursor</code> type implements the <a href="https://docs.rs/futures/latest/futures/stream/trait.Stream.html"><code>Stream</code></a> trait from the <a href="https://crates.io/crates/futures"><code>futures</code></a> crate, and in order to access its streaming functionality you need to import at least one of the <a href="https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html"><code>StreamExt</code></a> or <a href="https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html"><code>TryStreamExt</code></a> traits.</p>
-<pre><code class="language-toml"># In Cargo.toml, add the following dependency.
-futures = &quot;0.3&quot;
-</code></pre>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate serde;
-</span><span class="boring">extern crate futures;
-</span><span class="boring">use serde::Deserialize;
-</span><span class="boring">#[derive(Deserialize)]
-</span><span class="boring">struct Book { title: String }
-</span><span class="boring">async fn foo() -&gt; mongodb::error::Result&lt;()&gt; {
-</span><span class="boring">let typed_collection = mongodb::Client::with_uri_str(&quot;&quot;).await?.database(&quot;&quot;).collection::&lt;Book&gt;(&quot;&quot;);
-</span>// This trait is required to use `try_next()` on the cursor
-use futures::stream::TryStreamExt;
-use mongodb::{bson::doc, options::FindOptions};
-
-// Query the books in the collection with a filter and an option.
-let filter = doc! { &quot;author&quot;: &quot;George Orwell&quot; };
-let find_options = FindOptions::builder().sort(doc! { &quot;title&quot;: 1 }).build();
-let mut cursor = typed_collection.find(filter, find_options).await?;
-
-// Iterate over the results of the cursor.
-while let Some(book) = cursor.try_next().await? {
-    println!(&quot;title: {}&quot;, book.title);
-}
-<span class="boring">Ok(()) }
-</span><span class="boring">}</span></code></pre></pre>
-<p>If a <a href="https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html"><code>Cursor</code></a> is still open when it goes out of scope, it will automatically be closed via an asynchronous <a href="https://www.mongodb.com/docs/manual/reference/command/killCursors/">killCursors</a> command executed from its <a href="https://doc.rust-lang.org/std/ops/trait.Drop.html"><code>Drop</code></a> implementation.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="performance"><a class="header" href="#performance">Performance</a></h1>
-<h2 id="client-best-practices"><a class="header" href="#client-best-practices"><code>Client</code> Best Practices</a></h2>
-<p>The <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html"><code>Client</code></a> handles many aspects of database connection behind the scenes that can require manual management for other database drivers; it discovers server topology, monitors it for any changes, and maintains an internal connection pool.  This has implications for how a <code>Client</code> should be used for best performance.</p>
-<h3 id="lifetime"><a class="header" href="#lifetime">Lifetime</a></h3>
-<p>A <code>Client</code> should be as long-lived as possible.  Establishing a new <code>Client</code> is relatively slow and resource-intensive, so ideally that should only be done once at application startup.  Because <code>Client</code> is implemented using an internal <a href="https://doc.rust-lang.org/std/sync/struct.Arc.html"><code>Arc</code></a>, it can safely be shared across threads or tasks, and <code>clone</code>ing it to pass to new contexts is extremely cheap.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">use mongodb::Client;
-</span><span class="boring">use std::error::Error;
-</span>// This will be very slow because it's constructing and tearing down a `Client`
-// with every request.
-async fn handle_request_bad() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
-    let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-    // Do something with the client
-    Ok(())
-}
-
-// This will be much faster.
-async fn handle_request_good(client: &amp;Client) -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
-    // Do something with the client
-    Ok(())
-}
-<span class="boring">}</span></code></pre></pre>
-<p>This is especially noticeable when using a framework that provides connection pooling; because <code>Client</code> does its own pooling internally, attempting to maintain a pool of <code>Client</code>s will (somewhat counter-intuitively) result in worse performance than using a single one.</p>
-<h3 id="runtime"><a class="header" href="#runtime">Runtime</a></h3>
-<p>A <code>Client</code> is implicitly bound to the instance of the <code>tokio</code> or <code>async-std</code> runtime in which it was created.  Attempting to execute operations on a different runtime instance will cause incorrect behavior and unpredictable failures.  This is easy to accidentally invoke when testing, as the <code>tokio::test</code> or <code>async_std::test</code> helper macros create a new runtime for each test.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate once_cell;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use mongodb::Client;
-</span><span class="boring">use std::error::Error;
-</span>use tokio::runtime::Runtime;
-use once_cell::sync::Lazy;
-
-static CLIENT: Lazy&lt;Client&gt; = Lazy::new(|| {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async {
-        Client::with_uri_str(&quot;mongodb://example.com&quot;).await.unwrap()
-    })
-});
-
-// This will inconsistently fail.
-#[tokio::test]
-async fn test_list_dbs() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
-    CLIENT.list_database_names(None, None).await?;
-    Ok(())
-}
-<span class="boring">}</span></code></pre></pre>
-<p>To work around this issue, either create a new <code>Client</code> for every async test, or bundle the <code>Runtime</code> along with the client and don't use the test helper macros.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate once_cell;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use mongodb::Client;
-</span><span class="boring">use std::error::Error;
-</span>use tokio::runtime::Runtime;
-use once_cell::sync::Lazy;
-
-static CLIENT_RUNTIME: Lazy&lt;(Client, Runtime)&gt; = Lazy::new(|| {
-    let rt = Runtime::new().unwrap();
-    let client = rt.block_on(async {
-        Client::with_uri_str(&quot;mongodb://example.com&quot;).await.unwrap()
-    });
-    (client, rt)
-});
-
-#[test]
-fn test_list_dbs() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
-    let (client, rt) = &amp;*CLIENT_RUNTIME;
-    rt.block_on(async {
-        client.list_database_names(None, None).await
-    })?;
-    Ok(())
-}
-<span class="boring">}</span></code></pre></pre>
-<p>or</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use mongodb::Client;
-</span><span class="boring">use std::error::Error;
-</span>#[tokio::test]
-async fn test_list_dbs() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
-    let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-    CLIENT.list_database_names(None, None).await?;
-    Ok(())
-}
-<span class="boring">}</span></code></pre></pre>
-<h2 id="parallelism"><a class="header" href="#parallelism">Parallelism</a></h2>
-<p>Where data operations are naturally parallelizable, spawning many asynchronous tasks that use the driver concurrently is often the best way to achieve maximum performance, as the driver is designed to work well in such situations.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use mongodb::{bson::Document, Client, error::Result};
-</span><span class="boring">use tokio::task;
-</span><span class="boring">
-</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
-</span>let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-
-for i in 0..5 {
-    let client_ref = client.clone();
-
-    task::spawn(async move {
-        let collection = client_ref.database(&quot;items&quot;).collection::&lt;Document&gt;(&amp;format!(&quot;coll{}&quot;, i));
-
-        // Do something with the collection
-    });
-}
-<span class="boring">
-</span><span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}</span></code></pre></pre>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="web-framework-examples"><a class="header" href="#web-framework-examples">Web Framework Examples</a></h1>
-<h2 id="actix"><a class="header" href="#actix">Actix</a></h2>
-<p>The driver can be used easily with the Actix web framework by storing a <code>Client</code> in Actix application data. A full example application for using MongoDB with Actix can be found <a href="https://github.com/actix/examples/tree/master/databases/mongodb">here</a>.</p>
-<h2 id="rocket"><a class="header" href="#rocket">Rocket</a></h2>
-<p>The Rocket web framework provides built-in support for MongoDB via the Rust driver. The documentation for the <a href="https://api.rocket.rs/v0.5-rc/rocket_db_pools/index.html"><code>rocket_db_pools</code></a> crate contains instructions for using MongoDB with your Rocket application.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="unstable-api"><a class="header" href="#unstable-api">Unstable API</a></h1>
+                        <h1 id="unstable-api"><a class="header" href="#unstable-api">Unstable API</a></h1>
 <p>To enable support for in-use encryption (<a href="https://www.mongodb.com/docs/manual/core/csfle/">client-side field level encryption</a> and <a href="https://www.mongodb.com/docs/manual/core/queryable-encryption/">queryable encryption</a>), enable the <code>&quot;in-use-encryption-unstable&quot;</code> feature of the <code>mongodb</code> crate.  As the name implies, the API for this feature is unstable, and may change in backwards-incompatible ways in minor releases.</p>
 <h1 id="client-side-field-level-encryption"><a class="header" href="#client-side-field-level-encryption">Client-Side Field Level Encryption</a></h1>
 <p>Starting with MongoDB 4.2, client-side field level encryption allows an application to encrypt specific data fields in addition to pre-existing MongoDB encryption features such as <a href="https://dochub.mongodb.org/core/security-encryption-at-rest">Encryption at Rest</a> and <a href="https://dochub.mongodb.org/core/security-tls-transport-encryption">TLS/SSL (Transport Encryption)</a>.</p>
@@ -1223,6 +868,9 @@ async fn main() -&gt; Result&lt;()&gt; {
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="web_framework_examples.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
 
 
                         <div style="clear: both"></div>
@@ -1231,6 +879,9 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="web_framework_examples.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
 
             </nav>
 
@@ -1254,11 +905,6 @@ async fn main() -&gt; Result&lt;()&gt; {
 
         <!-- Custom JS scripts -->
 
-        <script>
-        window.addEventListener('load', function() {
-            window.setTimeout(window.print, 100);
-        });
-        </script>
 
     </body>
 </html>
