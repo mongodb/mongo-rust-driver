@@ -12,7 +12,7 @@ See also the MongoDB documentation on [Client Side Field Level Encryption](https
 
 ## Dependencies
 
-To get started using client-side field level encryption in your project, you will need to install [libmongocrypt](https://github.com/mongodb/libmongocrypt), which can be compiled from source or fetched from a variety of package repositories; for more information, see the libmongocrypt [README](https://github.com/mongodb/libmongocrypt/blob/master/README.md).  If you install libmongocrypt in a location outside of the system library search path, the `MONGOCRYPT_LIB_DIR` environment variable will need to be set when compiling your project.
+To get started using client-side field level encryption in your project, you will need to install [libmongocrypt](https://github.com/mongodb/libmongocrypt), which can be fetched from a [variety of package repositories](https://www.mongodb.com/docs/manual/core/csfle/reference/libmongocrypt/#std-label-csfle-reference-libmongocrypt).  If you install libmongocrypt in a location outside of the system library search path, the `MONGOCRYPT_LIB_DIR` environment variable will need to be set when compiling your project.
 
 Additionally, either `crypt_shared` or `mongocryptd` are required in order to use automatic client-side encryption.
 
@@ -44,7 +44,7 @@ For detailed installation instructions see the [MongoDB documentation on Automat
 
 ### mongocryptd
 
-The `mongocryptd` binary is required for automatic client-side encryption and is included as a component in the [MongoDB Enterprise Server package](https://dochub.mongodb.org/core/install-mongodb-enterprise). For detailed installation instructions see the [MongoDB documentation on mongocryptd](https://dochub.mongodb.org/core/client-side-field-level-encryption-mongocryptd).
+If using `crypt_shared` is not an option, the `mongocryptd` binary is required for automatic client-side encryption and is included as a component in the [MongoDB Enterprise Server package](https://dochub.mongodb.org/core/install-mongodb-enterprise). For detailed installation instructions see the [MongoDB documentation on mongocryptd](https://dochub.mongodb.org/core/client-side-field-level-encryption-mongocryptd).
 
 `mongocryptd` performs the following:
 * Parses the automatic encryption rules specified to the database connection. If the JSON schema contains invalid automatic encryption syntax or any document validation syntax, `mongocryptd` returns an error.

@@ -503,7 +503,7 @@ for i in 0..5 {
 <p>With field level encryption, applications can encrypt fields in documents prior to transmitting data over the wire to the server. Client-side field level encryption supports workloads where applications must guarantee that unauthorized parties, including server administrators, cannot read the encrypted data.</p>
 <p>See also the MongoDB documentation on <a href="https://dochub.mongodb.org/core/client-side-field-level-encryption">Client Side Field Level Encryption</a>.</p>
 <h2 id="dependencies"><a class="header" href="#dependencies">Dependencies</a></h2>
-<p>To get started using client-side field level encryption in your project, you will need to install <a href="https://github.com/mongodb/libmongocrypt">libmongocrypt</a>, which can be compiled from source or fetched from a variety of package repositories; for more information, see the libmongocrypt <a href="https://github.com/mongodb/libmongocrypt/blob/master/README.md">README</a>.  If you install libmongocrypt in a location outside of the system library search path, the <code>MONGOCRYPT_LIB_DIR</code> environment variable will need to be set when compiling your project.</p>
+<p>To get started using client-side field level encryption in your project, you will need to install <a href="https://github.com/mongodb/libmongocrypt">libmongocrypt</a>, which can be fetched from a <a href="https://www.mongodb.com/docs/manual/core/csfle/reference/libmongocrypt/#std-label-csfle-reference-libmongocrypt">variety of package repositories</a>.  If you install libmongocrypt in a location outside of the system library search path, the <code>MONGOCRYPT_LIB_DIR</code> environment variable will need to be set when compiling your project.</p>
 <p>Additionally, either <code>crypt_shared</code> or <code>mongocryptd</code> are required in order to use automatic client-side encryption.</p>
 <h3 id="crypt_shared"><a class="header" href="#crypt_shared">crypt_shared</a></h3>
 <p>The Automatic Encryption Shared Library (crypt_shared) provides the same functionality as mongocryptd, but does not require you to spawn another process to perform automatic encryption.</p>
@@ -529,7 +529,7 @@ for i in 0..5 {
 <p>If the <code>mongodb</code> crate cannot load crypt_shared it will attempt to fallback to using mongocryptd by default.  Include <code>&quot;cryptSharedRequired&quot;: true</code> in the <code>extra_options</code> document to always use crypt_shared and fail if it could not be loaded.</p>
 <p>For detailed installation instructions see the <a href="https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library">MongoDB documentation on Automatic Encryption Shared Library</a>.</p>
 <h3 id="mongocryptd"><a class="header" href="#mongocryptd">mongocryptd</a></h3>
-<p>The <code>mongocryptd</code> binary is required for automatic client-side encryption and is included as a component in the <a href="https://dochub.mongodb.org/core/install-mongodb-enterprise">MongoDB Enterprise Server package</a>. For detailed installation instructions see the <a href="https://dochub.mongodb.org/core/client-side-field-level-encryption-mongocryptd">MongoDB documentation on mongocryptd</a>.</p>
+<p>If using <code>crypt_shared</code> is not an option, the <code>mongocryptd</code> binary is required for automatic client-side encryption and is included as a component in the <a href="https://dochub.mongodb.org/core/install-mongodb-enterprise">MongoDB Enterprise Server package</a>. For detailed installation instructions see the <a href="https://dochub.mongodb.org/core/client-side-field-level-encryption-mongocryptd">MongoDB documentation on mongocryptd</a>.</p>
 <p><code>mongocryptd</code> performs the following:</p>
 <ul>
 <li>Parses the automatic encryption rules specified to the database connection. If the JSON schema contains invalid automatic encryption syntax or any document validation syntax, <code>mongocryptd</code> returns an error.</li>
@@ -657,7 +657,7 @@ async fn main() -&gt; Result&lt;()&gt; {
         key_vault_namespace,
         kms_providers,
     )?
-    .schema_map([(encrypted_namespace, schema)])
+    .schema_map([(encrypted_namespace.to_string(), schema)])
     .build()
     .await?;
     let coll = client
@@ -782,7 +782,10 @@ async fn main() -&gt; Result&lt;()&gt; {
         &quot;Encrypted document: {:?}&quot;,
         unencrypted_coll.find_one(None, None).await?
     );
-    
+    // This would return a Write error with the message &quot;Document failed validation&quot;.
+    // unencrypted_coll.insert_one(doc! { &quot;encryptedField&quot;: &quot;123456789&quot; }, None)
+    //    .await?;
+
     Ok(())
 }</code></pre></pre>
 <h3 id="automatic-queryable-encryption"><a class="header" href="#automatic-queryable-encryption">Automatic Queryable Encryption</a></h3>
