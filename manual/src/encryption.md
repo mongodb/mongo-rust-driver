@@ -1,6 +1,6 @@
 # Unstable API
 
-To enable support for in-use encryption (client-side field level encryption and queryable encryption), enable the `"in-use-encryption-unstable"` feature of the `mongodb` crate.  As the name implies, the API for this feature is unstable, and may change in backwards-incompatible ways in minor releases.
+To enable support for in-use encryption ([client-side field level encryption](https://www.mongodb.com/docs/manual/core/csfle/) and [queryable encryption](https://www.mongodb.com/docs/manual/core/queryable-encryption/)), enable the `"in-use-encryption-unstable"` feature of the `mongodb` crate.  As the name implies, the API for this feature is unstable, and may change in backwards-incompatible ways in minor releases.
 
 # Client-Side Field Level Encryption
 
