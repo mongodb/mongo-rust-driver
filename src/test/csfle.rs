@@ -2857,8 +2857,8 @@ async fn fle2_example() -> Result<()> {
     let key2_id = ce.create_data_key(MasterKey::Local).run().await?;
 
     // Create an encryptedFieldsMap.
-    let encrypted_fields_map = vec![(
-        "docsExamples.encrypted".to_string(),
+    let encrypted_fields_map = [(
+        "docsExamples.encrypted",
         doc! {
             "fields": [
                 {
