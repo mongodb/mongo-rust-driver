@@ -490,6 +490,8 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
+          . ${DRIVERS_TOOLS}/.evergreen/find-python3.sh
+          PYTHON=$(find_python3)
           set +o xtrace
           cat <<EOT > csfle-expansions.yml
           PREPARE_CSFLE: |
@@ -498,8 +500,8 @@ functions:
             export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
             export TLS_FEATURE=${TLS_FEATURE}
             export CRYPT_SHARED_LIB_PATH=${CRYPT_SHARED_LIB_PATH}
-            export PYTHON=${PYTHON}
-            ${PYTHON} -m pip install boto3
+            export PYTHON=$PYTHON
+            $PYTHON -m pip install boto3
             # Exported without xtrace to avoid leaking credentials
             set +o xtrace
             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -555,8 +557,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m virtualenv ./venv
-          ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
+          . ./activate-ocspvenv.sh
     - command: shell.exec
       params:
         background: true
@@ -574,8 +575,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m virtualenv ./venv
-          ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
+          . ./activate-ocspvenv.sh
     - command: shell.exec
       params:
         background: true
@@ -595,8 +595,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m virtualenv ./venv
-          ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
+          . ./activate-ocspvenv.sh
     - command: shell.exec
       params:
         background: true
@@ -614,8 +613,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m virtualenv ./venv
-          ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
+          . ./activate-ocspvenv.sh
     - command: shell.exec
       params:
         background: true
@@ -1736,21 +1734,18 @@ axes:
         display_name: "Ubuntu 18.04"
         run_on: ubuntu1804-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-64"
       - id: ubuntu-20.04
         display_name: "Ubuntu 20.04"
         run_on: ubuntu2004-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu2004-64"
       - id: ubuntu-18.04-arm64
         display_name: "ARM64 Ubuntu 18.04"
         run_on: ubuntu1804-arm64-test
         variables:
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-arm64"
       - id: macos-11.00
@@ -1758,14 +1753,12 @@ axes:
         run_on: macos-1100
         variables:
           SINGLE_THREAD: true
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python3"
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "macos"
       - id: windows-64-vs2017
         display_name: "Windows (VS 2017)"
         run_on: windows-64-vs2017-test
         variables:
-          PYTHON: "/cygdrive/c/python/Python36/python"
           VENV_BIN_DIR: "Scripts"
           LIBMONGOCRYPT_OS: "windows-test"
 

@@ -6,7 +6,7 @@ if [ "$TLS_FEATURE" != "openssl-tls" ]; then
 fi
 
 cd ${DRIVERS_TOOLS}/.evergreen/csfle
-. ./activate_venv.sh
+. ./activate-kmstlsvenv.sh
 # TMPDIR is required to avoid "AF_UNIX path too long" errors.
 export TMPDIR="$(dirname ${DRIVERS_TOOLS})"
 
