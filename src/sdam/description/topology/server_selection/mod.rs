@@ -89,14 +89,10 @@ impl TopologyDescription {
         if self.has_available_servers() {
             format!(
                 "Server selection timeout: None of the available servers suitable for criteria \
-                 {:?}. Topology: {}",
-                criteria, self
+                 {criteria:?}. Topology: {self}"
             )
         } else {
-            format!(
-                "Server selection timeout: No available servers. Topology: {}",
-                self
-            )
+            format!("Server selection timeout: No available servers. Topology: {self}")
         }
     }
 
@@ -129,9 +125,9 @@ impl TopologyDescription {
         self.servers.values().any(|server| server.is_available())
     }
 
-    fn suitable_servers<'a>(
+    fn suitable_servers(
         &self,
-        read_preference: &'a ReadPreference,
+        read_preference: &ReadPreference,
     ) -> Result<Vec<&ServerDescription>> {
         let servers = match self.topology_type {
             TopologyType::Unknown => Vec::new(),
@@ -145,10 +141,7 @@ impl TopologyDescription {
         Ok(servers)
     }
 
-    fn retain_servers_within_latency_window<'a>(
-        &self,
-        suitable_servers: &mut Vec<&'a ServerDescription>,
-    ) {
+    fn retain_servers_within_latency_window(&self, suitable_servers: &mut Vec<&ServerDescription>) {
         let shortest_average_rtt = suitable_servers
             .iter()
             .filter_map(|server_desc| server_desc.average_round_trip_time)
@@ -189,9 +182,9 @@ impl TopologyDescription {
         self.servers_with_type(&[ServerType::RsPrimary]).next()
     }
 
-    fn suitable_servers_in_replica_set<'a>(
+    fn suitable_servers_in_replica_set(
         &self,
-        read_preference: &'a ReadPreference,
+        read_preference: &ReadPreference,
     ) -> Result<Vec<&ServerDescription>> {
         let servers = match read_preference {
             ReadPreference::Primary => self.servers_with_type(&[ServerType::RsPrimary]).collect(),
@@ -234,10 +227,10 @@ impl TopologyDescription {
         Ok(servers)
     }
 
-    fn suitable_servers_for_read_preference<'a>(
+    fn suitable_servers_for_read_preference(
         &self,
         types: &'static [ServerType],
-        tag_sets: Option<&'a Vec<TagSet>>,
+        tag_sets: Option<&Vec<TagSet>>,
         max_staleness: Option<Duration>,
     ) -> Result<Vec<&ServerDescription>> {
         if let Some(max_staleness) = max_staleness {
@@ -368,7 +361,7 @@ impl fmt::Display for TopologyDescription {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{ Type: {:?}, Servers: [ ", self.topology_type)?;
         for server_info in self.servers.values().map(ServerInfo::new_borrowed) {
-            write!(f, "{}, ", server_info)?;
+            write!(f, "{server_info}, ",)?;
         }
         write!(f, "] }}")
     }

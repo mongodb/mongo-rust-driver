@@ -20,7 +20,7 @@ impl OpCode {
             2013 => Ok(OpCode::Message),
             2012 => Ok(OpCode::Compressed),
             other => Err(ErrorKind::InvalidResponse {
-                message: format!("Invalid wire protocol opcode: {}", other),
+                message: format!("Invalid wire protocol opcode: {other}"),
             }
             .into()),
         }

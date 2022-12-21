@@ -137,11 +137,11 @@ impl GridFsBucket {
             .selection_criteria(options.selection_criteria.clone())
             .build();
         let files = db.collection_with_options::<FilesCollectionDocument>(
-            &format!("{}.files", bucket_name),
+            &format!("{bucket_name}.files"),
             collection_options.clone(),
         );
         let chunks = db.collection_with_options::<Chunk>(
-            &format!("{}.chunks", bucket_name),
+            &format!("{bucket_name}.chunks",),
             collection_options,
         );
 

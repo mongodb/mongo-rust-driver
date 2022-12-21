@@ -297,6 +297,7 @@ impl Monitor {
             .await
     }
 
+    #[allow(clippy::let_underscore_future)]
     fn emit_event<F>(&self, event: F)
     where
         F: FnOnce() -> SdamEvent,

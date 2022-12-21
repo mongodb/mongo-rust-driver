@@ -167,8 +167,7 @@ impl<'de> Deserialize<'de> for ReadPreference {
                 options: preference.options,
             }),
             other => Err(D::Error::custom(format!(
-                "Unknown read preference mode: {}",
-                other
+                "Unknown read preference mode: {other}",
             ))),
         }
     }

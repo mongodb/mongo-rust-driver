@@ -117,7 +117,7 @@ impl AsyncTcpStream {
 
         if socket_addrs.is_empty() {
             return Err(ErrorKind::DnsResolve {
-                message: format!("No DNS results for domain {}", address),
+                message: format!("No DNS results for domain {address}",),
             }
             .into());
         }

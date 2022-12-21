@@ -161,7 +161,7 @@ pub(crate) async fn resolve_address(
 ) -> Result<impl Iterator<Item = SocketAddr>> {
     #[cfg(feature = "tokio-runtime")]
     {
-        let socket_addrs = tokio::net::lookup_host(format!("{}", address)).await?;
+        let socket_addrs = tokio::net::lookup_host(format!("{address}")).await?;
         Ok(socket_addrs)
     }
 

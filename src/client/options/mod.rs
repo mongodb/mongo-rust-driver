@@ -118,8 +118,7 @@ impl<'de> Deserialize<'de> for ServerAddress {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        Self::parse(s.as_str())
-            .map_err(|e| <D::Error as serde::de::Error>::custom(format!("{}", e)))
+        Self::parse(s.as_str()).map_err(|e| <D::Error as serde::de::Error>::custom(format!("{e}")))
     }
 }
 
@@ -177,8 +176,7 @@ impl ServerAddress {
                 if part.is_empty() {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "invalid server address: \"{}\"; hostname cannot be empty",
-                            address
+                            "invalid server address: \"{address}\"; hostname cannot be empty"
                         ),
                     }
                     .into());
@@ -187,7 +185,7 @@ impl ServerAddress {
             }
             None => {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid server address: \"{}\"", address),
+                    message: format!("invalid server address: \"{address}\""),
                 }
                 .into())
             }
@@ -197,16 +195,14 @@ impl ServerAddress {
             Some(part) => {
                 let port = u16::from_str(part).map_err(|_| ErrorKind::InvalidArgument {
                     message: format!(
-                        "port must be valid 16-bit unsigned integer, instead got: {}",
-                        part
+                        "port must be valid 16-bit unsigned integer, instead got: {part}"
                     ),
                 })?;
 
                 if port == 0 {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "invalid server address: \"{}\"; port must be non-zero",
-                            address
+                            "invalid server address: \"{address}\"; port must be non-zero"
                         ),
                     }
                     .into());
@@ -214,8 +210,7 @@ impl ServerAddress {
                 if parts.next().is_some() {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "address \"{}\" contains more than one unescaped ':'",
-                            address
+                            "address \"{address}\" contains more than one unescaped ':'"
                         ),
                     }
                     .into());
@@ -283,7 +278,7 @@ impl FromStr for ServerApiVersion {
         match str {
             "1" => Ok(Self::V1),
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid server api version string: {}", str),
+                message: format!("invalid server api version string: {str}"),
             }
             .into()),
         }
@@ -1440,7 +1435,7 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(ErrorKind::InvalidArgument {
-            message: format!("{} must be URL encoded", userinfo_type),
+            message: format!("{userinfo_type} must be URL encoded"),
         }
         .into());
     }
@@ -1705,8 +1700,7 @@ impl ConnectionString {
                 None => {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "connection string options is not a `key=value` pair: {}",
-                            option_pair,
+                            "connection string options is not a `key=value` pair: {option_pair}"
                         ),
                     }
                     .into())
@@ -1923,14 +1917,14 @@ impl ConnectionString {
             }
             "maxstalenessseconds" => {
                 let max_staleness_seconds = value.parse::<i64>().map_err(|e| {
-                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {}", e))
+                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {e}"))
                 })?;
 
                 let max_staleness = match max_staleness_seconds.cmp(&-1) {
                     Ordering::Less => {
                         return Err(Error::invalid_argument(format!(
-                            "maxStalenessSeconds must be -1 or positive, instead got {}",
-                            max_staleness_seconds
+                            "maxStalenessSeconds must be -1 or positive, instead got \
+                             {max_staleness_seconds}"
                         )));
                     }
                     Ordering::Equal => {
@@ -1968,7 +1962,7 @@ impl ConnectionString {
                     },
                     other => {
                         return Err(ErrorKind::InvalidArgument {
-                            message: format!("'{}' is not a valid read preference", other),
+                            message: format!("'{other}' is not a valid read preference"),
                         }
                         .into())
                     }
@@ -1989,9 +1983,8 @@ impl ConnectionString {
                                 }
                                 _ => Err(ErrorKind::InvalidArgument {
                                     message: format!(
-                                        "'{}' is not a valid read preference tag (which must be \
-                                         of the form 'key:value'",
-                                        value,
+                                        "'{value}' is not a valid read preference tag (which must \
+                                         be of the form 'key:value'"
                                     ),
                                 }
                                 .into()),
@@ -2173,13 +2166,9 @@ impl ConnectionString {
                     }
                     acc
                 });
-                let mut message = format!("{} is an invalid option", other);
+                let mut message = format!("{other} is an invalid option");
                 if jaro_winkler >= 0.84 {
-                    let _ = write!(
-                        message,
-                        ". An option with a similar name exists: {}",
-                        option
-                    );
+                    let _ = write!(message, ". An option with a similar name exists: {option}");
                 }
                 return Err(ErrorKind::InvalidArgument { message }.into());
             }
