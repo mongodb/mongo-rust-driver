@@ -7,7 +7,7 @@ use std::{
 };
 
 use bson::Bson;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{bson::Document, options::ServerAddress, sdam::TopologyVersion};
@@ -597,7 +597,7 @@ impl ErrorKind {
 }
 
 /// An error that occurred due to a database command failing.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CommandError {
     /// Identifies the type of error.
@@ -637,7 +637,7 @@ impl fmt::Display for CommandError {
 }
 
 /// An error that occurred due to not being able to satisfy a write concern.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct WriteConcernError {
     /// Identifies the type of write concern error.
@@ -673,7 +673,7 @@ impl WriteConcernError {
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct WriteError {
     /// Identifies the type of write error.
@@ -707,7 +707,7 @@ impl WriteError {
 
 /// An error that occurred during a write operation consisting of multiple writes that wasn't due to
 /// being unable to satisfy a write concern.
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct BulkWriteError {
     /// Index into the list of operations that this error corresponds to.
@@ -744,7 +744,7 @@ impl BulkWriteError {
 }
 
 /// The set of errors that occurred during a write operation.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct BulkWriteFailure {
@@ -769,7 +769,7 @@ impl BulkWriteFailure {
 }
 
 /// An error that occurred when trying to execute a write operation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum WriteFailure {
     /// An error that occurred due to not being able to satisfy a write concern.
