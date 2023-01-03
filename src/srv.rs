@@ -73,7 +73,7 @@ impl SrvResolver {
             .into());
         }
 
-        let lookup_hostname = format!("_mongodb._tcp.{original_hostname}",);
+        let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
 
         let srv_lookup = self.resolver.srv_lookup(lookup_hostname.as_str()).await?;
         let mut srv_addresses: Vec<Result<ServerAddress>> = Vec::new();
@@ -126,7 +126,7 @@ impl SrvResolver {
 
         if srv_addresses.is_empty() {
             return Err(ErrorKind::DnsResolve {
-                message: format!("SRV lookup for {original_hostname} returned no records"),
+                message: format!("SRV lookup for {} returned no records", original_hostname),
             }
             .into());
         }
@@ -156,8 +156,9 @@ impl SrvResolver {
         if txt_records.next().is_some() {
             return Err(ErrorKind::DnsResolve {
                 message: format!(
-                    "TXT lookup for {original_hostname} returned more than one record, but more \
-                     than one are not allowed with 'mongodb+srv'",
+                    "TXT lookup for {} returned more than one record, but more than one are not \
+                     allowed with 'mongodb+srv'",
+                    original_hostname,
                 ),
             }
             .into());
@@ -177,7 +178,8 @@ impl SrvResolver {
             if parts.len() != 2 {
                 return Err(ErrorKind::DnsResolve {
                     message: format!(
-                        "TXT record string '{option_pair}' is not a value `key=value` option pair",
+                        "TXT record string '{}' is not a value `key=value` option pair",
+                        option_pair
                     ),
                 }
                 .into());
@@ -210,8 +212,9 @@ impl SrvResolver {
                 other => {
                     return Err(ErrorKind::DnsResolve {
                         message: format!(
-                            "TXT record option '{other}' was returned, but only 'authSource', \
+                            "TXT record option '{}' was returned, but only 'authSource', \
                              'replicaSet', and 'loadBalanced' are allowed",
+                            other
                         ),
                     }
                     .into())

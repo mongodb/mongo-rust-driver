@@ -141,7 +141,8 @@ where
             other => Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "expected document for value field of findAndModify response, but instead got \
-                     {other:?}",
+                     {:?}",
+                    other
                 ),
             }
             .into()),

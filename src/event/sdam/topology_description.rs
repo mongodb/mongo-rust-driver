@@ -108,19 +108,19 @@ impl fmt::Display for TopologyDescription {
         write!(f, "{{ Type: {:?}", self.description.topology_type)?;
 
         if let Some(ref set_name) = self.description.set_name {
-            write!(f, ", Set Name: {set_name}")?;
+            write!(f, ", Set Name: {}", set_name)?;
         }
 
         if let Some(max_set_version) = self.description.max_set_version {
-            write!(f, ", Max Set Version: {max_set_version}")?;
+            write!(f, ", Max Set Version: {}", max_set_version)?;
         }
 
         if let Some(max_election_id) = self.description.max_election_id {
-            write!(f, ", Max Election ID: {max_election_id}")?;
+            write!(f, ", Max Election ID: {}", max_election_id)?;
         }
 
         if let Some(ref compatibility_error) = self.description.compatibility_error {
-            write!(f, ", Compatibility Error: {compatibility_error}")?;
+            write!(f, ", Compatibility Error: {}", compatibility_error)?;
         }
 
         if !self.description.servers.is_empty() {

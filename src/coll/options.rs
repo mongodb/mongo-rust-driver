@@ -50,7 +50,8 @@ impl<'de> Deserialize<'de> for ReturnDocument {
             "after" => Ok(ReturnDocument::After),
             "before" => Ok(ReturnDocument::Before),
             other => Err(D::Error::custom(format!(
-                "Unknown return document value: {other}"
+                "Unknown return document value: {}",
+                other
             ))),
         }
     }

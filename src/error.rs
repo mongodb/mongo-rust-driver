@@ -70,8 +70,8 @@ impl Error {
     pub(crate) fn pool_cleared_error(address: &ServerAddress, cause: &Error) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
-                "Connection pool for {address} cleared because another operation failed with: \
-                 {cause}"
+                "Connection pool for {} cleared because another operation failed with: {}",
+                address, cause
             ),
         }
         .into()
@@ -80,7 +80,7 @@ impl Error {
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
     pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
         ErrorKind::Authentication {
-            message: format!("{mechanism_name} failure: {reason}"),
+            message: format!("{} failure: {}", mechanism_name, reason),
         }
         .into()
     }
