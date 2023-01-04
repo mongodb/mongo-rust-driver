@@ -4,7 +4,14 @@
 use mongodb::{
     bson::{doc, Document},
     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
-    options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
+    options::{
+        Acknowledgment,
+        ReadConcern,
+        ReadPreference,
+        SelectionCriteria,
+        TransactionOptions,
+        WriteConcern,
+    },
     Client,
     ClientSession,
 };
@@ -42,6 +49,7 @@ async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
     let transaction_options = TransactionOptions::builder()
         .read_concern(ReadConcern::snapshot())
         .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
+        .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
         .build();
     session.start_transaction(transaction_options).await?;
 
