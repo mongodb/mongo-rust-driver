@@ -592,9 +592,9 @@ impl Client {
             cmd.set_cluster_time(cluster_time);
         }
 
-        let request_id = crate::cmap::conn::next_request_id();
         let connection_info = connection.info();
         let service_id = connection.service_id();
+        let request_id = crate::cmap::conn::next_request_id();
 
         if let Some(ref server_api) = self.inner.options.server_api {
             cmd.set_server_api(server_api);

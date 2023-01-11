@@ -462,7 +462,10 @@ fn selection_criteria_tracing_representation() {
 #[test]
 fn topology_description_tracing_representation() {
     let mut servers = HashMap::new();
-    servers.insert(ServerAddress::default(), ServerDescription::new(ServerAddress::default()));
+    servers.insert(
+        ServerAddress::default(),
+        ServerDescription::new(ServerAddress::default()),
+    );
 
     let oid = bson::oid::ObjectId::new();
     let description = TopologyDescription {
