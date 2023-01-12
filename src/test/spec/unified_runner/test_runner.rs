@@ -281,7 +281,7 @@ impl TestRunner {
                 self.sync_workers().await;
 
                 let all_tracing_events = tracing_subscriber
-                    .collect_events(Duration::from_millis(500), |_| true)
+                    .collect_events(Duration::from_millis(1000), |_| true)
                     .await;
 
                 for expectation in expected_messages {
