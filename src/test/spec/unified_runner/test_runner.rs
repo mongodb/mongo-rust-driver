@@ -37,7 +37,6 @@ use crate::{
         SERVERLESS,
         SERVER_API,
     },
-    Client,
     Collection,
     Database,
 };
@@ -472,12 +471,10 @@ impl TestRunner {
                         options.tracing_max_document_length_bytes = Some(10000);
                     }
 
-                    let client = Client::with_options(options).unwrap();
-
                     (
                         id,
                         Entity::Client(ClientEntity::new(
-                            client,
+                            options,
                             handler,
                             observe_events,
                             ignore_command_names,
