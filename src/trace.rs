@@ -3,7 +3,6 @@ use crate::{
     sdam::TopologyDescription,
     selection_criteria::SelectionCriteria,
 };
-use bson::Bson;
 
 pub(crate) mod command;
 pub(crate) mod connection;
@@ -23,16 +22,6 @@ impl TracingRepresentation for bson::oid::ObjectId {
 
     fn tracing_representation(&self) -> String {
         self.to_hex()
-    }
-}
-
-impl TracingRepresentation for bson::Document {
-    type Representation = String;
-
-    fn tracing_representation(&self) -> String {
-        Bson::Document(self.clone())
-            .into_relaxed_extjson()
-            .to_string()
     }
 }
 
