@@ -517,7 +517,7 @@ impl Client {
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                 topologyId = self.inner.topology.id.tracing_representation(),
                 operation = operation_name,
-                selector = ?criteria,
+                selector = criteria.tracing_representation(),
                 topologyDescription = latest_state.description.tracing_representation(),
                 "Server selection started"
             );
