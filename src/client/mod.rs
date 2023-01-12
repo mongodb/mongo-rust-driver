@@ -508,7 +508,10 @@ impl Client {
         if trace_or_log_enabled!(
             target: SERVER_SELECTION_TRACING_EVENT_TARGET,
             TracingOrLogLevel::Debug
-        ) {
+        )
+        // TODO: RUST-1499 Remove this condition.
+        && operation_name != "Check sessions support status"
+        {
             let latest_state = self.inner.topology.watch().observe_latest();
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
@@ -539,7 +542,10 @@ impl Client {
                     if trace_or_log_enabled!(
                         target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                         TracingOrLogLevel::Debug
-                    ) {
+                    )
+                    // TODO: RUST-1499 Remove this condition.
+                    && operation_name != "Check sessions support status"
+                    {
                         tracing::debug!(
                             target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                             topologyId = self.inner.topology.id.tracing_representation(),
@@ -558,7 +564,10 @@ impl Client {
                         if trace_or_log_enabled!(
                             target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                             TracingOrLogLevel::Debug
-                        ) {
+                        )
+                        // TODO: RUST-1499 Remove this condition.
+                        && operation_name != "Check sessions support status"
+                        {
                             tracing::debug!(
                                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                                 topologyId = self.inner.topology.id.tracing_representation(),
@@ -580,6 +589,8 @@ impl Client {
                                     target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                                     TracingOrLogLevel::Info
                                 )
+                                // TODO: RUST-1499 Remove this condition.
+                                && operation_name != "Check sessions support status"
                             {
                                 let remaining_time = timeout
                                     .checked_sub(start_time.elapsed())
@@ -616,7 +627,11 @@ impl Client {
                             if trace_or_log_enabled!(
                                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                                 TracingOrLogLevel::Debug
-                            ) {
+                            )
+                            // TODO: RUST-1499 Remove this condition.
+                            && operation_name
+                                != "Check sessions support status"
+                            {
                                 tracing::debug!(
                                     target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                                     topologyId = self.inner.topology.id.tracing_representation(),
