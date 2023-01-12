@@ -35,6 +35,7 @@ impl SelectedServer {
         Self { server }
     }
 
+    #[cfg(feature = "tracing-unstable")]
     pub(crate) fn address(&self) -> &ServerAddress {
         &self.server.address
     }
