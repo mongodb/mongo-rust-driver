@@ -19,11 +19,10 @@ use crate::options::ServerAddress;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
     command::CommandTracingEventEmitter,
+    server_selection::ServerSelectionEventEmitter,
     trace_or_log_enabled,
     TracingOrLogLevel,
-    TracingRepresentation,
     COMMAND_TRACING_EVENT_TARGET,
-    SERVER_SELECTION_TRACING_EVENT_TARGET,
 };
 use crate::{
     bson::Document,
@@ -505,24 +504,15 @@ impl Client {
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
         #[cfg(feature = "tracing-unstable")]
-        if trace_or_log_enabled!(
-            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-            TracingOrLogLevel::Debug
-        )
-        // TODO: RUST-1499 Remove this condition.
-        && operation_name != "Check sessions support status"
-        {
-            let latest_state = self.inner.topology.watch().observe_latest();
-            tracing::debug!(
-                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                topologyId = self.inner.topology.id.tracing_representation(),
-                operation = operation_name,
-                selector = criteria.tracing_representation(),
-                topologyDescription = latest_state.description.tracing_representation(),
-                "Server selection started"
-            );
-        }
-
+        let event_emitter = ServerSelectionEventEmitter::new(
+            self.inner.topology.id,
+            criteria,
+            operation_name,
+            start_time,
+            timeout,
+        );
+        #[cfg(feature = "tracing-unstable")]
+        event_emitter.emit_started_event(self.inner.topology.watch().observe_latest().description);
         // We only want to emit this message once per operation at most.
         #[cfg(feature = "tracing-unstable")]
         let mut emitted_waiting_message = false;
@@ -539,73 +529,20 @@ impl Client {
             match result {
                 Err(error) => {
                     #[cfg(feature = "tracing-unstable")]
-                    if trace_or_log_enabled!(
-                        target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                        TracingOrLogLevel::Debug
-                    )
-                    // TODO: RUST-1499 Remove this condition.
-                    && operation_name != "Check sessions support status"
-                    {
-                        tracing::debug!(
-                            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                            topologyId = self.inner.topology.id.tracing_representation(),
-                            operation = operation_name,
-                            selector = criteria.tracing_representation(),
-                            topologyDescription = state.description.tracing_representation(),
-                            failure = error.tracing_representation(),
-                            "Server selection failed"
-                        );
-                    }
+                    event_emitter.emit_failed_event(&state.description, &error);
+
                     return Err(error);
                 }
                 Ok(result) => {
                     if let Some(server) = result {
                         #[cfg(feature = "tracing-unstable")]
-                        if trace_or_log_enabled!(
-                            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                            TracingOrLogLevel::Debug
-                        )
-                        // TODO: RUST-1499 Remove this condition.
-                        && operation_name != "Check sessions support status"
-                        {
-                            tracing::debug!(
-                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                                topologyId = self.inner.topology.id.tracing_representation(),
-                                operation = operation_name,
-                                selector = criteria.tracing_representation(),
-                                topologyDescription = state.description.tracing_representation(),
-                                serverHost = server.address().host(),
-                                serverPort = server.address().port_tracing_representation(),
-                                "Server selection succeeded"
-                            );
-                        }
+                        event_emitter.emit_succeeded_event(&state.description, &server);
 
                         return Ok(server);
                     } else {
                         #[cfg(feature = "tracing-unstable")]
-                        {
-                            if !emitted_waiting_message
-                                && trace_or_log_enabled!(
-                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                                    TracingOrLogLevel::Info
-                                )
-                                // TODO: RUST-1499 Remove this condition.
-                                && operation_name != "Check sessions support status"
-                            {
-                                let remaining_time = timeout
-                                    .checked_sub(start_time.elapsed())
-                                    .unwrap_or(Duration::ZERO);
-                                tracing::info!(
-                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                                    topologyId = self.inner.topology.id.tracing_representation(),
-                                    operation = operation_name,
-                                    selector = criteria.clone().tracing_representation(),
-                                    topologyDescription =
-                                        state.description.tracing_representation(),
-                                    remainingTimeMS = remaining_time.as_millis(),
-                                    "Waiting for suitable server to become available",
-                                );
-                            }
+                        if !emitted_waiting_message {
+                            event_emitter.emit_waiting_event(&state.description);
                             emitted_waiting_message = true;
                         }
 
@@ -624,24 +561,7 @@ impl Client {
                             .into();
 
                             #[cfg(feature = "tracing-unstable")]
-                            if trace_or_log_enabled!(
-                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                                TracingOrLogLevel::Debug
-                            )
-                            // TODO: RUST-1499 Remove this condition.
-                            && operation_name
-                                != "Check sessions support status"
-                            {
-                                tracing::debug!(
-                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                                    topologyId = self.inner.topology.id.tracing_representation(),
-                                    operation = operation_name,
-                                    selector = criteria.tracing_representation(),
-                                    topologyDescription = ?state.description,
-                                    failure = error.tracing_representation(),
-                                    "Server selection failed"
-                                );
-                            }
+                            event_emitter.emit_failed_event(&state.description, &error);
 
                             return Err(error);
                         }

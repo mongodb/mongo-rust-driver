@@ -1,11 +1,8 @@
-use crate::{
-    client::options::{ServerAddress, DEFAULT_PORT},
-    sdam::TopologyDescription,
-    selection_criteria::SelectionCriteria,
-};
+use crate::client::options::{ServerAddress, DEFAULT_PORT};
 
 pub(crate) mod command;
 pub(crate) mod connection;
+pub(crate) mod server_selection;
 
 pub(crate) const COMMAND_TRACING_EVENT_TARGET: &str = "mongodb::command";
 pub(crate) const CONNECTION_TRACING_EVENT_TARGET: &str = "mongodb::connection";
@@ -29,22 +26,6 @@ impl TracingRepresentation for crate::error::Error {
     type Representation = String;
 
     fn tracing_representation(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl TracingRepresentation for SelectionCriteria {
-    type Representation = String;
-
-    fn tracing_representation(&self) -> Self::Representation {
-        self.to_string()
-    }
-}
-
-impl TracingRepresentation for TopologyDescription {
-    type Representation = String;
-
-    fn tracing_representation(&self) -> Self::Representation {
         self.to_string()
     }
 }
