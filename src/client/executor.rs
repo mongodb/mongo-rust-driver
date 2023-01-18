@@ -318,28 +318,22 @@ impl Client {
 
             // If the current transaction has been committed/aborted and it is not being
             // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
-            if retry.is_none() {
-                if let Some(ref mut session) = session {
-                    if matches!(
-                        session.transaction.state,
-                        TransactionState::Committed { .. }
-                    ) && op.name() != CommitTransaction::NAME
-                        || session.transaction.state == TransactionState::Aborted
-                            && op.name() != AbortTransaction::NAME
-                    {
-                        session.transaction.reset();
-                    }
+            if let Some(ref mut session) = session {
+                if matches!(
+                    session.transaction.state,
+                    TransactionState::Committed { .. }
+                ) && op.name() != CommitTransaction::NAME
+                    || session.transaction.state == TransactionState::Aborted
+                        && op.name() != AbortTransaction::NAME
+                {
+                    session.transaction.reset();
                 }
             }
 
-            let selection_criteria = if retry.is_none() {
-                session
+            let selection_criteria = session
                     .as_ref()
                     .and_then(|s| s.transaction.pinned_mongos())
-                    .or_else(|| op.selection_criteria())
-            } else {
-                op.selection_criteria()
-            };
+                    .or_else(|| op.selection_criteria());
 
             let server = match self.select_server(selection_criteria).await {
                 Ok(server) => server,
@@ -461,64 +455,6 @@ impl Client {
             break result;
         }
     }
-
-    /*
-    async fn execute_retry<T: Operation>(
-        &self,
-        op: &mut T,
-        session: &mut Option<&mut ClientSession>,
-        prior_txn_number: Option<i64>,
-        first_error: Error,
-    ) -> Result<ExecutionOutput<T>> {
-        op.update_for_retry();
-
-        let server = match self.select_server(op.selection_criteria()).await {
-            Ok(server) => server,
-            Err(_) => {
-                return Err(first_error);
-            }
-        };
-
-        let mut conn = match get_connection(session, op, &server.pool).await {
-            Ok(c) => c,
-            Err(_) => return Err(first_error),
-        };
-
-        let retryability = self.get_retryability(&conn, op, session)?;
-        if retryability == Retryability::None {
-            return Err(first_error);
-        }
-
-        let txn_number = prior_txn_number.or_else(|| get_txn_number(session, retryability));
-
-        match self
-            .execute_operation_on_connection(op, &mut conn, session, txn_number, retryability)
-            .await
-        {
-            Ok(operation_output) => Ok(ExecutionOutput {
-                operation_output,
-                connection: conn,
-            }),
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_application_error(
-                        server.address.clone(),
-                        err.clone(),
-                        HandshakePhase::after_completion(&conn),
-                    )
-                    .await;
-                drop(server);
-
-                if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
-                    Err(err)
-                } else {
-                    Err(first_error)
-                }
-            }
-        }
-    }
-    */
 
     /// Executes an operation on a given connection, optionally using a provided session.
     async fn execute_operation_on_connection<T: Operation>(
