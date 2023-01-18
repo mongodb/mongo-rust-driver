@@ -98,7 +98,7 @@ impl Client {
     ) -> Result<T::O> {
         self.execute_operation_with_details(op, session)
             .await
-            .map(|details| details.output.operation_output)
+            .map(|details| details.output)
     }
 
     async fn execute_operation_with_details<T: Operation>(
@@ -151,12 +151,12 @@ impl Client {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(
-                &details.output.operation_output,
-                &mut details.output.connection,
+                &details.output,
+                &mut details.connection,
             )?;
             Ok(Cursor::new(
                 self.clone(),
-                details.output.operation_output,
+                details.output,
                 details.implicit_session,
                 pinned,
             ))
@@ -177,13 +177,13 @@ impl Client {
             .await?;
 
         let pinned = self.pin_connection_for_session(
-            &details.output.operation_output,
-            &mut details.output.connection,
+            &details.output,
+            &mut details.connection,
             session,
         )?;
         Ok(SessionCursor::new(
             self.clone(),
-            details.output.operation_output,
+            details.output,
             pinned,
         ))
     }
@@ -246,9 +246,9 @@ impl Client {
             if let Some(session) = implicit_session {
                 details.implicit_session = Some(session);
             }
-            let (cursor_spec, cs_data) = details.output.operation_output;
+            let (cursor_spec, cs_data) = details.output;
             let pinned =
-                self.pin_connection_for_cursor(&cursor_spec, &mut details.output.connection)?;
+                self.pin_connection_for_cursor(&cursor_spec, &mut details.connection)?;
             let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
             Ok(ChangeStream::new(cursor, args, cs_data))
@@ -279,10 +279,10 @@ impl Client {
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
-            let (cursor_spec, cs_data) = details.output.operation_output;
+            let (cursor_spec, cs_data) = details.output;
             let pinned = self.pin_connection_for_session(
                 &cursor_spec,
-                &mut details.output.connection,
+                &mut details.connection,
                 session,
             )?;
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
@@ -327,40 +327,38 @@ impl Client {
 
             let server = match self.select_server(selection_criteria).await {
                 Ok(server) => server,
-                Err(mut err) => match retry {
-                    None => {
-                        err.add_labels_and_update_pin(None, &mut session, None)?;
-                        break Err(err);
-                    }
-                    Some(r) => break Err(r.first_error),
+                Err(mut err) => {
+                    retry.first_error()?;
+
+                    err.add_labels_and_update_pin(None, &mut session, None)?;
+                    return Err(err);
                 }
             };
 
             let mut conn = match get_connection(&session, &op, &server.pool).await {
                 Ok(c) => c,
-                Err(mut err) => match retry {
-                    None => {
-                        err.add_labels_and_update_pin(None, &mut session, None)?;
-                        if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
-                            err.add_label(RETRYABLE_WRITE_ERROR);
-                        }
+                Err(mut err) => {
+                    retry.first_error()?;
 
-                        let op_retry = match self.get_op_retryability(&op, &session) {
-                            Retryability::Read => err.is_read_retryable(),
-                            Retryability::Write => err.is_write_retryable(),
-                            _ => false,
-                        };
-                        if err.is_pool_cleared() || op_retry {
-                            retry = Some(ExecutionRetry {
-                                prior_txn_number: None,
-                                first_error: err,
-                            });
-                            continue;
-                        } else {
-                            return Err(err);
-                        }
+                    err.add_labels_and_update_pin(None, &mut session, None)?;
+                    if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
+                        err.add_label(RETRYABLE_WRITE_ERROR);
                     }
-                    Some(r) => return Err(r.first_error),
+
+                    let op_retry = match self.get_op_retryability(&op, &session) {
+                        Retryability::Read => err.is_read_retryable(),
+                        Retryability::Write => err.is_write_retryable(),
+                        _ => false,
+                    };
+                    if err.is_pool_cleared() || op_retry {
+                        retry = Some(ExecutionRetry {
+                            prior_txn_number: None,
+                            first_error: err,
+                        });
+                        continue;
+                    } else {
+                        return Err(err);
+                    }
                 }
             };
 
@@ -371,9 +369,7 @@ impl Client {
 
             let retryability = self.get_retryability(&conn, &op, &session)?;
             if retryability == Retryability::None {
-                if let Some(r) = retry {
-                    return Err(r.first_error);
-                }
+                retry.first_error()?;
             }
 
             let txn_number = retry
@@ -381,7 +377,7 @@ impl Client {
                 .and_then(|r| r.prior_txn_number)
                 .or_else(|| get_txn_number(&mut session, retryability));
 
-            let result = match self
+            let details = match self
                 .execute_operation_on_connection(
                     &mut op,
                     &mut conn,
@@ -391,13 +387,11 @@ impl Client {
                 )
                 .await
             {
-                Ok(operation_output) => Ok(ExecutionDetails {
-                    output: ExecutionOutput {
-                        operation_output,
-                        connection: conn,
-                    },
+                Ok(output) => ExecutionDetails {
+                    output,
+                    connection: conn,
                     implicit_session,
-                }),
+                },
                 Err(mut err) => {
                     err.wire_version = conn.stream_description()?.max_wire_version;
 
@@ -429,9 +423,9 @@ impl Client {
 
                     if let Some(r) = retry {
                         if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
-                            Err(err)
+                            return Err(err);
                         } else {
-                            Err(r.first_error)
+                            return Err(r.first_error);
                         }
                     } else {
                         if retryability == Retryability::Read && err.is_read_retryable()
@@ -443,12 +437,12 @@ impl Client {
                             });
                             continue;
                         } else {
-                            Err(err)
+                            return Err(err);
                         }
                     }
                 }
             };
-            break result;
+            return Ok(details);
         }
     }
 
@@ -1049,16 +1043,25 @@ impl Error {
 }
 
 struct ExecutionDetails<T: Operation> {
-    output: ExecutionOutput<T>,
-    implicit_session: Option<ClientSession>,
-}
-
-struct ExecutionOutput<T: Operation> {
-    operation_output: T::O,
+    output: T::O,
     connection: Connection,
+    implicit_session: Option<ClientSession>,
 }
 
 struct ExecutionRetry {
     prior_txn_number: Option<i64>,
     first_error: Error,
+}
+
+trait RetryHelper {
+    fn first_error(&mut self) -> Result<()>;
+}
+
+impl RetryHelper for Option<ExecutionRetry> {
+    fn first_error(&mut self) -> Result<()> {
+        match self.take() {
+            Some(r) => Err(r.first_error),
+            None => Ok(()),
+        }
+    }
 }
