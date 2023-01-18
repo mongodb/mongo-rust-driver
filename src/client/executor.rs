@@ -114,40 +114,29 @@ impl Client {
                 }
                 .into());
             }
-            let mut implicit_session = None;
-            let session = match session.into() {
-                Some(session) => {
-                    if !Arc::ptr_eq(&self.inner, &session.client().inner) {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "the session provided to an operation must be created from \
-                                      the same client as the collection/database"
-                                .into(),
+            let session = session.into();
+            if let Some(session) = &session {
+                if !Arc::ptr_eq(&self.inner, &session.client().inner) {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "the session provided to an operation must be created from \
+                                  the same client as the collection/database"
+                            .into(),
+                    }
+                    .into());
+                }
+
+                if let Some(SelectionCriteria::ReadPreference(read_preference)) =
+                    op.selection_criteria()
+                {
+                    if session.in_transaction() && read_preference != &ReadPreference::Primary {
+                        return Err(ErrorKind::Transaction {
+                            message: "read preference in a transaction must be primary".into(),
                         }
                         .into());
                     }
-
-                    if let Some(SelectionCriteria::ReadPreference(read_preference)) =
-                        op.selection_criteria()
-                    {
-                        if session.in_transaction() && read_preference != &ReadPreference::Primary {
-                            return Err(ErrorKind::Transaction {
-                                message: "read preference in a transaction must be primary".into(),
-                            }
-                            .into());
-                        }
-                    }
-                    Some(session)
                 }
-                None => {
-                    implicit_session = self.start_implicit_session(&op).await?;
-                    implicit_session.as_mut()
-                }
-            };
-            let output = self.execute_operation_with_retry(op, session).await?;
-            Ok(ExecutionDetails {
-                output,
-                implicit_session,
-            })
+            }
+            Ok(self.execute_operation_with_retry(op, session).await?)
         })
         .await
     }
@@ -309,8 +298,9 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<ExecutionOutput<T>> {
+    ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<ExecutionRetry> = None;
+        let mut implicit_session: Option<ClientSession> = None;
         loop {
             if retry.is_some() {
                 op.update_for_retry();
@@ -374,7 +364,10 @@ impl Client {
                 }
             };
 
-            // TODO(aegnor): create implicit session here
+            if session.is_none() {
+                implicit_session = self.start_implicit_session(&op).await?;
+                session = implicit_session.as_mut();
+            }
 
             let retryability = self.get_retryability(&conn, &op, &session)?;
             if retryability == Retryability::None {
@@ -398,9 +391,12 @@ impl Client {
                 )
                 .await
             {
-                Ok(operation_output) => Ok(ExecutionOutput {
-                    operation_output,
-                    connection: conn,
+                Ok(operation_output) => Ok(ExecutionDetails {
+                    output: ExecutionOutput {
+                        operation_output,
+                        connection: conn,
+                    },
+                    implicit_session,
                 }),
                 Err(mut err) => {
                     err.wire_version = conn.stream_description()?.max_wire_version;
