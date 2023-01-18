@@ -177,7 +177,7 @@ where
 {
     let bson = Bson::deserialize(deserializer)?;
     get_u64(&bson)
-        .ok_or_else(|| D::Error::custom(format!("could not deserialize u64 from {:?}", bson)))
+        .ok_or_else(|| D::Error::custom(format!("could not deserialize u64 from {bson:?}")))
 }
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.

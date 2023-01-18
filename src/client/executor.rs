@@ -662,8 +662,7 @@ impl Client {
                         Some(b) => crate::bson_util::get_int_raw(b).ok_or_else(|| {
                             ErrorKind::InvalidResponse {
                                 message: format!(
-                                    "expected ok value to be a number, instead got {:?}",
-                                    b
+                                    "expected ok value to be a number, instead got {b:?}"
                                 ),
                             }
                         })?,
@@ -715,7 +714,7 @@ impl Client {
                             .map(|error_response| error_response.into())
                             .unwrap_or_else(|e| {
                                 Error::from(ErrorKind::InvalidResponse {
-                                    message: format!("error deserializing command error: {}", e),
+                                    message: format!("error deserializing command error: {e}"),
                                 })
                             }))
                     }

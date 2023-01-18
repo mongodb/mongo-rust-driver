@@ -46,7 +46,7 @@ impl CompressorId {
             #[cfg(feature = "zstd-compression")]
             3 => Ok(CompressorId::Zstd),
             other => Err(ErrorKind::InvalidResponse {
-                message: format!("Invalid compressor id: {}", other),
+                message: format!("Invalid compressor id: {other}"),
             }
             .into()),
         }
@@ -107,7 +107,7 @@ impl Compressor {
             #[cfg(feature = "snappy-compression")]
             "snappy" => Ok(Compressor::Snappy),
             other => Err(Error::from(ErrorKind::InvalidArgument {
-                message: format!("Invalid compressor: {} was supplied but is invalid", other),
+                message: format!("Invalid compressor: {other} was supplied but is invalid"),
             })),
         }
     }

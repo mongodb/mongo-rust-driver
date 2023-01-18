@@ -218,7 +218,7 @@ impl RawCommandResponse {
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
         bson::from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
-                message: format!("{}", e),
+                message: format!("{e}"),
             })
         })
     }
@@ -228,7 +228,7 @@ impl RawCommandResponse {
     pub(crate) fn body_utf8_lossy<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
         bson::from_slice_utf8_lossy(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
-                message: format!("{}", e),
+                message: format!("{e}"),
             })
         })
     }

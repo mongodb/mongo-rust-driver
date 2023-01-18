@@ -237,7 +237,7 @@ pub(crate) fn append_options<T: Serialize + Debug>(
                     Ok(())
                 }
                 _ => Err(ErrorKind::Internal {
-                    message: format!("options did not serialize to a Document: {:?}", options),
+                    message: format!("options did not serialize to a Document: {options:?}"),
                 }
                 .into()),
             }

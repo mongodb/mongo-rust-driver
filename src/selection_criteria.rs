@@ -146,7 +146,7 @@ impl<'de> Deserialize<'de> for ReadPreference {
         match preference.mode.as_str() {
             "Primary" => {
                 if !preference.options.is_default() {
-                    return Err(D::Error::custom(&format!(
+                    return Err(D::Error::custom(format!(
                         "no options can be specified with read preference mode = primary, but got \
                          {:?}",
                         preference.options
@@ -167,8 +167,7 @@ impl<'de> Deserialize<'de> for ReadPreference {
                 options: preference.options,
             }),
             other => Err(D::Error::custom(format!(
-                "Unknown read preference mode: {}",
-                other
+                "Unknown read preference mode: {other}"
             ))),
         }
     }

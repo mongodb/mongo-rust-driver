@@ -58,7 +58,7 @@ impl AsyncTlsStream {
         cfg: &TlsConfig,
     ) -> Result<Self> {
         let name = ServerName::try_from(host).map_err(|e| ErrorKind::DnsResolve {
-            message: format!("could not resolve {:?}: {}", host, e),
+            message: format!("could not resolve {host:?}: {e}"),
         })?;
 
         let conn = cfg

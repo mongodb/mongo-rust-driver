@@ -26,7 +26,7 @@ async fn _connecting() -> Result<()> {
 
     // List the names of the databases in that deployment.
     for db_name in client.list_database_names(None, None).await? {
-        println!("{}", db_name);
+        println!("{db_name}");
     }
 
     Ok(())
@@ -39,7 +39,7 @@ async fn _getting_handle_to_database(client: mongodb::Client) -> Result<()> {
 
     // List the names of the collections in that database.
     for collection_name in db.list_collection_names(None).await? {
-        println!("{}", collection_name);
+        println!("{collection_name}");
     }
 
     Ok(())
