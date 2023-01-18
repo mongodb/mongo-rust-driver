@@ -118,8 +118,8 @@ impl Client {
             if let Some(session) = &session {
                 if !Arc::ptr_eq(&self.inner, &session.client().inner) {
                     return Err(ErrorKind::InvalidArgument {
-                        message: "the session provided to an operation must be created from \
-                                  the same client as the collection/database"
+                        message: "the session provided to an operation must be created from the \
+                                  same client as the collection/database"
                             .into(),
                     }
                     .into());
@@ -150,10 +150,8 @@ impl Client {
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
-            let pinned = self.pin_connection_for_cursor(
-                &details.output,
-                &mut details.connection,
-            )?;
+            let pinned =
+                self.pin_connection_for_cursor(&details.output, &mut details.connection)?;
             Ok(Cursor::new(
                 self.clone(),
                 details.output,
@@ -176,16 +174,9 @@ impl Client {
             .execute_operation_with_details(op, &mut *session)
             .await?;
 
-        let pinned = self.pin_connection_for_session(
-            &details.output,
-            &mut details.connection,
-            session,
-        )?;
-        Ok(SessionCursor::new(
-            self.clone(),
-            details.output,
-            pinned,
-        ))
+        let pinned =
+            self.pin_connection_for_session(&details.output, &mut details.connection, session)?;
+        Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
     fn is_load_balanced(&self) -> bool {
@@ -247,8 +238,7 @@ impl Client {
                 details.implicit_session = Some(session);
             }
             let (cursor_spec, cs_data) = details.output;
-            let pinned =
-                self.pin_connection_for_cursor(&cursor_spec, &mut details.connection)?;
+            let pinned = self.pin_connection_for_cursor(&cursor_spec, &mut details.connection)?;
             let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
             Ok(ChangeStream::new(cursor, args, cs_data))
@@ -280,11 +270,8 @@ impl Client {
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
             let (cursor_spec, cs_data) = details.output;
-            let pinned = self.pin_connection_for_session(
-                &cursor_spec,
-                &mut details.connection,
-                session,
-            )?;
+            let pinned =
+                self.pin_connection_for_session(&cursor_spec, &mut details.connection, session)?;
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
             Ok(SessionChangeStream::new(cursor, args, cs_data))
@@ -321,9 +308,9 @@ impl Client {
             }
 
             let selection_criteria = session
-                    .as_ref()
-                    .and_then(|s| s.transaction.pinned_mongos())
-                    .or_else(|| op.selection_criteria());
+                .as_ref()
+                .and_then(|s| s.transaction.pinned_mongos())
+                .or_else(|| op.selection_criteria());
 
             let server = match self.select_server(selection_criteria).await {
                 Ok(server) => server,
@@ -402,8 +389,8 @@ impl Client {
                             && command_error.message.starts_with("Transaction numbers")
                         {
                             command_error.message = "This MongoDB deployment does not support \
-                                                    retryable writes. Please add retryWrites=false \
-                                                    to your connection string."
+                                                     retryable writes. Please add \
+                                                     retryWrites=false to your connection string."
                                 .to_string();
                         }
                     }
@@ -422,7 +409,10 @@ impl Client {
                     drop(server);
 
                     if let Some(r) = retry {
-                        if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
+                        if err.is_server_error()
+                            || err.is_read_retryable()
+                            || err.is_write_retryable()
+                        {
                             return Err(err);
                         } else {
                             return Err(r.first_error);
