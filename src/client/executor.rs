@@ -136,7 +136,7 @@ impl Client {
                     }
                 }
             }
-            Ok(self.execute_operation_with_retry(op, session).await?)
+            self.execute_operation_with_retry(op, session).await
         })
         .await
     }
@@ -417,18 +417,16 @@ impl Client {
                         } else {
                             return Err(r.first_error);
                         }
+                    } else if retryability == Retryability::Read && err.is_read_retryable()
+                        || retryability == Retryability::Write && err.is_write_retryable()
+                    {
+                        retry = Some(ExecutionRetry {
+                            prior_txn_number: txn_number,
+                            first_error: err,
+                        });
+                        continue;
                     } else {
-                        if retryability == Retryability::Read && err.is_read_retryable()
-                            || retryability == Retryability::Write && err.is_write_retryable()
-                        {
-                            retry = Some(ExecutionRetry {
-                                prior_txn_number: txn_number,
-                                first_error: err,
-                            });
-                            continue;
-                        } else {
-                            return Err(err);
-                        }
+                        return Err(err);
                     }
                 }
             };
