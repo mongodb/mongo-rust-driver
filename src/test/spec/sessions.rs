@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use bson::Document;
 use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
@@ -6,6 +8,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::doc,
     error::{ErrorKind, Result},
+    event::command::{CommandEventHandler, CommandStartedEvent},
     options::SessionOptions,
     test::{TestClient, CLIENT_OPTIONS, LOCK},
     Client,
@@ -71,21 +74,35 @@ async fn explicit_session_created_on_same_client() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn implicit_session_after_connection() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+    struct EventHandler {
+        lsids: Mutex<Vec<Document>>,
+    }
 
-    let mut was_one_session = false;
-    for _ in 0..10 {
-        let client = Client::test_builder()
-            .options({
-                let mut options = CLIENT_OPTIONS.get().await.clone();
-                options.max_pool_size = Some(1);
-                options.retry_writes = Some(true);
-                options.hosts.drain(1..);
-                options
-            })
-            .event_client()
-            .build()
-            .await;
+    impl CommandEventHandler for EventHandler {
+        fn handle_command_started_event(&self, event: CommandStartedEvent) {
+            self.lsids
+                .lock()
+                .unwrap()
+                .push(event.command.get_document("lsid").unwrap().clone());
+        }
+    }
+
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+    let event_handler = Arc::new(EventHandler {
+        lsids: Mutex::new(vec![]),
+    });
+
+    let mut min_lsids = usize::MAX;
+    let mut max_lsids = 0usize;
+    for _ in 0..5 {
+        let client = {
+            let mut options = CLIENT_OPTIONS.get().await.clone();
+            options.max_pool_size = Some(1);
+            options.retry_writes = Some(true);
+            options.hosts.drain(1..);
+            options.command_event_handler = Some(event_handler.clone());
+            Client::with_options(options).unwrap()
+        };
 
         let coll = client
             .database("test_lazy_implicit")
@@ -125,17 +142,12 @@ async fn implicit_session_after_connection() {
             }
             .boxed(),
         );
-        let ops_len = ops.len();
 
         let _ = try_join_all(ops).await.unwrap();
 
-        let events = client.get_all_command_started_events();
-        let lsids: Vec<_> = events
-            .iter()
-            .map(|ev| ev.command.get_document("lsid").unwrap())
-            .collect();
+        let mut lsids = event_handler.lsids.lock().unwrap();
         let mut unique = vec![];
-        'outer: for lsid in lsids {
+        'outer: for lsid in lsids.iter() {
             for u in &unique {
                 if lsid == *u {
                     continue 'outer;
@@ -144,8 +156,10 @@ async fn implicit_session_after_connection() {
             unique.push(lsid);
         }
 
-        assert!(ops_len > unique.len());
-        was_one_session |= unique.len() == 1;
+        min_lsids = std::cmp::min(min_lsids, dbg!(unique.len()));
+        max_lsids = std::cmp::max(max_lsids, unique.len());
+        lsids.clear();
     }
-    assert!(was_one_session);
+    assert_eq!(min_lsids, 1);
+    assert!(max_lsids < 7, "max lsids is {}, expected < 7", max_lsids);
 }
