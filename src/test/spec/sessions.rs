@@ -74,7 +74,7 @@ async fn implicit_session_after_connection() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 
     let mut was_one_session = false;
-    for _ in 0..5 {
+    for _ in 0..10 {
         let client = Client::test_builder()
             .options({
                 let mut options = CLIENT_OPTIONS.get().await.clone();
