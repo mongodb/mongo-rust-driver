@@ -156,10 +156,19 @@ async fn implicit_session_after_connection() {
             unique.push(lsid);
         }
 
-        min_lsids = std::cmp::min(min_lsids, dbg!(unique.len()));
+        min_lsids = std::cmp::min(min_lsids, unique.len());
         max_lsids = std::cmp::max(max_lsids, unique.len());
         lsids.clear();
     }
-    assert_eq!(min_lsids, 1);
-    assert!(max_lsids < 7, "max lsids is {}, expected < 7", max_lsids);
+    assert_eq!(
+        min_lsids, 2,
+        "min lsids is {}, expected 2 (max is {})",
+        min_lsids, max_lsids
+    );
+    assert!(
+        max_lsids < 7,
+        "max lsids is {}, expected < 7 (min is {})",
+        max_lsids,
+        min_lsids
+    );
 }
