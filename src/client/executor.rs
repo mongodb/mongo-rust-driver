@@ -286,25 +286,25 @@ impl Client {
         mut op: T,
         mut session: Option<&mut ClientSession>,
     ) -> Result<ExecutionDetails<T>> {
+        // If the current transaction has been committed/aborted and it is not being
+        // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
+        if let Some(ref mut session) = session {
+            if matches!(
+                session.transaction.state,
+                TransactionState::Committed { .. }
+            ) && op.name() != CommitTransaction::NAME
+                || session.transaction.state == TransactionState::Aborted
+                    && op.name() != AbortTransaction::NAME
+            {
+                session.transaction.reset();
+            }
+        }
+
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
         loop {
             if retry.is_some() {
                 op.update_for_retry();
-            }
-
-            // If the current transaction has been committed/aborted and it is not being
-            // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
-            if let Some(ref mut session) = session {
-                if matches!(
-                    session.transaction.state,
-                    TransactionState::Committed { .. }
-                ) && op.name() != CommitTransaction::NAME
-                    || session.transaction.state == TransactionState::Aborted
-                        && op.name() != AbortTransaction::NAME
-                {
-                    session.transaction.reset();
-                }
             }
 
             let selection_criteria = session
