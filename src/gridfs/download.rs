@@ -192,7 +192,7 @@ impl GridFsBucket {
         if n != file.n() {
             return Err(ErrorKind::GridFs(GridFsErrorKind::WrongNumberOfChunks {
                 actual_number: n,
-                expected_number: file.n(),
+                expected_number: file.n() as u32,
             })
             .into());
         }

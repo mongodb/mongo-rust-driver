@@ -243,7 +243,7 @@ impl AuthMechanism {
             }
             .into()),
             _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {self:?} not yet implemented."),
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
             .into()),
         }
@@ -286,7 +286,7 @@ impl AuthMechanism {
             }
             .into()),
             _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {self:?} not yet implemented."),
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
             .into()),
         }
@@ -316,7 +316,7 @@ impl FromStr for AuthMechanism {
             .into()),
 
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid mechanism string: {str}"),
+                message: format!("invalid mechanism string: {}", str),
             }
             .into()),
         }

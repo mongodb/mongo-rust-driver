@@ -35,7 +35,7 @@ impl IndexModel {
             let key_names: Vec<String> = self
                 .keys
                 .iter()
-                .map(|(k, v)| format!("{k}_{v}"))
+                .map(|(k, v)| format!("{}_{}", k, v))
                 .collect();
             self.options.get_or_insert(IndexOptions::default()).name = Some(key_names.join("_"));
         }

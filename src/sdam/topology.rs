@@ -489,7 +489,8 @@ impl TopologyWorker {
                 let removed_server = self.servers.remove(address);
                 debug_assert!(
                     removed_server.is_some(),
-                    "tried to remove non-existent address from topology: {address}"
+                    "tried to remove non-existent address from topology: {}",
+                    address
                 );
 
                 self.emit_event(|| {
@@ -524,7 +525,8 @@ impl TopologyWorker {
                 if self.servers.contains_key(address) {
                     debug_assert!(
                         false,
-                        "adding address that already exists in topology: {address}"
+                        "adding address that already exists in topology: {}",
+                        address
                     );
                     continue;
                 }
@@ -717,7 +719,6 @@ impl TopologyWorker {
 
     fn emit_event(&self, make_event: impl FnOnce() -> SdamEvent) {
         if let Some(ref emitter) = self.event_emitter {
-            #[allow(clippy::let_underscore_future)]
             let _ = emitter.emit(make_event());
         }
     }

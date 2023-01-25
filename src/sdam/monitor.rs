@@ -303,7 +303,6 @@ impl Monitor {
     {
         if let Some(ref emitter) = self.sdam_event_emitter {
             // We don't care about ordering or waiting for the event to have been received.
-            #[allow(clippy::let_underscore_future)]
             let _ = emitter.emit(event());
         }
     }

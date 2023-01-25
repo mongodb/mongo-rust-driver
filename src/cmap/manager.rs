@@ -131,7 +131,7 @@ impl PoolManagementRequest {
     fn unwrap_check_in(self) -> Connection {
         match self {
             PoolManagementRequest::CheckIn(conn) => *conn,
-            _ => panic!("tried to unwrap checkin but got {self:?}"),
+            _ => panic!("tried to unwrap checkin but got {:?}", self),
         }
     }
 }
