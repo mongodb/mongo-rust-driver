@@ -15,6 +15,7 @@ mod index_management;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod lambda_examples;
 pub mod spec;
+mod timeseries;
 pub(crate) mod util;
 
 #[cfg(feature = "in-use-encryption-unstable")]
