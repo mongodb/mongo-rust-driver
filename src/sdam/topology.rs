@@ -719,6 +719,7 @@ impl TopologyWorker {
 
     fn emit_event(&self, make_event: impl FnOnce() -> SdamEvent) {
         if let Some(ref emitter) = self.event_emitter {
+            #[allow(clippy::let_underscore_future)]
             let _ = emitter.emit(make_event());
         }
     }
