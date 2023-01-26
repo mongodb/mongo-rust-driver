@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test;
 
+use std::env;
+
 use lazy_static::lazy_static;
 
 use crate::{
@@ -277,23 +279,29 @@ struct FaasEnvironment {
 
 impl FaasEnvironment {
     fn new() -> Option<Self> {
-        let name = if let Some(n) = Self::identify() {
+        let name = if let Some(n) = FaasEnvironmentName::new() {
             n
         } else {
             return None;
         };
-        Some(FaasEnvironment { 
-            name,
-            runtime: None,
-            timeout_sec: None,
-            memory_mb: None,
-            region: None,
-            url: None,
+        Some(match name {
+            FaasEnvironmentName::AwsLambda => {
+                let runtime = env::var("AWS_EXECUTION_ENV").ok();
+                let region = env::var("AWS_REGION").ok();
+                let memory_mb = env::var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
+                    .ok()
+                    .and_then(|s| s.parse().ok());
+                Self {
+                    name,
+                    runtime,
+                    region,
+                    memory_mb,
+                    timeout_sec: None,
+                    url: None,
+                }
+            }
+            _ => todo!(),
         })
-    }
-
-    fn identify() -> Option<FaasEnvironmentName> {
-        None
     }
 
     fn minimal(&self) -> Self {
@@ -314,12 +322,28 @@ impl From<FaasEnvironment> for Bson {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 enum FaasEnvironmentName {
     AwsLambda,
     AzureFunc,
     GcpFunc,
     Vercel,
+}
+
+impl FaasEnvironmentName {
+    fn new() -> Option<Self> {
+        if env::var("AWS_EXECUTION_ENV").is_ok() {
+            Some(FaasEnvironmentName::AwsLambda)
+        } else if env::var("FUNCTIONS_WORKER_RUNTIME").is_ok() {
+            Some(FaasEnvironmentName::AzureFunc)
+        } else if env::var("K_SERVICE").is_ok() || env::var("FUNCTION_NAME").is_ok() {
+            Some(FaasEnvironmentName::GcpFunc)
+        } else if env::var("VERCEL").is_ok() {
+            Some(FaasEnvironmentName::Vercel)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
