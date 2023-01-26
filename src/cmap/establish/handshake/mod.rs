@@ -123,6 +123,9 @@ pub(crate) struct Handshaker {
     /// given the same pool options, so it can be created at the time the Handshaker is created.
     command: Command,
 
+    /// The FaaS environment, if any, that the client is running under.
+    faas: Option<FaasEnvironment>,
+
     // This field is not read without a compression feature flag turned on.
     #[allow(dead_code)]
     compressors: Option<Vec<Compressor>>,
@@ -185,6 +188,7 @@ impl Handshaker {
         Self {
             http_client,
             command,
+            faas: FaasEnvironment::new(),
             compressors,
             server_api: options.server_api,
         }
@@ -204,6 +208,10 @@ impl Handshaker {
         }
 
         let client_first = set_speculative_auth_info(&mut command.body, credential)?;
+
+        if let Some(faas) = &self.faas {
+            command.body.insert("env", faas);
+        }
 
         let mut hello_reply = run_hello(conn, command).await?;
 
@@ -255,6 +263,63 @@ impl Handshaker {
 
         Ok(hello_reply)
     }
+}
+
+#[derive(Clone, Debug)]
+struct FaasEnvironment {
+    name: FaasEnvironmentName,
+    runtime: Option<String>,
+    timeout_sec: Option<i32>,
+    memory_mb: Option<i32>,
+    region: Option<String>,
+    url: Option<String>,
+}
+
+impl FaasEnvironment {
+    fn new() -> Option<Self> {
+        let name = if let Some(n) = Self::identify() {
+            n
+        } else {
+            return None;
+        };
+        Some(FaasEnvironment { 
+            name,
+            runtime: None,
+            timeout_sec: None,
+            memory_mb: None,
+            region: None,
+            url: None,
+        })
+    }
+
+    fn identify() -> Option<FaasEnvironmentName> {
+        None
+    }
+
+    fn minimal(&self) -> Self {
+        FaasEnvironment {
+            name: self.name.clone(),
+            runtime: None,
+            timeout_sec: None,
+            memory_mb: None,
+            region: None,
+            url: None, 
+        }
+    }
+}
+
+impl From<FaasEnvironment> for Bson {
+    fn from(env: FaasEnvironment) -> Self {
+        Bson::Document(doc! { })
+    }
+}
+
+#[derive(Clone, Debug)]
+enum FaasEnvironmentName {
+    AwsLambda,
+    AzureFunc,
+    GcpFunc,
+    Vercel,
 }
 
 #[derive(Debug)]
