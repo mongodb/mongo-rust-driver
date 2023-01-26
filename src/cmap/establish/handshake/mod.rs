@@ -212,7 +212,18 @@ impl Handshaker {
         let client_first = set_speculative_auth_info(&mut command.body, credential)?;
 
         if let Some(faas) = &self.faas {
-            command.body.insert("env", faas);
+            fn get_client(body: &mut Document) -> Result<&mut Document> {
+                body.get_document_mut("client")
+                    .map_err(|_| crate::error::Error::internal("invalid handshake: no 'client' subdocument"))
+            };
+            let body = &mut command.body;
+            get_client(body)?.insert("env", faas);
+            if doc_size(body)? > MAX_HELLO_SIZE {
+                get_client(body)?.insert("env", faas.minimal());
+                if doc_size(body)? > MAX_HELLO_SIZE {
+                    get_client(body)?.remove("env");
+                }
+            }
         }
 
         let mut hello_reply = run_hello(conn, command).await?;
@@ -397,3 +408,11 @@ fn set_speculative_auth_info(
 
     Ok(Some(client_first))
 }
+
+fn doc_size(d: &Document) -> Result<usize> {
+    let mut tmp = vec![];
+    d.to_writer(&mut tmp)?;
+    Ok(tmp.len())
+}
+
+const MAX_HELLO_SIZE: usize = 512;
