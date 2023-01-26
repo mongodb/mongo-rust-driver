@@ -215,7 +215,7 @@ impl Handshaker {
             fn get_client(body: &mut Document) -> Result<&mut Document> {
                 body.get_document_mut("client")
                     .map_err(|_| crate::error::Error::internal("invalid handshake: no 'client' subdocument"))
-            };
+            }
             let body = &mut command.body;
             get_client(body)?.insert("env", faas);
             if doc_size(body)? > MAX_HELLO_SIZE {
@@ -329,7 +329,26 @@ impl FaasEnvironment {
 
 impl From<FaasEnvironment> for Bson {
     fn from(env: FaasEnvironment) -> Self {
-        Bson::Document(doc! { })
+        let FaasEnvironment { name, runtime, timeout_sec, memory_mb, region, url } = env;
+        let mut out = doc! {
+            "name": name.to_str(),
+        };
+        if let Some(rt) = runtime {
+            out.insert("runtime", rt);
+        }
+        if let Some(t) = timeout_sec {
+            out.insert("timeout_sec", t);
+        }
+        if let Some(m) = memory_mb {
+            out.insert("memory_mb", m);
+        }
+        if let Some(r) = region {
+            out.insert("region", r);
+        }
+        if let Some(u) = url {
+            out.insert("url", u);
+        }
+        Bson::Document(out)
     }
 }
 
@@ -353,6 +372,16 @@ impl FaasEnvironmentName {
             Some(FaasEnvironmentName::Vercel)
         } else {
             None
+        }
+    }
+
+    fn to_str(&self) -> &'static str {
+        use FaasEnvironmentName::*;
+        match self {
+            AwsLambda => "aws.lambda",
+            AzureFunc => "azure.func",
+            GcpFunc => "gcp.func",
+            Vercel => "vercel",
         }
     }
 }
