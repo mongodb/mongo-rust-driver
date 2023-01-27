@@ -289,6 +289,15 @@ struct FaasEnvironment {
 }
 
 impl FaasEnvironment {
+    const UNSET: Self = FaasEnvironment {
+        name: FaasEnvironmentName::AwsLambda,
+        runtime: None,
+        timeout_sec: None,
+        memory_mb: None,
+        region: None,
+        url: None,
+    };
+
     fn new() -> Option<Self> {
         let name = if let Some(n) = FaasEnvironmentName::new() {
             n
@@ -307,11 +316,43 @@ impl FaasEnvironment {
                     runtime,
                     region,
                     memory_mb,
-                    timeout_sec: None,
-                    url: None,
+                    ..Self::UNSET
                 }
             }
-            _ => todo!(),
+            FaasEnvironmentName::AzureFunc => {
+                let runtime = env::var("FUNCTIONS_WORKER_RUNTIME").ok();
+                Self {
+                    name,
+                    runtime,
+                    ..Self::UNSET
+                }
+            }
+            FaasEnvironmentName::GcpFunc => {
+                let memory_mb = env::var("FUNCTION_MEMORY_MB")
+                    .ok()
+                    .and_then(|s| s.parse().ok());
+                let timeout_sec = env::var("FUNCTION_TIMEOUT_SEC")
+                    .ok()
+                    .and_then(|s| s.parse().ok());
+                let region = env::var("FUNCTION_REGION").ok();
+                Self {
+                    name,
+                    memory_mb,
+                    timeout_sec,
+                    region,
+                    ..Self::UNSET
+                }
+            }
+            FaasEnvironmentName::Vercel => {
+                let url = env::var("VERCEL_URL").ok();
+                let region = env::var("VERCEL_REGION").ok();
+                Self {
+                    name,
+                    url,
+                    region,
+                    ..Self::UNSET
+                }
+            }
         })
     }
 
@@ -362,14 +403,15 @@ enum FaasEnvironmentName {
 
 impl FaasEnvironmentName {
     fn new() -> Option<Self> {
+        use FaasEnvironmentName::*;
         if env::var("AWS_EXECUTION_ENV").is_ok() {
-            Some(FaasEnvironmentName::AwsLambda)
+            Some(AwsLambda)
         } else if env::var("FUNCTIONS_WORKER_RUNTIME").is_ok() {
-            Some(FaasEnvironmentName::AzureFunc)
+            Some(AzureFunc)
         } else if env::var("K_SERVICE").is_ok() || env::var("FUNCTION_NAME").is_ok() {
-            Some(FaasEnvironmentName::GcpFunc)
+            Some(GcpFunc)
         } else if env::var("VERCEL").is_ok() {
-            Some(FaasEnvironmentName::Vercel)
+            Some(Vercel)
         } else {
             None
         }
