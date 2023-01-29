@@ -10,7 +10,7 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Document},
-    error::Result,
+    error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
     options::{
         Acknowledgment,
         ClientOptions,
@@ -21,7 +21,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    sync::{Client, Collection},
+    sync::{Client, ClientSession, Collection},
     test::{TestClient as AsyncTestClient, LOCK},
 };
 
@@ -243,6 +243,27 @@ fn transactions() {
         return;
     }
 
+    fn run_transaction_with_retry(
+        session: &mut ClientSession,
+        f: impl Fn(&mut ClientSession) -> Result<()>,
+    ) -> Result<()> {
+        loop {
+            match f(session) {
+                Ok(()) => {
+                    return Ok(());
+                }
+                Err(error) => {
+                    if error.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                        continue;
+                    } else {
+                        session.abort_transaction()?;
+                        return Err(error);
+                    }
+                }
+            }
+        }
+    }
+
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let mut session = client
@@ -258,17 +279,36 @@ fn transactions() {
     session
         .start_transaction(None)
         .expect("start transaction should succeed");
-    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .expect("insert should succeed");
-    session
-        .commit_transaction()
-        .expect("commit transaction should succeed");
+
+    run_transaction_with_retry(&mut session, |s| {
+        coll.insert_one_with_session(doc! { "x": 1 }, None, s)?;
+        Ok(())
+    })
+    .unwrap();
+
+    loop {
+        match session.commit_transaction() {
+            Ok(()) => {
+                break;
+            }
+            Err(error) => {
+                if error.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
+                    continue;
+                } else {
+                    panic!("error while committing: {}", error);
+                }
+            }
+        }
+    }
 
     session
         .start_transaction(None)
         .expect("start transaction should succeed");
-    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .expect("insert should succeed");
+    run_transaction_with_retry(&mut session, |s| {
+        coll.insert_one_with_session(doc! { "x": 1 }, None, s)?;
+        Ok(())
+    })
+    .unwrap();
     session
         .abort_transaction()
         .expect("abort transaction should succeed");

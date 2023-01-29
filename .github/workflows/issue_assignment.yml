@@ -11,7 +11,7 @@ jobs:
             - name: 'Auto-assign issue'
               uses: pozil/auto-assign-issue@v1.1.0
               with:
-                  assignees: patrickfreed,abr-egn,isabelatkinson,kmahar
+                  assignees: abr-egn,isabelatkinson
                   numOfAssignee: 1
     add-labels:
         runs-on: ubuntu-latest
