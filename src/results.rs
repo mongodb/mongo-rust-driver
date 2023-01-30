@@ -121,6 +121,9 @@ pub enum CollectionType {
 
     /// Indicates that the data store is a collection.
     Collection,
+
+    /// Indicates that the data store is a timeseries.
+    Timeseries,
 }
 
 /// Info about the collection that is contained in the `CollectionSpecification::info` field of a
