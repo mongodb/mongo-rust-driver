@@ -160,6 +160,9 @@ async fn implicit_session_after_connection() {
         max_lsids = std::cmp::max(max_lsids, unique.len());
         lsids.clear();
     }
+    // The spec says the minimum should be 1; however, the background async nature of the Rust
+    // driver's session cleanup means that sometimes a session has not yet been returned to the pool
+    // when the next one is checked out.
     assert!(
         min_lsids <= 2,
         "min lsids is {}, expected <= 2 (max is {})",
