@@ -98,7 +98,7 @@ impl Client {
     ) -> Result<T::O> {
         self.execute_operation_with_details(op, session)
             .await
-            .map(|details| details.output.operation_output)
+            .map(|details| details.output)
     }
 
     async fn execute_operation_with_details<T: Operation>(
@@ -114,40 +114,29 @@ impl Client {
                 }
                 .into());
             }
-            let mut implicit_session = None;
-            let session = match session.into() {
-                Some(session) => {
-                    if !Arc::ptr_eq(&self.inner, &session.client().inner) {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "the session provided to an operation must be created from \
-                                      the same client as the collection/database"
-                                .into(),
+            let session = session.into();
+            if let Some(session) = &session {
+                if !Arc::ptr_eq(&self.inner, &session.client().inner) {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "the session provided to an operation must be created from the \
+                                  same client as the collection/database"
+                            .into(),
+                    }
+                    .into());
+                }
+
+                if let Some(SelectionCriteria::ReadPreference(read_preference)) =
+                    op.selection_criteria()
+                {
+                    if session.in_transaction() && read_preference != &ReadPreference::Primary {
+                        return Err(ErrorKind::Transaction {
+                            message: "read preference in a transaction must be primary".into(),
                         }
                         .into());
                     }
-
-                    if let Some(SelectionCriteria::ReadPreference(read_preference)) =
-                        op.selection_criteria()
-                    {
-                        if session.in_transaction() && read_preference != &ReadPreference::Primary {
-                            return Err(ErrorKind::Transaction {
-                                message: "read preference in a transaction must be primary".into(),
-                            }
-                            .into());
-                        }
-                    }
-                    Some(session)
                 }
-                None => {
-                    implicit_session = self.start_implicit_session(&op).await?;
-                    implicit_session.as_mut()
-                }
-            };
-            let output = self.execute_operation_with_retry(op, session).await?;
-            Ok(ExecutionDetails {
-                output,
-                implicit_session,
-            })
+            }
+            self.execute_operation_with_retry(op, session).await
         })
         .await
     }
@@ -161,13 +150,11 @@ impl Client {
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
-            let pinned = self.pin_connection_for_cursor(
-                &details.output.operation_output,
-                &mut details.output.connection,
-            )?;
+            let pinned =
+                self.pin_connection_for_cursor(&details.output, &mut details.connection)?;
             Ok(Cursor::new(
                 self.clone(),
-                details.output.operation_output,
+                details.output,
                 details.implicit_session,
                 pinned,
             ))
@@ -187,16 +174,9 @@ impl Client {
             .execute_operation_with_details(op, &mut *session)
             .await?;
 
-        let pinned = self.pin_connection_for_session(
-            &details.output.operation_output,
-            &mut details.output.connection,
-            session,
-        )?;
-        Ok(SessionCursor::new(
-            self.clone(),
-            details.output.operation_output,
-            pinned,
-        ))
+        let pinned =
+            self.pin_connection_for_session(&details.output, &mut details.connection, session)?;
+        Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
     fn is_load_balanced(&self) -> bool {
@@ -257,9 +237,8 @@ impl Client {
             if let Some(session) = implicit_session {
                 details.implicit_session = Some(session);
             }
-            let (cursor_spec, cs_data) = details.output.operation_output;
-            let pinned =
-                self.pin_connection_for_cursor(&cursor_spec, &mut details.output.connection)?;
+            let (cursor_spec, cs_data) = details.output;
+            let pinned = self.pin_connection_for_cursor(&cursor_spec, &mut details.connection)?;
             let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
             Ok(ChangeStream::new(cursor, args, cs_data))
@@ -290,12 +269,9 @@ impl Client {
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
-            let (cursor_spec, cs_data) = details.output.operation_output;
-            let pinned = self.pin_connection_for_session(
-                &cursor_spec,
-                &mut details.output.connection,
-                session,
-            )?;
+            let (cursor_spec, cs_data) = details.output;
+            let pinned =
+                self.pin_connection_for_session(&cursor_spec, &mut details.connection, session)?;
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
             Ok(SessionChangeStream::new(cursor, args, cs_data))
@@ -309,7 +285,7 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<ExecutionOutput<T>> {
+    ) -> Result<ExecutionDetails<T>> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
         if let Some(ref mut session) = session {
@@ -324,151 +300,137 @@ impl Client {
             }
         }
 
-        let selection_criteria = session
-            .as_ref()
-            .and_then(|s| s.transaction.pinned_mongos())
-            .or_else(|| op.selection_criteria());
-
-        let server = match self.select_server(selection_criteria, op.name()).await {
-            Ok(server) => server,
-            Err(mut err) => {
-                err.add_labels_and_update_pin(None, &mut session, None)?;
-                return Err(err);
+        let mut retry: Option<ExecutionRetry> = None;
+        let mut implicit_session: Option<ClientSession> = None;
+        loop {
+            if retry.is_some() {
+                op.update_for_retry();
             }
-        };
 
-        let mut conn = match get_connection(&session, &op, &server.pool).await {
-            Ok(c) => c,
-            Err(mut err) => {
-                err.add_labels_and_update_pin(None, &mut session, None)?;
-                if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
-                    err.add_label(RETRYABLE_WRITE_ERROR);
-                }
+            let selection_criteria = session
+                .as_ref()
+                .and_then(|s| s.transaction.pinned_mongos())
+                .or_else(|| op.selection_criteria());
 
-                let op_retry = match self.get_op_retryability(&op, &session) {
-                    Retryability::Read => err.is_read_retryable(),
-                    Retryability::Write => err.is_write_retryable(),
-                    _ => false,
-                };
-                if err.is_pool_cleared() || op_retry {
-                    return self.execute_retry(&mut op, &mut session, None, err).await;
-                } else {
+            let server = match self.select_server(selection_criteria, op.name()).await {
+                Ok(server) => server,
+                Err(mut err) => {
+                    retry.first_error()?;
+
+                    err.add_labels_and_update_pin(None, &mut session, None)?;
                     return Err(err);
                 }
-            }
-        };
+            };
 
-        let retryability = self.get_retryability(&conn, &op, &session)?;
+            let mut conn = match get_connection(&session, &op, &server.pool).await {
+                Ok(c) => c,
+                Err(mut err) => {
+                    retry.first_error()?;
 
-        let txn_number = get_txn_number(&mut session, retryability);
+                    err.add_labels_and_update_pin(None, &mut session, None)?;
+                    if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
+                        err.add_label(RETRYABLE_WRITE_ERROR);
+                    }
 
-        match self
-            .execute_operation_on_connection(
-                &mut op,
-                &mut conn,
-                &mut session,
-                txn_number,
-                retryability,
-            )
-            .await
-        {
-            Ok(operation_output) => Ok(ExecutionOutput {
-                operation_output,
-                connection: conn,
-            }),
-            Err(mut err) => {
-                err.wire_version = conn.stream_description()?.max_wire_version;
-
-                // Retryable writes are only supported by storage engines with document-level
-                // locking, so users need to disable retryable writes if using mmapv1.
-                if let ErrorKind::Command(ref mut command_error) = *err.kind {
-                    if command_error.code == 20
-                        && command_error.message.starts_with("Transaction numbers")
-                    {
-                        command_error.message = "This MongoDB deployment does not support \
-                                                 retryable writes. Please add retryWrites=false \
-                                                 to your connection string."
-                            .to_string();
+                    let op_retry = match self.get_op_retryability(&op, &session) {
+                        Retryability::Read => err.is_read_retryable(),
+                        Retryability::Write => err.is_write_retryable(),
+                        _ => false,
+                    };
+                    if err.is_pool_cleared() || op_retry {
+                        retry = Some(ExecutionRetry {
+                            prior_txn_number: None,
+                            first_error: err,
+                        });
+                        continue;
+                    } else {
+                        return Err(err);
                     }
                 }
+            };
 
-                self.inner
-                    .topology
-                    .handle_application_error(
-                        server.address.clone(),
-                        err.clone(),
-                        HandshakePhase::after_completion(&conn),
-                    )
-                    .await;
-                // release the connection to be processed by the connection pool
-                drop(conn);
-                // release the selected server to decrement its operation count
-                drop(server);
+            if session.is_none() {
+                implicit_session = self.start_implicit_session(&op).await?;
+                session = implicit_session.as_mut();
+            }
 
-                if retryability == Retryability::Read && err.is_read_retryable()
-                    || retryability == Retryability::Write && err.is_write_retryable()
-                {
-                    self.execute_retry(&mut op, &mut session, txn_number, err)
-                        .await
-                } else {
-                    Err(err)
+            let retryability = self.get_retryability(&conn, &op, &session)?;
+            if retryability == Retryability::None {
+                retry.first_error()?;
+            }
+
+            let txn_number = retry
+                .as_ref()
+                .and_then(|r| r.prior_txn_number)
+                .or_else(|| get_txn_number(&mut session, retryability));
+
+            let details = match self
+                .execute_operation_on_connection(
+                    &mut op,
+                    &mut conn,
+                    &mut session,
+                    txn_number,
+                    retryability,
+                )
+                .await
+            {
+                Ok(output) => ExecutionDetails {
+                    output,
+                    connection: conn,
+                    implicit_session,
+                },
+                Err(mut err) => {
+                    err.wire_version = conn.stream_description()?.max_wire_version;
+
+                    // Retryable writes are only supported by storage engines with document-level
+                    // locking, so users need to disable retryable writes if using mmapv1.
+                    if let ErrorKind::Command(ref mut command_error) = *err.kind {
+                        if command_error.code == 20
+                            && command_error.message.starts_with("Transaction numbers")
+                        {
+                            command_error.message = "This MongoDB deployment does not support \
+                                                     retryable writes. Please add \
+                                                     retryWrites=false to your connection string."
+                                .to_string();
+                        }
+                    }
+
+                    self.inner
+                        .topology
+                        .handle_application_error(
+                            server.address.clone(),
+                            err.clone(),
+                            HandshakePhase::after_completion(&conn),
+                        )
+                        .await;
+                    // release the connection to be processed by the connection pool
+                    drop(conn);
+                    // release the selected server to decrement its operation count
+                    drop(server);
+
+                    if let Some(r) = retry {
+                        if err.is_server_error()
+                            || err.is_read_retryable()
+                            || err.is_write_retryable()
+                        {
+                            return Err(err);
+                        } else {
+                            return Err(r.first_error);
+                        }
+                    } else if retryability == Retryability::Read && err.is_read_retryable()
+                        || retryability == Retryability::Write && err.is_write_retryable()
+                    {
+                        retry = Some(ExecutionRetry {
+                            prior_txn_number: txn_number,
+                            first_error: err,
+                        });
+                        continue;
+                    } else {
+                        return Err(err);
+                    }
                 }
-            }
-        }
-    }
-
-    async fn execute_retry<T: Operation>(
-        &self,
-        op: &mut T,
-        session: &mut Option<&mut ClientSession>,
-        prior_txn_number: Option<i64>,
-        first_error: Error,
-    ) -> Result<ExecutionOutput<T>> {
-        op.update_for_retry();
-        let server = match self.select_server(op.selection_criteria(), op.name()).await {
-            Ok(server) => server,
-            Err(_) => {
-                return Err(first_error);
-            }
-        };
-
-        let mut conn = match get_connection(session, op, &server.pool).await {
-            Ok(c) => c,
-            Err(_) => return Err(first_error),
-        };
-
-        let retryability = self.get_retryability(&conn, op, session)?;
-        if retryability == Retryability::None {
-            return Err(first_error);
-        }
-
-        let txn_number = prior_txn_number.or_else(|| get_txn_number(session, retryability));
-
-        match self
-            .execute_operation_on_connection(op, &mut conn, session, txn_number, retryability)
-            .await
-        {
-            Ok(operation_output) => Ok(ExecutionOutput {
-                operation_output,
-                connection: conn,
-            }),
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_application_error(
-                        server.address.clone(),
-                        err.clone(),
-                        HandshakePhase::after_completion(&conn),
-                    )
-                    .await;
-                drop(server);
-
-                if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
-                    Err(err)
-                } else {
-                    Err(first_error)
-                }
-            }
+            };
+            return Ok(details);
         }
     }
 
@@ -1071,11 +1033,25 @@ impl Error {
 }
 
 struct ExecutionDetails<T: Operation> {
-    output: ExecutionOutput<T>,
+    output: T::O,
+    connection: Connection,
     implicit_session: Option<ClientSession>,
 }
 
-struct ExecutionOutput<T: Operation> {
-    operation_output: T::O,
-    connection: Connection,
+struct ExecutionRetry {
+    prior_txn_number: Option<i64>,
+    first_error: Error,
+}
+
+trait RetryHelper {
+    fn first_error(&mut self) -> Result<()>;
+}
+
+impl RetryHelper for Option<ExecutionRetry> {
+    fn first_error(&mut self) -> Result<()> {
+        match self.take() {
+            Some(r) => Err(r.first_error),
+            None => Ok(()),
+        }
+    }
 }
