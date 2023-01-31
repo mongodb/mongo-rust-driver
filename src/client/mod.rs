@@ -56,6 +56,8 @@ pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
+// TODO: RUST-1585 Remove this constant.
+pub(crate) const SESSIONS_SUPPORT_OP_NAME: &str = "Check sessions support status";
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
@@ -481,7 +483,7 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self.select_server(criteria, "test_select_server").await?;
+        let server = self.select_server(criteria, "Test select server").await?;
         Ok(server.address.clone())
     }
 

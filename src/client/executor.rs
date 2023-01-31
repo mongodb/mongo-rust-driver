@@ -824,7 +824,7 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
-                self.select_data_bearing_server("Check sessions support status")
+                self.select_data_bearing_server(crate::client::SESSIONS_SUPPORT_OP_NAME)
                     .await?;
                 Ok(self.inner.topology.session_support_status())
             }

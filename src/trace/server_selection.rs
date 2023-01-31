@@ -5,6 +5,7 @@ use super::{
     SERVER_SELECTION_TRACING_EVENT_TARGET,
 };
 use crate::{
+    client::SESSIONS_SUPPORT_OP_NAME,
     error::Error,
     sdam::{SelectedServer, TopologyDescription},
     selection_criteria::SelectionCriteria,
@@ -57,7 +58,7 @@ impl ServerSelectionEventEmitter<'_> {
     pub(crate) fn emit_started_event(&self, topology_description: TopologyDescription) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
         // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != "Check sessions support status"
+        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
         {
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
@@ -77,7 +78,7 @@ impl ServerSelectionEventEmitter<'_> {
     ) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
         // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != "Check sessions support status"
+        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
         {
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
@@ -98,7 +99,7 @@ impl ServerSelectionEventEmitter<'_> {
     ) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
         // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != "Check sessions support status"
+        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
         {
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
@@ -116,7 +117,7 @@ impl ServerSelectionEventEmitter<'_> {
     pub(crate) fn emit_waiting_event(&self, topology_description: &TopologyDescription) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Info)
         // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != "Check sessions support status"
+        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
         {
             let remaining_time = self
                 .timeout
