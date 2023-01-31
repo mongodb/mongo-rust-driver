@@ -531,7 +531,10 @@ async fn server_selection_logging_unified() {
     let test_predicate = |tc: &TestCase|
         // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite support.
         tc.description != "Successful bulkWrite operation: log messages have operationIds" &&
-        tc.description != "Failed bulkWrite operation: log messages have operationIds";
+        tc.description != "Failed bulkWrite operation: log messages have operationIds" &&
+        // TODO: RUST-1585 Unskip these tests (they are currently flaky on certain topologies due to performing extra
+        // server selections to check for support.)
+        tc.description != "Failure due to unreachable server";
 
     let _guard = LOCK.run_exclusively().await;
     run_spec_test_with_path(&["server-selection", "logging"], |path, file| {

@@ -56,7 +56,7 @@ impl ServerSelectionEventEmitter<'_> {
 
     pub(crate) fn emit_started_event(&self, topology_description: TopologyDescription) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
-        // TODO: RUST-1499 Remove this condition.
+        // TODO: RUST-1585 Remove this condition.
         && self.operation_name != "Check sessions support status"
         {
             tracing::debug!(
@@ -76,7 +76,7 @@ impl ServerSelectionEventEmitter<'_> {
         error: &Error,
     ) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
-        // TODO: RUST-1499 Remove this condition.
+        // TODO: RUST-1585 Remove this condition.
         && self.operation_name != "Check sessions support status"
         {
             tracing::debug!(
@@ -97,7 +97,7 @@ impl ServerSelectionEventEmitter<'_> {
         server: &SelectedServer,
     ) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
-        // TODO: RUST-1499 Remove this condition.
+        // TODO: RUST-1585 Remove this condition.
         && self.operation_name != "Check sessions support status"
         {
             tracing::debug!(
@@ -115,7 +115,7 @@ impl ServerSelectionEventEmitter<'_> {
 
     pub(crate) fn emit_waiting_event(&self, topology_description: &TopologyDescription) {
         if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Info)
-        // TODO: RUST-1499 Remove this condition.
+        // TODO: RUST-1585 Remove this condition.
         && self.operation_name != "Check sessions support status"
         {
             let remaining_time = self
