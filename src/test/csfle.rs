@@ -203,7 +203,9 @@ async fn custom_key_material() -> Result<()> {
 
     let key = base64::decode(
         "xPTAjBRG5JiPm+d3fj6XLi2q5DMXUS/f1f+SMAlhhwkhDRL0kr8r9GDLIGTAGlvC+HVjSIgdL+RKw\
-         ZCvpXSyxTICWSXTUYsWYPyu3IoHbuBZdmw2faM3WhcRIgbMReU5").unwrap();
+         ZCvpXSyxTICWSXTUYsWYPyu3IoHbuBZdmw2faM3WhcRIgbMReU5",
+    )
+    .unwrap();
     let id = enc
         .create_data_key(MasterKey::Local)
         .key_material(key)
