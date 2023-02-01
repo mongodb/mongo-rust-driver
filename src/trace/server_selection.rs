@@ -30,7 +30,7 @@ impl TracingRepresentation for TopologyDescription {
 }
 
 /// Type responsible for emitting server selection tracing events.
-pub(crate) struct ServerSelectionEventEmitter<'a> {
+pub(crate) struct ServerSelectionTracingEventEmitter<'a> {
     topology_id: ObjectId,
     criteria: &'a SelectionCriteria,
     operation_name: &'a str,
@@ -38,15 +38,15 @@ pub(crate) struct ServerSelectionEventEmitter<'a> {
     timeout: Duration,
 }
 
-impl ServerSelectionEventEmitter<'_> {
+impl ServerSelectionTracingEventEmitter<'_> {
     pub(crate) fn new<'a>(
         topology_id: ObjectId,
         criteria: &'a SelectionCriteria,
         operation_name: &'a str,
         start_time: Instant,
         timeout: Duration,
-    ) -> ServerSelectionEventEmitter<'a> {
-        ServerSelectionEventEmitter::<'a> {
+    ) -> ServerSelectionTracingEventEmitter<'a> {
+        ServerSelectionTracingEventEmitter::<'a> {
             topology_id,
             criteria,
             operation_name,

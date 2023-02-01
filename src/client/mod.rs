@@ -19,7 +19,7 @@ use crate::options::ServerAddress;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
     command::CommandTracingEventEmitter,
-    server_selection::ServerSelectionEventEmitter,
+    server_selection::ServerSelectionTracingEventEmitter,
     trace_or_log_enabled,
     TracingOrLogLevel,
     COMMAND_TRACING_EVENT_TARGET,
@@ -506,7 +506,7 @@ impl Client {
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
         #[cfg(feature = "tracing-unstable")]
-        let event_emitter = ServerSelectionEventEmitter::new(
+        let event_emitter = ServerSelectionTracingEventEmitter::new(
             self.inner.topology.id,
             criteria,
             operation_name,
