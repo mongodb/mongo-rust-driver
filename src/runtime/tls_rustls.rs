@@ -1,7 +1,7 @@
 use std::{
     convert::TryFrom,
     fs::File,
-    io::{BufReader, Seek, SeekFrom},
+    io::{BufReader, Seek},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -139,7 +139,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
             }
         };
 
-        file.seek(SeekFrom::Start(0))?;
+        file.rewind()?;
         let key = loop {
             match read_one(&mut file) {
                 Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {

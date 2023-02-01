@@ -204,7 +204,7 @@ async fn run_connection_string_spec_tests() {
 }
 
 async fn parse_uri(option: &str, suggestion: Option<&str>) {
-    match ConnectionString::parse(&format!("mongodb://host:27017/?{}=test", option))
+    match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
         .map_err(|e| *e.kind)
     {
         Ok(_) => panic!("expected error for option {}", option),
