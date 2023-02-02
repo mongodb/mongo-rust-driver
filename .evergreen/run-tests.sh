@@ -10,7 +10,17 @@ if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
 fi
 
-FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression,tracing-unstable,${TLS_FEATURE}"
+FEATURE_FLAGS="tracing-unstable,${TLS_FEATURE}"
+
+if [ "$SNAPPY_COMPRESSION_ENABLED" = true ]; then
+	FEATURE_FLAGS="${FEATURE_FLAGS},snappy-compression"
+fi
+if [ "$ZLIB_COMPRESSION_ENABLED" = true ]; then
+	FEATURE_FLAGS="${FEATURE_FLAGS},zlib-compression"
+fi
+if [ "$ZSTD_COMPRESSION_ENABLED" = true ]; then
+	FEATURE_FLAGS="${FEATURE_FLAGS},zstd-compression"
+fi
 
 if [ "$ASYNC_RUNTIME" = "tokio" ]; then
     ASYNC_FEATURE_FLAGS=${FEATURE_FLAGS}
