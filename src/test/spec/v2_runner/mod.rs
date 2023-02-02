@@ -391,8 +391,14 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                     OperationResult::Error(operation_error) => {
                         let error = result.unwrap_err();
                         if let Some(error_contains) = operation_error.error_contains {
-                            let message = error.message().unwrap();
-                            assert!(message.contains(&error_contains));
+                            let message = error.message().unwrap().to_lowercase();
+                            assert!(
+                                message.contains(&error_contains.to_lowercase()),
+                                "{}: expected error message to contain \"{}\" but got \"{}\"",
+                                test.description,
+                                error_contains,
+                                message
+                            );
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
                             let code_name = error.code_name().unwrap();
