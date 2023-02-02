@@ -15,25 +15,28 @@ pub(crate) struct ListCollections {
     db: String,
     filter: Option<Document>,
     name_only: bool,
+    authorized_collections: bool,
     options: Option<ListCollectionsOptions>,
 }
 
 impl ListCollections {
     #[cfg(test)]
     fn empty() -> Self {
-        Self::new(String::new(), None, false, None)
+        Self::new(String::new(), None, false, false, None)
     }
 
     pub(crate) fn new(
         db: String,
         filter: Option<Document>,
         name_only: bool,
+        authorized_collections: bool,
         options: Option<ListCollectionsOptions>,
     ) -> Self {
         Self {
             db,
             filter,
             name_only,
+            authorized_collections,
             options,
         }
     }
@@ -54,11 +57,12 @@ impl OperationWithDefaults for ListCollections {
         if let Some(ref filter) = self.filter {
             body.insert("filter", filter.clone());
 
-            if name_only && filter.keys().any(|k| k != "name") {
+            if name_only && filter.keys().any(|k| k != "name" && k != "type") {
                 name_only = false;
             }
         }
         body.insert("nameOnly", name_only);
+        body.insert("authorizedCollections", self.authorized_collections);
 
         append_options(&mut body, self.options.as_ref())?;
 

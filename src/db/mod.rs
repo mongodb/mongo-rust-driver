@@ -48,7 +48,7 @@ use crate::{
 /// so it can safely be shared across threads or async tasks. For example:
 ///
 /// ```rust
-/// 
+///
 /// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # use mongodb::{bson::Document, Client, error::Result};
 /// # #[cfg(feature = "async-std-runtime")]
@@ -210,6 +210,7 @@ impl Database {
             self.name().to_string(),
             filter.into(),
             false,
+            false,
             options.into(),
         );
         self.client()
@@ -229,6 +230,7 @@ impl Database {
         let list_collections = ListCollections::new(
             self.name().to_string(),
             filter.into(),
+            false,
             false,
             options.into(),
         );
@@ -262,7 +264,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
     ) -> Result<Vec<String>> {
         let list_collections =
-            ListCollections::new(self.name().to_string(), filter.into(), true, None);
+            ListCollections::new(self.name().to_string(), filter.into(), true, false, None);
         let cursor: Cursor<Document> = self
             .client()
             .execute_cursor_operation(list_collections)
@@ -278,7 +280,39 @@ impl Database {
         session: &mut ClientSession,
     ) -> Result<Vec<String>> {
         let list_collections =
-            ListCollections::new(self.name().to_string(), filter.into(), true, None);
+            ListCollections::new(self.name().to_string(), filter.into(), true, false, None);
+        let mut cursor: SessionCursor<Document> = self
+            .client()
+            .execute_session_cursor_operation(list_collections, &mut *session)
+            .await?;
+
+        self.list_collection_names_common(cursor.stream(session))
+            .await
+    }
+
+    /// Gets the names of the collections in the database for which the user has privileges.
+    pub async fn list_authorized_collection_names(
+        &self,
+        filter: impl Into<Option<Document>>,
+    ) -> Result<Vec<String>> {
+        let list_collections =
+            ListCollections::new(self.name().to_string(), filter.into(), true, true, None);
+        let cursor: Cursor<Document> = self
+            .client()
+            .execute_cursor_operation(list_collections)
+            .await?;
+
+        self.list_collection_names_common(cursor).await
+    }
+
+    /// Gets the names of the collections in the database for which the user has privileges using the provided `ClientSession`.
+    pub async fn list_authorized_collection_names_with_session(
+        &self,
+        filter: impl Into<Option<Document>>,
+        session: &mut ClientSession,
+    ) -> Result<Vec<String>> {
+        let list_collections =
+            ListCollections::new(self.name().to_string(), filter.into(), true, true, None);
         let mut cursor: SessionCursor<Document> = self
             .client()
             .execute_session_cursor_operation(list_collections, &mut *session)
