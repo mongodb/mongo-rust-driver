@@ -343,7 +343,8 @@ mod test;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(any(feature = "in-use-encryption-unstable", docsrs))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
 pub use crate::client::csfle::client_encryption;
 pub use crate::{
     client::{session::ClientSession, Client},
@@ -355,7 +356,8 @@ pub use crate::{
     db::Database,
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(any(feature = "in-use-encryption-unstable", docsrs))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
 pub use ::mongocrypt;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
