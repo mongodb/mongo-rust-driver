@@ -1,4 +1,4 @@
-use bson::oid::ObjectId;
+use bson::{oid::ObjectId, Bson};
 
 use crate::{
     event::command::{
@@ -86,12 +86,11 @@ impl CommandEventHandler for CommandTracingEventEmitter {
 }
 
 fn serialize_command_or_reply(doc: bson::Document, max_length_bytes: usize) -> String {
-    let mut ext_json = doc.tracing_representation();
+    let mut ext_json = Bson::Document(doc).into_relaxed_extjson().to_string();
     truncate_on_char_boundary(&mut ext_json, max_length_bytes);
     ext_json
 }
 
-// TODO: subject to change based on what exact version of truncation we decide to go with.
 /// Truncates the given string at the closest UTF-8 character boundary >= the provided length.
 /// If the new length is >= the current length, does nothing.
 pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {

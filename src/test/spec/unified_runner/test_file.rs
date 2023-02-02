@@ -651,6 +651,7 @@ fn log_component_as_tracing_target(component: &String) -> String {
     match component.as_ref() {
         "command" => trace::COMMAND_TRACING_EVENT_TARGET.to_string(),
         "connection" => trace::CONNECTION_TRACING_EVENT_TARGET.to_string(),
+        "serverSelection" => trace::SERVER_SELECTION_TRACING_EVENT_TARGET.to_string(),
         _ => panic!("Unknown tracing target: {}", component),
     }
 }

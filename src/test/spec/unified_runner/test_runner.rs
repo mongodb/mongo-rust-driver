@@ -37,7 +37,6 @@ use crate::{
         SERVERLESS,
         SERVER_API,
     },
-    Client,
     Collection,
     Database,
 };
@@ -281,7 +280,7 @@ impl TestRunner {
                 self.sync_workers().await;
 
                 let all_tracing_events = tracing_subscriber
-                    .collect_events(Duration::from_millis(500), |_| true)
+                    .collect_events(Duration::from_millis(1000), |_| true)
                     .await;
 
                 for expectation in expected_messages {
@@ -472,12 +471,10 @@ impl TestRunner {
                         options.tracing_max_document_length_bytes = Some(10000);
                     }
 
-                    let client = Client::with_options(options).unwrap();
-
                     (
                         id,
                         Entity::Client(ClientEntity::new(
-                            client,
+                            options,
                             handler,
                             observe_events,
                             ignore_command_names,

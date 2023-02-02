@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Clone, Derivative)]
+#[derive(Clone, Derivative, derive_more::Display)]
 #[derivative(Debug)]
 #[non_exhaustive]
 pub enum SelectionCriteria {
@@ -21,10 +21,12 @@ pub enum SelectionCriteria {
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/core/read-preference/) for more details.
+    #[display(fmt = "ReadPreference {}", _0)]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
+    #[display(fmt = "Custom predicate")]
     Predicate(#[derivative(Debug = "ignore")] Predicate),
 }
 
@@ -127,6 +129,48 @@ pub enum ReadPreference {
     /// Route this operation to the node with the least network latency regardless of whether it's
     /// the primary or a secondary.
     Nearest { options: ReadPreferenceOptions },
+}
+
+impl std::fmt::Display for ReadPreference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ Mode: ")?;
+        let opts_ref = match self {
+            ReadPreference::Primary => {
+                write!(f, "Primary")?;
+                None
+            }
+            ReadPreference::Secondary { options } => {
+                write!(f, "Secondary")?;
+                Some(options)
+            }
+            ReadPreference::PrimaryPreferred { options } => {
+                write!(f, "PrimaryPreferred")?;
+                Some(options)
+            }
+            ReadPreference::SecondaryPreferred { options } => {
+                write!(f, "SecondaryPreferred")?;
+                Some(options)
+            }
+            ReadPreference::Nearest { options } => {
+                write!(f, "Nearest")?;
+                Some(options)
+            }
+        };
+        if let Some(opts) = opts_ref {
+            if !opts.is_default() {
+                if let Some(ref tag_sets) = opts.tag_sets {
+                    write!(f, ", Tag Sets: {:?}", tag_sets)?;
+                }
+                if let Some(ref max_staleness) = opts.max_staleness {
+                    write!(f, ", Max Staleness: {:?}", max_staleness)?;
+                }
+                if let Some(ref hedge) = opts.hedge {
+                    write!(f, ", Hedge: {}", hedge.enabled)?;
+                }
+            }
+        }
+        write!(f, " }}")
+    }
 }
 
 impl<'de> Deserialize<'de> for ReadPreference {

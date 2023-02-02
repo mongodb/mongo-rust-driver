@@ -19,6 +19,7 @@ use crate::options::ServerAddress;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
     command::CommandTracingEventEmitter,
+    server_selection::ServerSelectionTracingEventEmitter,
     trace_or_log_enabled,
     TracingOrLogLevel,
     COMMAND_TRACING_EVENT_TARGET,
@@ -33,7 +34,7 @@ use crate::{
     },
     concern::{ReadConcern, WriteConcern},
     db::Database,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::command::{handle_command_event, CommandEvent},
     operation::{AggregateTarget, ListDatabases},
     options::{
@@ -55,6 +56,8 @@ pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
+// TODO: RUST-1585 Remove this constant.
+pub(crate) const SESSIONS_SUPPORT_OP_NAME: &str = "Check sessions support status";
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
@@ -480,13 +483,18 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self.select_server(criteria).await?;
+        let server = self.select_server(criteria, "Test select server").await?;
         Ok(server.address.clone())
     }
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
-    async fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<SelectedServer> {
+    #[allow(unused_variables)] // we only use the operation_name for tracing.
+    async fn select_server(
+        &self,
+        criteria: Option<&SelectionCriteria>,
+        operation_name: &str,
+    ) -> Result<SelectedServer> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
@@ -497,31 +505,70 @@ impl Client {
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
+        #[cfg(feature = "tracing-unstable")]
+        let event_emitter = ServerSelectionTracingEventEmitter::new(
+            self.inner.topology.id,
+            criteria,
+            operation_name,
+            start_time,
+            timeout,
+        );
+        #[cfg(feature = "tracing-unstable")]
+        event_emitter.emit_started_event(self.inner.topology.watch().observe_latest().description);
+        // We only want to emit this message once per operation at most.
+        #[cfg(feature = "tracing-unstable")]
+        let mut emitted_waiting_message = false;
+
         let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.observe_latest();
 
-            if let Some(server) = server_selection::attempt_to_select_server(
+            let result = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
                 &state.servers(),
-            )? {
-                return Ok(server);
-            }
+            );
+            match result {
+                Err(error) => {
+                    #[cfg(feature = "tracing-unstable")]
+                    event_emitter.emit_failed_event(&state.description, &error);
 
-            watcher.request_immediate_check();
-
-            let change_occurred = start_time.elapsed() < timeout
-                && watcher
-                    .wait_for_update(timeout - start_time.elapsed())
-                    .await;
-            if !change_occurred {
-                return Err(ErrorKind::ServerSelection {
-                    message: state
-                        .description
-                        .server_selection_timeout_error_message(criteria),
+                    return Err(error);
                 }
-                .into());
+                Ok(result) => {
+                    if let Some(server) = result {
+                        #[cfg(feature = "tracing-unstable")]
+                        event_emitter.emit_succeeded_event(&state.description, &server);
+
+                        return Ok(server);
+                    } else {
+                        #[cfg(feature = "tracing-unstable")]
+                        if !emitted_waiting_message {
+                            event_emitter.emit_waiting_event(&state.description);
+                            emitted_waiting_message = true;
+                        }
+
+                        watcher.request_immediate_check();
+
+                        let change_occurred = start_time.elapsed() < timeout
+                            && watcher
+                                .wait_for_update(timeout - start_time.elapsed())
+                                .await;
+                        if !change_occurred {
+                            let error: Error = ErrorKind::ServerSelection {
+                                message: state
+                                    .description
+                                    .server_selection_timeout_error_message(criteria),
+                            }
+                            .into();
+
+                            #[cfg(feature = "tracing-unstable")]
+                            event_emitter.emit_failed_event(&state.description, &error);
+
+                            return Err(error);
+                        }
+                    }
+                }
             }
         }
     }

@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, oneshot, Mutex};
 use crate::{
     bson::{Bson, Document},
     change_stream::ChangeStream,
-    client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
+    client::{options::ClientOptions, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, Result},
     event::command::{CommandEvent, CommandStartedEvent},
     gridfs::GridFsBucket,
@@ -128,13 +128,16 @@ impl TestCursor {
 
 impl ClientEntity {
     pub(crate) fn new(
-        client: Client,
+        client_options: ClientOptions,
         handler: Arc<EventHandler>,
         observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
+        // ensure the observer is already listening before the client is created to avoid any races
+        // around collecting initial events when the topology opens.
         let observer = EventObserver::new(handler.broadcaster().subscribe());
+        let client = Client::with_options(client_options).unwrap();
         let topology_id = client.topology().id;
         Self {
             client: Some(client),
