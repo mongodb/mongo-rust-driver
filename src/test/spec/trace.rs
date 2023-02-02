@@ -22,7 +22,6 @@ use crate::{
     test::{
         log_uncaptured,
         run_spec_test_with_path,
-        spec::run_unified_format_test,
         TestClient,
         CLIENT_OPTIONS,
         DEFAULT_GLOBAL_TRACING_HANDLER,
@@ -498,9 +497,15 @@ fn topology_description_tracing_representation() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_unified() {
     let _guard = LOCK.run_exclusively().await;
+    // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
+    let test_predicate = |tc: &TestCase| {
+        tc.description
+            != "An unacknowledged write generates a succeeded log message with ok: 1 reply"
+    };
+
     run_spec_test_with_path(
         &["command-logging-and-monitoring", "logging"],
-        run_unified_format_test,
+        |path, file| run_unified_format_test_filtered(path, file, test_predicate),
     )
     .await;
 }
