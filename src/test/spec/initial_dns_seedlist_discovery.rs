@@ -5,7 +5,7 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
-    client::{auth::AuthMechanism, Client},
+    client::Client,
     options::{ClientOptions, ResolverConfig},
     runtime,
     test::{log_uncaptured, run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
@@ -137,26 +137,6 @@ async fn run_test(mut test_file: TestFile) {
             "skipping initial_dns_seedlist_discovery test case due to TLS requirement mismatch",
         )
     } else {
-        // If the connection URI provides authentication information, manually create the user
-        // before connecting.
-        // if let Some(ParsedOptions {
-        //     user: Some(ref user),
-        //     password: Some(ref pwd),
-        //     ref db,
-        // }) = test_file.parsed_options
-        // {
-        //     client
-        //         .drop_and_create_user(
-        //             user,
-        //             pwd.as_str(),
-        //             &[],
-        //             &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
-        //             db.as_deref(),
-        //         )
-        //         .await
-        //         .unwrap();
-        // }
-
         let mut options_with_tls = options.clone();
         if requires_tls {
             options_with_tls.tls = CLIENT_OPTIONS.get().await.tls.clone();
