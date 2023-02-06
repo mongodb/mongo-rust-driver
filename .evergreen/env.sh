@@ -19,5 +19,7 @@ if [[ "$OS" == "Windows_NT" ]]; then
     export PATH
     echo "updated path on windows PATH=$PATH"
 else
+    # Turn off tracing for the very-spammy nvm script.
+    set +o xtrace
     [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 fi
