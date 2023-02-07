@@ -146,15 +146,25 @@ async fn retry_read_pool_cleared() {
         .await
         .expect("pool clear should occur");
 
-    let _ = subscriber
-        .wait_for_event(Duration::from_millis(1000), |event| match event {
-            Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => {
-                matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
-            }
+    let next_cmap_events = subscriber
+        .collect_events(Duration::from_millis(1000), |event| match event {
+            Event::Cmap(_) => true,
             _ => false,
         })
-        .await
-        .expect("second checkout should fail");
+        .await;
+
+    if !next_cmap_events.iter().any(|event| match event {
+        Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => {
+            matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
+        }
+        _ => false,
+    }) {
+        panic!(
+            "Expected second checkout to fail, but no ConnectionCheckoutFailed event observed. \
+             CMAP events:\n{:?}",
+            next_cmap_events
+        );
+    }
 
     assert_eq!(handler.get_command_started_events(&["find"]).len(), 3);
 }
