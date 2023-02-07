@@ -571,10 +571,17 @@ async fn find_and_getmore_share_session() {
             .read_concern(ReadConcern::local())
             .build();
 
-        let mut cursor = coll
-            .find(doc! {}, options)
-            .await
-            .expect("find should succeed");
+        // Loop until data is found to avoid racing with replication.
+        let mut cursor;
+        loop {
+            cursor = coll
+                .find(doc! {}, options.clone())
+                .await
+                .expect("find should succeed");
+            if cursor.has_next() {
+                break;
+            }
+        }
 
         for _ in 0..3 {
             cursor
