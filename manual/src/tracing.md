@@ -47,21 +47,24 @@ And then in `main.rs`:
 # extern crate tokio;
 # extern crate tracing_subscriber;
 # use std::env;
-# use mongodb::{Client, bson::doc, options::ClientOptions};
+use mongodb::{bson::doc, error::Result, Client};
 
 #[tokio::main]
-async fn main() {
-    // Register a global tracing subscriber which will obey the RUST_LOG environment variable config.
+async fn main() -> Result<()> {
+    // Register a global tracing subscriber which will obey the RUST_LOG environment variable
+    // config.
     tracing_subscriber::fmt::init();
 
     // Create a MongoDB client.
-    let mongodb_uri = env::var("MONGODB_URI").unwrap_or_default();
-    let client_options = ClientOptions::parse(mongodb_uri).await.unwrap();
-    let client = Client::with_options(client_options).unwrap();
+    let mongodb_uri =
+        env::var("MONGODB_URI").expect("The MONGODB_URI environment variable was not set.");
+    let client = Client::with_uri_str(mongodb_uri).await?;
 
     // Insert a document.
     let coll = client.database("test").collection("test_coll");
-    coll.insert_one(doc! { "x" : 1 }, None).await.unwrap();
+    coll.insert_one(doc! { "x" : 1 }, None).await?;
+
+    Ok(())
 }
 ```
 
@@ -97,21 +100,23 @@ And in `main.rs`:
 # extern crate tokio;
 # extern crate env_logger;
 use std::env;
-use mongodb::{Client, bson::doc, options::ClientOptions};
+use mongodb::{bson::doc, error::Result, Client};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     // Register a global logger.
     env_logger::init();
 
     // Create a MongoDB client.
-    let mongodb_uri = env::var("MONGODB_URI").unwrap_or_default();
-    let client_options = ClientOptions::parse(mongodb_uri).await.unwrap();
-    let client = Client::with_options(client_options).unwrap();
+    let mongodb_uri =
+        env::var("MONGODB_URI").expect("The MONGODB_URI environment variable was not set.");
+    let client = Client::with_uri_str(mongodb_uri).await?;
 
     // Insert a document.
     let coll = client.database("test").collection("test_coll");
-    coll.insert_one(doc! { "x" : 1 }, None).await.unwrap();
+    coll.insert_one(doc! { "x" : 1 }, None).await?;
+
+    Ok(())
 }
 ```
 
