@@ -178,21 +178,24 @@ mongodb = { version = &quot;LATEST_VERSION_HERE&quot;, features = [&quot;tracing
 </span><span class="boring">extern crate tokio;
 </span><span class="boring">extern crate tracing_subscriber;
 </span><span class="boring">use std::env;
-</span><span class="boring">use mongodb::{Client, bson::doc, options::ClientOptions};
-</span>
+</span>use mongodb::{bson::doc, error::Result, Client};
+
 #[tokio::main]
-async fn main() {
-    // Register a global tracing subscriber which will obey the RUST_LOG environment variable config.
+async fn main() -&gt; Result&lt;()&gt; {
+    // Register a global tracing subscriber which will obey the RUST_LOG environment variable
+    // config.
     tracing_subscriber::fmt::init();
 
     // Create a MongoDB client.
-    let mongodb_uri = env::var(&quot;MONGODB_URI&quot;).unwrap_or_default();
-    let client_options = ClientOptions::parse(mongodb_uri).await.unwrap();
-    let client = Client::with_options(client_options).unwrap();
+    let mongodb_uri =
+        env::var(&quot;MONGODB_URI&quot;).expect(&quot;The MONGODB_URI environment variable was not set.&quot;);
+    let client = Client::with_uri_str(mongodb_uri).await?;
 
     // Insert a document.
     let coll = client.database(&quot;test&quot;).collection(&quot;test_coll&quot;);
-    coll.insert_one(doc! { &quot;x&quot; : 1 }, None).await.unwrap();
+    coll.insert_one(doc! { &quot;x&quot; : 1 }, None).await?;
+
+    Ok(())
 }</code></pre></pre>
 <p>This program can be run from the command line as follows, using the <a href="https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/fmt/index.html#filtering-events-with-environment-variables"><code>RUST_LOG</code></a> environment variable to configure verbosity levels and observe command-related events with severity debug or higher:</p>
 <pre><code class="language-sh no_run">RUST_LOG='mongodb::command=debug' MONGODB_URI='YOUR_URI_HERE' cargo run
@@ -215,21 +218,23 @@ env_logger = &quot;LATEST_VERSION_HERE&quot;
 </span><span class="boring">extern crate tokio;
 </span><span class="boring">extern crate env_logger;
 </span>use std::env;
-use mongodb::{Client, bson::doc, options::ClientOptions};
+use mongodb::{bson::doc, error::Result, Client};
 
 #[tokio::main]
-async fn main() {
+async fn main() -&gt; Result&lt;()&gt; {
     // Register a global logger.
     env_logger::init();
 
     // Create a MongoDB client.
-    let mongodb_uri = env::var(&quot;MONGODB_URI&quot;).unwrap_or_default();
-    let client_options = ClientOptions::parse(mongodb_uri).await.unwrap();
-    let client = Client::with_options(client_options).unwrap();
+    let mongodb_uri =
+        env::var(&quot;MONGODB_URI&quot;).expect(&quot;The MONGODB_URI environment variable was not set.&quot;);
+    let client = Client::with_uri_str(mongodb_uri).await?;
 
     // Insert a document.
     let coll = client.database(&quot;test&quot;).collection(&quot;test_coll&quot;);
-    coll.insert_one(doc! { &quot;x&quot; : 1 }, None).await.unwrap();
+    coll.insert_one(doc! { &quot;x&quot; : 1 }, None).await?;
+
+    Ok(())
 }</code></pre></pre>
 <p>This program can be run from the command line as follows, using the <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging"><code>RUST_LOG</code></a> environment variable to configure verbosity levels and observe command-related messages with severity debug or higher:</p>
 <pre><code class="language-sh no_run">RUST_LOG='mongodb::command=debug' MONGODB_URI='YOUR_URI_HERE' cargo run
@@ -268,22 +273,6 @@ async fn main() {
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script>
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
-            const socket = new WebSocket(wsAddress);
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 
