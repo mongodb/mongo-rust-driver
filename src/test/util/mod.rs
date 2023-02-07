@@ -273,30 +273,6 @@ impl TestClient {
         Ok(())
     }
 
-    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
-    pub(crate) async fn drop_and_create_user(
-        &self,
-        user: &str,
-        pwd: impl Into<Option<&str>>,
-        roles: &[Bson],
-        mechanisms: &[AuthMechanism],
-        db: Option<&str>,
-    ) -> Result<()> {
-        let drop_user_result = self
-            .database(db.unwrap_or("admin"))
-            .run_command(doc! { "dropUser": user }, None)
-            .await;
-
-        match drop_user_result.map_err(|e| *e.kind) {
-            Err(ErrorKind::Command(CommandError { code: 11, .. })) | Ok(_) => {}
-            e @ Err(_) => {
-                e.unwrap();
-            }
-        };
-
-        self.create_user(user, pwd, roles, mechanisms, db).await
-    }
-
     pub(crate) fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection<Document> {
         self.database(db_name).collection(coll_name)
     }
