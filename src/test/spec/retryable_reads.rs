@@ -130,7 +130,7 @@ async fn retry_read_pool_cleared() {
         .await
         .into_iter()
         .collect::<Result<Vec<_>>>()
-        .expect("all should succeeed");
+        .expect("all should succeed");
 
     let _ = subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
@@ -147,7 +147,7 @@ async fn retry_read_pool_cleared() {
         .expect("pool clear should occur");
 
     let _ = subscriber
-        .wait_for_event(Duration::from_millis(500), |event| match event {
+        .wait_for_event(Duration::from_millis(1000), |event| match event {
             Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => {
                 matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
             }

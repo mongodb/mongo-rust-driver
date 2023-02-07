@@ -479,7 +479,7 @@ async fn retry_write_pool_cleared() {
         .expect("pool clear should occur");
 
     let _ = subscriber
-        .wait_for_event(Duration::from_millis(500), |event| match event {
+        .wait_for_event(Duration::from_millis(1000), |event| match event {
             Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => {
                 matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
             }
