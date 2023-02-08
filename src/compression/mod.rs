@@ -65,24 +65,21 @@ impl CompressorId {
 pub enum Compressor {
     /// Zstd compressor.  Requires Rust version 1.54.
     /// See [`Zstd`](http://facebook.github.io/zstd/zstd_manual.html) for more information
-    #[cfg(any(feature = "zstd-compression", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "zstd-compression")))]
+    #[cfg(feature = "zstd-compression")]
     Zstd {
         /// Zstd compression level
         level: Option<i32>,
     },
     /// Zlib compressor.
     /// See [`Zlib`](https://zlib.net/) for more information.
-    #[cfg(any(feature = "zlib-compression", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "zlib-compression")))]
+    #[cfg(feature = "zlib-compression")]
     Zlib {
         /// Zlib compression level
         level: Option<i32>,
     },
     /// Snappy compressor.
     /// See [`Snappy`](http://google.github.io/snappy/) for more information.
-    #[cfg(any(feature = "snappy-compression", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "snappy-compression")))]
+    #[cfg(feature = "snappy-compression")]
     Snappy,
 }
 

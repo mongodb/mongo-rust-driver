@@ -26,6 +26,8 @@ exclude = [
     "tests/**",
 ]
 
+# NOTE: any new features added to this list should also be added to the features
+# list in the [package.metadata.docs.rs] section below.
 [features]
 default = ["tokio-runtime"]
 tokio-runtime = [
@@ -67,11 +69,12 @@ zstd-compression = ["zstd"]
 zlib-compression = ["flate2"]
 snappy-compression = ["snap"]
 
+# Enables support for client-side field level encryption and queryable encryption.
 # The In Use Encryption API is unstable and may have backwards-incompatible changes in minor version updates.
 in-use-encryption-unstable = ["mongocrypt", "rayon", "num_cpus"]
 
-# DO NOT USE; see https://jira.mongodb.org/browse/RUST-580 for the status of tracing/logging support in the Rust driver.
 # Enables support for emitting tracing events.
+# The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
 tracing-unstable = ["tracing", "log"]
 
@@ -185,3 +188,16 @@ regex = "1.6.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
+# async-std-runtime and sync are excluded here because they conflict with the default features.
+# Neither feature has any unique documentation associated with it, so we do not need to
+# include them in our documentation build.
+features = [
+    "tokio-sync",
+    "zstd-compression",
+    "snappy-compression",
+    "zlib-compression",
+    "openssl-tls",
+    "aws-auth",
+    "tracing-unstable",
+    "in-use-encryption-unstable"
+]

@@ -536,8 +536,7 @@ pub struct ClientOptions {
     /// Note that in cases where truncation occurs the output will not be valid JSON.
     ///
     /// The default value is 1000.
-    #[cfg(any(feature = "tracing-unstable", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tracing-unstable")))]
+    #[cfg(feature = "tracing-unstable")]
     #[builder(default)]
     pub tracing_max_document_length_bytes: Option<usize>,
 
@@ -938,8 +937,7 @@ pub struct TlsOptions {
     /// is invalid.
     ///
     /// The default value is to error on invalid hostnames.
-    #[cfg(any(feature = "openssl-tls", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+    #[cfg(feature = "openssl-tls")]
     pub allow_invalid_hostnames: Option<bool>,
 }
 
@@ -1072,8 +1070,7 @@ impl ClientOptions {
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse)
-    #[cfg(any(feature = "sync", feature = "tokio-sync", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
     pub fn parse(s: impl AsRef<str>) -> Result<Self> {
         runtime::block_on(Self::parse_uri(s.as_ref(), None))
     }
@@ -1102,8 +1099,7 @@ impl ClientOptions {
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse_with_resolver_config)
-    #[cfg(any(feature = "sync", feature = "tokio-sync", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
     pub fn parse_with_resolver_config(uri: &str, resolver_config: ResolverConfig) -> Result<Self> {
         runtime::block_on(Self::parse_uri(uri, Some(resolver_config)))
     }
