@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><a href="performance.html"><strong aria-hidden="true">6.</strong> Performance</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded "><a href="web_framework_examples.html"><strong aria-hidden="true">11.</strong> Web Framework Examples</a></li><li class="chapter-item expanded "><a href="encryption.html"><strong aria-hidden="true">12.</strong> Encryption</a></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">13.</strong> Writing Tests</div></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><a href="performance.html"><strong aria-hidden="true">6.</strong> Performance</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded "><a href="tracing.html"><strong aria-hidden="true">11.</strong> Tracing and Logging</a></li><li class="chapter-item expanded "><a href="web_framework_examples.html"><strong aria-hidden="true">12.</strong> Web Framework Examples</a></li><li class="chapter-item expanded "><a href="encryption.html"><strong aria-hidden="true">13.</strong> Encryption</a></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">14.</strong> Writing Tests</div></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -171,7 +171,7 @@ tokio::time::timeout(Duration::from_secs(5), handle).await???;
 </span><span class="boring">}
 </span><span class="boring">}</span></code></pre></pre>
 <h2 id="minimum-supported-rust-version-msrv"><a class="header" href="#minimum-supported-rust-version-msrv">Minimum supported Rust version (MSRV)</a></h2>
-<p>The MSRV for this crate is currently 1.57.0. This will be rarely be increased, and if it ever is,
+<p>The MSRV for this crate is currently 1.57.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="installation-and-features"><a class="header" href="#installation-and-features">Installation and Features</a></h1>
 <h2 id="importing"><a class="header" href="#importing">Importing</a></h2>
@@ -491,6 +491,108 @@ for i in 0..5 {
 </span><span class="boring">Ok(())
 </span><span class="boring">}
 </span><span class="boring">}</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="tracing-and-logging"><a class="header" href="#tracing-and-logging">Tracing and Logging</a></h1>
+<p>The driver utilizes the <a href="https://crates.io/crates/tracing"><code>tracing</code></a> crate to emit events at points of interest. To enable this, you must turn on the <code>tracing-unstable</code> feature flag.</p>
+<h2 id="stability-guarantees"><a class="header" href="#stability-guarantees">Stability Guarantees</a></h2>
+<p>This functionality is considered unstable as the <code>tracing</code> crate has not reached 1.0 yet. Future minor versions of the driver may upgrade the <code>tracing</code> dependency
+to a new version which is not backwards-compatible with <code>Subscriber</code>s that depend on older versions of <code>tracing</code>.
+Additionally, future minor releases may make changes such as:</p>
+<ul>
+<li>add or remove tracing events</li>
+<li>add or remove values attached to tracing events</li>
+<li>change the types and/or names of values attached to tracing events</li>
+<li>add or remove driver-defined tracing spans</li>
+<li>change the severity level of tracing events</li>
+</ul>
+<p>Such changes will be called out in release notes.</p>
+<h2 id="event-targets"><a class="header" href="#event-targets">Event Targets</a></h2>
+<p>Currently, events are emitted under the following targets:</p>
+<div class="table-wrapper"><table><thead><tr><th>Target</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>mongodb::command</code></td><td>Events describing commands sent to the database and their success or failure.</td></tr>
+<tr><td><code>mongodb::server_selection</code></td><td>Events describing the driver's process of selecting a server in the database deployment to send a command to.</td></tr>
+<tr><td><code>mongodb::connection</code></td><td>Events describing the behavior of driver connection pools and the connections they contain.</td></tr>
+</tbody></table>
+</div>
+<h2 id="consuming-events"><a class="header" href="#consuming-events">Consuming Events</a></h2>
+<p>To consume events in your application, in addition to enabling the <code>tracing-unstable</code> feature flag, you must either register a <code>tracing</code>-compatible subscriber or a <code>log</code>-compatible logger, as detailed in the following sections.</p>
+<h3 id="consuming-events-with-tracing"><a class="header" href="#consuming-events-with-tracing">Consuming Events with <code>tracing</code></a></h3>
+<p>To consume events with <code>tracing</code>, you will need to register a type implementing the <code>tracing::Subscriber</code> trait in your application, as <a href="https://docs.rs/tracing/latest/tracing/#in-executables">discussed in the <code>tracing</code> docs</a>.</p>
+<p>Here's a minimal example of a program using the driver which uses a tracing subscriber.</p>
+<p>First, add the following to <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml no_run">tracing = &quot;LATEST_VERSION_HERE&quot;
+tracing-subscriber = &quot;LATEST_VERSION_HERE&quot;
+mongodb = { version = &quot;LATEST_VERSION_HERE&quot;, features = [&quot;tracing-unstable&quot;] }
+</code></pre>
+<p>And then in <code>main.rs</code>:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate tracing_subscriber;
+</span><span class="boring">use std::env;
+</span>use mongodb::{bson::doc, error::Result, Client};
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // Register a global tracing subscriber which will obey the RUST_LOG environment variable
+    // config.
+    tracing_subscriber::fmt::init();
+
+    // Create a MongoDB client.
+    let mongodb_uri =
+        env::var(&quot;MONGODB_URI&quot;).expect(&quot;The MONGODB_URI environment variable was not set.&quot;);
+    let client = Client::with_uri_str(mongodb_uri).await?;
+
+    // Insert a document.
+    let coll = client.database(&quot;test&quot;).collection(&quot;test_coll&quot;);
+    coll.insert_one(doc! { &quot;x&quot; : 1 }, None).await?;
+
+    Ok(())
+}</code></pre></pre>
+<p>This program can be run from the command line as follows, using the <a href="https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/fmt/index.html#filtering-events-with-environment-variables"><code>RUST_LOG</code></a> environment variable to configure verbosity levels and observe command-related events with severity debug or higher:</p>
+<pre><code class="language-sh no_run">RUST_LOG='mongodb::command=debug' MONGODB_URI='YOUR_URI_HERE' cargo run
+</code></pre>
+<p>The output will look something like the following:</p>
+<pre><code class="language-text">2023-02-03T19:20:16.091822Z DEBUG mongodb::command: Command started topologyId=&quot;63dd5e706af9908fc834fd94&quot; command=&quot;{\&quot;insert\&quot;:\&quot;test_coll\&quot;,\&quot;ordered\&quot;:true,\&quot;$db\&quot;:\&quot;test\&quot;,\&quot;lsid\&quot;:{\&quot;id\&quot;:{\&quot;$binary\&quot;:{\&quot;base64\&quot;:\&quot;y/v7PiLaRwOhT0RBFRDtNw==\&quot;,\&quot;subType\&quot;:\&quot;04\&quot;}}},\&quot;documents\&quot;:[{\&quot;_id\&quot;:{\&quot;$oid\&quot;:\&quot;63dd5e706af9908fc834fd95\&quot;},\&quot;x\&quot;:1}]}&quot; databaseName=&quot;test&quot; commandName=&quot;insert&quot; requestId=4 driverConnectionId=1 serverConnectionId=16 serverHost=&quot;localhost&quot; serverPort=27017
+2023-02-03T19:20:16.092700Z DEBUG mongodb::command: Command succeeded topologyId=&quot;63dd5e706af9908fc834fd94&quot; reply=&quot;{\&quot;n\&quot;:1,\&quot;ok\&quot;:1.0}&quot; commandName=&quot;insert&quot; requestId=4 driverConnectionId=1 serverConnectionId=16 serverHost=&quot;localhost&quot; serverPort=27017 durationMS=0
+</code></pre>
+<h3 id="consuming-events-with-log"><a class="header" href="#consuming-events-with-log">Consuming Events with <code>log</code></a></h3>
+<p>Alternatively, to consume events with <code>log</code>, you will need to add <code>tracing</code> as a dependency of your application, and enable either its <code>log</code> or <code>log-always</code> feature.
+Those features are described in detail <a href="https://docs.rs/tracing/latest/tracing/#log-compatibility">here</a>. </p>
+<p>Here's a minimal example of a program using the driver which uses <a href="https://crates.io/crates/env_logger"><code>env_logger</code></a>.</p>
+<p>In <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml no_run">tracing = { version = &quot;LATEST_VERSION_HERE&quot;, features = [&quot;log&quot;] }
+mongodb = { version = &quot;LATEST_VERSION_HERE&quot;, features = [&quot;tracing-unstable&quot;] }
+env_logger = &quot;LATEST_VERSION_HERE&quot;
+</code></pre>
+<p>And in <code>main.rs</code>:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021"><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate env_logger;
+</span>use std::env;
+use mongodb::{bson::doc, error::Result, Client};
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // Register a global logger.
+    env_logger::init();
+
+    // Create a MongoDB client.
+    let mongodb_uri =
+        env::var(&quot;MONGODB_URI&quot;).expect(&quot;The MONGODB_URI environment variable was not set.&quot;);
+    let client = Client::with_uri_str(mongodb_uri).await?;
+
+    // Insert a document.
+    let coll = client.database(&quot;test&quot;).collection(&quot;test_coll&quot;);
+    coll.insert_one(doc! { &quot;x&quot; : 1 }, None).await?;
+
+    Ok(())
+}</code></pre></pre>
+<p>This program can be run from the command line as follows, using the <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging"><code>RUST_LOG</code></a> environment variable to configure verbosity levels and observe command-related messages with severity debug or higher:</p>
+<pre><code class="language-sh no_run">RUST_LOG='mongodb::command=debug' MONGODB_URI='YOUR_URI_HERE' cargo run
+</code></pre>
+<p>The output will look something like the following:</p>
+<pre><code class="language-text">2023-02-03T19:20:16.091822Z DEBUG mongodb::command: Command started topologyId=&quot;63dd5e706af9908fc834fd94&quot; command=&quot;{\&quot;insert\&quot;:\&quot;test_coll\&quot;,\&quot;ordered\&quot;:true,\&quot;$db\&quot;:\&quot;test\&quot;,\&quot;lsid\&quot;:{\&quot;id\&quot;:{\&quot;$binary\&quot;:{\&quot;base64\&quot;:\&quot;y/v7PiLaRwOhT0RBFRDtNw==\&quot;,\&quot;subType\&quot;:\&quot;04\&quot;}}},\&quot;documents\&quot;:[{\&quot;_id\&quot;:{\&quot;$oid\&quot;:\&quot;63dd5e706af9908fc834fd95\&quot;},\&quot;x\&quot;:1}]}&quot; databaseName=&quot;test&quot; commandName=&quot;insert&quot; requestId=4 driverConnectionId=1 serverConnectionId=16 serverHost=&quot;localhost&quot; serverPort=27017
+2023-02-03T19:20:16.092700Z DEBUG mongodb::command: Command succeeded topologyId=&quot;63dd5e706af9908fc834fd94&quot; reply=&quot;{\&quot;n\&quot;:1,\&quot;ok\&quot;:1.0}&quot; commandName=&quot;insert&quot; requestId=4 driverConnectionId=1 serverConnectionId=16 serverHost=&quot;localhost&quot; serverPort=27017 durationMS=0
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="web-framework-examples"><a class="header" href="#web-framework-examples">Web Framework Examples</a></h1>
 <h2 id="actix"><a class="header" href="#actix">Actix</a></h2>
 <p>The driver can be used easily with the Actix web framework by storing a <code>Client</code> in Actix application data. A full example application for using MongoDB with Actix can be found <a href="https://github.com/actix/examples/tree/master/databases/mongodb">here</a>.</p>

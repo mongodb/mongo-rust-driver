@@ -10,6 +10,7 @@
 - [Sessions and Transactions]()
 - [Change Streams]()
 - [Monitoring]()
+- [Tracing and Logging](tracing.md)
 - [Web Framework Examples](web_framework_examples.md)
 - [Encryption](encryption.md)
 
