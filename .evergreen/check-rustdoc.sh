@@ -14,14 +14,11 @@ source ./.evergreen/configure-rust.sh
 source ./.evergreen/feature-combinations.sh
 
 # build with all available features to ensure all optional dependencies are brought in too.
-for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
-    cargo +nightly build ${FEATURE_COMBINATIONS[$i]}
-done
+cargo +nightly build $ADDITIONAL_FEATURES
 cargo clean
 
 chmod -R 555 ${CARGO_HOME}/registry/src
 
-for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
-    cargo +nightly rustdoc ${FEATURE_COMBINATIONS[$i]} -- -D warnings --cfg docsrs
-done
-
+# this invocation mirrors the way docs.rs builds our documentation (see the [package.metadata.docs.rs] section
+# in Cargo.toml).
+cargo +nightly rustdoc $ADDITIONAL_FEATURES -- -D warnings --cfg docsrs

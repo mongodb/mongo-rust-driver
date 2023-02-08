@@ -290,10 +290,7 @@
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
-// `missing_crate_level_docs` was renamed with a `rustdoc::` prefix in rustc 1.55, but isn't
-// supported in the MSRV.
-// TODO: remove the wrapping cfg_attr if/when the MSRV is 1.55+.
-#![cfg_attr(docsrs, warn(rustdoc::missing_crate_level_docs))]
+#![warn(rustdoc::missing_crate_level_docs)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
@@ -304,7 +301,7 @@
         clippy::derive_partial_eq_without_eq
     )
 )]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
 #![doc(html_root_url = "https://docs.rs/mongodb/2.4.0")]
 
@@ -315,6 +312,8 @@ compile_error!("The `aws-auth` feature flag is only supported on the tokio runti
 pub mod options;
 
 pub use ::bson;
+#[cfg(feature = "in-use-encryption-unstable")]
+pub use ::mongocrypt;
 
 mod bson_util;
 pub mod change_stream;
@@ -337,16 +336,14 @@ pub(crate) mod runtime;
 mod sdam;
 mod selection_criteria;
 mod srv;
-#[cfg(any(feature = "sync", feature = "tokio-sync", docsrs))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
 pub mod sync;
 #[cfg(test)]
 mod test;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
-#[cfg(any(feature = "in-use-encryption-unstable", docsrs))]
-#[cfg_attr(docsrs, doc(cfg(feature = "in-use-encryption-unstable")))]
+#[cfg(feature = "in-use-encryption-unstable")]
 pub use crate::client::csfle::client_encryption;
 pub use crate::{
     client::{session::ClientSession, Client},
@@ -358,9 +355,6 @@ pub use crate::{
     db::Database,
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
-#[cfg(any(feature = "in-use-encryption-unstable", docsrs))]
-#[cfg_attr(docsrs, doc(cfg(feature = "in-use-encryption-unstable")))]
-pub use ::mongocrypt;
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
