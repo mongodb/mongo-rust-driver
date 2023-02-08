@@ -12,7 +12,7 @@ export ADDITIONAL_FEATURES='--features tokio-sync,zstd-compression,snappy-compre
 # This is useful for linting tasks where we want to get coverage of all features.
 # Since some of our features are mutually exclusive we cannot just use --all-features.
 export FEATURE_COMBINATIONS=(
-    NO_FEATURES
-    ASYNC_STD_FEATURES
-    ADDITIONAL_FEATURES
+    "$NO_FEATURES"
+    "$ASYNC_STD_FEATURES"
+    "$ADDITIONAL_FEATURES"
 )
