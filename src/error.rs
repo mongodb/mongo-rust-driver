@@ -608,7 +608,7 @@ pub struct CommandError {
     pub code_name: String,
 
     /// A description of the error that occurred.
-    #[serde(rename = "errmsg")]
+    #[serde(rename = "errmsg", default = "String::new")]
     pub message: String,
 
     /// The topology version reported by the server in the error response.
@@ -648,7 +648,7 @@ pub struct WriteConcernError {
     pub code_name: String,
 
     /// A description of the error that occurred.
-    #[serde(rename = "errmsg")]
+    #[serde(rename = "errmsg", default = "String::new")]
     pub message: String,
 
     /// A document identifying the write concern setting related to the error.
@@ -687,7 +687,7 @@ pub struct WriteError {
     pub code_name: Option<String>,
 
     /// A description of the error that occurred.
-    #[serde(rename = "errmsg")]
+    #[serde(rename = "errmsg", default = "String::new")]
     pub message: String,
 
     /// A document providing more information about the write error (e.g. details
@@ -725,7 +725,7 @@ pub struct BulkWriteError {
     pub code_name: Option<String>,
 
     /// A description of the error that occurred.
-    #[serde(rename = "errmsg")]
+    #[serde(rename = "errmsg", default = "String::new")]
     pub message: String,
 
     /// A document providing more information about the write error (e.g. details
