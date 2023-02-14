@@ -64,7 +64,7 @@ impl ClientEncryption {
         let exec = CryptExecutor::new_explicit(
             key_vault_client.weak(),
             key_vault_namespace.clone(),
-            kms_providers.tls_options().clone(),
+            kms_providers,
         )?;
         let key_vault = key_vault_client
             .database(&key_vault_namespace.db)
