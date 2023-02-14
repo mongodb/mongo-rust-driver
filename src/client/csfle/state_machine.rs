@@ -213,15 +213,22 @@ impl CryptExecutor {
                     let mut out = rawdoc! { };
                     #[cfg(feature = "aws-auth")]
                     if self.kms_providers.credentials().get(&KmsProvider::Aws).map_or(false, |d| d.is_empty()) {
-                        let aws_creds = crate::client::auth::aws::AwsCredential::get(&Credential::default(), &HttpClient::default()).await?;
-                        let mut creds = rawdoc! {
-                            "accessKeyId": aws_creds.access_key(),
-                            "secretAccessKey": aws_creds.secret_key(),
-                        };
-                        if let Some(token) = aws_creds.session_token() {
-                            creds.append("sessionToken", token);
+                        #[cfg(feature = "aws-auth")]
+                        {
+                            let aws_creds = crate::client::auth::aws::AwsCredential::get(&Credential::default(), &HttpClient::default()).await?;
+                            let mut creds = rawdoc! {
+                                "accessKeyId": aws_creds.access_key(),
+                                "secretAccessKey": aws_creds.secret_key(),
+                            };
+                            if let Some(token) = aws_creds.session_token() {
+                                creds.append("sessionToken", token);
+                            }
+                            out.append("aws", creds);
                         }
-                        out.append("aws", creds);
+                        #[cfg(not(feature = "aws-auth"))]
+                        {
+                            return Err(Error::invalid_argument("On-demand AWS KMS credentials require the `aws-auth` feature."));
+                        }
                     }
                     ctx.provide_kms_providers(&out)?;
                 }
