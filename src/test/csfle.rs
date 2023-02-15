@@ -2752,6 +2752,7 @@ impl CommandEventHandler for DecryptionEventsHandler {
 }
 
 // Prose test 15. On-demand AWS Credentials (failure)
+#[cfg(feature = "aws-auth")]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn on_demand_aws_failure() -> Result<()> {
@@ -2761,6 +2762,7 @@ async fn on_demand_aws_failure() -> Result<()> {
     if std::env::var("AWS_ACCESS_KEY_ID").is_ok() && std::env::var("AWS_SECRET_ACCESS_KEY").is_ok()
     {
         log_uncaptured("Skipping on_demand_aws_failure: credentials set");
+        return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
 
@@ -2784,6 +2786,7 @@ async fn on_demand_aws_failure() -> Result<()> {
 }
 
 // Prose test 15. On-demand AWS Credentials (success)
+#[cfg(feature = "aws-auth")]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn on_demand_aws_success() -> Result<()> {
