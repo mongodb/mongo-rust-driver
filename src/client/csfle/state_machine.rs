@@ -4,9 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bson::{Document, RawDocument, RawDocumentBuf, rawdoc};
+use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
-use mongocrypt::ctx::{Ctx, State, KmsProvider};
+use mongocrypt::ctx::{Ctx, KmsProvider, State};
 use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -14,12 +14,12 @@ use tokio::{
 };
 
 use crate::{
-    client::{options::ServerAddress, WeakClient, auth::Credential},
+    client::{auth::Credential, options::ServerAddress, WeakClient},
     coll::options::FindOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     options::ReadConcern,
-    runtime::{AsyncStream, Process, TlsConfig, HttpClient},
+    runtime::{AsyncStream, HttpClient, Process, TlsConfig},
     Client,
     Namespace,
 };
@@ -210,12 +210,21 @@ impl CryptExecutor {
                 State::NeedKmsCredentials => {
                     // TODO(RUST-1417): support fetching KMS credentials.
                     let ctx = result_mut(&mut ctx)?;
-                    let mut out = rawdoc! { };
+                    let mut out = rawdoc! {};
                     #[cfg(feature = "aws-auth")]
-                    if self.kms_providers.credentials().get(&KmsProvider::Aws).map_or(false, |d| d.is_empty()) {
+                    if self
+                        .kms_providers
+                        .credentials()
+                        .get(&KmsProvider::Aws)
+                        .map_or(false, |d| d.is_empty())
+                    {
                         #[cfg(feature = "aws-auth")]
                         {
-                            let aws_creds = crate::client::auth::aws::AwsCredential::get(&Credential::default(), &HttpClient::default()).await?;
+                            let aws_creds = crate::client::auth::aws::AwsCredential::get(
+                                &Credential::default(),
+                                &HttpClient::default(),
+                            )
+                            .await?;
                             let mut creds = rawdoc! {
                                 "accessKeyId": aws_creds.access_key(),
                                 "secretAccessKey": aws_creds.secret_key(),
@@ -227,7 +236,9 @@ impl CryptExecutor {
                         }
                         #[cfg(not(feature = "aws-auth"))]
                         {
-                            return Err(Error::invalid_argument("On-demand AWS KMS credentials require the `aws-auth` feature."));
+                            return Err(Error::invalid_argument(
+                                "On-demand AWS KMS credentials require the `aws-auth` feature.",
+                            ));
                         }
                     }
                     ctx.provide_kms_providers(&out)?;
