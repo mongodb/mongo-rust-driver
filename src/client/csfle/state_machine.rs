@@ -208,10 +208,8 @@ impl CryptExecutor {
                         .await?;
                 }
                 State::NeedKmsCredentials => {
-                    // TODO(RUST-1417): support fetching KMS credentials.
                     let ctx = result_mut(&mut ctx)?;
                     let mut out = rawdoc! {};
-                    #[cfg(feature = "aws-auth")]
                     if self
                         .kms_providers
                         .credentials()
