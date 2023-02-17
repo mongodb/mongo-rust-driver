@@ -1936,6 +1936,43 @@ buildvariants:
   tasks:
     - "serverless_task_group"
 
+- matrix_name: "csfle-mongodb-version"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+    mongodb-version:
+      - "latest"
+      - "rapid"
+      - "6.0"
+      - "5.0"
+      - "4.4"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
+# There's no 4.2 build for ubuntu-20.04, so drop down to -18.04.
+- matrix_name: "csfle-mongodb-version-old"
+  matrix_spec:
+    os:
+      - ubuntu-18.04
+    mongodb-version:
+      - "4.2"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "enabled"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
 - matrix_name: "csfle-topology"
   matrix_spec:
     os:
@@ -1943,7 +1980,6 @@ buildvariants:
     mongodb-version:
       - "6.0"
     topology:
-      - "standalone"
       - "replica-set"
     crypt-shared:
       - "enabled"
@@ -1970,13 +2006,33 @@ buildvariants:
   tasks:
     - "test-csfle"
 
-- matrix_name: "csfle-crypt-shared"
+- matrix_name: "csfle-mongocryptd"
   matrix_spec:
     os:
       - ubuntu-20.04
     mongodb-version:
-      - "5.0"
+      - "latest"
+      - "rapid"
       - "6.0"
+      - "5.0"
+      - "4.4"
+    topology:
+      - "standalone"
+    crypt-shared:
+      - "disabled"
+    tls-feature:
+      - "default"
+  display_name: "CSFLE (${crypt-shared}, ${tls-feature}) on mongodb ${mongodb-version} ${topology} / ${os}"
+  tasks:
+    - "test-csfle"
+
+# There's no 4.2 build for ubuntu-20.04, so drop down to -18.04.
+- matrix_name: "csfle-mongocryptd-old"
+  matrix_spec:
+    os:
+      - ubuntu-18.04
+    mongodb-version:
+      - "4.2"
     topology:
       - "standalone"
     crypt-shared:
