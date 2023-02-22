@@ -192,8 +192,8 @@ pub async fn read_msg<T: AsyncRead + Unpin + Send>(
         MongoMsg::Query(QueryOp::read_query_common(reader, length_remaining, &header).await?)
     } else if header.op_code == OpCode::Reply {
         MongoMsg::Reply(ReplyOp::read_reply_common(reader, length_remaining, &header).await?)
-        //} else if header.op_code == OpCode::Compressed {
-        //    MongoMsg::Message(Message::read_from_op_compressed(reader, &header).await?)
+    } else if header.op_code == OpCode::Compressed {
+        MongoMsg::Message(Message::read_op_compressed(reader, &header)?)
     } else {
         return Err(Error::new(
             ErrorKind::InvalidResponse {

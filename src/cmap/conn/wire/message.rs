@@ -23,7 +23,7 @@ use std::io::Read;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
     pub response_to: i32,
-    pub(crate) flags: MessageFlags,
+    pub flags: MessageFlags,
     pub sections: Vec<MessageSection>,
     pub checksum: Option<u32>,
     pub request_id: Option<i32>,
@@ -213,9 +213,79 @@ impl Message {
         })
     }
 
+    pub(crate) fn read_op_compressed(mut reader: &[u8], header: &Header) -> Result<Message> {
+        // Read original opcode (should be OP_MSG)
+        let original_opcode = reader.read_i32()?;
+        if original_opcode != OpCode::Message as i32 {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "The original opcode of the compressed message must be {}, but was {}.",
+                    OpCode::Message as i32,
+                    original_opcode,
+                ),
+            }
+            .into());
+        }
+    
+        // Read uncompressed size
+        let uncompressed_size = reader.read_i32()?;
+    
+        // Read compressor id
+        let compressor_id: u8 = reader.read_u8()?;
+    
+        // Get decoder
+        let decoder = Decoder::from_u8(compressor_id)?;
+    
+        // Decode message
+        let decoded_message = decoder.decode(reader)?;
+    
+        // Check that claimed length matches original length
+        if decoded_message.len() as i32 != uncompressed_size {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "The server's message claims that the uncompressed length is {}, but was \
+                     computed to be {}.",
+                    uncompressed_size,
+                    decoded_message.len(),
+                ),
+            }
+            .into());
+        }
+    
+        // Read decompressed message as a standard OP_MSG
+        let reader = decoded_message.as_slice();
+        let length_remaining = decoded_message.len();
+    
+        Message::read_op_common(reader, length_remaining as i32, header)
+    }
+
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+    pub async fn proxy_write_to<T: AsyncWrite + Send + Unpin>(
+        &self,
+        header: &Header,
+        stream: &mut T,
+    ) -> Result<()> {
+        let mut sections_bytes = Vec::new();
+
+        for section in &self.sections {
+            section.write(&mut sections_bytes).await?;
+        }
         let mut writer = BufWriter::new(stream);
+        header.write_to(&mut writer).await?;
+        writer.write_u32(self.flags.bits()).await?;
+        writer.write_all(&sections_bytes).await?;
+
+        if let Some(checksum) = self.checksum {
+            writer.write_u32(checksum).await?;
+        }
+
+        writer.flush().await?;
+
+        Ok(())
+    }
+
+    /// Serializes the Message to bytes and writes them to `writer`.
+    pub async fn write_to<T: AsyncWrite + Send + Unpin>(&self, writer: &mut T) -> Result<()> {
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {
@@ -238,7 +308,7 @@ impl Message {
             op_code: OpCode::Message,
         };
 
-        header.write_to(&mut writer).await?;
+        header.write_to(writer).await?;
         writer.write_u32(self.flags.bits()).await?;
         writer.write_all(&sections_bytes).await?;
 

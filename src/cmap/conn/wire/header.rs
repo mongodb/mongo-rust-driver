@@ -48,10 +48,10 @@ impl Header {
 
     /// Serializes the Header and writes the bytes to `w`.
     pub async fn write_to<W: AsyncWrite + Unpin>(&self, stream: &mut W) -> Result<()> {
-        stream.write(&self.length.to_le_bytes()).await?;
-        stream.write(&self.request_id.to_le_bytes()).await?;
-        stream.write(&self.response_to.to_le_bytes()).await?;
-        stream.write(&(self.op_code as i32).to_le_bytes()).await?;
+        stream.write_all(&self.length.to_le_bytes()).await?;
+        stream.write_all(&self.request_id.to_le_bytes()).await?;
+        stream.write_all(&self.response_to.to_le_bytes()).await?;
+        stream.write_all(&(self.op_code as i32).to_le_bytes()).await?;
 
         Ok(())
     }
