@@ -115,7 +115,7 @@ pub(super) async fn authenticate_stream(
 
 /// Contains the credentials for MONGODB-AWS authentication.
 #[derive(Debug, Deserialize)]
-struct AwsCredential {
+pub(crate) struct AwsCredential {
     #[serde(rename = "AccessKeyId")]
     access_key: String,
 
@@ -129,7 +129,7 @@ struct AwsCredential {
 impl AwsCredential {
     /// Derives the credentials for an authentication attempt given the set of credentials the user
     /// passed in.
-    async fn get(credential: &Credential, http_client: &HttpClient) -> Result<Self> {
+    pub(crate) async fn get(credential: &Credential, http_client: &HttpClient) -> Result<Self> {
         let access_key = credential
             .username
             .clone()
@@ -347,6 +347,18 @@ impl AwsCredential {
         );
 
         Ok(auth_header)
+    }
+
+    pub(crate) fn access_key(&self) -> &str {
+        &self.access_key
+    }
+
+    pub(crate) fn secret_key(&self) -> &str {
+        &self.secret_key
+    }
+
+    pub(crate) fn session_token(&self) -> Option<&str> {
+        self.session_token.as_deref()
     }
 }
 
