@@ -2,7 +2,7 @@
 //! [`Client`](struct.Client.html).
 
 #[cfg(feature = "aws-auth")]
-mod aws;
+pub(crate) mod aws;
 mod plain;
 mod sasl;
 mod scram;

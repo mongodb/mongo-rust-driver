@@ -4,9 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bson::{Document, RawDocument, RawDocumentBuf};
+use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
-use mongocrypt::ctx::{Ctx, State};
+use mongocrypt::ctx::{Ctx, KmsProvider, State};
 use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -14,23 +14,23 @@ use tokio::{
 };
 
 use crate::{
-    client::{options::ServerAddress, WeakClient},
+    client::{auth::Credential, options::ServerAddress, WeakClient},
     coll::options::FindOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     options::ReadConcern,
-    runtime::{AsyncStream, Process, TlsConfig},
+    runtime::{AsyncStream, HttpClient, Process, TlsConfig},
     Client,
     Namespace,
 };
 
-use super::options::KmsProvidersTlsOptions;
+use super::options::KmsProviders;
 
 #[derive(Debug)]
 pub(crate) struct CryptExecutor {
     key_vault_client: WeakClient,
     key_vault_namespace: Namespace,
-    tls_options: Option<KmsProvidersTlsOptions>,
+    kms_providers: KmsProviders,
     crypto_threads: ThreadPool,
     mongocryptd: Option<Mongocryptd>,
     mongocryptd_client: Option<Client>,
@@ -41,7 +41,7 @@ impl CryptExecutor {
     pub(crate) fn new_explicit(
         key_vault_client: WeakClient,
         key_vault_namespace: Namespace,
-        tls_options: Option<KmsProvidersTlsOptions>,
+        kms_providers: KmsProviders,
     ) -> Result<Self> {
         // TODO RUST-1492: Replace num_cpus with std::thread::available_parallelism.
         let crypto_threads = rayon::ThreadPoolBuilder::new()
@@ -51,7 +51,7 @@ impl CryptExecutor {
         Ok(Self {
             key_vault_client,
             key_vault_namespace,
-            tls_options,
+            kms_providers,
             crypto_threads,
             mongocryptd: None,
             mongocryptd_client: None,
@@ -62,7 +62,7 @@ impl CryptExecutor {
     pub(crate) async fn new_implicit(
         key_vault_client: WeakClient,
         key_vault_namespace: Namespace,
-        tls_options: Option<KmsProvidersTlsOptions>,
+        kms_providers: KmsProviders,
         mongocryptd_opts: Option<MongocryptdOptions>,
         mongocryptd_client: Option<Client>,
         metadata_client: Option<WeakClient>,
@@ -71,7 +71,7 @@ impl CryptExecutor {
             Some(opts) => Some(Mongocryptd::new(opts).await?),
             None => None,
         };
-        let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, tls_options)?;
+        let mut exec = Self::new_explicit(key_vault_client, key_vault_namespace, kms_providers)?;
         exec.mongocryptd = mongocryptd;
         exec.mongocryptd_client = mongocryptd_client;
         exec.metadata_client = metadata_client;
@@ -185,8 +185,8 @@ impl CryptExecutor {
                             let addr = ServerAddress::parse(endpoint)?;
                             let provider = kms_ctx.kms_provider()?;
                             let tls_options = self
-                                .tls_options
-                                .as_ref()
+                                .kms_providers
+                                .tls_options()
                                 .and_then(|tls| tls.get(&provider))
                                 .cloned()
                                 .unwrap_or_default();
@@ -208,8 +208,38 @@ impl CryptExecutor {
                         .await?;
                 }
                 State::NeedKmsCredentials => {
-                    // TODO(RUST-1314, RUST-1417): support fetching KMS credentials.
-                    return Err(Error::internal("KMS credentials are not yet supported"));
+                    let ctx = result_mut(&mut ctx)?;
+                    let mut out = rawdoc! {};
+                    if self
+                        .kms_providers
+                        .credentials()
+                        .get(&KmsProvider::Aws)
+                        .map_or(false, |d| d.is_empty())
+                    {
+                        #[cfg(feature = "aws-auth")]
+                        {
+                            let aws_creds = crate::client::auth::aws::AwsCredential::get(
+                                &Credential::default(),
+                                &HttpClient::default(),
+                            )
+                            .await?;
+                            let mut creds = rawdoc! {
+                                "accessKeyId": aws_creds.access_key(),
+                                "secretAccessKey": aws_creds.secret_key(),
+                            };
+                            if let Some(token) = aws_creds.session_token() {
+                                creds.append("sessionToken", token);
+                            }
+                            out.append("aws", creds);
+                        }
+                        #[cfg(not(feature = "aws-auth"))]
+                        {
+                            return Err(Error::invalid_argument(
+                                "On-demand AWS KMS credentials require the `aws-auth` feature.",
+                            ));
+                        }
+                    }
+                    ctx.provide_kms_providers(&out)?;
                 }
                 State::Ready => {
                     let (tx, rx) = oneshot::channel();
