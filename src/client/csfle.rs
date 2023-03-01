@@ -69,7 +69,7 @@ impl ClientState {
         let exec = CryptExecutor::new_implicit(
             aux_clients.key_vault_client,
             opts.key_vault_namespace.clone(),
-            opts.kms_providers.tls_options().clone(),
+            opts.kms_providers.clone(),
             mongocryptd_opts,
             mongocryptd_client,
             aux_clients.metadata_client,

@@ -122,11 +122,10 @@ impl KmsProviders {
         Ok(bson::to_document(&self.credentials)?)
     }
 
-    pub(crate) fn tls_options(&self) -> &Option<KmsProvidersTlsOptions> {
-        &self.tls_options
+    pub(crate) fn tls_options(&self) -> Option<&KmsProvidersTlsOptions> {
+        self.tls_options.as_ref()
     }
 
-    #[cfg(test)]
     pub(crate) fn credentials(&self) -> &HashMap<KmsProvider, Document> {
         &self.credentials
     }

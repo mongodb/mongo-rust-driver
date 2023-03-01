@@ -2749,7 +2749,70 @@ impl CommandEventHandler for DecryptionEventsHandler {
     }
 }
 
-// TODO RUST-1314: implement prose test 15. On-demand AWS Credentials
+// Prose test 15. On-demand AWS Credentials (failure)
+#[cfg(feature = "aws-auth")]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn on_demand_aws_failure() -> Result<()> {
+    if !check_env("on_demand_aws_failure", false) {
+        return Ok(());
+    }
+    if std::env::var("AWS_ACCESS_KEY_ID").is_ok() && std::env::var("AWS_SECRET_ACCESS_KEY").is_ok()
+    {
+        log_uncaptured("Skipping on_demand_aws_failure: credentials set");
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let ce = ClientEncryption::new(
+        Client::test_builder().build().await.into_client(),
+        KV_NAMESPACE.clone(),
+        [(KmsProvider::Aws, doc! {}, None)],
+    )?;
+    let result = ce
+        .create_data_key(MasterKey::Aws {
+            region: "us-east-1".to_string(),
+            key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+                .to_string(),
+            endpoint: None,
+        })
+        .run()
+        .await;
+    assert!(
+        result.as_ref().unwrap_err().is_auth_error(),
+        "Expected auth error, got {:?}",
+        result
+    );
+
+    Ok(())
+}
+
+// Prose test 15. On-demand AWS Credentials (success)
+#[cfg(feature = "aws-auth")]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn on_demand_aws_success() -> Result<()> {
+    if !check_env("on_demand_aws_success", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let ce = ClientEncryption::new(
+        Client::test_builder().build().await.into_client(),
+        KV_NAMESPACE.clone(),
+        [(KmsProvider::Aws, doc! {}, None)],
+    )?;
+    ce.create_data_key(MasterKey::Aws {
+        region: "us-east-1".to_string(),
+        key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
+            .to_string(),
+        endpoint: None,
+    })
+    .run()
+    .await?;
+
+    Ok(())
+}
 
 // TODO RUST-1441: implement prose test 16. Rewrap
 

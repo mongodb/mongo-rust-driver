@@ -60,11 +60,12 @@ impl ClientEncryption {
         let kms_providers = KmsProviders::new(kms_providers)?;
         let crypt = Crypt::builder()
             .kms_providers(&kms_providers.credentials_doc()?)?
+            .use_need_kms_credentials_state()
             .build()?;
         let exec = CryptExecutor::new_explicit(
             key_vault_client.weak(),
             key_vault_namespace.clone(),
-            kms_providers.tls_options().clone(),
+            kms_providers,
         )?;
         let key_vault = key_vault_client
             .database(&key_vault_namespace.db)
