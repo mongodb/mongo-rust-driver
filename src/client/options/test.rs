@@ -240,7 +240,12 @@ async fn uuid_representations() {
     let uuid_err = parse_uri_with_uuid_representation("unknownLegacy")
         .await
         .expect_err("expect `unknownLegacy` to be an invalid argument for `uuidRepresentation`");
-    assert_eq!("connection string `uuidRepresentation` option can be one of `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid `unknownLegacy`".to_string(), uuid_err );
+    assert_eq!(
+        "connection string `uuidRepresentation` option can be one of `csharpLegacy`, \
+         `javaLegacy`, or `pythonLegacy`. Received invalid `unknownLegacy`"
+            .to_string(),
+        uuid_err
+    );
 }
 
 async fn parse_uri_with_uuid_representation(uuid_repr: &str) -> Result<UuidRepresentation, String> {

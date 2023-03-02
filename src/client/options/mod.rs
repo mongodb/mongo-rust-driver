@@ -815,8 +815,9 @@ pub struct ConnectionString {
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
 
-    /// The `uuidRepresentation` to use when decoding UuidOld bindata types. This serves as a caching
-    /// mechanism. You must reference this option manually when you wish to use it with `to_uuid_with_representation`.
+    /// The `uuidRepresentation` to use when decoding UuidOld bindata types.  This is not used by
+    /// the driver; client code can use this when deserializing relevant values with
+    /// `to_uuid_with_representation`.
     pub uuid_representation: Option<UuidRepresentation>,
 
     wait_queue_timeout: Option<Duration>,
@@ -2121,17 +2122,22 @@ impl ConnectionString {
                     ))
                 }
             },
-            "uuidrepresentation" => {
-                match value.to_lowercase().as_str() {
-                    "csharplegacy" => self.uuid_representation = Some(UuidRepresentation::CSharpLegacy),
-                    "javalegacy" => self.uuid_representation = Some(UuidRepresentation::JavaLegacy),
-                    "pythonlegacy" => self.uuid_representation = Some(UuidRepresentation::PythonLegacy),
-                    _ => return Err(ErrorKind::InvalidArgument {
-                        message: format!("connection string `uuidRepresentation` option can be one of `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid `{value}`") 
+            "uuidrepresentation" => match value.to_lowercase().as_str() {
+                "csharplegacy" => self.uuid_representation = Some(UuidRepresentation::CSharpLegacy),
+                "javalegacy" => self.uuid_representation = Some(UuidRepresentation::JavaLegacy),
+                "pythonlegacy" => self.uuid_representation = Some(UuidRepresentation::PythonLegacy),
+                _ => {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: format!(
+                            "connection string `uuidRepresentation` option can be one of \
+                             `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid \
+                             `{}`",
+                            value
+                        ),
                     }
                     .into())
                 }
-            }
+            },
             "w" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
 
