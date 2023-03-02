@@ -2126,7 +2126,7 @@ impl ConnectionString {
                     "csharplegacy" => self.uuid_representation = Some(UuidRepresentation::CSharpLegacy),
                     "javalegacy" => self.uuid_representation = Some(UuidRepresentation::JavaLegacy),
                     "pythonlegacy" => self.uuid_representation = Some(UuidRepresentation::PythonLegacy),
-                    _ => return Err(ErrorKind::InvalidArgument { 
+                    _ => return Err(ErrorKind::InvalidArgument {
                         message: format!("connection string `uuidRepresentation` option can be one of `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid `{value}`") 
                     }
                     .into())
