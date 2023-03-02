@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bson::UuidRepresentation;
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
@@ -215,6 +216,41 @@ async fn parse_uri(option: &str, suggestion: Option<&str>) {
             };
         }
         Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn uuid_representations() {
+    let mut uuid_repr = parse_uri_with_uuid_representation("csharpLegacy")
+        .await
+        .expect("expected `csharpLegacy` to be a valid argument for `uuidRepresentation`");
+    assert_eq!(UuidRepresentation::CSharpLegacy, uuid_repr);
+
+    uuid_repr = parse_uri_with_uuid_representation("javaLegacy")
+        .await
+        .expect("expected `javaLegacy` to be a valid argument for `uuidRepresentation`");
+    assert_eq!(UuidRepresentation::JavaLegacy, uuid_repr);
+
+    uuid_repr = parse_uri_with_uuid_representation("pythonLegacy")
+        .await
+        .expect("expected `pythonLegacy` to be a valid argument for `uuidRepresentation`");
+    assert_eq!(UuidRepresentation::PythonLegacy, uuid_repr);
+
+    let uuid_err = parse_uri_with_uuid_representation("unknownLegacy")
+        .await
+        .expect_err("expect `unknownLegacy` to be an invalid argument for `uuidRepresentation`");
+    assert_eq!("connection string `uuidRepresentation` option can be one of `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid `unknownLegacy`".to_string(), uuid_err );
+}
+
+async fn parse_uri_with_uuid_representation(uuid_repr: &str) -> Result<UuidRepresentation, String> {
+    match ConnectionString::parse(format!(
+        "mongodb://localhost:27017/?uuidRepresentation={uuid_repr}"
+    ))
+    .map_err(|e| e.message().unwrap())
+    {
+        Ok(cs) => Ok(cs.uuid_representation.unwrap()),
+        Err(e) => Err(e),
     }
 }
 
