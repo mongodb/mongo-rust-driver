@@ -8,6 +8,7 @@ use crate::{
     runtime,
     test::{
         log_uncaptured,
+        spec::unified_runner::run_unified_tests,
         Event,
         EventHandler,
         FailCommandOptions,
@@ -21,15 +22,13 @@ use crate::{
     Client,
 };
 
-use crate::test::spec::unified_runner::run_unified_tests;
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["server-discovery-and-monitoring", "unified"])
-        // Skipped because the driver does not support socketTimeoutMS
-        .skipped_tests(&[
+        .skip_tests(&[
+            // The driver does not support socketTimeoutMS.
             "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
         ])

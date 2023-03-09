@@ -19,9 +19,9 @@ async fn run_unified() {
     let _guard = LOCK.run_concurrently().await;
     run_unified_tests(&["gridfs"])
         // The Rust driver doesn't support the disableMD5 option.
-        .skipped_files(&["upload-disableMD5.json"])
+        .skip_files(&["upload-disableMD5.json"])
         // The Rust driver doesn't support the contentType option.
-        .skipped_tests(&["upload when contentType is provided"])
+        .skip_tests(&["upload when contentType is provided"])
         .await;
 }
 

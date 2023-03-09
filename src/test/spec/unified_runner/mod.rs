@@ -6,10 +6,9 @@ pub(crate) mod test_event;
 pub(crate) mod test_file;
 pub(crate) mod test_runner;
 
-use std::{future::IntoFuture, path::Path};
+use std::future::IntoFuture;
 
 use futures::future::{BoxFuture, FutureExt};
-use semver::Version;
 use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
@@ -32,11 +31,8 @@ pub(crate) use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 13, 0);
-
-pub(crate) fn run_unified_tests(spec: &'static [&'static str]) -> RunUnifiedTestAction {
-    RunUnifiedTestAction {
+pub(crate) fn run_unified_tests(spec: &'static [&'static str]) -> RunUnifiedTestsAction {
+    RunUnifiedTestsAction {
         spec,
         skipped_files: None,
         skipped_tests: None,
@@ -44,18 +40,18 @@ pub(crate) fn run_unified_tests(spec: &'static [&'static str]) -> RunUnifiedTest
     }
 }
 
-type FileTransformation = Box<dyn Fn(&mut TestFile) + Send>;
-pub(crate) struct RunUnifiedTestAction {
+type FileTransformation = Box<dyn Fn(&mut TestFile) + Send + Sync>;
+pub(crate) struct RunUnifiedTestsAction {
     spec: &'static [&'static str],
     skipped_files: Option<&'static [&'static str]>,
     skipped_tests: Option<&'static [&'static str]>,
     file_transformation: Option<FileTransformation>,
 }
 
-impl RunUnifiedTestAction {
+impl RunUnifiedTestsAction {
     /// The files to skip deserializing. The provided filenames should only contain the filename and
     /// extension, e.g. "unacknowledged-writes.json". Filenames are matched case-sensitively.
-    pub(crate) fn skipped_files(self, skipped_files: &'static [&'static str]) -> Self {
+    pub(crate) fn skip_files(self, skipped_files: &'static [&'static str]) -> Self {
         Self {
             spec: self.spec,
             skipped_files: Some(skipped_files),
@@ -65,7 +61,7 @@ impl RunUnifiedTestAction {
     }
 
     /// The descriptions of the tests to skip. Test descriptions are matched case-sensitively.
-    pub(crate) fn skipped_tests(self, skipped_tests: &'static [&'static str]) -> Self {
+    pub(crate) fn skip_tests(self, skipped_tests: &'static [&'static str]) -> Self {
         Self {
             spec: self.spec,
             skipped_files: self.skipped_files,
@@ -75,9 +71,9 @@ impl RunUnifiedTestAction {
     }
 
     /// A transformation to apply to each test file prior to running the tests.
-    pub(crate) fn file_transformation(
+    pub(crate) fn transform_files(
         self,
-        file_transformation: impl Fn(&mut TestFile) + Send + 'static,
+        file_transformation: impl Fn(&mut TestFile) + Send + Sync + 'static,
     ) -> Self {
         Self {
             spec: self.spec,
@@ -88,40 +84,27 @@ impl RunUnifiedTestAction {
     }
 }
 
-impl IntoFuture for RunUnifiedTestAction {
+impl IntoFuture for RunUnifiedTestsAction {
     type Output = ();
     type IntoFuture = BoxFuture<'static, Self::Output>;
 
     fn into_future(self) -> Self::IntoFuture {
         async move {
-            for (path, mut test_file) in
+            for (mut test_file, path) in
                 deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files)
             {
                 if let Some(ref file_transformation) = self.file_transformation {
                     file_transformation(&mut test_file);
                 }
 
-                run_unified_test(&path, test_file, self.skipped_tests).await;
+                let test_runner = TestRunner::new().await;
+                test_runner
+                    .run_test(test_file, path, self.skipped_tests)
+                    .await;
             }
         }
         .boxed()
     }
-}
-
-async fn run_unified_test(
-    path: &Path,
-    test_file: TestFile,
-    skipped_tests: Option<&'static [&'static str]>,
-) {
-    assert!(
-        test_file.schema_version >= MIN_SPEC_VERSION
-            && test_file.schema_version <= MAX_SPEC_VERSION,
-        "Test runner not compatible with specification version {}",
-        &test_file.schema_version
-    );
-
-    let test_runner = TestRunner::new().await;
-    test_runner.run_test(test_file, path, skipped_tests).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -172,16 +155,21 @@ impl<'de> Deserialize<'de> for TestFileResult {
     }
 }
 
-/// Because the Rust driver enforces types in unified test files at both deserialization time and
-/// runtime, the valid-fail and invalid tests should succeed if an error occurs at either time.
+/// The test runner enforces the unified test format schema during both deserialization and
+/// execution.
 async fn expect_failures(spec: &[&str]) {
-    for (path, test_file_result) in deserialize_spec_tests::<TestFileResult>(spec, None) {
-        // If the test deserialized properly, then expect an error to occur at runtime.
+    for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, None) {
+        // If the test deserialized properly, then expect an error to occur during execution.
         if let TestFileResult::Ok(test_file) = test_file_result {
-            std::panic::AssertUnwindSafe(run_unified_test(&path, test_file, None))
-                .catch_unwind()
-                .await
-                .expect_err(&format!("Tests from {:?} should have failed", &path));
+            std::panic::AssertUnwindSafe(async {
+                TestRunner::new()
+                    .await
+                    .run_test(test_file, path.clone(), None)
+                    .await;
+            })
+            .catch_unwind()
+            .await
+            .expect_err(&format!("Tests from {:?} should have failed", &path));
         }
     }
 }

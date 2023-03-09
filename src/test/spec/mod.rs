@@ -48,7 +48,7 @@ use super::log_uncaptured;
 pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
     spec: &[&str],
     skipped_files: Option<&[&str]>,
-) -> Vec<(PathBuf, T)> {
+) -> Vec<(T, PathBuf)> {
     let dir_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
         .iter()
         .chain(spec.iter())
@@ -89,7 +89,7 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
             )
         });
 
-        tests.push((path, test));
+        tests.push((test, path));
     }
 
     tests
@@ -101,7 +101,7 @@ where
     G: Future<Output = ()>,
     T: DeserializeOwned,
 {
-    for (_, test_file) in deserialize_spec_tests(spec, None) {
+    for (test_file, _) in deserialize_spec_tests(spec, None) {
         run_test_file(test_file).await;
     }
 }

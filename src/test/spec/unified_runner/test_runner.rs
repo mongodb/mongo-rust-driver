@@ -1,7 +1,7 @@
-use std::{collections::HashMap, path::Path, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::TryStreamExt;
-
+use semver::Version;
 use tokio::sync::{mpsc, RwLock};
 
 use crate::{
@@ -73,6 +73,9 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "rewrapManyDataKey",
 ];
 
+static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 13, 0);
+
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
 #[derive(Clone)]
@@ -106,9 +109,16 @@ impl TestRunner {
     pub(crate) async fn run_test(
         &self,
         test_file: TestFile,
-        path: impl Into<Option<&Path>>,
+        path: impl Into<Option<PathBuf>>,
         skipped_tests: impl Into<Option<&'static [&'static str]>>,
     ) {
+        let schema_version = &test_file.schema_version;
+        assert!(
+            schema_version >= &MIN_SPEC_VERSION && schema_version <= &MAX_SPEC_VERSION,
+            "Test runner not compatible with specification version {}",
+            schema_version
+        );
+
         let skipped_tests = skipped_tests.into();
 
         let test_description = match path.into() {
@@ -151,7 +161,7 @@ impl TestRunner {
             if let Some(skipped_tests) = skipped_tests {
                 if skipped_tests.contains(&test_case.description.as_str()) {
                     log_uncaptured(format!(
-                        "Skipping test case {:?}: test skipped manually",
+                        "Skipping test case {}: test skipped manually",
                         &test_case.description
                     ));
                     continue;

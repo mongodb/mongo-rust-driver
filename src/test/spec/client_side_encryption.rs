@@ -16,7 +16,7 @@ async fn run_unified() {
     let skipped_tests = &[];
 
     run_unified_tests(&["client-side-encryption", "unified"])
-        .skipped_tests(skipped_tests)
+        .skip_tests(skipped_tests)
         .await;
 }
 
@@ -27,11 +27,11 @@ async fn run_legacy() {
 
     // TODO RUST-528: Unskip timeoutMS.json when CSOT is implemented.
     #[cfg(not(feature = "openssl-tls"))]
-    let skipped_tests = &["timeoutMS.json", "kmipKMS.json"];
+    let skipped_files = &["timeoutMS.json", "kmipKMS.json"];
     #[cfg(feature = "openssl-tls")]
-    let skipped_tests = &["timeoutMS.json"];
+    let skipped_files = &["timeoutMS.json"];
 
     run_v2_tests(&["client-side-encryption", "legacy"])
-        .skipped_files(skipped_tests)
+        .skip_files(skipped_files)
         .await;
 }

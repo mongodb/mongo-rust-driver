@@ -59,7 +59,7 @@ pub(crate) struct RunV2TestsAction {
 
 impl RunV2TestsAction {
     #[cfg(feature = "in-use-encryption-unstable")]
-    pub(crate) fn skipped_files(self, skipped_files: &'static [&'static str]) -> Self {
+    pub(crate) fn skip_files(self, skipped_files: &'static [&'static str]) -> Self {
         Self {
             spec: self.spec,
             skipped_files: Some(skipped_files),
@@ -76,7 +76,7 @@ impl IntoFuture for RunV2TestsAction {
             for (path, test_file) in
                 deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files)
             {
-                run_v2_test(path, test_file).await;
+                run_v2_test(test_file, path).await;
             }
         }
         .boxed()
