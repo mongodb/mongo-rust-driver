@@ -815,9 +815,9 @@ pub struct ConnectionString {
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
 
-    /// The `uuidRepresentation` to use when decoding UuidOld bindata types.  This is not used by
-    /// the driver; client code can use this when deserializing relevant values with
-    /// `to_uuid_with_representation`.
+    /// The [`UuidRepresentation`] to use when decoding [`Binary`] values with the UuidOld subtype.
+    /// This is not used by the driver; client code can use this when deserializing relevant
+    /// values with [`Binary::to_uuid_with_representation`].
     pub uuid_representation: Option<UuidRepresentation>,
 
     wait_queue_timeout: Option<Duration>,
