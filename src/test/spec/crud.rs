@@ -6,10 +6,10 @@ use crate::test::{spec::unified_runner::run_unified_tests, LOCK};
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     run_unified_tests(&["crud", "unified"])
-        // The Rust driver does not support unacknowledged writes (and does not intend to in the future).
         .skipped_files(&[
+            // The Rust driver does not support unacknowledged writes (and does not intend to in
+            // the future).
             "bulkWrite-deleteMany-hint-unacknowledged.json",
             "bulkWrite-deleteOne-hint-unacknowledged.json",
             "bulkWrite-replaceOne-hint-unacknowledged.json",
@@ -25,6 +25,9 @@ async fn run() {
             "updateOne-hint-unacknowledged.json",
         ])
         .skipped_tests(&[
+            // Unacknowledged write; see above.
+            "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected \
+             on pre-5.0 server",
             // TODO RUST-663: Unskip these tests.
             "Aggregate with $out includes read preference for 5.0+ server",
             "Aggregate with $out omits read preference for pre-5.0 server",
@@ -32,8 +35,6 @@ async fn run() {
             "Aggregate with $merge omits read preference for pre-5.0 server",
             "Database-level aggregate with $out omits read preference for pre-5.0 server",
             "Database-level aggregate with $merge omits read preference for pre-5.0 server",
-            // Unacknowledged write; see above.
-            "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected on pre-5.0 server",
         ])
         .await;
 }
