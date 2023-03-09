@@ -214,7 +214,7 @@ impl Message {
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+    pub async fn write_to<T: AsyncWrite + Unpin + Send>(&self, stream: &mut T) -> Result<()> {
         let mut writer = BufWriter::new(stream);
         let mut sections_bytes = Vec::new();
 
