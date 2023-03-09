@@ -250,7 +250,8 @@ async fn uuid_representations() {
 
 async fn parse_uri_with_uuid_representation(uuid_repr: &str) -> Result<UuidRepresentation, String> {
     match ConnectionString::parse(format!(
-        "mongodb://localhost:27017/?uuidRepresentation={uuid_repr}"
+        "mongodb://localhost:27017/?uuidRepresentation={}",
+        uuid_repr
     ))
     .map_err(|e| e.message().unwrap())
     {
