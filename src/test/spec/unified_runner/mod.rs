@@ -44,11 +44,12 @@ pub(crate) fn run_unified_tests(spec: &'static [&'static str]) -> RunUnifiedTest
     }
 }
 
+type FileTransformation = Box<dyn Fn(&mut TestFile) + Send>;
 pub(crate) struct RunUnifiedTestAction {
     spec: &'static [&'static str],
     skipped_files: Option<&'static [&'static str]>,
     skipped_tests: Option<&'static [&'static str]>,
-    file_transformation: Option<Box<dyn Fn(&mut TestFile) + Send>>,
+    file_transformation: Option<FileTransformation>,
 }
 
 impl RunUnifiedTestAction {

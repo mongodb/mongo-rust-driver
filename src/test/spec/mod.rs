@@ -55,7 +55,8 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
         .collect();
 
     let mut tests = vec![];
-    for entry in read_dir(&dir_path).expect(&format!("Failed to read directory at {:?}", &dir_path))
+    for entry in read_dir(&dir_path)
+        .unwrap_or_else(|e| panic!("Failed to read directory at {:?}: {}", &dir_path, e))
     {
         let path = entry.unwrap().path();
         let Some(filename) = path.file_name().and_then(OsStr::to_str).filter(|name| name.ends_with(".json")) else {
@@ -69,18 +70,24 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
             }
         }
 
-        let file = File::open(&path).expect(&format!("Failed to open file at {:?}", &path));
+        let file = File::open(&path)
+            .unwrap_or_else(|e| panic!("Failed to open file at {:?}: {}", &path, e));
 
         // Use BSON as an intermediary to deserialize extended JSON properly.
-        let test_bson: Bson = serde_json::from_reader(file).expect(&format!(
-            "Failed to deserialize test JSON to BSON in {:?}",
-            &path
-        ));
-        let test: T = bson::from_bson(test_bson).expect(&format!(
-            "Failed to deserialize test BSON to {} in {:?}",
-            type_name::<T>(),
-            &path
-        ));
+        let test_bson: Bson = serde_json::from_reader(file).unwrap_or_else(|e| {
+            panic!(
+                "Failed to deserialize test JSON to BSON in {:?}: {}",
+                &path, e
+            )
+        });
+        let test: T = bson::from_bson(test_bson).unwrap_or_else(|e| {
+            panic!(
+                "Failed to deserialize test BSON to {} in {:?}: {}",
+                type_name::<T>(),
+                &path,
+                e
+            )
+        });
 
         tests.push((path, test));
     }
