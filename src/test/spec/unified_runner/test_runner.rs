@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::Path, sync::Arc, time::Duration};
 
 use futures::TryStreamExt;
 
@@ -24,7 +24,7 @@ use crate::{
         spec::unified_runner::{
             entity::EventList,
             matcher::events_match,
-            test_file::{ExpectedEventType, TestCase, TestFile},
+            test_file::{ExpectedEventType, TestFile},
         },
         update_options_for_testing,
         util::FailPointGuard,
@@ -105,15 +105,16 @@ impl TestRunner {
 
     pub(crate) async fn run_test(
         &self,
-        path: impl Into<Option<PathBuf>>,
         test_file: TestFile,
-        pred: impl Fn(&TestCase) -> bool,
+        path: impl Into<Option<&Path>>,
+        skipped_tests: impl Into<Option<&'static [&'static str]>>,
     ) {
-        let path = path.into();
-        let file_title = path
-            .as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| test_file.description.clone());
+        let skipped_tests = skipped_tests.into();
+
+        let test_description = match path.into() {
+            Some(path) => format!("{} ({:?})", &test_file.description, path),
+            None => test_file.description.clone(),
+        };
 
         if let Some(ref requirements) = test_file.run_on_requirements {
             let mut can_run_on = false;
@@ -126,15 +127,15 @@ impl TestRunner {
             }
             if !can_run_on {
                 file_level_log(format!(
-                    "Skipping file {}: client topology not compatible with test ({})",
-                    file_title,
+                    "Skipping {}: client topology not compatible with test ({})",
+                    test_description,
                     run_on_errors.join(","),
                 ));
                 return;
             }
         }
 
-        file_level_log(format!("Running tests from {}", file_title));
+        file_level_log(format!("Running tests from {}", test_description));
 
         for test_case in &test_file.tests {
             if let Ok(description) = std::env::var("TEST_DESCRIPTION") {
@@ -143,6 +144,16 @@ impl TestRunner {
                     .to_lowercase()
                     .contains(&description.to_lowercase())
                 {
+                    continue;
+                }
+            }
+
+            if let Some(skipped_tests) = skipped_tests {
+                if skipped_tests.contains(&test_case.description.as_str()) {
+                    log_uncaptured(format!(
+                        "Skipping test case {:?}: test skipped manually",
+                        &test_case.description
+                    ));
                     continue;
                 }
             }
@@ -164,14 +175,6 @@ impl TestRunner {
                 log_uncaptured(format!(
                     "Skipping test case {:?}: unsupported operation {}",
                     &test_case.description, op
-                ));
-                continue;
-            }
-
-            if !pred(test_case) {
-                log_uncaptured(format!(
-                    "Skipping test case {:?}: predicate failed",
-                    test_case.description
                 ));
                 continue;
             }

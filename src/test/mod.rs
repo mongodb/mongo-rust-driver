@@ -21,7 +21,7 @@ pub(crate) mod util;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 pub(crate) use self::{
-    spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
+    spec::{run_spec_test, RunOn, Serverless, Topology},
     util::{
         assert_matches,
         eq_matches,

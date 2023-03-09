@@ -1,5 +1,5 @@
 use super::subscriber::EventSubscriber;
-use crate::test::spec::unified_runner::{TestCase, TestFileEntity};
+use crate::test::spec::unified_runner::{test_file::TestCase, TestFileEntity};
 use serde::Serialize;
 use std::{
     collections::HashMap,

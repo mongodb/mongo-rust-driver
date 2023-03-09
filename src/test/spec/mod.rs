@@ -28,28 +28,65 @@ mod versioned_api;
 mod write_error;
 
 use std::{
-    convert::TryFrom,
+    any::type_name,
     ffi::OsStr,
-    fs::{self, File},
+    fs::{read_dir, File},
     future::Future,
     path::PathBuf,
 };
 
-pub(crate) use self::{
-    unified_runner::{
-        merge_uri_options,
-        run_unified_format_test,
-        run_unified_format_test_filtered,
-        ExpectedEventType,
-        Topology,
-    },
-    v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
-};
-
 use serde::{de::DeserializeOwned, Deserialize};
-use serde_json::Value;
 
+pub(crate) use self::{
+    unified_runner::{merge_uri_options, ExpectedEventType, Topology},
+    v2_runner::{operation::Operation, test_file::RunOn},
+};
 use crate::{bson::Bson, test::SERVERLESS};
+
+use super::log_uncaptured;
+
+pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
+    spec: &[&str],
+    skipped_files: Option<&[&str]>,
+) -> Vec<(PathBuf, T)> {
+    let dir_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
+        .iter()
+        .chain(spec.iter())
+        .collect();
+
+    let mut tests = vec![];
+    for entry in read_dir(&dir_path).expect(&format!("Failed to read directory at {:?}", &dir_path))
+    {
+        let path = entry.unwrap().path();
+        let Some(filename) = path.file_name().and_then(OsStr::to_str).filter(|name| name.ends_with(".json")) else {
+            continue;
+        };
+
+        if let Some(skipped_files) = skipped_files {
+            if skipped_files.contains(&filename) {
+                log_uncaptured(format!("Skipping deserializing {:?}", &path));
+                continue;
+            }
+        }
+
+        let file = File::open(&path).expect(&format!("Failed to open file at {:?}", &path));
+
+        // Use BSON as an intermediary to deserialize extended JSON properly.
+        let test_bson: Bson = serde_json::from_reader(file).expect(&format!(
+            "Failed to deserialize test JSON to BSON in {:?}",
+            &path
+        ));
+        let test: T = bson::from_bson(test_bson).expect(&format!(
+            "Failed to deserialize test BSON to {} in {:?}",
+            type_name::<T>(),
+            &path
+        ));
+
+        tests.push((path, test));
+    }
+
+    tests
+}
 
 pub(crate) async fn run_spec_test<T, F, G>(spec: &[&str], run_test_file: F)
 where
@@ -57,75 +94,9 @@ where
     G: Future<Output = ()>,
     T: DeserializeOwned,
 {
-    run_spec_test_with_path(spec, |_, t| run_test_file(t)).await
-}
-
-pub(crate) async fn run_spec_test_with_path<T, F, G>(spec: &[&str], run_test_file: F)
-where
-    F: Fn(PathBuf, T) -> G,
-    G: Future<Output = ()>,
-    T: DeserializeOwned,
-{
-    let base_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
-        .iter()
-        .chain(spec.iter())
-        .collect();
-
-    for entry in fs::read_dir(&base_path).unwrap_or_else(|_| panic!("reading {:?}", base_path)) {
-        let test_file = entry.unwrap();
-
-        if !test_file.file_type().unwrap().is_file() {
-            continue;
-        }
-
-        let test_file_path = PathBuf::from(test_file.file_name());
-        if test_file_path.extension().and_then(OsStr::to_str) != Some("json") {
-            continue;
-        }
-
-        let test_file_full_path = base_path.join(&test_file_path);
-        run_single_test_with_path(test_file_full_path, &run_test_file).await;
+    for (_, test_file) in deserialize_spec_tests(spec, None) {
+        run_test_file(test_file).await;
     }
-}
-
-pub(crate) async fn run_single_test<T, F, G>(path: PathBuf, run_test_file: &F)
-where
-    F: Fn(PathBuf, T) -> G,
-    G: Future<Output = ()>,
-    T: DeserializeOwned,
-{
-    run_single_test_with_path(path, run_test_file).await
-}
-
-pub(crate) async fn run_single_test_with_path<T, F, G>(path: PathBuf, run_test_file: &F)
-where
-    F: Fn(PathBuf, T) -> G,
-    G: Future<Output = ()>,
-    T: DeserializeOwned,
-{
-    let mut json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap())
-        .unwrap_or_else(|err| panic!("{}: {}", path.display(), err));
-
-    // TODO RUST-36 Remove this when decimal128 support is implemented
-    if path.ends_with("client-side-encryption/legacy/types.json") {
-        strip_decimal128_test(&mut json);
-    }
-
-    run_test_file(
-        path.clone(),
-        bson::from_bson(
-            Bson::try_from(json).unwrap_or_else(|err| panic!("{}: {}", path.display(), err)),
-        )
-        .unwrap_or_else(|e| panic!("{}: {}", path.display(), e)),
-    )
-    .await
-}
-
-fn strip_decimal128_test(json: &mut Value) {
-    json["tests"]
-        .as_array_mut()
-        .unwrap()
-        .retain(|test| test["description"] != "type=decimal");
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

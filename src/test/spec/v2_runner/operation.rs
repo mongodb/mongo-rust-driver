@@ -43,7 +43,7 @@ use crate::{
     IndexModel,
 };
 
-pub(crate) trait TestOperation: Debug {
+pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_on_collection<'a>(
         &'a self,
         _collection: &'a Collection<Document>,

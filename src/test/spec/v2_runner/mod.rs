@@ -4,8 +4,9 @@ pub(crate) mod operation;
 pub(crate) mod test_event;
 pub(crate) mod test_file;
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{future::IntoFuture, ops::Deref, sync::Arc, time::Duration};
 
+use futures::{future::BoxFuture, FutureExt};
 use semver::VersionReq;
 
 use crate::{
@@ -20,6 +21,7 @@ use crate::{
         assert_matches,
         file_level_log,
         log_uncaptured,
+        spec::deserialize_spec_tests,
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
@@ -43,7 +45,45 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "mapReduce",
 ];
 
-pub(crate) async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
+pub(crate) fn run_v2_tests(spec: &'static [&'static str]) -> RunV2TestsAction {
+    RunV2TestsAction {
+        spec,
+        skipped_files: None,
+    }
+}
+
+pub(crate) struct RunV2TestsAction {
+    spec: &'static [&'static str],
+    skipped_files: Option<&'static [&'static str]>,
+}
+
+impl RunV2TestsAction {
+    #[cfg(feature = "in-use-encryption-unstable")]
+    pub(crate) fn skipped_files(self, skipped_files: &'static [&'static str]) -> Self {
+        Self {
+            spec: self.spec,
+            skipped_files: Some(skipped_files),
+        }
+    }
+}
+
+impl IntoFuture for RunV2TestsAction {
+    type Output = ();
+    type IntoFuture = BoxFuture<'static, Self::Output>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        async move {
+            for (path, test_file) in
+                deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files)
+            {
+                run_v2_test(path, test_file).await;
+            }
+        }
+        .boxed()
+    }
+}
+
+async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     let internal_client = TestClient::new().await;
 
     file_level_log(format!("Running tests from {}", path.display(),));

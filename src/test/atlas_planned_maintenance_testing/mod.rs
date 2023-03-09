@@ -80,7 +80,7 @@ async fn execute_workload(test_runner: &mut TestRunner, workload: Value) -> Vec<
 
     log_uncaptured("Running planned maintenance tests");
 
-    if AssertUnwindSafe(test_runner.run_test(None, test_file, |_| true))
+    if AssertUnwindSafe(test_runner.run_test(test_file, None, None))
         .catch_unwind()
         .await
         .is_err()

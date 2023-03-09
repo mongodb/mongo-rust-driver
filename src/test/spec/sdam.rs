@@ -3,7 +3,6 @@ use std::{sync::Arc, time::Duration};
 use bson::{doc, Document};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use super::{run_spec_test_with_path, run_unified_format_test_filtered};
 use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
@@ -22,24 +21,19 @@ use crate::{
     Client,
 };
 
+use crate::test::spec::unified_runner::run_unified_tests;
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test_with_path(
-        &["server-discovery-and-monitoring", "unified"],
-        |path, t| {
-            run_unified_format_test_filtered(path, t, |test| {
-                // skipped because we don't support socketTimeoutMS
-                !&[
-                    "Reset server and pool after network timeout error during authentication",
-                    "Ignore network timeout error on find",
-                ]
-                .contains(&test.description.as_str())
-            })
-        },
-    )
-    .await;
+    run_unified_tests(&["server-discovery-and-monitoring", "unified"])
+        // Skipped because the driver does not support socketTimeoutMS
+        .skipped_tests(&[
+            "Reset server and pool after network timeout error during authentication",
+            "Ignore network timeout error on find",
+        ])
+        .await;
 }
 
 /// Streaming protocol prose test 1 from SDAM spec tests.
