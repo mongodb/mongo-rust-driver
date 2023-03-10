@@ -27,7 +27,6 @@ use crate::{
     },
     options::{ServerAddress, TlsOptions},
     runtime::AsyncStream,
-    Header,
 };
 pub use command::{Command, RawCommand, RawCommandResponse};
 pub(crate) use stream_description::StreamDescription;
