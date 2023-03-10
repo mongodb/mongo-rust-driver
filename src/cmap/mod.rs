@@ -15,9 +15,10 @@ use derivative::Derivative;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
+pub use self::conn::Command;
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
-    conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
+    conn::{Connection, RawCommand, RawCommandResponse, StreamDescription},
     establish::{handshake::Handshaker, EstablishError},
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
@@ -27,11 +28,8 @@ use crate::{
     bson::oid::ObjectId,
     error::{Error, Result},
     event::cmap::{
-        CmapEventHandler,
-        ConnectionCheckoutFailedEvent,
-        ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent,
-        PoolCreatedEvent,
+        CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
+        ConnectionCheckoutStartedEvent, PoolCreatedEvent,
     },
     options::ServerAddress,
     runtime::HttpClient,

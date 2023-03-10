@@ -17,7 +17,7 @@ use crate::{
 
 /// A command that has been serialized to BSON.
 #[derive(Debug)]
-pub(crate) struct RawCommand {
+pub struct RawCommand {
     pub(crate) name: String,
     pub(crate) target_db: String,
     pub(crate) bytes: Vec<u8>,
@@ -32,16 +32,16 @@ impl RawCommand {
 
 /// Driver-side model of a database command.
 #[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Command<T = Document> {
+pub struct Command<T = Document> {
     #[serde(skip)]
     pub(crate) name: String,
 
     #[serde(flatten)]
     pub(crate) body: T,
 
-    #[serde(rename = "$db")]
+    #[serde(rename = "$db", default)]
     pub(crate) target_db: String,
 
     lsid: Option<Document>,
@@ -173,7 +173,7 @@ impl<T> Command<T> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RawCommandResponse {
+pub struct RawCommandResponse {
     pub(crate) source: ServerAddress,
     raw: RawDocumentBuf,
 }

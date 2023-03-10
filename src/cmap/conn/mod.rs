@@ -21,18 +21,15 @@ use crate::{
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
-        ConnectionCheckedInEvent,
-        ConnectionCheckedOutEvent,
-        ConnectionClosedEvent,
-        ConnectionClosedReason,
-        ConnectionCreatedEvent,
+        CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+        ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
     options::{ServerAddress, TlsOptions},
     runtime::AsyncStream,
+    Header,
 };
-pub(crate) use command::{Command, RawCommand, RawCommandResponse};
+pub use command::{Command, RawCommand, RawCommandResponse};
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
 

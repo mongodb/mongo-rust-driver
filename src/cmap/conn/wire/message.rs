@@ -16,7 +16,7 @@ use futures_util::{
     AsyncReadExt, AsyncWriteExt,
 };
 use serde::{Deserialize, Serialize};
-use std::io::Read;
+use std::io::{BufRead, Read};
 
 /// Represents an OP_MSG wire protocol operation.
 #[allow(missing_docs)]
@@ -340,11 +340,17 @@ impl MessageSection {
         let size = reader.read_i32()?;
         let mut length_remaining = size - std::mem::size_of::<i32>() as i32;
 
-        let mut identifier = String::new();
-        length_remaining -= reader.read_to_string(&mut identifier)? as i32;
+        //let mut identifier = String::new();
+        let mut identifier_vec = Vec::new();
+        let mut buf_read = std::io::BufReader::new(reader);
+        let n = buf_read.read_until(0x00, &mut identifier_vec)?;
+        identifier_vec.pop();
+        let identifier = String::from_utf8(identifier_vec).unwrap_or_default();
+        //length_remaining -= reader.read_to_string(&mut identifier).unwrap_or_default() as i32;
+        length_remaining -= n as i32;
 
         let mut documents = Vec::new();
-        let mut count_reader = SyncCountReader::new(reader);
+        let mut count_reader = SyncCountReader::new(buf_read.by_ref());
 
         while length_remaining > count_reader.bytes_read() as i32 {
             documents.push(bson_util::read_document_bytes(&mut count_reader)?);

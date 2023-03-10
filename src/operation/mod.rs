@@ -157,7 +157,7 @@ pub(crate) trait Operation {
     }
 }
 
-pub(crate) trait CommandBody: Serialize {
+pub trait CommandBody: Serialize {
     fn should_redact(&self) -> bool {
         false
     }
