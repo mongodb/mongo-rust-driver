@@ -8,10 +8,16 @@ use crate::{
     gridfs::{GridFsBucket, GridFsUploadStream},
     options::{GridFsBucketOptions, GridFsUploadOptions},
     runtime,
-    test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        spec::unified_runner::run_unified_tests,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
 };
-
-use crate::test::spec::unified_runner::run_unified_tests;
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
