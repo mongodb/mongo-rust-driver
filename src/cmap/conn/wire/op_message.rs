@@ -12,7 +12,7 @@ use futures_util::{
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[allow(missing_docs)]
 pub struct ReplyOp {
     pub flags: MessageFlags,
@@ -22,10 +22,10 @@ pub struct ReplyOp {
     pub documents: Vec<Document>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[allow(missing_docs)]
 pub struct QueryOp {
-    pub(crate) flags: MessageFlags,
+    pub flags: MessageFlags,
     pub collection: String,
     pub skip: i32,
     pub limit: i32,

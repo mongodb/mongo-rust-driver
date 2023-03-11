@@ -23,7 +23,7 @@ use std::io::{BufRead, Read};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
     pub response_to: i32,
-    pub(crate) flags: MessageFlags,
+    pub flags: MessageFlags,
     pub sections: Vec<MessageSection>,
     pub checksum: Option<u32>,
     pub request_id: Option<i32>,
