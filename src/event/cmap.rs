@@ -11,7 +11,9 @@ use derive_more::From;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
-    connection::ConnectionTracingEventEmitter, trace_or_log_enabled, TracingOrLogLevel,
+    connection::ConnectionTracingEventEmitter,
+    trace_or_log_enabled,
+    TracingOrLogLevel,
     CONNECTION_TRACING_EVENT_TARGET,
 };
 
