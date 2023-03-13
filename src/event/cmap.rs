@@ -11,9 +11,7 @@ use derive_more::From;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
-    connection::ConnectionTracingEventEmitter,
-    trace_or_log_enabled,
-    TracingOrLogLevel,
+    connection::ConnectionTracingEventEmitter, trace_or_log_enabled, TracingOrLogLevel,
     CONNECTION_TRACING_EVENT_TARGET,
 };
 
@@ -60,7 +58,7 @@ pub struct ConnectionPoolOptions {
     /// The maximum number of connections that the pool can have at a given time. This includes
     /// connections which are currently checked out of the pool.
     ///
-    /// The default is 100.
+    /// The default is 10.
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that the pool can have at a given time. This includes
