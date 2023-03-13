@@ -15,6 +15,7 @@ use std::{
     time::Duration,
 };
 
+use bson::UuidRepresentation;
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
@@ -74,6 +75,7 @@ const URI_OPTIONS: &[&str] = &[
     "tlsallowinvalidcertificates",
     "tlscafile",
     "tlscertificatekeyfile",
+    "uuidRepresentation",
     "w",
     "waitqueuetimeoutms",
     "wtimeoutms",
@@ -812,6 +814,12 @@ pub struct ConnectionString {
 
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
+
+    /// The [`UuidRepresentation`] to use when decoding [`Binary`](bson::Binary) values with the
+    /// [`UuidOld`](bson::spec::BinarySubtype::UuidOld) subtype. This is not used by the
+    /// driver; client code can use this when deserializing relevant values with
+    /// [`Binary::to_uuid_with_representation`](bson::binary::Binary::to_uuid_with_representation).
+    pub uuid_representation: Option<UuidRepresentation>,
 
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
@@ -2113,6 +2121,22 @@ impl ConnectionString {
                             .cert_key_file_path(PathBuf::from(value))
                             .build(),
                     ))
+                }
+            },
+            "uuidrepresentation" => match value.to_lowercase().as_str() {
+                "csharplegacy" => self.uuid_representation = Some(UuidRepresentation::CSharpLegacy),
+                "javalegacy" => self.uuid_representation = Some(UuidRepresentation::JavaLegacy),
+                "pythonlegacy" => self.uuid_representation = Some(UuidRepresentation::PythonLegacy),
+                _ => {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: format!(
+                            "connection string `uuidRepresentation` option can be one of \
+                             `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid \
+                             `{}`",
+                            value
+                        ),
+                    }
+                    .into())
                 }
             },
             "w" => {
