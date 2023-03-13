@@ -447,7 +447,7 @@ pub struct ClientOptions {
     /// `max_pool_size` connections are checked out, the operation will block until an in-progress
     /// operation finishes and its connection is checked back into the pool.
     ///
-    /// The default value is 100.
+    /// The default value is 10.
     #[builder(default)]
     pub max_pool_size: Option<u32>,
 
