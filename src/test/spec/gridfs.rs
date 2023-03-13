@@ -9,8 +9,7 @@ use crate::{
     options::{GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
-        run_spec_test_with_path,
-        spec::unified_runner::{run_unified_format_test_filtered, TestCase},
+        spec::unified_runner::run_unified_tests,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -22,19 +21,14 @@ use crate::{
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn run() {
+async fn run_unified() {
     let _guard = LOCK.run_concurrently().await;
-    run_spec_test_with_path(&["gridfs"], |path, f| {
-        run_unified_format_test_filtered(path, f, test_predicate)
-    })
-    .await;
-}
-
-fn test_predicate(test: &TestCase) -> bool {
-    let lower = test.description.to_lowercase();
-
-    // The Rust driver doesn't support the disableMD5 and contentType options for upload.
-    !lower.contains("sans md5") && !lower.contains("contenttype")
+    run_unified_tests(&["gridfs"])
+        // The Rust driver doesn't support the disableMD5 option.
+        .skip_files(&["upload-disableMD5.json"])
+        // The Rust driver doesn't support the contentType option.
+        .skip_tests(&["upload when contentType is provided"])
+        .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

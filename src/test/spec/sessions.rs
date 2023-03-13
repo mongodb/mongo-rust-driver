@@ -10,17 +10,15 @@ use crate::{
     error::{ErrorKind, Result},
     event::command::{CommandEventHandler, CommandStartedEvent},
     options::SessionOptions,
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
+    test::{spec::unified_runner::run_unified_tests, TestClient, CLIENT_OPTIONS, LOCK},
     Client,
 };
-
-use super::{run_spec_test_with_path, run_unified_format_test};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test_with_path(&["sessions"], run_unified_format_test).await;
+    run_unified_tests(&["sessions"]).await;
 }
 
 // Sessions prose test 1

@@ -1,12 +1,10 @@
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::LOCK;
-
-use super::{run_spec_test_with_path, run_unified_format_test};
+use crate::test::{spec::unified_runner::run_unified_tests, LOCK};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn run() {
+async fn run_unified() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_spec_test_with_path(&["versioned-api"], run_unified_format_test).await;
+    run_unified_tests(&["versioned-api"]).await;
 }

@@ -1,3 +1,5 @@
+use std::{collections::HashMap, iter, sync::Arc, time::Duration};
+
 use crate::{
     bson::{doc, Document},
     client::options::ServerAddress,
@@ -21,7 +23,7 @@ use crate::{
     },
     test::{
         log_uncaptured,
-        run_spec_test_with_path,
+        spec::unified_runner::run_unified_tests,
         TestClient,
         CLIENT_OPTIONS,
         DEFAULT_GLOBAL_TRACING_HANDLER,
@@ -35,9 +37,6 @@ use crate::{
     },
     TopologyType,
 };
-use std::{collections::HashMap, iter, sync::Arc, time::Duration};
-
-use super::{run_unified_format_test_filtered, unified_runner::TestCase};
 
 #[test]
 fn tracing_truncation() {
@@ -497,53 +496,45 @@ fn topology_description_tracing_representation() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_unified() {
     let _guard = LOCK.run_exclusively().await;
-    // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
-    let test_predicate = |tc: &TestCase| {
-        tc.description
-            != "An unacknowledged write generates a succeeded log message with ok: 1 reply"
-    };
-
-    run_spec_test_with_path(
-        &["command-logging-and-monitoring", "logging"],
-        |path, file| run_unified_format_test_filtered(path, file, test_predicate),
-    )
-    .await;
+    run_unified_tests(&["command-logging-and-monitoring", "logging"])
+        // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
+        .skip_tests(&[
+            "An unacknowledged write generates a succeeded log message with ok: 1 reply",
+        ])
+        .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn connection_logging_unified() {
-    let test_predicate = |tc: &TestCase|
-        // TODO: RUST-1096 Unskip when configurable maxConnecting is added.
-        tc.description != "maxConnecting should be included in connection pool created message when specified" &&
-        // We don't support any of these options (and are unlikely to ever support them).
-        tc.description != "waitQueueTimeoutMS should be included in connection pool created message when specified" &&
-        tc.description != "waitQueueSize should be included in connection pool created message when specified" &&
-        tc.description != "waitQueueMultiple should be included in connection pool created message when specified";
-
     let _guard = LOCK.run_exclusively().await;
-
-    run_spec_test_with_path(
-        &["connection-monitoring-and-pooling", "logging"],
-        |path, file| run_unified_format_test_filtered(path, file, test_predicate),
-    )
-    .await;
+    run_unified_tests(&["connection-monitoring-and-pooling", "logging"])
+        .skip_tests(&[
+            // TODO: RUST-1096 Unskip when configurable maxConnecting is added.
+            "maxConnecting should be included in connection pool created message when specified",
+            // We don't support any of these options (and are unlikely ever to support them).
+            "waitQueueTimeoutMS should be included in connection pool created message when \
+             specified",
+            "waitQueueSize should be included in connection pool created message when specified",
+            "waitQueueMultiple should be included in connection pool created message when \
+             specified",
+        ])
+        .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_logging_unified() {
-    let test_predicate = |tc: &TestCase|
-        // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite support.
-        tc.description != "Successful bulkWrite operation: log messages have operationIds" &&
-        tc.description != "Failed bulkWrite operation: log messages have operationIds" &&
-        // TODO: RUST-1585 Unskip these tests (they are currently flaky on certain topologies due to performing extra
-        // server selections to check for support.)
-        tc.description != "Failure due to unreachable server";
-
     let _guard = LOCK.run_exclusively().await;
-    run_spec_test_with_path(&["server-selection", "logging"], |path, file| {
-        run_unified_format_test_filtered(path, file, test_predicate)
-    })
-    .await;
+    run_unified_tests(&["server-selection", "logging"])
+        .skip_tests(&[
+            // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite
+            // support.
+            "Successful bulkWrite operation: log messages have operationIds",
+            "Failed bulkWrite operation: log messages have operationIds",
+            // TODO: RUST-1585 Unskip these tests (they are currently flaky on certain topologies
+            // due to performing extra server selections to check for support.)
+            "Failure due to unreachable server",
+        ])
+        .await;
 }

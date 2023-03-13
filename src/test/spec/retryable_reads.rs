@@ -13,6 +13,7 @@ use crate::{
     runtime::AsyncJoinHandle,
     test::{
         log_uncaptured,
+        spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
         Event,
         EventHandler,
         FailCommandOptions,
@@ -24,20 +25,18 @@ use crate::{
     },
 };
 
-use super::{run_spec_test_with_path, run_unified_format_test, run_v2_test};
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test_with_path(&["retryable-reads", "legacy"], run_v2_test).await;
+    run_v2_tests(&["retryable-reads", "legacy"]).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test_with_path(&["retryable-reads", "unified"], run_unified_format_test).await;
+    run_unified_tests(&["retryable-reads", "unified"]).await;
 }
 
 /// Test ensures that the connection used in the first attempt of a retry is released back into the
