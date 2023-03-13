@@ -60,7 +60,7 @@ pub struct ConnectionPoolOptions {
     /// The maximum number of connections that the pool can have at a given time. This includes
     /// connections which are currently checked out of the pool.
     ///
-    /// The default is 100.
+    /// The default is 10.
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that the pool can have at a given time. This includes
