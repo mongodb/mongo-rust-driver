@@ -53,20 +53,16 @@ impl RunUnifiedTestsAction {
     /// extension, e.g. "unacknowledged-writes.json". Filenames are matched case-sensitively.
     pub(crate) fn skip_files(self, skipped_files: &'static [&'static str]) -> Self {
         Self {
-            spec: self.spec,
             skipped_files: Some(skipped_files),
-            skipped_tests: self.skipped_tests,
-            file_transformation: self.file_transformation,
+            ..self
         }
     }
 
     /// The descriptions of the tests to skip. Test descriptions are matched case-sensitively.
     pub(crate) fn skip_tests(self, skipped_tests: &'static [&'static str]) -> Self {
         Self {
-            spec: self.spec,
-            skipped_files: self.skipped_files,
             skipped_tests: Some(skipped_tests),
-            file_transformation: self.file_transformation,
+            ..self
         }
     }
 
@@ -76,10 +72,8 @@ impl RunUnifiedTestsAction {
         file_transformation: impl Fn(&mut TestFile) + Send + Sync + 'static,
     ) -> Self {
         Self {
-            spec: self.spec,
-            skipped_files: self.skipped_files,
-            skipped_tests: self.skipped_tests,
             file_transformation: Some(Box::new(file_transformation)),
+            ..self
         }
     }
 }
@@ -155,8 +149,8 @@ impl<'de> Deserialize<'de> for TestFileResult {
     }
 }
 
-/// The test runner enforces the unified test format schema during both deserialization and
-/// execution.
+// The test runner enforces the unified test format schema during both deserialization and
+// execution.
 async fn expect_failures(spec: &[&str]) {
     for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, None) {
         // If the test deserialized properly, then expect an error to occur during execution.
