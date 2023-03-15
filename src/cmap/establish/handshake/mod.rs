@@ -404,16 +404,23 @@ enum FaasEnvironmentName {
 impl FaasEnvironmentName {
     fn new() -> Option<Self> {
         use FaasEnvironmentName::*;
-        if env::var("AWS_EXECUTION_ENV").is_ok() {
-            Some(AwsLambda)
-        } else if env::var("FUNCTIONS_WORKER_RUNTIME").is_ok() {
-            Some(AzureFunc)
-        } else if env::var("K_SERVICE").is_ok() || env::var("FUNCTION_NAME").is_ok() {
-            Some(GcpFunc)
-        } else if env::var("VERCEL").is_ok() {
-            Some(Vercel)
-        } else {
+        let mut found = vec![];
+        if env::var("AWS_EXECUTION_ENV").is_ok() || env::var("AWS_LAMBDA_RUNTIME_API").is_ok() {
+            found.push(AwsLambda);
+        }
+        if env::var("FUNCTIONS_WORKER_RUNTIME").is_ok() {
+            found.push(AzureFunc);
+        }
+        if env::var("K_SERVICE").is_ok() || env::var("FUNCTION_NAME").is_ok() {
+            found.push(GcpFunc);
+        } 
+        if env::var("VERCEL").is_ok() {
+            found.push(Vercel);
+        }
+        if found.len() != 1 {
             None
+        } else {
+            Some(found[0])
         }
     }
 
