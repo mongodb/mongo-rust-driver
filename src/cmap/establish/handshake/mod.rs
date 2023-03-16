@@ -93,7 +93,6 @@ impl From<ClientMetadata> for Bson {
         metadata_doc.insert("os", metadata.os);
         metadata_doc.insert("platform", metadata.platform);
 
-
         if let Some(env) = metadata.env {
             metadata_doc.insert("env", env);
         }
@@ -124,9 +123,16 @@ impl From<OsMetadata> for Bson {
 
 impl From<FaasEnvironment> for Bson {
     fn from(env: FaasEnvironment) -> Self {
-        let FaasEnvironment { name, runtime, timeout_sec, memory_mb, region, url } = env;
+        let FaasEnvironment {
+            name,
+            runtime,
+            timeout_sec,
+            memory_mb,
+            region,
+            url,
+        } = env;
         let mut out = doc! {
-            "name": name.to_str(),
+            "name": name.name(),
         };
         if let Some(rt) = runtime {
             out.insert("runtime", rt);
@@ -158,11 +164,7 @@ impl FaasEnvironment {
     };
 
     fn new() -> Option<Self> {
-        let name = if let Some(n) = FaasEnvironmentName::new() {
-            n
-        } else {
-            return None;
-        };
+        let name = FaasEnvironmentName::new()?;
         Some(match name {
             FaasEnvironmentName::AwsLambda => {
                 let runtime = env::var("AWS_EXECUTION_ENV").ok();
@@ -232,7 +234,7 @@ impl FaasEnvironmentName {
         }
         if var_set("K_SERVICE") || var_set("FUNCTION_NAME") {
             found.push(GcpFunc);
-        } 
+        }
         if var_set("VERCEL") {
             found.push(Vercel);
         }
@@ -243,7 +245,7 @@ impl FaasEnvironmentName {
         }
     }
 
-    fn to_str(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         use FaasEnvironmentName::*;
         match self {
             AwsLambda => "aws.lambda",
@@ -358,7 +360,7 @@ impl Handshaker {
             }
         }
 
-        metadata.env =  FaasEnvironment::new();
+        metadata.env = FaasEnvironment::new();
 
         if options.load_balanced {
             command.body.insert("loadBalanced", true);
