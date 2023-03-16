@@ -34,6 +34,7 @@ struct ClientMetadata {
     driver: DriverMetadata,
     os: OsMetadata,
     platform: String,
+    env: Option<FaasEnvironment>,
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +56,24 @@ struct OsMetadata {
     version: Option<String>,
 }
 
+#[derive(Clone, Debug)]
+struct FaasEnvironment {
+    name: FaasEnvironmentName,
+    runtime: Option<String>,
+    timeout_sec: Option<i32>,
+    memory_mb: Option<i32>,
+    region: Option<String>,
+    url: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum FaasEnvironmentName {
+    AwsLambda,
+    AzureFunc,
+    GcpFunc,
+    Vercel,
+}
+
 impl From<ClientMetadata> for Bson {
     fn from(metadata: ClientMetadata) -> Self {
         let mut metadata_doc = Document::new();
@@ -73,6 +92,11 @@ impl From<ClientMetadata> for Bson {
 
         metadata_doc.insert("os", metadata.os);
         metadata_doc.insert("platform", metadata.platform);
+
+
+        if let Some(env) = metadata.env {
+            metadata_doc.insert("env", env);
+        }
 
         Bson::Document(metadata_doc)
     }
@@ -96,196 +120,29 @@ impl From<OsMetadata> for Bson {
     }
 }
 
-lazy_static! {
-    /// Contains the basic handshake information that can be statically determined. This document
-    /// (potentially with additional fields added) can be cloned and put in the `client` field of
-    /// the `hello` or legacy hello command.
-    static ref BASE_CLIENT_METADATA: ClientMetadata = {
-        ClientMetadata {
-            application: None,
-            driver: DriverMetadata {
-                name: "mongo-rust-driver".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            os: OsMetadata {
-                os_type: std::env::consts::OS.into(),
-                architecture: std::env::consts::ARCH.into(),
-                name: None,
-                version: None,
-            },
-            platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
+impl From<FaasEnvironment> for Bson {
+    fn from(env: FaasEnvironment) -> Self {
+        let FaasEnvironment { name, runtime, timeout_sec, memory_mb, region, url } = env;
+        let mut out = doc! {
+            "name": name.to_str(),
+        };
+        if let Some(rt) = runtime {
+            out.insert("runtime", rt);
         }
-    };
-}
-
-/// Contains the logic needed to handshake a connection.
-#[derive(Clone, Debug)]
-pub(crate) struct Handshaker {
-    /// The hello or legacy hello command to send when handshaking. This will always be identical
-    /// given the same pool options, so it can be created at the time the Handshaker is created.
-    command: Command,
-
-    /// The FaaS environment, if any, that the client is running under.
-    faas: Option<FaasEnvironment>,
-
-    // This field is not read without a compression feature flag turned on.
-    #[allow(dead_code)]
-    compressors: Option<Vec<Compressor>>,
-
-    http_client: HttpClient,
-
-    server_api: Option<ServerApi>,
-}
-
-impl Handshaker {
-    /// Creates a new Handshaker.
-    pub(crate) fn new(http_client: HttpClient, options: HandshakerOptions) -> Self {
-        let mut metadata = BASE_CLIENT_METADATA.clone();
-        let compressors = options.compressors;
-
-        let mut command = hello_command(
-            options.server_api.as_ref(),
-            options.load_balanced.into(),
-            None,
-            None,
-        );
-
-        if let Some(app_name) = options.app_name {
-            metadata.application = Some(AppMetadata { name: app_name });
+        if let Some(t) = timeout_sec {
+            out.insert("timeout_sec", t);
         }
-
-        if let Some(driver_info) = options.driver_info {
-            metadata.driver.name.push('|');
-            metadata.driver.name.push_str(&driver_info.name);
-
-            if let Some(ref version) = driver_info.version {
-                metadata.driver.version.push('|');
-                metadata.driver.version.push_str(version);
-            }
-
-            if let Some(ref driver_info_platform) = driver_info.platform {
-                metadata.platform.push('|');
-                metadata.platform.push_str(driver_info_platform);
-            }
+        if let Some(m) = memory_mb {
+            out.insert("memory_mb", m);
         }
-
-        if options.load_balanced {
-            command.body.insert("loadBalanced", true);
+        if let Some(r) = region {
+            out.insert("region", r);
         }
-
-        // Add compressors to handshake.
-        // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
-        if let Some(ref compressors) = compressors {
-            command.body.insert(
-                "compression",
-                compressors
-                    .iter()
-                    .map(|x| x.name())
-                    .collect::<Vec<&'static str>>(),
-            );
+        if let Some(u) = url {
+            out.insert("url", u);
         }
-
-        command.body.insert("client", metadata);
-
-        Self {
-            http_client,
-            command,
-            faas: FaasEnvironment::new(),
-            compressors,
-            server_api: options.server_api,
-        }
+        Bson::Document(out)
     }
-
-    /// Handshakes a connection.
-    pub(crate) async fn handshake(
-        &self,
-        conn: &mut Connection,
-        credential: Option<&Credential>,
-    ) -> Result<HelloReply> {
-        let mut command = self.command.clone();
-
-        if let Some(cred) = credential {
-            cred.append_needed_mechanism_negotiation(&mut command.body);
-            command.target_db = cred.resolved_source().to_string();
-        }
-
-        let client_first = set_speculative_auth_info(&mut command.body, credential)?;
-
-        if let Some(faas) = &self.faas {
-            fn get_client(body: &mut Document) -> Result<&mut Document> {
-                body.get_document_mut("client")
-                    .map_err(|_| crate::error::Error::internal("invalid handshake: no 'client' subdocument"))
-            }
-            let body = &mut command.body;
-            get_client(body)?.insert("env", faas);
-            if doc_size(body)? > MAX_HELLO_SIZE {
-                get_client(body)?.insert("env", faas.minimal());
-                if doc_size(body)? > MAX_HELLO_SIZE {
-                    get_client(body)?.remove("env");
-                }
-            }
-        }
-
-        let mut hello_reply = run_hello(conn, command).await?;
-
-        conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
-
-        // Record the client's message and the server's response from speculative authentication if
-        // the server did send a response.
-        let first_round = client_first.and_then(|client_first| {
-            hello_reply
-                .command_response
-                .speculative_authenticate
-                .take()
-                .map(|server_first| client_first.into_first_round(server_first))
-        });
-
-        // Check that the hello reply has a compressor list and unpack it
-        if let (Some(server_compressors), Some(client_compressors)) = (
-            hello_reply.command_response.compressors.as_ref(),
-            self.compressors.as_ref(),
-        ) {
-            // Use the Client's first compressor choice that the server supports (comparing only on
-            // enum variant)
-            if let Some(compressor) = client_compressors
-                .iter()
-                .find(|c| server_compressors.iter().any(|x| c.name() == x))
-            {
-                // Without a feature flag turned on, the Compressor enum is empty which causes an
-                // unreachable code warning.
-                #[allow(unreachable_code)]
-                // zlib compression level is already set
-                {
-                    conn.compressor = Some(compressor.clone());
-                }
-            }
-        }
-
-        conn.server_id = hello_reply.command_response.connection_id;
-
-        if let Some(credential) = credential {
-            credential
-                .authenticate_stream(
-                    conn,
-                    &self.http_client,
-                    self.server_api.as_ref(),
-                    first_round,
-                )
-                .await?
-        }
-
-        Ok(hello_reply)
-    }
-}
-
-#[derive(Clone, Debug)]
-struct FaasEnvironment {
-    name: FaasEnvironmentName,
-    runtime: Option<String>,
-    timeout_sec: Option<i32>,
-    memory_mb: Option<i32>,
-    region: Option<String>,
-    url: Option<String>,
 }
 
 impl FaasEnvironment {
@@ -355,50 +212,6 @@ impl FaasEnvironment {
             }
         })
     }
-
-    fn minimal(&self) -> Self {
-        FaasEnvironment {
-            name: self.name.clone(),
-            runtime: None,
-            timeout_sec: None,
-            memory_mb: None,
-            region: None,
-            url: None, 
-        }
-    }
-}
-
-impl From<FaasEnvironment> for Bson {
-    fn from(env: FaasEnvironment) -> Self {
-        let FaasEnvironment { name, runtime, timeout_sec, memory_mb, region, url } = env;
-        let mut out = doc! {
-            "name": name.to_str(),
-        };
-        if let Some(rt) = runtime {
-            out.insert("runtime", rt);
-        }
-        if let Some(t) = timeout_sec {
-            out.insert("timeout_sec", t);
-        }
-        if let Some(m) = memory_mb {
-            out.insert("memory_mb", m);
-        }
-        if let Some(r) = region {
-            out.insert("region", r);
-        }
-        if let Some(u) = url {
-            out.insert("url", u);
-        }
-        Bson::Document(out)
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-enum FaasEnvironmentName {
-    AwsLambda,
-    AzureFunc,
-    GcpFunc,
-    Vercel,
 }
 
 fn var_set(name: &str) -> bool {
@@ -438,6 +251,197 @@ impl FaasEnvironmentName {
         }
     }
 }
+
+lazy_static! {
+    /// Contains the basic handshake information that can be statically determined. This document
+    /// (potentially with additional fields added) can be cloned and put in the `client` field of
+    /// the `hello` or legacy hello command.
+    static ref BASE_CLIENT_METADATA: ClientMetadata = {
+        ClientMetadata {
+            application: None,
+            driver: DriverMetadata {
+                name: "mongo-rust-driver".into(),
+                version: env!("CARGO_PKG_VERSION").into(),
+            },
+            os: OsMetadata {
+                os_type: std::env::consts::OS.into(),
+                architecture: std::env::consts::ARCH.into(),
+                name: None,
+                version: None,
+            },
+            platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
+            env: FaasEnvironment::new(),
+        }
+    };
+}
+
+/// Contains the logic needed to handshake a connection.
+#[derive(Clone, Debug)]
+pub(crate) struct Handshaker {
+    /// The hello or legacy hello command to send when handshaking. This will always be identical
+    /// given the same pool options, so it can be created at the time the Handshaker is created.
+    command: Command,
+
+    // This field is not read without a compression feature flag turned on.
+    #[allow(dead_code)]
+    compressors: Option<Vec<Compressor>>,
+
+    http_client: HttpClient,
+
+    server_api: Option<ServerApi>,
+}
+
+impl Handshaker {
+    /// Creates a new Handshaker.
+    pub(crate) fn new(http_client: HttpClient, options: HandshakerOptions) -> Self {
+        let mut metadata = BASE_CLIENT_METADATA.clone();
+        let compressors = options.compressors;
+
+        let mut command = hello_command(
+            options.server_api.as_ref(),
+            options.load_balanced.into(),
+            None,
+            None,
+        );
+
+        if let Some(app_name) = options.app_name {
+            metadata.application = Some(AppMetadata { name: app_name });
+        }
+
+        if let Some(driver_info) = options.driver_info {
+            metadata.driver.name.push('|');
+            metadata.driver.name.push_str(&driver_info.name);
+
+            if let Some(ref version) = driver_info.version {
+                metadata.driver.version.push('|');
+                metadata.driver.version.push_str(version);
+            }
+
+            if let Some(ref driver_info_platform) = driver_info.platform {
+                metadata.platform.push('|');
+                metadata.platform.push_str(driver_info_platform);
+            }
+        }
+
+        if options.load_balanced {
+            command.body.insert("loadBalanced", true);
+        }
+
+        // Add compressors to handshake.
+        // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
+        if let Some(ref compressors) = compressors {
+            command.body.insert(
+                "compression",
+                compressors
+                    .iter()
+                    .map(|x| x.name())
+                    .collect::<Vec<&'static str>>(),
+            );
+        }
+
+        command.body.insert("client", metadata);
+
+        Self {
+            http_client,
+            command,
+            compressors,
+            server_api: options.server_api,
+        }
+    }
+
+    /// Handshakes a connection.
+    pub(crate) async fn handshake(
+        &self,
+        conn: &mut Connection,
+        credential: Option<&Credential>,
+    ) -> Result<HelloReply> {
+        let mut command = self.command.clone();
+
+        if let Some(cred) = credential {
+            cred.append_needed_mechanism_negotiation(&mut command.body);
+            command.target_db = cred.resolved_source().to_string();
+        }
+
+        let client_first = set_speculative_auth_info(&mut command.body, credential)?;
+
+        fn get_client(body: &mut Document) -> Result<&mut Document> {
+            body.get_document_mut("client")
+                .map_err(|_| crate::error::Error::internal("invalid handshake: no 'client' subdocument"))
+        }
+
+        let body = &mut command.body;
+
+        for trunc_fn in HANDSHAKE_TRUNCATIONS {
+            if doc_size(body)? <= MAX_HELLO_SIZE {
+                break;
+            }
+            let _ = trunc_fn(get_client(body)?);
+        }
+
+        let mut hello_reply = run_hello(conn, command).await?;
+
+        conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
+
+        // Record the client's message and the server's response from speculative authentication if
+        // the server did send a response.
+        let first_round = client_first.and_then(|client_first| {
+            hello_reply
+                .command_response
+                .speculative_authenticate
+                .take()
+                .map(|server_first| client_first.into_first_round(server_first))
+        });
+
+        // Check that the hello reply has a compressor list and unpack it
+        if let (Some(server_compressors), Some(client_compressors)) = (
+            hello_reply.command_response.compressors.as_ref(),
+            self.compressors.as_ref(),
+        ) {
+            // Use the Client's first compressor choice that the server supports (comparing only on
+            // enum variant)
+            if let Some(compressor) = client_compressors
+                .iter()
+                .find(|c| server_compressors.iter().any(|x| c.name() == x))
+            {
+                // Without a feature flag turned on, the Compressor enum is empty which causes an
+                // unreachable code warning.
+                #[allow(unreachable_code)]
+                // zlib compression level is already set
+                {
+                    conn.compressor = Some(compressor.clone());
+                }
+            }
+        }
+
+        conn.server_id = hello_reply.command_response.connection_id;
+
+        if let Some(credential) = credential {
+            credential
+                .authenticate_stream(
+                    conn,
+                    &self.http_client,
+                    self.server_api.as_ref(),
+                    first_round,
+                )
+                .await?
+        }
+
+        Ok(hello_reply)
+    }
+}
+
+type Truncation = fn(&mut Document) -> bson::document::ValueAccessResult<()>;
+
+const HANDSHAKE_TRUNCATIONS: &[Truncation] = &[
+    // clear `env.*` except `name`
+    |client| {
+        let env = client.get_document_mut("env")?;
+        let name = env.get_str("name")?.to_owned();
+        env.clear();
+        env.insert("name", name);
+        Ok(())
+    }
+];
 
 #[derive(Debug)]
 pub(crate) struct HandshakerOptions {
