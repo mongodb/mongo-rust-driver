@@ -52,7 +52,7 @@ struct DriverMetadata {
 struct OsMetadata {
     os_type: String,
     name: Option<String>,
-    architecture: String,
+    architecture: Option<String>,
     version: Option<String>,
 }
 
@@ -110,7 +110,9 @@ impl From<OsMetadata> for Bson {
             doc.insert("name", name);
         }
 
-        doc.insert("architecture", metadata.architecture);
+        if let Some(arch) = metadata.architecture {
+            doc.insert("architecture", arch);
+        }
 
         if let Some(version) = metadata.version {
             doc.insert("version", version);
@@ -265,15 +267,46 @@ lazy_static! {
             },
             os: OsMetadata {
                 os_type: std::env::consts::OS.into(),
-                architecture: std::env::consts::ARCH.into(),
+                architecture: Some(std::env::consts::ARCH.into()),
                 name: None,
                 version: None,
             },
             platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
-            env: FaasEnvironment::new(),
+            env: None,
         }
     };
 }
+
+type Truncation = fn(&mut ClientMetadata);
+
+const METADATA_TRUNCATIONS: &[Truncation] = &[
+    // truncate `platform`
+    |metadata| {
+        metadata.platform = rustc_version_runtime::version_meta().short_version_string;
+    },
+    // clear `env.*` except `name`
+    |metadata| {
+        if let Some(env) = &mut metadata.env {
+            *env = FaasEnvironment {
+                name: env.name,
+                ..FaasEnvironment::UNSET
+            }
+        }
+    },
+    // clear `os.*` except `type`
+    |metadata| {
+        metadata.os = OsMetadata {
+            os_type: metadata.os.os_type.clone(),
+            architecture: None,
+            name: None,
+            version: None,
+        }
+    },
+    // clear `env`
+    |metadata| {
+        metadata.env = None;
+    },
+];
 
 /// Contains the logic needed to handshake a connection.
 #[derive(Clone, Debug)]
@@ -289,6 +322,8 @@ pub(crate) struct Handshaker {
     http_client: HttpClient,
 
     server_api: Option<ServerApi>,
+
+    metadata: ClientMetadata,
 }
 
 impl Handshaker {
@@ -323,6 +358,8 @@ impl Handshaker {
             }
         }
 
+        metadata.env =  FaasEnvironment::new();
+
         if options.load_balanced {
             command.body.insert("loadBalanced", true);
         }
@@ -339,13 +376,14 @@ impl Handshaker {
             );
         }
 
-        command.body.insert("client", metadata);
+        command.body.insert("client", metadata.clone());
 
         Self {
             http_client,
             command,
             compressors,
             server_api: options.server_api,
+            metadata,
         }
     }
 
@@ -364,18 +402,14 @@ impl Handshaker {
 
         let client_first = set_speculative_auth_info(&mut command.body, credential)?;
 
-        fn get_client(body: &mut Document) -> Result<&mut Document> {
-            body.get_document_mut("client")
-                .map_err(|_| crate::error::Error::internal("invalid handshake: no 'client' subdocument"))
-        }
-
         let body = &mut command.body;
-
-        for trunc_fn in HANDSHAKE_TRUNCATIONS {
+        let mut trunc_meta = self.metadata.clone();
+        for trunc_fn in METADATA_TRUNCATIONS {
             if doc_size(body)? <= MAX_HELLO_SIZE {
                 break;
             }
-            let _ = trunc_fn(get_client(body)?);
+            trunc_fn(&mut trunc_meta);
+            body.insert("client", trunc_meta.clone());
         }
 
         let mut hello_reply = run_hello(conn, command).await?;
@@ -429,19 +463,6 @@ impl Handshaker {
         Ok(hello_reply)
     }
 }
-
-type Truncation = fn(&mut Document) -> bson::document::ValueAccessResult<()>;
-
-const HANDSHAKE_TRUNCATIONS: &[Truncation] = &[
-    // clear `env.*` except `name`
-    |client| {
-        let env = client.get_document_mut("env")?;
-        let name = env.get_str("name")?.to_owned();
-        env.clear();
-        env.insert("name", name);
-        Ok(())
-    }
-];
 
 #[derive(Debug)]
 pub(crate) struct HandshakerOptions {
