@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test;
 
+use std::env;
+
 use lazy_static::lazy_static;
 
 use crate::{
@@ -32,6 +34,7 @@ struct ClientMetadata {
     driver: DriverMetadata,
     os: OsMetadata,
     platform: String,
+    env: Option<FaasEnvironment>,
 }
 
 #[derive(Clone, Debug)]
@@ -49,8 +52,26 @@ struct DriverMetadata {
 struct OsMetadata {
     os_type: String,
     name: Option<String>,
-    architecture: String,
+    architecture: Option<String>,
     version: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct FaasEnvironment {
+    name: FaasEnvironmentName,
+    runtime: Option<String>,
+    timeout_sec: Option<i32>,
+    memory_mb: Option<i32>,
+    region: Option<String>,
+    url: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum FaasEnvironmentName {
+    AwsLambda,
+    AzureFunc,
+    GcpFunc,
+    Vercel,
 }
 
 impl From<ClientMetadata> for Bson {
@@ -72,6 +93,10 @@ impl From<ClientMetadata> for Bson {
         metadata_doc.insert("os", metadata.os);
         metadata_doc.insert("platform", metadata.platform);
 
+        if let Some(env) = metadata.env {
+            metadata_doc.insert("env", env);
+        }
+
         Bson::Document(metadata_doc)
     }
 }
@@ -84,13 +109,150 @@ impl From<OsMetadata> for Bson {
             doc.insert("name", name);
         }
 
-        doc.insert("architecture", metadata.architecture);
+        if let Some(arch) = metadata.architecture {
+            doc.insert("architecture", arch);
+        }
 
         if let Some(version) = metadata.version {
             doc.insert("version", version);
         }
 
         Bson::Document(doc)
+    }
+}
+
+impl From<FaasEnvironment> for Bson {
+    fn from(env: FaasEnvironment) -> Self {
+        let FaasEnvironment {
+            name,
+            runtime,
+            timeout_sec,
+            memory_mb,
+            region,
+            url,
+        } = env;
+        let mut out = doc! {
+            "name": name.name(),
+        };
+        if let Some(rt) = runtime {
+            out.insert("runtime", rt);
+        }
+        if let Some(t) = timeout_sec {
+            out.insert("timeout_sec", t);
+        }
+        if let Some(m) = memory_mb {
+            out.insert("memory_mb", m);
+        }
+        if let Some(r) = region {
+            out.insert("region", r);
+        }
+        if let Some(u) = url {
+            out.insert("url", u);
+        }
+        Bson::Document(out)
+    }
+}
+
+impl FaasEnvironment {
+    const UNSET: Self = FaasEnvironment {
+        name: FaasEnvironmentName::AwsLambda,
+        runtime: None,
+        timeout_sec: None,
+        memory_mb: None,
+        region: None,
+        url: None,
+    };
+
+    fn new() -> Option<Self> {
+        let name = FaasEnvironmentName::new()?;
+        Some(match name {
+            FaasEnvironmentName::AwsLambda => {
+                let runtime = env::var("AWS_EXECUTION_ENV").ok();
+                let region = env::var("AWS_REGION").ok();
+                let memory_mb = env::var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
+                    .ok()
+                    .and_then(|s| s.parse().ok());
+                Self {
+                    name,
+                    runtime,
+                    region,
+                    memory_mb,
+                    ..Self::UNSET
+                }
+            }
+            FaasEnvironmentName::AzureFunc => {
+                let runtime = env::var("FUNCTIONS_WORKER_RUNTIME").ok();
+                Self {
+                    name,
+                    runtime,
+                    ..Self::UNSET
+                }
+            }
+            FaasEnvironmentName::GcpFunc => {
+                let memory_mb = env::var("FUNCTION_MEMORY_MB")
+                    .ok()
+                    .and_then(|s| s.parse().ok());
+                let timeout_sec = env::var("FUNCTION_TIMEOUT_SEC")
+                    .ok()
+                    .and_then(|s| s.parse().ok());
+                let region = env::var("FUNCTION_REGION").ok();
+                Self {
+                    name,
+                    memory_mb,
+                    timeout_sec,
+                    region,
+                    ..Self::UNSET
+                }
+            }
+            FaasEnvironmentName::Vercel => {
+                let url = env::var("VERCEL_URL").ok();
+                let region = env::var("VERCEL_REGION").ok();
+                Self {
+                    name,
+                    url,
+                    region,
+                    ..Self::UNSET
+                }
+            }
+        })
+    }
+}
+
+fn var_set(name: &str) -> bool {
+    env::var_os(name).map_or(false, |v| !v.is_empty())
+}
+
+impl FaasEnvironmentName {
+    fn new() -> Option<Self> {
+        use FaasEnvironmentName::*;
+        let mut found = vec![];
+        if var_set("AWS_EXECUTION_ENV") || var_set("AWS_LAMBDA_RUNTIME_API") {
+            found.push(AwsLambda);
+        }
+        if var_set("FUNCTIONS_WORKER_RUNTIME") {
+            found.push(AzureFunc);
+        }
+        if var_set("K_SERVICE") || var_set("FUNCTION_NAME") {
+            found.push(GcpFunc);
+        }
+        if var_set("VERCEL") {
+            found.push(Vercel);
+        }
+        if found.len() != 1 {
+            None
+        } else {
+            Some(found[0])
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        use FaasEnvironmentName::*;
+        match self {
+            AwsLambda => "aws.lambda",
+            AzureFunc => "azure.func",
+            GcpFunc => "gcp.func",
+            Vercel => "vercel",
+        }
     }
 }
 
@@ -107,14 +269,46 @@ lazy_static! {
             },
             os: OsMetadata {
                 os_type: std::env::consts::OS.into(),
-                architecture: std::env::consts::ARCH.into(),
+                architecture: Some(std::env::consts::ARCH.into()),
                 name: None,
                 version: None,
             },
             platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
+            env: None,
         }
     };
 }
+
+type Truncation = fn(&mut ClientMetadata);
+
+const METADATA_TRUNCATIONS: &[Truncation] = &[
+    // truncate `platform`
+    |metadata| {
+        metadata.platform = rustc_version_runtime::version_meta().short_version_string;
+    },
+    // clear `env.*` except `name`
+    |metadata| {
+        if let Some(env) = &mut metadata.env {
+            *env = FaasEnvironment {
+                name: env.name,
+                ..FaasEnvironment::UNSET
+            }
+        }
+    },
+    // clear `os.*` except `type`
+    |metadata| {
+        metadata.os = OsMetadata {
+            os_type: metadata.os.os_type.clone(),
+            architecture: None,
+            name: None,
+            version: None,
+        }
+    },
+    // clear `env`
+    |metadata| {
+        metadata.env = None;
+    },
+];
 
 /// Contains the logic needed to handshake a connection.
 #[derive(Clone, Debug)]
@@ -130,6 +324,8 @@ pub(crate) struct Handshaker {
     http_client: HttpClient,
 
     server_api: Option<ServerApi>,
+
+    metadata: ClientMetadata,
 }
 
 impl Handshaker {
@@ -164,6 +360,8 @@ impl Handshaker {
             }
         }
 
+        metadata.env = FaasEnvironment::new();
+
         if options.load_balanced {
             command.body.insert("loadBalanced", true);
         }
@@ -180,13 +378,14 @@ impl Handshaker {
             );
         }
 
-        command.body.insert("client", metadata);
+        command.body.insert("client", metadata.clone());
 
         Self {
             http_client,
             command,
             compressors,
             server_api: options.server_api,
+            metadata,
         }
     }
 
@@ -204,6 +403,16 @@ impl Handshaker {
         }
 
         let client_first = set_speculative_auth_info(&mut command.body, credential)?;
+
+        let body = &mut command.body;
+        let mut trunc_meta = self.metadata.clone();
+        for trunc_fn in METADATA_TRUNCATIONS {
+            if doc_size(body)? <= MAX_HELLO_SIZE {
+                break;
+            }
+            trunc_fn(&mut trunc_meta);
+            body.insert("client", trunc_meta.clone());
+        }
 
         let mut hello_reply = run_hello(conn, command).await?;
 
@@ -308,3 +517,11 @@ fn set_speculative_auth_info(
 
     Ok(Some(client_first))
 }
+
+fn doc_size(d: &Document) -> Result<usize> {
+    let mut tmp = vec![];
+    d.to_writer(&mut tmp)?;
+    Ok(tmp.len())
+}
+
+const MAX_HELLO_SIZE: usize = 512;
