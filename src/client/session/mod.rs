@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use uuid::Uuid;
 
@@ -558,6 +559,15 @@ impl ClientSession {
                     .await;
                 Ok(())
             }
+        }
+    }
+
+    /// TODO
+    pub async fn with_transaction<F, R>(&mut self, mut callback: F, _options: impl Into<Option<TransactionOptions>>) -> Result<R>
+        where F: for<'a> FnMut(&'a mut ClientSession) -> BoxFuture<'a, Result<R>>,
+    {
+        loop {
+            callback(self).await?;
         }
     }
 

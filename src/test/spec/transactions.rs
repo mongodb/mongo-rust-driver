@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use futures_util::FutureExt;
 
 use crate::{
     bson::{doc, Document},
@@ -80,4 +81,22 @@ async fn deserialize_recovery_token() {
 
     // Nevertheless, the recovery token should have been retrieved from the ok: 1 response.
     assert!(session.transaction.recovery_token.is_some());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn convenient_api_usage() {
+    let client = crate::Client::test_builder().build().await;
+    let mut session = client.start_session(None).await.unwrap();
+    // This closure, by signature, must be callable repeatedly; when it is created, ownership of captured variables are moved into the closure
+    session.with_transaction(|session| {
+        let coll = client.database("test_convenient").collection::<Document>("test_convenient");
+        // This block also must take ownership of captured variables, but that would leave the original closure without values
+        async move {
+            let out = coll.find_one_with_session(None, None, session).await?;
+            Ok(out)
+        }.boxed()
+    },
+    None).await.unwrap();
+    let _ = client.clone();
 }
