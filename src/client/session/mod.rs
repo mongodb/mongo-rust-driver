@@ -563,11 +563,46 @@ impl ClientSession {
     }
 
     /// TODO
-    pub async fn with_transaction<F, R>(&mut self, mut callback: F, _options: impl Into<Option<TransactionOptions>>) -> Result<R>
-        where F: for<'a> FnMut(&'a mut ClientSession) -> BoxFuture<'a, Result<R>>,
+    pub async fn with_transaction<F, R, C>(&mut self, mut callback: F, options: impl Into<Option<TransactionOptions>>, mut context: C) -> Result<R>
+        where F: for<'a> FnMut(&'a mut ClientSession, &'a mut C) -> BoxFuture<'a, Result<R>>,
     {
-        loop {
-            callback(self).await?;
+        let options = options.into();
+        const TIMEOUT: Duration = Duration::from_secs(120);
+        let start = Instant::now();
+
+        'transaction: loop {
+            self.start_transaction(options.clone()).await?;
+            let ret = match callback(self, &mut context).await {
+                Ok(v) => v,
+                Err(e) => {
+                    if matches!(self.transaction.state, TransactionState::Starting | TransactionState::InProgress) {
+                        self.abort_transaction().await?;
+                    }
+                    if e.contains_label("TransientTransactionError") && start.elapsed() < TIMEOUT {
+                        continue 'transaction;
+                    }
+                    return Err(e);
+                }
+            };
+            if matches!(self.transaction.state, TransactionState::None | TransactionState::Aborted | TransactionState::Committed { .. }) {
+                return Ok(ret);
+            }
+            'commit: loop {
+                match self.commit_transaction().await {
+                    Ok(()) => return Ok(ret),
+                    Err(e) => {
+                        if start.elapsed() < TIMEOUT {
+                            if e.contains_label("UnknownTransactionCommitResult") {
+                                continue 'commit;
+                            }
+                            if e.contains_label("TransientTransactionError") {
+                                continue 'transaction;
+                            }
+                        }
+                        return Err(e);
+                    }
+                }
+            }
         }
     }
 
