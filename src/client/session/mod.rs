@@ -563,7 +563,7 @@ impl ClientSession {
     }
 
     /// TODO
-    pub async fn with_transaction<F, R, C>(&mut self, mut callback: F, options: impl Into<Option<TransactionOptions>>, mut context: C) -> Result<R>
+    pub async fn with_transaction<R, C, F>(&mut self, mut context: C, mut callback: F, options: impl Into<Option<TransactionOptions>>) -> Result<R>
         where F: for<'a> FnMut(&'a mut ClientSession, &'a mut C) -> BoxFuture<'a, Result<R>>,
     {
         let options = options.into();

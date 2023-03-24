@@ -95,16 +95,18 @@ async fn convenient_api_usage() {
     }
     let f = Foo;
     // This closure, by signature, must be callable repeatedly; when it is created, ownership of captured variables are moved into the closure
-    session.with_transaction(|session, (coll, f)| {
-        // This block also must take ownership of captured variables, but that would leave the original closure without values
-        async move {
-            f.thing();
-            let out = coll.find_one_with_session(None, None, session).await?;
-            f.thing();
-            Ok(out)
-        }.boxed()
-    },
-    None,
-    (coll, &f)).await.unwrap();
+    session.with_transaction(
+        (coll, &f),
+        |session, (coll, f)| {
+            // This block also must take ownership of captured variables, but that would leave the original closure without values
+            async move {
+                f.thing();
+                let out = coll.find_one_with_session(None, None, session).await?;
+                f.thing();
+                Ok(out)
+            }.boxed()
+        },
+        None,
+    ).await.unwrap();
     let _ = client.clone();
 }
