@@ -12,7 +12,7 @@ use crate::{
         TestClient,
         LOCK, FailPointMode, FailCommandOptions, FailPoint, CLIENT_OPTIONS,
     },
-    Collection, error::{Error, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT}, runtime::delay_for,
+    Collection, error::{Error, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -166,14 +166,13 @@ async fn convenient_api_retry_timeout_callback() {
     let _guard: _ = LOCK.run_concurrently().await;
     let client = crate::Client::test_builder().event_client().build().await;
     let mut session = client.start_session(None).await.unwrap();
-    session.convenient_transaction_timeout = Some(Duration::from_secs(5));
+    session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
 
     let result: Result<()> = session.with_transaction(
         coll,
         |session, coll| async move {
             coll.find_one_with_session(None, None, session).await?;
-            delay_for(Duration::from_secs(6)).await;
             let mut err = Error::custom(42);
             err.add_label(TRANSIENT_TRANSACTION_ERROR);
             Err(err)
@@ -201,7 +200,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         .build()
         .await;
     let mut session = client.start_session(None).await.unwrap();
-    session.convenient_transaction_timeout = Some(Duration::from_secs(5));
+    session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
 
     let _fp = FailPoint::fail_command(
@@ -219,7 +218,6 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         coll,
         |session, coll| async move {
             coll.find_one_with_session(None, None, session).await?;
-            delay_for(Duration::from_secs(6)).await;
             Ok(())
         }.boxed(),
         None,
