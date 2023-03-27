@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use futures_util::FutureExt;
@@ -10,7 +12,7 @@ use crate::{
         TestClient,
         LOCK,
     },
-    Collection,
+    Collection, error::{Error, Result}, runtime::delay_for,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -86,8 +88,10 @@ async fn deserialize_recovery_token() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_usage() {
+    let _guard: _ = LOCK.run_concurrently().await;
     let client = crate::Client::test_builder().build().await;
     let mut session = client.start_session(None).await.unwrap();
+
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
     struct Foo;
     impl Foo {
@@ -108,5 +112,67 @@ async fn convenient_api_usage() {
         },
         None,
     ).await.unwrap();
-    let _ = client.clone();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn convenient_api_custom_error() {
+    let _guard: _ = LOCK.run_concurrently().await;
+    let client = crate::Client::test_builder().event_client().build().await;
+    let mut session = client.start_session(None).await.unwrap();
+
+    struct MyErr;
+    let result: Result<()> = session.with_transaction(
+        (),
+        |_, _| async move { Err(Error::custom(MyErr)) }.boxed(),
+        None,
+    ).await;
+
+    assert!(result.is_err());
+    assert!(result.unwrap_err().get_custom::<MyErr>().is_some());
+    assert_eq!(0, client.get_all_command_started_events().len());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn convenient_api_returned_value() {
+    let _guard: _ = LOCK.run_concurrently().await;
+    let client = crate::Client::test_builder().event_client().build().await;
+    let mut session = client.start_session(None).await.unwrap();
+
+    let value = session.with_transaction(
+        (),
+        |_, _| async move { Ok(42) }.boxed(),
+        None,
+    ).await.unwrap();
+
+    assert_eq!(42, value);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn convenient_api_retry_timeout() {
+    let _guard: _ = LOCK.run_concurrently().await;
+    let client = crate::Client::test_builder().event_client().build().await;
+    let mut session = client.start_session(None).await.unwrap();
+    session.convenient_transaction_timeout = Some(Duration::from_secs(5));
+
+    use crate::error::TRANSIENT_TRANSACTION_ERROR;
+
+    // Callback raises an error with the TransientTransactionError label
+    let result: Result<()> = session.with_transaction(
+        (),
+        |_, _| async move {
+            delay_for(Duration::from_secs(6)).await;
+            let mut err = Error::custom(42);
+            err.add_label(TRANSIENT_TRANSACTION_ERROR);
+            Err(err)
+        }.boxed(),
+        None,
+    ).await;
+    let err = result.unwrap_err();
+    assert_eq!(&42, err.get_custom::<i32>().unwrap());
+    assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR))
+
+    // Committing raises an error with the UnknownTransactionCommitResult label
 }

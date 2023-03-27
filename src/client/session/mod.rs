@@ -111,6 +111,8 @@ pub struct ClientSession {
     pub(crate) transaction: Transaction,
     pub(crate) snapshot_time: Option<Timestamp>,
     pub(crate) operation_time: Option<Timestamp>,
+    #[cfg(test)]
+    pub(crate) convenient_transaction_timeout: Option<Duration>,
 }
 
 #[derive(Debug)]
@@ -217,6 +219,8 @@ impl ClientSession {
             transaction: Default::default(),
             snapshot_time: None,
             operation_time: None,
+            #[cfg(test)]
+            convenient_transaction_timeout: None,
         }
     }
 
@@ -567,8 +571,12 @@ impl ClientSession {
         where F: for<'a> FnMut(&'a mut ClientSession, &'a mut C) -> BoxFuture<'a, Result<R>>,
     {
         let options = options.into();
-        const TIMEOUT: Duration = Duration::from_secs(120);
+        let timeout = Duration::from_secs(120);
+        #[cfg(test)]
+        let timeout = self.convenient_transaction_timeout.clone().unwrap_or(timeout);
         let start = Instant::now();
+
+        use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
 
         'transaction: loop {
             self.start_transaction(options.clone()).await?;
@@ -578,7 +586,7 @@ impl ClientSession {
                     if matches!(self.transaction.state, TransactionState::Starting | TransactionState::InProgress) {
                         self.abort_transaction().await?;
                     }
-                    if e.contains_label("TransientTransactionError") && start.elapsed() < TIMEOUT {
+                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
                         continue 'transaction;
                     }
                     return Err(e);
@@ -591,11 +599,11 @@ impl ClientSession {
                 match self.commit_transaction().await {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
-                        if start.elapsed() < TIMEOUT {
-                            if e.contains_label("UnknownTransactionCommitResult") {
+                        if start.elapsed() < timeout {
+                            if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
                                 continue 'commit;
                             }
-                            if e.contains_label("TransientTransactionError") {
+                            if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
                                 continue 'transaction;
                             }
                         }
@@ -635,6 +643,8 @@ impl From<DroppedClientSession> for ClientSession {
             transaction: dropped_session.transaction,
             snapshot_time: dropped_session.snapshot_time,
             operation_time: dropped_session.operation_time,
+            #[cfg(test)]
+            convenient_transaction_timeout: None,
         }
     }
 }
