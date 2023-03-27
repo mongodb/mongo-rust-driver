@@ -226,3 +226,46 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     let err = result.unwrap_err();
     assert!(err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT));
 }
+
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn convenient_api_retry_timeout_commit_transient() {
+    let _guard: _ = LOCK.run_exclusively().await;
+    let client = crate::Client::test_builder()
+        .options({
+            let mut options = CLIENT_OPTIONS.get().await.clone();
+            options.direct_connection = Some(true);
+            options.hosts.drain(1..);    
+            options
+        })
+        .event_client()
+        .build()
+        .await;
+    let mut session = client.start_session(None).await.unwrap();
+    session.convenient_transaction_timeout = Some(Duration::ZERO);
+    let coll = client.database("test_convenient").collection::<Document>("test_convenient");
+
+    let _fp = FailPoint::fail_command(
+        &["commitTransaction"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(251)
+            .error_labels(vec![TRANSIENT_TRANSACTION_ERROR.to_string()])
+            .build(),
+    )
+    .enable(&client, None)
+    .await.unwrap();
+
+    let result = session.with_transaction(
+        coll,
+        |session, coll| async move {
+            coll.find_one_with_session(None, None, session).await?;
+            Ok(())
+        }.boxed(),
+        None,
+    ).await;
+
+    let err = result.unwrap_err();
+    assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR));
+}
