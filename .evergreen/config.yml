@@ -1978,6 +1978,7 @@ buildvariants:
     os:
       - ubuntu-20.04
     mongodb-version:
+      - "rapid"
       - "6.0"
     topology:
       - "replica-set"
