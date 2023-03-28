@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -72,7 +72,7 @@ use super::{
 
 type Result<T> = anyhow::Result<T>;
 
-pub(super) async fn init_client() -> Result<(EventClient, Collection<Document>)> {
+async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = EventClient::new().await;
     let datakeys = client
         .database("keyvault")
@@ -538,7 +538,7 @@ fn load_testdata_raw(name: &str) -> Result<String> {
     ]
     .iter()
     .collect();
-    Ok(std::fs::read_to_string(path.clone()).context(path.to_string_lossy().into_owned())?)
+    std::fs::read_to_string(path.clone()).context(path.to_string_lossy().into_owned())
 }
 
 fn load_testdata(name: &str) -> Result<Document> {
@@ -3024,7 +3024,7 @@ async fn range_explicit_encryption_test(
     .await?;
 
     let key = format!("encrypted{}", bson_type);
-    let bson_numbers: HashMap<i32, RawBson> = [0, 6, 30, 200]
+    let bson_numbers: BTreeMap<i32, RawBson> = [0, 6, 30, 200]
         .iter()
         .map(|num| (*num, get_raw_bson_from_num(bson_type, *num)))
         .collect();
@@ -3032,7 +3032,7 @@ async fn range_explicit_encryption_test(
         .database("db")
         .collection("explicit_encryption");
 
-    for (id, num) in [0, 6, 30, 200].iter().enumerate() {
+    for (id, num) in bson_numbers.keys().enumerate() {
         let encrypted_value = client_encryption
             .encrypt(
                 bson_numbers[num].clone(),
@@ -3059,7 +3059,7 @@ async fn range_explicit_encryption_test(
     let insert_payload = client_encryption
         .encrypt(
             bson_numbers[&6].clone(),
-            Binary::from(key1_id.clone()),
+            key1_id.clone(),
             Algorithm::RangePreview,
         )
         .contention_factor(0)
@@ -3072,9 +3072,19 @@ async fn range_explicit_encryption_test(
         .await?;
     assert_eq!(decrypted, bson_numbers[&6]);
 
+    // Utilities for cases 2-5
     let explicit_encryption_collection =
         explicit_encryption_collection.clone_with_type::<RawDocumentBuf>();
     let find_options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
+    let assert_success = |actual: Vec<RawDocumentBuf>, expected: &[i32]| {
+        assert_eq!(actual.len(), expected.len());
+        for (idx, num) in expected.iter().enumerate() {
+            assert_eq!(
+                actual[idx].get(&key),
+                Ok(Some(bson_numbers[num].as_raw_bson_ref()))
+            );
+        }
+    };
 
     // Case 2: Find encrypted range and return the maximum
     let query = rawdoc! {
@@ -3095,14 +3105,7 @@ async fn range_explicit_encryption_test(
         .await?
         .try_collect()
         .await?;
-
-    assert_eq!(docs.len(), 3);
-    for (idx, num) in [6, 30, 200].iter().enumerate() {
-        assert_eq!(
-            docs[idx].get(&key)?,
-            Some(bson_numbers[num].as_raw_bson_ref())
-        );
-    }
+    assert_success(docs, &[6, 30, 200]);
 
     // Case 3: Find encrypted range and return the minimum
     let query = rawdoc! {
@@ -3125,14 +3128,7 @@ async fn range_explicit_encryption_test(
         .await?
         .try_collect()
         .await?;
-
-    assert_eq!(docs.len(), 2);
-    for (idx, num) in [0, 6].iter().enumerate() {
-        assert_eq!(
-            docs[idx].get(&key)?,
-            Some(bson_numbers[num].as_raw_bson_ref())
-        );
-    }
+    assert_success(docs, &[0, 6]);
 
     // Case 4: Find encrypted range with an open range query
     let query = rawdoc! {
@@ -3154,14 +3150,7 @@ async fn range_explicit_encryption_test(
         .await?
         .try_collect()
         .await?;
-
-    assert_eq!(docs.len(), 1);
-    for (idx, num) in [200].iter().enumerate() {
-        assert_eq!(
-            docs[idx].get(&key)?,
-            Some(bson_numbers[num].as_raw_bson_ref())
-        );
-    }
+    assert_success(docs, &[200]);
 
     // Case 5: Run an aggregation expression inside $expr
     let query = rawdoc! { "$and": [ { "$lt": [ format!("${key}"), get_raw_bson_from_num(bson_type, 30) ] } ] };
@@ -3179,14 +3168,7 @@ async fn range_explicit_encryption_test(
         .await?
         .try_collect()
         .await?;
-
-    assert_eq!(docs.len(), 2);
-    for (idx, num) in [0, 6].iter().enumerate() {
-        assert_eq!(
-            docs[idx].get(&key)?,
-            Some(bson_numbers[num].as_raw_bson_ref())
-        );
-    }
+    assert_success(docs, &[0, 6]);
 
     // Case 6: Encrypting a document greater than the maximum errors
     if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {

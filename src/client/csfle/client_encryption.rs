@@ -326,7 +326,7 @@ impl ClientEncryption {
         key: impl Into<EncryptKey>,
     ) -> EncryptExpressionAction {
         EncryptExpressionAction {
-            client_enc: &self,
+            client_enc: self,
             value: expression,
             opts: EncryptOptions {
                 key: key.into(),
@@ -340,7 +340,7 @@ impl ClientEncryption {
 
     async fn encrypt_final(&self, value: RawBson, opts: EncryptOptions) -> Result<Binary> {
         let builder = self.get_ctx_builder(&opts)?;
-        let ctx = builder.build_explicit_encrypt(value.into())?;
+        let ctx = builder.build_explicit_encrypt(value)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
             .get_binary("v")
