@@ -87,35 +87,6 @@ async fn deserialize_recovery_token() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn convenient_api_usage() {
-    let _guard: _ = LOCK.run_concurrently().await;
-    let client = crate::Client::test_builder().build().await;
-    let mut session = client.start_session(None).await.unwrap();
-    let coll = client.database("test_convenient").collection::<Document>("test_convenient");
-    
-    struct Foo;
-    impl Foo {
-        fn thing(&self) { }
-    }
-    let f = Foo;
-    // This closure, by signature, must be callable repeatedly; when it is created, ownership of captured variables are moved into the closure
-    session.with_transaction(
-        (coll, &f),
-        |session, (coll, f)| {
-            // This block also must take ownership of captured variables, but that would leave the original closure without values
-            async move {
-                f.thing();
-                let out = coll.find_one_with_session(None, None, session).await?;
-                f.thing();
-                Ok(out)
-            }.boxed()
-        },
-        None,
-    ).await.unwrap();
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_custom_error() {
     let _guard: _ = LOCK.run_concurrently().await;
     let client = crate::Client::test_builder().event_client().build().await;

@@ -1494,6 +1494,17 @@ impl TestOperation for AssertIndexNotExists {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct WithTransaction {
+    callback: WithTransactionCallback,
+    options: Option<TransactionOptions>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WithTransactionCallback {
+    operations: Vec<Operation>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct UnimplementedOperation;
 
 impl TestOperation for UnimplementedOperation {}
