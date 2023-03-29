@@ -582,7 +582,7 @@ impl<'a> EncryptAction<'a> {
 
     /// NOTE: This method is experimental and not intended for public use.
     ///
-    /// Set the range options. It is an error to call this method when the algorithm is not
+    /// Set the range options. This method should only be called when the algorithm is
     /// [`Algorithm::RangePreview`].
     pub fn range_options(mut self, range_options: impl Into<Option<RangeOptions>>) -> Self {
         self.opts.range_options = range_options.into();
