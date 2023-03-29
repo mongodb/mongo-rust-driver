@@ -138,14 +138,14 @@ pub(crate) struct Outcome {
 
 impl Outcome {
     pub(crate) async fn assert_matches_actual(
-        self,
-        db_name: String,
-        coll_name: String,
+        &self,
+        db_name: &str,
+        coll_name: &str,
         client: &Client,
     ) {
         use crate::coll::options::CollectionOptions;
 
-        let coll_name = match self.collection.name {
+        let coll_name = match self.collection.name.as_deref() {
             Some(name) => name,
             None => coll_name,
         };

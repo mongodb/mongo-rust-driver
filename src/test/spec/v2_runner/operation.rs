@@ -36,7 +36,7 @@ use crate::{
         UpdateOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{FailPoint, TestClient},
+    test::{FailPoint, TestClient, log_uncaptured, assert_matches},
     ClientSession,
     Collection,
     Database,
@@ -85,6 +85,72 @@ pub(crate) struct Operation {
     pub(crate) error: Option<bool>,
     pub(crate) result: Option<OperationResult>,
     pub(crate) session: Option<String>,
+}
+
+impl Operation {
+    pub(crate) fn assert_result_matches(&self, result: &Result<Option<Bson>>, description: &str) {
+        if self.error.is_none() && self.result.is_none() && result.is_err() {
+            log_uncaptured(format!(
+                "Ignoring operation error: {}",
+                result.clone().unwrap_err()
+            ));
+        }
+
+        if let Some(error) = self.error {
+            assert_eq!(error, result.is_err(), "{}", description);
+        }
+
+        if let Some(expected_result) = &self.result {
+            match expected_result {
+                OperationResult::Success(expected) => {
+                    let result = result
+                        .as_ref()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap();
+                    assert_matches(result, expected, Some(description));
+                }
+                OperationResult::Error(operation_error) => {
+                    let error = result.as_ref().unwrap_err();
+                    if let Some(error_contains) = &operation_error.error_contains {
+                        let message = error.message().unwrap();
+                        assert!(message.contains(error_contains));
+                    }
+                    if let Some(error_code_name) = &operation_error.error_code_name {
+                        let code_name = error.code_name().unwrap();
+                        assert_eq!(
+                            error_code_name, code_name,
+                            "{}: expected error with codeName {:?}, instead got {:#?}",
+                            description, error_code_name, error
+                        );
+                    }
+                    if let Some(error_code) = operation_error.error_code {
+                        let code = error.code().unwrap();
+                        assert_eq!(error_code, code);
+                    }
+                    if let Some(error_labels_contain) = &operation_error.error_labels_contain {
+                        let labels = error.labels();
+                        error_labels_contain
+                            .iter()
+                            .for_each(|label| assert!(labels.contains(label)));
+                    }
+                    if let Some(error_labels_omit) = &operation_error.error_labels_omit {
+                        let labels = error.labels();
+                        error_labels_omit
+                            .iter()
+                            .for_each(|label| assert!(!labels.contains(label)));
+                    }
+                    #[cfg(feature = "in-use-encryption-unstable")]
+                    if let Some(t) = &operation_error.is_timeout_error {
+                        assert_eq!(
+                            *t,
+                            error.is_network_timeout() || error.is_non_timeout_network_error()
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
