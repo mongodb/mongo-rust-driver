@@ -43,6 +43,8 @@ use crate::{
     IndexModel,
 };
 
+use super::{OpRunner, OpSessions};
+
 pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_on_collection<'a>(
         &'a self,
@@ -70,6 +72,14 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_on_session<'a>(
         &'a self,
         _session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        todo!()
+    }
+
+    fn execute_recursive<'a>(
+        &'a self,
+        runner: &'a mut OpRunner,
+        sessions: OpSessions<'a>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         todo!()
     }
@@ -113,9 +123,15 @@ impl Operation {
                 OperationResult::Error(operation_error) => {
                     let error = result.as_ref().unwrap_err();
                     if let Some(error_contains) = &operation_error.error_contains {
-                        let message = error.message().unwrap();
-                        assert!(message.contains(error_contains));
-                    }
+                        let message = error.message().unwrap().to_lowercase();
+                        assert!(
+                            message.contains(&error_contains.to_lowercase()),
+                            "{}: expected error message to contain \"{}\" but got \"{}\"",
+                            test.description,
+                            error_contains,
+                            message
+                        );
+                }
                     if let Some(error_code_name) = &operation_error.error_code_name {
                         let code_name = error.code_name().unwrap();
                         assert_eq!(
@@ -1568,6 +1584,36 @@ pub(super) struct WithTransaction {
 #[derive(Debug, Deserialize)]
 struct WithTransactionCallback {
     operations: Vec<Operation>,
+}
+
+impl TestOperation for WithTransaction {
+    fn execute_recursive<'a>(
+        &'a self,
+        runner: &'a mut OpRunner,
+        sessions: OpSessions<'a>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let session = sessions.session0.unwrap();
+            session.with_transaction(
+                (runner, &self.callback.operations, sessions.session1),
+                |session, (runner, operations, session1)| {
+                    async move {
+                        for op in operations.iter() {
+                            let sessions = OpSessions {
+                                session0: Some(session),
+                                session1: session1.as_deref_mut(),
+                            };
+                            let result = runner.run_operation(op, sessions).await;
+                        }
+                        return Ok(());
+                    }.boxed()
+                },
+                self.options.clone(),
+            ).await?;
+            Ok(None)
+        }.boxed()
+    }
+
 }
 
 #[derive(Debug, Deserialize)]
