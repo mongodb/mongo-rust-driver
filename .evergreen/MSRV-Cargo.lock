@@ -1140,7 +1140,7 @@ dependencies = [
 [[package]]
 name = "mongocrypt"
 version = "0.1.0"
-source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#eee5a9817cdfb92204f6167ade5064f540e8b9e9"
+source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#a3f48fade8ce1a32ed098e9dfaecf9b7c604b3cd"
 dependencies = [
  "bson",
  "mongocrypt-sys",
