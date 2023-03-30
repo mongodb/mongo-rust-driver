@@ -78,8 +78,8 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
 
     fn execute_recursive<'a>(
         &'a self,
-        runner: &'a mut OpRunner,
-        sessions: OpSessions<'a>,
+        _runner: &'a mut OpRunner,
+        _sessions: OpSessions<'a>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         todo!()
     }
@@ -1603,7 +1603,11 @@ impl TestOperation for WithTransaction {
                                 session0: Some(session),
                                 session1: session1.as_deref_mut(),
                             };
-                            let result = runner.run_operation(op, sessions).await;
+                            let result = match runner.run_operation(op, sessions).await {
+                                Some(r) => r,
+                                None => continue,
+                            };
+                            op.assert_result_matches(&result, "withTransaction nested operation");
                         }
                         return Ok(());
                     }.boxed()
@@ -1613,7 +1617,6 @@ impl TestOperation for WithTransaction {
             Ok(None)
         }.boxed()
     }
-
 }
 
 #[derive(Debug, Deserialize)]
