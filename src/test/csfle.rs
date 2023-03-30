@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -9,15 +9,19 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 #[cfg(not(feature = "tokio-runtime"))]
 use async_std::net::TcpListener;
 use bson::{
     doc,
+    rawdoc,
     spec::{BinarySubtype, ElementType},
     Binary,
     Bson,
+    DateTime,
     Document,
     RawBson,
+    RawDocumentBuf,
 };
 use futures_util::TryStreamExt;
 use lazy_static::lazy_static;
@@ -26,15 +30,7 @@ use mongocrypt::ctx::{Algorithm, KmsProvider};
 use tokio::net::TcpListener;
 
 use crate::{
-    client::{auth::Credential, options::TlsOptions},
-    client_encryption::{ClientEncryption, EncryptKey, MasterKey},
-    coll::options::{
-        CollectionOptions,
-        CreateIndexOptions,
-        DropCollectionOptions,
-        InsertOneOptions,
-    },
-    db::options::CreateCollectionOptions,
+    client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
     error::{ErrorKind, WriteError, WriteFailure},
     event::command::{
         CommandEventHandler,
@@ -42,7 +38,19 @@ use crate::{
         CommandStartedEvent,
         CommandSucceededEvent,
     },
-    options::{IndexOptions, ReadConcern, WriteConcern},
+    options::{
+        CollectionOptions,
+        CreateCollectionOptions,
+        CreateIndexOptions,
+        Credential,
+        DropCollectionOptions,
+        FindOptions,
+        IndexOptions,
+        InsertOneOptions,
+        ReadConcern,
+        TlsOptions,
+        WriteConcern,
+    },
     runtime,
     test::{Event, EventHandler, SdamEvent},
     Client,
@@ -530,7 +538,7 @@ fn load_testdata_raw(name: &str) -> Result<String> {
     ]
     .iter()
     .collect();
-    Ok(std::fs::read_to_string(path)?)
+    std::fs::read_to_string(path.clone()).context(path.to_string_lossy().into_owned())
 }
 
 fn load_testdata(name: &str) -> Result<Document> {
@@ -2871,6 +2879,376 @@ async fn bypass_mongocryptd_client() -> Result<()> {
     assert!(!connected.load(Ordering::SeqCst));
 
     Ok(())
+}
+
+// Prose test 22. Range explicit encryption
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn range_explicit_encryption() -> Result<()> {
+    let client = TestClient::new().await;
+    if client.server_version_lt(6, 2) || client.is_standalone() {
+        log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
+        return Ok(());
+    }
+
+    range_explicit_encryption_test(
+        "DecimalNoPrecision",
+        RangeOptions::builder().sparsity(1).build(),
+    )
+    .await?;
+    range_explicit_encryption_test(
+        "DecimalPrecision",
+        RangeOptions::builder()
+            .sparsity(1)
+            .min(Bson::Decimal128("0".parse()?))
+            .max(Bson::Decimal128("200".parse()?))
+            .precision(2)
+            .build(),
+    )
+    .await?;
+    range_explicit_encryption_test(
+        "DoubleNoPrecision",
+        RangeOptions::builder().sparsity(1).build(),
+    )
+    .await?;
+    range_explicit_encryption_test(
+        "DoublePrecision",
+        RangeOptions::builder()
+            .sparsity(1)
+            .min(Bson::Double(0.0))
+            .max(Bson::Double(200.0))
+            .precision(2)
+            .build(),
+    )
+    .await?;
+    range_explicit_encryption_test(
+        "Date",
+        RangeOptions::builder()
+            .sparsity(1)
+            .min(Bson::DateTime(DateTime::from_millis(0)))
+            .max(Bson::DateTime(DateTime::from_millis(200)))
+            .build(),
+    )
+    .await?;
+    range_explicit_encryption_test(
+        "Int",
+        RangeOptions::builder()
+            .sparsity(1)
+            .min(Bson::Int32(0))
+            .max(Bson::Int32(200))
+            .build(),
+    )
+    .await?;
+    range_explicit_encryption_test(
+        "Long",
+        RangeOptions::builder()
+            .sparsity(1)
+            .min(Bson::Int64(0))
+            .max(Bson::Int64(200))
+            .build(),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn range_explicit_encryption_test(
+    bson_type: &str,
+    range_options: RangeOptions,
+) -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+    let util_client = TestClient::new().await;
+
+    let encrypted_fields = load_testdata(&format!("range-encryptedFields-{}.json", bson_type))?;
+
+    let key1_document = load_testdata("key1-document.json")?;
+    let key1_id = match key1_document.get("_id").unwrap() {
+        Bson::Binary(binary) => binary,
+        _ => unreachable!(),
+    }
+    .clone();
+
+    let explicit_encryption_collection = util_client
+        .database("db")
+        .collection::<Document>("explicit_encryption");
+    explicit_encryption_collection
+        .drop(
+            DropCollectionOptions::builder()
+                .encrypted_fields(encrypted_fields.clone())
+                .build(),
+        )
+        .await?;
+    util_client
+        .database("db")
+        .create_collection(
+            "explicit_encryption",
+            CreateCollectionOptions::builder()
+                .encrypted_fields(encrypted_fields.clone())
+                .build(),
+        )
+        .await?;
+
+    let datakeys_collection = util_client
+        .database("keyvault")
+        .collection::<Document>("datakeys");
+    datakeys_collection.drop(None).await?;
+    util_client
+        .database("keyvault")
+        .create_collection("datakeys", None)
+        .await?;
+
+    datakeys_collection
+        .insert_one(
+            key1_document,
+            InsertOneOptions::builder()
+                .write_concern(WriteConcern::MAJORITY)
+                .build(),
+        )
+        .await?;
+
+    let key_vault_client = TestClient::new().await;
+
+    let client_encryption = ClientEncryption::new(
+        key_vault_client.into_client(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?;
+
+    let encrypted_client = Client::encrypted_builder(
+        CLIENT_OPTIONS.get().await.clone(),
+        KV_NAMESPACE.clone(),
+        LOCAL_KMS.clone(),
+    )?
+    .bypass_query_analysis(true)
+    .build()
+    .await?;
+
+    let key = format!("encrypted{}", bson_type);
+    let bson_numbers: BTreeMap<i32, RawBson> = [0, 6, 30, 200]
+        .iter()
+        .map(|num| (*num, get_raw_bson_from_num(bson_type, *num)))
+        .collect();
+    let explicit_encryption_collection = encrypted_client
+        .database("db")
+        .collection("explicit_encryption");
+
+    for (id, num) in bson_numbers.keys().enumerate() {
+        let encrypted_value = client_encryption
+            .encrypt(
+                bson_numbers[num].clone(),
+                key1_id.clone(),
+                Algorithm::RangePreview,
+            )
+            .contention_factor(0)
+            .range_options(range_options.clone())
+            .run()
+            .await?;
+
+        explicit_encryption_collection
+            .insert_one(
+                doc! {
+                    &key: encrypted_value,
+                    "_id": id as i32,
+                },
+                None,
+            )
+            .await?;
+    }
+
+    // Case 1: Decrypt a payload
+    let insert_payload = client_encryption
+        .encrypt(
+            bson_numbers[&6].clone(),
+            key1_id.clone(),
+            Algorithm::RangePreview,
+        )
+        .contention_factor(0)
+        .range_options(range_options.clone())
+        .run()
+        .await?;
+
+    let decrypted = client_encryption
+        .decrypt(insert_payload.as_raw_binary())
+        .await?;
+    assert_eq!(decrypted, bson_numbers[&6]);
+
+    // Utilities for cases 2-5
+    let explicit_encryption_collection =
+        explicit_encryption_collection.clone_with_type::<RawDocumentBuf>();
+    let find_options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
+    let assert_success = |actual: Vec<RawDocumentBuf>, expected: &[i32]| {
+        assert_eq!(actual.len(), expected.len());
+        for (idx, num) in expected.iter().enumerate() {
+            assert_eq!(
+                actual[idx].get(&key),
+                Ok(Some(bson_numbers[num].as_raw_bson_ref()))
+            );
+        }
+    };
+
+    // Case 2: Find encrypted range and return the maximum
+    let query = rawdoc! {
+        "$and": [
+            { &key: { "$gte": bson_numbers[&6].clone() } },
+            { &key: { "$lte": bson_numbers[&200].clone() } },
+        ]
+    };
+    let find_payload = client_encryption
+        .encrypt_expression(query, key1_id.clone())
+        .contention_factor(0)
+        .range_options(range_options.clone())
+        .run()
+        .await?;
+
+    let docs: Vec<RawDocumentBuf> = explicit_encryption_collection
+        .find(find_payload, find_options.clone())
+        .await?
+        .try_collect()
+        .await?;
+    assert_success(docs, &[6, 30, 200]);
+
+    // Case 3: Find encrypted range and return the minimum
+    let query = rawdoc! {
+        "$and": [
+            { &key: { "$gte": bson_numbers[&0].clone() } },
+            { &key: { "$lte": bson_numbers[&6].clone() } },
+        ]
+    };
+    let find_payload = client_encryption
+        .encrypt_expression(query, key1_id.clone())
+        .contention_factor(0)
+        .range_options(range_options.clone())
+        .run()
+        .await?;
+
+    let docs: Vec<RawDocumentBuf> = encrypted_client
+        .database("db")
+        .collection("explicit_encryption")
+        .find(find_payload, find_options.clone())
+        .await?
+        .try_collect()
+        .await?;
+    assert_success(docs, &[0, 6]);
+
+    // Case 4: Find encrypted range with an open range query
+    let query = rawdoc! {
+        "$and": [
+            { &key: { "$gt": bson_numbers[&30].clone() } },
+        ]
+    };
+    let find_payload = client_encryption
+        .encrypt_expression(query, key1_id.clone())
+        .contention_factor(0)
+        .range_options(range_options.clone())
+        .run()
+        .await?;
+
+    let docs: Vec<RawDocumentBuf> = encrypted_client
+        .database("db")
+        .collection("explicit_encryption")
+        .find(find_payload, find_options.clone())
+        .await?
+        .try_collect()
+        .await?;
+    assert_success(docs, &[200]);
+
+    // Case 5: Run an aggregation expression inside $expr
+    let query = rawdoc! { "$and": [ { "$lt": [ format!("${key}"), get_raw_bson_from_num(bson_type, 30) ] } ] };
+    let find_payload = client_encryption
+        .encrypt_expression(query, key1_id.clone())
+        .contention_factor(0)
+        .range_options(range_options.clone())
+        .run()
+        .await?;
+
+    let docs: Vec<RawDocumentBuf> = encrypted_client
+        .database("db")
+        .collection("explicit_encryption")
+        .find(doc! { "$expr": find_payload }, find_options.clone())
+        .await?
+        .try_collect()
+        .await?;
+    assert_success(docs, &[0, 6]);
+
+    // Case 6: Encrypting a document greater than the maximum errors
+    if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
+        let num = get_raw_bson_from_num(bson_type, 201);
+        let error = client_encryption
+            .encrypt(num, key1_id.clone(), Algorithm::RangePreview)
+            .contention_factor(0)
+            .range_options(range_options.clone())
+            .run()
+            .await
+            .unwrap_err();
+        assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
+    }
+
+    // Case 7: Encrypting a document of a different type errors
+    if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
+        let value = if bson_type == "Int" {
+            rawdoc! { &key: { "$numberDouble": "6" } }
+        } else {
+            rawdoc! { &key: { "$numberInt": "6" } }
+        };
+        let error = client_encryption
+            .encrypt(value, key1_id.clone(), Algorithm::RangePreview)
+            .contention_factor(0)
+            .range_options(range_options.clone())
+            .run()
+            .await
+            .unwrap_err();
+        assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
+    }
+
+    // Case 8: Setting precision errors if the type is not a double
+    if !bson_type.contains("Double") && !bson_type.contains("Decimal") {
+        let range_options = RangeOptions::builder()
+            .sparsity(1)
+            .min(get_bson_from_num(bson_type, 0))
+            .max(get_bson_from_num(bson_type, 200))
+            .precision(2)
+            .build();
+        let error = client_encryption
+            .encrypt(
+                bson_numbers[&6].clone(),
+                key1_id.clone(),
+                Algorithm::RangePreview,
+            )
+            .contention_factor(0)
+            .range_options(range_options)
+            .run()
+            .await
+            .unwrap_err();
+        assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
+    }
+
+    Ok(())
+}
+
+fn get_bson_from_num(bson_type: &str, num: i32) -> Bson {
+    match bson_type {
+        "DecimalNoPrecision" | "DecimalPrecision" => {
+            Bson::Decimal128(num.to_string().parse().unwrap())
+        }
+        "DoubleNoPrecision" | "DoublePrecision" => Bson::Double(num as f64),
+        "Date" => Bson::DateTime(DateTime::from_millis(num as i64)),
+        "Int" => Bson::Int32(num),
+        "Long" => Bson::Int64(num as i64),
+        _ => unreachable!(),
+    }
+}
+
+fn get_raw_bson_from_num(bson_type: &str, num: i32) -> RawBson {
+    match bson_type {
+        "DecimalNoPrecision" | "DecimalPrecision" => {
+            RawBson::Decimal128(num.to_string().parse().unwrap())
+        }
+        "DoubleNoPrecision" | "DoublePrecision" => RawBson::Double(num as f64),
+        "Date" => RawBson::DateTime(DateTime::from_millis(num as i64)),
+        "Int" => RawBson::Int32(num),
+        "Long" => RawBson::Int64(num as i64),
+        _ => unreachable!(),
+    }
 }
 
 async fn bind(addr: &str) -> Result<TcpListener> {

@@ -1,7 +1,24 @@
 //! Support for explicit encryption.
 
+use mongocrypt::{
+    ctx::{Algorithm, Ctx, CtxBuilder, KmsProvider},
+    Crypt,
+};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+use typed_builder::TypedBuilder;
+
 use crate::{
-    bson::Binary,
+    bson::{
+        doc,
+        spec::BinarySubtype,
+        Binary,
+        Bson,
+        Document,
+        RawBinaryRef,
+        RawBson,
+        RawDocumentBuf,
+    },
     client::options::TlsOptions,
     coll::options::CollectionOptions,
     error::{Error, Result},
@@ -12,12 +29,6 @@ use crate::{
     Cursor,
     Namespace,
 };
-use bson::{doc, spec::BinarySubtype, RawBinaryRef, RawDocumentBuf};
-use mongocrypt::{
-    ctx::{Algorithm, Ctx, KmsProvider},
-    Crypt,
-};
-use serde::{Deserialize, Serialize};
 
 use super::{options::KmsProviders, state_machine::CryptExecutor};
 
@@ -245,7 +256,7 @@ impl ClientEncryption {
     /// # use mongodb::error::Result;
     /// # async fn func() -> Result<()> {
     /// # let client_encryption: ClientEncryption = todo!();
-    /// # let key = todo!();
+    /// # let key = String::new();
     /// let encrypted = client_encryption
     ///     .encrypt(
     ///         "plaintext",
@@ -271,12 +282,65 @@ impl ClientEncryption {
                 algorithm,
                 contention_factor: None,
                 query_type: None,
+                range_options: None,
             },
         }
     }
 
-    async fn encrypt_final(&self, value: bson::RawBson, opts: EncryptOptions) -> Result<Binary> {
-        let ctx = self.encrypt_ctx(value, &opts)?;
+    /// NOTE: This method is experimental only. It is not intended for public use.
+    ///
+    /// Encrypts a match or aggregate expression with the given key.
+    /// `EncryptExpressionAction::run` returns a [`Document`] containing the encrypted expression.
+    ///
+    /// The expression will be encrypted using the [`Algorithm::RangePreview`] algorithm and the
+    /// "rangePreview" query type.
+    ///
+    /// The returned `EncryptExpressionAction` must be executed via `run`, e.g.
+    /// ```no_run
+    /// # use mongocrypt::ctx::Algorithm;
+    /// # use mongodb::client_encryption::ClientEncryption;
+    /// # use mongodb::error::Result;
+    /// # use bson::rawdoc;
+    /// # async fn func() -> Result<()> {
+    /// # let client_encryption: ClientEncryption = todo!();
+    /// # let key = String::new();
+    /// let expression  = rawdoc! {
+    ///     "$and": [
+    ///         { "field": { "$gte": 5 } },
+    ///         { "field": { "$lte": 10 } },
+    ///     ]
+    /// };
+    /// let encrypted_expression = client_encryption
+    ///     .encrypt_expression(
+    ///         expression,
+    ///         key,
+    ///     )
+    ///     .contention_factor(10)
+    ///     .run().await?;
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn encrypt_expression(
+        &self,
+        expression: RawDocumentBuf,
+        key: impl Into<EncryptKey>,
+    ) -> EncryptExpressionAction {
+        EncryptExpressionAction {
+            client_enc: self,
+            value: expression,
+            opts: EncryptOptions {
+                key: key.into(),
+                algorithm: Algorithm::RangePreview,
+                contention_factor: None,
+                query_type: Some("rangePreview".into()),
+                range_options: None,
+            },
+        }
+    }
+
+    async fn encrypt_final(&self, value: RawBson, opts: EncryptOptions) -> Result<Binary> {
+        let builder = self.get_ctx_builder(&opts)?;
+        let ctx = builder.build_explicit_encrypt(value)?;
         let result = self.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
             .get_binary("v")
@@ -284,7 +348,25 @@ impl ClientEncryption {
         Ok(bin_ref.to_binary())
     }
 
-    fn encrypt_ctx(&self, value: bson::RawBson, opts: &EncryptOptions) -> Result<Ctx> {
+    async fn encrypt_expression_final(
+        &self,
+        value: RawDocumentBuf,
+        opts: EncryptOptions,
+    ) -> Result<Document> {
+        let builder = self.get_ctx_builder(&opts)?;
+        let ctx = builder.build_explicit_encrypt_expression(value)?;
+        let result = self.exec.run_ctx(ctx, None).await?;
+        let doc_ref = result
+            .get_document("v")
+            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+        let doc = doc_ref
+            .to_owned()
+            .to_document()
+            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+        Ok(doc)
+    }
+
+    fn get_ctx_builder(&self, opts: &EncryptOptions) -> Result<CtxBuilder> {
         let mut builder = self.crypt.ctx_builder();
         match &opts.key {
             EncryptKey::Id(id) => {
@@ -301,7 +383,11 @@ impl ClientEncryption {
         if let Some(qtype) = &opts.query_type {
             builder = builder.query_type(qtype)?;
         }
-        Ok(builder.build_explicit_encrypt(value)?)
+        if let Some(range_options) = &opts.range_options {
+            let options_doc = bson::to_document(range_options)?;
+            builder = builder.range_options(options_doc)?;
+        }
+        Ok(builder)
     }
 
     /// Decrypts an encrypted value (BSON binary of subtype 6).
@@ -444,6 +530,29 @@ pub(crate) struct EncryptOptions {
     pub(crate) algorithm: Algorithm,
     pub(crate) contention_factor: Option<i64>,
     pub(crate) query_type: Option<String>,
+    pub(crate) range_options: Option<RangeOptions>,
+}
+
+/// NOTE: These options are experimental and not intended for public use.
+///
+/// The index options for a Queryable Encryption field supporting "rangePreview" queries.
+/// The options set must match the values set in the encryptedFields of the destination collection.
+#[skip_serializing_none]
+#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct RangeOptions {
+    /// The minimum value. This option must be set if `precision` is set.
+    pub min: Option<Bson>,
+
+    /// The maximum value. This option must be set if `precision` is set.
+    pub max: Option<Bson>,
+
+    /// The sparsity.
+    pub sparsity: i64,
+
+    /// The precision. This value must only be set for Double and Decimal128 fields.
+    pub precision: Option<i32>,
 }
 
 /// A pending `ClientEncryption::encrypt` action.
@@ -466,9 +575,45 @@ impl<'a> EncryptAction<'a> {
     }
 
     /// Set the query type.
-    #[allow(clippy::redundant_clone)]
     pub fn query_type(mut self, qtype: impl Into<String>) -> Self {
         self.opts.query_type = Some(qtype.into());
+        self
+    }
+
+    /// NOTE: This method is experimental and not intended for public use.
+    ///
+    /// Set the range options. This method should only be called when the algorithm is
+    /// [`Algorithm::RangePreview`].
+    pub fn range_options(mut self, range_options: impl Into<Option<RangeOptions>>) -> Self {
+        self.opts.range_options = range_options.into();
+        self
+    }
+}
+
+/// A pending `ClientEncryption::encrypt_expression` action.
+pub struct EncryptExpressionAction<'a> {
+    client_enc: &'a ClientEncryption,
+    value: RawDocumentBuf,
+    opts: EncryptOptions,
+}
+
+impl<'a> EncryptExpressionAction<'a> {
+    /// Execute the encryption of the expression.
+    pub async fn run(self) -> Result<Document> {
+        self.client_enc
+            .encrypt_expression_final(self.value, self.opts)
+            .await
+    }
+
+    /// Set the contention factor.
+    pub fn contention_factor(mut self, factor: impl Into<Option<i64>>) -> Self {
+        self.opts.contention_factor = factor.into();
+        self
+    }
+
+    /// Set the range options.
+    pub fn range_options(mut self, range_options: impl Into<Option<RangeOptions>>) -> Self {
+        self.opts.range_options = range_options.into();
         self
     }
 }
