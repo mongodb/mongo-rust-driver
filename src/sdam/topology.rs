@@ -43,6 +43,9 @@ use crate::{
     TopologyType,
 };
 
+#[cfg(feature = "tracing-unstable")]
+use crate::trace::topology::TopologyTracingEventEmitter;
+
 use super::{
     monitor::{MonitorManager, MonitorRequestReceiver},
     srv_polling::SrvPollingMonitor,
@@ -67,22 +70,38 @@ pub(crate) struct Topology {
 impl Topology {
     pub(crate) fn new(options: ClientOptions) -> Result<Topology> {
         let description = TopologyDescription::default();
+        let id = ObjectId::new();
 
-        let event_emitter = options.sdam_event_handler.as_ref().map(|handler| {
-            let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
+        let event_emitter =
+            if options.sdam_event_handler.is_some() || cfg!(feature = "tracing-unstable") {
+                let user_handler = options.sdam_event_handler.clone();
 
-            // Spin up a task to handle events so that a user's event handling code can't block the
-            // TopologyWorker.
-            let handler = handler.clone();
-            runtime::execute(async move {
-                while let Some(event) = rx.recv().await {
-                    let (event, ack) = event.into_parts();
-                    handle_sdam_event(handler.as_ref(), event);
-                    ack.acknowledge(());
-                }
-            });
-            SdamEventEmitter { sender: tx }
-        });
+                #[cfg(feature = "tracing-unstable")]
+                let tracing_emitter =
+                    TopologyTracingEventEmitter::new(options.tracing_max_document_length_bytes, id);
+                let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
+                // Spin up a task to handle events so that a user's event handling code can't block
+                // the TopologyWorker.
+                runtime::execute(async move {
+                    while let Some(event) = rx.recv().await {
+                        let (event, ack) = event.into_parts();
+
+                        if let Some(ref user_handler) = user_handler {
+                            #[cfg(feature = "tracing-unstable")]
+                            handle_sdam_event(user_handler.as_ref(), event.clone());
+                            #[cfg(not(feature = "tracing-unstable"))]
+                            handle_sdam_event(user_handler.as_ref(), event);
+                        }
+                        #[cfg(feature = "tracing-unstable")]
+                        handle_sdam_event(&tracing_emitter, event);
+
+                        ack.acknowledge(());
+                    }
+                });
+                Some(SdamEventEmitter { sender: tx })
+            } else {
+                None
+            };
 
         let (updater, update_receiver) = TopologyUpdater::channel();
         let (worker_handle, handle_listener) = WorkerHandleListener::channel();
@@ -94,8 +113,6 @@ impl Topology {
 
         let connection_establisher =
             ConnectionEstablisher::new(EstablisherOptions::from_client_options(&options))?;
-
-        let id = ObjectId::new();
 
         let worker = TopologyWorker {
             id,
@@ -375,18 +392,41 @@ impl TopologyWorker {
             // indicate to the topology watchers that the topology is no longer alive
             drop(self.publisher);
 
-            // close all the monitors.
-            let mut close_futures = self
-                .servers
-                .into_values()
-                .map(|server| {
-                    drop(server.inner);
-                    server.monitor_manager.close_monitor()
-                })
-                .collect::<FuturesUnordered<_>>();
+            // Close all the monitors.
+            let mut close_futures = FuturesUnordered::new();
+            for (address, server) in self.servers.into_iter() {
+                if let Some(ref emitter) = self.event_emitter {
+                    emitter
+                        .emit(SdamEvent::ServerClosed(ServerClosedEvent {
+                            address,
+                            topology_id: self.id,
+                        }))
+                        .await;
+                }
+                drop(server.inner);
+                close_futures.push(server.monitor_manager.close_monitor());
+            }
             while close_futures.next().await.is_some() {}
 
             if let Some(emitter) = self.event_emitter {
+                if !self.topology_description.servers.is_empty()
+                    && self.options.load_balanced != Some(true)
+                {
+                    let previous_description = self.topology_description;
+                    let mut new_description = previous_description.clone();
+                    new_description.servers.clear();
+
+                    emitter
+                        .emit(SdamEvent::TopologyDescriptionChanged(Box::new(
+                            TopologyDescriptionChangedEvent {
+                                topology_id: self.id,
+                                previous_description: previous_description.into(),
+                                new_description: new_description.into(),
+                            },
+                        )))
+                        .await;
+                }
+
                 emitter
                     .emit(SdamEvent::TopologyClosed(TopologyClosedEvent {
                         topology_id: self.id,
@@ -436,11 +476,10 @@ impl TopologyWorker {
         let diff = old_description.diff(&self.topology_description);
         let changed = diff.is_some();
         if let Some(diff) = diff {
-            // For ordering of events in tests, sort the addresses.
-
             #[cfg(not(test))]
             let changed_servers = diff.changed_servers;
 
+            // For ordering of events in tests, sort the addresses.
             #[cfg(test)]
             let changed_servers = {
                 let mut servers = diff.changed_servers.into_iter().collect::<Vec<_>>();

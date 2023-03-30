@@ -17,7 +17,7 @@ pub struct TracingEvent {
     /// The target, i.e. component the event corresponds to.
     pub target: String,
     /// Map of key/value pairs attached to the event.
-    pub fields: std::collections::HashMap<String, TracingEventValue>,
+    pub fields: HashMap<String, TracingEventValue>,
 }
 
 impl TracingEvent {

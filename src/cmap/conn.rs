@@ -65,11 +65,13 @@ pub struct ConnectionInfo {
 #[derivative(Debug)]
 pub(crate) struct Connection {
     /// Driver-generated ID for the connection.
-    pub(super) id: u32,
+    pub(crate) id: u32,
+
     /// Server-generated ID for the connection.
     pub(crate) server_id: Option<i64>,
 
     pub(crate) address: ServerAddress,
+
     pub(crate) generation: ConnectionGeneration,
 
     /// The cached StreamDescription from the connection's handshake.
@@ -164,9 +166,8 @@ impl Connection {
 
     /// Create a connection intended for monitoring purposes.
     /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
-    pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream) -> Self {
-        // Monitoring connections don't have IDs, so just use 0 as a placeholder here.
-        Self::new(address, stream, 0, ConnectionGeneration::Monitoring)
+    pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream, id: u32) -> Self {
+        Self::new(address, stream, id, ConnectionGeneration::Monitoring)
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {

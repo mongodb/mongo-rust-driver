@@ -1,9 +1,13 @@
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
 use bson::doc;
+use lazy_static::lazy_static;
 use tokio::sync::watch;
 
 use super::{
@@ -25,6 +29,13 @@ use crate::{
     options::{ClientOptions, ServerAddress},
     runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, WorkerHandle, WorkerHandleListener},
 };
+
+fn next_monitoring_connection_id() -> u32 {
+    lazy_static! {
+        static ref MONITORING_CONNECTION_ID: AtomicU32 = AtomicU32::new(0);
+    }
+    MONITORING_CONNECTION_ID.fetch_add(1, Ordering::SeqCst)
+}
 
 pub(crate) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
 pub(crate) const MIN_HEARTBEAT_FREQUENCY: Duration = Duration::from_millis(500);
@@ -162,10 +173,18 @@ impl Monitor {
     }
 
     async fn perform_hello(&mut self) -> HelloResult {
+        let driver_connection_id = self
+            .connection
+            .as_ref()
+            .map(|c| c.id)
+            .unwrap_or(next_monitoring_connection_id());
+
         self.emit_event(|| {
             SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
                 awaited: self.topology_version.is_some(),
+                driver_connection_id,
+                server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
             })
         });
 
@@ -215,7 +234,7 @@ impl Monitor {
                     let start = Instant::now();
                     let res = self
                         .connection_establisher
-                        .establish_monitoring_connection(self.address.clone())
+                        .establish_monitoring_connection(self.address.clone(), driver_connection_id)
                         .await;
                     match res {
                         Ok((conn, hello_reply)) => {
@@ -264,6 +283,8 @@ impl Monitor {
                         reply,
                         server_address: self.address.clone(),
                         awaited: self.topology_version.is_some(),
+                        driver_connection_id,
+                        server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
                 });
 
@@ -272,18 +293,21 @@ impl Monitor {
                 self.topology_version = r.command_response.topology_version;
             }
             HelloResult::Err(ref e) | HelloResult::Cancelled { reason: ref e } => {
-                // Per the spec, cancelled requests and errors both require the monitoring
-                // connection to be closed.
-                self.connection = None;
-                self.rtt_monitor_handle.reset_average_rtt();
                 self.emit_event(|| {
                     SdamEvent::ServerHeartbeatFailed(ServerHeartbeatFailedEvent {
                         duration,
                         failure: e.clone(),
                         server_address: self.address.clone(),
                         awaited: self.topology_version.is_some(),
+                        driver_connection_id,
+                        server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
                 });
+
+                // Per the spec, cancelled requests and errors both require the monitoring
+                // connection to be closed.
+                self.connection = None;
+                self.rtt_monitor_handle.reset_average_rtt();
                 self.topology_version.take();
             }
         }
@@ -402,7 +426,10 @@ impl RttMonitor {
                     None => {
                         let connection = self
                             .connection_establisher
-                            .establish_monitoring_connection(self.address.clone())
+                            .establish_monitoring_connection(
+                                self.address.clone(),
+                                next_monitoring_connection_id(),
+                            )
                             .await?
                             .0;
                         self.connection = Some(connection);

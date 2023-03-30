@@ -437,18 +437,23 @@ pub(crate) enum EventMatch {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct ExpectedMessages {
     pub(crate) client: String,
+    pub(crate) ignore_extra_messages: Option<bool>,
+    pub(crate) ignore_messages: Option<Vec<ExpectedMessage>>,
     pub(crate) messages: Vec<ExpectedMessage>,
 }
 
 #[cfg(feature = "tracing-unstable")]
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct ExpectedMessage {
-    #[serde(deserialize_with = "deserialize_tracing_level")]
-    pub(crate) level: tracing::Level,
-    #[serde(rename = "component", deserialize_with = "deserialize_tracing_target")]
-    pub(crate) target: String,
+    #[serde(default, deserialize_with = "deserialize_tracing_level")]
+    pub(crate) level: Option<tracing::Level>,
+    #[serde(
+        default,
+        rename = "component",
+        deserialize_with = "deserialize_tracing_target"
+    )]
+    pub(crate) target: Option<String>,
     pub(crate) failure_is_redacted: Option<bool>,
     pub(crate) data: Document,
 }
@@ -646,11 +651,13 @@ where
 }
 
 #[cfg(feature = "tracing-unstable")]
-fn deserialize_tracing_target<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+fn deserialize_tracing_target<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    String::deserialize(deserializer).map(|s| log_component_as_tracing_target(&s))
+    String::deserialize(deserializer).map(|s| Some(log_component_as_tracing_target(&s)))
 }
 
 #[cfg(feature = "tracing-unstable")]
@@ -659,6 +666,7 @@ fn log_component_as_tracing_target(component: &String) -> String {
         "command" => trace::COMMAND_TRACING_EVENT_TARGET.to_string(),
         "connection" => trace::CONNECTION_TRACING_EVENT_TARGET.to_string(),
         "serverSelection" => trace::SERVER_SELECTION_TRACING_EVENT_TARGET.to_string(),
+        "topology" => trace::TOPOLOGY_TRACING_EVENT_TARGET.to_string(),
         _ => panic!("Unknown tracing target: {}", component),
     }
 }
@@ -666,11 +674,12 @@ fn log_component_as_tracing_target(component: &String) -> String {
 #[cfg(feature = "tracing-unstable")]
 fn deserialize_tracing_level<'de, D>(
     deserializer: D,
-) -> std::result::Result<tracing::Level, D::Error>
+) -> std::result::Result<Option<tracing::Level>, D::Error>
 where
     D: Deserializer<'de>,
 {
     String::deserialize(deserializer)?
         .parse::<tracing::Level>()
+        .map(|level| Some(level))
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))
 }

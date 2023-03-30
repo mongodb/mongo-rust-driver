@@ -84,6 +84,10 @@ pub(crate) enum ExpectedSdamEvent {
     },
     #[serde(rename = "topologyDescriptionChangedEvent")]
     TopologyDescriptionChanged {},
+    #[serde(rename = "serverHeartbeatSucceededEvent", rename_all = "camelCase")]
+    ServerHeartbeatSucceeded {},
+    #[serde(rename = "serverHeartbeatFailedEvent", rename_all = "camelCase")]
+    ServerHeartbeatFailed {},
 }
 
 #[derive(Debug, Deserialize)]
@@ -127,6 +131,12 @@ pub(crate) enum ObserveEvent {
     ServerDescriptionChanged,
     #[serde(rename = "topologyDescriptionChangedEvent")]
     TopologyDescriptionChanged,
+    #[serde(rename = "serverHeartbeatStartedEvent")]
+    ServerHeartbeatStarted,
+    #[serde(rename = "serverHeartbeatSucceededEvent")]
+    ServerHeartbeatSucceeded,
+    #[serde(rename = "serverHeartbeatFailedEvent")]
+    ServerHeartbeatFailed,
 }
 
 impl ObserveEvent {
@@ -157,6 +167,14 @@ impl ObserveEvent {
                 Self::TopologyDescriptionChanged,
                 Event::Sdam(SdamEvent::TopologyDescriptionChanged(_)),
             ) => true,
+            (Self::ServerHeartbeatStarted, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_))) => {
+                true
+            }
+            (
+                Self::ServerHeartbeatSucceeded,
+                Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)),
+            ) => true,
+            (Self::ServerHeartbeatFailed, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_))) => true,
             _ => false,
         }
     }

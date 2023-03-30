@@ -26,7 +26,20 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
+    // TODO RUST-1222: Unskip this file
+    let mut skipped_files = vec!["interruptInUse-pool-clear.json"];
+    if cfg!(not(feature = "tracing-unstable")) {
+        skipped_files.extend_from_slice(&[
+            "logging-standalone.json",
+            "logging-replicaset.json",
+            "logging-sharded.json",
+            "logging-loadbalanced.json",
+        ]);
+    }
+
     run_unified_tests(&["server-discovery-and-monitoring", "unified"])
+        .skip_files(&skipped_files)
         .skip_tests(&[
             // The driver does not support socketTimeoutMS.
             "Reset server and pool after network timeout error during authentication",
