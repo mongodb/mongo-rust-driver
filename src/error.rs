@@ -1,9 +1,10 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
 use std::{
+    any::Any,
     collections::{HashMap, HashSet},
     fmt::{self, Debug},
-    sync::Arc, any::Any,
+    sync::Arc,
 };
 
 use bson::Bson;
@@ -52,12 +53,14 @@ pub struct Error {
 }
 
 impl Error {
-    /// Create a new `Error` wrapping an arbitrary value.  Can be used to abort transactions in callbacks for [ClientSession::with_transaction].
+    /// Create a new `Error` wrapping an arbitrary value.  Can be used to abort transactions in
+    /// callbacks for [ClientSession::with_transaction].
     pub fn custom(e: impl Any + Send + Sync) -> Self {
         Self::new(ErrorKind::Custom(Arc::new(e)), None::<Option<String>>)
     }
 
-    /// Retrieve a reference to a value provided to `Error::custom`.  Returns `None` if this is not a custom error or if the payload types mismatch.
+    /// Retrieve a reference to a value provided to `Error::custom`.  Returns `None` if this is not
+    /// a custom error or if the payload types mismatch.
     pub fn get_custom<E: Any>(&self) -> Option<&E> {
         if let ErrorKind::Custom(c) = &*self.kind {
             c.downcast_ref()

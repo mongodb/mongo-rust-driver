@@ -36,7 +36,7 @@ use crate::{
         UpdateOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{FailPoint, TestClient, log_uncaptured, assert_matches},
+    test::{assert_matches, log_uncaptured, FailPoint, TestClient},
     ClientSession,
     Collection,
     Database,
@@ -113,11 +113,7 @@ impl Operation {
         if let Some(expected_result) = &self.result {
             match expected_result {
                 OperationResult::Success(expected) => {
-                    let result = result
-                        .as_ref()
-                        .unwrap()
-                        .as_ref()
-                        .unwrap();
+                    let result = result.as_ref().unwrap().as_ref().unwrap();
                     assert_matches(result, expected, Some(description));
                 }
                 OperationResult::Error(operation_error) => {
@@ -1595,30 +1591,37 @@ impl TestOperation for WithTransaction {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let session = sessions.session0.unwrap();
-            session.with_transaction(
-                (runner, &self.callback.operations, sessions.session1),
-                |session, (runner, operations, session1)| {
-                    async move {
-                        for op in operations.iter() {
-                            let sessions = OpSessions {
-                                session0: Some(session),
-                                session1: session1.as_deref_mut(),
-                            };
-                            let result = match runner.run_operation(op, sessions).await {
-                                Some(r) => r,
-                                None => continue,
-                            };
-                            op.assert_result_matches(&result, "withTransaction nested operation");
-                            // Propagate sub-operation errors after validating the result.
-                            let _ = result?;
+            session
+                .with_transaction(
+                    (runner, &self.callback.operations, sessions.session1),
+                    |session, (runner, operations, session1)| {
+                        async move {
+                            for op in operations.iter() {
+                                let sessions = OpSessions {
+                                    session0: Some(session),
+                                    session1: session1.as_deref_mut(),
+                                };
+                                let result = match runner.run_operation(op, sessions).await {
+                                    Some(r) => r,
+                                    None => continue,
+                                };
+                                op.assert_result_matches(
+                                    &result,
+                                    "withTransaction nested operation",
+                                );
+                                // Propagate sub-operation errors after validating the result.
+                                let _ = result?;
+                            }
+                            return Ok(());
                         }
-                        return Ok(());
-                    }.boxed()
-                },
-                self.options.clone(),
-            ).await?;
+                        .boxed()
+                    },
+                    self.options.clone(),
+                )
+                .await?;
             Ok(None)
-        }.boxed()
+        }
+        .boxed()
     }
 }
 

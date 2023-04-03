@@ -27,7 +27,9 @@ use crate::{
         CLIENT_OPTIONS,
         SERVERLESS,
     },
-    Client, ClientSession, Namespace,
+    Client,
+    ClientSession,
+    Namespace,
 };
 
 use operation::OperationObject;
@@ -121,7 +123,11 @@ struct TestContext {
 }
 
 impl TestContext {
-    async fn new(test_file: &TestFile, test: &test_file::Test, internal_client: &TestClient) -> Self {
+    async fn new(
+        test_file: &TestFile,
+        test: &test_file::Test,
+        internal_client: &TestClient,
+    ) -> Self {
         // Get the test target collection
         let db_name = test_file
             .database_name
@@ -241,7 +247,10 @@ impl TestContext {
 
         Self {
             description: test.description.clone(),
-            ns: Namespace { db: db_name, coll: coll_name },
+            ns: Namespace {
+                db: db_name,
+                coll: coll_name,
+            },
             internal_client: internal_client.clone(),
             client,
             fail_point_guards,
@@ -250,7 +259,10 @@ impl TestContext {
         }
     }
 
-    async fn run_operation(&mut self, operation: &Operation) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
+    async fn run_operation(
+        &mut self,
+        operation: &Operation,
+    ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
         if operation.name == "endSession" {
             let session = match &operation.object {
                 Some(OperationObject::Session0) => &mut self.session0,
@@ -293,7 +305,11 @@ pub(crate) struct OpRunner<'a> {
 }
 
 impl<'a> OpRunner<'a> {
-    pub(crate) async fn run_operation<'b>(&mut self, operation: &Operation, mut sessions: OpSessions<'b>) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
+    pub(crate) async fn run_operation<'b>(
+        &mut self,
+        operation: &Operation,
+        mut sessions: OpSessions<'b>,
+    ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
         if operation.name == "withTransaction" {
             if !matches!(&operation.object, Some(OperationObject::Session0)) {
                 panic!("invalid object for withTransaction: {:?}", operation.object);
@@ -302,7 +318,9 @@ impl<'a> OpRunner<'a> {
         }
 
         let db = match &operation.database_options {
-            Some(options) => self.client.database_with_options(&self.ns.db, options.clone()),
+            Some(options) => self
+                .client
+                .database_with_options(&self.ns.db, options.clone()),
             None => self.client.database(&self.ns.db),
         };
         let coll = match &operation.collection_options {
@@ -330,9 +348,7 @@ impl<'a> OpRunner<'a> {
                 }
                 result
             }
-            Some(OperationObject::Database) => {
-                operation.execute_on_database(&db, session).await
-            }
+            Some(OperationObject::Database) => operation.execute_on_database(&db, session).await,
             Some(OperationObject::Client) => operation.execute_on_client(&self.client).await,
             Some(OperationObject::Session0) => {
                 operation
@@ -370,7 +386,10 @@ impl<'a> OpRunner<'a> {
                     | "assertCollectionNotExists"
                     | "assertIndexExists"
                     | "assertIndexNotExists" => {
-                        operation.execute_on_client(&self.internal_client).await.unwrap();
+                        operation
+                            .execute_on_client(&self.internal_client)
+                            .await
+                            .unwrap();
                     }
                     "targetedFailPoint" => {
                         let fail_point = from_bson(
@@ -415,7 +434,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
 
     if !file_ctx.check_topology(&test_file) {
         log_uncaptured("Client topology not compatible with test");
-            return;
+        return;
     }
 
     for test in &test_file.tests {
@@ -441,7 +460,8 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         // `killAllSessions` isn't supported on serverless.
         // TODO CLOUDP-84298 remove this conditional.
         if !*SERVERLESS {
-            match file_ctx.internal_client
+            match file_ctx
+                .internal_client
                 .database("admin")
                 .run_command(doc! { "killAllSessions": [] }, None)
                 .await
@@ -455,7 +475,8 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         }
 
         #[cfg(feature = "in-use-encryption-unstable")]
-        csfle::populate_key_vault(&file_ctx.internal_client, test_file.key_vault_data.as_ref()).await;
+        csfle::populate_key_vault(&file_ctx.internal_client, test_file.key_vault_data.as_ref())
+            .await;
 
         let mut test_ctx = TestContext::new(&test_file, &test, &file_ctx.internal_client).await;
         let session0_lsid = test_ctx.session0.as_ref().unwrap().id().clone();
@@ -479,7 +500,8 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         }
 
         if let Some(expectations) = &test.expectations {
-            let events: Vec<CommandStartedEvent> = test_ctx.client
+            let events: Vec<CommandStartedEvent> = test_ctx
+                .client
                 .get_all_command_started_events()
                 .into_iter()
                 .map(Into::into)

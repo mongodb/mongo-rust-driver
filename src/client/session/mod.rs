@@ -567,13 +567,22 @@ impl ClientSession {
     }
 
     /// TODO
-    pub async fn with_transaction<R, C, F>(&mut self, mut context: C, mut callback: F, options: impl Into<Option<TransactionOptions>>) -> Result<R>
-        where F: for<'a> FnMut(&'a mut ClientSession, &'a mut C) -> BoxFuture<'a, Result<R>>,
+    pub async fn with_transaction<R, C, F>(
+        &mut self,
+        mut context: C,
+        mut callback: F,
+        options: impl Into<Option<TransactionOptions>>,
+    ) -> Result<R>
+    where
+        F: for<'a> FnMut(&'a mut ClientSession, &'a mut C) -> BoxFuture<'a, Result<R>>,
     {
         let options = options.into();
         let timeout = Duration::from_secs(120);
         #[cfg(test)]
-        let timeout = self.convenient_transaction_timeout.clone().unwrap_or(timeout);
+        let timeout = self
+            .convenient_transaction_timeout
+            .clone()
+            .unwrap_or(timeout);
         let start = Instant::now();
 
         use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
@@ -583,7 +592,10 @@ impl ClientSession {
             let ret = match callback(self, &mut context).await {
                 Ok(v) => v,
                 Err(e) => {
-                    if matches!(self.transaction.state, TransactionState::Starting | TransactionState::InProgress) {
+                    if matches!(
+                        self.transaction.state,
+                        TransactionState::Starting | TransactionState::InProgress
+                    ) {
                         self.abort_transaction().await?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
@@ -592,7 +604,12 @@ impl ClientSession {
                     return Err(e);
                 }
             };
-            if matches!(self.transaction.state, TransactionState::None | TransactionState::Aborted | TransactionState::Committed { .. }) {
+            if matches!(
+                self.transaction.state,
+                TransactionState::None
+                    | TransactionState::Aborted
+                    | TransactionState::Committed { .. }
+            ) {
                 return Ok(ret);
             }
             'commit: loop {
