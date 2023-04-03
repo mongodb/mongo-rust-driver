@@ -22,6 +22,14 @@ async fn run_legacy() {
     run_v2_tests(&["transactions", "legacy"]).await;
 }
 
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run_legacy_convenient_api() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    run_v2_tests(&["transactions-convenient-api"]).await;
+}
+
 // TODO RUST-902: Reduce transactionLifetimeLimitSeconds.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
@@ -90,6 +98,10 @@ async fn deserialize_recovery_token() {
 async fn convenient_api_custom_error() {
     let _guard: _ = LOCK.run_concurrently().await;
     let client = crate::Client::test_builder().event_client().build().await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
+        return;
+    }
     let mut session = client.start_session(None).await.unwrap();
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
 
@@ -116,6 +128,10 @@ async fn convenient_api_custom_error() {
 async fn convenient_api_returned_value() {
     let _guard: _ = LOCK.run_concurrently().await;
     let client = crate::Client::test_builder().event_client().build().await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
+        return;
+    }
     let mut session = client.start_session(None).await.unwrap();
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
 
@@ -136,6 +152,10 @@ async fn convenient_api_returned_value() {
 async fn convenient_api_retry_timeout_callback() {
     let _guard: _ = LOCK.run_concurrently().await;
     let client = crate::Client::test_builder().event_client().build().await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
+        return;
+    }
     let mut session = client.start_session(None).await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
@@ -170,6 +190,10 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         .event_client()
         .build()
         .await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping convenient_api_retry_timeout_commit_unknown: no transaction support.");
+        return;
+    }
     let mut session = client.start_session(None).await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");
@@ -213,6 +237,10 @@ async fn convenient_api_retry_timeout_commit_transient() {
         .event_client()
         .build()
         .await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping convenient_api_retry_timeout_commit_transient: no transaction support.");
+        return;
+    }
     let mut session = client.start_session(None).await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client.database("test_convenient").collection::<Document>("test_convenient");

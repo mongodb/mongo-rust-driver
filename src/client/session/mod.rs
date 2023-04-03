@@ -599,13 +599,14 @@ impl ClientSession {
                 match self.commit_transaction().await {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
-                        if start.elapsed() < timeout {
-                            if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-                                continue 'commit;
-                            }
-                            if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
-                                continue 'transaction;
-                            }
+                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
+                            return Err(e);
+                        }
+                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
+                            continue 'commit;
+                        }
+                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                            continue 'transaction;
                         }
                         return Err(e);
                     }

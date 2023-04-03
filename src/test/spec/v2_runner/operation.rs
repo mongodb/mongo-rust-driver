@@ -280,6 +280,7 @@ impl<'de> Deserialize<'de> for Operation {
             "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
             "watch" => deserialize_op::<Watch>(definition.arguments),
+            "withTransaction" => deserialize_op::<WithTransaction>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1608,6 +1609,8 @@ impl TestOperation for WithTransaction {
                                 None => continue,
                             };
                             op.assert_result_matches(&result, "withTransaction nested operation");
+                            // Propagate sub-operation errors after validating the result.
+                            let _ = result?;
                         }
                         return Ok(());
                     }.boxed()

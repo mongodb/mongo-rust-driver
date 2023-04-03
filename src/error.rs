@@ -154,6 +154,10 @@ impl Error {
         matches!(self.kind.as_ref(), ErrorKind::ServerSelection { .. })
     }
 
+    pub(crate) fn is_max_time_ms_expired_error(&self) -> bool {
+        self.code() == Some(50)
+    }
+
     /// Whether a read operation should be retried if this error occurs.
     pub(crate) fn is_read_retryable(&self) -> bool {
         if self.is_network_error() {
