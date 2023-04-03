@@ -566,15 +566,17 @@ impl ClientSession {
         }
     }
 
-    /// Runs a callback inside a transaction.  Transient transaction errors will cause the callback to be
-    /// re-run, other errors will abort the transaction and be returned to the caller.  If the callback needs
-    /// to provide its own error information, the [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
+    /// Runs a callback inside a transaction.  Transient transaction errors will cause the callback
+    /// to be re-run, other errors will abort the transaction and be returned to the caller.  If
+    /// the callback needs to provide its own error information, the
+    /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
     /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
-    /// 
-    /// Because the callback can be repeatedly executed and because it returns a future, the rust closure borrowing
-    /// rules for captured values can be overly restrictive.  As a convenience, `with_transaction` accepts a context
-    /// argument that will be passed to the callback along with the session:
-    /// 
+    ///
+    /// Because the callback can be repeatedly executed and because it returns a future, the rust
+    /// closure borrowing rules for captured values can be overly restrictive.  As a
+    /// convenience, `with_transaction` accepts a context argument that will be passed to the
+    /// callback along with the session:
+    ///
     /// ```no_run
     /// # use mongodb::{bson::{doc, Document}, error::Result, Client};
     /// # use futures::FutureExt;
