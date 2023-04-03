@@ -206,16 +206,7 @@ async fn convenient_api_retry_timeout_callback() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_retry_timeout_commit_unknown() {
     let _guard: _ = LOCK.run_exclusively().await;
-    let client = crate::Client::test_builder()
-        .options({
-            let mut options = CLIENT_OPTIONS.get().await.clone();
-            options.direct_connection = Some(true);
-            options.hosts.drain(1..);
-            options
-        })
-        .event_client()
-        .build()
-        .await;
+    let client = crate::Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured(
             "Skipping convenient_api_retry_timeout_commit_unknown: no transaction support.",

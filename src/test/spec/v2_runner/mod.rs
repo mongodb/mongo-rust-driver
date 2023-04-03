@@ -92,7 +92,7 @@ struct FileContext {
 }
 
 impl FileContext {
-    async fn new(path: &std::path::PathBuf) -> Self {
+    async fn new(path: &std::path::Path) -> Self {
         let internal_client = TestClient::new().await;
         let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
@@ -108,7 +108,7 @@ impl FileContext {
                 .iter()
                 .any(|run_on| run_on.can_run_on(&self.internal_client));
         }
-        return true;
+        true
     }
 }
 
@@ -478,7 +478,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         csfle::populate_key_vault(&file_ctx.internal_client, test_file.key_vault_data.as_ref())
             .await;
 
-        let mut test_ctx = TestContext::new(&test_file, &test, &file_ctx.internal_client).await;
+        let mut test_ctx = TestContext::new(&test_file, test, &file_ctx.internal_client).await;
         let session0_lsid = test_ctx.session0.as_ref().unwrap().id().clone();
         let session1_lsid = test_ctx.session1.as_ref().unwrap().id().clone();
 

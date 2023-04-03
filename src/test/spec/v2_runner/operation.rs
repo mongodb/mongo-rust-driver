@@ -1612,7 +1612,7 @@ impl TestOperation for WithTransaction {
                                 // Propagate sub-operation errors after validating the result.
                                 let _ = result?;
                             }
-                            return Ok(());
+                            Ok(())
                         }
                         .boxed()
                     },

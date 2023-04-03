@@ -617,10 +617,7 @@ impl ClientSession {
         let options = options.into();
         let timeout = Duration::from_secs(120);
         #[cfg(test)]
-        let timeout = self
-            .convenient_transaction_timeout
-            .clone()
-            .unwrap_or(timeout);
+        let timeout = self.convenient_transaction_timeout.unwrap_or(timeout);
         let start = Instant::now();
 
         use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};

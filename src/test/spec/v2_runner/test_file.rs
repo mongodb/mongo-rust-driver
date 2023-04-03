@@ -156,8 +156,8 @@ impl Outcome {
             .read_concern(crate::options::ReadConcern::LOCAL)
             .build();
         let coll = client
-            .database(&db_name)
-            .collection_with_options(&coll_name, coll_opts);
+            .database(db_name)
+            .collection_with_options(coll_name, coll_opts);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         let options = FindOptions::builder()
             .sort(doc! { "_id": 1 })
