@@ -566,7 +566,43 @@ impl ClientSession {
         }
     }
 
-    /// TODO
+    /// Runs a callback inside a transaction.  Transient transaction errors will cause the callback to be
+    /// re-run, other errors will abort the transaction and be returned to the caller.  If the callback needs
+    /// to provide its own error information, the [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
+    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    /// 
+    /// Because the callback can be repeatedly executed and because it returns a future, the rust closure borrowing
+    /// rules for captured values can be overly restrictive.  As a convenience, `with_transaction` accepts a context
+    /// argument that will be passed to the callback along with the session:
+    /// 
+    /// ```no_run
+    /// # use mongodb::{bson::{doc, Document}, error::Result, Client};
+    /// # use futures::FutureExt;
+    /// # async fn wrapper() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// # let mut session = client.start_session(None).await?;
+    /// let coll = client.database("mydb").collection::<Document>("mycoll");
+    /// let my_data = "my data".to_string();
+    /// // This works:
+    /// session.with_transaction(
+    ///     (&coll, &my_data),
+    ///     |session, (coll, my_data)| async move {
+    ///         coll.insert_one_with_session(doc! { "data": *my_data }, None, session).await
+    ///     }.boxed(),
+    ///     None,
+    /// ).await?;
+    /// /* This will not compile with a "variable moved due to use in generator" error:
+    /// session.with_transaction(
+    ///     (),
+    ///     |session, _| async move {
+    ///         coll.insert_one_with_session(doc! { "data": my_data }, None, session).await
+    ///     }.boxed(),
+    ///     None,
+    /// ).await?;
+    /// */
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn with_transaction<R, C, F>(
         &mut self,
         mut context: C,

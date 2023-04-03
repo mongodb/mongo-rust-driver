@@ -54,7 +54,7 @@ pub struct Error {
 
 impl Error {
     /// Create a new `Error` wrapping an arbitrary value.  Can be used to abort transactions in
-    /// callbacks for [ClientSession::with_transaction].
+    /// callbacks for [`ClientSession::with_transaction`](crate::ClientSession::with_transaction).
     pub fn custom(e: impl Any + Send + Sync) -> Self {
         Self::new(ErrorKind::Custom(Arc::new(e)), None::<Option<String>>)
     }
