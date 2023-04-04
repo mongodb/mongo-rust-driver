@@ -208,7 +208,7 @@ impl TestContext {
             .await
             .min_heartbeat_freq(Some(Duration::from_millis(50)));
         #[cfg(feature = "in-use-encryption-unstable")]
-        let builder = csfle::set_auto_enc(builder, &test);
+        let builder = csfle::set_auto_enc(builder, test);
         let client = builder.event_client().build().await;
 
         // TODO RUST-900: Remove this extraneous call.
