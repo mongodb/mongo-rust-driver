@@ -255,7 +255,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         .await;
 
     let err = result.unwrap_err();
-    assert!(err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT));
+    assert_eq!(Some(251), err.code());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
