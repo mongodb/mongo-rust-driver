@@ -123,11 +123,11 @@ impl Operation {
                         assert!(
                             message.contains(&error_contains.to_lowercase()),
                             "{}: expected error message to contain \"{}\" but got \"{}\"",
-                            test.description,
+                            description,
                             error_contains,
                             message
                         );
-                }
+                    }
                     if let Some(error_code_name) = &operation_error.error_code_name {
                         let code_name = error.code_name().unwrap();
                         assert_eq!(
