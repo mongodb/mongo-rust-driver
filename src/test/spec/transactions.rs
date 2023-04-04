@@ -115,10 +115,13 @@ async fn convenient_api_custom_error() {
     let result: Result<()> = session
         .with_transaction(
             coll,
-            |session, coll| async move {
-                coll.find_one_with_session(None, None, session).await?;
-                Err(Error::custom(MyErr))
-            }.boxed(),
+            |session, coll| {
+                async move {
+                    coll.find_one_with_session(None, None, session).await?;
+                    Err(Error::custom(MyErr))
+                }
+                .boxed()
+            },
             None,
         )
         .await;
@@ -126,10 +129,7 @@ async fn convenient_api_custom_error() {
     assert!(result.is_err());
     assert!(result.unwrap_err().get_custom::<MyErr>().is_some());
     let events = client.get_all_command_started_events();
-    let commands: Vec<_> = events
-        .iter()
-        .map(|ev| &ev.command_name)
-        .collect();
+    let commands: Vec<_> = events.iter().map(|ev| &ev.command_name).collect();
     assert_eq!(&["find", "abortTransaction"], &commands[..]);
 }
 
@@ -150,10 +150,13 @@ async fn convenient_api_returned_value() {
     let value = session
         .with_transaction(
             coll,
-            |session, coll| async move {
-                coll.find_one_with_session(None, None, session).await?;
-                Ok(42)
-            }.boxed(),
+            |session, coll| {
+                async move {
+                    coll.find_one_with_session(None, None, session).await?;
+                    Ok(42)
+                }
+                .boxed()
+            },
             None,
         )
         .await
@@ -180,12 +183,15 @@ async fn convenient_api_retry_timeout_callback() {
     let result: Result<()> = session
         .with_transaction(
             coll,
-            |session, coll| async move {
-                coll.find_one_with_session(None, None, session).await?;
-                let mut err = Error::custom(42);
-                err.add_label(TRANSIENT_TRANSACTION_ERROR);
-                Err(err)
-            }.boxed(),
+            |session, coll| {
+                async move {
+                    coll.find_one_with_session(None, None, session).await?;
+                    let mut err = Error::custom(42);
+                    err.add_label(TRANSIENT_TRANSACTION_ERROR);
+                    Err(err)
+                }
+                .boxed()
+            },
             None,
         )
         .await;
@@ -227,10 +233,13 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     let result = session
         .with_transaction(
             coll,
-            |session, coll| async move {
-                coll.find_one_with_session(None, None, session).await?;
-                Ok(())
-            }.boxed(),
+            |session, coll| {
+                async move {
+                    coll.find_one_with_session(None, None, session).await?;
+                    Ok(())
+                }
+                .boxed()
+            },
             None,
         )
         .await;
@@ -280,10 +289,13 @@ async fn convenient_api_retry_timeout_commit_transient() {
     let result = session
         .with_transaction(
             coll,
-            |session, coll| async move {
-                coll.find_one_with_session(None, None, session).await?;
-                Ok(())
-            }.boxed(),
+            |session, coll| {
+                async move {
+                    coll.find_one_with_session(None, None, session).await?;
+                    Ok(())
+                }
+                .boxed()
+            },
             None,
         )
         .await;
