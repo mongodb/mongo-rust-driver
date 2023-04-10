@@ -9,7 +9,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use uuid::Uuid;
 
@@ -566,9 +565,10 @@ impl ClientSession {
         }
     }
 
-    /// Runs a callback inside a transaction.  Transient transaction errors will cause the callback
-    /// to be re-run, other errors will abort the transaction and be returned to the caller.  If
-    /// the callback needs to provide its own error information, the
+    /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
+    /// Transient transaction errors will cause the callback or the commit to be retried;
+    /// other errors will cause the transaction to be aborted and the error returned to the
+    /// caller.  If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
     /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
     ///
@@ -673,6 +673,8 @@ impl ClientSession {
             .and_then(|options| options.default_transaction_options.as_ref())
     }
 }
+
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 struct DroppedClientSession {
     cluster_time: Option<ClusterTime>,
