@@ -35,7 +35,7 @@ use crate::{
     ClientSession,
     Collection,
     Namespace,
-    SessionCursor,
+    SessionCursor, client_encryption::{ClientEncryption, MasterKey},
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -419,6 +419,40 @@ impl Database {
         session: &mut ClientSession,
     ) -> Result<()> {
         self.create_collection_common(name, options, session).await
+    }
+
+    /// TODO
+    pub async fn create_encrypted_collection(
+        &self,
+        ce: &ClientEncryption,
+        name: impl AsRef<str>,
+        options: impl Into<Option<CreateCollectionOptions>>,
+        master_key: MasterKey,
+    ) -> std::result::Result<Document, (Error, Document)> {
+        let options: Option<CreateCollectionOptions> = options.into();
+        let ef = match options.as_ref().and_then(|o| o.encrypted_fields.as_ref()) {
+            Some(ef) => ef,
+            None => return Err((Error::invalid_argument("no encrypted_fields defined for collection"), doc! { })),
+        };
+        let mut ef_prime = ef.clone();
+        if let Ok(fields) = ef_prime.get_array_mut("fields") {
+            for f in fields {
+                let f_doc = if let Some(d) = f.as_document_mut() { d } else { continue; };
+                if f_doc.get("keyId") == Some(&Bson::Null) {
+                    let d = match ce.create_data_key(master_key.clone()).run().await {
+                        Ok(v) => v,
+                        Err(e) => return Err((e, ef_prime)),
+                    };
+                    f_doc.insert("keyId", d);
+                }
+            }
+        }
+        let mut opts_prime = options.unwrap().clone();  // safe unwrap: no options would be caught by the encrypted_fields check
+        opts_prime.encrypted_fields = Some(ef_prime.clone());
+        match self.create_collection(name, opts_prime).await {
+            Ok(()) => Ok(ef_prime),
+            Err(e) => Err((e, ef_prime)),
+        }
     }
 
     pub(crate) async fn run_command_common(
