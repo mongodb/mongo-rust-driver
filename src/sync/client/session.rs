@@ -135,4 +135,72 @@ impl ClientSession {
     pub fn abort_transaction(&mut self) -> Result<()> {
         runtime::block_on(self.async_client_session.abort_transaction())
     }
+
+    /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
+    /// Transient transaction errors will cause the callback or the commit to be retried;
+    /// other errors will cause the transaction to be aborted and the error returned to the
+    /// caller.  If the callback needs to provide its own error information, the
+    /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
+    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    pub fn with_transaction<R, F>(
+        &mut self,
+        mut callback: F,
+        options: impl Into<Option<TransactionOptions>>,
+    ) -> Result<R>
+    where
+        F: for<'a> FnMut(&'a mut ClientSession) -> Result<R>,
+    {
+        let options = options.into();
+        let timeout = std::time::Duration::from_secs(120);
+        let start = std::time::Instant::now();
+
+        use crate::{
+            client::session::TransactionState,
+            error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
+        };
+
+        'transaction: loop {
+            self.start_transaction(options.clone())?;
+            let ret = match callback(self) {
+                Ok(v) => v,
+                Err(e) => {
+                    if matches!(
+                        self.async_client_session.transaction.state,
+                        TransactionState::Starting | TransactionState::InProgress
+                    ) {
+                        self.abort_transaction()?;
+                    }
+                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
+                        continue 'transaction;
+                    }
+                    return Err(e);
+                }
+            };
+            if matches!(
+                self.async_client_session.transaction.state,
+                TransactionState::None
+                    | TransactionState::Aborted
+                    | TransactionState::Committed { .. }
+            ) {
+                return Ok(ret);
+            }
+            'commit: loop {
+                match self.commit_transaction() {
+                    Ok(()) => return Ok(ret),
+                    Err(e) => {
+                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
+                            return Err(e);
+                        }
+                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
+                            continue 'commit;
+                        }
+                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                            continue 'transaction;
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+        }
+    }
 }

@@ -36,12 +36,14 @@ use crate::{
         UpdateOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{FailPoint, TestClient},
+    test::{assert_matches, log_uncaptured, FailPoint, TestClient},
     ClientSession,
     Collection,
     Database,
     IndexModel,
 };
+
+use super::{OpRunner, OpSessions};
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_on_collection<'a>(
@@ -73,6 +75,14 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         todo!()
     }
+
+    fn execute_recursive<'a>(
+        &'a self,
+        _runner: &'a mut OpRunner,
+        _sessions: OpSessions<'a>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -85,6 +95,74 @@ pub(crate) struct Operation {
     pub(crate) error: Option<bool>,
     pub(crate) result: Option<OperationResult>,
     pub(crate) session: Option<String>,
+}
+
+impl Operation {
+    pub(crate) fn assert_result_matches(&self, result: &Result<Option<Bson>>, description: &str) {
+        if self.error.is_none() && self.result.is_none() && result.is_err() {
+            log_uncaptured(format!(
+                "Ignoring operation error: {}",
+                result.clone().unwrap_err()
+            ));
+        }
+
+        if let Some(error) = self.error {
+            assert_eq!(error, result.is_err(), "{}", description);
+        }
+
+        if let Some(expected_result) = &self.result {
+            match expected_result {
+                OperationResult::Success(expected) => {
+                    let result = result.as_ref().unwrap().as_ref().unwrap();
+                    assert_matches(result, expected, Some(description));
+                }
+                OperationResult::Error(operation_error) => {
+                    let error = result.as_ref().unwrap_err();
+                    if let Some(error_contains) = &operation_error.error_contains {
+                        let message = error.message().unwrap().to_lowercase();
+                        assert!(
+                            message.contains(&error_contains.to_lowercase()),
+                            "{}: expected error message to contain \"{}\" but got \"{}\"",
+                            description,
+                            error_contains,
+                            message
+                        );
+                    }
+                    if let Some(error_code_name) = &operation_error.error_code_name {
+                        let code_name = error.code_name().unwrap();
+                        assert_eq!(
+                            error_code_name, code_name,
+                            "{}: expected error with codeName {:?}, instead got {:#?}",
+                            description, error_code_name, error
+                        );
+                    }
+                    if let Some(error_code) = operation_error.error_code {
+                        let code = error.code().unwrap();
+                        assert_eq!(error_code, code);
+                    }
+                    if let Some(error_labels_contain) = &operation_error.error_labels_contain {
+                        let labels = error.labels();
+                        error_labels_contain
+                            .iter()
+                            .for_each(|label| assert!(labels.contains(label)));
+                    }
+                    if let Some(error_labels_omit) = &operation_error.error_labels_omit {
+                        let labels = error.labels();
+                        error_labels_omit
+                            .iter()
+                            .for_each(|label| assert!(!labels.contains(label)));
+                    }
+                    #[cfg(feature = "in-use-encryption-unstable")]
+                    if let Some(t) = &operation_error.is_timeout_error {
+                        assert_eq!(
+                            *t,
+                            error.is_network_timeout() || error.is_non_timeout_network_error()
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,6 +276,7 @@ impl<'de> Deserialize<'de> for Operation {
             "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
             "watch" => deserialize_op::<Watch>(definition.arguments),
+            "withTransaction" => deserialize_op::<WithTransaction>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1487,6 +1566,59 @@ impl TestOperation for AssertIndexNotExists {
                 // a namespace not found error indicates that the index does not exist
                 Err(err) => assert_eq!(err.code(), Some(26)),
             }
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct WithTransaction {
+    callback: WithTransactionCallback,
+    options: Option<TransactionOptions>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WithTransactionCallback {
+    operations: Vec<Operation>,
+}
+
+impl TestOperation for WithTransaction {
+    fn execute_recursive<'a>(
+        &'a self,
+        runner: &'a mut OpRunner,
+        sessions: OpSessions<'a>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let session = sessions.session0.unwrap();
+            session
+                .with_transaction(
+                    (runner, &self.callback.operations, sessions.session1),
+                    |session, (runner, operations, session1)| {
+                        async move {
+                            for op in operations.iter() {
+                                let sessions = OpSessions {
+                                    session0: Some(session),
+                                    session1: session1.as_deref_mut(),
+                                };
+                                let result = match runner.run_operation(op, sessions).await {
+                                    Some(r) => r,
+                                    None => continue,
+                                };
+                                op.assert_result_matches(
+                                    &result,
+                                    "withTransaction nested operation",
+                                );
+                                // Propagate sub-operation errors after validating the result.
+                                let _ = result?;
+                            }
+                            Ok(())
+                        }
+                        .boxed()
+                    },
+                    self.options.clone(),
+                )
+                .await?;
             Ok(None)
         }
         .boxed()

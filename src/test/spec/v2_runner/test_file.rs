@@ -138,14 +138,14 @@ pub(crate) struct Outcome {
 
 impl Outcome {
     pub(crate) async fn assert_matches_actual(
-        self,
-        db_name: String,
-        coll_name: String,
+        &self,
+        db_name: &str,
+        coll_name: &str,
         client: &Client,
     ) {
         use crate::coll::options::CollectionOptions;
 
-        let coll_name = match self.collection.name {
+        let coll_name = match self.collection.name.as_deref() {
             Some(name) => name,
             None => coll_name,
         };
@@ -156,8 +156,8 @@ impl Outcome {
             .read_concern(crate::options::ReadConcern::LOCAL)
             .build();
         let coll = client
-            .database(&db_name)
-            .collection_with_options(&coll_name, coll_opts);
+            .database(db_name)
+            .collection_with_options(coll_name, coll_opts);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         let options = FindOptions::builder()
             .sort(doc! { "_id": 1 })
