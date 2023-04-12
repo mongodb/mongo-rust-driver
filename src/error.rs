@@ -158,7 +158,7 @@ impl Error {
     }
 
     pub(crate) fn is_max_time_ms_expired_error(&self) -> bool {
-        self.code() == Some(50)
+        self.sdam_code() == Some(50)
     }
 
     /// Whether a read operation should be retried if this error occurs.
@@ -166,7 +166,7 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        match self.code() {
+        match self.sdam_code() {
             Some(code) => RETRYABLE_READ_CODES.contains(&code),
             None => false,
         }
@@ -187,7 +187,7 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        match &self.code() {
+        match &self.sdam_code() {
             Some(code) => RETRYABLE_WRITE_CODES.contains(code),
             None => false,
         }
@@ -201,7 +201,7 @@ impl Error {
         {
             return true;
         }
-        match self.code() {
+        match self.sdam_code() {
             Some(code) => UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES.contains(&code),
             None => false,
         }
@@ -259,7 +259,7 @@ impl Error {
 
     /// Gets the code from this error for performing SDAM updates, if applicable.
     /// Any codes contained in WriteErrors are ignored.
-    pub(crate) fn code(&self) -> Option<i32> {
+    pub(crate) fn sdam_code(&self) -> Option<i32> {
         match self.kind.as_ref() {
             ErrorKind::Command(command_error) => Some(command_error.code),
             // According to SDAM spec, write concern error codes MUST also be checked, and
@@ -271,7 +271,23 @@ impl Error {
             ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
             _ => None,
         }
-        .or_else(|| self.source.as_ref().and_then(|s| s.code()))
+        .or_else(|| self.source.as_ref().and_then(|s| s.sdam_code()))
+    }
+
+    /// Gets the code from this error.
+    #[allow(unused)]
+    pub(crate) fn code(&self) -> Option<i32> {
+        match self.kind.as_ref() {
+            ErrorKind::Command(command_error) => Some(command_error.code),
+            ErrorKind::BulkWrite(BulkWriteFailure {
+                write_concern_error: Some(wc_error),
+                ..
+            }) => Some(wc_error.code),
+            ErrorKind::Write(e) => Some(e.code()),
+            _ => None,
+        }
+        .or_else(|| self.source.as_ref().and_then(|s| s.sdam_code()))
+
     }
 
     /// Gets the message for this error, if applicable, for use in testing.
@@ -333,21 +349,21 @@ impl Error {
 
     /// If this error corresponds to a "not writable primary" error as per the SDAM spec.
     pub(crate) fn is_notwritableprimary(&self) -> bool {
-        self.code()
+        self.sdam_code()
             .map(|code| NOTWRITABLEPRIMARY_CODES.contains(&code))
             .unwrap_or(false)
     }
 
     /// If this error corresponds to a "node is recovering" error as per the SDAM spec.
     pub(crate) fn is_recovering(&self) -> bool {
-        self.code()
+        self.sdam_code()
             .map(|code| RECOVERING_CODES.contains(&code))
             .unwrap_or(false)
     }
 
     /// If this error corresponds to a "node is shutting down" error as per the SDAM spec.
     pub(crate) fn is_shutting_down(&self) -> bool {
-        self.code()
+        self.sdam_code()
             .map(|code| SHUTTING_DOWN_CODES.contains(&code))
             .unwrap_or(false)
     }
@@ -361,7 +377,7 @@ impl Error {
         if !self.is_server_error() {
             return true;
         }
-        let code = self.code();
+        let code = self.sdam_code();
         if code == Some(43) {
             return true;
         }
@@ -823,6 +839,13 @@ impl WriteFailure {
                 message: "error missing write errors and write concern errors".to_string(),
             }
             .into())
+        }
+    }
+
+    pub(crate) fn code(&self) -> i32 {
+        match self {
+            Self::WriteConcernError(e) => e.code,
+            Self::WriteError(e) => e.code,
         }
     }
 }

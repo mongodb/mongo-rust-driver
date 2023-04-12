@@ -467,7 +467,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
                 .await
             {
                 Ok(_) => {}
-                Err(err) => match err.code() {
+                Err(err) => match err.sdam_code() {
                     Some(11601) => {}
                     _ => panic!("{}: killAllSessions failed", test.description),
                 },

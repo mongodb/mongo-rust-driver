@@ -236,7 +236,7 @@ async fn upload_stream_errors() {
     .unwrap();
 
     let error = get_mongo_error(upload_stream.write_all(&[11]).await);
-    assert_eq!(error.code(), Some(1234));
+    assert_eq!(error.sdam_code(), Some(1234));
 
     assert_closed(&bucket, upload_stream).await;
 
@@ -258,7 +258,7 @@ async fn upload_stream_errors() {
     .unwrap();
 
     let error = get_mongo_error(upload_stream.close().await);
-    assert_eq!(error.code(), Some(1234));
+    assert_eq!(error.sdam_code(), Some(1234));
 
     assert_closed(&bucket, upload_stream).await;
 }

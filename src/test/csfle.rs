@@ -2485,7 +2485,7 @@ async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
 
 // `Error::code` skips write errors per the SDAM spec, but we need those.
 fn write_err_code(err: &crate::error::Error) -> Option<i32> {
-    if let Some(code) = err.code() {
+    if let Some(code) = err.sdam_code() {
         return Some(code);
     }
     match *err.kind {
@@ -2555,7 +2555,7 @@ async fn decryption_events_command_error() -> Result<()> {
         .aggregate(vec![doc! { "$count": "total" }], None)
         .await
         .unwrap_err();
-    assert_eq!(Some(123), err.code());
+    assert_eq!(Some(123), err.sdam_code());
     assert!(td.ev_handler.failed.lock().unwrap().is_some());
 
     Ok(())
@@ -2877,6 +2877,56 @@ async fn bypass_mongocryptd_client() -> Result<()> {
 
     assert!(!client_encrypted.has_mongocryptd_client().await);
     assert!(!connected.load(Ordering::SeqCst));
+
+    Ok(())
+}
+
+// Prost test 21. Automatic Data Encryption Keys
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn auto_encryption_keys() -> Result<()> {
+    if !check_env("custom_key_material", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = Client::test_builder().build().await;
+    let db = client.database("test_auto_encryption_keys");
+    db.drop(None).await?;
+    let ce = ClientEncryption::new(
+        client.into_client(),
+        KV_NAMESPACE.clone(),
+        KMS_PROVIDERS
+            .iter()
+            .filter(|(p, ..)| p == &KmsProvider::Local || p == &KmsProvider::Aws)
+            .cloned()
+            .collect::<Vec<_>>(),
+    )?;
+    let _aws_key = MasterKey::Aws {
+        region: "us-east-1".to_string(),
+        key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+        endpoint: None,
+    };
+
+    // Case 1: Simple Creation and Validation
+    let opts = CreateCollectionOptions::builder()
+        .encrypted_fields(doc! {
+            "fields": [{
+                "path": "ssn",
+                "bsonType": "string",
+                "keyId": Bson::Null,
+            }],
+        })
+        .build();
+    db.create_encrypted_collection(
+        &ce,
+        "case_1",
+        opts,
+        MasterKey::Local,
+    ).await.map_err(|(e, _)| e)?;
+    let coll = db.collection::<Document>("case_1");
+    let result = coll.insert_one(doc! { "ssn": "123-45-6789" }, None).await;
+    assert!(result.as_ref().unwrap_err().code() == Some(121), "Expected error 121 (failed validation), got {:?}", result);
 
     Ok(())
 }
