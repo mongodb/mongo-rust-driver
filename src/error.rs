@@ -404,6 +404,11 @@ impl Error {
         matches!(self.kind.as_ref(), ErrorKind::IncompatibleServer { .. })
     }
 
+    #[allow(unused)]
+    pub(crate) fn is_invalid_argument(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::InvalidArgument { .. })
+    }
+
     pub(crate) fn with_source<E: Into<Option<Error>>>(mut self, source: E) -> Self {
         self.source = source.into().map(Box::new);
         self

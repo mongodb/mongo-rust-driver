@@ -2923,10 +2923,67 @@ async fn auto_encryption_keys() -> Result<()> {
         "case_1",
         opts,
         MasterKey::Local,
-    ).await.map_err(|(e, _)| e)?;
+    ).await.map_err(|e| e.0)?;
     let coll = db.collection::<Document>("case_1");
     let result = coll.insert_one(doc! { "ssn": "123-45-6789" }, None).await;
     assert!(result.as_ref().unwrap_err().code() == Some(121), "Expected error 121 (failed validation), got {:?}", result);
+
+    // Case 2: Missing encryptedFields
+    let result = db.create_encrypted_collection(
+        &ce,
+        "case_2",
+        None,
+        MasterKey::Local,
+    ).await.map_err(|e| e.0);
+    assert!(result.as_ref().unwrap_err().is_invalid_argument(), "Expected invalid argument errorm got {:?}", result);
+
+    // Case 3: Invalid keyId
+    let opts = CreateCollectionOptions::builder()
+    .encrypted_fields(doc! {
+        "fields": [{
+            "path": "ssn",
+            "bsonType": "string",
+            "keyId": false,
+        }],
+    })
+    .build();
+    let result = db.create_encrypted_collection(
+        &ce,
+        "case_1",
+        opts,
+        MasterKey::Local,
+    ).await.map_err(|e| e.0);
+    assert!(result.as_ref().unwrap_err().code() == Some(14), "Expected error 14 (type mismatch), got {:?}", result);
+
+    // Case 4: Insert encrypted value
+    let opts = CreateCollectionOptions::builder()
+    .encrypted_fields(doc! {
+        "fields": [{
+            "path": "ssn",
+            "bsonType": "string",
+            "keyId": Bson::Null,
+        }],
+    })
+    .build();
+    let ef = db.create_encrypted_collection(
+        &ce,
+        "case_4",
+        opts,
+        MasterKey::Local,
+    ).await.map_err(|e| e.0)?;
+    let key = match ef.get_array("fields")?[0].as_document().unwrap().get("keyId").unwrap() {
+        Bson::Binary(bin) => bin.clone(),
+        v => panic!("invalid keyId {:?}", v),
+    };
+    let encrypted_payload = ce.encrypt(
+        "123-45-6789",
+        key,
+        Algorithm::Unindexed,
+    )
+    .run()
+    .await?;
+    let coll = db.collection::<Document>("case_1");
+    coll.insert_one(doc! { "ssn": encrypted_payload }, None).await?;
 
     Ok(())
 }
