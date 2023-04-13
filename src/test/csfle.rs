@@ -2931,7 +2931,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         .build();
     db.create_encrypted_collection(&ce, "case_1", opts, master_key.clone())
         .await
-        .map_err(|e| e.0)?;
+        .1?;
     let coll = db.collection::<Document>("case_1");
     let result = coll.insert_one(doc! { "ssn": "123-45-6789" }, None).await;
     assert!(
@@ -2944,7 +2944,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     let result = db
         .create_encrypted_collection(&ce, "case_2", None, master_key.clone())
         .await
-        .map_err(|e| e.0);
+        .1;
     assert!(
         result.as_ref().unwrap_err().is_invalid_argument(),
         "Expected invalid argument error, got {:?}",
@@ -2964,7 +2964,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     let result = db
         .create_encrypted_collection(&ce, "case_1", opts, master_key.clone())
         .await
-        .map_err(|e| e.0);
+        .1;
     assert!(
         result.as_ref().unwrap_err().code() == Some(14),
         "Expected error 14 (type mismatch), got {:?}",
@@ -2981,10 +2981,10 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
             }],
         })
         .build();
-    let ef = db
+    let (ef, result) = db
         .create_encrypted_collection(&ce, "case_4", opts, master_key.clone())
-        .await
-        .map_err(|e| e.0)?;
+        .await;
+    result?;
     let key = match ef.get_array("fields")?[0]
         .as_document()
         .unwrap()
