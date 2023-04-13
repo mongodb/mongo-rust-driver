@@ -2907,6 +2907,14 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     let client = Client::test_builder().build().await;
+    if client.server_version_lt(6, 0) {
+        log_uncaptured("Skipping auto_encryption_key test: server < 6.0");
+        return Ok(());
+    }
+    if client.is_standalone() {
+        log_uncaptured("Skipping auto_encryption_key test: standalone server");
+        return Ok(());
+    }
     let db = client.database("test_auto_encryption_keys");
     db.drop(None).await?;
     let ce = ClientEncryption::new(
