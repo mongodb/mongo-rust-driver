@@ -6,6 +6,8 @@ use std::{fmt::Debug, sync::Arc};
 use bson::doc;
 use futures_util::stream::TryStreamExt;
 
+#[cfg(feature = "in-use-encryption-unstable")]
+use crate::client_encryption::{ClientEncryption, MasterKey};
 use crate::{
     bson::{Bson, Document},
     change_stream::{
@@ -37,8 +39,6 @@ use crate::{
     Namespace,
     SessionCursor,
 };
-#[cfg(feature = "in-use-encryption-unstable")]
-use crate::client_encryption::{ClientEncryption, MasterKey};
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
 /// database-level operations or to obtain handles to specific collections within the database. A
