@@ -51,14 +51,7 @@ use crate::{
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
-    sdam::{
-        HandshakePhase,
-        SelectedServer,
-        ServerType,
-        SessionSupportStatus,
-        TopologyType,
-        TransactionSupportStatus,
-    },
+    sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
     ClusterTime,
 };
@@ -349,8 +342,16 @@ impl Client {
                 }
             };
 
-            if session.is_none() {
-                implicit_session = self.start_implicit_session(&op).await?;
+            if !conn.supports_sessions() && session.is_some() {
+                return Err(ErrorKind::SessionsNotSupported.into());
+            }
+
+            if conn.supports_sessions()
+                && session.is_none()
+                && op.supports_sessions()
+                && op.is_acknowledged()
+            {
+                implicit_session = Some(ClientSession::new(self.clone(), None, true).await);
                 session = implicit_session.as_mut();
             }
 
@@ -790,19 +791,6 @@ impl Client {
         })
     }
 
-    /// Start an implicit session if the operation and write concern are compatible with sessions.
-    async fn start_implicit_session<T: Operation>(&self, op: &T) -> Result<Option<ClientSession>> {
-        match self.get_session_support_status().await? {
-            SessionSupportStatus::Supported {
-                logical_session_timeout,
-            } if op.supports_sessions() && op.is_acknowledged() => Ok(Some(
-                self.start_session_with_timeout(logical_session_timeout, None, true)
-                    .await,
-            )),
-            _ => Ok(None),
-        }
-    }
-
     async fn select_data_bearing_server(&self, operation_name: &str) -> Result<()> {
         let topology_type = self.inner.topology.topology_type();
         let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
@@ -812,24 +800,6 @@ impl Client {
         }));
         let _: SelectedServer = self.select_server(Some(&criteria), operation_name).await?;
         Ok(())
-    }
-
-    /// Gets whether the topology supports sessions, and if so, returns the topology's logical
-    /// session timeout. If it has yet to be determined if the topology supports sessions, this
-    /// method will perform a server selection that will force that determination to be made.
-    pub(crate) async fn get_session_support_status(&self) -> Result<SessionSupportStatus> {
-        let initial_status = self.inner.topology.session_support_status();
-
-        // Need to guarantee that we're connected to at least one server that can determine if
-        // sessions are supported or not.
-        match initial_status {
-            SessionSupportStatus::Undetermined => {
-                self.select_data_bearing_server(crate::client::SESSIONS_SUPPORT_OP_NAME)
-                    .await?;
-                Ok(self.inner.topology.session_support_status())
-            }
-            _ => Ok(initial_status),
-        }
     }
 
     /// Gets whether the topology supports transactions. If it has yet to be determined if the

@@ -49,7 +49,6 @@ use super::{
     Monitor,
     Server,
     ServerDescription,
-    SessionSupportStatus,
     TopologyDescription,
     TransactionSupportStatus,
 };
@@ -170,12 +169,11 @@ impl Topology {
         self.watcher.peek_latest().description.topology_type
     }
 
-    /// Gets the latest information on whether sessions are supported or not.
-    pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
+    pub(crate) fn logical_session_timeout(&self) -> Option<Duration> {
         self.watcher
             .peek_latest()
             .description
-            .session_support_status()
+            .logical_session_timeout
     }
 
     /// Gets the latest information on whether transactions are support or not.

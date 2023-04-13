@@ -19,7 +19,7 @@ use crate::{
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     options::ReadConcern,
-    runtime::{AsyncStream, Process, TlsConfig},
+    runtime::{process::Process, AsyncStream, TlsConfig},
     Client,
     Namespace,
 };

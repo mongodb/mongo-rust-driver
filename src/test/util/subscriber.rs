@@ -23,6 +23,7 @@ impl<H, E: Clone> EventSubscriber<'_, H, E> {
         }
     }
 
+    /// Waits for an event to occur within the given duration that passes the given filter.
     pub(crate) async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<E>
     where
         F: FnMut(&E) -> bool,

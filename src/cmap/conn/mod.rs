@@ -431,6 +431,14 @@ impl Connection {
     pub(crate) fn is_streaming(&self) -> bool {
         self.more_to_come
     }
+
+    /// Whether the connection supports sessions.
+    pub(crate) fn supports_sessions(&self) -> bool {
+        self.stream_description
+            .as_ref()
+            .and_then(|sd| sd.logical_session_timeout)
+            .is_some()
+    }
 }
 
 impl Drop for Connection {

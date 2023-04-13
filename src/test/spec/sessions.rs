@@ -1,16 +1,28 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use bson::Document;
 use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
+    client::options::ClientOptions,
     error::{ErrorKind, Result},
-    event::command::{CommandEventHandler, CommandStartedEvent},
+    event::command::{CommandEvent, CommandEventHandler, CommandStartedEvent},
     options::SessionOptions,
-    test::{spec::unified_runner::run_unified_tests, TestClient, CLIENT_OPTIONS, LOCK},
+    runtime::process::Process,
+    test::{
+        log_uncaptured,
+        spec::unified_runner::run_unified_tests,
+        util::Event,
+        EventClient,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
     Client,
 };
 
@@ -173,4 +185,108 @@ async fn implicit_session_after_connection() {
         max_lsids,
         min_lsids,
     );
+}
+
+async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
+    let util_client = TestClient::new().await;
+    if util_client.server_version_lt(4, 2) {
+        log_uncaptured(format!(
+            "Skipping {name}: cannot spawn mongocryptd due to server version < 4.2"
+        ));
+        return None;
+    }
+
+    let pid_file_path = format!("--pidfilepath={name}.pid");
+    let args = vec!["--port=47017", &pid_file_path];
+    let process = Process::spawn("mongocryptd", args).expect("Failed to spawn mongocryptd");
+
+    let options = ClientOptions::parse("mongodb://localhost:47017")
+        .await
+        .unwrap();
+    let client = EventClient::with_options(options).await;
+    assert!(client.server_info.logical_session_timeout_minutes.is_none());
+
+    Some((client, process))
+}
+
+async fn clean_up_mongocryptd(mut process: Process, name: &str) {
+    let _ = std::fs::remove_file(format!("{name}.pid"));
+    let _ = process.kill();
+    let _ = process.wait().await;
+}
+
+// Sessions prose test 18
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn sessions_not_supported_implicit_session_ignored() {
+    let _guard = LOCK.run_exclusively().await;
+
+    let name = "sessions_not_supported_implicit_session_ignored";
+
+    let Some((client, process)) = spawn_mongocryptd(name).await else {
+        return;
+    };
+
+    let mut subscriber = client.handler.subscribe();
+    let coll = client.database(name).collection(name);
+
+    let _ = coll.find(doc! {}, None).await;
+    let event = subscriber
+        .filter_map_event(Duration::from_millis(500), |event| match event {
+            Event::Command(CommandEvent::Started(command_started_event))
+                if command_started_event.command_name == "find" =>
+            {
+                Some(command_started_event)
+            }
+            _ => None,
+        })
+        .await
+        .expect("Did not observe a command started event for find operation");
+    assert!(!event.command.contains_key("lsid"));
+
+    let _ = coll.insert_one(doc! { "x": 1 }, None).await;
+    let event = subscriber
+        .filter_map_event(Duration::from_millis(500), |event| match event {
+            Event::Command(CommandEvent::Started(command_started_event))
+                if command_started_event.command_name == "insert" =>
+            {
+                Some(command_started_event)
+            }
+            _ => None,
+        })
+        .await
+        .expect("Did not observe a command started event for insert operation");
+    assert!(!event.command.contains_key("lsid"));
+
+    clean_up_mongocryptd(process, name).await;
+}
+
+// Sessions prose test 19
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn sessions_not_supported_explicit_session_error() {
+    let _guard = LOCK.run_exclusively().await;
+
+    let name = "sessions_not_supported_explicit_session_error";
+
+    let Some((client, process)) = spawn_mongocryptd(name).await else {
+        return;
+    };
+
+    let mut session = client.start_session(None).await.unwrap();
+    let coll = client.database(name).collection(name);
+
+    let error = coll
+        .find_one_with_session(doc! {}, None, &mut session)
+        .await
+        .unwrap_err();
+    assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));
+
+    let error = coll
+        .insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap_err();
+    assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));
+
+    clean_up_mongocryptd(process, name).await;
 }

@@ -473,7 +473,7 @@ fn topology_description_tracing_representation() {
         max_set_version: Some(100),
         max_election_id: Some(oid),
         compatibility_error: Some("Compat error".to_string()),
-        session_support_status: crate::sdam::SessionSupportStatus::default(),
+        logical_session_timeout: None,
         transaction_support_status: crate::sdam::TransactionSupportStatus::default(),
         cluster_time: None,
         local_threshold: None,

@@ -46,7 +46,7 @@ impl TestTopologyDescription {
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
-            session_support_status: Default::default(),
+            logical_session_timeout: None,
             transaction_support_status: Default::default(),
             cluster_time: None,
             local_threshold: None,

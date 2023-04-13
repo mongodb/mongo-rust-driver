@@ -215,6 +215,8 @@ async fn pool_is_lifo() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
+    // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
+    runtime::delay_for(Duration::from_millis(500)).await;
 
     if client.is_standalone() {
         return;
