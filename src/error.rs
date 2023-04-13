@@ -287,7 +287,6 @@ impl Error {
             _ => None,
         }
         .or_else(|| self.source.as_ref().and_then(|s| s.sdam_code()))
-
     }
 
     /// Gets the message for this error, if applicable, for use in testing.
