@@ -2884,7 +2884,21 @@ async fn bypass_mongocryptd_client() -> Result<()> {
 // Prost test 21. Automatic Data Encryption Keys
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn auto_encryption_keys() -> Result<()> {
+async fn auto_encryption_keys_local() -> Result<()> {
+    auto_encryption_keys(MasterKey::Local).await
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn auto_encryption_keys_aws() -> Result<()> {
+    auto_encryption_keys(MasterKey::Aws {
+        region: "us-east-1".to_string(),
+        key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
+        endpoint: None,
+    }).await
+}
+
+async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     if !check_env("custom_key_material", false) {
         return Ok(());
     }
@@ -2902,11 +2916,6 @@ async fn auto_encryption_keys() -> Result<()> {
             .cloned()
             .collect::<Vec<_>>(),
     )?;
-    let _aws_key = MasterKey::Aws {
-        region: "us-east-1".to_string(),
-        key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0".to_string(),
-        endpoint: None,
-    };
 
     // Case 1: Simple Creation and Validation
     let opts = CreateCollectionOptions::builder()
@@ -2922,7 +2931,7 @@ async fn auto_encryption_keys() -> Result<()> {
         &ce,
         "case_1",
         opts,
-        MasterKey::Local,
+        master_key.clone(),
     ).await.map_err(|e| e.0)?;
     let coll = db.collection::<Document>("case_1");
     let result = coll.insert_one(doc! { "ssn": "123-45-6789" }, None).await;
@@ -2933,7 +2942,7 @@ async fn auto_encryption_keys() -> Result<()> {
         &ce,
         "case_2",
         None,
-        MasterKey::Local,
+        master_key.clone(),
     ).await.map_err(|e| e.0);
     assert!(result.as_ref().unwrap_err().is_invalid_argument(), "Expected invalid argument errorm got {:?}", result);
 
@@ -2951,7 +2960,7 @@ async fn auto_encryption_keys() -> Result<()> {
         &ce,
         "case_1",
         opts,
-        MasterKey::Local,
+        master_key.clone(),
     ).await.map_err(|e| e.0);
     assert!(result.as_ref().unwrap_err().code() == Some(14), "Expected error 14 (type mismatch), got {:?}", result);
 
@@ -2969,7 +2978,7 @@ async fn auto_encryption_keys() -> Result<()> {
         &ce,
         "case_4",
         opts,
-        MasterKey::Local,
+        master_key.clone(),
     ).await.map_err(|e| e.0)?;
     let key = match ef.get_array("fields")?[0].as_document().unwrap().get("keyId").unwrap() {
         Bson::Binary(bin) => bin.clone(),
