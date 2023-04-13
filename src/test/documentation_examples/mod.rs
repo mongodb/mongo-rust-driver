@@ -1829,6 +1829,96 @@ async fn change_streams_examples() -> Result<()> {
     Ok(())
 }
 
+async fn convenient_transaction_examples() -> Result<()> {
+    use crate::{db::options::DatabaseOptions, options::WriteConcern};
+    use futures::FutureExt;
+    use std::time::Duration;
+
+    let setup_client = Client::test_builder().build().await;
+    if !setup_client.supports_transactions() {
+        log_uncaptured(
+            "skipping convenient transaction API examples due to no transaction support",
+        );
+        return Ok(());
+    }
+
+    let uri = DEFAULT_URI.clone();
+    // Start Transactions withTxn API Example 1
+
+    // For a replica set, include the replica set name and a seedlist of the members in the URI
+    // string; e.g. let uri = "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017/?
+    // replicaSet=myRepl"; For a sharded cluster, connect to the mongos instances; e.g.
+    // let uri = "mongodb://mongos0.example.com:27017,mongos1.example.com:27017/";
+
+    let client = Client::with_uri_str(uri).await?;
+    let mut my_write_concern_majority = WriteConcern::MAJORITY;
+    my_write_concern_majority.w_timeout = Some(Duration::from_millis(1000));
+
+    // Prereq: Create collections. CRUD operations in transactions must be on existing collections.
+
+    client
+        .database_with_options(
+            "mydb1",
+            DatabaseOptions::builder()
+                .write_concern(my_write_concern_majority.clone())
+                .build(),
+        )
+        .collection::<Document>("foo")
+        .insert_one(doc! { "abc": 0}, None)
+        .await?;
+    client
+        .database_with_options(
+            "mydb2",
+            DatabaseOptions::builder()
+                .write_concern(my_write_concern_majority.clone())
+                .build(),
+        )
+        .collection::<Document>("bar")
+        .insert_one(doc! { "xyz": 0}, None)
+        .await?;
+
+    // Step 1: Start a client session.
+
+    let mut session = client.start_session(None).await?;
+
+    // Step 2: Use with_transaction to start a transaction, execute the callback, and commit (or
+    // abort on error).
+
+    session
+        .with_transaction(
+            (),
+            |session, _| {
+                async move {
+                    let collection_one = session
+                        .client()
+                        .database("mydb1")
+                        .collection::<Document>("foo");
+                    let collection_two = session
+                        .client()
+                        .database("mydb2")
+                        .collection::<Document>("bar");
+
+                    // Important:: You must pass the session to the operations.
+                    collection_one
+                        .insert_one_with_session(doc! { "abc": 1 }, None, session)
+                        .await?;
+                    collection_two
+                        .insert_one_with_session(doc! { "xyz": 999 }, None, session)
+                        .await?;
+
+                    Ok(())
+                }
+                .boxed()
+            },
+            None,
+        )
+        .await?;
+
+    // End Transactions withTxn API Example 1
+
+    Ok(())
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test() {
@@ -1855,4 +1945,5 @@ async fn test() {
     run_command_examples().await.unwrap();
     index_examples().await.unwrap();
     change_streams_examples().await.unwrap();
+    convenient_transaction_examples().await.unwrap();
 }
