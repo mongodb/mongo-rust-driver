@@ -15,7 +15,6 @@ use crate::{
         ChangeStream,
     },
     client::session::TransactionState,
-    client_encryption::{ClientEncryption, MasterKey},
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
@@ -38,6 +37,8 @@ use crate::{
     Namespace,
     SessionCursor,
 };
+#[cfg(feature = "in-use-encryption-unstable")]
+use crate::client_encryption::{ClientEncryption, MasterKey};
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
 /// database-level operations or to obtain handles to specific collections within the database. A
