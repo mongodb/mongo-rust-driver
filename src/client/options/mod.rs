@@ -1083,6 +1083,12 @@ impl ClientOptions {
         runtime::block_on(Self::parse_uri(s.as_ref(), None))
     }
 
+    /// This method is the same as `parse`, but is provided to make the async version available when
+    /// the `sync` feature is enabled.
+    pub async fn parse_async(s: impl AsRef<str>) -> Result<Self> {
+        Self::parse_uri(s, None).await
+    }
+
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
     /// If the string is malformed or one of the options has an invalid value, an error will be
     /// returned.
