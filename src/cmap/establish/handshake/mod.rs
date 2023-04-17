@@ -205,11 +205,9 @@ impl FaasEnvironment {
                 }
             }
             FaasEnvironmentName::Vercel => {
-                let url = env::var("VERCEL_URL").ok();
                 let region = env::var("VERCEL_REGION").ok();
                 Self {
                     name,
-                    url,
                     region,
                     ..Self::UNSET
                 }
@@ -225,24 +223,28 @@ fn var_set(name: &str) -> bool {
 impl FaasEnvironmentName {
     fn new() -> Option<Self> {
         use FaasEnvironmentName::*;
-        let mut found = vec![];
+        let mut found: Option<Self> = None;
         if var_set("AWS_EXECUTION_ENV") || var_set("AWS_LAMBDA_RUNTIME_API") {
-            found.push(AwsLambda);
-        }
-        if var_set("FUNCTIONS_WORKER_RUNTIME") {
-            found.push(AzureFunc);
-        }
-        if var_set("K_SERVICE") || var_set("FUNCTION_NAME") {
-            found.push(GcpFunc);
+            found = Some(AwsLambda);
         }
         if var_set("VERCEL") {
-            found.push(Vercel);
+            // Vercel takes precedence over AwsLambda.
+            found = Some(Vercel);
         }
-        if found.len() != 1 {
-            None
-        } else {
-            Some(found[0])
+        // Any other conflict is treated as unset.
+        if var_set("FUNCTIONS_WORKER_RUNTIME") {
+            match found {
+                None => found = Some(AzureFunc),
+                _ => return None,
+            }
         }
+        if var_set("K_SERVICE") || var_set("FUNCTION_NAME") {
+            match found {
+                None => found = Some(GcpFunc),
+                _ => return None,
+            }
+        }
+        found
     }
 
     fn name(&self) -> &'static str {
@@ -282,10 +284,6 @@ lazy_static! {
 type Truncation = fn(&mut ClientMetadata);
 
 const METADATA_TRUNCATIONS: &[Truncation] = &[
-    // truncate `platform`
-    |metadata| {
-        metadata.platform = rustc_version_runtime::version_meta().short_version_string;
-    },
     // clear `env.*` except `name`
     |metadata| {
         if let Some(env) = &mut metadata.env {
@@ -307,6 +305,10 @@ const METADATA_TRUNCATIONS: &[Truncation] = &[
     // clear `env`
     |metadata| {
         metadata.env = None;
+    },
+    // truncate `platform`
+    |metadata| {
+        metadata.platform = rustc_version_runtime::version_meta().short_version_string;
     },
 ];
 
