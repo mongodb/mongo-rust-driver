@@ -427,13 +427,9 @@ fn verify_description_outcome(
         .logical_session_timeout_minutes
         .map(|mins| Duration::from_secs((mins as u64) * 60));
     assert_eq!(
-        topology_description
-            .session_support_status
-            .logical_session_timeout(),
-        expected_timeout,
+        topology_description.logical_session_timeout, expected_timeout,
         "{}: {}",
-        test_description,
-        phase_description
+        test_description, phase_description
     );
 
     if let Some(compatible) = outcome.compatible {

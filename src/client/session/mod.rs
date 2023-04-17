@@ -202,13 +202,15 @@ pub(crate) enum TransactionPin {
 }
 
 impl ClientSession {
-    /// Creates a new `ClientSession` wrapping the provided server session.
-    pub(crate) fn new(
-        server_session: ServerSession,
+    /// Creates a new `ClientSession` by checking out a corresponding `ServerSession` from the
+    /// provided client's session pool.
+    pub(crate) async fn new(
         client: Client,
         options: Option<SessionOptions>,
         is_implicit: bool,
     ) -> Self {
+        let timeout = client.inner.topology.logical_session_timeout();
+        let server_session = client.inner.session_pool.check_out(timeout).await;
         Self {
             client,
             server_session,

@@ -15,7 +15,6 @@ pub(crate) use self::{
         topology::{
             server_selection::{self, SelectedServer},
             verify_max_staleness,
-            SessionSupportStatus,
             TopologyDescription,
             TransactionSupportStatus,
         },

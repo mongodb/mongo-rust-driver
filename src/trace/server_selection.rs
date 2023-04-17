@@ -5,7 +5,6 @@ use super::{
     SERVER_SELECTION_TRACING_EVENT_TARGET,
 };
 use crate::{
-    client::SESSIONS_SUPPORT_OP_NAME,
     error::Error,
     sdam::{SelectedServer, TopologyDescription},
     selection_criteria::SelectionCriteria,
@@ -56,10 +55,10 @@ impl ServerSelectionTracingEventEmitter<'_> {
     }
 
     pub(crate) fn emit_started_event(&self, topology_description: TopologyDescription) {
-        if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
-        // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
-        {
+        if trace_or_log_enabled!(
+            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Debug
+        ) {
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                 topologyId = self.topology_id.tracing_representation(),
@@ -76,10 +75,10 @@ impl ServerSelectionTracingEventEmitter<'_> {
         topology_description: &TopologyDescription,
         error: &Error,
     ) {
-        if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
-        // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
-        {
+        if trace_or_log_enabled!(
+            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Debug
+        ) {
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                 topologyId = self.topology_id.tracing_representation(),
@@ -97,10 +96,10 @@ impl ServerSelectionTracingEventEmitter<'_> {
         topology_description: &TopologyDescription,
         server: &SelectedServer,
     ) {
-        if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Debug)
-        // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
-        {
+        if trace_or_log_enabled!(
+            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Debug
+        ) {
             tracing::debug!(
                 target: SERVER_SELECTION_TRACING_EVENT_TARGET,
                 topologyId = self.topology_id.tracing_representation(),
@@ -115,10 +114,10 @@ impl ServerSelectionTracingEventEmitter<'_> {
     }
 
     pub(crate) fn emit_waiting_event(&self, topology_description: &TopologyDescription) {
-        if trace_or_log_enabled!(target: SERVER_SELECTION_TRACING_EVENT_TARGET, TracingOrLogLevel::Info)
-        // TODO: RUST-1585 Remove this condition.
-        && self.operation_name != SESSIONS_SUPPORT_OP_NAME
-        {
+        if trace_or_log_enabled!(
+            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+            TracingOrLogLevel::Info
+        ) {
             let remaining_time = self
                 .timeout
                 .checked_sub(self.start_time.elapsed())

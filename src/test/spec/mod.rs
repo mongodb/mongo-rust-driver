@@ -19,6 +19,7 @@ mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
 mod sdam;
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod sessions;
 #[cfg(feature = "tracing-unstable")]
 mod trace;

@@ -91,10 +91,8 @@ pub(crate) struct TopologyDescription {
     /// respective supported wire versions.
     pub(crate) compatibility_error: Option<String>,
 
-    /// Whether or not this topology supports sessions, and if so, what the logicalSessionTimeout
-    /// is for them.
-    #[serde(skip)]
-    pub(crate) session_support_status: SessionSupportStatus,
+    /// The time that a session remains active after its most recent use.
+    pub(crate) logical_session_timeout: Option<Duration>,
 
     /// Whether or not this topology supports transactions.
     #[serde(skip)]
@@ -137,7 +135,7 @@ impl Default for TopologyDescription {
             max_set_version: Default::default(),
             max_election_id: Default::default(),
             compatibility_error: Default::default(),
-            session_support_status: SessionSupportStatus::Undetermined,
+            logical_session_timeout: None,
             transaction_support_status: TransactionSupportStatus::Undetermined,
             cluster_time: Default::default(),
             local_threshold: Default::default(),
@@ -162,14 +160,6 @@ impl TopologyDescription {
             TopologyType::LoadBalanced
         } else {
             TopologyType::Unknown
-        };
-
-        self.session_support_status = if self.topology_type == TopologyType::LoadBalanced {
-            SessionSupportStatus::Supported {
-                logical_session_timeout: None,
-            }
-        } else {
-            SessionSupportStatus::Undetermined
         };
 
         self.transaction_support_status = if self.topology_type == TopologyType::LoadBalanced {
@@ -298,33 +288,17 @@ impl TopologyDescription {
     }
 
     /// Updates the topology's logical session timeout value based on the server's value for it.
-    fn update_session_support_status(&mut self, server_description: &ServerDescription) {
+    fn update_logical_session_timeout(&mut self, server_description: &ServerDescription) {
         if !server_description.server_type.is_data_bearing() {
-            if let TopologyType::Single = self.topology_type {
-                self.session_support_status = SessionSupportStatus::Unsupported {
-                    logical_session_timeout: None,
-                };
-            }
             return;
         }
-
         match server_description.logical_session_timeout().ok().flatten() {
-            Some(timeout) => match self.session_support_status {
-                SessionSupportStatus::Supported {
-                    logical_session_timeout: topology_timeout,
-                } => {
-                    self.session_support_status = SessionSupportStatus::Supported {
-                        logical_session_timeout: std::cmp::min(Some(timeout), topology_timeout),
-                    };
+            Some(new_timeout) => match self.logical_session_timeout {
+                Some(current_timeout) => {
+                    self.logical_session_timeout =
+                        Some(std::cmp::min(current_timeout, new_timeout));
                 }
-                SessionSupportStatus::Undetermined => {
-                    self.session_support_status = SessionSupportStatus::Supported {
-                        logical_session_timeout: Some(timeout),
-                    }
-                }
-                SessionSupportStatus::Unsupported { .. } => {
-                    // Check if the timeout is now reported on all servers, and, if so, assign the
-                    // topology's timeout to the minimum.
+                None => {
                     let min_timeout = self
                         .servers
                         .values()
@@ -332,39 +306,19 @@ impl TopologyDescription {
                         .map(|s| s.logical_session_timeout().ok().flatten())
                         .min()
                         .flatten();
-
-                    match min_timeout {
-                        Some(timeout) => {
-                            self.session_support_status = SessionSupportStatus::Supported {
-                                logical_session_timeout: Some(timeout),
-                            }
-                        }
-                        None => {
-                            self.session_support_status = SessionSupportStatus::Unsupported {
-                                logical_session_timeout: None,
-                            }
-                        }
-                    }
+                    self.logical_session_timeout = min_timeout;
                 }
             },
-            None if server_description.server_type.is_data_bearing()
-                || self.topology_type == TopologyType::Single =>
-            {
-                self.session_support_status = SessionSupportStatus::Unsupported {
-                    logical_session_timeout: None,
-                }
-            }
-            None => {}
+            // If any data-bearing server does not have a value for logicalSessionTimeoutMinutes,
+            // the topology's value should be None.
+            None => self.logical_session_timeout = None,
         }
     }
 
     /// Updates the topology's transaction support status based on its session support status and
     /// the server description's max wire version.
     fn update_transaction_support_status(&mut self, server_description: &ServerDescription) {
-        if !matches!(
-            self.session_support_status,
-            SessionSupportStatus::Supported { .. }
-        ) {
+        if self.logical_session_timeout.is_none() {
             self.transaction_support_status = TransactionSupportStatus::Unsupported;
         }
         if let Ok(Some(max_wire_version)) = server_description.max_wire_version() {
@@ -429,10 +383,6 @@ impl TopologyDescription {
         self.servers.retain(|host, _| hosts.contains(host));
     }
 
-    pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
-        self.session_support_status
-    }
-
     pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
         self.transaction_support_status
     }
@@ -495,7 +445,7 @@ impl TopologyDescription {
         }
 
         // Update the topology's min logicalSessionTimeout.
-        self.update_session_support_status(&server_description);
+        self.update_logical_session_timeout(&server_description);
 
         // Update the topology's transaction support status.
         self.update_transaction_support_status(&server_description);
@@ -773,50 +723,6 @@ impl TopologyDescription {
                 self.servers
                     .insert(server.clone(), ServerDescription::new(server.clone()));
             }
-        }
-    }
-}
-
-/// Enum representing whether sessions are supported by the topology.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum SessionSupportStatus {
-    /// It is not known yet whether the topology supports sessions. This is possible if no
-    /// data-bearing servers have updated the `TopologyDescription` yet.
-    Undetermined,
-
-    /// Sessions are not supported by this topology. This is possible if there is a data-bearing
-    /// server in the deployment that does not support sessions.
-    ///
-    /// While standalones do not support sessions, they still do report a logical session timeout,
-    /// so it is stored here if necessary.
-    Unsupported {
-        logical_session_timeout: Option<Duration>,
-    },
-
-    /// Sessions are supported by this topology. This is the minimum timeout of all data-bearing
-    /// servers in the deployment.
-    Supported {
-        logical_session_timeout: Option<Duration>,
-    },
-}
-
-impl Default for SessionSupportStatus {
-    fn default() -> Self {
-        Self::Undetermined
-    }
-}
-
-impl SessionSupportStatus {
-    #[cfg(test)]
-    fn logical_session_timeout(&self) -> Option<Duration> {
-        match self {
-            Self::Undetermined => None,
-            Self::Unsupported {
-                logical_session_timeout,
-            } => *logical_session_timeout,
-            Self::Supported {
-                logical_session_timeout,
-            } => *logical_session_timeout,
         }
     }
 }

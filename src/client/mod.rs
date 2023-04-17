@@ -46,7 +46,7 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
-    sdam::{server_selection, SelectedServer, SessionSupportStatus, Topology},
+    sdam::{server_selection, SelectedServer, Topology},
     ClientSession,
 };
 
@@ -56,8 +56,6 @@ pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
-// TODO: RUST-1585 Remove this constant.
-pub(crate) const SESSIONS_SUPPORT_OP_NAME: &str = "Check sessions support status";
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
@@ -367,14 +365,7 @@ impl Client {
         if let Some(ref options) = options {
             options.validate()?;
         }
-        match self.get_session_support_status().await? {
-            SessionSupportStatus::Supported {
-                logical_session_timeout,
-            } => Ok(self
-                .start_session_with_timeout(logical_session_timeout, options, false)
-                .await),
-            _ => Err(ErrorKind::SessionsNotSupported.into()),
-        }
+        Ok(ClientSession::new(self.clone(), options, false).await)
     }
 
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
@@ -428,42 +419,11 @@ impl Client {
             .await
     }
 
-    /// Check in a server session to the server session pool.
-    /// If the session is expired or dirty, or the topology no longer supports sessions, the session
-    /// will be discarded.
+    /// Check in a server session to the server session pool. The session will be discarded if it is
+    /// expired or dirty.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
-        let session_support_status = self.inner.topology.session_support_status();
-        if let SessionSupportStatus::Supported {
-            logical_session_timeout,
-        } = session_support_status
-        {
-            self.inner
-                .session_pool
-                .check_in(session, logical_session_timeout)
-                .await;
-        }
-    }
-
-    /// Starts a `ClientSession`.
-    ///
-    /// This method will attempt to re-use server sessions from the pool which are not about to
-    /// expire according to the provided logical session timeout. If no such sessions are
-    /// available, a new one will be created.
-    pub(crate) async fn start_session_with_timeout(
-        &self,
-        logical_session_timeout: Option<Duration>,
-        options: Option<SessionOptions>,
-        is_implicit: bool,
-    ) -> ClientSession {
-        ClientSession::new(
-            self.inner
-                .session_pool
-                .check_out(logical_session_timeout)
-                .await,
-            self.clone(),
-            options,
-            is_implicit,
-        )
+        let timeout = self.inner.topology.logical_session_timeout();
+        self.inner.session_pool.check_in(session, timeout).await;
     }
 
     #[cfg(test)]
@@ -601,7 +561,7 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub(crate) fn topology(&self) -> &crate::sdam::Topology {
+    pub(crate) fn topology(&self) -> &Topology {
         &self.inner.topology
     }
 

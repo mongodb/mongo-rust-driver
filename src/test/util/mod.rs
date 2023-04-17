@@ -34,12 +34,11 @@ use crate::{
 };
 use bson::Document;
 use semver::{Version, VersionReq};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},
-    operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     test::{
         update_options_for_testing,
@@ -194,42 +193,29 @@ impl TestClient {
     }
 
     async fn from_client(client: Client) -> Self {
-        // To avoid populating the session pool with leftover implicit sessions, we check out a
-        // session here and immediately mark it as dirty, then use it with any operations we need.
-        let mut session = client
-            .start_session_with_timeout(Some(Duration::from_secs(60 * 60)), None, true)
-            .await;
-        session.mark_dirty();
-
-        let hello_cmd = hello_command(
+        let hello = hello_command(
             client.options().server_api.as_ref(),
             client.options().load_balanced,
             None,
             None,
         );
-        let hello = RunCommand::new("admin".into(), hello_cmd.body, None, None).unwrap();
-
-        let server_info = bson::from_bson(Bson::Document(
-            client.execute_operation(hello, &mut session).await.unwrap(),
-        ))
-        .unwrap();
-
-        let build_info =
-            RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None, None).unwrap();
-
-        let response = client
-            .execute_operation(build_info, &mut session)
+        let server_info_doc = client
+            .database("admin")
+            .run_command(hello.body, None)
             .await
             .unwrap();
+        let server_info = bson::from_document(server_info_doc).unwrap();
 
-        let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
-        let server_version_str = info.version.split('-').next().unwrap();
-        let server_version = Version::parse(server_version_str).unwrap();
+        let build_info = client
+            .database("test")
+            .run_command(doc! { "buildInfo": 1 }, None)
+            .await
+            .unwrap();
+        let server_version = Version::parse(build_info.get_str("version").unwrap()).unwrap();
 
-        let get_parameters =
-            RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None, None).unwrap();
         let server_parameters = client
-            .execute_operation(get_parameters, &mut session)
+            .database("admin")
+            .run_command(doc! { "getParameter": "*" }, None)
             .await
             .unwrap_or_default();
 
@@ -540,11 +526,6 @@ where
             e.unwrap();
         }
     };
-}
-
-#[derive(Debug, Deserialize)]
-struct BuildInfo {
-    version: String,
 }
 
 pub(crate) fn get_default_name(description: &str) -> String {
