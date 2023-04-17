@@ -137,7 +137,7 @@ impl Operation {
                         );
                     }
                     if let Some(error_code) = operation_error.error_code {
-                        let code = error.code().unwrap();
+                        let code = error.sdam_code().unwrap();
                         assert_eq!(error_code, code);
                     }
                     if let Some(error_labels_contain) = &operation_error.error_labels_contain {
@@ -1564,7 +1564,7 @@ impl TestOperation for AssertIndexNotExists {
             match coll.list_index_names().await {
                 Ok(indexes) => assert!(!indexes.contains(&self.index)),
                 // a namespace not found error indicates that the index does not exist
-                Err(err) => assert_eq!(err.code(), Some(26)),
+                Err(err) => assert_eq!(err.sdam_code(), Some(26)),
             }
             Ok(None)
         }

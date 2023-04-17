@@ -2065,7 +2065,7 @@ impl TestOperation for AssertIndexNotExists {
             match coll.list_index_names().await {
                 Ok(indexes) => assert!(!indexes.contains(&self.index_name)),
                 // a namespace not found error indicates that the index does not exist
-                Err(err) => assert_eq!(err.code(), Some(26)),
+                Err(err) => assert_eq!(err.sdam_code(), Some(26)),
             }
         }
         .boxed()

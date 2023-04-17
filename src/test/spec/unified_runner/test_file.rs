@@ -490,7 +490,7 @@ impl ExpectError {
             }
         }
         if let Some(error_code) = self.error_code {
-            match &error.code() {
+            match &error.sdam_code() {
                 Some(code) => {
                     if code != &error_code {
                         return Err(format!(

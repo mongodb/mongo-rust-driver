@@ -14,12 +14,12 @@ use tokio::{
 };
 
 use crate::{
-    client::{auth::Credential, options::ServerAddress, WeakClient},
+    client::{options::ServerAddress, WeakClient},
     coll::options::FindOptions,
     error::{Error, Result},
     operation::{RawOutput, RunCommand},
     options::ReadConcern,
-    runtime::{AsyncStream, HttpClient, Process, TlsConfig},
+    runtime::{AsyncStream, Process, TlsConfig},
     Client,
     Namespace,
 };
@@ -209,6 +209,7 @@ impl CryptExecutor {
                 }
                 State::NeedKmsCredentials => {
                     let ctx = result_mut(&mut ctx)?;
+                    #[allow(unused_mut)]
                     let mut out = rawdoc! {};
                     if self
                         .kms_providers
@@ -219,8 +220,8 @@ impl CryptExecutor {
                         #[cfg(feature = "aws-auth")]
                         {
                             let aws_creds = crate::client::auth::aws::AwsCredential::get(
-                                &Credential::default(),
-                                &HttpClient::default(),
+                                &crate::client::auth::Credential::default(),
+                                &crate::runtime::HttpClient::default(),
                             )
                             .await?;
                             let mut creds = rawdoc! {

@@ -180,7 +180,7 @@ impl GridFsBucket {
             .build();
         // Ignore NamespaceExists errors if the collection has already been created.
         if let Err(error) = self.inner.db.create_collection(coll.name(), options).await {
-            if error.code() != Some(48) {
+            if error.sdam_code() != Some(48) {
                 return Err(error);
             }
         }
