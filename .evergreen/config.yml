@@ -934,23 +934,24 @@ tasks:
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
 
-  - name: "test-4.4-aws-auth"
-    # "4.4" explicitly left off to keep this out of the generic matrix
-    tags: ["aws-auth"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: "auth-aws.json"
-          MONGODB_VERSION: "4.4"
-          AUTH: "auth"
-          TOPOLOGY: "server"
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with regular aws credentials"
-      - func: "run aws auth test with assume role credentials"
-      - func: "run aws auth test with aws credentials as environment variables"
-      - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+  # TODO RUST-1634 Enable this when AWS auth on evergreen is fixed
+  #- name: "test-4.4-aws-auth"
+  #  # "4.4" explicitly left off to keep this out of the generic matrix
+  #  tags: ["aws-auth"]
+  #  commands:
+  #    - func: "bootstrap mongo-orchestration"
+  #      vars:
+  #        ORCHESTRATION_FILE: "auth-aws.json"
+  #        MONGODB_VERSION: "4.4"
+  #        AUTH: "auth"
+  #        TOPOLOGY: "server"
+  #    - func: "add aws auth variables to file"
+  #    - func: "run aws auth test with regular aws credentials"
+  #    - func: "run aws auth test with assume role credentials"
+  #    - func: "run aws auth test with aws credentials as environment variables"
+  #    - func: "run aws auth test with aws credentials and session token as environment variables"
+  #    - func: "run aws auth test with aws EC2 credentials"
+  #    - func: "run aws ECS auth test"
 
   - name: "test-5.0-standalone"
     tags: ["5.0", "standalone"]
@@ -994,23 +995,24 @@ tasks:
       - func: "start load balancer"
       - func: "run tests"
 
-  - name: "test-5.0-aws-auth"
-    # "5.0" explicitly left off to keep this out of the generic matrix
-    tags: ["aws-auth"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: "auth-aws.json"
-          MONGODB_VERSION: "5.0"
-          AUTH: "auth"
-          TOPOLOGY: "server"
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with regular aws credentials"
-      - func: "run aws auth test with assume role credentials"
-      - func: "run aws auth test with aws credentials as environment variables"
-      - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+  # TODO RUST-1634 Enable this when AWS auth on evergreen is fixed
+  #- name: "test-5.0-aws-auth"
+  #  # "5.0" explicitly left off to keep this out of the generic matrix
+  #  tags: ["aws-auth"]
+  #  commands:
+  #    - func: "bootstrap mongo-orchestration"
+  #      vars:
+  #        ORCHESTRATION_FILE: "auth-aws.json"
+  #        MONGODB_VERSION: "5.0"
+  #        AUTH: "auth"
+  #        TOPOLOGY: "server"
+  #    - func: "add aws auth variables to file"
+  #    - func: "run aws auth test with regular aws credentials"
+  #    - func: "run aws auth test with assume role credentials"
+  #    - func: "run aws auth test with aws credentials as environment variables"
+  #    - func: "run aws auth test with aws credentials and session token as environment variables"
+  #    - func: "run aws auth test with aws EC2 credentials"
+  #    - func: "run aws ECS auth test"
 
   - name: "test-6.0-standalone"
     tags: ["6.0", "standalone"]
@@ -1054,23 +1056,24 @@ tasks:
       - func: "start load balancer"
       - func: "run tests"
 
-  - name: "test-6.0-aws-auth"
-    # "6.0" explicitly left off to keep this out of the generic matrix
-    tags: ["aws-auth"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: "auth-aws.json"
-          MONGODB_VERSION: "6.0"
-          AUTH: "auth"
-          TOPOLOGY: "server"
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with regular aws credentials"
-      - func: "run aws auth test with assume role credentials"
-      - func: "run aws auth test with aws credentials as environment variables"
-      - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+  # TODO RUST-1634 Enable this when AWS auth on evergreen is fixed
+  #- name: "test-6.0-aws-auth"
+  #  # "6.0" explicitly left off to keep this out of the generic matrix
+  #  tags: ["aws-auth"]
+  #  commands:
+  #    - func: "bootstrap mongo-orchestration"
+  #      vars:
+  #        ORCHESTRATION_FILE: "auth-aws.json"
+  #        MONGODB_VERSION: "6.0"
+  #        AUTH: "auth"
+  #        TOPOLOGY: "server"
+  #    - func: "add aws auth variables to file"
+  #    - func: "run aws auth test with regular aws credentials"
+  #    - func: "run aws auth test with assume role credentials"
+  #    - func: "run aws auth test with aws credentials as environment variables"
+  #    - func: "run aws auth test with aws credentials and session token as environment variables"
+  #    - func: "run aws auth test with aws EC2 credentials"
+  #    - func: "run aws ECS auth test"
 
   - name: "test-rapid-standalone"
     tags: ["rapid", "standalone"]
@@ -1114,23 +1117,24 @@ tasks:
       - func: "start load balancer"
       - func: "run tests"
 
-  - name: "test-rapid-aws-auth"
-    # "rapid" explicitly left off to keep this out of the generic matrix
-    tags: ["aws-auth"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: "auth-aws.json"
-          MONGODB_VERSION: "rapid"
-          AUTH: "auth"
-          TOPOLOGY: "server"
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with regular aws credentials"
-      - func: "run aws auth test with assume role credentials"
-      - func: "run aws auth test with aws credentials as environment variables"
-      - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+  # TODO RUST-1634 Enable this when AWS auth on evergreen is fixed
+  #- name: "test-rapid-aws-auth"
+  #  # "rapid" explicitly left off to keep this out of the generic matrix
+  #  tags: ["aws-auth"]
+  #  commands:
+  #    - func: "bootstrap mongo-orchestration"
+  #      vars:
+  #        ORCHESTRATION_FILE: "auth-aws.json"
+  #        MONGODB_VERSION: "rapid"
+  #        AUTH: "auth"
+  #        TOPOLOGY: "server"
+  #    - func: "add aws auth variables to file"
+  #    - func: "run aws auth test with regular aws credentials"
+  #    - func: "run aws auth test with assume role credentials"
+  #    - func: "run aws auth test with aws credentials as environment variables"
+  #    - func: "run aws auth test with aws credentials and session token as environment variables"
+  #    - func: "run aws auth test with aws EC2 credentials"
+  #    - func: "run aws ECS auth test"
 
   - name: "test-latest-standalone"
     tags: ["latest", "standalone"]
@@ -1175,23 +1179,24 @@ tasks:
       - func: "run tests"
 
 
-  - name: "test-latest-aws-auth"
-    # "latest" explicitly left off to keep this out of the generic matrix
-    tags: ["aws-auth"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: "auth-aws.json"
-          MONGODB_VERSION: "latest"
-          AUTH: "auth"
-          TOPOLOGY: "server"
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with regular aws credentials"
-      - func: "run aws auth test with assume role credentials"
-      - func: "run aws auth test with aws credentials as environment variables"
-      - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+  # TODO RUST-1634 Enable this when AWS auth on evergreen is fixed
+  #- name: "test-latest-aws-auth"
+  #  # "latest" explicitly left off to keep this out of the generic matrix
+  #  tags: ["aws-auth"]
+  #  commands:
+  #    - func: "bootstrap mongo-orchestration"
+  #      vars:
+  #        ORCHESTRATION_FILE: "auth-aws.json"
+  #        MONGODB_VERSION: "latest"
+  #        AUTH: "auth"
+  #        TOPOLOGY: "server"
+  #    - func: "add aws auth variables to file"
+  #    - func: "run aws auth test with regular aws credentials"
+  #    - func: "run aws auth test with assume role credentials"
+  #    - func: "run aws auth test with aws credentials as environment variables"
+  #    - func: "run aws auth test with aws credentials and session token as environment variables"
+  #    - func: "run aws auth test with aws EC2 credentials"
+  #    - func: "run aws ECS auth test"
 
   - name: "test-connection-string"
     commands:
@@ -2074,15 +2079,17 @@ buildvariants:
   tasks:
     - ".atlas-connect"
 
-- matrix_name: "aws-auth"
-  matrix_spec:
-    os:
-      - ubuntu-18.04
-    async-runtime: "tokio"
-  display_name: "${os} AWS Auth with ${async-runtime}"
-  tasks:
-    - ".aws-auth"
-    - "test-connection-string"
+# TODO RUST-1634 Enable this when AWS auth on evergreen is fixed
+#- matrix_name: "aws-auth"
+#  matrix_spec:
+#    os:
+#      - ubuntu-18.04
+#    async-runtime: "tokio"
+#  display_name: "${os} AWS Auth with ${async-runtime}"
+#  tasks:
+#    - ".aws-auth"
+#    - "test-connection-string"
+
 # TODO: RUST-361 enable these tests once OCSP support is implemented
 # - matrix_name: "ocsp"
 #   matrix_spec:
