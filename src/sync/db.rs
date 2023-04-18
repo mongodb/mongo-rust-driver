@@ -219,28 +219,6 @@ impl Database {
         ))
     }
 
-    /// Creates a new collection with encrypted fields, automatically creating new data encryption
-    /// keys when needed based on the configured [`CreateCollectionOptions::encrypted_fields`].
-    ///
-    /// Returns the potentially updated `encrypted_fields` along with status, as keys may have been
-    /// created even when a failure occurs.
-    ///
-    /// Does not affect any auto encryption settings on existing MongoClients that are already
-    /// configured with auto encryption.
-    #[cfg(feature = "in-use-encryption-unstable")]
-    pub fn create_encrypted_collection(
-        &self,
-        ce: &crate::client_encryption::ClientEncryption,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-        master_key: crate::client_encryption::MasterKey,
-    ) -> (Document, Result<()>) {
-        runtime::block_on(
-            self.async_database
-                .create_encrypted_collection(ce, name, options, master_key),
-        )
-    }
-
     /// Runs a database-level command.
     ///
     /// Note that no inspection is done on `doc`, so the command will not use the database's default

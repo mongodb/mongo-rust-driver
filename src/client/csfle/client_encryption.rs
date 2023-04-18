@@ -21,12 +21,14 @@ use crate::{
     },
     client::options::TlsOptions,
     coll::options::CollectionOptions,
+    db::options::CreateCollectionOptions,
     error::{Error, Result},
     options::{ReadConcern, WriteConcern},
     results::DeleteResult,
     Client,
     Collection,
     Cursor,
+    Database,
     Namespace,
 };
 
@@ -410,6 +412,30 @@ impl ClientEncryption {
             .ok_or_else(|| Error::internal("invalid decryption result"))?
             .to_raw_bson())
     }
+
+    /// Creates a new collection with encrypted fields, automatically creating new data encryption
+    /// keys when needed based on the configured [`CreateCollectionOptions::encrypted_fields`].
+    ///
+    /// Returns the potentially updated `encrypted_fields` along with status, as keys may have been
+    /// created even when a failure occurs.
+    ///
+    /// Does not affect any auto encryption settings on existing MongoClients that are already
+    /// configured with auto encryption.
+    #[must_use]
+    pub fn create_encrypted_collection(
+        &self,
+        db: &Database,
+        name: impl Into<String>,
+        master_key: MasterKey,
+    ) -> CreateEncryptedCollectionAction {
+        CreateEncryptedCollectionAction {
+            client_enc: self,
+            db: db.clone(),
+            name: name.into(),
+            options: CreateCollectionOptions::default(),
+            master_key,
+        }
+    }
 }
 
 /// Options for creating a data key.
@@ -637,5 +663,72 @@ impl From<Binary> for EncryptKey {
 impl From<String> for EncryptKey {
     fn from(s: String) -> Self {
         Self::AltName(s)
+    }
+}
+
+/// A pending `ClientEncryption::create_encrypted_collection` action.
+pub struct CreateEncryptedCollectionAction<'a> {
+    client_enc: &'a ClientEncryption,
+    db: Database,
+    name: String,
+    options: CreateCollectionOptions,
+    master_key: MasterKey,
+}
+
+impl<'a> CreateEncryptedCollectionAction<'a> {
+    /// Execute the collection creation.
+    pub async fn run(self) -> (Document, Result<()>) {
+        let ef = match self.options.encrypted_fields.as_ref() {
+            Some(ef) => ef,
+            None => {
+                return (
+                    doc! {},
+                    Err(Error::invalid_argument(
+                        "no encrypted_fields defined for collection",
+                    )),
+                );
+            }
+        };
+        let mut ef_prime = ef.clone();
+        if let Ok(fields) = ef_prime.get_array_mut("fields") {
+            for f in fields {
+                let f_doc = if let Some(d) = f.as_document_mut() {
+                    d
+                } else {
+                    continue;
+                };
+                if f_doc.get("keyId") == Some(&Bson::Null) {
+                    let d = match self
+                        .client_enc
+                        .create_data_key(self.master_key.clone())
+                        .run()
+                        .await
+                    {
+                        Ok(v) => v,
+                        Err(e) => return (ef_prime, Err(e)),
+                    };
+                    f_doc.insert("keyId", d);
+                }
+            }
+        }
+        let mut opts_prime = self.options.clone();
+        opts_prime.encrypted_fields = Some(ef_prime.clone());
+        (
+            ef_prime,
+            self.db.create_collection(&self.name, opts_prime).await,
+        )
+    }
+
+    /// Set the encrypted fields for the colllection.
+    pub fn encrypted_fields(mut self, encrypted_fields: impl Into<Option<Document>>) -> Self {
+        self.options.encrypted_fields = encrypted_fields.into();
+        self
+    }
+
+    /// Set the complete creation options for the collection.  This will overwrite prior calls to
+    /// `encrypted_fields`.
+    pub fn create_collection_options(mut self, options: CreateCollectionOptions) -> Self {
+        self.options = options;
+        self
     }
 }
