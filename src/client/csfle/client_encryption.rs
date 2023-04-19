@@ -719,7 +719,7 @@ impl<'a> CreateEncryptedCollectionAction<'a> {
         )
     }
 
-    /// Set the encrypted fields for the colllection.
+    /// Set the encrypted fields for the collection.
     pub fn encrypted_fields(mut self, encrypted_fields: Document) -> Self {
         self.options.encrypted_fields = Some(encrypted_fields);
         self
