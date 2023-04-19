@@ -6,8 +6,6 @@ use std::{fmt::Debug, sync::Arc};
 use bson::doc;
 use futures_util::stream::TryStreamExt;
 
-#[cfg(feature = "in-use-encryption-unstable")]
-use crate::client_encryption::{ClientEncryption, MasterKey};
 use crate::{
     bson::{Bson, Document},
     change_stream::{
@@ -421,56 +419,6 @@ impl Database {
         session: &mut ClientSession,
     ) -> Result<()> {
         self.create_collection_common(name, options, session).await
-    }
-
-    /// Creates a new collection with encrypted fields, automatically creating new data encryption
-    /// keys when needed based on the configured [`CreateCollectionOptions::encrypted_fields`].
-    ///
-    /// Returns the potentially updated `encrypted_fields` along with status, as keys may have been
-    /// created even when a failure occurs.
-    ///
-    /// Does not affect any auto encryption settings on existing MongoClients that are already
-    /// configured with auto encryption.
-    #[cfg(feature = "in-use-encryption-unstable")]
-    pub async fn create_encrypted_collection(
-        &self,
-        ce: &ClientEncryption,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-        master_key: MasterKey,
-    ) -> (Document, Result<()>) {
-        let options: Option<CreateCollectionOptions> = options.into();
-        let ef = match options.as_ref().and_then(|o| o.encrypted_fields.as_ref()) {
-            Some(ef) => ef,
-            None => {
-                return (
-                    doc! {},
-                    Err(Error::invalid_argument(
-                        "no encrypted_fields defined for collection",
-                    )),
-                );
-            }
-        };
-        let mut ef_prime = ef.clone();
-        if let Ok(fields) = ef_prime.get_array_mut("fields") {
-            for f in fields {
-                let f_doc = if let Some(d) = f.as_document_mut() {
-                    d
-                } else {
-                    continue;
-                };
-                if f_doc.get("keyId") == Some(&Bson::Null) {
-                    let d = match ce.create_data_key(master_key.clone()).run().await {
-                        Ok(v) => v,
-                        Err(e) => return (ef_prime, Err(e)),
-                    };
-                    f_doc.insert("keyId", d);
-                }
-            }
-        }
-        let mut opts_prime = options.unwrap().clone(); // safe unwrap: no options would be caught by the encrypted_fields check
-        opts_prime.encrypted_fields = Some(ef_prime.clone());
-        (ef_prime, self.create_collection(name, opts_prime).await)
     }
 
     pub(crate) async fn run_command_common(
