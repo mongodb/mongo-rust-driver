@@ -2928,7 +2928,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     )?;
 
     // Case 1: Simple Creation and Validation
-    ce.create_encrypted_collection(&db, "case_1", master_key.clone())
+    let options = CreateCollectionOptions::builder()
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -2936,7 +2936,8 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": Bson::Null,
             }],
         })
-        .run()
+        .build();
+    ce.create_encrypted_collection(&db, "case_1", master_key.clone(), options)
         .await
         .1?;
     let coll = db.collection::<Document>("case_1");
@@ -2949,8 +2950,12 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
 
     // Case 2: Missing encryptedFields
     let result = ce
-        .create_encrypted_collection(&db, "case_2", master_key.clone())
-        .run()
+        .create_encrypted_collection(
+            &db,
+            "case_2",
+            master_key.clone(),
+            CreateCollectionOptions::default(),
+        )
         .await
         .1;
     assert!(
@@ -2960,8 +2965,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     );
 
     // Case 3: Invalid keyId
-    let result = ce
-        .create_encrypted_collection(&db, "case_1", master_key.clone())
+    let options = CreateCollectionOptions::builder()
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -2969,7 +2973,9 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": false,
             }],
         })
-        .run()
+        .build();
+    let result = ce
+        .create_encrypted_collection(&db, "case_1", master_key.clone(), options)
         .await
         .1;
     assert!(
@@ -2979,8 +2985,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     );
 
     // Case 4: Insert encrypted value
-    let (ef, result) = ce
-        .create_encrypted_collection(&db, "case_4", master_key.clone())
+    let options = CreateCollectionOptions::builder()
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -2988,7 +2993,9 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": Bson::Null,
             }],
         })
-        .run()
+        .build();
+    let (ef, result) = ce
+        .create_encrypted_collection(&db, "case_4", master_key.clone(), options)
         .await;
     result?;
     let key = match ef.get_array("fields")?[0]
