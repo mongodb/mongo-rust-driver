@@ -67,7 +67,7 @@ use super::{
     FailPointMode,
     TestClient,
     CLIENT_OPTIONS,
-    LOCK,
+    LOCK, SERVERLESS,
 };
 
 type Result<T> = anyhow::Result<T>;
@@ -2062,6 +2062,23 @@ async fn kms_tls_options() -> Result<()> {
     Ok(())
 }
 
+async fn fle2v2_ok(name: &str) -> bool {
+    if *SERVERLESS {
+        log_uncaptured(format!("Skipping {}: not supported on serverless", name));
+        return false;
+    }
+    let setup_client = Client::test_builder().build().await;
+    if setup_client.server_version_lt(7, 0) {
+        log_uncaptured(format!("Skipping {}: not supported on server < 7.0", name));
+        return false;
+    }
+    if setup_client.is_standalone() {
+        log_uncaptured(format!("Skipping {}: not supported on standalone", name));
+        return false;
+    }
+    true
+}
+
 // Prose test 12. Explicit Encryption (Case 1: can insert encrypted indexed and find)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
@@ -2069,8 +2086,10 @@ async fn explicit_encryption_case_1() -> Result<()> {
     if !check_env("explicit_encryption_case_1", false) {
         return Ok(());
     }
+    if !fle2v2_ok("explicit_encryption_case_1").await {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
-
     let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
         None => return Ok(()),
@@ -2125,6 +2144,9 @@ async fn explicit_encryption_case_1() -> Result<()> {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_2() -> Result<()> {
     if !check_env("explicit_encryption_case_2", false) {
+        return Ok(());
+    }
+    if !fle2v2_ok("explicit_encryption_case_2").await {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -2206,6 +2228,9 @@ async fn explicit_encryption_case_3() -> Result<()> {
     if !check_env("explicit_encryption_case_3", false) {
         return Ok(());
     }
+    if !fle2v2_ok("explicit_encryption_case_3").await {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let testdata = match explicit_encryption_setup().await? {
@@ -2254,6 +2279,9 @@ async fn explicit_encryption_case_4() -> Result<()> {
     if !check_env("explicit_encryption_case_4", false) {
         return Ok(());
     }
+    if !fle2v2_ok("explicit_encryption_case_4").await {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let testdata = match explicit_encryption_setup().await? {
@@ -2286,6 +2314,9 @@ async fn explicit_encryption_case_4() -> Result<()> {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn explicit_encryption_case_5() -> Result<()> {
     if !check_env("explicit_encryption_case_5", false) {
+        return Ok(());
+    }
+    if !fle2v2_ok("explicit_encryption_case_5").await {
         return Ok(());
     }
     let _guard = LOCK.run_exclusively().await;
@@ -2904,6 +2935,9 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     if !check_env("custom_key_material", false) {
         return Ok(());
     }
+    if !fle2v2_ok("auto_encryption_keys").await {
+        return Ok(());
+    }
     let _guard = LOCK.run_exclusively().await;
 
     let client = Client::test_builder().build().await;
@@ -3022,6 +3056,9 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn range_explicit_encryption() -> Result<()> {
+    if !fle2v2_ok("range_explicit_encryption").await {
+        return Ok(());
+    }
     let client = TestClient::new().await;
     if client.server_version_lt(6, 2) || client.is_standalone() {
         log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
