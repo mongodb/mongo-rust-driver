@@ -97,9 +97,7 @@ impl ClientState {
     }
 
     fn make_crypt(opts: &AutoEncryptionOptions) -> Result<Crypt> {
-        let mut builder = Crypt::builder()
-            .kms_providers(&opts.kms_providers.credentials_doc()?)?
-            .fle2v2(true)?;
+        let mut builder = Crypt::builder().kms_providers(&opts.kms_providers.credentials_doc()?)?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
         }
@@ -206,7 +204,7 @@ pub(crate) fn aux_collections(
     enc_fields: &bson::Document,
 ) -> Result<Vec<Namespace>> {
     let mut out = vec![];
-    for &key in &["esc", "ecc", "ecoc"] {
+    for &key in &["esc", "ecoc"] {
         let coll = match enc_fields.get_str(format!("{}Collection", key)) {
             Ok(s) => s.to_string(),
             Err(_) => format!("enxcol_.{}.{}", base_ns.coll, key),

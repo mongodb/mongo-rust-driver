@@ -550,7 +550,6 @@ impl Client {
         self.inner.topology.sync_workers().await;
     }
 
-    #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
         self.inner
             .topology
