@@ -1679,7 +1679,14 @@ Expect no error on construction.
 12. Explicit Encryption
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The Explicit Encryption tests require MongoDB server 6.0+. The tests must not run against a standalone.
+The Explicit Encryption tests require MongoDB server 7.0+. The tests must not run against a standalone.
+
+.. note::
+   MongoDB Server 7.0 introduced a backwards breaking change to the Queryable Encryption (QE) protocol: QEv2.
+	libmongocrypt 1.8.0 is configured to use the QEv2 protocol.
+
+.. note::
+   Skip this test on Serverless until MongoDB Serverless enables the QEv2 protocol. Refer: `DRIVERS-2589 <https://jira.mongodb.org/browse/DRIVERS-2589>`_
 
 Before running each of the following test cases, perform the following Test Setup.
 
@@ -2495,7 +2502,14 @@ The following tests that a mongocryptd client is not created when shared library
 21. Automatic Data Encryption Keys
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Automatic Data Encryption Keys tests require MongoDB server 6.0+. The tests must not run against a standalone.
+The Automatic Data Encryption Keys tests require MongoDB server 7.0+. The tests must not run against a standalone.
+
+.. note::
+   MongoDB Server 7.0 introduced a backwards breaking change to the Queryable Encryption (QE) protocol: QEv2.
+	libmongocrypt 1.8.0 is configured to use the QEv2 protocol.
+
+.. note::
+   Skip this test on Serverless until MongoDB Serverless enables the QEv2 protocol. Refer: `DRIVERS-2589 <https://jira.mongodb.org/browse/DRIVERS-2589>`_
 
 For each of the following test cases, assume `DB` is a valid open database
 handle, and assume a ClientEncryption_ object `CE` created using the following
@@ -2644,7 +2658,14 @@ with encrypted value.
 
 22. Range Explicit Encryption
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Range Explicit Encryption tests require MongoDB server 6.2+. The tests must not run against a standalone.
+The Range Explicit Encryption tests require MongoDB server 7.0+. The tests must not run against a standalone.
+
+.. note::
+   MongoDB Server 7.0 introduced a backwards breaking change to the Queryable Encryption (QE) protocol: QEv2.
+	libmongocrypt 1.8.0 is configured to use the QEv2 protocol.
+
+.. note::
+   Skip this test on Serverless until MongoDB Serverless enables the QEv2 protocol. Refer: `DRIVERS-2589 <https://jira.mongodb.org/browse/DRIVERS-2589>`_
 
 Each of the following test cases must pass for each of the supported types (``DecimalNoPrecision``, ``DecimalPrecision``, ``DoublePrecision``, ``DoubleNoPrecision``, ``Date``, ``Int``, and ``Long``), unless it is stated the type should be skipped.
 
@@ -2654,7 +2675,7 @@ Before running each of the following test cases, perform the following Test Setu
 
 Test Setup
 ``````````
-Load the file for the specific data type being tested ``encryptedFields-<type>.json``. For example, for ``Int`` load `range-encryptedFields-Int.json <https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/etc/data/range-encryptedFields-Int.json>`_ as ``encryptedFields``.
+Load the file for the specific data type being tested ``range-encryptedFields-<type>.json``. For example, for ``Int`` load `range-encryptedFields-Int.json <https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/etc/data/range-encryptedFields-Int.json>`_ as ``encryptedFields``.
 
 Load the file `key1-document.json <https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/keys/key1-document.json>`_ as ``key1Document``.
 
