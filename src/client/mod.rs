@@ -565,6 +565,7 @@ impl Client {
         &self.inner.topology
     }
 
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) async fn primary_description(&self) -> Option<crate::sdam::ServerDescription> {
         let start_time = Instant::now();
         let timeout = self
