@@ -379,7 +379,7 @@ impl Database {
             Some(f) => f,
             None => return Ok(()),
         };
-        let max_wire = match self.client().topology_description().primary() {
+        let max_wire = match self.client().primary_description().await {
             Some(p) => p.max_wire_version()?,
             None => None
         };

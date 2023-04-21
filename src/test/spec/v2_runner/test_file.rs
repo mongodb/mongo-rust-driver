@@ -14,7 +14,7 @@ use crate::{
         FailPoint,
         Serverless,
         TestClient,
-        DEFAULT_URI,
+        DEFAULT_URI, log_uncaptured,
     },
     Client,
 };
@@ -54,22 +54,26 @@ impl RunOn {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
+                log_uncaptured(format!("runOn mismatch: required server version >= {}, got {}", min_version, client.server_version));
                 return false;
             }
         }
         if let Some(ref max_version) = self.max_server_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
             if !req.matches(&client.server_version) {
+                log_uncaptured(format!("runOn mismatch: required server version <= {}, got {}", max_version, client.server_version));
                 return false;
             }
         }
         if let Some(ref topology) = self.topology {
             if !topology.contains(&client.topology_string()) {
+                log_uncaptured(format!("runOn mismatch: required topology in {:?}, got {:?}", topology, client.topology_string()));
                 return false;
             }
         }
         if let Some(ref serverless) = self.serverless {
             if !serverless.can_run() {
+                log_uncaptured(format!("runOn mismatch: required serverless {:?}", serverless));
                 return false;
             }
         }

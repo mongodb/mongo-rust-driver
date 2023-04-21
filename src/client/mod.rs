@@ -550,6 +550,7 @@ impl Client {
         self.inner.topology.sync_workers().await;
     }
 
+    #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
         self.inner
             .topology
@@ -562,6 +563,25 @@ impl Client {
     #[cfg(test)]
     pub(crate) fn topology(&self) -> &Topology {
         &self.inner.topology
+    }
+
+    pub(crate) async fn primary_description(&self) -> Option<crate::sdam::ServerDescription> {
+        let start_time = Instant::now();
+        let timeout = self
+            .inner
+            .options
+            .server_selection_timeout
+            .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
+        let mut watcher = self.inner.topology.watch();
+        loop {
+            let topology = watcher.observe_latest();
+            if let Some(desc) = topology.description.primary() {
+                return Some(desc.clone());
+            }
+            if !watcher.wait_for_update(timeout - start_time.elapsed()).await {
+                return None;
+            }
+        }
     }
 
     #[cfg(feature = "in-use-encryption-unstable")]

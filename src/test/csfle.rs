@@ -3447,8 +3447,8 @@ async fn fle2_example() -> Result<()> {
 
     // FLE 2 is not supported on Standalone topology.
     let test_client = Client::test_builder().build().await;
-    if test_client.server_version_lt(6, 0) {
-        log_uncaptured("skipping fle2 example: server below 6.0");
+    if test_client.server_version_lt(7, 0) {
+        log_uncaptured("skipping fle2 example: server below 7.0");
         return Ok(());
     }
     if test_client.is_standalone() {

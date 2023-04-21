@@ -113,7 +113,10 @@ impl Operation {
         if let Some(expected_result) = &self.result {
             match expected_result {
                 OperationResult::Success(expected) => {
-                    let result = result.as_ref().unwrap().as_ref().unwrap();
+                    let result = match result.as_ref() {
+                        Ok(Some(r)) => r,
+                        _ => panic!("{}: expected value, got {:?}", description, result),
+                    };
                     assert_matches(result, expected, Some(description));
                 }
                 OperationResult::Error(operation_error) => {
