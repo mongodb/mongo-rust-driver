@@ -67,7 +67,8 @@ use super::{
     FailPointMode,
     TestClient,
     CLIENT_OPTIONS,
-    LOCK, SERVERLESS,
+    LOCK,
+    SERVERLESS,
 };
 
 type Result<T> = anyhow::Result<T>;

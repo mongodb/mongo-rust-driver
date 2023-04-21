@@ -578,7 +578,10 @@ impl Client {
             if let Some(desc) = topology.description.primary() {
                 return Some(desc.clone());
             }
-            if !watcher.wait_for_update(timeout - start_time.elapsed()).await {
+            if !watcher
+                .wait_for_update(timeout - start_time.elapsed())
+                .await
+            {
                 return None;
             }
         }
