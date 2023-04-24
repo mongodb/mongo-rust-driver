@@ -2856,7 +2856,47 @@ async fn on_demand_aws_success() -> Result<()> {
 
 // TODO RUST-1441: implement prose test 16. Rewrap
 
-// TODO RUST-1417: implement prose test 17. On-demand GCP Credentials
+// Prose test 17. On-demand GCP Credentials
+#[cfg(feature = "gcp-kms")]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn on_demand_gcp_credentials() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let util_client = TestClient::new().await.into_client();
+    let client_encryption = ClientEncryption::new(
+        util_client,
+        KV_NAMESPACE.clone(),
+        [(KmsProvider::Gcp, doc! {}, None)],
+    )?;
+
+    let result = client_encryption
+        .create_data_key(MasterKey::Gcp {
+            project_id: "devprod-drivers".into(),
+            location: "global".into(),
+            key_ring: "key-ring-csfle".into(),
+            key_name: "key-name-csfle".into(),
+            key_version: None,
+            endpoint: None,
+        })
+        .run()
+        .await;
+
+    if std::env::var("ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED").is_ok() {
+        result.unwrap();
+    } else {
+        let error = result.unwrap_err();
+        match *error.kind {
+            ErrorKind::Encryption(e) => {
+                assert!(matches!(e.kind, mongocrypt::error::ErrorKind::Kms));
+                assert!(e.message.unwrap().contains("GCP credentials"));
+            }
+            other => panic!("Expected encryption error, got {:?}", other),
+        }
+    }
+
+    Ok(())
+}
 
 // Prose test 18. Azure IMDS Credentials
 #[cfg(feature = "azure-kms")]

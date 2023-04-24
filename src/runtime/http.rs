@@ -1,3 +1,6 @@
+// Suppress noisy warnings when a method is not used under a certain feature flag.
+#![allow(unused)]
+
 use reqwest::{IntoUrl, Method, Response};
 use serde::Deserialize;
 
@@ -36,7 +39,6 @@ impl HttpClient {
     }
 
     /// Executes an HTTP GET request and returns the response body as a string.
-    #[allow(unused)]
     pub(crate) async fn get_and_read_string<'a>(
         &self,
         uri: &str,
@@ -47,7 +49,6 @@ impl HttpClient {
     }
 
     /// Executes an HTTP PUT request and returns the response body as a string.
-    #[allow(unused)]
     pub(crate) async fn put_and_read_string<'a>(
         &self,
         uri: &str,
@@ -58,7 +59,6 @@ impl HttpClient {
     }
 
     /// Executes an HTTP request and returns the response body as a string.
-    #[allow(unused)]
     pub(crate) async fn request_and_read_string<'a>(
         &self,
         method: Method,
