@@ -379,6 +379,22 @@ impl Database {
             Some(f) => f,
             None => return Ok(()),
         };
+        let max_wire = match self.client().primary_description().await {
+            Some(p) => p.max_wire_version()?,
+            None => None,
+        };
+        const SERVER_7_0_0_WIRE_VERSION: i32 = 21;
+        match max_wire {
+            Some(v) if v >= SERVER_7_0_0_WIRE_VERSION => (),
+            _ => {
+                return Err(ErrorKind::IncompatibleServer {
+                    message: "Driver support of Queryable Encryption is incompatible with server. \
+                              Upgrade server to use Queryable Encryption."
+                        .to_string(),
+                }
+                .into())
+            }
+        }
         for ns in crate::client::csfle::aux_collections(base_ns, enc_fields)? {
             let mut sub_opts = opts.clone();
             sub_opts.clustered_index = Some(self::options::ClusteredIndex {

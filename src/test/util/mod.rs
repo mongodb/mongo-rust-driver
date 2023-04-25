@@ -211,7 +211,9 @@ impl TestClient {
             .run_command(doc! { "buildInfo": 1 }, None)
             .await
             .unwrap();
-        let server_version = Version::parse(build_info.get_str("version").unwrap()).unwrap();
+        let mut server_version = Version::parse(build_info.get_str("version").unwrap()).unwrap();
+        // Clear prerelease tag to allow version comparisons.
+        server_version.pre = semver::Prerelease::EMPTY;
 
         let server_parameters = client
             .database("admin")

@@ -113,10 +113,20 @@ impl Operation {
         if let Some(expected_result) = &self.result {
             match expected_result {
                 OperationResult::Success(expected) => {
-                    let result = result.as_ref().unwrap().as_ref().unwrap();
+                    let result = match result.as_ref() {
+                        Ok(Some(r)) => r,
+                        _ => panic!("{}: expected value, got {:?}", description, result),
+                    };
                     assert_matches(result, expected, Some(description));
                 }
                 OperationResult::Error(operation_error) => {
+                    assert!(
+                        result.is_err(),
+                        "{}: expected error\n{:#?}  got value\n{:#?}",
+                        description,
+                        operation_error,
+                        result,
+                    );
                     let error = result.as_ref().unwrap_err();
                     if let Some(error_contains) = &operation_error.error_contains {
                         let message = error.message().unwrap().to_lowercase();
