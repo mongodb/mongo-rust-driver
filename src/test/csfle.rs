@@ -2820,11 +2820,7 @@ async fn on_demand_aws_failure() -> Result<()> {
         })
         .run()
         .await;
-    assert!(
-        result.is_err(),
-        "Expected error, got {:?}",
-        result
-    );
+    assert!(result.is_err(), "Expected error, got {:?}", result);
 
     Ok(())
 }
