@@ -74,7 +74,6 @@ impl ClientEncryption {
         let crypt = Crypt::builder()
             .kms_providers(&kms_providers.credentials_doc()?)?
             .use_need_kms_credentials_state()
-            .fle2v2(true)?
             .build()?;
         let exec = CryptExecutor::new_explicit(
             key_vault_client.weak(),
