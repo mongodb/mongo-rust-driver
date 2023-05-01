@@ -1748,12 +1748,12 @@ axes:
         variables:
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu2004-64"
-      - id: ubuntu-18.04-arm64
-        display_name: "ARM64 Ubuntu 18.04"
-        run_on: ubuntu1804-arm64-test
+      - id: ubuntu-20.04-arm64
+        display_name: "ARM64 Ubuntu 20.04"
+        run_on: ubuntu2004-arm64-test
         variables:
           VENV_BIN_DIR: "bin"
-          LIBMONGOCRYPT_OS: "ubuntu1804-arm64"
+          LIBMONGOCRYPT_OS: "ubuntu2004-arm64"
       - id: macos-11.00
         display_name: "MacOS 11.00"
         run_on: macos-1100
@@ -1842,7 +1842,7 @@ buildvariants:
       - rhel-8.0
       - ubuntu-18.04
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     auth-and-tls: "*"
@@ -1873,7 +1873,7 @@ buildvariants:
     # generic Linux builds on them. These do not link to OpenSSL, so we have to skip
     # the SSL tests on them.
     - if:
-        os: "ubuntu-20.04"
+        os: ["ubuntu-20.04", "ubuntu-20.04-arm64"]
         auth-and-tls: "*"
         async-runtime: "*"
         compressor: "*"
@@ -1886,17 +1886,9 @@ buildvariants:
         compressor: "*"
       then:
         remove_tasks: ".3.6"
-    # ubuntu 1804 ARM64 only has downloads for 4.2+
-    - if:
-        os: ["ubuntu-18.04-arm64"]
-        auth-and-tls: "*"
-        async-runtime: "*"
-        compressor: "*"
-      then:
-        remove_tasks: [".3.6", ".4.0"]
     # haproxy isn't installed on windows / ubuntu-arm / macos 11
     - if:
-        os: ["ubuntu-18.04-arm64", "windows-64-vs2017", "macos-11.00"]
+        os: ["ubuntu-20.04-arm64", "windows-64-vs2017", "macos-11.00"]
         auth-and-tls: "*"
         async-runtime: "*"
         compressor: "*"
@@ -1906,7 +1898,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     auth-and-tls:
@@ -1921,7 +1913,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     async-runtime: "*"
@@ -2074,7 +2066,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     async-runtime: "*"
