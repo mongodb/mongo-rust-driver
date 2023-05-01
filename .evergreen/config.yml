@@ -1730,6 +1730,12 @@ axes:
   - id: "os"
     display_name: OS
     values:
+      - id: rhel-8.0
+        display_name: "RHEL 8.0"
+        run_on: rhel80-test
+        variables:
+          VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "rhel-80-64-bit"
       - id: ubuntu-18.04
         display_name: "Ubuntu 18.04"
         run_on: ubuntu1804-test
@@ -1833,6 +1839,7 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os:
+      - rhel-8.0
       - ubuntu-18.04
       - ubuntu-20.04
       - ubuntu-18.04-arm64
