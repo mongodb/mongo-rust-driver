@@ -1628,7 +1628,9 @@ impl DeadlockTestCase {
             .create_collection(
                 "coll",
                 CreateCollectionOptions::builder()
-                    .validator(doc! { "$jsonSchema": load_testdata("external/external-schema.json")? })
+                    .validator(
+                        doc! { "$jsonSchema": load_testdata("external/external-schema.json")? },
+                    )
                     .build(),
             )
             .await?;
@@ -3130,7 +3132,8 @@ async fn range_explicit_encryption_test(
     let _guard = LOCK.run_exclusively().await;
     let util_client = TestClient::new().await;
 
-    let encrypted_fields = load_testdata(&format!("data/range-encryptedFields-{}.json", bson_type))?;
+    let encrypted_fields =
+        load_testdata(&format!("data/range-encryptedFields-{}.json", bson_type))?;
 
     let key1_document = load_testdata("data/keys/key1-document.json")?;
     let key1_id = match key1_document.get("_id").unwrap() {
