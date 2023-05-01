@@ -1736,12 +1736,6 @@ axes:
         variables:
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "rhel-80-64-bit"
-      - id: ubuntu-18.04
-        display_name: "Ubuntu 18.04"
-        run_on: ubuntu1804-test
-        variables:
-          VENV_BIN_DIR: "bin"
-          LIBMONGOCRYPT_OS: "ubuntu1804-64"
       - id: ubuntu-20.04
         display_name: "Ubuntu 20.04"
         run_on: ubuntu2004-test
@@ -1840,7 +1834,6 @@ buildvariants:
   matrix_spec:
     os:
       - rhel-8.0
-      - ubuntu-18.04
       - ubuntu-20.04
       - ubuntu-20.04-arm64
       - macos-11.00
@@ -1879,13 +1872,6 @@ buildvariants:
         compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
-    - if:
-        os: "ubuntu-18.04"
-        auth-and-tls: "auth-and-tls"
-        async-runtime: "*"
-        compressor: "*"
-      then:
-        remove_tasks: ".3.6"
     # haproxy isn't installed on windows / ubuntu-arm / macos 11
     - if:
         os: ["ubuntu-20.04-arm64", "windows-64-vs2017", "macos-11.00"]
@@ -1924,7 +1910,7 @@ buildvariants:
 - matrix_name: "serverless"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     async-runtime: "*"
     crypt-shared:
       - "enabled"
@@ -1955,11 +1941,11 @@ buildvariants:
   tasks:
     - "test-csfle"
 
-# There's no 4.2 build for ubuntu-20.04, so drop down to -18.04.
+# There's no 4.2 build for ubuntu-20.04, so switch to rhel.
 - matrix_name: "csfle-mongodb-version-old"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel-8.0
     mongodb-version:
       - "4.2"
     topology:
@@ -2027,11 +2013,11 @@ buildvariants:
   tasks:
     - "test-csfle"
 
-# There's no 4.2 build for ubuntu-20.04, so drop down to -18.04.
+# There's no 4.2 build for ubuntu-20.04, so switch to rhel.
 - matrix_name: "csfle-mongocryptd-old"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel-8.0
     mongodb-version:
       - "4.2"
     topology:
@@ -2077,7 +2063,7 @@ buildvariants:
 - matrix_name: "aws-auth"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     async-runtime: "tokio"
   display_name: "${os} AWS Auth with ${async-runtime}"
   tasks:
@@ -2129,7 +2115,7 @@ buildvariants:
 - matrix_name: "compile-only"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     extra-rust-versions: "*"
   display_name: "! Compile on Rust ${extra-rust-versions}"
   tasks:
@@ -2138,7 +2124,7 @@ buildvariants:
 - matrix_name: "versioned-api-tests"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     async-runtime: "tokio"
     versioned-api: "*"
   display_name: "Versioned API ${versioned-api}"
