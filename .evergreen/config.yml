@@ -56,6 +56,10 @@ functions:
            export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
            export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/lib"
+           # The RHEL path is 'lib64', not 'lib'
+           if [ "$LIBMONGOCRYPT_OS" = "rhel-80-64-bit" ]; then
+             export MONGOCRYPT_LIB_DIR="$MONGOCRYPT_LIB_DIR64"
+           fi
            export LD_LIBRARY_PATH="$MONGOCRYPT_LIB_DIR:$LD_LIBRARY_PATH"
 
            cat <<EOT > expansion.yml
