@@ -28,4 +28,16 @@ curl -sL "https://github.com/mongodb/specifications/archive/$REF.zip" -o "$tmpdi
 unzip -q -d "$tmpdir" "$tmpdir/specs.zip"
 mkdir -p "src/test/spec/json/$1"
 rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/tests/" "src/test/spec/json/$1" --delete
+
+if [ "$1" = "client-side-encryption" ]; then
+    mkdir -p "src/test/spec/json/testdata/$1/data"
+    rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/etc/data/" "src/test/spec/json/testdata/$1/data" --delete
+    mkdir -p "src/test/spec/json/testdata/$1/corpus"
+    rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/corpus/" "src/test/spec/json/testdata/$1/corpus" --delete
+    mkdir -p "src/test/spec/json/testdata/$1/external"
+    rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/external/" "src/test/spec/json/testdata/$1/external" --delete
+    mkdir -p "src/test/spec/json/testdata/$1/limits"
+    rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/limits/" "src/test/spec/json/testdata/$1/limits" --delete
+fi
+
 rm -rf "$tmpdir"

@@ -2807,7 +2807,7 @@ Each test listed in the cases below must pass for all supported data types unles
 
 Case 1: can decrypt a payload
 `````````````````````````````
-Use ``clientEncryption.encrypt()`` to encrypt the value 6. Ensure the type matches with the type of the encrypted field. For example, if the encrypted field is ``encryptedDoubleNoPrecision`` encrypt the double value 6.0.
+Use ``clientEncryption.encrypt()`` to encrypt the value 6. Ensure the encoded BSON type matches the type of the encrypted field. For example, if the encrypted field is ``encryptedLong`` encrypt the 64-bit BSON long value 6, not the 32-bit BSON int value 6.
 
 Store the result in ``insertPayload``.
 
@@ -2822,6 +2822,11 @@ Encrypt with the matching ``RangeOpts`` listed in `Test Setup: RangeOpts`_ and t
    }
 
 Use ``clientEncryption`` to decrypt ``insertPayload``. Assert the returned value equals 6.
+
+.. note::
+
+   The type returned by ``clientEncryption.decrypt()`` may differ from the input type to ``clientEncryption.encrypt()`` depending on how the driver unmarshals BSON numerics to language native types.
+   Example: a driver may unmarshal a BSON long to a numeric type that does not distinguish between int64 and int32.
 
 Case 2: can find encrypted range and return the maximum 
 ```````````````````````````````````````````````````````
