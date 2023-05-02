@@ -55,11 +55,12 @@ functions:
            export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
            export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
-           export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/lib"
+           LIBMONGOCRYPT_SUFFIX_DIR="lib"
            # The RHEL path is 'lib64', not 'lib'
-           if [ "$LIBMONGOCRYPT_OS" = "rhel-80-64-bit" ]; then
-             export MONGOCRYPT_LIB_DIR="${MONGOCRYPT_LIB_DIR}64"
+           if [ "${LIBMONGOCRYPT_OS}" = "rhel-80-64-bit" ]; then
+             LIBMONGOCRYPT_SUFFIX_DIR="lib64"
            fi
+           export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/$LIBMONGOCRYPT_SUFFIX_DIR"
            export LD_LIBRARY_PATH="$MONGOCRYPT_LIB_DIR:$LD_LIBRARY_PATH"
 
            cat <<EOT > expansion.yml
@@ -1734,6 +1735,12 @@ axes:
   - id: "os"
     display_name: OS
     values:
+      - id: ubuntu-18.04
+        display_name: "Ubuntu 18.04"
+        run_on: ubuntu1804-test
+        variables:
+          VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "ubuntu1804-64"
       - id: rhel-8.0
         display_name: "RHEL 8.0"
         run_on: rhel80-test
@@ -2067,7 +2074,7 @@ buildvariants:
 - matrix_name: "aws-auth"
   matrix_spec:
     os:
-      - ubuntu-20.04
+      - ubuntu-18.04
     async-runtime: "tokio"
   display_name: "${os} AWS Auth with ${async-runtime}"
   tasks:
