@@ -3455,6 +3455,10 @@ async fn fle2_example() -> Result<()> {
         log_uncaptured("skipping fle2 example: cannot run on standalone");
         return Ok(());
     }
+    if *SERVERLESS {
+        log_uncaptured("skipping fle2 example: cannot run on serverless");
+        return Ok(());
+    }
 
     // Drop data from prior test runs.
     test_client
