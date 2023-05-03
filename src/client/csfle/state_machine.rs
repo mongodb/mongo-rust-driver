@@ -36,13 +36,7 @@ pub(crate) struct CryptExecutor {
     mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
     cached_azure_access_token: Mutex<Option<CachedAzureAccessToken>>,
-    azure_imds: Box<dyn AzureImds>,
-}
-
-#[derive(Debug)]
-struct CachedAzureAccessToken {
-    token_doc: RawDocumentBuf,
-    expire_time: Instant,
+    azure_imds: Box<dyn AzureImds + Send + Sync>,
 }
 
 impl CryptExecutor {
@@ -370,6 +364,12 @@ fn result_mut<T>(r: &mut Result<T>) -> Result<&mut T> {
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
     raw.try_into()
         .map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
+}
+
+#[derive(Debug)]
+struct CachedAzureAccessToken {
+    token_doc: RawDocumentBuf,
+    expire_time: Instant,
 }
 
 #[async_trait::async_trait]
