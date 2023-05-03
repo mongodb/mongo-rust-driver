@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     ops::DerefMut,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, time::{Duration, Instant},
 };
 
 use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
@@ -35,6 +35,14 @@ pub(crate) struct CryptExecutor {
     mongocryptd: Option<Mongocryptd>,
     mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
+    cached_azure_access_token: Mutex<Option<CachedAzureAccessToken>>,
+    azure_imds: Box<dyn AzureImds>,
+}
+
+#[derive(Debug)]
+struct CachedAzureAccessToken {
+    token_doc: RawDocumentBuf,
+    expire_time: Instant,
 }
 
 impl CryptExecutor {
@@ -56,6 +64,8 @@ impl CryptExecutor {
             mongocryptd: None,
             mongocryptd_client: None,
             metadata_client: None,
+            cached_azure_access_token: Mutex::new(None),
+            azure_imds: Box::new(ProdAzureImds),
         })
     }
 
@@ -211,11 +221,10 @@ impl CryptExecutor {
                     let ctx = result_mut(&mut ctx)?;
                     #[allow(unused_mut)]
                     let mut out = rawdoc! {};
-                    if self
-                        .kms_providers
-                        .credentials()
+                    let credentials = self.kms_providers.credentials();
+                    if credentials
                         .get(&KmsProvider::Aws)
-                        .map_or(false, |d| d.is_empty())
+                        .map_or(false, Document::is_empty)
                     {
                         #[cfg(feature = "aws-auth")]
                         {
@@ -238,6 +247,22 @@ impl CryptExecutor {
                             return Err(Error::invalid_argument(
                                 "On-demand AWS KMS credentials require the `aws-auth` feature.",
                             ));
+                        }
+                    }
+                    if credentials
+                        .get(&KmsProvider::Azure)
+                        .map_or(false, Document::is_empty)
+                    {
+                        let mut cached_token = self.cached_azure_access_token.lock().await;
+                        match &*cached_token {
+                            Some(cached) if cached.expire_time.saturating_duration_since(Instant::now()) > Duration::from_secs(60) => {
+                                out.append("azure", cached.token_doc.clone());
+                            }
+                            _ => {
+                                let token = self.azure_imds.get_token().await?;
+                                out.append("azure", token.token_doc.clone());
+                                *cached_token = Some(token);
+                            }
                         }
                     }
                     ctx.provide_kms_providers(&out)?;
@@ -345,4 +370,19 @@ fn result_mut<T>(r: &mut Result<T>) -> Result<&mut T> {
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
     raw.try_into()
         .map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
+}
+
+#[async_trait::async_trait]
+trait AzureImds: std::fmt::Debug {
+    async fn get_token(&self) -> Result<CachedAzureAccessToken>;
+}
+
+#[derive(Debug)]
+struct ProdAzureImds;
+
+#[async_trait::async_trait]
+impl AzureImds for ProdAzureImds {
+    async fn get_token(&self) -> Result<CachedAzureAccessToken> {
+        todo!()
+    }
 }
