@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     ops::DerefMut,
-    path::{Path, PathBuf}, time::{Duration, Instant},
+    path::{Path, PathBuf},
 };
 
 use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
@@ -35,8 +35,8 @@ pub(crate) struct CryptExecutor {
     mongocryptd: Option<Mongocryptd>,
     mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
-    cached_azure_access_token: Mutex<Option<CachedAzureAccessToken>>,
-    azure_imds: Box<dyn AzureImds + Send + Sync>,
+    #[cfg(feature = "azure-kms")]
+    azure: azure::ExecutorState,
 }
 
 impl CryptExecutor {
@@ -58,8 +58,8 @@ impl CryptExecutor {
             mongocryptd: None,
             mongocryptd_client: None,
             metadata_client: None,
-            cached_azure_access_token: Mutex::new(None),
-            azure_imds: Box::new(ProdAzureImds),
+            #[cfg(feature = "azure-kms")]
+            azure: azure::ExecutorState::new(),
         })
     }
 
@@ -247,16 +247,15 @@ impl CryptExecutor {
                         .get(&KmsProvider::Azure)
                         .map_or(false, Document::is_empty)
                     {
-                        let mut cached_token = self.cached_azure_access_token.lock().await;
-                        match &*cached_token {
-                            Some(cached) if cached.expire_time.saturating_duration_since(Instant::now()) > Duration::from_secs(60) => {
-                                out.append("azure", cached.token_doc.clone());
-                            }
-                            _ => {
-                                let token = self.azure_imds.get_token().await?;
-                                out.append("azure", token.token_doc.clone());
-                                *cached_token = Some(token);
-                            }
+                        #[cfg(feature = "azure-kms")]
+                        {
+                            out.append("azure", self.azure.get_token().await?);
+                        }
+                        #[cfg(not(feature = "azure-kms"))]
+                        {
+                            return Err(Error::invalid_argument(
+                                "On-demand Azure KMS credentials require the `azure-kms` feature.",
+                            ));
                         }
                     }
                     ctx.provide_kms_providers(&out)?;
@@ -366,23 +365,61 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
         .map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
 }
 
-#[derive(Debug)]
-struct CachedAzureAccessToken {
-    token_doc: RawDocumentBuf,
-    expire_time: Instant,
-}
+#[cfg(feature = "azure-kms")]
+mod azure {
+    use bson::RawDocumentBuf;
+    use tokio::sync::Mutex;
+    use std::time::{Instant, Duration};
 
-#[async_trait::async_trait]
-trait AzureImds: std::fmt::Debug {
-    async fn get_token(&self) -> Result<CachedAzureAccessToken>;
-}
+    use crate::error::Result;
 
-#[derive(Debug)]
-struct ProdAzureImds;
-
-#[async_trait::async_trait]
-impl AzureImds for ProdAzureImds {
-    async fn get_token(&self) -> Result<CachedAzureAccessToken> {
-        todo!()
+    #[derive(Debug)]
+    pub(super) struct ExecutorState {
+        cached_access_token: Mutex<Option<CachedAccessToken>>,
+        token_source: Box<dyn TokenSource + Send + Sync>,
     }
+
+    impl ExecutorState {
+        pub(super) fn new() -> Self {
+            Self {
+                cached_access_token: Mutex::new(None),
+                token_source: Box::new(AzureImdsTokenSource),
+            }
+        }
+
+        pub(super) async fn get_token(&self) -> Result<RawDocumentBuf> {
+            let mut cached_token = self.cached_access_token.lock().await;
+            if let Some(cached) = &*cached_token {
+                if cached.expire_time.saturating_duration_since(Instant::now()) > Duration::from_secs(60) {
+                    return Ok(cached.token_doc.clone());
+                }
+            }
+            let token = self.token_source.get_token().await?;
+            let out = token.token_doc.clone();
+            *cached_token = Some(token);
+            Ok(out)
+        }
+    }
+
+    #[derive(Debug)]
+    struct CachedAccessToken {
+        token_doc: RawDocumentBuf,
+        expire_time: Instant,
+    }
+
+    #[async_trait::async_trait]
+    trait TokenSource: std::fmt::Debug {
+        async fn get_token(&self) -> Result<CachedAccessToken>;
+    }
+
+    #[derive(Debug)]
+    struct AzureImdsTokenSource;
+
+    #[async_trait::async_trait]
+    impl TokenSource for AzureImdsTokenSource {
+        async fn get_token(&self) -> Result<CachedAccessToken> {
+            todo!()
+        }
+    }
+
 }
