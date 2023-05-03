@@ -367,16 +367,18 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 
 #[cfg(feature = "azure-kms")]
 mod azure {
-    use bson::RawDocumentBuf;
+    use bson::{RawDocumentBuf, rawdoc};
+    use serde::Deserialize;
     use tokio::sync::Mutex;
     use std::time::{Instant, Duration};
 
-    use crate::error::Result;
+    use crate::{error::{Result, Error}, runtime::HttpClient};
 
     #[derive(Debug)]
     pub(super) struct ExecutorState {
         cached_access_token: Mutex<Option<CachedAccessToken>>,
         token_source: Box<dyn TokenSource + Send + Sync>,
+        http: HttpClient,
     }
 
     impl ExecutorState {
@@ -384,6 +386,7 @@ mod azure {
             Self {
                 cached_access_token: Mutex::new(None),
                 token_source: Box::new(AzureImdsTokenSource),
+                http: HttpClient::default(),
             }
         }
 
@@ -394,7 +397,7 @@ mod azure {
                     return Ok(cached.token_doc.clone());
                 }
             }
-            let token = self.token_source.get_token().await?;
+            let token = self.token_source.get_token(&self.http).await?;
             let out = token.token_doc.clone();
             *cached_token = Some(token);
             Ok(out)
@@ -409,7 +412,7 @@ mod azure {
 
     #[async_trait::async_trait]
     trait TokenSource: std::fmt::Debug {
-        async fn get_token(&self) -> Result<CachedAccessToken>;
+        async fn get_token(&self, http: &HttpClient) -> Result<CachedAccessToken>;
     }
 
     #[derive(Debug)]
@@ -417,8 +420,25 @@ mod azure {
 
     #[async_trait::async_trait]
     impl TokenSource for AzureImdsTokenSource {
-        async fn get_token(&self) -> Result<CachedAccessToken> {
-            todo!()
+        async fn get_token(&self, http: &HttpClient) -> Result<CachedAccessToken> {
+            #[derive(Deserialize)]
+            struct Response {
+                access_token: String,
+                expires_in: u32,
+            }
+            
+            let now = Instant::now();
+            let resp: Response = http.get_and_deserialize_json(
+                "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net/",
+                &[("Metadata", "true"), ("Accept", "application/json")],
+            )
+            .await
+            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+
+            Ok(CachedAccessToken {
+                token_doc: rawdoc! { "accessToken": resp.access_token },
+                expire_time: now + Duration::from_secs(resp.expires_in as u64),
+            })
         }
     }
 

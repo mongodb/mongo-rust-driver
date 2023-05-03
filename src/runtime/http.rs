@@ -26,6 +26,7 @@ impl HttpClient {
     }
 
     /// Executes an HTTP GET request and returns the response body as a string.
+    #[allow(unused)]
     pub(crate) async fn get_and_read_string<'a>(
         &self,
         uri: &str,
@@ -36,6 +37,7 @@ impl HttpClient {
     }
 
     /// Executes an HTTP PUT request and returns the response body as a string.
+    #[allow(unused)]
     pub(crate) async fn put_and_read_string<'a>(
         &self,
         uri: &str,
@@ -46,6 +48,7 @@ impl HttpClient {
     }
 
     /// Executes an HTTP request and returns the response body as a string.
+    #[allow(unused)]
     pub(crate) async fn request_and_read_string<'a>(
         &self,
         method: Method,
@@ -57,7 +60,7 @@ impl HttpClient {
         Ok(text)
     }
 
-    /// Executes an HTTP equest and returns the response.
+    /// Executes an HTTP request and returns the response.
     pub(crate) async fn request<'a>(
         &self,
         method: Method,
