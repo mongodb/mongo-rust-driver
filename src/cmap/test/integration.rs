@@ -51,7 +51,6 @@ async fn acquire_connection_and_send_command() {
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(
-            Default::default(),
             EstablisherOptions::from_client_options(&client_options),
         )
         .unwrap(),
@@ -133,7 +132,6 @@ async fn concurrent_connections() {
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.get().await.hosts[0].clone(),
         ConnectionEstablisher::new(
-            Default::default(),
             EstablisherOptions::from_client_options(&client_options),
         )
         .unwrap(),
@@ -226,7 +224,6 @@ async fn connection_error_during_establishment() {
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(
-            Default::default(),
             EstablisherOptions::from_client_options(&client_options),
         )
         .unwrap(),

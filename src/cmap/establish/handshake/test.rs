@@ -3,13 +3,11 @@ use crate::{
     bson::doc,
     cmap::establish::handshake::HandshakerOptions,
     options::DriverInfo,
-    runtime::HttpClient,
 };
 
 #[test]
 fn metadata_no_options() {
     let handshaker = Handshaker::new(
-        HttpClient::default(),
         HandshakerOptions {
             app_name: None,
             compressors: None,
@@ -51,7 +49,7 @@ fn metadata_with_options() {
         load_balanced: false,
     };
 
-    let handshaker = Handshaker::new(HttpClient::default(), options);
+    let handshaker = Handshaker::new(options);
 
     let metadata = handshaker.command.body.get_document("client").unwrap();
     assert_eq!(

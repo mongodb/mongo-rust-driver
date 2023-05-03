@@ -160,7 +160,6 @@ impl Executor {
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.get().await.hosts[0].clone(),
             ConnectionEstablisher::new(
-                Default::default(),
                 EstablisherOptions::from_client_options(CLIENT_OPTIONS.get().await),
             )
             .unwrap(),

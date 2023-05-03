@@ -35,7 +35,7 @@ use crate::{
         TopologyDescriptionChangedEvent,
         TopologyOpeningEvent,
     },
-    runtime::{self, AcknowledgedMessage, HttpClient, WorkerHandle, WorkerHandleListener},
+    runtime::{self, AcknowledgedMessage, WorkerHandle, WorkerHandleListener},
     selection_criteria::SelectionCriteria,
     ClusterTime,
     ServerInfo,
@@ -93,7 +93,6 @@ impl Topology {
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
         let connection_establisher = ConnectionEstablisher::new(
-            HttpClient::default(),
             EstablisherOptions::from_client_options(&options),
         )?;
 

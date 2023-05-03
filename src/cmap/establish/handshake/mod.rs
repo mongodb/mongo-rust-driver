@@ -332,7 +332,7 @@ pub(crate) struct Handshaker {
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(crate) fn new(http_client: HttpClient, options: HandshakerOptions) -> Self {
+    pub(crate) fn new(options: HandshakerOptions) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let compressors = options.compressors;
 
@@ -383,7 +383,7 @@ impl Handshaker {
         command.body.insert("client", metadata.clone());
 
         Self {
-            http_client,
+            http_client: HttpClient::default(),
             command,
             compressors,
             server_api: options.server_api,
