@@ -377,16 +377,18 @@ mod azure {
     #[derive(Debug)]
     pub(super) struct ExecutorState {
         cached_access_token: Mutex<Option<CachedAccessToken>>,
-        token_source: Box<dyn TokenSource + Send + Sync>,
         http: HttpClient,
+        #[cfg(test)]
+        test_host: Option<&'static str>,
     }
 
     impl ExecutorState {
         pub(super) fn new() -> Self {
             Self {
                 cached_access_token: Mutex::new(None),
-                token_source: Box::new(AzureImdsTokenSource),
                 http: HttpClient::default(),
+                #[cfg(test)]
+                test_host: None,
             }
         }
 
@@ -397,30 +399,13 @@ mod azure {
                     return Ok(cached.token_doc.clone());
                 }
             }
-            let token = self.token_source.get_token(&self.http).await?;
+            let token = self.fetch_new_token().await?;
             let out = token.token_doc.clone();
             *cached_token = Some(token);
             Ok(out)
         }
-    }
 
-    #[derive(Debug)]
-    struct CachedAccessToken {
-        token_doc: RawDocumentBuf,
-        expire_time: Instant,
-    }
-
-    #[async_trait::async_trait]
-    trait TokenSource: std::fmt::Debug {
-        async fn get_token(&self, http: &HttpClient) -> Result<CachedAccessToken>;
-    }
-
-    #[derive(Debug)]
-    struct AzureImdsTokenSource;
-
-    #[async_trait::async_trait]
-    impl TokenSource for AzureImdsTokenSource {
-        async fn get_token(&self, http: &HttpClient) -> Result<CachedAccessToken> {
+        async fn fetch_new_token(&self) -> Result<CachedAccessToken> {
             #[derive(Deserialize)]
             struct Response {
                 access_token: String,
@@ -428,8 +413,26 @@ mod azure {
             }
             
             let now = Instant::now();
-            let resp: Response = http.get_and_deserialize_json(
-                "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net/",
+            let url = reqwest::Url::parse_with_params(
+                "http://169.254.169.254/metadata/identity/oauth2/token",
+                &[
+                    ("api-version", "2018-02-01"),
+                    ("resource", "https://vault.azure.net/"),
+                ],
+            )
+            .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {}", e)))?;
+            #[cfg(test)]
+            let url = {
+                let mut url = url;
+                if let Some(th) = self.test_host {
+                    url
+                        .set_host(Some(th))
+                        .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
+                }
+                url
+            };
+            let resp: Response = self.http.get_and_deserialize_json(
+                url,
                 &[("Metadata", "true"), ("Accept", "application/json")],
             )
             .await
@@ -442,4 +445,9 @@ mod azure {
         }
     }
 
+    #[derive(Debug)]
+    struct CachedAccessToken {
+        token_doc: RawDocumentBuf,
+        expire_time: Instant,
+    }
 }

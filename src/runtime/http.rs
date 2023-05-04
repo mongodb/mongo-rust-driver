@@ -1,4 +1,4 @@
-use reqwest::{Method, Response};
+use reqwest::{Method, Response, IntoUrl};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Default)]
@@ -10,7 +10,7 @@ impl HttpClient {
     /// Executes an HTTP GET request and deserializes the JSON response.
     pub(crate) async fn get_and_deserialize_json<'a, T>(
         &self,
-        uri: &str,
+        uri: impl IntoUrl,
         headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
     ) -> reqwest::Result<T>
     where
@@ -64,7 +64,7 @@ impl HttpClient {
     pub(crate) async fn request<'a>(
         &self,
         method: Method,
-        uri: &str,
+        uri: impl IntoUrl,
         headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
     ) -> reqwest::Result<Response> {
         let response = headers
