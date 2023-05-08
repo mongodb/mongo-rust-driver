@@ -399,21 +399,14 @@ pub(crate) mod azure {
                     return Ok(cached.token_doc.clone());
                 }
             }
-            let now = Instant::now();
             let token = self.fetch_new_token().await?;
-            let expires_in_secs: u64 = token.expires_in
-                .parse()
-                .map_err(|_| Error::invalid_authentication_response("azure imds"))?;
-            let cached = CachedAccessToken {
-                token_doc: rawdoc! { "accessToken": token.access_token },
-                expire_time: now + Duration::from_secs(expires_in_secs),
-            };
-            let out = cached.token_doc.clone();
-            *cached_token = Some(cached);
+            let out = token.token_doc.clone();
+            *cached_token = Some(token);
             Ok(out)
         }
 
-        pub(crate) async fn fetch_new_token(&self) -> Result<AccessToken> {
+        async fn fetch_new_token(&self) -> Result<CachedAccessToken> {
+            let now = Instant::now();
             let url = reqwest::Url::parse_with_params(
                 "http://169.254.169.254/metadata/identity/oauth2/token",
                 &[
@@ -435,26 +428,42 @@ pub(crate) mod azure {
                 }
                 url
             };
-            self.http.get_and_deserialize_json(
+            let server_response: ServerResponse = self.http.get_and_deserialize_json(
                 url,
                 &[("Metadata", "true"), ("Accept", "application/json")],
             )
             .await
-            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))
+            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+            let expires_in_secs: u64 = server_response.expires_in
+                .parse()
+                .map_err(|_| Error::invalid_authentication_response("azure imds"))?;
+            Ok(CachedAccessToken {
+                token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
+                expire_time: now + Duration::from_secs(expires_in_secs),
+                #[cfg(test)]
+                server_response,
+            })
+        }
+
+        #[cfg(test)]
+        pub(crate) async fn cached(&self) -> Option<CachedAccessToken> {
+            self.cached_access_token.lock().await.clone()
         }
     }
 
-    #[derive(Debug, Deserialize)]
-    pub(crate) struct AccessToken {
+    #[derive(Debug, Deserialize, Clone)]
+    pub(crate) struct ServerResponse {
         pub(crate) access_token: String,
         pub(crate) expires_in: String,
         #[allow(unused)]
         pub(crate) resource: String,
     }
 
-    #[derive(Debug)]
-    struct CachedAccessToken {
-        token_doc: RawDocumentBuf,
-        expire_time: Instant,
+    #[derive(Debug, Clone)]
+    pub(crate) struct CachedAccessToken {
+        pub(crate) token_doc: RawDocumentBuf,
+        pub(crate) expire_time: Instant,
+        #[cfg(test)]
+        pub(crate) server_response: ServerResponse,
     }
 }

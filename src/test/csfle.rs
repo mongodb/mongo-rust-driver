@@ -2872,10 +2872,13 @@ async fn azure_imds() -> Result<()> {
     azure_exec.test_host = Some(("localhost", 8080));
 
     // Case 1
-    let token = azure_exec.fetch_new_token().await?;
-    assert_eq!(token.access_token, "magic-cookie");
-    assert_eq!(token.expires_in, "70");
-    assert_eq!(token.resource, "https://vault.azure.net");
+    let now = std::time::Instant::now();
+    let token = azure_exec.get_token().await?;
+    assert_eq!(token, rawdoc! { "accessToken": "magic-cookie" });
+    let cached = azure_exec.cached().await.expect("cached token");
+    assert_eq!(cached.server_response.expires_in, "70");
+    assert_eq!(cached.server_response.resource, "https://vault.azure.net");
+    assert!((65..75).contains(&cached.expire_time.duration_since(now).as_secs()));
 
     Ok(())
 }
