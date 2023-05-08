@@ -55,7 +55,12 @@ functions:
            export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
            export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
-           export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/lib"
+           LIBMONGOCRYPT_SUFFIX_DIR="lib"
+           # The RHEL path is 'lib64', not 'lib'
+           if [ "${LIBMONGOCRYPT_OS}" = "rhel-80-64-bit" ]; then
+             LIBMONGOCRYPT_SUFFIX_DIR="lib64"
+           fi
+           export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/$LIBMONGOCRYPT_SUFFIX_DIR"
            export LD_LIBRARY_PATH="$MONGOCRYPT_LIB_DIR:$LD_LIBRARY_PATH"
 
            cat <<EOT > expansion.yml
@@ -1736,18 +1741,24 @@ axes:
         variables:
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu1804-64"
+      - id: rhel-8.0
+        display_name: "RHEL 8.0"
+        run_on: rhel80-test
+        variables:
+          VENV_BIN_DIR: "bin"
+          LIBMONGOCRYPT_OS: "rhel-80-64-bit"
       - id: ubuntu-20.04
         display_name: "Ubuntu 20.04"
         run_on: ubuntu2004-test
         variables:
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "ubuntu2004-64"
-      - id: ubuntu-18.04-arm64
-        display_name: "ARM64 Ubuntu 18.04"
-        run_on: ubuntu1804-arm64-test
+      - id: ubuntu-20.04-arm64
+        display_name: "ARM64 Ubuntu 20.04"
+        run_on: ubuntu2004-arm64-test
         variables:
           VENV_BIN_DIR: "bin"
-          LIBMONGOCRYPT_OS: "ubuntu1804-arm64"
+          LIBMONGOCRYPT_OS: "ubuntu2004-arm64"
       - id: macos-11.00
         display_name: "MacOS 11.00"
         run_on: macos-1100
@@ -1833,9 +1844,9 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel-8.0
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     auth-and-tls: "*"
@@ -1866,30 +1877,15 @@ buildvariants:
     # generic Linux builds on them. These do not link to OpenSSL, so we have to skip
     # the SSL tests on them.
     - if:
-        os: "ubuntu-20.04"
+        os: ["ubuntu-20.04", "ubuntu-20.04-arm64"]
         auth-and-tls: "*"
         async-runtime: "*"
         compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
-    - if:
-        os: "ubuntu-18.04"
-        auth-and-tls: "auth-and-tls"
-        async-runtime: "*"
-        compressor: "*"
-      then:
-        remove_tasks: ".3.6"
-    # ubuntu 1804 ARM64 only has downloads for 4.2+
-    - if:
-        os: ["ubuntu-18.04-arm64"]
-        auth-and-tls: "*"
-        async-runtime: "*"
-        compressor: "*"
-      then:
-        remove_tasks: [".3.6", ".4.0"]
     # haproxy isn't installed on windows / ubuntu-arm / macos 11
     - if:
-        os: ["ubuntu-18.04-arm64", "windows-64-vs2017", "macos-11.00"]
+        os: ["ubuntu-20.04-arm64", "windows-64-vs2017", "macos-11.00"]
         auth-and-tls: "*"
         async-runtime: "*"
         compressor: "*"
@@ -1899,7 +1895,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     auth-and-tls:
@@ -1914,7 +1910,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     async-runtime: "*"
@@ -1925,7 +1921,7 @@ buildvariants:
 - matrix_name: "serverless"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     async-runtime: "*"
     crypt-shared:
       - "enabled"
@@ -1956,11 +1952,11 @@ buildvariants:
   tasks:
     - "test-csfle"
 
-# There's no 4.2 build for ubuntu-20.04, so drop down to -18.04.
+# There's no 4.2 build for ubuntu-20.04, so switch to rhel.
 - matrix_name: "csfle-mongodb-version-old"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel-8.0
     mongodb-version:
       - "4.2"
     topology:
@@ -2028,11 +2024,11 @@ buildvariants:
   tasks:
     - "test-csfle"
 
-# There's no 4.2 build for ubuntu-20.04, so drop down to -18.04.
+# There's no 4.2 build for ubuntu-20.04, so switch to rhel.
 - matrix_name: "csfle-mongocryptd-old"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel-8.0
     mongodb-version:
       - "4.2"
     topology:
@@ -2067,7 +2063,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-20.04
-      - ubuntu-18.04-arm64
+      - ubuntu-20.04-arm64
       - macos-11.00
       - windows-64-vs2017
     async-runtime: "*"
@@ -2130,7 +2126,7 @@ buildvariants:
 - matrix_name: "compile-only"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     extra-rust-versions: "*"
   display_name: "! Compile on Rust ${extra-rust-versions}"
   tasks:
@@ -2139,7 +2135,7 @@ buildvariants:
 - matrix_name: "versioned-api-tests"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     async-runtime: "tokio"
     versioned-api: "*"
   display_name: "Versioned API ${versioned-api}"

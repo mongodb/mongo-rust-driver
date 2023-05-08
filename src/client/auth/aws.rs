@@ -349,14 +349,17 @@ impl AwsCredential {
         Ok(auth_header)
     }
 
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn access_key(&self) -> &str {
         &self.access_key
     }
 
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn secret_key(&self) -> &str {
         &self.secret_key
     }
 
+    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn session_token(&self) -> Option<&str> {
         self.session_token.as_deref()
     }
