@@ -1,12 +1,22 @@
 use reqwest::{Method, Response, IntoUrl};
 use serde::Deserialize;
 
+use crate::error::{Error, Result};
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
     inner: reqwest::Client,
 }
 
 impl HttpClient {
+    pub(crate) fn with_timeout(timeout: std::time::Duration) -> Result<Self> {
+        let inner = reqwest::Client::builder()
+            .timeout(timeout)
+            .build()
+            .map_err(|e| Error::internal(format!("error initializing http client: {}", e)))?;
+        Ok(Self { inner })
+    }
+
     /// Executes an HTTP GET request and deserializes the JSON response.
     pub(crate) async fn get_and_deserialize_json<'a, T>(
         &self,

@@ -59,7 +59,7 @@ impl CryptExecutor {
             mongocryptd_client: None,
             metadata_client: None,
             #[cfg(feature = "azure-kms")]
-            azure: azure::ExecutorState::new(),
+            azure: azure::ExecutorState::new()?,
         })
     }
 
@@ -380,16 +380,21 @@ pub(crate) mod azure {
         http: HttpClient,
         #[cfg(test)]
         pub(crate) test_host: Option<(&'static str, u16)>,
+        #[cfg(test)]
+        pub(crate) test_param: Option<&'static str>,
     }
 
     impl ExecutorState {
-        pub(crate) fn new() -> Self {
-            Self {
+        pub(crate) fn new() -> Result<Self> {
+            const AZURE_IMDS_TIMEOUT: Duration = Duration::from_secs(10);
+            Ok(Self {
                 cached_access_token: Mutex::new(None),
-                http: HttpClient::default(),
+                http: HttpClient::with_timeout(AZURE_IMDS_TIMEOUT)?,
                 #[cfg(test)]
                 test_host: None,
-            }
+                #[cfg(test)]
+                test_param: None,
+            })
         }
 
         pub(crate) async fn get_token(&self) -> Result<RawDocumentBuf> {
@@ -407,6 +412,29 @@ pub(crate) mod azure {
 
         async fn fetch_new_token(&self) -> Result<CachedAccessToken> {
             let now = Instant::now();
+            let server_response: ServerResponse = self.http.get_and_deserialize_json(
+                self.make_url()?,
+                &self.make_headers(),
+            )
+            .await
+            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+            let expires_in_secs: u64 = server_response.expires_in
+                .parse()
+                .map_err(|e| {
+                    Error::authentication_error(
+                        "azure imds",
+                        &format!("invalid `expires_in` response field: {}", e),
+                    )
+                })?;
+            Ok(CachedAccessToken {
+                token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
+                expire_time: now + Duration::from_secs(expires_in_secs),
+                #[cfg(test)]
+                server_response,
+            })
+        }
+
+        fn make_url(&self) -> Result<reqwest::Url> {
             let url = reqwest::Url::parse_with_params(
                 "http://169.254.169.254/metadata/identity/oauth2/token",
                 &[
@@ -428,30 +456,29 @@ pub(crate) mod azure {
                 }
                 url
             };
-            let server_response: ServerResponse = self.http.get_and_deserialize_json(
-                url,
-                &[("Metadata", "true"), ("Accept", "application/json")],
-            )
-            .await
-            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
-            let expires_in_secs: u64 = server_response.expires_in
-                .parse()
-                .map_err(|_| Error::invalid_authentication_response("azure imds"))?;
-            Ok(CachedAccessToken {
-                token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
-                expire_time: now + Duration::from_secs(expires_in_secs),
-                #[cfg(test)]
-                server_response,
-            })
+            Ok(url)
+        }
+
+        fn make_headers(&self) -> Vec<(&'static str, &'static str)> {
+            let headers = vec![("Metadata", "true"), ("Accept", "application/json")];
+            #[cfg(test)]
+            let headers = {
+                let mut headers = headers;
+                if let Some(p) = self.test_param {
+                    headers.push(("X-MongoDB-HTTP-TestParams", p));
+                }
+                headers
+            };
+            headers
         }
 
         #[cfg(test)]
-        pub(crate) async fn cached(&self) -> Option<CachedAccessToken> {
-            self.cached_access_token.lock().await.clone()
+        pub(crate) async fn take_cached(&self) -> Option<CachedAccessToken> {
+            self.cached_access_token.lock().await.take()
         }
     }
 
-    #[derive(Debug, Deserialize, Clone)]
+    #[derive(Debug, Deserialize)]
     pub(crate) struct ServerResponse {
         pub(crate) access_token: String,
         pub(crate) expires_in: String,
@@ -459,7 +486,7 @@ pub(crate) mod azure {
         pub(crate) resource: String,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug)]
     pub(crate) struct CachedAccessToken {
         pub(crate) token_doc: RawDocumentBuf,
         pub(crate) expire_time: Instant,
