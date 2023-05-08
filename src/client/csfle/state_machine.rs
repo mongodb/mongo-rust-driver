@@ -366,7 +366,7 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 }
 
 #[cfg(feature = "azure-kms")]
-mod azure {
+pub(crate) mod azure {
     use bson::{RawDocumentBuf, rawdoc};
     use serde::Deserialize;
     use tokio::sync::Mutex;
@@ -375,15 +375,15 @@ mod azure {
     use crate::{error::{Result, Error}, runtime::HttpClient};
 
     #[derive(Debug)]
-    pub(super) struct ExecutorState {
+    pub(crate) struct ExecutorState {
         cached_access_token: Mutex<Option<CachedAccessToken>>,
         http: HttpClient,
         #[cfg(test)]
-        test_host: Option<&'static str>,
+        pub(crate) test_host: Option<(&'static str, u16)>,
     }
 
     impl ExecutorState {
-        pub(super) fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self {
                 cached_access_token: Mutex::new(None),
                 http: HttpClient::default(),
@@ -392,57 +392,64 @@ mod azure {
             }
         }
 
-        pub(super) async fn get_token(&self) -> Result<RawDocumentBuf> {
+        pub(crate) async fn get_token(&self) -> Result<RawDocumentBuf> {
             let mut cached_token = self.cached_access_token.lock().await;
             if let Some(cached) = &*cached_token {
                 if cached.expire_time.saturating_duration_since(Instant::now()) > Duration::from_secs(60) {
                     return Ok(cached.token_doc.clone());
                 }
             }
+            let now = Instant::now();
             let token = self.fetch_new_token().await?;
-            let out = token.token_doc.clone();
-            *cached_token = Some(token);
+            let expires_in_secs: u64 = token.expires_in
+                .parse()
+                .map_err(|_| Error::invalid_authentication_response("azure imds"))?;
+            let cached = CachedAccessToken {
+                token_doc: rawdoc! { "accessToken": token.access_token },
+                expire_time: now + Duration::from_secs(expires_in_secs),
+            };
+            let out = cached.token_doc.clone();
+            *cached_token = Some(cached);
             Ok(out)
         }
 
-        async fn fetch_new_token(&self) -> Result<CachedAccessToken> {
-            #[derive(Deserialize)]
-            struct Response {
-                access_token: String,
-                expires_in: u32,
-            }
-            
-            let now = Instant::now();
+        pub(crate) async fn fetch_new_token(&self) -> Result<AccessToken> {
             let url = reqwest::Url::parse_with_params(
                 "http://169.254.169.254/metadata/identity/oauth2/token",
                 &[
                     ("api-version", "2018-02-01"),
-                    ("resource", "https://vault.azure.net/"),
+                    ("resource", "https://vault.azure.net"),
                 ],
             )
             .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {}", e)))?;
             #[cfg(test)]
             let url = {
                 let mut url = url;
-                if let Some(th) = self.test_host {
+                if let Some((host, port)) = self.test_host {
                     url
-                        .set_host(Some(th))
+                        .set_host(Some(host))
                         .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
+                    url
+                        .set_port(Some(port))
+                        .map_err(|()| Error::internal(format!("invalid test port")))?;
                 }
                 url
             };
-            let resp: Response = self.http.get_and_deserialize_json(
+            self.http.get_and_deserialize_json(
                 url,
                 &[("Metadata", "true"), ("Accept", "application/json")],
             )
             .await
-            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
-
-            Ok(CachedAccessToken {
-                token_doc: rawdoc! { "accessToken": resp.access_token },
-                expire_time: now + Duration::from_secs(resp.expires_in as u64),
-            })
+            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))
         }
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub(crate) struct AccessToken {
+        pub(crate) access_token: String,
+        pub(crate) expires_in: String,
+        #[allow(unused)]
+        pub(crate) resource: String,
     }
 
     #[derive(Debug)]

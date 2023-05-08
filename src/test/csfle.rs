@@ -2858,7 +2858,27 @@ async fn on_demand_aws_success() -> Result<()> {
 
 // TODO RUST-1417: implement prose test 17. On-demand GCP Credentials
 
-// TODO RUST-1442: implement prose test 18. Azure IMDS Credentials
+// Prose test 18. Azure IMDS Credentials
+#[cfg(feature = "azure-kms")]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn azure_imds() -> Result<()> {
+    if !check_env("azure_imds", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_concurrently().await;
+
+    let mut azure_exec = crate::client::csfle::state_machine::azure::ExecutorState::new();
+    azure_exec.test_host = Some(("localhost", 8080));
+
+    // Case 1
+    let token = azure_exec.fetch_new_token().await?;
+    assert_eq!(token.access_token, "magic-cookie");
+    assert_eq!(token.expires_in, "70");
+    assert_eq!(token.resource, "https://vault.azure.net");
+
+    Ok(())
+}
 
 // TODO RUST-1442: implement prose test 19. Azure IMDS Credentials Integration Test
 
