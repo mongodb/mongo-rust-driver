@@ -7,18 +7,21 @@
           "subType": "04"
         }
       },
-      "path": "encryptedDecimalPrecision",
-      "bsonType": "decimal",
+      "path": "encryptedDoublePrecision",
+      "bsonType": "double",
       "queries": {
         "queryType": "rangePreview",
+        "contention": {
+          "$numberLong": "0"
+        },
         "sparsity": {
-          "$numberInt": "1"
+          "$numberLong": "1"
         },
         "min": {
-          "$numberDecimal": "0.0"
+          "$numberDouble": "0.0"
         },
         "max": {
-          "$numberDecimal": "200.0"
+          "$numberDouble": "200.0"
         },
         "precision": {
           "$numberInt": "2"

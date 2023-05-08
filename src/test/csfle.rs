@@ -455,7 +455,7 @@ async fn external_key_vault() -> Result<()> {
         // Setup: initialize db.
         let (client, datakeys) = init_client().await?;
         datakeys
-            .insert_one(load_testdata("external-key.json")?, None)
+            .insert_one(load_testdata("external/external-key.json")?, None)
             .await?;
 
         // Setup: test options.
@@ -479,7 +479,7 @@ async fn external_key_vault() -> Result<()> {
             LOCAL_KMS.clone(),
         )?
         .key_vault_client(kv_client.clone())
-        .schema_map([("db.coll", load_testdata("external-schema.json")?)])
+        .schema_map([("db.coll", load_testdata("external/external-schema.json")?)])
         .extra_options(EXTRA_OPTIONS.clone())
         .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
         .build()
@@ -562,12 +562,12 @@ async fn bson_size_limits() -> Result<()> {
         .create_collection(
             "coll",
             CreateCollectionOptions::builder()
-                .validator(doc! { "$jsonSchema": load_testdata("limits-schema.json")? })
+                .validator(doc! { "$jsonSchema": load_testdata("limits/limits-schema.json")? })
                 .build(),
         )
         .await?;
     datakeys
-        .insert_one(load_testdata("limits-key.json")?, None)
+        .insert_one(load_testdata("limits/limits-key.json")?, None)
         .await?;
 
     // Setup: encrypted client.
@@ -597,7 +597,7 @@ async fn bson_size_limits() -> Result<()> {
     .await?;
 
     // Test operation 2
-    let mut doc: Document = load_testdata("limits-doc.json")?;
+    let mut doc: Document = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
     doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
     coll.insert_one(doc, None).await?;
@@ -631,7 +631,7 @@ async fn bson_size_limits() -> Result<()> {
     assert_eq!(2, inserts.len());
 
     // Test operation 4
-    let mut doc = load_testdata("limits-doc.json")?;
+    let mut doc = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib_1");
     doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
     let mut doc2 = doc.clone();
@@ -657,7 +657,7 @@ async fn bson_size_limits() -> Result<()> {
     coll.insert_one(doc, None).await?;
 
     // Test operation 6
-    let mut doc: Document = load_testdata("limits-doc.json")?;
+    let mut doc: Document = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_16mib");
     doc.insert("unencrypted", "a".repeat(16_777_216 - 2_000));
     let result = coll.insert_one(doc, None).await;
@@ -1347,7 +1347,7 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
-    .schema_map([("db.coll", load_testdata("external-schema.json")?)])
+    .schema_map([("db.coll", load_testdata("external/external-schema.json")?)])
     .extra_options(doc! {
         "mongocryptdURI": "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000",
         "mongocryptdSpawnArgs": ["--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
@@ -1394,7 +1394,7 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
-    .schema_map([("db.coll", load_testdata("external-schema.json")?)])
+    .schema_map([("db.coll", load_testdata("external/external-schema.json")?)])
     .extra_options(extra_options)
     .disable_crypt_shared(true)
     .build()
@@ -1617,7 +1617,7 @@ impl DeadlockTestCase {
             .database("keyvault")
             .collection::<Document>("datakeys")
             .insert_one(
-                load_testdata("external-key.json")?,
+                load_testdata("external/external-key.json")?,
                 InsertOneOptions::builder()
                     .write_concern(WriteConcern::MAJORITY)
                     .build(),
@@ -1628,7 +1628,9 @@ impl DeadlockTestCase {
             .create_collection(
                 "coll",
                 CreateCollectionOptions::builder()
-                    .validator(doc! { "$jsonSchema": load_testdata("external-schema.json")? })
+                    .validator(
+                        doc! { "$jsonSchema": load_testdata("external/external-schema.json")? },
+                    )
                     .build(),
             )
             .await?;
@@ -2363,8 +2365,8 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
         return Ok(None);
     }
 
-    let encrypted_fields = load_testdata("encryptedFields.json")?;
-    let key1_document = load_testdata("key1-document.json")?;
+    let encrypted_fields = load_testdata("data/encryptedFields.json")?;
+    let key1_document = load_testdata("data/keys/key1-document.json")?;
     let key1_id = match key1_document.get("_id").unwrap() {
         Bson::Binary(b) => b.clone(),
         v => return Err(failure!("expected binary _id, got {:?}", v)),
@@ -3130,9 +3132,10 @@ async fn range_explicit_encryption_test(
     let _guard = LOCK.run_exclusively().await;
     let util_client = TestClient::new().await;
 
-    let encrypted_fields = load_testdata(&format!("range-encryptedFields-{}.json", bson_type))?;
+    let encrypted_fields =
+        load_testdata(&format!("data/range-encryptedFields-{}.json", bson_type))?;
 
-    let key1_document = load_testdata("key1-document.json")?;
+    let key1_document = load_testdata("data/keys/key1-document.json")?;
     let key1_id = match key1_document.get("_id").unwrap() {
         Bson::Binary(binary) => binary,
         _ => unreachable!(),
