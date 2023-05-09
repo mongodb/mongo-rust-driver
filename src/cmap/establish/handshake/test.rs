@@ -1,21 +1,15 @@
 use super::Handshaker;
-use crate::{
-    bson::doc,
-    cmap::establish::handshake::HandshakerOptions,
-    options::DriverInfo,
-};
+use crate::{bson::doc, cmap::establish::handshake::HandshakerOptions, options::DriverInfo};
 
 #[test]
 fn metadata_no_options() {
-    let handshaker = Handshaker::new(
-        HandshakerOptions {
-            app_name: None,
-            compressors: None,
-            driver_info: None,
-            server_api: None,
-            load_balanced: false,
-        },
-    );
+    let handshaker = Handshaker::new(HandshakerOptions {
+        app_name: None,
+        compressors: None,
+        driver_info: None,
+        server_api: None,
+        load_balanced: false,
+    });
 
     let metadata = handshaker.command.body.get_document("client").unwrap();
     assert!(!metadata.contains_key("application"));

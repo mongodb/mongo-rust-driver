@@ -92,9 +92,8 @@ impl Topology {
         };
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
-        let connection_establisher = ConnectionEstablisher::new(
-            EstablisherOptions::from_client_options(&options),
-        )?;
+        let connection_establisher =
+            ConnectionEstablisher::new(EstablisherOptions::from_client_options(&options))?;
 
         let id = ObjectId::new();
 
