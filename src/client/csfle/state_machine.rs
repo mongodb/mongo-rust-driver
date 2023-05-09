@@ -428,6 +428,7 @@ pub(crate) mod azure {
                     &format!("invalid `expires_in` response field: {}", e),
                 )
             })?;
+            #[allow(clippy::redundant_clone)]
             Ok(CachedAccessToken {
                 token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
                 expire_time: now + Duration::from_secs(expires_in_secs),
@@ -452,7 +453,7 @@ pub(crate) mod azure {
                     url.set_host(Some(host))
                         .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
                     url.set_port(Some(port))
-                        .map_err(|()| Error::internal(format!("invalid test port")))?;
+                        .map_err(|()| Error::internal(format!("invalid test port {}", port)))?;
                 }
                 url
             };
