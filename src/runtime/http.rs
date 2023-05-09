@@ -1,4 +1,4 @@
-use reqwest::{Method, Response, IntoUrl};
+use reqwest::{IntoUrl, Method, Response};
 use serde::Deserialize;
 
 use crate::error::{Error, Result};

@@ -399,8 +399,7 @@ impl Credential {
         conn: &mut Connection,
         server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
-        #[cfg(feature = "aws-auth")]
-        http_client: &crate::runtime::HttpClient,
+        #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
@@ -431,7 +430,13 @@ impl Credential {
 
         // Authenticate according to the chosen mechanism.
         mechanism
-            .authenticate_stream(conn, self, server_api, #[cfg(feature = "aws-auth")] http_client)
+            .authenticate_stream(
+                conn,
+                self,
+                server_api,
+                #[cfg(feature = "aws-auth")]
+                http_client,
+            )
             .await
     }
 

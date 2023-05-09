@@ -367,12 +367,15 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 
 #[cfg(feature = "azure-kms")]
 pub(crate) mod azure {
-    use bson::{RawDocumentBuf, rawdoc};
+    use bson::{rawdoc, RawDocumentBuf};
     use serde::Deserialize;
+    use std::time::{Duration, Instant};
     use tokio::sync::Mutex;
-    use std::time::{Instant, Duration};
 
-    use crate::{error::{Result, Error}, runtime::HttpClient};
+    use crate::{
+        error::{Error, Result},
+        runtime::HttpClient,
+    };
 
     #[derive(Debug)]
     pub(crate) struct ExecutorState {
@@ -400,7 +403,9 @@ pub(crate) mod azure {
         pub(crate) async fn get_token(&self) -> Result<RawDocumentBuf> {
             let mut cached_token = self.cached_access_token.lock().await;
             if let Some(cached) = &*cached_token {
-                if cached.expire_time.saturating_duration_since(Instant::now()) > Duration::from_secs(60) {
+                if cached.expire_time.saturating_duration_since(Instant::now())
+                    > Duration::from_secs(60)
+                {
                     return Ok(cached.token_doc.clone());
                 }
             }
@@ -412,20 +417,17 @@ pub(crate) mod azure {
 
         async fn fetch_new_token(&self) -> Result<CachedAccessToken> {
             let now = Instant::now();
-            let server_response: ServerResponse = self.http.get_and_deserialize_json(
-                self.make_url()?,
-                &self.make_headers(),
-            )
-            .await
-            .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
-            let expires_in_secs: u64 = server_response.expires_in
-                .parse()
-                .map_err(|e| {
-                    Error::authentication_error(
-                        "azure imds",
-                        &format!("invalid `expires_in` response field: {}", e),
-                    )
-                })?;
+            let server_response: ServerResponse = self
+                .http
+                .get_and_deserialize_json(self.make_url()?, &self.make_headers())
+                .await
+                .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+            let expires_in_secs: u64 = server_response.expires_in.parse().map_err(|e| {
+                Error::authentication_error(
+                    "azure imds",
+                    &format!("invalid `expires_in` response field: {}", e),
+                )
+            })?;
             Ok(CachedAccessToken {
                 token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
                 expire_time: now + Duration::from_secs(expires_in_secs),
@@ -447,11 +449,9 @@ pub(crate) mod azure {
             let url = {
                 let mut url = url;
                 if let Some((host, port)) = self.test_host {
-                    url
-                        .set_host(Some(host))
+                    url.set_host(Some(host))
                         .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
-                    url
-                        .set_port(Some(port))
+                    url.set_port(Some(port))
                         .map_err(|()| Error::internal(format!("invalid test port")))?;
                 }
                 url
