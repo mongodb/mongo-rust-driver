@@ -2869,7 +2869,7 @@ async fn azure_imds() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
     let mut azure_exec = crate::client::csfle::state_machine::azure::ExecutorState::new()?;
-    azure_exec.test_host = Some(("localhost", 8080));
+    azure_exec.test_host = Some(("localhost", std::env::var("AZURE_IMDS_MOCK_PORT").unwrap().parse().unwrap()));
 
     // Case 1: Success
     {

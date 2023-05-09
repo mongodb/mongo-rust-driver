@@ -91,6 +91,8 @@ functions:
               export TOPOLOGY=${TOPOLOGY}
               export MONGODB_VERSION=${MONGODB_VERSION}
 
+              export AZURE_IMDS_MOCK_PORT=44175
+
               if [ "Windows_NT" != "$OS" ]; then
                   ulimit -n 64000
               fi
@@ -487,6 +489,16 @@ functions:
         ${PREPARE_SHELL}
         export TLS_FEATURE=${TLS_FEATURE}
         .evergreen/run-csfle-kmip-servers.sh
+
+  "run mock azure imds server":
+  - command: shell.exec
+    params:
+      shell: bash
+      working_dir: "src"
+      background: true
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/run-csfle-mock-azure-imds.sh
 
   "build csfle expansions":
     - command: shell.exec
@@ -1214,6 +1226,7 @@ tasks:
       - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
       - func: "run kmip server"
+      - func: "run mock azure imds server"
       - func: "build csfle expansions"
       - func: "run csfle tests"
 
@@ -1229,6 +1242,7 @@ tasks:
       - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "run kmip server"
+      - func: "run mock azure imds server"
       - func: "build csfle expansions"
       - func: "run csfle serverless tests"
 
