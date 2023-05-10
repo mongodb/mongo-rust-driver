@@ -905,6 +905,15 @@ pub enum GridFsErrorKind {
     /// [`GridFsUploadStream`](crate::gridfs::GridFsUploadStream) while a write was still in
     /// progress.
     WriteInProgress,
+
+    /// Partial file download range is invalid when start is greater then end
+    InvalidPartialDownloadRange { start: u64, end: u64 },
+
+    /// Partial file download range is invalid when start or end are greater then file length
+    PartialDownloadRangeOutOfBounds {
+        out_of_bounds_value: u64,
+        file_length: u64,
+    },
 }
 
 /// An identifier for a file stored in a GridFS bucket.

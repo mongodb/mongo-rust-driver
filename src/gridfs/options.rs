@@ -44,6 +44,20 @@ pub struct GridFsUploadOptions {
 }
 
 /// Contains the options for downloading a file from a [`GridFsBucket`](crate::gridfs::GridFsBucket)
+/// by id.
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct GridFsDownloadByIdOptions {
+    /// 0-indexed non-negative byte offset from the beginning of the file.
+    pub start: Option<u64>,
+
+    /// 0-indexed non-negative byte offset to the end of the file contents to be returned by the
+    /// stream. end is non-inclusive.
+    pub end: Option<u64>,
+}
+
+/// Contains the options for downloading a file from a [`GridFsBucket`](crate::gridfs::GridFsBucket)
 /// by name.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -60,6 +74,13 @@ pub struct GridFsDownloadByNameOptions {
     /// -2 = the second most recent revision
     /// -1 = the most recent revision
     pub revision: Option<i32>,
+
+    /// 0-indexed non-negative byte offset from the beginning of the file.
+    pub start: Option<u64>,
+
+    /// 0-indexed non-negative byte offset to the end of the file contents to be returned by the
+    /// stream. end is non-inclusive.
+    pub end: Option<u64>,
 }
 
 /// Contains the options for finding

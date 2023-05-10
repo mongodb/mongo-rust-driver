@@ -148,6 +148,7 @@ impl<T> Cursor<T> {
     }
 
     /// Whether this cursor has any additional items to return.
+    #[allow(dead_code)]
     pub(crate) fn has_next(&self) -> bool {
         !self.is_exhausted()
             || !self

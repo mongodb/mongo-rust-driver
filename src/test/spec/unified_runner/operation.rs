@@ -2744,7 +2744,7 @@ impl TestOperation for Download {
 
             // Next, read via the open_download_stream API.
             let mut buf: Vec<u8> = vec![];
-            let mut stream = bucket.open_download_stream(self.id.clone()).await?;
+            let mut stream = bucket.open_download_stream(self.id.clone(), None).await?;
             stream.read_to_end(&mut buf).await?;
             let stream_data = hex::encode(buf);
 
