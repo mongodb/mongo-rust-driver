@@ -1246,6 +1246,15 @@ tasks:
       - func: "build csfle expansions"
       - func: "run csfle serverless tests"
 
+  - name: "test-azure-kms"
+    commands:
+      - command: shell.exec
+        params:
+          working_dir: "src"
+          script: |
+            ${PREPARE_SHELL}
+            .evergreen/run-azure-kms-test.sh
+
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
     commands:
@@ -1851,7 +1860,57 @@ task_groups:
 
     tasks:
       - ".serverless"
-
+  
+  - name: azurekms_task_group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - command: shell.exec
+        params:
+          shell: bash
+          script: |-
+              ${PREPARE_SHELL}
+              set +o xtrace
+              echo '${testazurekms_publickey}' > /tmp/testazurekms_publickey
+              echo '${testazurekms_privatekey}' > /tmp/testazurekms_privatekey
+              # Set 600 permissions on private key file. Otherwise ssh / scp may error with permissions "are too open".
+              chmod 600 /tmp/testazurekms_privatekey
+              export AZUREKMS_CLIENTID=${testazurekms_clientid}
+              export AZUREKMS_TENANTID=${testazurekms_tenantid}
+              export AZUREKMS_SECRET=${testazurekms_secret}
+              export AZUREKMS_DRIVERS_TOOLS=$DRIVERS_TOOLS
+              export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+              export AZUREKMS_PUBLICKEYPATH=/tmp/testazurekms_publickey
+              export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
+              export AZUREKMS_SCOPE=${testazurekms_scope}
+              export AZUREKMS_VMNAME_PREFIX=rustdriver
+              set -o xtrace
+              $DRIVERS_TOOLS/.evergreen/csfle/azurekms/create-and-setup-vm.sh
+      - command: expansions.update
+        params:
+          file: testazurekms-expansions.yml
+    teardown_group:
+      - command: expansions.update
+        params:
+          file: testazurekms-expansions.yml
+      - command: shell.exec
+        params:
+          shell: bash
+          script: |-
+            ${PREPARE_SHELL}
+            set -o errexit
+            export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
+            export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+            $DRIVERS_TOOLS/.evergreen/csfle/azurekms/delete-vm.sh
+    tasks:
+      - test-azure-kms
 
 buildvariants:
 -
@@ -2159,8 +2218,7 @@ buildvariants:
     - ".6.0 .standalone"
     - ".5.0 .standalone"
 
--
-  name: "lint"
+- name: "lint"
   display_name: "! Lint"
   run_on:
     - ubuntu1804-test
@@ -2171,3 +2229,9 @@ buildvariants:
     - name: "check-manual"
     - name: "check-cargo-deny"
 
+- name: "azure-kms"
+  display_name: "Azure KMS"
+  run_on:
+    - ubuntu2004-test
+  tasks:
+    - name: "azurekms_task_group"
