@@ -1908,6 +1908,7 @@ task_groups:
             set -o errexit
             export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
             export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+            export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
             $DRIVERS_TOOLS/.evergreen/csfle/azurekms/delete-vm.sh
     tasks:
       - test-azure-kms
