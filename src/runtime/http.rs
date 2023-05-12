@@ -1,20 +1,26 @@
-#[cfg(feature = "aws-auth")]
-use reqwest::{Method, Response};
-#[cfg(feature = "aws-auth")]
+use reqwest::{IntoUrl, Method, Response};
 use serde::Deserialize;
+
+use crate::error::{Error, Result};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
-    #[cfg(feature = "aws-auth")]
     inner: reqwest::Client,
 }
 
-#[cfg(feature = "aws-auth")]
 impl HttpClient {
+    pub(crate) fn with_timeout(timeout: std::time::Duration) -> Result<Self> {
+        let inner = reqwest::Client::builder()
+            .timeout(timeout)
+            .build()
+            .map_err(|e| Error::internal(format!("error initializing http client: {}", e)))?;
+        Ok(Self { inner })
+    }
+
     /// Executes an HTTP GET request and deserializes the JSON response.
     pub(crate) async fn get_and_deserialize_json<'a, T>(
         &self,
-        uri: &str,
+        uri: impl IntoUrl,
         headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
     ) -> reqwest::Result<T>
     where
@@ -30,6 +36,7 @@ impl HttpClient {
     }
 
     /// Executes an HTTP GET request and returns the response body as a string.
+    #[allow(unused)]
     pub(crate) async fn get_and_read_string<'a>(
         &self,
         uri: &str,
@@ -40,6 +47,7 @@ impl HttpClient {
     }
 
     /// Executes an HTTP PUT request and returns the response body as a string.
+    #[allow(unused)]
     pub(crate) async fn put_and_read_string<'a>(
         &self,
         uri: &str,
@@ -50,6 +58,7 @@ impl HttpClient {
     }
 
     /// Executes an HTTP request and returns the response body as a string.
+    #[allow(unused)]
     pub(crate) async fn request_and_read_string<'a>(
         &self,
         method: Method,
@@ -61,11 +70,11 @@ impl HttpClient {
         Ok(text)
     }
 
-    /// Executes an HTTP equest and returns the response.
+    /// Executes an HTTP request and returns the response.
     pub(crate) async fn request<'a>(
         &self,
         method: Method,
-        uri: &str,
+        uri: impl IntoUrl,
         headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
     ) -> reqwest::Result<Response> {
         let response = headers

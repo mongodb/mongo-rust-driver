@@ -1,7 +1,7 @@
 pub(crate) mod client_builder;
 pub mod client_encryption;
 pub mod options;
-mod state_machine;
+pub(crate) mod state_machine;
 
 use std::{path::Path, time::Duration};
 

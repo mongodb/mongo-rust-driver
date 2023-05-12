@@ -15,7 +15,7 @@ use crate::{
     },
     error::{Error as MongoError, ErrorKind, Result},
     hello::HelloReply,
-    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, HttpClient, TlsConfig},
+    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, TlsConfig},
     sdam::HandshakePhase,
 };
 
@@ -56,8 +56,8 @@ impl EstablisherOptions {
 
 impl ConnectionEstablisher {
     /// Creates a new ConnectionEstablisher from the given options.
-    pub(crate) fn new(http_client: HttpClient, options: EstablisherOptions) -> Result<Self> {
-        let handshaker = Handshaker::new(http_client, options.handshake_options);
+    pub(crate) fn new(options: EstablisherOptions) -> Result<Self> {
+        let handshaker = Handshaker::new(options.handshake_options);
 
         let tls_config = if let Some(tls_options) = options.tls_options {
             Some(TlsConfig::new(tls_options)?)

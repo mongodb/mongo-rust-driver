@@ -23,7 +23,6 @@ use crate::{
     client::options::ServerApi,
     cmap::{Command, Connection, StreamDescription},
     error::{Error, ErrorKind, Result},
-    runtime::HttpClient,
 };
 
 const SCRAM_SHA_1_STR: &str = "SCRAM-SHA-1";
@@ -253,7 +252,7 @@ impl AuthMechanism {
         stream: &mut Connection,
         credential: &Credential,
         server_api: Option<&ServerApi>,
-        #[cfg_attr(not(feature = "aws-auth"), allow(unused))] http_client: &HttpClient,
+        #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         self.validate_credential(credential)?;
 
@@ -398,9 +397,9 @@ impl Credential {
     pub(crate) async fn authenticate_stream(
         &self,
         conn: &mut Connection,
-        http_client: &HttpClient,
         server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
+        #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
@@ -431,7 +430,13 @@ impl Credential {
 
         // Authenticate according to the chosen mechanism.
         mechanism
-            .authenticate_stream(conn, self, server_api, http_client)
+            .authenticate_stream(
+                conn,
+                self,
+                server_api,
+                #[cfg(feature = "aws-auth")]
+                http_client,
+            )
             .await
     }
 

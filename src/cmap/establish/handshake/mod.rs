@@ -13,7 +13,6 @@ use crate::{
     error::Result,
     hello::{hello_command, run_hello, HelloReply},
     options::{AuthMechanism, Credential, DriverInfo, ServerApi},
-    runtime::HttpClient,
 };
 
 #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
@@ -323,16 +322,17 @@ pub(crate) struct Handshaker {
     #[allow(dead_code)]
     compressors: Option<Vec<Compressor>>,
 
-    http_client: HttpClient,
-
     server_api: Option<ServerApi>,
 
     metadata: ClientMetadata,
+
+    #[cfg(feature = "aws-auth")]
+    http_client: crate::runtime::HttpClient,
 }
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(crate) fn new(http_client: HttpClient, options: HandshakerOptions) -> Self {
+    pub(crate) fn new(options: HandshakerOptions) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let compressors = options.compressors;
 
@@ -383,11 +383,12 @@ impl Handshaker {
         command.body.insert("client", metadata.clone());
 
         Self {
-            http_client,
             command,
             compressors,
             server_api: options.server_api,
             metadata,
+            #[cfg(feature = "aws-auth")]
+            http_client: crate::runtime::HttpClient::default(),
         }
     }
 
@@ -457,9 +458,10 @@ impl Handshaker {
             credential
                 .authenticate_stream(
                     conn,
-                    &self.http_client,
                     self.server_api.as_ref(),
                     first_round,
+                    #[cfg(feature = "aws-auth")]
+                    &self.http_client,
                 )
                 .await?
         }

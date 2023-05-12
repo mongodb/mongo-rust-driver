@@ -2858,7 +2858,78 @@ async fn on_demand_aws_success() -> Result<()> {
 
 // TODO RUST-1417: implement prose test 17. On-demand GCP Credentials
 
-// TODO RUST-1442: implement prose test 18. Azure IMDS Credentials
+// Prose test 18. Azure IMDS Credentials
+#[cfg(feature = "azure-kms")]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn azure_imds() -> Result<()> {
+    if !check_env("azure_imds", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_concurrently().await;
+
+    let mut azure_exec = crate::client::csfle::state_machine::azure::ExecutorState::new()?;
+    azure_exec.test_host = Some((
+        "localhost",
+        std::env::var("AZURE_IMDS_MOCK_PORT")
+            .unwrap()
+            .parse()
+            .unwrap(),
+    ));
+
+    // Case 1: Success
+    {
+        let now = std::time::Instant::now();
+        let token = azure_exec.get_token().await?;
+        assert_eq!(token, rawdoc! { "accessToken": "magic-cookie" });
+        let cached = azure_exec.take_cached().await.expect("cached token");
+        assert_eq!(cached.server_response.expires_in, "70");
+        assert_eq!(cached.server_response.resource, "https://vault.azure.net");
+        assert!((65..75).contains(&cached.expire_time.duration_since(now).as_secs()));
+    }
+
+    // Case 2: Empty JSON
+    {
+        azure_exec.test_param = Some("case=empty-json");
+        let result = azure_exec.get_token().await;
+        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.unwrap_err().is_auth_error());
+    }
+
+    // Case 3: Bad JSON
+    {
+        azure_exec.test_param = Some("case=bad-json");
+        let result = azure_exec.get_token().await;
+        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.unwrap_err().is_auth_error());
+    }
+
+    // Case 4: HTTP 404
+    {
+        azure_exec.test_param = Some("case=404");
+        let result = azure_exec.get_token().await;
+        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.unwrap_err().is_auth_error());
+    }
+
+    // Case 5: HTTP 500
+    {
+        azure_exec.test_param = Some("case=500");
+        let result = azure_exec.get_token().await;
+        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.unwrap_err().is_auth_error());
+    }
+
+    // Case 6: Slow Response
+    {
+        azure_exec.test_param = Some("case=slow");
+        let result = azure_exec.get_token().await;
+        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.unwrap_err().is_auth_error());
+    }
+
+    Ok(())
+}
 
 // TODO RUST-1442: implement prose test 19. Azure IMDS Credentials Integration Test
 

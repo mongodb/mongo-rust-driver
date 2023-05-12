@@ -50,11 +50,8 @@ async fn acquire_connection_and_send_command() {
 
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
-        ConnectionEstablisher::new(
-            Default::default(),
-            EstablisherOptions::from_client_options(&client_options),
-        )
-        .unwrap(),
+        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
+            .unwrap(),
         TopologyUpdater::channel().0,
         bson::oid::ObjectId::new(),
         Some(pool_options),
@@ -132,11 +129,8 @@ async fn concurrent_connections() {
 
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.get().await.hosts[0].clone(),
-        ConnectionEstablisher::new(
-            Default::default(),
-            EstablisherOptions::from_client_options(&client_options),
-        )
-        .unwrap(),
+        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
+            .unwrap(),
         TopologyUpdater::channel().0,
         bson::oid::ObjectId::new(),
         Some(options),
@@ -225,11 +219,8 @@ async fn connection_error_during_establishment() {
         Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
-        ConnectionEstablisher::new(
-            Default::default(),
-            EstablisherOptions::from_client_options(&client_options),
-        )
-        .unwrap(),
+        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
+            .unwrap(),
         TopologyUpdater::channel().0,
         bson::oid::ObjectId::new(),
         Some(options),

@@ -35,6 +35,8 @@ pub(crate) struct CryptExecutor {
     mongocryptd: Option<Mongocryptd>,
     mongocryptd_client: Option<Client>,
     metadata_client: Option<WeakClient>,
+    #[cfg(feature = "azure-kms")]
+    azure: azure::ExecutorState,
 }
 
 impl CryptExecutor {
@@ -56,6 +58,8 @@ impl CryptExecutor {
             mongocryptd: None,
             mongocryptd_client: None,
             metadata_client: None,
+            #[cfg(feature = "azure-kms")]
+            azure: azure::ExecutorState::new()?,
         })
     }
 
@@ -211,11 +215,10 @@ impl CryptExecutor {
                     let ctx = result_mut(&mut ctx)?;
                     #[allow(unused_mut)]
                     let mut out = rawdoc! {};
-                    if self
-                        .kms_providers
-                        .credentials()
+                    let credentials = self.kms_providers.credentials();
+                    if credentials
                         .get(&KmsProvider::Aws)
-                        .map_or(false, |d| d.is_empty())
+                        .map_or(false, Document::is_empty)
                     {
                         #[cfg(feature = "aws-auth")]
                         {
@@ -237,6 +240,21 @@ impl CryptExecutor {
                         {
                             return Err(Error::invalid_argument(
                                 "On-demand AWS KMS credentials require the `aws-auth` feature.",
+                            ));
+                        }
+                    }
+                    if credentials
+                        .get(&KmsProvider::Azure)
+                        .map_or(false, Document::is_empty)
+                    {
+                        #[cfg(feature = "azure-kms")]
+                        {
+                            out.append("azure", self.azure.get_token().await?);
+                        }
+                        #[cfg(not(feature = "azure-kms"))]
+                        {
+                            return Err(Error::invalid_argument(
+                                "On-demand Azure KMS credentials require the `azure-kms` feature.",
                             ));
                         }
                     }
@@ -345,4 +363,135 @@ fn result_mut<T>(r: &mut Result<T>) -> Result<&mut T> {
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
     raw.try_into()
         .map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
+}
+
+#[cfg(feature = "azure-kms")]
+pub(crate) mod azure {
+    use bson::{rawdoc, RawDocumentBuf};
+    use serde::Deserialize;
+    use std::time::{Duration, Instant};
+    use tokio::sync::Mutex;
+
+    use crate::{
+        error::{Error, Result},
+        runtime::HttpClient,
+    };
+
+    #[derive(Debug)]
+    pub(crate) struct ExecutorState {
+        cached_access_token: Mutex<Option<CachedAccessToken>>,
+        http: HttpClient,
+        #[cfg(test)]
+        pub(crate) test_host: Option<(&'static str, u16)>,
+        #[cfg(test)]
+        pub(crate) test_param: Option<&'static str>,
+    }
+
+    impl ExecutorState {
+        pub(crate) fn new() -> Result<Self> {
+            const AZURE_IMDS_TIMEOUT: Duration = Duration::from_secs(10);
+            Ok(Self {
+                cached_access_token: Mutex::new(None),
+                http: HttpClient::with_timeout(AZURE_IMDS_TIMEOUT)?,
+                #[cfg(test)]
+                test_host: None,
+                #[cfg(test)]
+                test_param: None,
+            })
+        }
+
+        pub(crate) async fn get_token(&self) -> Result<RawDocumentBuf> {
+            let mut cached_token = self.cached_access_token.lock().await;
+            if let Some(cached) = &*cached_token {
+                if cached.expire_time.saturating_duration_since(Instant::now())
+                    > Duration::from_secs(60)
+                {
+                    return Ok(cached.token_doc.clone());
+                }
+            }
+            let token = self.fetch_new_token().await?;
+            let out = token.token_doc.clone();
+            *cached_token = Some(token);
+            Ok(out)
+        }
+
+        async fn fetch_new_token(&self) -> Result<CachedAccessToken> {
+            let now = Instant::now();
+            let server_response: ServerResponse = self
+                .http
+                .get_and_deserialize_json(self.make_url()?, &self.make_headers())
+                .await
+                .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+            let expires_in_secs: u64 = server_response.expires_in.parse().map_err(|e| {
+                Error::authentication_error(
+                    "azure imds",
+                    &format!("invalid `expires_in` response field: {}", e),
+                )
+            })?;
+            #[allow(clippy::redundant_clone)]
+            Ok(CachedAccessToken {
+                token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
+                expire_time: now + Duration::from_secs(expires_in_secs),
+                #[cfg(test)]
+                server_response,
+            })
+        }
+
+        fn make_url(&self) -> Result<reqwest::Url> {
+            let url = reqwest::Url::parse_with_params(
+                "http://169.254.169.254/metadata/identity/oauth2/token",
+                &[
+                    ("api-version", "2018-02-01"),
+                    ("resource", "https://vault.azure.net"),
+                ],
+            )
+            .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {}", e)))?;
+            #[cfg(test)]
+            let url = {
+                let mut url = url;
+                if let Some((host, port)) = self.test_host {
+                    url.set_host(Some(host))
+                        .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
+                    url.set_port(Some(port))
+                        .map_err(|()| Error::internal(format!("invalid test port {}", port)))?;
+                }
+                url
+            };
+            Ok(url)
+        }
+
+        fn make_headers(&self) -> Vec<(&'static str, &'static str)> {
+            let headers = vec![("Metadata", "true"), ("Accept", "application/json")];
+            #[cfg(test)]
+            let headers = {
+                let mut headers = headers;
+                if let Some(p) = self.test_param {
+                    headers.push(("X-MongoDB-HTTP-TestParams", p));
+                }
+                headers
+            };
+            headers
+        }
+
+        #[cfg(test)]
+        pub(crate) async fn take_cached(&self) -> Option<CachedAccessToken> {
+            self.cached_access_token.lock().await.take()
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub(crate) struct ServerResponse {
+        pub(crate) access_token: String,
+        pub(crate) expires_in: String,
+        #[allow(unused)]
+        pub(crate) resource: String,
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct CachedAccessToken {
+        pub(crate) token_doc: RawDocumentBuf,
+        pub(crate) expire_time: Instant,
+        #[cfg(test)]
+        pub(crate) server_response: ServerResponse,
+    }
 }

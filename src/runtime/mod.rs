@@ -1,4 +1,5 @@
 mod acknowledged_message;
+#[cfg(feature = "reqwest")]
 mod http;
 #[cfg(feature = "async-std-runtime")]
 mod interval;
@@ -28,6 +29,7 @@ pub(crate) use self::{
     worker_handle::{WorkerHandle, WorkerHandleListener},
 };
 use crate::{error::Result, options::ServerAddress};
+#[cfg(feature = "reqwest")]
 pub(crate) use http::HttpClient;
 #[cfg(feature = "async-std-runtime")]
 use interval::Interval;
