@@ -2944,16 +2944,17 @@ async fn azure_imds_integration_failure() -> Result<()> {
     let c = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
         KV_NAMESPACE.clone(),
-        [(KmsProvider::Azure, doc! { }, None)],
+        [(KmsProvider::Azure, doc! {}, None)],
     )?;
 
-    let result = c.create_data_key(MasterKey::Azure {
-        key_vault_endpoint: "https://keyvault-drivers-2411.vault.azure.net/keys/".to_string(),
-        key_name: "KEY-NAME".to_string(),
-        key_version: None,
-    })
-    .run()
-    .await;
+    let result = c
+        .create_data_key(MasterKey::Azure {
+            key_vault_endpoint: "https://keyvault-drivers-2411.vault.azure.net/keys/".to_string(),
+            key_name: "KEY-NAME".to_string(),
+            key_version: None,
+        })
+        .run()
+        .await;
 
     assert!(result.is_err(), "expected error, got {:?}", result);
     assert!(result.unwrap_err().is_auth_error());
