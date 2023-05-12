@@ -1253,6 +1253,7 @@ tasks:
           working_dir: "src"
           script: |
             ${PREPARE_SHELL}
+            ${AZURE_SHELL}
             .evergreen/run-azure-kms-test.sh
 
   - name: "test-atlas-connectivity"
@@ -1872,6 +1873,7 @@ task_groups:
       - func: "init test-results"
       - func: "make files executable"
       - func: "install rust"
+      - func: "install libmongocrypt"
       - command: shell.exec
         params:
           shell: bash
@@ -1896,6 +1898,19 @@ task_groups:
       - command: expansions.update
         params:
           file: testazurekms-expansions.yml
+      - command: shell.exec
+        params:
+          shell: bash
+          script: |-
+              cat <<EOT > azure_shell.yml
+              AZURE_SHELL: |
+                  export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
+                  export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+                  export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
+              EOT
+      - command: expansions.update
+        params:
+          file: azure_shell.yml
     teardown_group:
       - command: expansions.update
         params:
@@ -1905,10 +1920,8 @@ task_groups:
           shell: bash
           script: |-
             ${PREPARE_SHELL}
+            ${AZURE_SHELL}
             set -o errexit
-            export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
-            export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
-            export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
             $DRIVERS_TOOLS/.evergreen/csfle/azurekms/delete-vm.sh
     tasks:
       - test-azure-kms
@@ -2230,9 +2243,10 @@ buildvariants:
     - name: "check-manual"
     - name: "check-cargo-deny"
 
-- name: "azure-kms"
+- matrix_name: "azure-kms"
   display_name: "Azure KMS"
-  run_on:
-    - ubuntu2004-test
+  matrix_spec:
+    os:
+      - ubuntu-20.04
   tasks:
     - name: "azurekms_task_group"
