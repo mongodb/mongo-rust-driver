@@ -2250,3 +2250,4 @@ buildvariants:
       - ubuntu-20.04
   tasks:
     - name: "azurekms_task_group"
+  batchtime: 20160
