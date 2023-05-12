@@ -6,9 +6,8 @@ use mongodb::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    /*
     let c = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::with_uri_str("mongodb://localhost:27017").await?,
         Namespace::new("keyvault", "datakeys"),
         [(KmsProvider::Azure, doc! { }, None)],
     )?;
@@ -20,7 +19,8 @@ async fn main() -> Result<()> {
     })
     .run()
     .await?;
-    */
+
+    println!("Azure KMS integration test passed!");
 
     Ok(())
 }
