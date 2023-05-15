@@ -223,7 +223,9 @@ impl FaasEnvironmentName {
     fn new() -> Option<Self> {
         use FaasEnvironmentName::*;
         let mut found: Option<Self> = None;
-        if var_set("AWS_EXECUTION_ENV") || var_set("AWS_LAMBDA_RUNTIME_API") {
+        let lambda_env = env::var_os("AWS_EXECUTION_ENV")
+            .map_or(false, |v| v.to_string_lossy().starts_with("AWS_Lambda_"));
+        if lambda_env || var_set("AWS_LAMBDA_RUNTIME_API") {
             found = Some(AwsLambda);
         }
         if var_set("VERCEL") {
