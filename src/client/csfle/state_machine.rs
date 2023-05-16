@@ -290,9 +290,9 @@ impl CryptExecutor {
                             let host = std::env::var("GCE_METADATA_HOST")
                                 .unwrap_or_else(|_| "metadata.google.internal".into());
                             let uri = format!(
-                            "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
-                            host
-                        );
+                                "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
+                                host
+                            );
                             let headers = vec![("Metadata-Flavor", "Google")];
                             let response = http_client
                                 .request(Method::GET, &uri, &headers)
