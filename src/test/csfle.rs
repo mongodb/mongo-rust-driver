@@ -2931,7 +2931,36 @@ async fn azure_imds() -> Result<()> {
     Ok(())
 }
 
-// TODO RUST-1442: implement prose test 19. Azure IMDS Credentials Integration Test
+// Prose test 19. Azure IMDS Credentials Integration Test (case 1: failure)
+#[cfg(feature = "azure-kms")]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn azure_imds_integration_failure() -> Result<()> {
+    if !check_env("azure_imds_integration_failure", false) {
+        return Ok(());
+    }
+    let _guard = LOCK.run_concurrently().await;
+
+    let c = ClientEncryption::new(
+        Client::test_builder().build().await.into_client(),
+        KV_NAMESPACE.clone(),
+        [(KmsProvider::Azure, doc! {}, None)],
+    )?;
+
+    let result = c
+        .create_data_key(MasterKey::Azure {
+            key_vault_endpoint: "https://keyvault-drivers-2411.vault.azure.net/keys/".to_string(),
+            key_name: "KEY-NAME".to_string(),
+            key_version: None,
+        })
+        .run()
+        .await;
+
+    assert!(result.is_err(), "expected error, got {:?}", result);
+    assert!(result.unwrap_err().is_auth_error());
+
+    Ok(())
+}
 
 // Prose test 20. Bypass creating mongocryptd client when shared library is loaded
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
