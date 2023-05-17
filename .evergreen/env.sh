@@ -22,4 +22,5 @@ else
     # Turn off tracing for the very-spammy nvm script.
     set +o xtrace
     [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+    set -o xtrace
 fi

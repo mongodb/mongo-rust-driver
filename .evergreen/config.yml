@@ -645,6 +645,61 @@ functions:
           -v \
           --fault revoked
 
+  "build and upload gcp kms test":
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+
+          set +o xtrace
+          export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
+          export GCPKMS_PROJECT=${GCPKMS_PROJECT}
+          export GCPKMS_ZONE=${GCPKMS_ZONE}
+          export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
+          set -o xtrace
+
+          mkdir test-contents
+          cp -r $MONGOCRYPT_LIB_DIR test-contents
+
+          echo "Building test ... begin"
+          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
+          cargo test get_exe_name --features in-use-encryption-unstable,gcp-kms -- --ignored
+          cp $(cat exe_name.txt) test-contents/test-exe
+          echo "Building test ... end"
+
+          echo "Copying test contents ... begin"
+          tar czf test-contents.tgz test-contents
+          GCPKMS_SRC=test-contents.tgz GCPKMS_DST=$GCPKMS_INSTANCENAME: $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/copy-file.sh
+          echo "Copying test contents ... end"
+
+          echo "Untarring test contents ... begin"
+          GCPKMS_CMD="tar xf test-contents.tgz" $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
+          echo "Untarring test contents ... end"
+
+  "run gcp kms test":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+
+          set +o xtrace
+          export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
+          export GCPKMS_PROJECT=${GCPKMS_PROJECT}
+          export GCPKMS_ZONE=${GCPKMS_ZONE}
+          export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
+          set -o xtrace
+
+          export GCPKMS_CMD="ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED=1 \
+            RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib \
+            ./test-contents/test-exe on_demand_gcp_credentials --nocapture"
+          $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
+
+
   "compile only":
     - command: shell.exec
       type: test
@@ -1274,6 +1329,11 @@ tasks:
     commands:
       - func: "run plain tests"
 
+  - name: "test-gcp-kms"
+    commands:
+      - func: "build and upload gcp kms test"
+      - func: "run gcp kms test"
+
   - name: test-ocsp-rsa-valid-cert-server-staples
     tags: ["ocsp", "ocsp-rsa", "ocsp-staple"]
     commands:
@@ -1796,6 +1856,11 @@ axes:
         variables:
           VENV_BIN_DIR: "Scripts"
           LIBMONGOCRYPT_OS: "windows-test"
+      - id: debian-11
+        display_name: "Debian 11"
+        run_on: debian11-small
+        variables:
+          LIBMONGOCRYPT_OS: "debian11"
 
   - id: "versioned-api"
     display_name: "Versioned API"
@@ -1925,6 +1990,49 @@ task_groups:
             $DRIVERS_TOOLS/.evergreen/csfle/azurekms/delete-vm.sh
     tasks:
       - test-azure-kms
+
+  - name: testgcpkms_task_group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install libmongocrypt"
+      - command: shell.exec
+        params:
+          shell: "bash"
+          script: |
+            ${PREPARE_SHELL}
+            set +o xtrace
+            echo '${testgcpkms_key_file}' > /tmp/testgcpkms_key_file.json
+            export GCPKMS_KEYFILE=/tmp/testgcpkms_key_file.json
+            export GCPKMS_DRIVERS_TOOLS=$DRIVERS_TOOLS
+            export GCPKMS_SERVICEACCOUNT="${testgcpkms_service_account}"
+            set -o xtrace
+            $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/create-and-setup-instance.sh
+      - command: expansions.update
+        params:
+          file: testgcpkms-expansions.yml
+    teardown_group:
+      - command: shell.exec
+        params:
+          shell: "bash"
+          script: |
+            ${PREPARE_SHELL}
+            set +o xtrace
+            export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
+            export GCPKMS_PROJECT=${GCPKMS_PROJECT}
+            export GCPKMS_ZONE=${GCPKMS_ZONE}
+            export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
+            set -o xtrace
+            $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/delete-instance.sh
+    tasks:
+      - test-gcp-kms
 
 buildvariants:
 -
@@ -2210,6 +2318,7 @@ buildvariants:
 #   tasks:
 #       # Windows MongoDB servers do not staple OCSP responses and only support RSA.
 #       - name: ".ocsp-rsa !.ocsp-staple"
+
 - matrix_name: "compile-only"
   matrix_spec:
     os:
@@ -2232,6 +2341,24 @@ buildvariants:
     - ".6.0 .standalone"
     - ".5.0 .standalone"
 
+- matrix_name: "azure-kms"
+  display_name: "Azure KMS"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+  tasks:
+    - name: "azurekms_task_group"
+  batchtime: 20160
+
+- matrix_name: "gcp-kms"
+  display_name: "GCP KMS"
+  matrix_spec:
+    os:
+      - debian-11
+  tasks:
+    - name: testgcpkms_task_group
+      batchtime: 20160
+
 - name: "lint"
   display_name: "! Lint"
   run_on:
@@ -2242,12 +2369,3 @@ buildvariants:
     - name: "check-rustdoc"
     - name: "check-manual"
     - name: "check-cargo-deny"
-
-- matrix_name: "azure-kms"
-  display_name: "Azure KMS"
-  matrix_spec:
-    os:
-      - ubuntu-20.04
-  tasks:
-    - name: "azurekms_task_group"
-  batchtime: 20160

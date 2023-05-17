@@ -214,7 +214,7 @@ impl CryptExecutor {
                 State::NeedKmsCredentials => {
                     let ctx = result_mut(&mut ctx)?;
                     #[allow(unused_mut)]
-                    let mut out = rawdoc! {};
+                    let mut kms_providers = rawdoc! {};
                     let credentials = self.kms_providers.credentials();
                     if credentials
                         .get(&KmsProvider::Aws)
@@ -234,7 +234,7 @@ impl CryptExecutor {
                             if let Some(token) = aws_creds.session_token() {
                                 creds.append("sessionToken", token);
                             }
-                            out.append("aws", creds);
+                            kms_providers.append("aws", creds);
                         }
                         #[cfg(not(feature = "aws-auth"))]
                         {
@@ -249,7 +249,7 @@ impl CryptExecutor {
                     {
                         #[cfg(feature = "azure-kms")]
                         {
-                            out.append("azure", self.azure.get_token().await?);
+                            kms_providers.append("azure", self.azure.get_token().await?);
                         }
                         #[cfg(not(feature = "azure-kms"))]
                         {
@@ -258,7 +258,70 @@ impl CryptExecutor {
                             ));
                         }
                     }
-                    ctx.provide_kms_providers(&out)?;
+                    if credentials
+                        .get(&KmsProvider::Gcp)
+                        .map_or(false, Document::is_empty)
+                    {
+                        #[cfg(feature = "gcp-kms")]
+                        {
+                            use crate::runtime::HttpClient;
+                            use reqwest::Method;
+                            use serde::Deserialize;
+
+                            #[derive(Deserialize)]
+                            struct ResponseBody {
+                                access_token: String,
+                            }
+
+                            fn kms_error(error: String) -> Error {
+                                let message = format!(
+                                    "An error occurred when obtaining GCP credentials: {}",
+                                    error
+                                );
+                                let error = mongocrypt::error::Error {
+                                    kind: mongocrypt::error::ErrorKind::Kms,
+                                    message: Some(message),
+                                    code: None,
+                                };
+                                error.into()
+                            }
+
+                            let http_client = HttpClient::default();
+                            let host = std::env::var("GCE_METADATA_HOST")
+                                .unwrap_or_else(|_| "metadata.google.internal".into());
+                            let uri = format!(
+                                "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
+                                host
+                            );
+                            let headers = vec![("Metadata-Flavor", "Google")];
+                            let response = http_client
+                                .request(Method::GET, &uri, &headers)
+                                .await
+                                .map_err(|e| kms_error(e.to_string()))?;
+
+                            if response.status().as_u16() != 200 {
+                                let error = match response.text().await {
+                                    Ok(text) => text,
+                                    Err(e) => format!("could not parse HTTP response: {}", e),
+                                };
+                                return Err(kms_error(error));
+                            }
+
+                            let body: ResponseBody = response.json().await.map_err(|e| {
+                                let error = format!("could not parse HTTP response: {}", e);
+                                kms_error(error)
+                            })?;
+                            kms_providers
+                                .append("gcp", rawdoc! { "accessToken": body.access_token });
+                        }
+                        #[cfg(not(feature = "gcp-kms"))]
+                        {
+                            return Err(Error::invalid_argument(
+                                "On-demand GCP KMS credentials require the `gcp-kms` feature.",
+                            ));
+                        }
+                    }
+                    ctx.provide_kms_providers(&kms_providers)?;
                 }
                 State::Ready => {
                     let (tx, rx) = oneshot::channel();
