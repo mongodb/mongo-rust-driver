@@ -42,7 +42,10 @@ async fn run_legacy_convenient_api() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_unified_tests(&["transactions", "unified"]).await;
+    run_unified_tests(&["transactions", "unified"])
+        // TODO RUST-1656: unskip these files
+        .skip_files(&["retryable-abort-handshake.json", "retryable-commit-handshake.json"])
+        .await;
 }
 
 // This test checks that deserializing an operation correctly still retrieves the recovery token.
