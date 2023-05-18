@@ -13,7 +13,8 @@ use crate::{
     event::command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{Acknowledgment, WriteConcern},
     test::{FailCommandOptions, FailPoint, FailPointMode},
-    Collection, Client,
+    Client,
+    Collection,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -730,7 +731,9 @@ async fn split_large_event() -> Result<()> {
     }
 
     let db = client.database("change_stream_tests");
-    db.collection::<Document>("split_large_event").drop(None).await?;
+    db.collection::<Document>("split_large_event")
+        .drop(None)
+        .await?;
     db.create_collection(
         "split_large_event",
         CreateCollectionOptions::builder()
@@ -740,16 +743,24 @@ async fn split_large_event() -> Result<()> {
     .await?;
 
     let coll = db.collection::<Document>("split_large_event");
-    coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None).await?.inserted_id;
-    let stream = coll.watch(
-        [doc! { "$changeStreamSplitLargeEvent": {} }],
-        ChangeStreamOptions::builder()
-            .full_document_before_change(Some(FullDocumentBeforeChangeType::Required))
-            .build(),
+    coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None)
+        .await?
+        .inserted_id;
+    let stream = coll
+        .watch(
+            [doc! { "$changeStreamSplitLargeEvent": {} }],
+            ChangeStreamOptions::builder()
+                .full_document_before_change(Some(FullDocumentBeforeChangeType::Required))
+                .build(),
+        )
+        .await?
+        .with_type::<Document>();
+    coll.update_one(
+        doc! {},
+        doc! { "$set": { "value": "z".repeat(10 * 1024 * 1024) } },
+        None,
     )
-    .await?
-    .with_type::<Document>();
-    coll.update_one(doc! {}, doc! { "$set": { "value": "z".repeat(10 * 1024 * 1024) } }, None).await?;
+    .await?;
 
     let events: Vec<_> = stream.take(2).try_collect().await?;
     assert_eq!(2, events.len());
