@@ -41,6 +41,7 @@ use super::Operation;
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
+    // TODO RUST-1657: unskip the download operations
     "download",
     "download_by_name",
     "listCollectionObjects",
@@ -75,10 +76,10 @@ impl IntoFuture for RunV2TestsAction {
 
     fn into_future(self) -> Self::IntoFuture {
         async move {
-            for (path, test_file) in
+            for (test_file, path) in
                 deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files)
             {
-                run_v2_test(test_file, path).await;
+                run_v2_test(path, test_file).await;
             }
         }
         .boxed()

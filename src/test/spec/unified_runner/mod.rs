@@ -134,12 +134,14 @@ async fn valid_pass() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_fail() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     expect_failures(&["unified-test-format", "valid-fail"], None).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     expect_failures(
         &["unified-test-format", "invalid"],
         // We don't do the schema validation required by these tests to avoid lengthy

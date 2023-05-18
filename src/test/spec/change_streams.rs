@@ -11,5 +11,11 @@ async fn run_unified() {
             // TODO RUST-1423: unskip this file
             "change-streams-disambiguatedPaths.json",
         ])
+        .skip_tests(&[
+            // TODO RUST-1658: unskip these tests
+            "Test with document comment",
+            "Test with string comment",
+            "Test that comment is set on getMore",
+        ])
         .await;
 }
