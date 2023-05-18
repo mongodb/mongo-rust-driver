@@ -604,40 +604,6 @@ instead.
 Q & A
 =====
 
-Why do some tests appear to hang for 60 seconds on a sharded cluster?
-`````````````````````````````````````````````````````````````````````
-
-There are two cases where this can happen. When the initial commitTransaction
-attempt fails on mongos A and is retried on mongos B, mongos B will block
-waiting for the transaction to complete. However because the initial commit
-attempt failed, the command will only complete after the transaction is
-automatically aborted for exceeding the shard's
-transactionLifetimeLimitSeconds setting. `SERVER-39726`_ requests that
-recovering the outcome of an uncommitted transaction should immediately abort
-the transaction.
-
-The second case is when a *single-shard* transaction is committed successfully
-on mongos A and then explicitly committed again on mongos B. Mongos B will also
-block until the transactionLifetimeLimitSeconds timeout is hit at which point
-``{ok:1}`` will be returned. `SERVER-39349`_ requests that recovering the
-outcome of a completed single-shard transaction should not block.
-Note that this test suite only includes single shard transactions.
-
-To workaround these issues, drivers SHOULD decrease the transaction timeout
-setting by running setParameter **on each shard**. Setting the timeout to 3
-seconds significantly speeds up the test suite without a high risk of
-prematurely timing out any tests' transactions. To decrease the timeout, run::
-
-  db.adminCommand( { setParameter: 1, transactionLifetimeLimitSeconds: 3 } )
-
-Note that mongo-orchestration >=0.6.13 automatically sets this timeout to 3
-seconds so drivers using mongo-orchestration do not need to run these commands
-manually.
-
-.. _SERVER-39726: https://jira.mongodb.org/browse/SERVER-39726
-
-.. _SERVER-39349: https://jira.mongodb.org/browse/SERVER-39349
-
 Why do tests that run distinct sometimes fail with StaleDbVersion?
 ``````````````````````````````````````````````````````````````````
 
