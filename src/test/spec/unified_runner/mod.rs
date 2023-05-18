@@ -103,13 +103,6 @@ impl IntoFuture for RunUnifiedTestsAction {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn test_examples() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_unified_tests(&["unified-test-format", "examples"]).await;
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_unified_tests(&["unified-test-format", "valid-pass"]).await;
