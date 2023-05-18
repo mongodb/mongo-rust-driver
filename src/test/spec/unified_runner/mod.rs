@@ -114,6 +114,9 @@ async fn valid_pass() {
         // TODO RUST-582: unskip these tests (ditto below)
         "entity-cursor-iterateOnce.json",
         "matches-lte-operator.json",
+        // TODO: unskip this test when the convenient transactions API tests are converted to the
+        // unified format (ditto below)
+        "poc-transactions-convenient-api.json",
     ];
     #[cfg(not(feature = "in-use-encryption-unstable"))]
     let skipped_files = &[
@@ -121,6 +124,7 @@ async fn valid_pass() {
         "expectedError-errorResponse.json",
         "entity-cursor-iterateOnce.json",
         "matches-lte-operator.json",
+        "poc-transactions-convenient-api.json",
         "kmsProviders-placeholder_kms_credentials.json",
         "kmsProviders-unconfigured_kms.json",
         "kmsProviders-explicit_kms_credentials.json",
