@@ -1,11 +1,11 @@
 use bson::{doc, Bson, Document};
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use semver::VersionReq;
 
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, OperationType},
-        options::ChangeStreamOptions,
+        options::{ChangeStreamOptions, FullDocumentBeforeChangeType},
         ChangeStream,
     },
     coll::options::CollectionOptions,
@@ -13,7 +13,7 @@ use crate::{
     event::command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{Acknowledgment, WriteConcern},
     test::{FailCommandOptions, FailPoint, FailPointMode},
-    Collection,
+    Collection, Client,
 };
 
 use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
@@ -706,6 +706,61 @@ async fn create_coll_pre_post() -> Result<()> {
             .build(),
     )
     .await?;
+
+    Ok(())
+}
+
+// Prose test 19: large event splitting
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn split_large_event() -> Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = Client::test_builder().build().await;
+    if !client.server_version_gte(7, 0) {
+        log_uncaptured(format!(
+            "skipping change stream test on unsupported version {:?}",
+            client.server_version
+        ));
+        return Ok(());
+    }
+    if !client.is_replica_set() && !client.is_sharded() {
+        log_uncaptured("skipping change stream test on unsupported topology");
+        return Ok(());
+    }
+
+    let db = client.database("change_stream_tests");
+    db.collection::<Document>("split_large_event").drop(None).await?;
+    db.create_collection(
+        "split_large_event",
+        CreateCollectionOptions::builder()
+            .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
+            .build(),
+    )
+    .await?;
+
+    let coll = db.collection::<Document>("split_large_event");
+    coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None).await?.inserted_id;
+    let stream = coll.watch(
+        [doc! { "$changeStreamSplitLargeEvent": {} }],
+        ChangeStreamOptions::builder()
+            .full_document_before_change(Some(FullDocumentBeforeChangeType::Required))
+            .build(),
+    )
+    .await?
+    .with_type::<Document>();
+    coll.update_one(doc! {}, doc! { "$set": { "value": "z".repeat(10 * 1024 * 1024) } }, None).await?;
+
+    let events: Vec<_> = stream.take(2).try_collect().await?;
+    assert_eq!(2, events.len());
+    assert_eq!(
+        events[0].get_document("splitEvent")?,
+        &doc! { "fragment": 1, "of": 2 },
+    );
+    assert_eq!(
+        events[1].get_document("splitEvent")?,
+        &doc! { "fragment": 2, "of": 2 },
+    );
 
     Ok(())
 }
