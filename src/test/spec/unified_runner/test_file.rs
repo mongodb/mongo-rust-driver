@@ -81,8 +81,6 @@ pub(crate) enum Topology {
     Single,
     ReplicaSet,
     Sharded,
-    #[serde(rename = "sharded-replicaset")]
-    ShardedReplicaSet,
     #[serde(rename = "load-balanced")]
     LoadBalanced,
 }
@@ -108,15 +106,10 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref topologies) = self.topologies {
-            let client_topology = client.topology().await;
-            if !topologies.iter().any(|expected_topology| {
-                match (expected_topology, client_topology) {
-                    (Topology::Sharded, Topology::Sharded | Topology::ShardedReplicaSet) => true,
-                    _ => expected_topology == &client_topology,
-                }
-            }) {
+            let client_topology = client.topology();
+            if !topologies.contains(&client_topology) {
                 return Err(format!(
-                    "allowed topologies {:?}, actual {:?}",
+                    "allowed topologies {:?}, actual: {:?}",
                     topologies, client_topology
                 ));
             }

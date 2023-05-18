@@ -61,7 +61,6 @@ pub(crate) struct RunV2TestsAction {
 }
 
 impl RunV2TestsAction {
-    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn skip_files(self, skipped_files: &'static [&'static str]) -> Self {
         Self {
             skipped_files: Some(skipped_files),

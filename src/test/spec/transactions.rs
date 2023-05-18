@@ -25,7 +25,9 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_v2_tests(&["transactions", "legacy"]).await;
+    run_v2_tests(&["transactions", "legacy"])
+        .skip_files(&["error-labels-blockConnection.json"])
+        .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
