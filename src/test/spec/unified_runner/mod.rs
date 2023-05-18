@@ -105,7 +105,30 @@ impl IntoFuture for RunUnifiedTestsAction {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_unified_tests(&["unified-test-format", "valid-pass"]).await;
+    #[cfg(feature = "in-use-encryption-unstable")]
+    let skipped_files = &[
+        // TODO RUST-1570: unskip this test (ditto below)
+        "collectionData-createOptions.json",
+        // TODO RUST-1405: unskip this test (ditto below)
+        "expectedError-errorResponse.json",
+        // TODO RUST-582: unskip these tests (ditto below)
+        "entity-cursor-iterateOnce.json",
+        "matches-lte-operator.json",
+    ];
+    #[cfg(not(feature = "in-use-encryption-unstable"))]
+    let skipped_files = &[
+        "collectionData-createOptions.json",
+        "expectedError-errorResponse.json",
+        "entity-cursor-iterateOnce.json",
+        "matches-lte-operator.json",
+        "kmsProviders-placeholder_kms_credentials.json",
+        "kmsProviders-unconfigured_kms.json",
+        "kmsProviders-explicit_kms_credentials.json",
+        "kmsProviders-mixed_kms_credential_fields.json",
+    ];
+    run_unified_tests(&["unified-test-format", "valid-pass"])
+        .skip_files(skipped_files)
+        .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
