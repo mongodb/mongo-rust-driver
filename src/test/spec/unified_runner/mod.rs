@@ -134,13 +134,26 @@ async fn valid_pass() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_fail() {
-    expect_failures(&["unified-test-format", "valid-fail"]).await;
+    expect_failures(&["unified-test-format", "valid-fail"], None).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid() {
-    expect_failures(&["unified-test-format", "invalid"]).await;
+    expect_failures(
+        &["unified-test-format", "invalid"],
+        // We don't do the schema validation required by these tests to avoid lengthy
+        // deserialization implementations.
+        Some(&[
+            "runOnRequirement-minProperties.json",
+            "storeEventsAsEntity-events-enum.json",
+            "tests-minItems.json",
+            "expectedError-isError-const.json",
+            "expectedError-minProperties.json",
+            "storeEventsAsEntity-events-minItems.json",
+        ]),
+    )
+    .await;
 }
 
 #[derive(Debug)]
@@ -167,8 +180,10 @@ impl<'de> Deserialize<'de> for TestFileResult {
 
 // The test runner enforces the unified test format schema during both deserialization and
 // execution.
-async fn expect_failures(spec: &[&str]) {
-    for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, None) {
+async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static str]>) {
+    for (test_file_result, path) in
+        deserialize_spec_tests::<TestFileResult>(spec, skipped_files.into())
+    {
         // If the test deserialized properly, then expect an error to occur during execution.
         if let TestFileResult::Ok(test_file) = test_file_result {
             std::panic::AssertUnwindSafe(async {

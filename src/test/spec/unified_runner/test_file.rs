@@ -39,7 +39,9 @@ pub(crate) struct TestFile {
     pub(crate) schema_version: Version,
     #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) run_on_requirements: Option<Vec<RunOnRequirement>>,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) create_entities: Option<Vec<TestFileEntity>>,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) initial_data: Option<Vec<CollectionData>>,
     pub(crate) tests: Vec<TestCase>,
     // We don't need to use this field, but it needs to be included during deserialization so that
@@ -69,6 +71,7 @@ where
 pub(crate) struct RunOnRequirement {
     min_server_version: Option<String>,
     max_server_version: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     topologies: Option<Vec<Topology>>,
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
@@ -389,12 +392,15 @@ pub(crate) struct CollectionData {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct TestCase {
     pub(crate) description: String,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) run_on_requirements: Option<Vec<RunOnRequirement>>,
     pub(crate) skip_reason: Option<String>,
     pub(crate) operations: Vec<Operation>,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) expect_events: Option<Vec<ExpectedEvents>>,
     #[cfg(feature = "tracing-unstable")]
     pub(crate) expect_log_messages: Option<Vec<ExpectedMessages>>,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) outcome: Option<Vec<CollectionData>>,
 }
 
@@ -454,6 +460,7 @@ pub(crate) struct ExpectError {
     pub(crate) error_contains: Option<String>,
     pub(crate) error_code: Option<i32>,
     pub(crate) error_code_name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) error_labels_contain: Option<Vec<String>>,
     #[serde(default, deserialize_with = "deserialize_nonempty_vec")]
     pub(crate) error_labels_omit: Option<Vec<String>>,
