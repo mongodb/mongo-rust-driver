@@ -21,7 +21,10 @@ use futures::{
     stream::{StreamExt, TryStreamExt},
     FutureExt,
 };
-use serde::{de::Deserializer, Deserialize};
+use serde::{
+    de::{DeserializeOwned, Deserializer},
+    Deserialize,
+};
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 
@@ -37,7 +40,7 @@ use super::{
 };
 
 use crate::{
-    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
+    bson::{doc, to_bson, Bson, Document},
     bson_util,
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
@@ -250,10 +253,10 @@ pub(crate) enum Expectation {
     Ignore,
 }
 
-fn deserialize_op<'de, 'a, T: 'a + Deserialize<'de> + TestOperation>(
-    value: Bson,
+fn deserialize_op<'de, 'a, T: 'a + DeserializeOwned + TestOperation>(
+    value: Document,
 ) -> std::result::Result<Box<dyn TestOperation + 'a>, bson::de::Error> {
-    T::deserialize(BsonDeserializer::new(value)).map(|op| Box::new(op) as Box<dyn TestOperation>)
+    bson::from_document::<T>(value).map(|op| Box::new(op) as Box<dyn TestOperation>)
 }
 
 impl<'de> Deserialize<'de> for Operation {
@@ -264,15 +267,15 @@ impl<'de> Deserialize<'de> for Operation {
             pub(crate) name: String,
             pub(crate) object: OperationObject,
             #[serde(default = "default_arguments")]
-            pub(crate) arguments: Bson,
+            pub(crate) arguments: Document,
             pub(crate) expect_error: Option<ExpectError>,
             pub(crate) expect_result: Option<Bson>,
             pub(crate) save_result_as_entity: Option<String>,
             pub(crate) ignore_result_and_error: Option<bool>,
         }
 
-        fn default_arguments() -> Bson {
-            Bson::Document(doc! {})
+        fn default_arguments() -> Document {
+            doc! {}
         }
 
         let definition = OperationDefinition::deserialize(deserializer)?;

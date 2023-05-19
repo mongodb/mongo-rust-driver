@@ -12,7 +12,7 @@ use futures::future::{BoxFuture, FutureExt};
 use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{file_level_log, spec::deserialize_spec_tests, LOCK};
+use crate::test::{file_level_log, log_uncaptured, spec::deserialize_spec_tests, LOCK};
 
 pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
@@ -132,6 +132,9 @@ async fn valid_pass() {
     ];
     run_unified_tests(&["unified-test-format", "valid-pass"])
         .skip_files(skipped_files)
+        // This test relies on old OP_QUERY behavior that many drivers still use for < 4.4, but
+        // we do not use, due to never implementing OP_QUERY.
+        .skip_tests(&["A successful find event with a getmore and the server kills the cursor (<= 4.4)"])
         .await;
 }
 
@@ -157,6 +160,12 @@ async fn invalid() {
             "expectedError-isError-const.json",
             "expectedError-minProperties.json",
             "storeEventsAsEntity-events-minItems.json",
+            "expectedEventsForClient-events_conflicts_with_command_eventType.json",
+            "expectedEventsForClient-events_conflicts_with_default_eventType.json",
+            "expectedEventsForClient-events_conflicts_with_cmap_eventType.json",
+            "expectedLogMessage-component-enum.json",
+            "entity-client-observeLogMessages-minProperties.json",
+            "test-expectLogMessages-minItems.json",
         ]),
     )
     .await;
@@ -187,9 +196,8 @@ impl<'de> Deserialize<'de> for TestFileResult {
 // The test runner enforces the unified test format schema during both deserialization and
 // execution.
 async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static str]>) {
-    for (test_file_result, path) in
-        deserialize_spec_tests::<TestFileResult>(spec, skipped_files.into())
-    {
+    for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, skipped_files) {
+        log_uncaptured(format!("Expecting failure for {:?}", path));
         // If the test deserialized properly, then expect an error to occur during execution.
         if let TestFileResult::Ok(test_file) = test_file_result {
             std::panic::AssertUnwindSafe(async {

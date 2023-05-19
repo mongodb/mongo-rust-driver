@@ -16,6 +16,8 @@ async fn run_unified() {
             "Test with document comment",
             "Test with string comment",
             "Test that comment is set on getMore",
+            "Test with document comment - pre 4.4",
+            "Test that comment is not set on getMore - pre 4.4",
         ])
         .await;
 }
