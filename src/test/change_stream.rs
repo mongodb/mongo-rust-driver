@@ -744,8 +744,7 @@ async fn split_large_event() -> Result<()> {
 
     let coll = db.collection::<Document>("split_large_event");
     coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None)
-        .await?
-        .inserted_id;
+        .await?;
     let stream = coll
         .watch(
             [doc! { "$changeStreamSplitLargeEvent": {} }],
