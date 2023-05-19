@@ -107,14 +107,14 @@ async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     #[cfg(feature = "in-use-encryption-unstable")]
     let skipped_files = &[
-        // TODO RUST-1570: unskip this test (ditto below)
+        // TODO RUST-1570: unskip this file (ditto below)
         "collectionData-createOptions.json",
-        // TODO RUST-1405: unskip this test (ditto below)
+        // TODO RUST-1405: unskip this file (ditto below)
         "expectedError-errorResponse.json",
-        // TODO RUST-582: unskip these tests (ditto below)
+        // TODO RUST-582: unskip these files (ditto below)
         "entity-cursor-iterateOnce.json",
         "matches-lte-operator.json",
-        // TODO: unskip this test when the convenient transactions API tests are converted to the
+        // TODO: unskip this file when the convenient transactions API tests are converted to the
         // unified format (ditto below)
         "poc-transactions-convenient-api.json",
     ];
@@ -160,9 +160,6 @@ async fn invalid() {
             "expectedError-isError-const.json",
             "expectedError-minProperties.json",
             "storeEventsAsEntity-events-minItems.json",
-            "expectedEventsForClient-events_conflicts_with_command_eventType.json",
-            "expectedEventsForClient-events_conflicts_with_default_eventType.json",
-            "expectedEventsForClient-events_conflicts_with_cmap_eventType.json",
             "expectedLogMessage-component-enum.json",
             "entity-client-observeLogMessages-minProperties.json",
             "test-expectLogMessages-minItems.json",
@@ -194,7 +191,8 @@ impl<'de> Deserialize<'de> for TestFileResult {
 }
 
 // The test runner enforces the unified test format schema during both deserialization and
-// execution.
+// execution. Note that these tests may not fail as expected if the TEST_DESCRIPTION environment
+// variable for skipping tests is set.
 async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static str]>) {
     for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, skipped_files) {
         log_uncaptured(format!("Expecting failure for {:?}", path));
