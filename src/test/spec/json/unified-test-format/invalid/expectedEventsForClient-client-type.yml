@@ -1,0 +1,14 @@
+description: "expectedEventsForClient-client-type"
+
+schemaVersion: "1.0"
+
+createEntities:
+  - client:
+      id: &client0 "client0"
+
+tests:
+  - description: "foo"
+    operations: []
+    expectEvents:
+      - client: 0
+        events: []

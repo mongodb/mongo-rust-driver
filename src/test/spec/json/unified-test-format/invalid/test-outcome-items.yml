@@ -1,0 +1,8 @@
+description: "test-outcome-items"
+
+schemaVersion: "1.0"
+
+tests:
+  - description: "foo"
+    operations: []
+    outcome: [0]

@@ -375,19 +375,19 @@ impl TestClient {
     }
 
     pub(crate) fn is_standalone(&self) -> bool {
-        self.base_topology() == Topology::Single
+        self.topology() == Topology::Single
     }
 
     pub(crate) fn is_replica_set(&self) -> bool {
-        self.base_topology() == Topology::ReplicaSet
+        self.topology() == Topology::ReplicaSet
     }
 
     pub(crate) fn is_sharded(&self) -> bool {
-        self.base_topology() == Topology::Sharded
+        self.topology() == Topology::Sharded
     }
 
     pub(crate) fn is_load_balanced(&self) -> bool {
-        self.base_topology() == Topology::LoadBalanced
+        self.topology() == Topology::LoadBalanced
     }
 
     pub(crate) fn server_version_eq(&self, major: u64, minor: u64) -> bool {
@@ -423,7 +423,7 @@ impl TestClient {
 
     /// Returns the `Topology' that can be determined without a server query, i.e. all except
     /// `Toplogy::ShardedReplicaSet`.
-    fn base_topology(&self) -> Topology {
+    pub(crate) fn topology(&self) -> Topology {
         if self.client.options().load_balanced.unwrap_or(false) {
             return Topology::LoadBalanced;
         }
@@ -436,30 +436,10 @@ impl TestClient {
         Topology::Single
     }
 
-    pub(crate) async fn topology(&self) -> Topology {
-        let bt = self.base_topology();
-        if let Topology::Sharded = bt {
-            let shard_info = self
-                .database("config")
-                .collection::<Document>("shards")
-                .find_one(None, None)
-                .await
-                .unwrap()
-                .unwrap();
-            let hosts = shard_info.get_str("host").unwrap();
-            // If the host string has more than one host, a slash will separate the replica set name
-            // and list of hosts.
-            if hosts.contains('/') {
-                return Topology::ShardedReplicaSet;
-            }
-        }
-        bt
-    }
-
     pub(crate) fn topology_string(&self) -> String {
-        match self.base_topology() {
+        match self.topology() {
             Topology::LoadBalanced => "load-balanced",
-            Topology::Sharded | Topology::ShardedReplicaSet => "sharded",
+            Topology::Sharded => "sharded",
             Topology::ReplicaSet => "replicaset",
             Topology::Single => "single",
         }

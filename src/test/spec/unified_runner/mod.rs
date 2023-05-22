@@ -12,7 +12,7 @@ use futures::future::{BoxFuture, FutureExt};
 use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{file_level_log, spec::deserialize_spec_tests, LOCK};
+use crate::test::{file_level_log, log_uncaptured, spec::deserialize_spec_tests, LOCK};
 
 pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
@@ -103,28 +103,70 @@ impl IntoFuture for RunUnifiedTestsAction {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn test_examples() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_unified_tests(&["unified-test-format", "examples"]).await;
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_unified_tests(&["unified-test-format", "valid-pass"]).await;
+    #[cfg(feature = "in-use-encryption-unstable")]
+    let skipped_files = &[
+        // TODO RUST-1570: unskip this file (ditto below)
+        "collectionData-createOptions.json",
+        // TODO RUST-1405: unskip this file (ditto below)
+        "expectedError-errorResponse.json",
+        // TODO RUST-582: unskip these files (ditto below)
+        "entity-cursor-iterateOnce.json",
+        "matches-lte-operator.json",
+        // TODO: unskip this file when the convenient transactions API tests are converted to the
+        // unified format (ditto below)
+        "poc-transactions-convenient-api.json",
+    ];
+    #[cfg(not(feature = "in-use-encryption-unstable"))]
+    let skipped_files = &[
+        "collectionData-createOptions.json",
+        "expectedError-errorResponse.json",
+        "entity-cursor-iterateOnce.json",
+        "matches-lte-operator.json",
+        "poc-transactions-convenient-api.json",
+        // These tests need the in-use-encryption-unstable feature flag to be deserialized and run.
+        "kmsProviders-placeholder_kms_credentials.json",
+        "kmsProviders-unconfigured_kms.json",
+        "kmsProviders-explicit_kms_credentials.json",
+        "kmsProviders-mixed_kms_credential_fields.json",
+    ];
+    run_unified_tests(&["unified-test-format", "valid-pass"])
+        .skip_files(skipped_files)
+        // This test relies on old OP_QUERY behavior that many drivers still use for < 4.4, but
+        // we do not use, due to never implementing OP_QUERY.
+        .skip_tests(&["A successful find event with a getmore and the server kills the cursor (<= 4.4)"])
+        .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_fail() {
-    expect_failures(&["unified-test-format", "valid-fail"]).await;
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+    expect_failures(&["unified-test-format", "valid-fail"], None).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid() {
-    expect_failures(&["unified-test-format", "invalid"]).await;
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+    expect_failures(
+        &["unified-test-format", "invalid"],
+        // We don't do the schema validation required by these tests to avoid lengthy
+        // deserialization implementations.
+        Some(&[
+            "runOnRequirement-minProperties.json",
+            "storeEventsAsEntity-events-enum.json",
+            "tests-minItems.json",
+            "expectedError-isError-const.json",
+            "expectedError-minProperties.json",
+            "storeEventsAsEntity-events-minItems.json",
+            "expectedLogMessage-component-enum.json",
+            "entity-client-observeLogMessages-minProperties.json",
+            "test-expectLogMessages-minItems.json",
+        ]),
+    )
+    .await;
 }
 
 #[derive(Debug)]
@@ -150,9 +192,11 @@ impl<'de> Deserialize<'de> for TestFileResult {
 }
 
 // The test runner enforces the unified test format schema during both deserialization and
-// execution.
-async fn expect_failures(spec: &[&str]) {
-    for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, None) {
+// execution. Note that these tests may not fail as expected if the TEST_DESCRIPTION environment
+// variable for skipping tests is set.
+async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static str]>) {
+    for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, skipped_files) {
+        log_uncaptured(format!("Expecting failure for {:?}", path));
         // If the test deserialized properly, then expect an error to occur during execution.
         if let TestFileResult::Ok(test_file) = test_file_result {
             std::panic::AssertUnwindSafe(async {

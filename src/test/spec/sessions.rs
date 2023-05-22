@@ -30,7 +30,10 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_unified_tests(&["sessions"]).await;
+    run_unified_tests(&["sessions"])
+        // TODO RUST-1414: unskip this file
+        .skip_files(&["implicit-sessions-default-causal-consistency.json"])
+        .await;
 }
 
 // Sessions prose test 1
