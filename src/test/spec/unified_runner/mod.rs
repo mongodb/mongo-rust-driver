@@ -125,6 +125,7 @@ async fn valid_pass() {
         "entity-cursor-iterateOnce.json",
         "matches-lte-operator.json",
         "poc-transactions-convenient-api.json",
+        // These tests need the in-use-encryption-unstable feature flag to be deserialized and run.
         "kmsProviders-placeholder_kms_credentials.json",
         "kmsProviders-unconfigured_kms.json",
         "kmsProviders-explicit_kms_credentials.json",
