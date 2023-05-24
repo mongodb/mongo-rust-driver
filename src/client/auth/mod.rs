@@ -32,6 +32,7 @@ const GSSAPI_STR: &str = "GSSAPI";
 const MONGODB_AWS_STR: &str = "MONGODB-AWS";
 const MONGODB_X509_STR: &str = "MONGODB-X509";
 const PLAIN_STR: &str = "PLAIN";
+const MONGODB_OIDC_STR: &str = "MONGODB-OIDC";
 
 /// The authentication mechanisms supported by MongoDB.
 ///
@@ -83,6 +84,9 @@ pub enum AuthMechanism {
     /// supports AWS authentication with the tokio runtime.
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
+
+    /// dbg!
+    MongoDbOidc,
 }
 
 impl AuthMechanism {
@@ -191,6 +195,7 @@ impl AuthMechanism {
             AuthMechanism::Plain => PLAIN_STR,
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => MONGODB_AWS_STR,
+            AuthMechanism::MongoDbOidc => MONGODB_OIDC_STR,
         }
     }
 
@@ -302,6 +307,7 @@ impl FromStr for AuthMechanism {
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
+            MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
 
             #[cfg(feature = "aws-auth")]
             MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
