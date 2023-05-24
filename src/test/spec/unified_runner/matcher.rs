@@ -329,6 +329,10 @@ fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result
             }
             Ok(())
         }
+        (
+            SdamEvent::TopologyDescriptionChanged(_),
+            ExpectedSdamEvent::TopologyDescriptionChanged {},
+        ) => Ok(()),
         _ => expected_err(actual, expected),
     }
 }

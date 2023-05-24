@@ -82,6 +82,8 @@ pub(crate) enum ExpectedSdamEvent {
         previous_description: Option<TestServerDescription>,
         new_description: Option<TestServerDescription>,
     },
+    #[serde(rename = "topologyDescriptionChangedEvent")]
+    TopologyDescriptionChanged {},
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +125,8 @@ pub(crate) enum ObserveEvent {
     ConnectionCheckedIn,
     #[serde(rename = "serverDescriptionChangedEvent")]
     ServerDescriptionChanged,
+    #[serde(rename = "topologyDescriptionChangedEvent")]
+    TopologyDescriptionChanged,
 }
 
 impl ObserveEvent {
@@ -149,6 +153,10 @@ impl ObserveEvent {
             ) => true,
             (Self::ConnectionCheckedOut, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
             (Self::ConnectionCheckedIn, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
+            (
+                Self::TopologyDescriptionChanged,
+                Event::Sdam(crate::test::SdamEvent::TopologyDescriptionChanged(_)),
+            ) => true,
             _ => false,
         }
     }

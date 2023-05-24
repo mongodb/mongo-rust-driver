@@ -22,7 +22,8 @@
           "serverSelection": "debug"
         },
         "observeEvents": [
-          "serverDescriptionChangedEvent"
+          "serverDescriptionChangedEvent",
+          "topologyDescriptionChangedEvent"
         ],
         "useMultipleMongoses": false
       }
@@ -58,13 +59,9 @@
           "arguments": {
             "client": "client",
             "event": {
-              "serverDescriptionChangedEvent": {
-                "newDescription": {
-                  "type": "Mongos"
-                }
-              }
+              "topologyDescriptionChangedEvent": {}
             },
-            "count": 1
+            "count": 2
           }
         },
         {
@@ -104,192 +101,6 @@
                   "$$exists": true
                 },
                 "operation": "insert",
-                "topologyDescription": {
-                  "$$exists": true
-                },
-                "serverHost": {
-                  "$$type": "string"
-                },
-                "serverPort": {
-                  "$$type": [
-                    "int",
-                    "long"
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "description": "Waiting message is logged when a suitable server is not immediately available",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "4.1.5"
-        }
-      ],
-      "operations": [
-        {
-          "name": "waitForEvent",
-          "object": "testRunner",
-          "arguments": {
-            "client": "client",
-            "event": {
-              "serverDescriptionChangedEvent": {
-                "newDescription": {
-                  "type": "Mongos"
-                }
-              }
-            },
-            "count": 1
-          }
-        },
-        {
-          "name": "failPoint",
-          "object": "testRunner",
-          "arguments": {
-            "client": "failPointClient",
-            "failPoint": {
-              "configureFailPoint": "failCommand",
-              "mode": {
-                "times": 1
-              },
-              "data": {
-                "failCommands": [
-                  "insert"
-                ],
-                "closeConnection": true
-              }
-            }
-          }
-        },
-        {
-          "name": "insertOne",
-          "object": "collection",
-          "arguments": {
-            "document": {
-              "x": 1
-            }
-          },
-          "expectError": {
-            "isClientError": true
-          }
-        },
-        {
-          "name": "waitForEvent",
-          "object": "testRunner",
-          "arguments": {
-            "client": "client",
-            "event": {
-              "serverDescriptionChangedEvent": {
-                "newDescription": {
-                  "type": "Unknown"
-                }
-              }
-            },
-            "count": 1
-          }
-        },
-        {
-          "name": "updateOne",
-          "object": "collection",
-          "arguments": {
-            "filter": {
-              "x": 1
-            },
-            "update": {
-              "$set": {
-                "y": 1
-              }
-            }
-          }
-        }
-      ],
-      "expectLogMessages": [
-        {
-          "client": "client",
-          "messages": [
-            {
-              "level": "debug",
-              "component": "serverSelection",
-              "data": {
-                "message": "Server selection started",
-                "selector": {
-                  "$$exists": true
-                },
-                "operation": "insert",
-                "topologyDescription": {
-                  "$$exists": true
-                }
-              }
-            },
-            {
-              "level": "debug",
-              "component": "serverSelection",
-              "data": {
-                "message": "Server selection succeeded",
-                "selector": {
-                  "$$exists": true
-                },
-                "operation": "insert",
-                "topologyDescription": {
-                  "$$exists": true
-                },
-                "serverHost": {
-                  "$$type": "string"
-                },
-                "serverPort": {
-                  "$$type": [
-                    "int",
-                    "long"
-                  ]
-                }
-              }
-            },
-            {
-              "level": "debug",
-              "component": "serverSelection",
-              "data": {
-                "message": "Server selection started",
-                "selector": {
-                  "$$exists": true
-                },
-                "operation": "update",
-                "topologyDescription": {
-                  "$$exists": true
-                }
-              }
-            },
-            {
-              "level": "info",
-              "component": "serverSelection",
-              "data": {
-                "message": "Waiting for suitable server to become available",
-                "selector": {
-                  "$$exists": true
-                },
-                "operation": "update",
-                "topologyDescription": {
-                  "$$exists": true
-                },
-                "remainingTimeMS": {
-                  "$$type": [
-                    "int",
-                    "long"
-                  ]
-                }
-              }
-            },
-            {
-              "level": "debug",
-              "component": "serverSelection",
-              "data": {
-                "message": "Server selection succeeded",
-                "selector": {
-                  "$$exists": true
-                },
-                "operation": "update",
                 "topologyDescription": {
                   "$$exists": true
                 },

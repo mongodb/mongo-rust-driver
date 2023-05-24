@@ -18,6 +18,7 @@ createEntities:
         serverSelection: debug
       observeEvents:
         - serverDescriptionChangedEvent
+        - topologyDescriptionChangedEvent
   - database:
       id: &database database
       client: *client
@@ -34,15 +35,14 @@ tests:
     operations:
       # ensure we've discovered the server so it is immediately available
       # and no extra "waiting for suitable server" messages are emitted.
+      # expected topology events reflect initial server discovery and server connect event.
       - name: waitForEvent
         object: testRunner
         arguments:
           client: *client
           event:
-            serverDescriptionChangedEvent:
-              newDescription:
-                type: Standalone
-          count: 1
+            topologyDescriptionChangedEvent: {}
+          count: 2
       - name: bulkWrite
         object: *collection
         arguments:
