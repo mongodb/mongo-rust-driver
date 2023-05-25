@@ -156,7 +156,7 @@ impl TestRunner {
                 }
             }
 
-            if let Some(ref skipped_tests) = skipped_tests {
+            if let Some(skipped_tests) = skipped_tests {
                 if skipped_tests.contains(&test_case.description.as_str()) {
                     log_uncaptured(format!(
                         "Skipping test case {}: test skipped manually",
