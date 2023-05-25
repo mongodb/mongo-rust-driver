@@ -3,6 +3,7 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
+pub(crate) mod oidc;
 mod plain;
 mod sasl;
 mod scram;
@@ -307,6 +308,9 @@ impl AuthMechanism {
                     .into(),
             }
             .into()),
+            AuthMechanism::MongoDbOidc => {
+                oidc::authenticate_stream(stream, credential, server_api).await
+            }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
