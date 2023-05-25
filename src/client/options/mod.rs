@@ -43,7 +43,7 @@ use crate::{
 use crate::runtime;
 
 pub use resolver_config::ResolverConfig;
-pub use super::auth::oidc::Callbacks as OidcCallbacks;
+use super::auth::oidc;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
@@ -552,7 +552,7 @@ pub struct ClientOptions {
     #[builder(default)]
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub oidc_callbacks: Option<OidcCallbacks>,
+    pub oidc_callbacks: Option<oidc::Callbacks>,
     
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]

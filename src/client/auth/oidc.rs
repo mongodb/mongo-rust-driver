@@ -1,4 +1,4 @@
-use std::{time::Instant, sync::Arc};
+use std::{time::{Instant, Duration}, sync::Arc};
 
 use bson::rawdoc;
 use futures_core::future::BoxFuture;
@@ -25,6 +25,12 @@ impl Callbacks {
     }
 }
 
+impl std::fmt::Debug for Callbacks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Callbacks").finish()
+    }
+}
+
 struct CallbacksInner {
     on_request: Box<dyn Fn(&IdpServerInfo, &RequestParameters) -> BoxFuture<'static, IdpServerResponse> + Send + Sync>,
     //on_refresh: Option<Box<dyn Fn(&IdpServerInfo) -> IdpServerResponse + Send + Sync>>,
@@ -47,19 +53,21 @@ pub struct IdpServerResponse {
 
 #[non_exhaustive]
 pub struct RequestParameters {
-    pub timeout: Instant,
+    pub deadline: Instant,
 }
 
 pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
+    callbacks: Option<&Callbacks>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
     let username = credential
         .username
         .as_deref()
         .ok_or_else(|| auth_error("no username supplied"))?;
+    let callbacks = callbacks.ok_or_else(|| auth_error("no callbacks supplied"))?.clone();
 
     let payload = rawdoc! {
         "n": username,
@@ -79,7 +87,10 @@ pub(crate) async fn authenticate_stream(
     let server_info: IdpServerInfo = bson::from_slice(&response.payload)
         .map_err(|_| invalid_auth_response())?;
 
-    let idp_response: IdpServerResponse = todo!();
+    const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+    let deadline = Instant::now() + CALLBACK_TIMEOUT;
+    let cb_params = RequestParameters { deadline };
+    let idp_response = (callbacks.inner.on_request)(&server_info, &cb_params).await;
 
     let payload = rawdoc! {
         "jwt": idp_response.access_token,
@@ -91,7 +102,7 @@ pub(crate) async fn authenticate_stream(
         server_api.cloned(),
     ).into_command();
 
-    let response = send_sasl_command(conn, sasl_start).await?;
+    let response = send_sasl_command(conn, sasl_continue).await?;
     if !response.done {
         return Err(invalid_auth_response());
     }

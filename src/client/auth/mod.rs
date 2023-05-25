@@ -277,6 +277,7 @@ impl AuthMechanism {
         stream: &mut Connection,
         credential: &Credential,
         server_api: Option<&ServerApi>,
+        oidc_callbacks: Option<&oidc::Callbacks>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         self.validate_credential(credential)?;
@@ -309,7 +310,7 @@ impl AuthMechanism {
             }
             .into()),
             AuthMechanism::MongoDbOidc => {
-                oidc::authenticate_stream(stream, credential, server_api).await
+                oidc::authenticate_stream(stream, credential, server_api, oidc_callbacks).await
             }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
@@ -428,6 +429,7 @@ impl Credential {
         conn: &mut Connection,
         server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
+        oidc_callbacks: Option<&oidc::Callbacks>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
@@ -463,6 +465,7 @@ impl Credential {
                 conn,
                 self,
                 server_api,
+                oidc_callbacks,
                 #[cfg(feature = "aws-auth")]
                 http_client,
             )
