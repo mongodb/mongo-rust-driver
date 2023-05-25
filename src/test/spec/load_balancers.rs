@@ -38,7 +38,7 @@ async fn run_unified() {
 
     run_unified_tests(&["load-balancers"])
         // The Rust driver doesn't support wait queue timeouts.
-        .skip_files(&["wait-queue-timeouts.json"])
+        .skip_files(vec!["wait-queue-timeouts.json"])
         .transform_files(file_transformation)
         .await;
 }

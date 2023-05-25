@@ -110,7 +110,7 @@ impl TestRunner {
         &self,
         test_file: TestFile,
         path: impl Into<Option<PathBuf>>,
-        skipped_tests: impl Into<Option<&'static [&'static str]>>,
+        skipped_tests: Option<&Vec<&str>>,
     ) {
         let schema_version = &test_file.schema_version;
         assert!(
@@ -118,8 +118,6 @@ impl TestRunner {
             "Test runner not compatible with specification version {}",
             schema_version
         );
-
-        let skipped_tests = skipped_tests.into();
 
         let test_description = match path.into() {
             Some(path) => format!("{} ({:?})", &test_file.description, path),
@@ -158,7 +156,7 @@ impl TestRunner {
                 }
             }
 
-            if let Some(skipped_tests) = skipped_tests {
+            if let Some(ref skipped_tests) = skipped_tests {
                 if skipped_tests.contains(&test_case.description.as_str()) {
                     log_uncaptured(format!(
                         "Skipping test case {}: test skipped manually",

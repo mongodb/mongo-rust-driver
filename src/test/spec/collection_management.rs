@@ -6,6 +6,6 @@ async fn run_unified() {
     let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["collection-management"])
         // The driver does not support modifyCollection.
-        .skip_files(&["modifyCollection-pre_and_post_images.json"])
+        .skip_files(vec!["modifyCollection-pre_and_post_images.json"])
         .await;
 }

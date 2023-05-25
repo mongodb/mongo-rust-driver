@@ -27,7 +27,7 @@ async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_v2_tests(&["transactions", "legacy"])
         // TODO RUST-582: unskip this file
-        .skip_files(&["error-labels-blockConnection.json"])
+        .skip_files(vec!["error-labels-blockConnection.json"])
         .await;
 }
 
@@ -45,7 +45,7 @@ async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["transactions", "unified"])
         // TODO RUST-1656: unskip these files
-        .skip_files(&["retryable-abort-handshake.json", "retryable-commit-handshake.json"])
+        .skip_files(vec!["retryable-abort-handshake.json", "retryable-commit-handshake.json"])
         .await;
 }
 

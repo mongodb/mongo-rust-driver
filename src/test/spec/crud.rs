@@ -7,7 +7,7 @@ use crate::test::{spec::unified_runner::run_unified_tests, LOCK};
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["crud", "unified"])
-        .skip_files(&[
+        .skip_files(vec![
             // The Rust driver does not support unacknowledged writes (and does not intend to in
             // the future).
             "bulkWrite-deleteMany-hint-unacknowledged.json",
@@ -24,7 +24,7 @@ async fn run_unified() {
             "updateMany-hint-unacknowledged.json",
             "updateOne-hint-unacknowledged.json",
         ])
-        .skip_tests(&[
+        .skip_tests(vec![
             // Unacknowledged write; see above.
             "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected \
              on pre-5.0 server",

@@ -58,13 +58,13 @@ pub(crate) fn run_v2_tests(spec: &'static [&'static str]) -> RunV2TestsAction {
 
 pub(crate) struct RunV2TestsAction {
     spec: &'static [&'static str],
-    skipped_files: Option<&'static [&'static str]>,
+    skipped_files: Option<Vec<&'static str>>,
 }
 
 impl RunV2TestsAction {
-    pub(crate) fn skip_files(self, skipped_files: &'static [&'static str]) -> Self {
+    pub(crate) fn skip_files(self, skipped_files: impl Into<Option<Vec<&'static str>>>) -> Self {
         Self {
-            skipped_files: Some(skipped_files),
+            skipped_files: skipped_files.into(),
             ..self
         }
     }
@@ -77,7 +77,7 @@ impl IntoFuture for RunV2TestsAction {
     fn into_future(self) -> Self::IntoFuture {
         async move {
             for (test_file, path) in
-                deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files)
+                deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files.as_deref())
             {
                 run_v2_test(path, test_file).await;
             }
