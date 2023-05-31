@@ -27,7 +27,7 @@ use crate::{
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["server-discovery-and-monitoring", "unified"])
-        .skip_tests(vec![
+        .skip_tests(&[
             // The driver does not support socketTimeoutMS.
             "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",

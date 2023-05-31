@@ -10,14 +10,13 @@ use crate::test::{
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    let skipped_tests = if cfg!(not(feature = "openssl-tls")) {
-        Some(vec!["create datakey with KMIP KMS provider"])
-    } else {
-        None
-    };
+    let mut skipped_tests = vec![];
+    if cfg!(not(feature = "openssl-tls")) {
+        skipped_tests.push("create datakey with KMIP KMS provider");
+    }
 
     run_unified_tests(&["client-side-encryption", "unified"])
-        .skip_tests(skipped_tests)
+        .skip_tests(&skipped_tests)
         .await;
 }
 

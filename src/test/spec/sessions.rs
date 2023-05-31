@@ -32,7 +32,7 @@ async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["sessions"])
         // TODO RUST-1414: unskip this file
-        .skip_files(vec!["implicit-sessions-default-causal-consistency.json"])
+        .skip_files(&["implicit-sessions-default-causal-consistency.json"])
         .await;
 }
 

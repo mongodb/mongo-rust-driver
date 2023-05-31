@@ -498,7 +498,7 @@ async fn command_logging_unified() {
     let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["command-logging-and-monitoring", "logging"])
         // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
-        .skip_tests(vec![
+        .skip_tests(&[
             "An unacknowledged write generates a succeeded log message with ok: 1 reply",
         ])
         .await;
@@ -509,7 +509,7 @@ async fn command_logging_unified() {
 async fn connection_logging_unified() {
     let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["connection-monitoring-and-pooling", "logging"])
-        .skip_tests(vec![
+        .skip_tests(&[
             // TODO: RUST-1096 Unskip when configurable maxConnecting is added.
             "maxConnecting should be included in connection pool created message when specified",
             // We don't support any of these options (and are unlikely ever to support them).
@@ -527,7 +527,7 @@ async fn connection_logging_unified() {
 async fn server_selection_logging_unified() {
     let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["server-selection", "logging"])
-        .skip_tests(vec![
+        .skip_tests(&[
             // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite
             // support.
             "Successful bulkWrite operation: log messages have operationIds",

@@ -51,17 +51,17 @@ pub(crate) struct RunUnifiedTestsAction {
 impl RunUnifiedTestsAction {
     /// The files to skip deserializing. The provided filenames should only contain the filename and
     /// extension, e.g. "unacknowledged-writes.json". Filenames are matched case-sensitively.
-    pub(crate) fn skip_files(self, skipped_files: impl Into<Option<Vec<&'static str>>>) -> Self {
+    pub(crate) fn skip_files(self, skipped_files: &[&'static str]) -> Self {
         Self {
-            skipped_files: skipped_files.into(),
+            skipped_files: Some(skipped_files.to_vec()),
             ..self
         }
     }
 
     /// The descriptions of the tests to skip. Test descriptions are matched case-sensitively.
-    pub(crate) fn skip_tests(self, skipped_tests: impl Into<Option<Vec<&'static str>>>) -> Self {
+    pub(crate) fn skip_tests(self, skipped_tests: &[&'static str]) -> Self {
         Self {
-            skipped_tests: skipped_tests.into(),
+            skipped_tests: Some(skipped_tests.to_vec()),
             ..self
         }
     }
@@ -129,10 +129,10 @@ async fn valid_pass() {
     }
 
     run_unified_tests(&["unified-test-format", "valid-pass"])
-        .skip_files(skipped_files)
+        .skip_files(&skipped_files)
         // This test relies on old OP_QUERY behavior that many drivers still use for < 4.4, but
         // we do not use, due to never implementing OP_QUERY.
-        .skip_tests(vec!["A successful find event with a getmore and the server kills the cursor (<= 4.4)"])
+        .skip_tests(&["A successful find event with a getmore and the server kills the cursor (<= 4.4)"])
         .await;
 }
 
