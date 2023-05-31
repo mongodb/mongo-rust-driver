@@ -4,7 +4,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
         command::CommandEvent,
     },
-    test::Event,
+    test::{Event, SdamEvent},
     ServerType,
 };
 use serde::Deserialize;
@@ -155,7 +155,7 @@ impl ObserveEvent {
             (Self::ConnectionCheckedIn, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
             (
                 Self::TopologyDescriptionChanged,
-                Event::Sdam(crate::test::SdamEvent::TopologyDescriptionChanged(_)),
+                Event::Sdam(SdamEvent::TopologyDescriptionChanged(_)),
             ) => true,
             _ => false,
         }
