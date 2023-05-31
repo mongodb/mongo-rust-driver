@@ -266,7 +266,7 @@ impl AuthMechanism {
             }
             .into()),
             _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
+                message: dbg!(format!("Authentication mechanism {:?} not yet implemented.", self)),
             }
             .into()),
         }

@@ -17,7 +17,7 @@ pub struct Callbacks {
 impl Callbacks {
     /// dbg!
     pub fn new<F>(on_request: F) -> Self
-        where F: Fn(&IdpServerInfo, &RequestParameters) -> BoxFuture<'static, IdpServerResponse> + Send + Sync + 'static,
+        where F: Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync + 'static,
     {
         Self {
             inner: Arc::new(CallbacksInner { on_request: Box::new(on_request) })
@@ -32,11 +32,11 @@ impl std::fmt::Debug for Callbacks {
 }
 
 struct CallbacksInner {
-    on_request: Box<dyn Fn(&IdpServerInfo, &RequestParameters) -> BoxFuture<'static, IdpServerResponse> + Send + Sync>,
+    on_request: Box<dyn Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
     //on_refresh: Option<Box<dyn Fn(&IdpServerInfo) -> IdpServerResponse + Send + Sync>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[non_exhaustive]
 pub struct IdpServerInfo {
     pub issuer: String,
@@ -47,10 +47,11 @@ pub struct IdpServerInfo {
 #[non_exhaustive]
 pub struct IdpServerResponse {
     pub access_token: String,
-    pub expires: Instant,
-    pub refresh_token: String,
+    pub expires: Option<Instant>,
+    pub refresh_token: Option<String>,
 }
 
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct RequestParameters {
     pub deadline: Instant,
@@ -69,39 +70,31 @@ pub(crate) async fn authenticate_stream(
         .ok_or_else(|| auth_error("no username supplied"))?;
     let callbacks = callbacks.ok_or_else(|| auth_error("no callbacks supplied"))?.clone();
 
-    let payload = rawdoc! {
-        "n": username,
-    }.into_bytes();
     let sasl_start = SaslStart::new(
         source.to_string(),
         AuthMechanism::MongoDbOidc,
-        payload,
+        rawdoc! { "n": username }.into_bytes(),
         server_api.cloned(),
     )
     .into_command();
-
     let response = send_sasl_command(conn, sasl_start).await?;
     if response.done {
         return Err(invalid_auth_response());
     }
-    let server_info: IdpServerInfo = bson::from_slice(&response.payload)
-        .map_err(|_| invalid_auth_response())?;
-
-    const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-    let deadline = Instant::now() + CALLBACK_TIMEOUT;
-    let cb_params = RequestParameters { deadline };
-    let idp_response = (callbacks.inner.on_request)(&server_info, &cb_params).await;
-
-    let payload = rawdoc! {
-        "jwt": idp_response.access_token,
-    }.into_bytes();
+    let idp_response = {
+        let server_info: IdpServerInfo = bson::from_slice(&response.payload)
+            .map_err(|_| invalid_auth_response())?;
+        const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+        let cb_params = RequestParameters { deadline: Instant::now() + CALLBACK_TIMEOUT };
+        (callbacks.inner.on_request)(server_info, cb_params).await?
+    };
+    
     let sasl_continue = SaslContinue::new(
         source.to_string(),
         response.conversation_id,
-        payload,
+        rawdoc! { "jwt": idp_response.access_token }.into_bytes(),
         server_api.cloned(),
     ).into_command();
-
     let response = send_sasl_command(conn, sasl_continue).await?;
     if !response.done {
         return Err(invalid_auth_response());

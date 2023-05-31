@@ -13,6 +13,7 @@ mod gridfs;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
+mod oidc;
 mod ocsp;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod read_write_concern;

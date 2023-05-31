@@ -836,7 +836,7 @@ pub struct ConnectionString {
 }
 
 /// Elements from the connection string that are not top-level fields in `ConnectionString`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ConnectionStringParts {
     read_preference_tags: Option<Vec<TagSet>>,
     max_staleness: Option<Duration>,
@@ -1666,8 +1666,8 @@ impl ConnectionString {
                     credential.mechanism_properties = Some(doc);
                 }
 
+                credential.mechanism = Some(mechanism.clone());
                 mechanism.validate_credential(credential)?;
-                credential.mechanism = parts.auth_mechanism.take();
             }
             None => {
                 if let Some(ref mut credential) = conn_str.credential {
