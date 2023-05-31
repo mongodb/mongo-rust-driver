@@ -532,9 +532,6 @@ async fn server_selection_logging_unified() {
             // support.
             "Successful bulkWrite operation: log messages have operationIds",
             "Failed bulkWrite operation: log messages have operationIds",
-            // TODO: RUST-1585 Unskip these tests (they are currently flaky on certain topologies
-            // due to performing extra server selections to check for support.)
-            "Failure due to unreachable server",
         ])
         .await;
 }
