@@ -27,7 +27,7 @@ async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_v2_tests(&["transactions", "legacy"])
         // TODO RUST-582: unskip this file
-        .skip_files(vec!["error-labels-blockConnection.json"])
+        .skip_files(&["error-labels-blockConnection.json"])
         .await;
 }
 

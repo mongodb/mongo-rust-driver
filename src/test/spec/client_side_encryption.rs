@@ -32,6 +32,6 @@ async fn run_legacy() {
     }
 
     run_v2_tests(&["client-side-encryption", "legacy"])
-        .skip_files(skipped_files)
+        .skip_files(&skipped_files)
         .await;
 }
