@@ -265,7 +265,6 @@ impl CryptExecutor {
                         #[cfg(feature = "gcp-kms")]
                         {
                             use crate::runtime::HttpClient;
-                            use reqwest::Method;
                             use serde::Deserialize;
 
                             #[derive(Deserialize)]
@@ -293,26 +292,15 @@ impl CryptExecutor {
                                 "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
                                 host
                             );
-                            let headers = vec![("Metadata-Flavor", "Google")];
-                            let response = http_client
-                                .request(Method::GET, &uri, &headers)
+
+                            let response: ResponseBody = http_client
+                                .get(&uri)
+                                .headers(&[("Metadata-Flavor", "Google")])
+                                .send()
                                 .await
                                 .map_err(|e| kms_error(e.to_string()))?;
-
-                            if response.status().as_u16() != 200 {
-                                let error = match response.text().await {
-                                    Ok(text) => text,
-                                    Err(e) => format!("could not parse HTTP response: {}", e),
-                                };
-                                return Err(kms_error(error));
-                            }
-
-                            let body: ResponseBody = response.json().await.map_err(|e| {
-                                let error = format!("could not parse HTTP response: {}", e);
-                                kms_error(error)
-                            })?;
                             kms_providers
-                                .append("gcp", rawdoc! { "accessToken": body.access_token });
+                                .append("gcp", rawdoc! { "accessToken": response.access_token });
                         }
                         #[cfg(not(feature = "gcp-kms"))]
                         {
@@ -482,7 +470,9 @@ pub(crate) mod azure {
             let now = Instant::now();
             let server_response: ServerResponse = self
                 .http
-                .get_and_deserialize_json(self.make_url()?, &self.make_headers())
+                .get(self.make_url()?)
+                .headers(&self.make_headers())
+                .send()
                 .await
                 .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
             let expires_in_secs: u64 = server_response.expires_in.parse().map_err(|e| {
