@@ -1,6 +1,6 @@
 description: "standalone-logging"
 
-schemaVersion: "1.13"
+schemaVersion: "1.14"
 
 runOnRequirements:
   - topologies:
@@ -18,6 +18,7 @@ createEntities:
         serverSelection: debug
       observeEvents:
         - serverDescriptionChangedEvent
+        - topologyDescriptionChangedEvent
   - database:
       id: &database database
       client: *client
@@ -34,15 +35,14 @@ tests:
     operations:
       # ensure we've discovered the server so it is immediately available
       # and no extra "waiting for suitable server" messages are emitted.
+      # expected topology events reflect initial server discovery and server connect event.
       - name: waitForEvent
         object: testRunner
         arguments:
           client: *client
           event:
-            serverDescriptionChangedEvent:
-              newDescription:
-                type: Standalone
-          count: 1
+            topologyDescriptionChangedEvent: {}
+          count: 2
       - name: insertOne
         object: *collection
         arguments:
@@ -63,101 +63,6 @@ tests:
               message: "Server selection succeeded"
               selector: { $$exists: true }
               operation: insert
-              topologyDescription: { $$exists: true }
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-
-  - description: "Waiting message is logged when a suitable server is not immediately available"
-    runOnRequirements:
-      - minServerVersion: "4.0" # min version for failCommand on mongod
-    operations:
-      # ensure we've discovered the server so it is immediately available
-      # and no extra "waiting for suitable server" messages are emitted.
-      - name: waitForEvent
-        object: testRunner
-        arguments:
-          client: *client
-          event:
-            serverDescriptionChangedEvent:
-              newDescription:
-                type: Standalone
-          count: 1
-      # set a failPoint for insert and run insert so that we mark the server
-      # as unknown.
-      - name: failPoint
-        object: testRunner
-        arguments:
-          client: *failPointClient
-          failPoint:
-            configureFailPoint: failCommand
-            mode: { times: 1 }
-            data:
-              failCommands: ["insert"]
-              closeConnection: true
-      - name: insertOne
-        object: *collection
-        arguments:
-          document: { x : 1 }
-        expectError:
-          isClientError: true # network error
-      # wait for the server to be marked unknown.
-      - name: waitForEvent
-        object: testRunner
-        arguments:
-          client: *client
-          event:
-            serverDescriptionChangedEvent:
-              newDescription:
-                type: Unknown
-          count: 1
-      # perform another write to rediscover the server. this should lead
-      # to a log message because no server will be available until we
-      # request an immediate check which rediscovers it.
-      - name: updateOne
-        object: *collection
-        arguments:
-          filter: { x: 1 }
-          update: { $set: { y : 1 } }
-    expectLogMessages:
-      - client: *client
-        messages:
-          - level: debug
-            component: serverSelection
-            data:
-              message: "Server selection started"
-              selector: { $$exists: true }
-              operation: insert
-              topologyDescription: { $$exists: true } 
-          - level: debug
-            component: serverSelection
-            data:
-              message: "Server selection succeeded"
-              selector: { $$exists: true }
-              operation: insert
-              topologyDescription: { $$exists: true }
-              serverHost: { $$type: string }
-              serverPort: { $$type: [int, long] }
-          - level: debug
-            component: serverSelection
-            data:
-              message: "Server selection started"
-              selector: { $$exists: true }
-              operation: update
-              topologyDescription: { $$exists: true } 
-          - level: info
-            component: serverSelection
-            data:
-              message: "Waiting for suitable server to become available"
-              selector: { $$exists: true }
-              operation: update
-              topologyDescription: { $$exists: true } 
-              remainingTimeMS: { $$type: [int, long] }
-          - level: debug
-            component: serverSelection
-            data:
-              message: "Server selection succeeded"
-              selector: { $$exists: true }
-              operation: update
               topologyDescription: { $$exists: true }
               serverHost: { $$type: string }
               serverPort: { $$type: [int, long] }

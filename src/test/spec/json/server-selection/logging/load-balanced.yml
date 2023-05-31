@@ -1,6 +1,6 @@
 description: "server-selection-logging"
 
-schemaVersion: "1.13"
+schemaVersion: "1.14"
 
 runOnRequirements:
   - topologies:
@@ -27,9 +27,7 @@ createEntities:
 tests:
   - description: "A successful operation - load balanced cluster"
     operations:
-      # ensure we've discovered the entire topology before starting
-      # to avoid an extra "waiting for server selection" messages
-      # when the insert begins.
+      # ensure we've discovered the entire topology before starting.
       - name: waitForEvent
         object: testRunner
         arguments:
