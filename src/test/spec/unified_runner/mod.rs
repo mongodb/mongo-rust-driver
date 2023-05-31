@@ -43,25 +43,25 @@ pub(crate) fn run_unified_tests(spec: &'static [&'static str]) -> RunUnifiedTest
 type FileTransformation = Box<dyn Fn(&mut TestFile) + Send + Sync>;
 pub(crate) struct RunUnifiedTestsAction {
     spec: &'static [&'static str],
-    skipped_files: Option<&'static [&'static str]>,
-    skipped_tests: Option<&'static [&'static str]>,
+    skipped_files: Option<Vec<&'static str>>,
+    skipped_tests: Option<Vec<&'static str>>,
     file_transformation: Option<FileTransformation>,
 }
 
 impl RunUnifiedTestsAction {
     /// The files to skip deserializing. The provided filenames should only contain the filename and
     /// extension, e.g. "unacknowledged-writes.json". Filenames are matched case-sensitively.
-    pub(crate) fn skip_files(self, skipped_files: &'static [&'static str]) -> Self {
+    pub(crate) fn skip_files(self, skipped_files: &[&'static str]) -> Self {
         Self {
-            skipped_files: Some(skipped_files),
+            skipped_files: Some(skipped_files.to_vec()),
             ..self
         }
     }
 
     /// The descriptions of the tests to skip. Test descriptions are matched case-sensitively.
-    pub(crate) fn skip_tests(self, skipped_tests: &'static [&'static str]) -> Self {
+    pub(crate) fn skip_tests(self, skipped_tests: &[&'static str]) -> Self {
         Self {
-            skipped_tests: Some(skipped_tests),
+            skipped_tests: Some(skipped_tests.to_vec()),
             ..self
         }
     }
@@ -85,7 +85,7 @@ impl IntoFuture for RunUnifiedTestsAction {
     fn into_future(self) -> Self::IntoFuture {
         async move {
             for (mut test_file, path) in
-                deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files)
+                deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files.as_deref())
             {
                 if let Some(ref file_transformation) = self.file_transformation {
                     file_transformation(&mut test_file);
@@ -93,7 +93,7 @@ impl IntoFuture for RunUnifiedTestsAction {
 
                 let test_runner = TestRunner::new().await;
                 test_runner
-                    .run_test(test_file, path, self.skipped_tests)
+                    .run_test(test_file, path, self.skipped_tests.as_ref())
                     .await;
             }
         }
@@ -105,34 +105,31 @@ impl IntoFuture for RunUnifiedTestsAction {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    #[cfg(feature = "in-use-encryption-unstable")]
-    let skipped_files = &[
-        // TODO RUST-1570: unskip this file (ditto below)
+
+    let mut skipped_files = vec![
+        // TODO RUST-1570: unskip this file
         "collectionData-createOptions.json",
-        // TODO RUST-1405: unskip this file (ditto below)
+        // TODO RUST-1405: unskip this file
         "expectedError-errorResponse.json",
-        // TODO RUST-582: unskip these files (ditto below)
+        // TODO RUST-582: unskip these files
         "entity-cursor-iterateOnce.json",
         "matches-lte-operator.json",
         // TODO: unskip this file when the convenient transactions API tests are converted to the
-        // unified format (ditto below)
+        // unified format
         "poc-transactions-convenient-api.json",
     ];
-    #[cfg(not(feature = "in-use-encryption-unstable"))]
-    let skipped_files = &[
-        "collectionData-createOptions.json",
-        "expectedError-errorResponse.json",
-        "entity-cursor-iterateOnce.json",
-        "matches-lte-operator.json",
-        "poc-transactions-convenient-api.json",
-        // These tests need the in-use-encryption-unstable feature flag to be deserialized and run.
-        "kmsProviders-placeholder_kms_credentials.json",
-        "kmsProviders-unconfigured_kms.json",
-        "kmsProviders-explicit_kms_credentials.json",
-        "kmsProviders-mixed_kms_credential_fields.json",
-    ];
+    // These tests need the in-use-encryption-unstable feature flag to be deserialized and run.
+    if cfg!(not(feature = "in-use-encryption-unstable")) {
+        skipped_files.extend(&[
+            "kmsProviders-placeholder_kms_credentials.json",
+            "kmsProviders-unconfigured_kms.json",
+            "kmsProviders-explicit_kms_credentials.json",
+            "kmsProviders-mixed_kms_credential_fields.json",
+        ]);
+    }
+
     run_unified_tests(&["unified-test-format", "valid-pass"])
-        .skip_files(skipped_files)
+        .skip_files(&skipped_files)
         // This test relies on old OP_QUERY behavior that many drivers still use for < 4.4, but
         // we do not use, due to never implementing OP_QUERY.
         .skip_tests(&["A successful find event with a getmore and the server kills the cursor (<= 4.4)"])

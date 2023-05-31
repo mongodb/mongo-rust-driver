@@ -10,13 +10,13 @@ use crate::test::{
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    #[cfg(not(feature = "openssl-tls"))]
-    let skipped_tests = &["create datakey with KMIP KMS provider"];
-    #[cfg(feature = "openssl-tls")]
-    let skipped_tests = &[];
+    let mut skipped_tests = vec![];
+    if cfg!(not(feature = "openssl-tls")) {
+        skipped_tests.push("create datakey with KMIP KMS provider");
+    }
 
     run_unified_tests(&["client-side-encryption", "unified"])
-        .skip_tests(skipped_tests)
+        .skip_tests(&skipped_tests)
         .await;
 }
 
@@ -25,13 +25,13 @@ async fn run_unified() {
 async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    // TODO RUST-528: Unskip timeoutMS.json when CSOT is implemented.
-    #[cfg(not(feature = "openssl-tls"))]
-    let skipped_files = &["timeoutMS.json", "kmipKMS.json"];
-    #[cfg(feature = "openssl-tls")]
-    let skipped_files = &["timeoutMS.json"];
+    // TODO RUST-528: unskip this file
+    let mut skipped_files = vec!["timeoutMS.json"];
+    if cfg!(not(feature = "openssl-tls")) {
+        skipped_files.push("kmipKMS.json");
+    }
 
     run_v2_tests(&["client-side-encryption", "legacy"])
-        .skip_files(skipped_files)
+        .skip_files(&skipped_files)
         .await;
 }
