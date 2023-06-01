@@ -1144,6 +1144,66 @@ tasks:
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
 
+  - name: "test-7.0-standalone"
+    tags: ["7.0", "standalone"]
+    commands:
+      - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "7.0"
+          TOPOLOGY: "server"
+      - func: "run tests"
+
+  - name: "test-7.0-replica_set"
+    tags: ["7.0", "replica_set"]
+    commands:
+      - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "7.0"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+
+  - name: "test-7.0-sharded_cluster"
+    tags: ["7.0", "sharded_cluster"]
+    commands:
+      - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "7.0"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+
+  - name: "test-7.0-load_balancer"
+    tags: ["7.0", "load_balancer"]
+    commands:
+      - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "7.0"
+          TOPOLOGY: "sharded_cluster"
+          LOAD_BALANCER: "true"
+      - func: "start load balancer"
+      - func: "run tests"
+
+  - name: "test-7.0-aws-auth"
+    # "7.0" explicitly left off to keep this out of the generic matrix
+    tags: ["aws-auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: "auth-aws.json"
+          MONGODB_VERSION: "7.0"
+          AUTH: "auth"
+          TOPOLOGY: "server"
+      - func: "add aws auth variables to file"
+      - func: "run aws auth test with regular aws credentials"
+      - func: "run aws auth test with assume role credentials"
+      - func: "run aws auth test with aws credentials as environment variables"
+      - func: "run aws auth test with aws credentials and session token as environment variables"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
+
   - name: "test-rapid-standalone"
     tags: ["rapid", "standalone"]
     commands:
@@ -1707,6 +1767,10 @@ axes:
         display_name: "rapid"
         variables:
            MONGODB_VERSION: "rapid"
+      - id: "7.0"
+        display_name: "7.0"
+        variables:
+          MONGODB_VERSION: "7.0"
       - id: "6.0"
         display_name: "6.0"
         variables:
@@ -2061,6 +2125,7 @@ buildvariants:
   tasks:
      - ".latest"
      - ".rapid"
+     - ".7.0"
      - ".6.0"
      - ".5.0"
      - ".4.4"
@@ -2134,6 +2199,7 @@ buildvariants:
     mongodb-version:
       - "latest"
       - "rapid"
+      - "7.0"
       - "6.0"
       - "5.0"
       - "4.4"
@@ -2171,6 +2237,7 @@ buildvariants:
     mongodb-version:
       - "latest"
       - "rapid"
+      - "7.0"
       - "6.0"
     topology:
       - "replica-set"
@@ -2188,7 +2255,7 @@ buildvariants:
       - macos-11.00
       - windows-64-vs2017
     mongodb-version:
-      - "6.0"
+      - "7.0"
     topology:
       - "standalone"
     crypt-shared:
@@ -2206,6 +2273,7 @@ buildvariants:
     mongodb-version:
       - "latest"
       - "rapid"
+      - "7.0"
       - "6.0"
       - "5.0"
       - "4.4"
@@ -2243,7 +2311,7 @@ buildvariants:
       - macos-11.00
       - windows-64-vs2017
     mongodb-version:
-      - "6.0"
+      - "7.0"
     topology:
       - "standalone"
     crypt-shared:
@@ -2338,6 +2406,7 @@ buildvariants:
   tasks:
     - ".latest .standalone"
     - ".rapid .standalone"
+    - ".7.0 .standalone"
     - ".6.0 .standalone"
     - ".5.0 .standalone"
 
