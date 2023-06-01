@@ -64,16 +64,16 @@ pub(crate) async fn authenticate_stream(
     callbacks: Option<&Callbacks>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
-    let username = credential
-        .username
-        .as_deref()
-        .ok_or_else(|| auth_error("no username supplied"))?;
     let callbacks = callbacks.ok_or_else(|| auth_error("no callbacks supplied"))?.clone();
 
+    let mut start_doc = rawdoc! { };
+    if let Some(username) = credential.username.as_deref() {
+        start_doc.append("n", username);
+    }
     let sasl_start = SaslStart::new(
         source.to_string(),
         AuthMechanism::MongoDbOidc,
-        rawdoc! { "n": username }.into_bytes(),
+        start_doc.into_bytes(),
         server_api.cloned(),
     )
     .into_command();

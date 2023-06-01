@@ -21,7 +21,7 @@ async fn single_principal_implicit_username() -> Result<()> {
             })
         }.boxed()
     }));
-    // todo: set callback
+    //opts.direct_connection = Some(true);
     let client = Client::with_options(opts)?;
     client.database("test").collection::<Document>("test").find_one(None, None).await?;
     Ok(())

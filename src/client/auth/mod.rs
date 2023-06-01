@@ -222,16 +222,16 @@ impl AuthMechanism {
     /// Get the default authSource for a given mechanism depending on the database provided in the
     /// connection string.
     pub(crate) fn default_source<'a>(&'a self, uri_db: Option<&'a str>) -> &'a str {
-        // TODO: fill in others as they're implemented
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
                 uri_db.unwrap_or("admin")
             }
             AuthMechanism::MongoDbX509 => "$external",
             AuthMechanism::Plain => uri_db.unwrap_or("$external"),
+            AuthMechanism::MongoDbOidc => "$external",
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => "$external",
-            _ => "",
+            AuthMechanism::Gssapi => "",
         }
     }
 
@@ -257,6 +257,7 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
+            Self::MongoDbOidc => Ok(None),  // dbg!
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
@@ -266,7 +267,7 @@ impl AuthMechanism {
             }
             .into()),
             _ => Err(ErrorKind::Authentication {
-                message: dbg!(format!("Authentication mechanism {:?} not yet implemented.", self)),
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
             .into()),
         }
