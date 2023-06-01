@@ -40,8 +40,10 @@ struct CallbacksInner {
 #[non_exhaustive]
 pub struct IdpServerInfo {
     pub issuer: String,
+    #[serde(rename = "clientId")]
     pub client_id: String,
-    pub request_scopes: Vec<String>,
+    #[serde(rename = "requestScopes")]
+    pub request_scopes: Option<Vec<String>>,
 }
 
 #[non_exhaustive]
@@ -96,7 +98,7 @@ pub(crate) async fn authenticate_stream(
         server_api.cloned(),
     ).into_command();
     let response = send_sasl_command(conn, sasl_continue).await?;
-    if !response.done {
+    if dbg!(!response.done) {
         return Err(invalid_auth_response());
     }
     
