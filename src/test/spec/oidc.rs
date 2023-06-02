@@ -1,7 +1,7 @@
 use bson::Document;
 use futures_util::FutureExt;
 
-use crate::{client::{options::ClientOptions, auth::oidc}, Client};
+use crate::{client::{options::ClientOptions, auth::oidc}, Client, test::log_uncaptured};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -9,6 +9,10 @@ type Result<T> = anyhow::Result<T>;
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn single_principal_implicit_username() -> Result<()> {
+    if !std::env::var("OIDC_TOKEN_DIR").is_ok() {
+        log_uncaptured("Skipping OIDC test");
+        return Ok(());
+    }
     let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.oidc_callbacks = Some(oidc::Callbacks::new(|info, params| {
         async move {
