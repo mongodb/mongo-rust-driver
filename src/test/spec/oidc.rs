@@ -13,11 +13,12 @@ type Result<T> = anyhow::Result<T>;
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn single_principal_implicit_username() -> Result<()> {
-    if !std::env::var("OIDC_TOKEN_DIR").is_ok() {
+    if std::env::var("OIDC_TOKEN_DIR").is_err() {
         log_uncaptured("Skipping OIDC test");
         return Ok(());
     }
-    let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
+    let mut opts =
+        ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.oidc_callbacks = Some(oidc::Callbacks::new(|_info, _params| {
         async move {
             Ok(oidc::IdpServerResponse {
