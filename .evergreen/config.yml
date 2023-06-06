@@ -1400,6 +1400,7 @@ tasks:
   - name: test-oidc-latest
     commands:
       - func: "bootstrap oidc"
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           AUTH: "auth"
