@@ -1,7 +1,11 @@
 use bson::Document;
 use futures_util::FutureExt;
 
-use crate::{client::{options::ClientOptions, auth::oidc}, Client, test::log_uncaptured};
+use crate::{
+    client::{auth::oidc, options::ClientOptions},
+    test::log_uncaptured,
+    Client,
+};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -21,9 +25,14 @@ async fn single_principal_implicit_username() -> Result<()> {
                 expires: None,
                 refresh_token: None,
             })
-        }.boxed()
+        }
+        .boxed()
     }));
     let client = Client::with_options(opts)?;
-    client.database("test").collection::<Document>("test").find_one(None, None).await?;
+    client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(None, None)
+        .await?;
     Ok(())
 }

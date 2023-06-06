@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     bson::{doc, Bson, Document},
-    client::auth::{ClientFirst, oidc},
+    client::auth::{oidc, ClientFirst},
     cmap::{Command, Connection, StreamDescription},
     compression::Compressor,
     error::Result,

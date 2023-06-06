@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     client::{
-        auth::{Credential},
+        auth::Credential,
         options::{ClientOptions, ServerAddress, TlsOptions},
     },
     error::{Error as MongoError, ErrorKind, Result},

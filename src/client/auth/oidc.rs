@@ -1,12 +1,25 @@
-use std::{time::{Instant, Duration}, sync::Arc};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use bson::rawdoc;
 use futures_core::future::BoxFuture;
 use serde::Deserialize;
 
-use crate::{cmap::Connection, client::{options::ServerApi, auth::{sasl::{SaslStart, SaslResponse}, AuthMechanism}}, error::{Result, Error}};
+use crate::{
+    client::{
+        auth::{
+            sasl::{SaslResponse, SaslStart},
+            AuthMechanism,
+        },
+        options::ServerApi,
+    },
+    cmap::Connection,
+    error::{Error, Result},
+};
 
-use super::{Credential, MONGODB_OIDC_STR, sasl::SaslContinue};
+use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
@@ -17,10 +30,16 @@ pub struct Callbacks {
 impl Callbacks {
     /// Create a new instance with a token request callback.
     pub fn new<F>(on_request: F) -> Self
-        where F: Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync + 'static,
+    where
+        F: Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
     {
         Self {
-            inner: Arc::new(CallbacksInner { on_request: Box::new(on_request) })
+            inner: Arc::new(CallbacksInner {
+                on_request: Box::new(on_request),
+            }),
         }
     }
 }
@@ -32,8 +51,12 @@ impl std::fmt::Debug for Callbacks {
 }
 
 struct CallbacksInner {
-    on_request: Box<dyn Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
-    //on_refresh: Option<Box<dyn Fn(&IdpServerInfo) -> IdpServerResponse + Send + Sync>>,
+    on_request: Box<
+        dyn Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync,
+    >,
+    // on_refresh: Option<Box<dyn Fn(&IdpServerInfo) -> IdpServerResponse + Send + Sync>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,9 +89,11 @@ pub(crate) async fn authenticate_stream(
     callbacks: Option<&Callbacks>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
-    let callbacks = callbacks.ok_or_else(|| auth_error("no callbacks supplied"))?.clone();
+    let callbacks = callbacks
+        .ok_or_else(|| auth_error("no callbacks supplied"))?
+        .clone();
 
-    let mut start_doc = rawdoc! { };
+    let mut start_doc = rawdoc! {};
     if let Some(username) = credential.username.as_deref() {
         start_doc.append("n", username);
     }
@@ -84,24 +109,27 @@ pub(crate) async fn authenticate_stream(
         return Err(invalid_auth_response());
     }
     let idp_response = {
-        let server_info: IdpServerInfo = bson::from_slice(&response.payload)
-            .map_err(|_| invalid_auth_response())?;
+        let server_info: IdpServerInfo =
+            bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
         const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-        let cb_params = RequestParameters { deadline: Instant::now() + CALLBACK_TIMEOUT };
+        let cb_params = RequestParameters {
+            deadline: Instant::now() + CALLBACK_TIMEOUT,
+        };
         (callbacks.inner.on_request)(server_info, cb_params).await?
     };
-    
+
     let sasl_continue = SaslContinue::new(
         source.to_string(),
         response.conversation_id,
         rawdoc! { "jwt": idp_response.access_token }.into_bytes(),
         server_api.cloned(),
-    ).into_command();
+    )
+    .into_command();
     let response = send_sasl_command(conn, sasl_continue).await?;
     if !response.done {
         return Err(invalid_auth_response());
     }
-    
+
     Ok(())
 }
 
@@ -113,7 +141,13 @@ fn invalid_auth_response() -> Error {
     Error::invalid_authentication_response(MONGODB_OIDC_STR)
 }
 
-async fn send_sasl_command(conn: &mut Connection, command: crate::cmap::Command) -> Result<SaslResponse> {
+async fn send_sasl_command(
+    conn: &mut Connection,
+    command: crate::cmap::Command,
+) -> Result<SaslResponse> {
     let response = conn.send_command(command, None).await?;
-    SaslResponse::parse(MONGODB_OIDC_STR, response.auth_response_body(MONGODB_OIDC_STR)?)
+    SaslResponse::parse(
+        MONGODB_OIDC_STR,
+        response.auth_response_body(MONGODB_OIDC_STR)?,
+    )
 }

@@ -108,10 +108,10 @@ pub struct Client {
     inner: Arc<ClientInner>,
 }
 
-#[allow(dead_code, unreachable_code)]
+#[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
 const _: fn() = || {
-    fn assert_send<T: Send>(_t: T) { }
-    fn assert_sync<T: Sync>(_t: T) { }
+    fn assert_send<T: Send>(_t: T) {}
+    fn assert_sync<T: Sync>(_t: T) {}
 
     let _c: super::Client = todo!();
     assert_send(_c);

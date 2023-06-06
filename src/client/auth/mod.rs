@@ -187,16 +187,29 @@ impl AuthMechanism {
                     .as_ref()
                     .map_or(false, |p| p.contains_key("PROVIDER_NAME"));
                 if credential.username.is_some() && is_automatic {
-                    return Err(Error::invalid_argument("username and PROVIDER_NAME cannot both be specified for MONGODB-OIDC authentication"));
+                    return Err(Error::invalid_argument(
+                        "username and PROVIDER_NAME cannot both be specified for MONGODB-OIDC \
+                         authentication",
+                    ));
                 }
-                if credential.source.as_ref().map_or(false, |s| s != "$external") {
-                    return Err(Error::invalid_argument("source must be $external for MONGODB-OIDC authentication"));
+                if credential
+                    .source
+                    .as_ref()
+                    .map_or(false, |s| s != "$external")
+                {
+                    return Err(Error::invalid_argument(
+                        "source must be $external for MONGODB-OIDC authentication",
+                    ));
                 }
                 if credential.password.is_some() {
-                    return Err(Error::invalid_argument("password must not be set for MONGODB-OIDC authentication"));
+                    return Err(Error::invalid_argument(
+                        "password must not be set for MONGODB-OIDC authentication",
+                    ));
                 }
                 if credential.mechanism != Some(AuthMechanism::MongoDbOidc) {
-                    return Err(Error::invalid_argument("mechanism must be MONGODB-OIDC for MONGODB-OIDC authentication"));
+                    return Err(Error::invalid_argument(
+                        "mechanism must be MONGODB-OIDC for MONGODB-OIDC authentication",
+                    ));
                 }
                 Ok(())
             }
