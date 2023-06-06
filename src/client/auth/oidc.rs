@@ -8,14 +8,14 @@ use crate::{cmap::Connection, client::{options::ServerApi, auth::{sasl::{SaslSta
 
 use super::{Credential, MONGODB_OIDC_STR, sasl::SaslContinue};
 
-/// dbg!
+/// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
 pub struct Callbacks {
     inner: Arc<CallbacksInner>,
 }
 
 impl Callbacks {
-    /// dbg!
+    /// Create a new instance with a token request callback.
     pub fn new<F>(on_request: F) -> Self
         where F: Fn(IdpServerInfo, RequestParameters) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync + 'static,
     {
@@ -98,7 +98,7 @@ pub(crate) async fn authenticate_stream(
         server_api.cloned(),
     ).into_command();
     let response = send_sasl_command(conn, sasl_continue).await?;
-    if dbg!(!response.done) {
+    if !response.done {
         return Err(invalid_auth_response());
     }
     

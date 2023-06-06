@@ -86,7 +86,7 @@ pub enum AuthMechanism {
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
 
-    /// dbg!
+    /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.
     MongoDbOidc,
 }
 
@@ -257,7 +257,7 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
-            Self::MongoDbOidc => Ok(None),  // dbg!
+            Self::MongoDbOidc => Ok(None),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {

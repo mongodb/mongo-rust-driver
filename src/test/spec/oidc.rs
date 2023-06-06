@@ -14,10 +14,8 @@ async fn single_principal_implicit_username() -> Result<()> {
         return Ok(());
     }
     let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
-    opts.oidc_callbacks = Some(oidc::Callbacks::new(|info, params| {
+    opts.oidc_callbacks = Some(oidc::Callbacks::new(|_info, _params| {
         async move {
-            dbg!(info);
-            dbg!(params);
             Ok(oidc::IdpServerResponse {
                 access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
                 expires: None,
@@ -25,7 +23,6 @@ async fn single_principal_implicit_username() -> Result<()> {
             })
         }.boxed()
     }));
-    //opts.direct_connection = Some(true);
     let client = Client::with_options(opts)?;
     client.database("test").collection::<Document>("test").find_one(None, None).await?;
     Ok(())

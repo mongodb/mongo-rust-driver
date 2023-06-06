@@ -548,7 +548,7 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
-    /// dbg!
+    /// The token callbacks for OIDC authentication.
     #[builder(default)]
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
