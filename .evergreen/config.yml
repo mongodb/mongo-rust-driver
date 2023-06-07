@@ -127,7 +127,12 @@ functions:
               "iam_auth_assume_role_name" : "${iam_auth_assume_role_name}",
               "iam_auth_ec2_instance_account" : "${iam_auth_ec2_instance_account}",
               "iam_auth_ec2_instance_secret_access_key" : "${iam_auth_ec2_instance_secret_access_key}",
-              "iam_auth_ec2_instance_profile" : "${iam_auth_ec2_instance_profile}"
+              "iam_auth_ec2_instance_profile" : "${iam_auth_ec2_instance_profile}",
+              "iam_auth_assume_web_role_name": "${iam_auth_assume_web_role_name}",
+              "iam_web_identity_issuer": "${iam_web_identity_issuer}",
+              "iam_web_identity_jwks_uri": "${iam_web_identity_jwks_uri}",
+              "iam_web_identity_token_file": "${iam_web_identity_token_file}",
+              "iam_web_identity_rsa_key": "${iam_web_identity_rsa_key}"
           }
           EOF
 
@@ -296,6 +301,46 @@ functions:
 
           cat setup.js
           mongo --nodb setup.js aws_e2e_ecs.js
+
+  "run aws assume role with web identity test":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
+          . ./activate-authawsvenv.sh
+          mongo aws_e2e_web_identity.js
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: "src"
+        silent: true
+        script: |
+          # DO NOT ECHO WITH XTRACE (which PREPARE_SHELL does)
+          cat <<'EOF' > "${PROJECT_DIRECTORY}/prepare_mongodb_aws.sh"
+            export AWS_ROLE_ARN="${iam_auth_assume_web_role_name}"
+            export AWS_WEB_IDENTITY_TOKEN_FILE="${iam_web_identity_token_file}"
+          EOF
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          # the test should be run with and without a session name set
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+            PROJECT_DIRECTORY=${PROJECT_DIRECTORY} \
+            ASSERT_NO_URI_CREDS=true \
+            AWS_ROLE_SESSION_NAME="test" \
+            .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+            PROJECT_DIRECTORY=${PROJECT_DIRECTORY} \
+            ASSERT_NO_URI_CREDS=true \
+            .evergreen/run-aws-tests.sh
+
 
   "run x509 tests":
     - command: shell.exec
@@ -1023,6 +1068,7 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+      - func: "run aws assume role with web identity test"
 
   - name: "test-5.0-standalone"
     tags: ["5.0", "standalone"]
@@ -1083,6 +1129,7 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+      - func: "run aws assume role with web identity test"
 
   - name: "test-6.0-standalone"
     tags: ["6.0", "standalone"]
@@ -1143,6 +1190,7 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+      - func: "run aws assume role with web identity test"
 
   - name: "test-7.0-standalone"
     tags: ["7.0", "standalone"]
@@ -1203,6 +1251,7 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+      - func: "run aws assume role with web identity test"
 
   - name: "test-rapid-standalone"
     tags: ["rapid", "standalone"]
@@ -1263,6 +1312,7 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+      - func: "run aws assume role with web identity test"
 
   - name: "test-latest-standalone"
     tags: ["latest", "standalone"]
@@ -1324,6 +1374,7 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+      - func: "run aws assume role with web identity test"
 
   - name: "test-connection-string"
     commands:

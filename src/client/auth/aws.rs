@@ -1,10 +1,13 @@
+use std::{fs::File, io::Read};
+
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
+use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
+    bson::{doc, rawdoc, spec::BinarySubtype, Binary, Bson, Document},
     client::{
         auth::{
             self,
@@ -22,6 +25,7 @@ use crate::{
 const AWS_ECS_IP: &str = "169.254.170.2";
 const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
+const MECH_NAME: &str = "MONGODB-AWS";
 
 /// Performs MONGODB-AWS authentication for a given stream.
 pub(super) async fn authenticate_stream(
@@ -34,7 +38,7 @@ pub(super) async fn authenticate_stream(
         Some("$external") | None => "$external",
         Some(..) => {
             return Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "auth source must be $external",
             ))
         }
@@ -61,8 +65,7 @@ pub(super) async fn authenticate_stream(
 
     let server_first_response = conn.send_command(client_first, None).await?;
 
-    let server_first =
-        ServerFirst::parse(server_first_response.auth_response_body("MONGODB-AWS")?)?;
+    let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
     let aws_credential = AwsCredential::get(credential, http_client).await?;
@@ -98,16 +101,16 @@ pub(super) async fn authenticate_stream(
 
     let server_second_response = conn.send_command(client_second, None).await?;
     let server_second = SaslResponse::parse(
-        "MONGODB-AWS",
-        server_second_response.auth_response_body("MONGODB-AWS")?,
+        MECH_NAME,
+        server_second_response.auth_response_body(MECH_NAME)?,
     )?;
 
     if server_second.conversation_id != server_first.conversation_id {
-        return Err(Error::invalid_authentication_response("MONGODB-AWS"));
+        return Err(Error::invalid_authentication_response(MECH_NAME));
     }
 
     if !server_second.done {
-        return Err(Error::invalid_authentication_response("MONGODB-AWS"));
+        return Err(Error::invalid_authentication_response(MECH_NAME));
     }
 
     Ok(())
@@ -115,14 +118,13 @@ pub(super) async fn authenticate_stream(
 
 /// Contains the credentials for MONGODB-AWS authentication.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub(crate) struct AwsCredential {
-    #[serde(rename = "AccessKeyId")]
-    access_key: String,
+    access_key_id: String,
 
-    #[serde(rename = "SecretAccessKey")]
-    secret_key: String,
+    secret_access_key: String,
 
-    #[serde(rename = "Token")]
+    #[serde(alias = "Token")]
     session_token: Option<String>,
 }
 
@@ -152,15 +154,15 @@ impl AwsCredential {
         // found.
         if let (Some(access_key), Some(secret_key)) = (access_key, secret_key) {
             return Ok(Self {
-                access_key,
-                secret_key,
+                access_key_id: access_key,
+                secret_access_key: secret_key,
                 session_token,
             });
         }
 
         if found_access_key || found_secret_key {
             return Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "cannot specify only one of access key and secret key; either both or neither \
                  must be provided",
             ));
@@ -168,9 +170,21 @@ impl AwsCredential {
 
         if session_token.is_some() {
             return Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "cannot specify session token without both access key and secret key",
             ));
+        }
+
+        if let (Ok(token_file), Ok(role_arn)) = (
+            std::env::var("AWS_WEB_IDENTITY_TOKEN_FILE"),
+            std::env::var("AWS_ROLE_ARN"),
+        ) {
+            return Self::get_from_assume_role_with_web_identity_request(
+                token_file,
+                role_arn,
+                http_client,
+            )
+            .await;
         }
 
         if let Ok(relative_uri) = std::env::var("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") {
@@ -180,26 +194,71 @@ impl AwsCredential {
         }
     }
 
+    async fn get_from_assume_role_with_web_identity_request(
+        token_file: String,
+        role_arn: String,
+        http_client: &HttpClient,
+    ) -> Result<Self> {
+        let mut file = File::open(&token_file).map_err(|_| {
+            Error::authentication_error(MECH_NAME, "could not open identity token file")
+        })?;
+        let mut buffer = Vec::<u8>::new();
+        file.read_to_end(&mut buffer).map_err(|_| {
+            Error::authentication_error(MECH_NAME, "could not read identity token file")
+        })?;
+        let token = std::str::from_utf8(&buffer).map_err(|_| {
+            Error::authentication_error(MECH_NAME, "could not read identity token file")
+        })?;
+
+        let session_name = std::env::var("AWS_ROLE_SESSION_NAME")
+            .unwrap_or_else(|_| Alphanumeric.sample_string(&mut rand::thread_rng(), 10));
+
+        let query = rawdoc! {
+            "Action": "AssumeRoleWithWebIdentity",
+            "RoleSessionName": session_name,
+            "RoleArn": role_arn,
+            "WebIdentityToken": token,
+            "Version": "2011-06-15",
+        };
+
+        let response = http_client
+            .get("https://sts.amazonaws.com/")
+            .headers(&[("Accept", "application/json")])
+            .query(query)
+            .send::<Document>()
+            .await
+            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
+
+        let credential = response
+            .get_document("AssumeRoleWithWebIdentityResponse")
+            .and_then(|d| d.get_document("AssumeRoleWithWebIdentityResult"))
+            .and_then(|d| d.get_document("Credentials"))
+            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?
+            .to_owned();
+
+        Ok(bson::from_document(credential)?)
+    }
+
     /// Obtains credentials from the ECS endpoint.
     async fn get_from_ecs(relative_uri: String, http_client: &HttpClient) -> Result<Self> {
         // Use the local IP address that AWS uses for ECS agents.
         let uri = format!("http://{}/{}", AWS_ECS_IP, relative_uri);
 
         http_client
-            .get_and_deserialize_json(&uri, None)
+            .get(&uri)
+            .send()
             .await
-            .map_err(|_| Error::unknown_authentication_error("MONGODB-AWS"))
+            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
     }
 
     /// Obtains temporary credentials for an EC2 instance to use for authentication.
     async fn get_from_ec2(http_client: &HttpClient) -> Result<Self> {
         let temporary_token = http_client
-            .put_and_read_string(
-                &format!("http://{}/latest/api/token", AWS_EC2_IP),
-                &[("X-aws-ec2-metadata-token-ttl-seconds", "30")],
-            )
+            .put(&format!("http://{}/latest/api/token", AWS_EC2_IP))
+            .headers(&[("X-aws-ec2-metadata-token-ttl-seconds", "30")])
+            .send_and_get_string()
             .await
-            .map_err(|_| Error::unknown_authentication_error("MONGODB-AWS"))?;
+            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
         let role_name_uri = format!(
             "http://{}/latest/meta-data/iam/security-credentials/",
@@ -207,22 +266,20 @@ impl AwsCredential {
         );
 
         let role_name = http_client
-            .get_and_read_string(
-                &role_name_uri,
-                &[("X-aws-ec2-metadata-token", &temporary_token[..])],
-            )
+            .get(&role_name_uri)
+            .headers(&[("X-aws-ec2-metadata-token", &temporary_token[..])])
+            .send_and_get_string()
             .await
-            .map_err(|_| Error::unknown_authentication_error("MONGODB-AWS"))?;
+            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
         let credential_uri = format!("{}/{}", role_name_uri, role_name);
 
         http_client
-            .get_and_deserialize_json(
-                &credential_uri,
-                &[("X-aws-ec2-metadata-token", &temporary_token[..])],
-            )
+            .get(&credential_uri)
+            .headers(&[("X-aws-ec2-metadata-token", &temporary_token[..])])
+            .send()
             .await
-            .map_err(|_| Error::unknown_authentication_error("MONGODB-AWS"))
+            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
     }
 
     /// Computes the signed authorization header for the credentials to send to the server in a sasl
@@ -319,16 +376,15 @@ impl AwsCredential {
             hashed_request = hashed_request,
         );
 
-        let first_hmac_key = format!("AWS4{}", self.secret_key);
+        let first_hmac_key = format!("AWS4{}", self.secret_access_key);
         let k_date =
-            auth::mac::<Hmac<Sha256>>(first_hmac_key.as_ref(), small_date.as_ref(), "MONGODB-AWS")?;
-        let k_region = auth::mac::<Hmac<Sha256>>(k_date.as_ref(), region.as_ref(), "MONGODB-AWS")?;
-        let k_service = auth::mac::<Hmac<Sha256>>(k_region.as_ref(), b"sts", "MONGODB-AWS")?;
-        let k_signing =
-            auth::mac::<Hmac<Sha256>>(k_service.as_ref(), b"aws4_request", "MONGODB-AWS")?;
+            auth::mac::<Hmac<Sha256>>(first_hmac_key.as_ref(), small_date.as_ref(), MECH_NAME)?;
+        let k_region = auth::mac::<Hmac<Sha256>>(k_date.as_ref(), region.as_ref(), MECH_NAME)?;
+        let k_service = auth::mac::<Hmac<Sha256>>(k_region.as_ref(), b"sts", MECH_NAME)?;
+        let k_signing = auth::mac::<Hmac<Sha256>>(k_service.as_ref(), b"aws4_request", MECH_NAME)?;
 
         let signature_bytes =
-            auth::mac::<Hmac<Sha256>>(k_signing.as_ref(), string_to_sign.as_ref(), "MONGODB-AWS")?;
+            auth::mac::<Hmac<Sha256>>(k_signing.as_ref(), string_to_sign.as_ref(), MECH_NAME)?;
         let signature = hex::encode(signature_bytes);
 
         #[rustfmt::skip]
@@ -339,7 +395,7 @@ impl AwsCredential {
              SignedHeaders={signed_headers}, \
              Signature={signature}\
             ",
-            access_key = self.access_key,
+            access_key = self.access_key_id,
             small_date = small_date,
             region = region,
             signed_headers = signed_headers,
@@ -351,12 +407,12 @@ impl AwsCredential {
 
     #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn access_key(&self) -> &str {
-        &self.access_key
+        &self.access_key_id
     }
 
     #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn secret_key(&self) -> &str {
-        &self.secret_key
+        &self.secret_access_key
     }
 
     #[cfg(feature = "in-use-encryption-unstable")]
@@ -390,13 +446,13 @@ impl ServerFirst {
             conversation_id,
             payload,
             done,
-        } = SaslResponse::parse("MONGODB-AWS", response)?;
+        } = SaslResponse::parse(MECH_NAME, response)?;
 
         let ServerFirstPayload {
             server_nonce,
             sts_host,
         } = bson::from_slice(payload.as_slice())
-            .map_err(|_| Error::invalid_authentication_response("MONGODB-AWS"))?;
+            .map_err(|_| Error::invalid_authentication_response(MECH_NAME))?;
 
         Ok(Self {
             conversation_id,
@@ -410,32 +466,29 @@ impl ServerFirst {
     fn validate(&self, nonce: &[u8]) -> Result<()> {
         if self.done {
             Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "handshake terminated early",
             ))
         } else if !self.server_nonce.starts_with(nonce) {
-            Err(Error::authentication_error(
-                "MONGODB-AWS",
-                "mismatched nonce",
-            ))
+            Err(Error::authentication_error(MECH_NAME, "mismatched nonce"))
         } else if self.server_nonce.len() != 64 {
             Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "incorrect length server nonce",
             ))
         } else if self.sts_host.is_empty() {
             Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "sts host must be non-empty",
             ))
         } else if self.sts_host.as_bytes().len() > 255 {
             Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "sts host cannot be more than 255 bytes",
             ))
         } else if self.sts_host.split('.').any(|s| s.is_empty()) {
             Err(Error::authentication_error(
-                "MONGODB-AWS",
+                MECH_NAME,
                 "sts host cannot contain empty labels",
             ))
         } else {

@@ -2,13 +2,53 @@
 #![allow(unused)]
 
 use reqwest::{IntoUrl, Method, Response};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
     inner: reqwest::Client,
+}
+
+pub(crate) struct HttpRequest {
+    inner: reqwest::RequestBuilder,
+}
+
+impl From<reqwest::RequestBuilder> for HttpRequest {
+    fn from(value: reqwest::RequestBuilder) -> Self {
+        Self { inner: value }
+    }
+}
+
+impl HttpRequest {
+    /// Sets the headers for the request.
+    pub(crate) fn headers<'a>(
+        self,
+        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
+    ) -> Self {
+        headers
+            .into_iter()
+            .fold(self.inner, |request, (k, v)| request.header(*k, *v))
+            .into()
+    }
+
+    /// Sets the query for the request. The query can be any value with key-value pairs that
+    /// implements Serialize.
+    pub(crate) fn query(self, query: impl Serialize) -> Self {
+        self.inner.query(&query).into()
+    }
+
+    /// Sends the request via the HttpClient it was created from and returns the result as the given
+    /// type T.
+    pub(crate) async fn send<T: DeserializeOwned>(self) -> reqwest::Result<T> {
+        self.inner.send().await?.json().await
+    }
+
+    /// Sends the request via the HttpClient it was created from and returns the result as a string.
+    pub(crate) async fn send_and_get_string(self) -> reqwest::Result<String> {
+        self.inner.send().await?.text().await
+    }
 }
 
 impl HttpClient {
@@ -20,71 +60,15 @@ impl HttpClient {
         Ok(Self { inner })
     }
 
-    /// Executes an HTTP GET request and deserializes the JSON response.
-    pub(crate) async fn get_and_deserialize_json<'a, T>(
-        &self,
-        uri: impl IntoUrl,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> reqwest::Result<T>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        let value = self
-            .request(Method::GET, uri, headers)
-            .await?
-            .json()
-            .await?;
-
-        Ok(value)
+    /// Creates an HTTP get request. One of the send methods defined on HttpRequest must be called
+    /// for the request to be executed.
+    pub(crate) fn get(&self, uri: impl IntoUrl) -> HttpRequest {
+        self.inner.request(Method::GET, uri).into()
     }
 
-    /// Executes an HTTP GET request and returns the response body as a string.
-    pub(crate) async fn get_and_read_string<'a>(
-        &self,
-        uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> reqwest::Result<String> {
-        self.request_and_read_string(Method::GET, uri, headers)
-            .await
-    }
-
-    /// Executes an HTTP PUT request and returns the response body as a string.
-    pub(crate) async fn put_and_read_string<'a>(
-        &self,
-        uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> reqwest::Result<String> {
-        self.request_and_read_string(Method::PUT, uri, headers)
-            .await
-    }
-
-    /// Executes an HTTP request and returns the response body as a string.
-    pub(crate) async fn request_and_read_string<'a>(
-        &self,
-        method: Method,
-        uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> reqwest::Result<String> {
-        let text = self.request(method, uri, headers).await?.text().await?;
-
-        Ok(text)
-    }
-
-    /// Executes an HTTP request and returns the response.
-    pub(crate) async fn request<'a>(
-        &self,
-        method: Method,
-        uri: impl IntoUrl,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> reqwest::Result<Response> {
-        let response = headers
-            .into_iter()
-            .fold(self.inner.request(method, uri), |request, (k, v)| {
-                request.header(*k, *v)
-            })
-            .send()
-            .await?;
-
-        Ok(response)
+    /// Creates an HTTP put request. One of the send methods defined on HttpRequest must be called
+    /// for the request to be executed.
+    pub(crate) fn put(&self, uri: impl IntoUrl) -> HttpRequest {
+        self.inner.request(Method::PUT, uri).into()
     }
 }
