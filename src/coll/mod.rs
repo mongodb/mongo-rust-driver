@@ -1,6 +1,6 @@
 pub mod options;
 
-use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
+use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc, str::FromStr};
 
 use futures_util::{
     future,
@@ -1499,5 +1499,23 @@ impl Serialize for Namespace {
         S: serde::Serializer,
     {
         serializer.serialize_str(&(self.db.clone() + "." + &self.coll))
+    }
+}
+
+impl FromStr for Namespace {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let mut parts = s.split('.');
+
+        let db = parts.next();
+        let coll = parts.collect::<Vec<_>>().join(".");
+        
+        match (db, coll) {
+            (Some(db), coll) if !coll.is_empty() => std::result::Result::Ok(Self {
+                db: db.to_string(),
+                coll,
+            }),
+            _ => std::result::Result::Err(Self::Err::invalid_argument("Missing one or more fields in namespace"))
+        }
     }
 }

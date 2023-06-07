@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use crate::Namespace;
 
 use crate::{
     bson::{doc, to_document, Bson, Document},
@@ -1200,4 +1201,13 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
             e
         ),
     }
+}
+
+#[test]
+fn test_namespace_fromstr() {
+    let t: Namespace = "something.somethingelse".parse().unwrap();
+    assert_eq!(t.db, "something");
+    assert_eq!(t.coll, "somethingelse");
+    let t2: std::result::Result<Namespace, <Namespace as std::str::FromStr>::Err> = "blahblah".parse();
+    assert!(t2.is_err());
 }
