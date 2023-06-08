@@ -93,6 +93,8 @@ functions:
 
               export AZURE_IMDS_MOCK_PORT=44175
 
+              export SESSION_TEST_REQUIRE_MONGOCRYPTD=1
+
               if [ "Windows_NT" != "$OS" ]; then
                   ulimit -n 64000
               fi
