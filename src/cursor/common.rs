@@ -281,18 +281,6 @@ where
     }
 }
 
-// impl<P, T> Stream for GenericCursor<P, T>
-// where
-// P: GetMoreProvider,
-// T: DeserializeOwned,
-// {
-// type Item = Result<T>;
-//
-// fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-// stream_poll_next(Pin::into_inner(self), cx)
-// }
-// }
-
 /// A trait implemented by objects that can provide batches of documents to a cursor via the getMore
 /// command.
 pub(super) trait GetMoreProvider: Unpin {
