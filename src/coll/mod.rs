@@ -1,6 +1,6 @@
 pub mod options;
 
-use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc, str::FromStr};
+use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
 use futures_util::{
     future,
@@ -1509,13 +1509,15 @@ impl FromStr for Namespace {
 
         let db = parts.next();
         let coll = parts.collect::<Vec<_>>().join(".");
-        
+
         match (db, coll) {
             (Some(db), coll) if !coll.is_empty() => std::result::Result::Ok(Self {
                 db: db.to_string(),
                 coll,
             }),
-            _ => std::result::Result::Err(Self::Err::invalid_argument("Missing one or more fields in namespace"))
+            _ => std::result::Result::Err(Self::Err::invalid_argument(
+                "Missing one or more fields in namespace",
+            )),
         }
     }
 }
