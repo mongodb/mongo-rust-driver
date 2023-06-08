@@ -1504,18 +1504,18 @@ impl Serialize for Namespace {
 
 impl FromStr for Namespace {
     type Err = Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let mut parts = s.split('.');
 
         let db = parts.next();
         let coll = parts.collect::<Vec<_>>().join(".");
 
         match (db, coll) {
-            (Some(db), coll) if !coll.is_empty() => std::result::Result::Ok(Self {
+            (Some(db), coll) if !coll.is_empty() => Ok(Self {
                 db: db.to_string(),
                 coll,
             }),
-            _ => std::result::Result::Err(Self::Err::invalid_argument(
+            _ => Err(Self::Err::invalid_argument(
                 "Missing one or more fields in namespace",
             )),
         }

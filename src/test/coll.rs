@@ -1208,8 +1208,7 @@ fn test_namespace_fromstr() {
     let t: Namespace = "something.somethingelse".parse().unwrap();
     assert_eq!(t.db, "something");
     assert_eq!(t.coll, "somethingelse");
-    let t2: std::result::Result<Namespace, <Namespace as std::str::FromStr>::Err> =
-        "blahblah".parse();
+    let t2: Result<Namespace> = "blahblah".parse();
     assert!(t2.is_err());
     let t: Namespace = "something.something.else".parse().unwrap();
     assert_eq!(t.db, "something");
