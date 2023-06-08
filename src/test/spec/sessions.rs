@@ -209,7 +209,13 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
 
     let pid_file_path = format!("--pidfilepath={name}.pid");
     let args = vec!["--port=47017", &pid_file_path];
-    let process = Process::spawn("mongocryptd", args).expect("Failed to spawn mongocryptd");
+    let Ok(process) = Process::spawn("mongocryptd", args) else {
+        if std::env::var("SESSION_TEST_REQUIRE_MONGOCRYPTD").is_ok() {
+            panic!("Failed to spawn mongocryptd");
+        }
+        log_uncaptured(format!("Skipping {name}: failed to spawn mongocryptd"));
+        return None;
+    };
 
     let options = ClientOptions::parse("mongodb://localhost:47017")
         .await
