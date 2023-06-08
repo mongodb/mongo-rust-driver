@@ -1211,4 +1211,7 @@ fn test_namespace_fromstr() {
     let t2: std::result::Result<Namespace, <Namespace as std::str::FromStr>::Err> =
         "blahblah".parse();
     assert!(t2.is_err());
+    let t: Namespace = "something.something.else".parse().unwrap();
+    assert_eq!(t.db, "something");
+    assert_eq!(t.coll, "something.else");
 }
