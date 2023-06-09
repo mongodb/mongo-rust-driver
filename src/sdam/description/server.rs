@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     client::ClusterTime,
     error::{Error, ErrorKind, Result},
-    hello::HelloReply,
+    hello::{HelloCommandResponse, HelloReply},
     options::ServerAddress,
     selection_criteria::TagSet,
 };
@@ -137,6 +137,25 @@ pub(crate) struct ServerDescription {
     pub(crate) reply: Result<Option<HelloReply>>,
 }
 
+// Server description equality has a specific notion of what fields in a hello command response
+// should be compared (https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#serverdescription).
+fn hello_command_eq(a: &HelloCommandResponse, b: &HelloCommandResponse) -> bool {
+    a.server_type() == b.server_type()
+        && a.min_wire_version == b.min_wire_version
+        && a.max_wire_version == b.max_wire_version
+        && a.me == b.me
+        && a.hosts == b.hosts
+        && a.passives == b.passives
+        && a.arbiters == b.arbiters
+        && a.tags == b.tags
+        && a.set_name == b.set_name
+        && a.set_version == b.set_version
+        && a.election_id == b.election_id
+        && a.primary == b.primary
+        && a.logical_session_timeout_minutes == b.logical_session_timeout_minutes
+        && a.topology_version == b.topology_version
+}
+
 impl PartialEq for ServerDescription {
     fn eq(&self, other: &Self) -> bool {
         if self.address != other.address || self.server_type != other.server_type {
@@ -148,7 +167,11 @@ impl PartialEq for ServerDescription {
                 let self_response = self_reply.as_ref().map(|r| &r.command_response);
                 let other_response = other_reply.as_ref().map(|r| &r.command_response);
 
-                self_response == other_response
+                match (self_response, other_response) {
+                    (Some(a), Some(b)) => hello_command_eq(a, b),
+                    (None, None) => true,
+                    _ => false,
+                }
             }
             (Err(self_err), Err(other_err)) => {
                 match (self_err.kind.as_ref(), other_err.kind.as_ref()) {
