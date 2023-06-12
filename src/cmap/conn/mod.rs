@@ -46,8 +46,14 @@ pub struct ConnectionInfo {
     pub id: u32,
 
     /// A server-generated identifier that uniquely identifies the connection. Available on server
-    /// versions 4.2+. This may be used to correlate driver connections with server logs.
+    /// versions 4.2+. This may be used to correlate driver connections with server logs. This
+    /// could be a truncated value based on input server_id.
     pub server_id: Option<i32>,
+
+    /// A server-generated identifier that uniquely identifies the connection. Available on server
+    /// versions 4.2+. This may be used to correlate driver connections with server logs. Reference
+    /// this for the full server_id
+    pub server_id_i64: Option<i64>,
 
     /// The address that the connection is connected to.
     pub address: ServerAddress,
@@ -60,7 +66,7 @@ pub(crate) struct Connection {
     /// Driver-generated ID for the connection.
     pub(super) id: u32,
     /// Server-generated ID for the connection.
-    pub(crate) server_id: Option<i32>,
+    pub(crate) server_id: Option<i64>,
 
     pub(crate) address: ServerAddress,
     pub(crate) generation: ConnectionGeneration,
@@ -165,7 +171,8 @@ impl Connection {
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
-            server_id: self.server_id,
+            server_id: self.server_id.map(|value| value as i32),
+            server_id_i64: self.server_id,
             address: self.address.clone(),
         }
     }
