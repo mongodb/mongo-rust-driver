@@ -182,29 +182,6 @@ pub(crate) struct HelloCommandResponse {
     pub connection_id: Option<i32>,
 }
 
-impl PartialEq for HelloCommandResponse {
-    fn eq(&self, other: &Self) -> bool {
-        self.server_type() == other.server_type()
-            && self.min_wire_version == other.min_wire_version
-            && self.max_wire_version == other.max_wire_version
-            && self.me == other.me
-            && self.hosts == other.hosts
-            && self.passives == other.passives
-            && self.arbiters == other.arbiters
-            && self.tags == other.tags
-            && self.set_name == other.set_name
-            && self.set_version == other.set_version
-            && self.election_id == other.election_id
-            && self.primary == other.primary
-            && self.logical_session_timeout_minutes == other.logical_session_timeout_minutes
-            && self.max_bson_object_size == other.max_bson_object_size
-            && self.max_write_batch_size == other.max_write_batch_size
-            && self.service_id == other.service_id
-            && self.max_message_size_bytes == other.max_message_size_bytes
-            && self.topology_version == other.topology_version
-    }
-}
-
 impl HelloCommandResponse {
     pub(crate) fn server_type(&self) -> ServerType {
         if self.msg.as_deref() == Some("isdbgrid") {
