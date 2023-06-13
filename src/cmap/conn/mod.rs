@@ -46,8 +46,8 @@ pub struct ConnectionInfo {
     pub id: u32,
 
     /// A server-generated identifier that uniquely identifies the connection. Available on server
-    /// versions 4.2+. This may be used to correlate driver connections with server logs. This
-    /// could be a truncated value based on input server_id.
+    /// versions 4.2+. This may be used to correlate driver connections with server logs. 
+    /// If the connection ID sent by the server is too large for an i32, this will be a truncated value.
     pub server_id: Option<i32>,
 
     /// A server-generated identifier that uniquely identifies the connection. Available on server
