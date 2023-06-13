@@ -104,11 +104,11 @@ pub struct Cursor<T> {
     client: Client,
     // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor
     // that's had `with_type` called; in all other circumstances it will be `Some`.
-    wrapped_cursor: Option<ImplicitSessionCursor<T>>,
+    wrapped_cursor: Option<ImplicitSessionCursor>,
     drop_address: Option<ServerAddress>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: std::marker::PhantomData<fn() -> T>,
 }
 
 impl<T> Cursor<T> {
@@ -271,7 +271,7 @@ impl<T> Cursor<T> {
     {
         Cursor {
             client: self.client.clone(),
-            wrapped_cursor: self.wrapped_cursor.take().map(|c| c.with_type()),
+            wrapped_cursor: self.wrapped_cursor.take(),
             drop_address: self.drop_address.take(),
             #[cfg(test)]
             kill_watcher: self.kill_watcher.take(),
@@ -301,7 +301,7 @@ impl<T> Cursor<T> {
 
 impl<T> CursorStream for Cursor<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         self.wrapped_cursor.as_mut().unwrap().poll_next_in_batch(cx)
@@ -310,13 +310,13 @@ where
 
 impl<T> Stream for Cursor<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // This `unwrap` is safe because `wrapped_cursor` is always `Some` outside of `drop`.
-        Pin::new(self.wrapped_cursor.as_mut().unwrap()).poll_next(cx)
+        stream_poll_next(self.wrapped_cursor.as_mut().unwrap(), cx)
     }
 }
 
@@ -344,7 +344,7 @@ impl<T> Drop for Cursor<T> {
 
 /// A `GenericCursor` that optionally owns its own sessions.
 /// This is to be used by cursors associated with implicit sessions.
-type ImplicitSessionCursor<T> = GenericCursor<ImplicitSessionGetMoreProvider, T>;
+type ImplicitSessionCursor = GenericCursor<ImplicitSessionGetMoreProvider>;
 
 struct ImplicitSessionGetMoreResult {
     get_more_result: Result<GetMoreResult>,

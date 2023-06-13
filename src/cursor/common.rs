@@ -1,6 +1,5 @@
 use std::{
     collections::VecDeque,
-    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -8,8 +7,7 @@ use std::{
 
 use bson::{RawDocument, RawDocumentBuf};
 use derivative::Derivative;
-use futures_core::{future::BoxFuture, Future, Stream};
-use serde::{de::DeserializeOwned, Deserialize};
+use futures_core::{future::BoxFuture, Future};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
@@ -29,7 +27,7 @@ use crate::{
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(super) struct GenericCursor<P, T>
+pub(super) struct GenericCursor<P>
 where
     P: GetMoreProvider,
 {
@@ -40,10 +38,9 @@ where
     /// This is an `Option` to allow it to be "taken" when the cursor is no longer needed
     /// but may be resumed in the future for `SessionCursor`.
     state: Option<CursorState>,
-    _phantom: PhantomData<T>,
 }
 
-impl<P, T> GenericCursor<P, T>
+impl<P> GenericCursor<P>
 where
     P: GetMoreProvider,
 {
@@ -64,7 +61,6 @@ where
                 post_batch_resume_token: None,
                 pinned_connection,
             }),
-            _phantom: Default::default(),
         }
     }
 
@@ -78,7 +74,6 @@ where
             provider,
             client,
             info,
-            _phantom: Default::default(),
             state: state.into(),
         }
     }
@@ -192,19 +187,6 @@ where
     pub(super) fn provider_mut(&mut self) -> &mut P {
         &mut self.provider
     }
-
-    pub(super) fn with_type<'a, D>(self) -> GenericCursor<P, D>
-    where
-        D: Deserialize<'a>,
-    {
-        GenericCursor {
-            client: self.client,
-            provider: self.provider,
-            info: self.info,
-            state: self.state,
-            _phantom: Default::default(),
-        }
-    }
 }
 
 pub(crate) trait CursorStream {
@@ -217,10 +199,9 @@ pub(crate) enum BatchValue {
     Exhausted,
 }
 
-impl<P, T> CursorStream for GenericCursor<P, T>
+impl<P> CursorStream for GenericCursor<P>
 where
     P: GetMoreProvider,
-    T: DeserializeOwned + Unpin,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         // If there is a get more in flight, check on its status.
@@ -297,18 +278,6 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.0.poll_next_in_batch(cx)
-    }
-}
-
-impl<P, T> Stream for GenericCursor<P, T>
-where
-    P: GetMoreProvider,
-    T: DeserializeOwned + Unpin,
-{
-    type Item = Result<T>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        stream_poll_next(Pin::into_inner(self), cx)
     }
 }
 

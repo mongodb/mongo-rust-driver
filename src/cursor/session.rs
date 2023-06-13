@@ -22,6 +22,7 @@ use super::{
         GetMoreProviderResult,
         PinnedConnection,
     },
+    stream_poll_next,
     BatchValue,
     CursorStream,
 };
@@ -108,7 +109,7 @@ impl<T> SessionCursor<T> {
 
 impl<T> SessionCursor<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     /// Retrieves a [`SessionCursorStream`] to iterate this cursor. The session provided must be the
     /// same session used to create the cursor.
@@ -379,8 +380,7 @@ impl<T> Drop for SessionCursor<T> {
 
 /// A `GenericCursor` that borrows its session.
 /// This is to be used with cursors associated with explicit sessions borrowed from the user.
-type ExplicitSessionCursor<'session, T> =
-    GenericCursor<ExplicitSessionGetMoreProvider<'session>, T>;
+type ExplicitSessionCursor<'session> = GenericCursor<ExplicitSessionGetMoreProvider<'session>>;
 
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
 /// stream the results of a [`SessionCursor`]. Returned from [`SessionCursor::stream`].
@@ -389,12 +389,12 @@ type ExplicitSessionCursor<'session, T> =
 /// any further streams created from [`SessionCursor::stream`] will pick up where this one left off.
 pub struct SessionCursorStream<'cursor, 'session, T = Document> {
     session_cursor: &'cursor mut SessionCursor<T>,
-    generic_cursor: ExplicitSessionCursor<'session, T>,
+    generic_cursor: ExplicitSessionCursor<'session>,
 }
 
 impl<'cursor, 'session, T> SessionCursorStream<'cursor, 'session, T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
         self.generic_cursor.post_batch_resume_token()
@@ -407,18 +407,18 @@ where
 
 impl<'cursor, 'session, T> Stream for SessionCursorStream<'cursor, 'session, T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.generic_cursor).poll_next(cx)
+        stream_poll_next(&mut self.generic_cursor, cx)
     }
 }
 
 impl<'cursor, 'session, T> CursorStream for SessionCursorStream<'cursor, 'session, T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         self.generic_cursor.poll_next_in_batch(cx)

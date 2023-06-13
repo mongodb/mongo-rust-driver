@@ -85,7 +85,7 @@ use crate::{
 #[derivative(Debug)]
 pub struct ChangeStream<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     /// The cursor to iterate over event instances.
     cursor: Cursor<T>,
@@ -103,7 +103,7 @@ where
 
 impl<T> ChangeStream<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     pub(crate) fn new(cursor: Cursor<T>, args: WatchArgs, data: ChangeStreamData) -> Self {
         let pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>> = None;
@@ -126,7 +126,7 @@ where
     }
 
     /// Update the type streamed values will be parsed as.
-    pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> ChangeStream<D> {
+    pub fn with_type<D: DeserializeOwned>(self) -> ChangeStream<D> {
         ChangeStream {
             cursor: self.cursor.with_type(),
             args: self.args,
@@ -256,7 +256,7 @@ fn get_resume_token(
 
 impl<T> CursorStream for ChangeStream<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         loop {
@@ -316,7 +316,7 @@ where
 
 impl<T> Stream for ChangeStream<T>
 where
-    T: DeserializeOwned + Unpin + Send + Sync,
+    T: DeserializeOwned,
 {
     type Item = Result<T>;
 
