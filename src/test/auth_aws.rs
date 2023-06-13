@@ -13,3 +13,9 @@ async fn auth_aws() {
 
     coll.find_one(None, None).await.unwrap();
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn cached_credentials() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+}
