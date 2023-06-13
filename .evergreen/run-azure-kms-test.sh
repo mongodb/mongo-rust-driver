@@ -3,7 +3,7 @@
 set -o errexit
 set -o pipefail
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 
 set -o xtrace
 

@@ -42,7 +42,7 @@ set -x
 
 set -o errexit
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 
 RUST_BACKTRACE=1 cargo test --features aws-auth auth_aws
 RUST_BACKTRACE=1 cargo test --features aws-auth lambda_examples::auth::test_handler

@@ -11,5 +11,5 @@ else
     exit 1
 fi
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 RUST_BACKTRACE=1 cargo test atlas_connectivity ${OPTIONS}

@@ -287,7 +287,7 @@ functions:
 
           # compile mini test project
           cd $PROJECT_DIRECTORY/.evergreen/aws-ecs-test
-          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
+          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
           cargo build
           cd -
 
@@ -619,7 +619,7 @@ functions:
           cp -r $MONGOCRYPT_LIB_DIR test-contents
 
           echo "Building test ... begin"
-          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
+          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
           cargo test get_exe_name --features in-use-encryption-unstable,gcp-kms -- --ignored
           cp $(cat exe_name.txt) test-contents/test-exe
           echo "Building test ... end"
