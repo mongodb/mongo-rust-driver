@@ -179,7 +179,7 @@ pub(crate) struct HelloCommandResponse {
 
     /// The server-generated ID for the connection the "hello" command was run on.
     /// Present on server versions 4.2+.
-    pub connection_id: Option<i32>,
+    pub connection_id: Option<i64>,
 }
 
 impl HelloCommandResponse {
