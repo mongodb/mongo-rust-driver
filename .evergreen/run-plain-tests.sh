@@ -3,6 +3,11 @@
 set -o errexit
 set -o xtrace 
 
-source ./.evergreen/env.sh
+source .evergreen/env.sh
+source .evergreen/cargo-test.sh
 
-RUST_BACKTRACE=1 MONGO_PLAIN_AUTH_TEST=1 cargo test plain
+set +o errexit
+
+MONGO_PLAIN_AUTH_TEST=1 cargo_test plain > results.xml
+
+exit $CARGO_RESULT

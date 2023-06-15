@@ -42,7 +42,16 @@ set -x
 
 set -o errexit
 
-source ./.evergreen/env.sh
+source .evergreen/env.sh
+source .evergreen/cargo-test.sh
 
-RUST_BACKTRACE=1 cargo test --features aws-auth auth_aws
-RUST_BACKTRACE=1 cargo test --features aws-auth lambda_examples::auth::test_handler
+FEATURE_FLAGS+=("aws-auth")
+
+set +o errexit
+
+cargo_test auth_aws > auth_aws.xml
+cargo_test lambda_examples::auth::test_handler > lambda_handler.xml
+
+junit-report-merger results.xml auth_aws.xml lambda_handler.xml
+
+exit $CARGO_RESULT

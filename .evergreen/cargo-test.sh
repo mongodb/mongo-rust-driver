@@ -15,7 +15,7 @@ use_async_runtime() {
     if [ "${ASYNC_RUNTIME}" = "async-std" ]; then
         FEATURE_FLAGS+=("async-std-runtime")
         CARGO_OPTIONS+=("--no-default-features")
-    elif [ "$ASYNC_RUNTIME" != "tokio" ]; then
+    elif [ "${ASYNC_RUNTIME}" != "tokio" ]; then
         echo "invalid async runtime: ${ASYNC_RUNTIME}" >&2
         exit 1
     fi
@@ -24,11 +24,15 @@ use_async_runtime() {
 join_by() { local IFS="$1"; shift; echo "$*"; }
 
 cargo_test_options() {
+    local FILTERED=()
+    for FEAT in "${FEATURE_FLAGS[@]}"; do
+        [[ "${FEAT}" != "" ]] && FILTERED+=("${FEAT}")
+    done
     local FEATURE_OPTION=""
-    if (( ${#FEATURE_FLAGS[@]} != 0 )); then
-        FEATURE_OPTION="--features $(join_by , "${FEATURE_FLAGS[@]}")"
+    if (( ${#FILTERED[@]} != 0 )); then
+        FEATURE_OPTION="--features $(join_by , "${FILTERED[@]}")"
     fi
-    echo ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} $1 -- ${TEST_OPTIONS[@]}
+    echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {

@@ -1007,6 +1007,7 @@ tasks:
     # "4.4" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1068,6 +1069,7 @@ tasks:
     # "5.0" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1129,6 +1131,7 @@ tasks:
     # "6.0" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1190,6 +1193,7 @@ tasks:
     # "7.0" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1251,6 +1255,7 @@ tasks:
     # "rapid" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1313,6 +1318,7 @@ tasks:
     # "latest" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1330,6 +1336,7 @@ tasks:
 
   - name: "test-connection-string"
     commands:
+      - func: "install junit dependencies"
       - func: "run connection string tests"
 
   - name: "test-serverless"
@@ -1377,6 +1384,7 @@ tasks:
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
     commands:
+      - func: "install junit dependencies"
       - func: "run atlas tests"
 
   - name: "test-x509-auth"
@@ -1390,6 +1398,7 @@ tasks:
 
   - name: "test-plain-auth"
     commands:
+      - func: "install junit dependencies"
       - func: "run plain tests"
 
   - name: "test-gcp-kms"

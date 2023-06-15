@@ -4,15 +4,13 @@ set -o errexit
 set -o pipefail
 
 source ./.evergreen/env.sh
+source .evergreen/cargo-test.sh
 
 set -o xtrace
 
-FEATURE_FLAGS="in-use-encryption-unstable,aws-auth,azure-kms,${TLS_FEATURE}"
-OPTIONS="-- -Z unstable-options --format json --report-time"
+FEATURE_FLAGS+=("in-use-encryption-unstable" "aws-auth" "azure-kms" "${TLS_FEATURE}")
 
-if [ "$SINGLE_THREAD" = true ]; then
-	OPTIONS="$OPTIONS --test-threads=1"
-fi
+use_single_thread
 
 if [ "$OS" = "Windows_NT" ]; then
     export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
@@ -23,15 +21,7 @@ fi
 export AWS_DEFAULT_REGION=us-east-1
 . ${DRIVERS_TOOLS}/.evergreen/csfle/set-temp-creds.sh
 
-echo "cargo test options: --features ${FEATURE_FLAGS} ${OPTIONS}"
-
-CARGO_RESULT=0
-
-cargo_test() {
-    RUST_BACKTRACE=1 \
-        cargo test --features ${FEATURE_FLAGS} $1 ${OPTIONS} | grep -v '{"t":' | cargo2junit
-    (( CARGO_RESULT = ${CARGO_RESULT} || $? ))
-}
+echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
 
