@@ -549,10 +549,11 @@ pub struct ClientOptions {
     pub write_concern: Option<WriteConcern>,
 
     /// The token callbacks for OIDC authentication.
+    /// TODO RUST-1497: make this `pub`
     #[builder(default)]
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub oidc_callbacks: Option<oidc::Callbacks>,
+    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
