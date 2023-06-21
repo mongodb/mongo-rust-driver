@@ -86,10 +86,10 @@ pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    callbacks: Option<&Callbacks>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
-    let callbacks = callbacks
+    let callbacks = credential.oidc_callbacks
+        .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
         .clone();
 

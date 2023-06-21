@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     bson::{doc, Bson, Document},
-    client::auth::{oidc, ClientFirst},
+    client::auth::ClientFirst,
     cmap::{Command, Connection, StreamDescription},
     compression::Compressor,
     error::Result,
@@ -328,8 +328,6 @@ pub(crate) struct Handshaker {
 
     metadata: ClientMetadata,
 
-    oidc_callbacks: Option<oidc::Callbacks>,
-
     #[cfg(feature = "aws-auth")]
     http_client: crate::runtime::HttpClient,
 }
@@ -391,7 +389,6 @@ impl Handshaker {
             compressors,
             server_api: options.server_api,
             metadata,
-            oidc_callbacks: options.oidc_callbacks,
             #[cfg(feature = "aws-auth")]
             http_client: crate::runtime::HttpClient::default(),
         }
@@ -465,7 +462,6 @@ impl Handshaker {
                     conn,
                     self.server_api.as_ref(),
                     first_round,
-                    self.oidc_callbacks.as_ref(),
                     #[cfg(feature = "aws-auth")]
                     &self.http_client,
                 )
@@ -498,9 +494,6 @@ pub(crate) struct HandshakerOptions {
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: bool,
-
-    /// Callbacks for OIDC authentication.
-    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
 }
 
 /// Updates the handshake command document with the speculative authenitication info.

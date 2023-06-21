@@ -13,6 +13,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
+use derivative::Derivative;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
 use serde::Deserialize;
@@ -292,7 +293,6 @@ impl AuthMechanism {
         stream: &mut Connection,
         credential: &Credential,
         server_api: Option<&ServerApi>,
-        oidc_callbacks: Option<&oidc::Callbacks>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         self.validate_credential(credential)?;
@@ -325,7 +325,7 @@ impl AuthMechanism {
             }
             .into()),
             AuthMechanism::MongoDbOidc => {
-                oidc::authenticate_stream(stream, credential, server_api, oidc_callbacks).await
+                oidc::authenticate_stream(stream, credential, server_api).await
             }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
@@ -370,7 +370,8 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Default, Deserialize, TypedBuilder, PartialEq)]
+#[derive(Clone, Default, Deserialize, TypedBuilder, Derivative)]
+#[derivative(PartialEq)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Credential {
@@ -392,6 +393,12 @@ pub struct Credential {
 
     /// Additional properties for the given mechanism.
     pub mechanism_properties: Option<Document>,
+
+    /// The token callbacks for OIDC authentication.
+    /// TODO RUST-1497: make this `pub`
+    #[serde(skip)]
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
 }
 
 impl Credential {
@@ -444,7 +451,6 @@ impl Credential {
         conn: &mut Connection,
         server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
-        oidc_callbacks: Option<&oidc::Callbacks>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
@@ -480,7 +486,6 @@ impl Credential {
                 conn,
                 self,
                 server_api,
-                oidc_callbacks,
                 #[cfg(feature = "aws-auth")]
                 http_client,
             )

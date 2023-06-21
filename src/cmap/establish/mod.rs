@@ -47,7 +47,6 @@ impl EstablisherOptions {
                 driver_info: opts.driver_info.clone(),
                 server_api: opts.server_api.clone(),
                 load_balanced: opts.load_balanced.unwrap_or(false),
-                oidc_callbacks: opts.oidc_callbacks.clone(),
             },
             tls_options: opts.tls_options(),
             connect_timeout: opts.connect_timeout,

@@ -42,7 +42,6 @@ use crate::{
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::runtime;
 
-use super::auth::oidc;
 pub use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
@@ -547,13 +546,6 @@ pub struct ClientOptions {
     /// WriteConcern type documentation for more details.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
-
-    /// The token callbacks for OIDC authentication.
-    /// TODO RUST-1497: make this `pub`
-    #[builder(default)]
-    #[serde(skip)]
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
@@ -1290,7 +1282,6 @@ impl ClientOptions {
             test_options: None,
             #[cfg(feature = "tracing-unstable")]
             tracing_max_document_length_bytes: None,
-            oidc_callbacks: None,
         }
     }
 
