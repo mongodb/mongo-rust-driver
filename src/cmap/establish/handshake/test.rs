@@ -9,7 +9,6 @@ fn metadata_no_options() {
         driver_info: None,
         server_api: None,
         load_balanced: false,
-        oidc_callbacks: None,
     });
 
     let metadata = handshaker.command.body.get_document("client").unwrap();
@@ -42,7 +41,6 @@ fn metadata_with_options() {
         compressors: None,
         server_api: None,
         load_balanced: false,
-        oidc_callbacks: None,
     };
 
     let handshaker = Handshaker::new(options);

@@ -2,7 +2,7 @@ use bson::Document;
 use futures_util::FutureExt;
 
 use crate::{
-    client::{auth::oidc, options::ClientOptions},
+    client::{auth::{oidc, Credential}, options::ClientOptions},
     test::log_uncaptured,
     Client,
 };
@@ -19,16 +19,19 @@ async fn single_principal_implicit_username() -> Result<()> {
     }
     let mut opts =
         ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
-    opts.oidc_callbacks = Some(oidc::Callbacks::new(|_info, _params| {
-        async move {
-            Ok(oidc::IdpServerResponse {
-                access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
-                expires: None,
-                refresh_token: None,
-            })
-        }
-        .boxed()
-    }));
+    opts.credential = Some(Credential {
+        oidc_callbacks: Some(oidc::Callbacks::new(|_info, _params| {
+            async move {
+                Ok(oidc::IdpServerResponse {
+                    access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
+                    expires: None,
+                    refresh_token: None,
+                })
+            }
+            .boxed()
+        })),
+        ..Credential::default()
+    });
     let client = Client::with_options(opts)?;
     client
         .database("test")
