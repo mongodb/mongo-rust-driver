@@ -4,8 +4,8 @@ use std::{
 };
 
 use bson::rawdoc;
-use futures_core::future::BoxFuture;
 use serde::Deserialize;
+use typed_builder::TypedBuilder;
 
 use crate::{
     client::{
@@ -26,6 +26,8 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 pub struct Callbacks {
     inner: Arc<CallbacksInner>,
 }
+
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 impl Callbacks {
     /// Create a new instance with a token request callback.
@@ -60,15 +62,16 @@ struct CallbacksInner {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IdpServerInfo {
     pub issuer: String,
-    #[serde(rename = "clientId")]
     pub client_id: String,
-    #[serde(rename = "requestScopes")]
     pub request_scopes: Option<Vec<String>>,
 }
 
+#[derive(TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerResponse {
     pub access_token: String,

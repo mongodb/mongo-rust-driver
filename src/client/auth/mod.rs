@@ -208,11 +208,6 @@ impl AuthMechanism {
                         "password must not be set for MONGODB-OIDC authentication",
                     ));
                 }
-                if credential.mechanism != Some(AuthMechanism::MongoDbOidc) {
-                    return Err(Error::invalid_argument(
-                        "mechanism must be MONGODB-OIDC for MONGODB-OIDC authentication",
-                    ));
-                }
                 Ok(())
             }
             _ => Ok(()),
