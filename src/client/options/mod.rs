@@ -1891,7 +1891,9 @@ impl ConnectionString {
                             let (k, v) = exclusive_split_at(kvp, index);
                             let key = k.ok_or_else(err_func)?;
                             if key == "ALLOWED_HOSTS" {
-                                return Err(Error::invalid_argument("ALLOWED_HOSTS must only be specified through client options"));
+                                return Err(Error::invalid_argument(
+                                    "ALLOWED_HOSTS must only be specified through client options",
+                                ));
                             }
                             let value = v.ok_or_else(err_func)?;
                             doc.insert(key, value);

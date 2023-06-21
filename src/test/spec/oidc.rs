@@ -2,7 +2,10 @@ use bson::Document;
 use futures_util::FutureExt;
 
 use crate::{
-    client::{auth::{oidc, Credential}, options::ClientOptions},
+    client::{
+        auth::{oidc, Credential},
+        options::ClientOptions,
+    },
     test::log_uncaptured,
     Client,
 };
