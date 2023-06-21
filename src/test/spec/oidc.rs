@@ -3,7 +3,7 @@ use futures_util::FutureExt;
 
 use crate::{
     client::{
-        auth::{oidc, Credential},
+        auth::{oidc, AuthMechanism, Credential},
         options::ClientOptions,
     },
     test::log_uncaptured,
@@ -23,6 +23,7 @@ async fn single_principal_implicit_username() -> Result<()> {
     let mut opts =
         ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.credential = Some(Credential {
+        mechanism: Some(AuthMechanism::MongoDbOidc),
         oidc_callbacks: Some(oidc::Callbacks::new(|_info, _params| {
             async move {
                 Ok(oidc::IdpServerResponse {
