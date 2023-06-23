@@ -19,6 +19,7 @@ mod oidc;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
+mod run_command;
 mod sdam;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod sessions;
@@ -29,7 +30,6 @@ pub mod unified_runner;
 mod v2_runner;
 mod versioned_api;
 mod write_error;
-mod run_command;
 
 use std::{
     any::type_name,
