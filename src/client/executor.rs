@@ -410,9 +410,10 @@ impl Client {
                     drop(server);
 
                     if let Some(r) = retry {
-                        if err.is_server_error()
+                        if (err.is_server_error()
                             || err.is_read_retryable()
-                            || err.is_write_retryable()
+                            || err.is_write_retryable())
+                            && !err.contains_label("NoWritesPerformed")
                         {
                             return Err(err);
                         } else {

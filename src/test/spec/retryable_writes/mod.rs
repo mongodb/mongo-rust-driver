@@ -34,7 +34,7 @@ use crate::{
         TestClient,
         CLIENT_OPTIONS,
         LOCK,
-    },
+    }, Client,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -498,4 +498,40 @@ async fn retry_write_pool_cleared() {
     }
 
     assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
+}
+
+/// Prose test from retryable writes spec verifying that the original error is returned after encountering a WriteConcernError with a RetryableWriteError label.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_write_retryable_write_error() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
+    struct Handler;
+
+    impl CommandEventHandler for Handler {
+        fn handle_command_succeeded_event(&self, event: crate::event::command::CommandSucceededEvent) {
+            dbg!(event.command_name);
+            dbg!(event.reply.get("writeConcernError"));
+        }
+    }
+
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    client_options.retry_writes = Some(true);
+    client_options.command_event_handler = Some(Arc::new(Handler));
+    let client = Client::test_builder().options(client_options).build().await;
+    if !client.is_replica_set() || client.server_version_lt(6, 0) {
+        log_uncaptured("skipping retry_write_retryable_write_error: invalid topology");
+        return;
+    }
+
+    let _fp_guard = client.failpoint_builder(&["insert"], FailPointMode::Times(1))
+        .write_concern_error(doc! {
+            "code": 91,
+            "errorLabels": ["RetryableWriteError"],
+        })
+        .enable()
+        .await
+        .unwrap();
+
+    let _ = client.database("test").collection::<Document>("test").insert_one(doc! { "hello": "there" }, None).await;
 }

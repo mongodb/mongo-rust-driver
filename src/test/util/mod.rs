@@ -6,6 +6,7 @@ mod subscriber;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
+use self::failpoint::FailPointBuilder;
 pub(crate) use self::{
     event::{Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
@@ -368,6 +369,15 @@ impl TestClient {
         criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<FailPointGuard> {
         fp.enable(self, criteria).await
+    }
+
+    #[must_use]
+    pub(crate) fn failpoint_builder(
+        &self,
+        fail_commands: &[&str],
+        mode: FailPointMode,
+    ) -> FailPointBuilder {
+        FailPointBuilder::new(self, fail_commands, mode)
     }
 
     pub(crate) fn auth_enabled(&self) -> bool {
