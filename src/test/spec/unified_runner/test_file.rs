@@ -84,6 +84,7 @@ pub(crate) struct RunOnRequirement {
 pub(crate) enum Topology {
     Single,
     ReplicaSet,
+    #[serde(alias = "sharded-replicaset")]
     Sharded,
     #[serde(rename = "load-balanced")]
     LoadBalanced,
