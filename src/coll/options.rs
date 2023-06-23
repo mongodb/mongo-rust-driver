@@ -299,6 +299,10 @@ pub struct ReplaceOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// Sets the [`SerializerOptions::human_readable`] option for the [`Bson`] serializer.
+    /// The default value is true.
+    pub human_readable: Option<bool>,
 }
 
 /// Specifies the options to a
@@ -443,6 +447,10 @@ pub struct FindOneAndReplaceOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// Sets the [`SerializerOptions::human_readable`] option for the [`Bson`] serializer.
+    /// The default value is true.
+    pub human_readable: Option<bool>,
 }
 
 /// Specifies the options to a

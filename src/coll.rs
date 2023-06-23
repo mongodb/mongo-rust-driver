@@ -1119,14 +1119,16 @@ where
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
+        let mut options = options.into();
         let replacement = to_document_with_options(
             replacement.borrow(),
-            SerializerOptions::builder().human_readable(false).build(),
+            SerializerOptions::builder()
+                .human_readable(options.as_ref().and_then(|opts| opts.human_readable))
+                .build(),
         )?;
 
         let session = session.into();
 
-        let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
@@ -1382,16 +1384,18 @@ where
         options: impl Into<Option<ReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
+        let mut options = options.into();
         let replacement = to_document_with_options(
             replacement.borrow(),
-            SerializerOptions::builder().human_readable(false).build(),
+            SerializerOptions::builder()
+                .human_readable(options.as_ref().and_then(|opts| opts.human_readable))
+                .build(),
         )?;
 
         bson_util::replacement_document_check(&replacement)?;
 
         let session = session.into();
 
-        let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let update = Update::new(
