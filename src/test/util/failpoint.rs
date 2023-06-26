@@ -64,6 +64,7 @@ impl FailPoint {
     }
 }
 
+#[derive(Debug)]
 pub struct FailPointGuard {
     client: Client,
     failpoint_name: String,
