@@ -5,12 +5,6 @@ TEST_OPTIONS=("-Z unstable-options" "--format json" "--report-time")
 FEATURE_FLAGS=()
 CARGO_RESULT=0
 
-use_single_thread() {
-    if [ "${SINGLE_THREAD}" = true ]; then
-        TEST_OPTIONS+=("--test-threads=1")
-    fi
-}
-
 use_async_runtime() {
     if [ "${ASYNC_RUNTIME}" = "async-std" ]; then
         FEATURE_FLAGS+=("async-std-runtime")
@@ -36,6 +30,9 @@ cargo_test_options() {
 }
 
 cargo_test() {
+    if [ "${SINGLE_THREAD}" = true ]; then
+        TEST_OPTIONS+=("--test-threads=1")
+    fi
     RUST_BACKTRACE=1 \
         cargo test $(cargo_test_options $1) \
         | grep -v '{"t":' \

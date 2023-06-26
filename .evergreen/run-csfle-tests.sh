@@ -10,8 +10,6 @@ set -o xtrace
 
 FEATURE_FLAGS+=("in-use-encryption-unstable" "aws-auth" "azure-kms" "${TLS_FEATURE}")
 
-use_single_thread
-
 if [ "$OS" = "Windows_NT" ]; then
     export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
     export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)

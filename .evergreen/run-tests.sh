@@ -6,7 +6,6 @@ set -o pipefail
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-use_single_thread
 use_async_runtime
 
 FEATURE_FLAGS+=("tracing-unstable" "${TLS_FEATURE}")
