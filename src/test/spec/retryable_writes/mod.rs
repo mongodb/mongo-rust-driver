@@ -575,7 +575,8 @@ async fn retry_write_retryable_write_error() {
     .await
     .unwrap();
 
-    let _ = client.database("test").collection::<Document>("test").insert_one(doc! { "hello": "there" }, None).await;
+    let result = client.database("test").collection::<Document>("test").insert_one(doc! { "hello": "there" }, None).await;
+    assert_eq!(result.unwrap_err().code(), Some(91));
 
     // Consume failpoint guard.
     let _ = fp_rx.recv().await;
