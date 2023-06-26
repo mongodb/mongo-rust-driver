@@ -26,13 +26,14 @@ cargo_test_options() {
     if (( ${#FILTERED[@]} != 0 )); then
         FEATURE_OPTION="--features $(join_by , "${FILTERED[@]}")"
     fi
-    echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]}
+    local THREAD_OPTION=""
+    if [ "${SINGLE_THREAD}" = true ]; then
+        THREAD_OPTION="--test-threads=1"
+    fi
+    echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]} ${THREAD_OPTION}
 }
 
 cargo_test() {
-    if [ "${SINGLE_THREAD}" = true ]; then
-        TEST_OPTIONS+=("--test-threads=1")
-    fi
     RUST_BACKTRACE=1 \
         cargo test $(cargo_test_options $1) \
         | grep -v '{"t":' \
