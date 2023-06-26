@@ -589,8 +589,12 @@ pub(crate) struct TestOptions {
     pub(crate) mock_lookup_hosts: Option<Result<LookupHosts>>,
 
     /// Async-capable command event listener.
-    pub(crate) async_event_listener: Option<tokio::sync::mpsc::Sender<crate::runtime::AcknowledgedMessage<crate::event::command::CommandEvent>>>,
+    pub(crate) async_event_listener: Option<TestEventSender>,
 }
+
+pub(crate) type TestEventSender = tokio::sync::mpsc::Sender<
+    crate::runtime::AcknowledgedMessage<crate::event::command::CommandEvent>,
+>;
 
 fn default_hosts() -> Vec<ServerAddress> {
     vec![ServerAddress::default()]

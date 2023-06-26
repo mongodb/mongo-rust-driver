@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard, Mutex};
+use tokio::sync::{Mutex, RwLockReadGuard, RwLockWriteGuard};
 
 use test_file::{TestFile, TestResult};
 
@@ -14,11 +14,11 @@ use crate::{
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::{CommandEventHandler, CommandEvent},
+        command::{CommandEvent, CommandEventHandler},
     },
     options::{ClientOptions, FindOptions, InsertManyOptions},
     runtime,
-    runtime::{AsyncJoinHandle, spawn, AcknowledgedMessage},
+    runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         assert_matches,
@@ -35,7 +35,8 @@ use crate::{
         TestClient,
         CLIENT_OPTIONS,
         LOCK,
-    }, Client,
+    },
+    Client,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -501,7 +502,8 @@ async fn retry_write_pool_cleared() {
     assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
 }
 
-/// Prose test from retryable writes spec verifying that the original error is returned after encountering a WriteConcernError with a RetryableWriteError label.
+/// Prose test from retryable writes spec verifying that the original error is returned after
+/// encountering a WriteConcernError with a RetryableWriteError label.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_write_retryable_write_error() {
@@ -510,7 +512,8 @@ async fn retry_write_retryable_write_error() {
     let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.retry_writes = Some(true);
     let (event_tx, event_rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
-    // The listener needs to be active on client startup, but also needs a handle to the client itself for the trigger action.
+    // The listener needs to be active on client startup, but also needs a handle to the client
+    // itself for the trigger action.
     let listener_client: Arc<Mutex<Option<TestClient>>> = Arc::new(Mutex::new(None));
     // Set up event listener
     let (fp_tx, mut fp_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -521,7 +524,6 @@ async fn retry_write_retryable_write_error() {
         // Spawn a task to watch the event channel
         spawn(async move {
             while let Some(msg) = event_rx.recv().await {
-                dbg!("message");
                 if let CommandEvent::Succeeded(ev) = &*msg {
                     if let Some(Bson::Document(wc_err)) = ev.reply.get("writeConcernError") {
                         if ev.command_name == "insert" && wc_err.get_i32("code") == Ok(91) {
@@ -537,18 +539,24 @@ async fn retry_write_retryable_write_error() {
                                         FailPointMode::Times(1),
                                         FailCommandOptions::builder()
                                             .error_code(10107)
-                                            .error_labels(vec!["RetryableWriteError".to_string(), "NoWritesPerformed".to_string()])
+                                            .error_labels(vec![
+                                                "RetryableWriteError".to_string(),
+                                                "NoWritesPerformed".to_string(),
+                                            ])
                                             .build(),
-                                    ).enable(client.as_ref().unwrap(), None).await.unwrap()
+                                    )
+                                    .enable(client.as_ref().unwrap(), None)
+                                    .await
+                                    .unwrap()
                                 };
                                 fp_tx.send(fp_guard).unwrap();
-                                // Defer acknowledging the message until the failpoint has been set up so the retry hits it.
+                                // Defer acknowledging the message until the failpoint has been set
+                                // up so the retry hits it.
                                 msg.acknowledge(());
                             });
                         }
                     }
                 }
-                dbg!("message done");
             }
         });
     }
@@ -575,7 +583,11 @@ async fn retry_write_retryable_write_error() {
     .await
     .unwrap();
 
-    let result = client.database("test").collection::<Document>("test").insert_one(doc! { "hello": "there" }, None).await;
+    let result = client
+        .database("test")
+        .collection::<Document>("test")
+        .insert_one(doc! { "hello": "there" }, None)
+        .await;
     assert_eq!(result.unwrap_err().code(), Some(91));
 
     // Consume failpoint guard.

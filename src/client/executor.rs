@@ -607,7 +607,8 @@ impl Client {
                 connection: connection_info.clone(),
                 service_id,
             })
-        }).await;
+        })
+        .await;
 
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
@@ -707,7 +708,8 @@ impl Client {
                         connection: connection_info.clone(),
                         service_id,
                     })
-                }).await;
+                })
+                .await;
 
                 if let Some(ref mut session) = session {
                     if err.is_network_error() {
@@ -736,7 +738,8 @@ impl Client {
                         connection: connection_info.clone(),
                         service_id,
                     })
-                }).await;
+                })
+                .await;
 
                 #[cfg(feature = "in-use-encryption-unstable")]
                 let response = {
