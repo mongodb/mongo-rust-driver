@@ -3,6 +3,7 @@ mod test;
 
 use std::convert::TryInto;
 
+use crate::operation::WriteConcern;
 use bson::{RawBsonRef, RawDocumentBuf};
 
 use super::{CursorBody, OperationWithDefaults};
