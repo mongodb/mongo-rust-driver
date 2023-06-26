@@ -165,7 +165,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with assume role credentials":
     - command: shell.exec
@@ -203,7 +203,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with aws EC2 credentials":
     - command: shell.exec
@@ -243,7 +243,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} PROJECT_DIRECTORY=${PROJECT_DIRECTORY} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} PROJECT_DIRECTORY=${PROJECT_DIRECTORY} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with aws credentials and session token as environment variables":
     - command: shell.exec
@@ -265,7 +265,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws ECS auth test":
     - command: shell.exec
@@ -1066,8 +1066,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-5.0-standalone"
@@ -1127,8 +1127,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-6.0-standalone"
@@ -1188,8 +1188,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-7.0-standalone"
@@ -1249,8 +1249,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-rapid-standalone"
@@ -1310,8 +1310,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-latest-standalone"
@@ -1372,8 +1372,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-connection-string"

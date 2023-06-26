@@ -4,7 +4,7 @@ use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
 use lazy_static::lazy_static;
 use rand::distributions::{Alphanumeric, DistString};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
@@ -99,7 +99,9 @@ async fn authenticate_stream_inner(
                 // From the spec: the driver MUST not place a lock on making a request.
                 drop(cached_credential);
                 let aws_credential = AwsCredential::get(credential, http_client).await?;
-                *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+                if aws_credential.expiration.is_some() {
+                    *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+                }
                 aws_credential
             }
         }
@@ -162,7 +164,18 @@ pub(crate) struct AwsCredential {
     #[serde(alias = "Token")]
     session_token: Option<String>,
 
+    #[serde(default, deserialize_with = "deserialize_datetime_option_from_double")]
     expiration: Option<bson::DateTime>,
+}
+
+pub(crate) fn deserialize_datetime_option_from_double<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<bson::DateTime>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let millis = f64::deserialize(deserializer)? * 1000.0;
+    Ok(Some(bson::DateTime::from_millis(millis as i64)))
 }
 
 impl AwsCredential {
@@ -462,7 +475,7 @@ impl AwsCredential {
         match self.expiration {
             Some(expiration) => {
                 expiration.saturating_duration_since(bson::DateTime::now())
-                    > Duration::from_secs(5 * 60)
+                    < Duration::from_secs(5 * 60)
             }
             None => true,
         }
@@ -542,5 +555,47 @@ impl ServerFirst {
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_utils {
+    use super::{AwsCredential, CACHED_CREDENTIAL};
+
+    pub(crate) async fn cached_credential() -> Option<AwsCredential> {
+        CACHED_CREDENTIAL.lock().await.clone()
+    }
+
+    pub(crate) async fn clear_cached_credential() {
+        *CACHED_CREDENTIAL.lock().await = None;
+    }
+
+    pub(crate) async fn poison_cached_credential() {
+        CACHED_CREDENTIAL
+            .lock()
+            .await
+            .as_mut()
+            .unwrap()
+            .access_key_id = "bad".into();
+    }
+
+    pub(crate) async fn cached_access_key_id() -> String {
+        cached_credential().await.unwrap().access_key_id
+    }
+
+    pub(crate) async fn cached_secret_access_key() -> String {
+        cached_credential().await.unwrap().secret_access_key
+    }
+
+    pub(crate) async fn cached_session_token() -> Option<String> {
+        cached_credential().await.unwrap().session_token
+    }
+
+    pub(crate) async fn cached_expiration() -> bson::DateTime {
+        cached_credential().await.unwrap().expiration.unwrap()
+    }
+
+    pub(crate) async fn set_cached_expiration(expiration: bson::DateTime) {
+        CACHED_CREDENTIAL.lock().await.as_mut().unwrap().expiration = Some(expiration);
     }
 }
