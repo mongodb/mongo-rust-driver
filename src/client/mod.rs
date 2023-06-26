@@ -219,9 +219,26 @@ impl Client {
     }
 
     #[cfg(not(feature = "tracing-unstable"))]
-    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        #[cfg(test)]
+        if self.inner.options.command_event_handler.is_none() && self.inner.options.test_options.as_ref().and_then(|t| t.async_event_listener.as_ref()).is_none() {
+            return;
+        }
+        #[cfg(not(test))]
+        if self.inner.options.command_event_handler.is_none() {
+            return;
+        }
+        let event = generate_event();
+        #[cfg(test)]
+        if let Some(listener) = self.inner.options.test_options.as_ref().and_then(|t| t.async_event_listener.as_ref()) {
+            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
+            dbg!("sending message");
+            let _ = listener.send(msg).await;
+            dbg!("waiting for ack");
+            ack.wait_for_acknowledgment().await;
+            dbg!("got ack");
+        }
         if let Some(ref handler) = self.inner.options.command_event_handler {
-            let event = generate_event();
             handle_command_event(handler.as_ref(), event);
         }
     }

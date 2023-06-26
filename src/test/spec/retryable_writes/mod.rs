@@ -2,6 +2,7 @@ mod test_file;
 
 use std::{sync::Arc, time::Duration};
 
+use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
@@ -13,11 +14,11 @@ use crate::{
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::CommandEventHandler,
+        command::{CommandEventHandler, CommandEvent},
     },
     options::{ClientOptions, FindOptions, InsertManyOptions},
     runtime,
-    runtime::AsyncJoinHandle,
+    runtime::{AsyncJoinHandle, spawn},
     sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         assert_matches,
@@ -506,19 +507,49 @@ async fn retry_write_pool_cleared() {
 async fn retry_write_retryable_write_error() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    struct Handler;
-
-    impl CommandEventHandler for Handler {
-        fn handle_command_succeeded_event(&self, event: crate::event::command::CommandSucceededEvent) {
-            dbg!(event.command_name);
-            dbg!(event.reply.get("writeConcernError"));
-        }
-    }
-
     let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.retry_writes = Some(true);
-    client_options.command_event_handler = Some(Arc::new(Handler));
+    let (event_tx, event_rx) = tokio::sync::mpsc::channel(1);
+    client_options.test_options_mut().async_event_listener = Some(event_tx);
     let client = Client::test_builder().options(client_options).build().await;
+
+    // Set up event listener
+    let (_done_tx, done_rx) = tokio::sync::watch::channel(());
+    {
+        let client = client.clone();
+        let mut event_rx = event_rx;
+        let done_rx = done_rx.clone();
+        // Spawn a task to watch the event channel
+        spawn(async move {
+            while let Some(msg) = event_rx.recv().await {
+                if let CommandEvent::Succeeded(ev) = &*msg {
+                    if let Some(Bson::Document(wc_err)) = ev.reply.get("writeConcernError") {
+                        if ev.command_name == "insert" && wc_err.get_i32("code") == Ok(91) {
+                            // When the trigger is reached, spawn a task to keep the failpoint alive for the duration of the test.
+                            let client = client.clone();
+                            let mut done_rx = done_rx.clone();
+                            spawn(async move {
+                                // Enable the failpoint.
+                                let _fp_guard = FailPoint::fail_command(
+                                    &["insert"],
+                                    FailPointMode::Times(1),
+                                    FailCommandOptions::builder()
+                                        .error_code(10107)
+                                        .error_labels(vec!["RetryableWriteError".to_string(), "NoWritesPerformed".to_string()])
+                                        .build(),
+                                ).enable(&client, None).await.unwrap();
+                                // Acknowledge the event, allowing a retry to proceed.
+                                msg.acknowledge(());
+                                // Wait for the test to finish.
+                                let _ = done_rx.changed().await;
+                            });
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     if !client.is_replica_set() || client.server_version_lt(6, 0) {
         log_uncaptured("skipping retry_write_retryable_write_error: invalid topology");
         return;
