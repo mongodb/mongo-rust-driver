@@ -235,6 +235,16 @@ pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
         .serialize(serializer)
 }
 
+pub(crate) fn deserialize_datetime_option_from_double<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<bson::DateTime>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let millis = f64::deserialize(deserializer)? * 1000.0;
+    Ok(Some(bson::DateTime::from_millis(millis as i64)))
+}
+
 #[cfg(test)]
 mod test {
     use crate::bson_util::num_decimal_digits;

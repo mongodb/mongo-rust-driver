@@ -17,8 +17,8 @@ async fn auth_aws() {
     coll.find_one(None, None).await.unwrap();
 }
 
-// The TestClient performs operations upon creation that trigger authentication, so the cache tests
-// use a regular client instead to avoid that noise.
+// The TestClient performs operations upon creation that trigger authentication, so the credential
+// caching tests use a regular client instead to avoid that noise.
 async fn get_client() -> Client {
     Client::with_uri_str(DEFAULT_URI.clone()).await.unwrap()
 }

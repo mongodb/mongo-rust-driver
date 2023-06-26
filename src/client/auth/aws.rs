@@ -4,12 +4,13 @@ use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
 use lazy_static::lazy_static;
 use rand::distributions::{Alphanumeric, DistString};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::{
     bson::{doc, rawdoc, spec::BinarySubtype, Binary, Bson, Document},
+    bson_util::deserialize_datetime_option_from_double,
     client::{
         auth::{
             self,
@@ -166,16 +167,6 @@ pub(crate) struct AwsCredential {
 
     #[serde(default, deserialize_with = "deserialize_datetime_option_from_double")]
     expiration: Option<bson::DateTime>,
-}
-
-pub(crate) fn deserialize_datetime_option_from_double<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<bson::DateTime>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let millis = f64::deserialize(deserializer)? * 1000.0;
-    Ok(Some(bson::DateTime::from_millis(millis as i64)))
 }
 
 impl AwsCredential {
@@ -471,7 +462,7 @@ impl AwsCredential {
         self.session_token.as_deref()
     }
 
-    pub(crate) fn is_expired(&self) -> bool {
+    fn is_expired(&self) -> bool {
         match self.expiration {
             Some(expiration) => {
                 expiration.saturating_duration_since(bson::DateTime::now())
