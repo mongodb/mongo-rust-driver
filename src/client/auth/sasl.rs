@@ -118,6 +118,7 @@ fn validate_command_success(auth_mechanism: &str, response: &Document) -> Result
 }
 
 /// Encapsulates the parsing of the response to a `saslStart` or `saslContinue` command.
+#[derive(Debug)]
 pub(super) struct SaslResponse {
     pub(super) conversation_id: Bson,
     pub(super) done: bool,

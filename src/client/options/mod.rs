@@ -829,7 +829,7 @@ pub struct ConnectionString {
 }
 
 /// Elements from the connection string that are not top-level fields in `ConnectionString`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ConnectionStringParts {
     read_preference_tags: Option<Vec<TagSet>>,
     max_staleness: Option<Duration>,
@@ -1658,8 +1658,8 @@ impl ConnectionString {
                     credential.mechanism_properties = Some(doc);
                 }
 
+                credential.mechanism = Some(mechanism.clone());
                 mechanism.validate_credential(credential)?;
-                credential.mechanism = parts.auth_mechanism.take();
             }
             None => {
                 if let Some(ref mut credential) = conn_str.credential {
@@ -1890,6 +1890,11 @@ impl ConnectionString {
                         Some(index) => {
                             let (k, v) = exclusive_split_at(kvp, index);
                             let key = k.ok_or_else(err_func)?;
+                            if key == "ALLOWED_HOSTS" {
+                                return Err(Error::invalid_argument(
+                                    "ALLOWED_HOSTS must only be specified through client options",
+                                ));
+                            }
                             let value = v.ok_or_else(err_func)?;
                             doc.insert(key, value);
                         }

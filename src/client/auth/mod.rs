@@ -3,6 +3,7 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
+pub(crate) mod oidc;
 mod plain;
 mod sasl;
 mod scram;
@@ -12,6 +13,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
+use derivative::Derivative;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
 use serde::Deserialize;
@@ -32,6 +34,7 @@ const GSSAPI_STR: &str = "GSSAPI";
 const MONGODB_AWS_STR: &str = "MONGODB-AWS";
 const MONGODB_X509_STR: &str = "MONGODB-X509";
 const PLAIN_STR: &str = "PLAIN";
+const MONGODB_OIDC_STR: &str = "MONGODB-OIDC";
 
 /// The authentication mechanisms supported by MongoDB.
 ///
@@ -83,6 +86,10 @@ pub enum AuthMechanism {
     /// supports AWS authentication with the tokio runtime.
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
+
+    /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.  NOTE: this is not supported by the Rust driver.
+    // TODO RUST-1497: remove the NOTE.
+    MongoDbOidc,
 }
 
 impl AuthMechanism {
@@ -176,6 +183,33 @@ impl AuthMechanism {
 
                 Ok(())
             }
+            AuthMechanism::MongoDbOidc => {
+                let is_automatic = credential
+                    .mechanism_properties
+                    .as_ref()
+                    .map_or(false, |p| p.contains_key("PROVIDER_NAME"));
+                if credential.username.is_some() && is_automatic {
+                    return Err(Error::invalid_argument(
+                        "username and PROVIDER_NAME cannot both be specified for MONGODB-OIDC \
+                         authentication",
+                    ));
+                }
+                if credential
+                    .source
+                    .as_ref()
+                    .map_or(false, |s| s != "$external")
+                {
+                    return Err(Error::invalid_argument(
+                        "source must be $external for MONGODB-OIDC authentication",
+                    ));
+                }
+                if credential.password.is_some() {
+                    return Err(Error::invalid_argument(
+                        "password must not be set for MONGODB-OIDC authentication",
+                    ));
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -191,22 +225,23 @@ impl AuthMechanism {
             AuthMechanism::Plain => PLAIN_STR,
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => MONGODB_AWS_STR,
+            AuthMechanism::MongoDbOidc => MONGODB_OIDC_STR,
         }
     }
 
     /// Get the default authSource for a given mechanism depending on the database provided in the
     /// connection string.
     pub(crate) fn default_source<'a>(&'a self, uri_db: Option<&'a str>) -> &'a str {
-        // TODO: fill in others as they're implemented
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
                 uri_db.unwrap_or("admin")
             }
             AuthMechanism::MongoDbX509 => "$external",
             AuthMechanism::Plain => uri_db.unwrap_or("$external"),
+            AuthMechanism::MongoDbOidc => "$external",
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => "$external",
-            _ => "",
+            AuthMechanism::Gssapi => "",
         }
     }
 
@@ -232,6 +267,7 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
+            Self::MongoDbOidc => Ok(None),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
@@ -283,6 +319,9 @@ impl AuthMechanism {
                     .into(),
             }
             .into()),
+            AuthMechanism::MongoDbOidc => {
+                oidc::authenticate_stream(stream, credential, server_api).await
+            }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
@@ -302,6 +341,7 @@ impl FromStr for AuthMechanism {
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
+            MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
 
             #[cfg(feature = "aws-auth")]
             MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
@@ -325,7 +365,8 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Default, Deserialize, TypedBuilder, PartialEq)]
+#[derive(Clone, Default, Deserialize, TypedBuilder, Derivative)]
+#[derivative(PartialEq)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Credential {
@@ -347,6 +388,12 @@ pub struct Credential {
 
     /// Additional properties for the given mechanism.
     pub mechanism_properties: Option<Document>,
+
+    /// The token callbacks for OIDC authentication.
+    /// TODO RUST-1497: make this `pub`
+    #[serde(skip)]
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
 }
 
 impl Credential {

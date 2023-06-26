@@ -654,6 +654,48 @@ functions:
             ./test-contents/test-exe on_demand_gcp_credentials --nocapture"
           $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
 
+  "bootstrap oidc":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+          cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
+          set +o xtrace
+
+          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+          export OIDC_TOKEN_DIR=/tmp/tokens
+
+          . ./activate-authoidcvenv.sh
+          python oidc_write_orchestration.py
+          python oidc_get_tokens.py
+  
+  "setup oidc":
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+          cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
+          mongosh setup_oidc.js
+
+  "run oidc tests":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: "src"
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+          export OIDC_TOKEN_DIR=/tmp/tokens
+          .evergreen/run-oidc-tests.sh
 
   "compile only":
     - command: shell.exec
@@ -1355,6 +1397,19 @@ tasks:
       - func: "build and upload gcp kms test"
       - func: "run gcp kms test"
 
+  - name: test-oidc-latest
+    commands:
+      - func: "bootstrap oidc"
+      - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          ORCHESTRATION_FILE: "auth-oidc.json"
+          TOPOLOGY: "replica_set"
+          VERSION: "latest"
+      - func: "setup oidc"
+      - func: "run oidc tests"
+
   - name: "compile-only"
     commands:
       - func: "compile only"
@@ -2021,6 +2076,14 @@ buildvariants:
   tasks:
     - name: testgcpkms_task_group
       batchtime: 20160
+
+- matrix_name: "oidc"
+  display_name: "OIDC"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+  tasks:
+    - name: test-oidc-latest
 
 - name: "lint"
   display_name: "! Lint"

@@ -14,6 +14,7 @@ mod gridfs;
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 mod ocsp;
+mod oidc;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod read_write_concern;
 mod retryable_reads;
