@@ -1,10 +1,8 @@
 #[cfg(test)]
 mod test;
 
-use std::convert::TryInto;
-
-use crate::operation::WriteConcern;
 use bson::{RawBsonRef, RawDocumentBuf};
+use std::convert::TryInto;
 
 use super::{CursorBody, OperationWithDefaults};
 use crate::{
@@ -45,17 +43,10 @@ impl<'conn> RunCommand<'conn> {
         selection_criteria: Option<SelectionCriteria>,
         pinned_connection: Option<&'conn PinnedConnectionHandle>,
     ) -> Result<Self> {
-        let write_concern = command
-            .get("writeConcern")?
-            .and_then(|b| b.as_document())
-            .map(|doc| bson::from_slice::<WriteConcern>(doc.as_bytes()))
-            .transpose()?;
-
         Ok(Self {
             db,
             command,
             selection_criteria,
-            write_concern,
             pinned_connection,
         })
     }

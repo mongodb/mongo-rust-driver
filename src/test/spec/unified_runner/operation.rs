@@ -1621,7 +1621,7 @@ impl TestOperation for RunCommand {
         test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            let mut command = self.command.clone();
+            let command = self.command.clone();
 
             let db = test_runner.get_database(id).await;
             let result = match &self.session {
