@@ -11,49 +11,6 @@ use crate::{
     Client,
 };
 
-pub(crate) struct FailPointBuilder<'client> {
-    client: &'client Client,
-    fp: FailPoint,
-    criteria: Option<SelectionCriteria>,
-    options: Option<FailCommandOptions>,
-}
-
-impl<'client> FailPointBuilder<'client> {
-    pub(crate) fn new(
-        client: &'client Client,
-        fail_commands: &[&str],
-        mode: FailPointMode,
-    ) -> Self {
-        Self {
-            client,
-            fp: FailPoint::fail_command(fail_commands, mode, None),
-            criteria: None,
-            options: None,
-        }
-    }
-
-    fn options(&mut self) -> &mut FailCommandOptions {
-        self.options.get_or_insert_with(FailCommandOptions::default)
-    }
-
-    #[must_use]
-    pub(crate) fn write_concern_error(mut self, error: impl Into<Option<Document>>) -> Self {
-        self.options().write_concern_error = error.into();
-        self
-    }
-
-    #[must_use]
-    pub(crate) fn selection_criteria(mut self, criteria: impl Into<Option<SelectionCriteria>>) -> Self {
-        self.criteria = criteria.into();
-        self
-    }
-
-    pub(crate) async fn enable(mut self) -> Result<FailPointGuard> {
-        append_options(self.fp.command.get_document_mut("data").unwrap(), self.options.as_ref()).unwrap();
-        self.fp.enable(self.client, self.criteria).await
-    }
-}
-
 // If you write a tokio test that uses this, make sure to annotate it with
 // tokio::test(flavor = "multi_thread").
 // TODO RUST-1530 Make the error message here better.

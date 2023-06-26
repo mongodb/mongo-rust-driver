@@ -524,14 +524,19 @@ async fn retry_write_retryable_write_error() {
         return;
     }
 
-    let _fp_guard = client.failpoint_builder(&["insert"], FailPointMode::Times(1))
-        .write_concern_error(doc! {
-            "code": 91,
-            "errorLabels": ["RetryableWriteError"],
-        })
-        .enable()
-        .await
-        .unwrap();
+    let _fp_guard = FailPoint::fail_command(
+        &["insert"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .write_concern_error(doc! {
+                "code": 91,
+                "errorLabels": ["RetryableWriteError"],
+            })
+            .build(),
+    )
+    .enable(&client, None)
+    .await
+    .unwrap();
 
     let _ = client.database("test").collection::<Document>("test").insert_one(doc! { "hello": "there" }, None).await;
 }
