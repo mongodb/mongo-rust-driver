@@ -2,17 +2,9 @@ set -o errexit
 set -o pipefail
 
 source ./.evergreen/env.sh
+source .evergreen/cargo-test.sh
 
 set -o xtrace
-
-OPTIONS="-- -Z unstable-options --format json --report-time"
-CARGO_RESULT=0
-
-cargo_test() {
-    RUST_BACKTRACE=1 \
-        cargo test $1 ${OPTIONS} | tee /dev/stderr | cargo2junit
-    CARGO_RESULT=$(( ${CARGO_RESULT} || $? ))
-}
 
 set +o errexit
 
