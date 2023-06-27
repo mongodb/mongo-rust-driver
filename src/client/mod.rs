@@ -221,8 +221,7 @@ impl Client {
     fn test_command_event_channel(&self) -> Option<&options::TestEventSender> {
         #[cfg(test)]
         {
-            self
-                .inner
+            self.inner
                 .options
                 .test_options
                 .as_ref()
