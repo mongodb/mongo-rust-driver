@@ -335,6 +335,7 @@ pub mod results;
 pub(crate) mod runtime;
 mod sdam;
 mod selection_criteria;
+mod serde_util;
 mod srv;
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 pub mod sync;

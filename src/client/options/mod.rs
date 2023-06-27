@@ -27,7 +27,6 @@ use typed_builder::TypedBuilder;
 use crate::srv::LookupHosts;
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util,
     client::auth::{AuthMechanism, Credential},
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
@@ -36,6 +35,7 @@ use crate::{
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
+    serde_util,
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
@@ -609,7 +609,7 @@ impl Serialize for ClientOptions {
         struct ClientOptionsHelper<'a> {
             appname: &'a Option<String>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             connecttimeoutms: &'a Option<Duration>,
 
             #[serde(flatten, serialize_with = "Credential::serialize_for_client_options")]
@@ -617,13 +617,13 @@ impl Serialize for ClientOptions {
 
             directconnection: &'a Option<bool>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             heartbeatfrequencyms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             localthresholdms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             maxidletimems: &'a Option<Duration>,
 
             maxpoolsize: &'a Option<u32>,
@@ -645,10 +645,10 @@ impl Serialize for ClientOptions {
             )]
             selectioncriteria: &'a Option<SelectionCriteria>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             serverselectiontimeoutms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             sockettimeoutms: &'a Option<Duration>,
 
             #[serde(flatten, serialize_with = "Tls::serialize_for_client_options")]
@@ -2692,8 +2692,8 @@ pub struct TransactionOptions {
     /// The maximum amount of time to allow a single commitTransaction to run.
     #[builder(default)]
     #[serde(
-        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
+        serialize_with = "serde_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis",
         rename(serialize = "maxTimeMS", deserialize = "maxCommitTimeMS"),
         default
     )]

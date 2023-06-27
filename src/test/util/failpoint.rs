@@ -1,5 +1,5 @@
 use bson::{doc, Document};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
@@ -8,6 +8,7 @@ use crate::{
     operation::append_options,
     runtime,
     selection_criteria::SelectionCriteria,
+    serde_util,
     Client,
 };
 
@@ -112,7 +113,7 @@ pub struct FailCommandOptions {
 
     /// If non-null, how long the server should block the affected commands.
     /// Only available in 4.2.9+.
-    #[serde(serialize_with = "serialize_block_connection")]
+    #[serde(serialize_with = "serde_util::serialize_block_connection")]
     #[serde(flatten)]
     block_connection: Option<Duration>,
 
@@ -131,17 +132,4 @@ pub struct FailCommandOptions {
 
     /// Document to be returned as a write concern error.
     write_concern_error: Option<Document>,
-}
-
-fn serialize_block_connection<S: Serializer>(
-    val: &Option<Duration>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(duration) => {
-            (doc! { "blockConnection": true, "blockTimeMS": duration.as_millis() as i64})
-                .serialize(serializer)
-        }
-        None => serializer.serialize_none(),
-    }
 }

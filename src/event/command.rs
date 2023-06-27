@@ -7,8 +7,8 @@ use serde::Serialize;
 
 use crate::{
     bson::{oid::ObjectId, Document},
-    bson_util::serialize_error_as_string,
     error::Error,
+    serde_util,
 };
 
 pub use crate::cmap::ConnectionInfo;
@@ -78,7 +78,7 @@ pub struct CommandFailedEvent {
     pub command_name: String,
 
     /// The error that the driver returned due to the event failing.
-    #[serde(serialize_with = "serialize_error_as_string")]
+    #[serde(serialize_with = "serde_util::serialize_error_as_string")]
     pub failure: Error,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the

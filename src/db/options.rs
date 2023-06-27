@@ -7,10 +7,10 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{Bson, Document},
-    bson_util,
     concern::{ReadConcern, WriteConcern},
     options::Collation,
     selection_criteria::SelectionCriteria,
+    serde_util,
 };
 
 /// These are the valid options for creating a [`Database`](../struct.Database.html) with
@@ -42,13 +42,13 @@ pub struct CreateCollectionOptions {
 
     /// The maximum size (in bytes) for a capped collection. This option is ignored if `capped` is
     /// not set to true.
-    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
     pub size: Option<u64>,
 
     /// The maximum number of documents in a capped collection. The `size` limit takes precedence
     /// over this option. If a capped collection reaches the size limit before it reaches the
     /// maximum number of documents, MongoDB removes old documents.
-    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
     pub max: Option<u64>,
 
     /// The storage engine that the collection should use. The value should take the following
@@ -100,8 +100,8 @@ pub struct CreateCollectionOptions {
     /// information.
     #[serde(
         default,
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
+        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
     )]
     pub expire_after_seconds: Option<Duration>,
 
@@ -249,7 +249,7 @@ pub struct ListCollectionsOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
     #[serde(
-        serialize_with = "bson_util::serialize_u32_option_as_batch_size",
+        serialize_with = "serde_util::serialize_u32_option_as_batch_size",
         rename(serialize = "cursor")
     )]
     pub batch_size: Option<u32>,

@@ -6,10 +6,10 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::doc,
-    bson_util,
     error::{ErrorKind, Result},
     options::ServerAddress,
     sdam::public::ServerInfo,
+    serde_util,
 };
 
 /// Describes which servers are suitable for a given operation.
@@ -279,8 +279,8 @@ pub struct ReadPreferenceOptions {
     #[serde(
         rename = "maxStalenessSeconds",
         default,
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
+        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
     )]
     pub max_staleness: Option<Duration>,
 
@@ -390,7 +390,7 @@ impl ReadPreference {
 
             readpreferencetags: Option<&'a Vec<HashMap<String, String>>>,
 
-            #[serde(serialize_with = "crate::bson_util::serialize_duration_option_as_int_secs")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_secs")]
             maxstalenessseconds: Option<Duration>,
         }
 

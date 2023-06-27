@@ -1,11 +1,10 @@
 use std::time::Duration;
 
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util,
     coll::options::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -16,18 +15,15 @@ use crate::{
     },
     collation::Collation,
     concern::WriteConcern,
+    serde_util,
 };
 
 #[derive(Clone, Debug, Serialize)]
 pub(super) enum Modification {
-    #[serde(rename = "remove", serialize_with = "self::serialize_true")]
+    #[serde(rename = "remove", serialize_with = "serde_util::serialize_true")]
     Delete,
     #[serde(rename = "update")]
     Update(UpdateModifications),
-}
-
-fn serialize_true<S: Serializer>(s: S) -> std::result::Result<S::Ok, S::Error> {
-    s.serialize_bool(true)
 }
 
 #[serde_with::skip_serializing_none]
@@ -57,7 +53,7 @@ pub(super) struct FindAndModifyOptions {
     pub(crate) array_filters: Option<Vec<Document>>,
 
     #[serde(
-        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        serialize_with = "serde_util::serialize_duration_option_as_int_millis",
         rename = "maxTimeMS"
     )]
     #[builder(default)]
