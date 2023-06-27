@@ -269,15 +269,17 @@ dependencies = [
 
 [[package]]
 name = "bson"
-version = "2.3.0"
-source = "git+https://github.com/mongodb/bson-rust?branch=main#0612667e1344f9aabc3592a2cee02a96ac1b76bc"
+version = "2.6.0"
+source = "git+https://github.com/mongodb/bson-rust?branch=main#b243db19b74745fcf52eacd9e4d34077186186d5"
 dependencies = [
  "ahash",
- "base64",
+ "base64 0.13.1",
+ "bitvec",
  "chrono",
  "hex",
- "indexmap",
- "lazy_static",
+ "indexmap 1.9.3",
+ "js-sys",
+ "once_cell 1.13.0",
  "rand",
  "serde",
  "serde_bytes",
@@ -285,7 +287,7 @@ dependencies = [
  "serde_with",
  "time",
  "uuid 0.8.2",
- "uuid 1.1.2",
+ "uuid 1.4.0",
 ]
 
 [[package]]
