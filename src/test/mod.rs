@@ -1,6 +1,7 @@
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
+#[cfg(feature = "aws-auth")]
 mod auth_aws;
 mod change_stream;
 mod client;

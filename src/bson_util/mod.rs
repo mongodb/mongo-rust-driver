@@ -235,6 +235,7 @@ pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
         .serialize(serializer)
 }
 
+#[cfg(feature = "aws-auth")]
 pub(crate) fn deserialize_datetime_option_from_double<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<bson::DateTime>, D::Error>
