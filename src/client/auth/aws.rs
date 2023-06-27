@@ -1,13 +1,16 @@
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, time::Duration};
 
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
+use lazy_static::lazy_static;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use tokio::sync::Mutex;
 
 use crate::{
     bson::{doc, rawdoc, spec::BinarySubtype, Binary, Bson, Document},
+    bson_util::deserialize_datetime_option_from_double,
     client::{
         auth::{
             self,
@@ -27,8 +30,27 @@ const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
 const MECH_NAME: &str = "MONGODB-AWS";
 
+lazy_static! {
+    static ref CACHED_CREDENTIAL: Mutex<Option<AwsCredential>> = Mutex::new(None);
+}
+
 /// Performs MONGODB-AWS authentication for a given stream.
 pub(super) async fn authenticate_stream(
+    conn: &mut Connection,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    http_client: &HttpClient,
+) -> Result<()> {
+    match authenticate_stream_inner(conn, credential, server_api, http_client).await {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            *CACHED_CREDENTIAL.lock().await = None;
+            Err(error)
+        }
+    }
+}
+
+async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
@@ -68,7 +90,23 @@ pub(super) async fn authenticate_stream(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    let aws_credential = AwsCredential::get(credential, http_client).await?;
+    let aws_credential = {
+        // Limit scope of this variable to avoid holding onto the lock for the duration of
+        // authenticate_stream.
+        let cached_credential = CACHED_CREDENTIAL.lock().await;
+        match *cached_credential {
+            Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
+            _ => {
+                // From the spec: the driver MUST not place a lock on making a request.
+                drop(cached_credential);
+                let aws_credential = AwsCredential::get(credential, http_client).await?;
+                if aws_credential.expiration.is_some() {
+                    *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+                }
+                aws_credential
+            }
+        }
+    };
 
     let date = Utc::now();
 
@@ -117,7 +155,7 @@ pub(super) async fn authenticate_stream(
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct AwsCredential {
     access_key_id: String,
@@ -126,6 +164,9 @@ pub(crate) struct AwsCredential {
 
     #[serde(alias = "Token")]
     session_token: Option<String>,
+
+    #[serde(default, deserialize_with = "deserialize_datetime_option_from_double")]
+    expiration: Option<bson::DateTime>,
 }
 
 impl AwsCredential {
@@ -157,6 +198,7 @@ impl AwsCredential {
                 access_key_id: access_key,
                 secret_access_key: secret_key,
                 session_token,
+                expiration: None,
             });
         }
 
@@ -419,6 +461,16 @@ impl AwsCredential {
     pub(crate) fn session_token(&self) -> Option<&str> {
         self.session_token.as_deref()
     }
+
+    fn is_expired(&self) -> bool {
+        match self.expiration {
+            Some(expiration) => {
+                expiration.saturating_duration_since(bson::DateTime::now())
+                    < Duration::from_secs(5 * 60)
+            }
+            None => true,
+        }
+    }
 }
 
 /// The response from the server to the `saslStart` command in a MONGODB-AWS authentication attempt.
@@ -494,5 +546,47 @@ impl ServerFirst {
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_utils {
+    use super::{AwsCredential, CACHED_CREDENTIAL};
+
+    pub(crate) async fn cached_credential() -> Option<AwsCredential> {
+        CACHED_CREDENTIAL.lock().await.clone()
+    }
+
+    pub(crate) async fn clear_cached_credential() {
+        *CACHED_CREDENTIAL.lock().await = None;
+    }
+
+    pub(crate) async fn poison_cached_credential() {
+        CACHED_CREDENTIAL
+            .lock()
+            .await
+            .as_mut()
+            .unwrap()
+            .access_key_id = "bad".into();
+    }
+
+    pub(crate) async fn cached_access_key_id() -> String {
+        cached_credential().await.unwrap().access_key_id
+    }
+
+    pub(crate) async fn cached_secret_access_key() -> String {
+        cached_credential().await.unwrap().secret_access_key
+    }
+
+    pub(crate) async fn cached_session_token() -> Option<String> {
+        cached_credential().await.unwrap().session_token
+    }
+
+    pub(crate) async fn cached_expiration() -> bson::DateTime {
+        cached_credential().await.unwrap().expiration.unwrap()
+    }
+
+    pub(crate) async fn set_cached_expiration(expiration: bson::DateTime) {
+        CACHED_CREDENTIAL.lock().await.as_mut().unwrap().expiration = Some(expiration);
     }
 }

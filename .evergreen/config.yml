@@ -167,7 +167,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with assume role credentials":
     - command: shell.exec
@@ -205,7 +205,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with aws EC2 credentials":
     - command: shell.exec
@@ -245,7 +245,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} PROJECT_DIRECTORY=${PROJECT_DIRECTORY} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} PROJECT_DIRECTORY=${PROJECT_DIRECTORY} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with aws credentials and session token as environment variables":
     - command: shell.exec
@@ -267,7 +267,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws ECS auth test":
     - command: shell.exec
