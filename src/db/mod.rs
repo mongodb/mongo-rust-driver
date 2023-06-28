@@ -458,7 +458,8 @@ impl Database {
     /// Note that no inspection is done on `doc`, so the command will not use the database's default
     /// read concern or write concern. If specific read concern or write concern is desired, it must
     /// be specified manually.
-    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the command document.
+    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
+    /// command document.
     pub async fn run_command(
         &self,
         command: Document,
