@@ -2,9 +2,19 @@
 
 set -o errexit
 set -o xtrace
+set -o pipefail
 
-source ./.evergreen/configure-rust.sh
+source .evergreen/env.sh
+source .evergreen/cargo-test.sh
 
-RUST_BACKTRACE=1 cargo test --features aws-auth spec::auth
-RUST_BACKTRACE=1 cargo test --features aws-auth uri_options
-RUST_BACKTRACE=1 cargo test --features aws-auth connection_string
+FEATURE_FLAGS+=("aws-auth")
+
+set +o errexit
+
+cargo_test spec::auth > spec.xml
+cargo_test uri_options > uri_options.xml
+cargo_test connection_string > connection_string.xml
+
+junit-report-merger results.xml spec.xml uri_options.xml connection_string.xml
+
+exit ${CARGO_RESULT}

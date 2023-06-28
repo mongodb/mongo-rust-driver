@@ -3,7 +3,7 @@
 set -o errexit
 set -o xtrace
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 rustup update $RUST_VERSION
 
 # pin dependencies who have bumped their MSRVs to > ours in recent releases.
