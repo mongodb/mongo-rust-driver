@@ -136,20 +136,6 @@ where
 }
 
 #[cfg(test)]
-pub(crate) fn serialize_block_connection<S: Serializer>(
-    val: &Option<Duration>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(duration) => {
-            (doc! { "blockConnection": true, "blockTimeMS": duration.as_millis() as i64})
-                .serialize(serializer)
-        }
-        None => serializer.serialize_none(),
-    }
-}
-
-#[cfg(test)]
 pub(crate) fn deserialize_nonempty_vec<'de, D, T>(
     deserializer: D,
 ) -> std::result::Result<Option<Vec<T>>, D::Error>
