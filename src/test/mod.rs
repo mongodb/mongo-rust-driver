@@ -15,7 +15,6 @@ mod documentation_examples;
 mod index_management;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod lambda_examples;
-pub(crate) mod serde_helpers;
 pub(crate) mod spec;
 mod timeseries;
 pub(crate) mod util;
