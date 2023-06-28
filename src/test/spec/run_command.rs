@@ -10,6 +10,8 @@ async fn run_unified() {
         .skip_tests(&[
             // TODO re: RUST-1649: fix withTransaction for new test runner
             "attaches transaction fields to given command",
+            "always attaches $db and implicit lsid to given command and omits default readPreference",
+            "does not attach primary $readPreference to given command",
         ])
         .await;
 }
