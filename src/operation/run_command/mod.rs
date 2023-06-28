@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod test;
 
-use bson::{RawBsonRef, RawDocumentBuf};
 use std::convert::TryInto;
+
+use bson::{RawBsonRef, RawDocumentBuf};
 
 use super::{CursorBody, OperationWithDefaults};
 use crate::{
