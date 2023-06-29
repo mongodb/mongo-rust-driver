@@ -192,8 +192,10 @@ pub struct IndexOptionDefaults {
 }
 
 /// Specifies options for creating a timeseries collection.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TimeseriesOptions {
     /// Name of the top-level field to be used for time. Inserted documents must have this field,
@@ -208,6 +210,33 @@ pub struct TimeseriesOptions {
     /// The units you'd use to describe the expected interval between subsequent measurements for a
     /// time-series.  Defaults to `TimeseriesGranularity::Seconds` if unset.
     pub granularity: Option<TimeseriesGranularity>,
+
+    /// The maximum time between timestamps in the same bucket. This value must be between 1 and
+    /// 31,536,000 seconds. If this value is set, the same value should be set for
+    /// `bucket_rounding` and `granularity` should not be set.
+    ///
+    /// This option is only available on MongoDB 6.3+.
+    #[serde(
+        default,
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
+        rename = "bucketMaxSpanSeconds"
+    )]
+    pub bucket_max_span: Option<Duration>,
+
+    /// The time interval that determines the starting timestamp for a new bucket. When a document
+    /// requires a new bucket, MongoDB rounds down the document's timestamp value by this interval
+    /// to set the minimum time for the bucket.  If this value is set, the same value should be set
+    /// for `bucket_max_span` and `granularity` should not be set.
+    ///
+    /// This option is only available on MongoDB 6.3+.
+    #[serde(
+        default,
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
+        rename = "bucketRoundingSeconds"
+    )]
+    pub bucket_rounding: Option<Duration>,
 }
 
 /// The units you'd use to describe the expected interval between subsequent measurements for a
