@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{bson::oid::ObjectId, bson_util, options::ServerAddress};
+use crate::{bson::oid::ObjectId, options::ServerAddress, serde_util};
 use derivative::Derivative;
 use derive_more::From;
 
@@ -54,7 +54,7 @@ pub struct ConnectionPoolOptions {
     /// The default is that connections will not be closed due to being idle.
     #[serde(rename = "maxIdleTimeMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
+    #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum number of connections that the pool can have at a given time. This includes

@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, Document},
-    bson_util::serialize_error_as_string,
     error::Error,
     options::ServerAddress,
+    serde_util,
 };
 
 pub use crate::sdam::public::TopologyType;
@@ -150,7 +150,7 @@ pub struct ServerHeartbeatFailedEvent {
     pub duration: Duration,
 
     /// The failure that occurred.
-    #[serde(serialize_with = "serialize_error_as_string")]
+    #[serde(serialize_with = "serde_util::serialize_error_as_string")]
     pub failure: Error,
 
     /// The address of the server.

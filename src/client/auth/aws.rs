@@ -10,7 +10,6 @@ use tokio::sync::Mutex;
 
 use crate::{
     bson::{doc, rawdoc, spec::BinarySubtype, Binary, Bson, Document},
-    bson_util::deserialize_datetime_option_from_double,
     client::{
         auth::{
             self,
@@ -23,6 +22,7 @@ use crate::{
     cmap::Connection,
     error::{Error, Result},
     runtime::HttpClient,
+    serde_util,
 };
 
 const AWS_ECS_IP: &str = "169.254.170.2";
@@ -165,7 +165,10 @@ pub(crate) struct AwsCredential {
     #[serde(alias = "Token")]
     session_token: Option<String>,
 
-    #[serde(default, deserialize_with = "deserialize_datetime_option_from_double")]
+    #[serde(
+        default,
+        deserialize_with = "serde_util::deserialize_datetime_option_from_double"
+    )]
     expiration: Option<bson::DateTime>,
 }
 

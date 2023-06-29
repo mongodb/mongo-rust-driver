@@ -11,8 +11,8 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, serde_helpers, Timestamp},
-    bson_util,
     error::{ErrorKind, Result},
+    serde_util,
 };
 
 /// Specifies the consistency and isolation properties of read operations from replica sets and
@@ -232,8 +232,8 @@ pub struct WriteConcern {
     /// write would not have finished propagating if allowed more time to finish, and the
     /// server will not roll back the writes that occurred before the timeout was reached.
     #[serde(rename = "wtimeout", alias = "wtimeoutMS")]
-    #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
-    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
+    #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
     #[serde(default)]
     pub w_timeout: Option<Duration>,
 
@@ -366,7 +366,7 @@ impl WriteConcern {
         struct WriteConcernHelper<'a> {
             w: Option<&'a Acknowledgment>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             wtimeoutms: Option<Duration>,
 
             journal: Option<bool>,

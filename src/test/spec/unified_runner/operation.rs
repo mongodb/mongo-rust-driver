@@ -41,7 +41,6 @@ use super::{
 
 use crate::{
     bson::{doc, to_bson, Bson, Document},
-    bson_util,
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
     coll::options::Hint,
@@ -75,6 +74,7 @@ use crate::{
     },
     runtime,
     selection_criteria::ReadPreference,
+    serde_util,
     test::FailPoint,
     Collection,
     Database,
@@ -514,7 +514,7 @@ pub(super) struct Find {
     #[serde(
         default,
         rename = "maxTimeMS",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
     )]
     max_time: Option<Duration>,
     min: Option<Document>,

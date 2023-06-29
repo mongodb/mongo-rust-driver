@@ -8,10 +8,10 @@ use serde::de::{Deserializer, Error};
 use serde::Deserialize;
 
 use crate::{
-    bson_util,
     client::auth::Credential,
     event::cmap::{CmapEventHandler, ConnectionPoolOptions as EventOptions},
     options::ClientOptions,
+    serde_util,
 };
 
 /// Contains the options for creating a connection pool.
@@ -39,7 +39,7 @@ pub(crate) struct ConnectionPoolOptions {
     /// The default is that connections will not be closed due to being idle.
     #[serde(rename = "maxIdleTimeMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
+    #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
     pub(crate) max_idle_time: Option<Duration>,
 
     /// The maximum number of connections that the pool can have at a given time. This includes
