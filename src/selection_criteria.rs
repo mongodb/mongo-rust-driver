@@ -279,8 +279,7 @@ pub struct ReadPreferenceOptions {
     #[serde(
         rename = "maxStalenessSeconds",
         default,
-        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
+        with = "serde_util::duration_option_as_int_seconds"
     )]
     pub max_staleness: Option<Duration>,
 
@@ -390,7 +389,7 @@ impl ReadPreference {
 
             readpreferencetags: Option<&'a Vec<HashMap<String, String>>>,
 
-            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_secs")]
+            #[serde(serialize_with = "serde_util::duration_option_as_int_seconds::serialize")]
             maxstalenessseconds: Option<Duration>,
         }
 

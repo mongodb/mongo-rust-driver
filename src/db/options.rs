@@ -98,11 +98,7 @@ pub struct CreateCollectionOptions {
     /// Used to automatically delete documents in time series collections. See the [`create`
     /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for more
     /// information.
-    #[serde(
-        default,
-        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
-    )]
+    #[serde(default, with = "serde_util::duration_option_as_int_seconds")]
     pub expire_after_seconds: Option<Duration>,
 
     /// Options for supporting change stream pre- and post-images.
@@ -218,8 +214,7 @@ pub struct TimeseriesOptions {
     /// This option is only available on MongoDB 6.3+.
     #[serde(
         default,
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
+        with = "serde_util::duration_option_as_int_seconds",
         rename = "bucketMaxSpanSeconds"
     )]
     pub bucket_max_span: Option<Duration>,
@@ -232,8 +227,7 @@ pub struct TimeseriesOptions {
     /// This option is only available on MongoDB 6.3+.
     #[serde(
         default,
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
+        with = "serde_util::duration_option_as_int_seconds",
         rename = "bucketRoundingSeconds"
     )]
     pub bucket_rounding: Option<Duration>,

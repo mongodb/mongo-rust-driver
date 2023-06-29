@@ -8,6 +8,33 @@ use crate::{
     error::{Error, Result},
 };
 
+pub(crate) mod duration_option_as_int_seconds {
+    use super::*;
+
+    pub(crate) fn serialize<S: Serializer>(
+        val: &Option<Duration>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        match val {
+            Some(duration) if duration.as_secs() > i32::MAX as u64 => {
+                serializer.serialize_i64(duration.as_secs() as i64)
+            }
+            Some(duration) => serializer.serialize_i32(duration.as_secs() as i32),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub(crate) fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> std::result::Result<Option<Duration>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let millis = Option::<u64>::deserialize(deserializer)?;
+        Ok(millis.map(Duration::from_secs))
+    }
+}
+
 pub(crate) fn serialize_duration_option_as_int_millis<S: Serializer>(
     val: &Option<Duration>,
     serializer: S,
@@ -21,19 +48,6 @@ pub(crate) fn serialize_duration_option_as_int_millis<S: Serializer>(
     }
 }
 
-pub(crate) fn serialize_duration_option_as_int_secs<S: Serializer>(
-    val: &Option<Duration>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(duration) if duration.as_secs() > i32::MAX as u64 => {
-            serializer.serialize_i64(duration.as_secs() as i64)
-        }
-        Some(duration) => serializer.serialize_i32(duration.as_secs() as i32),
-        None => serializer.serialize_none(),
-    }
-}
-
 pub(crate) fn deserialize_duration_option_from_u64_millis<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<Duration>, D::Error>
@@ -42,16 +56,6 @@ where
 {
     let millis = Option::<u64>::deserialize(deserializer)?;
     Ok(millis.map(Duration::from_millis))
-}
-
-pub(crate) fn deserialize_duration_option_from_u64_seconds<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<Duration>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let millis = Option::<u64>::deserialize(deserializer)?;
-    Ok(millis.map(Duration::from_secs))
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
