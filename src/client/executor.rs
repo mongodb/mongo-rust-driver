@@ -410,9 +410,10 @@ impl Client {
                     drop(server);
 
                     if let Some(r) = retry {
-                        if err.is_server_error()
+                        if (err.is_server_error()
                             || err.is_read_retryable()
-                            || err.is_write_retryable()
+                            || err.is_write_retryable())
+                            && !err.contains_label("NoWritesPerformed")
                         {
                             return Err(err);
                         } else {
@@ -606,7 +607,8 @@ impl Client {
                 connection: connection_info.clone(),
                 service_id,
             })
-        });
+        })
+        .await;
 
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
@@ -706,7 +708,8 @@ impl Client {
                         connection: connection_info.clone(),
                         service_id,
                     })
-                });
+                })
+                .await;
 
                 if let Some(ref mut session) = session {
                     if err.is_network_error() {
@@ -735,7 +738,8 @@ impl Client {
                         connection: connection_info.clone(),
                         service_id,
                     })
-                });
+                })
+                .await;
 
                 #[cfg(feature = "in-use-encryption-unstable")]
                 let response = {

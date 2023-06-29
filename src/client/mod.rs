@@ -218,16 +218,42 @@ impl Client {
             .map_or(false, |cs| cs.exec().has_mongocryptd_client())
     }
 
+    fn test_command_event_channel(&self) -> Option<&options::TestEventSender> {
+        #[cfg(test)]
+        {
+            self.inner
+                .options
+                .test_options
+                .as_ref()
+                .and_then(|t| t.async_event_listener.as_ref())
+        }
+        #[cfg(not(test))]
+        {
+            None
+        }
+    }
+
     #[cfg(not(feature = "tracing-unstable"))]
-    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
-        if let Some(ref handler) = self.inner.options.command_event_handler {
-            let event = generate_event();
+    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        let handler = self.inner.options.command_event_handler.as_ref();
+        let test_channel = self.test_command_event_channel();
+        if handler.is_none() && test_channel.is_none() {
+            return;
+        }
+
+        let event = generate_event();
+        if let Some(tx) = test_channel {
+            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
+            let _ = tx.send(msg).await;
+            ack.wait_for_acknowledgment().await;
+        }
+        if let Some(handler) = handler {
             handle_command_event(handler.as_ref(), event);
         }
     }
 
     #[cfg(feature = "tracing-unstable")]
-    pub(crate) fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
         let tracing_emitter = if trace_or_log_enabled!(
             target: COMMAND_TRACING_EVENT_TARGET,
             TracingOrLogLevel::Debug
@@ -240,11 +266,17 @@ impl Client {
             None
         };
         let apm_event_handler = self.inner.options.command_event_handler.as_ref();
-        if !(tracing_emitter.is_some() || apm_event_handler.is_some()) {
+        let test_channel = self.test_command_event_channel();
+        if !(tracing_emitter.is_some() || apm_event_handler.is_some() || test_channel.is_some()) {
             return;
         }
 
         let event = generate_event();
+        if let Some(tx) = test_channel {
+            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
+            let _ = tx.send(msg).await;
+            ack.wait_for_acknowledgment().await;
+        }
         if let (Some(event_handler), Some(ref tracing_emitter)) =
             (apm_event_handler, &tracing_emitter)
         {

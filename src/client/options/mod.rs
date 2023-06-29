@@ -587,7 +587,14 @@ pub(crate) struct TestOptions {
 
     /// Mock response for `SrvPollingMonitor::lookup_hosts`.
     pub(crate) mock_lookup_hosts: Option<Result<LookupHosts>>,
+
+    /// Async-capable command event listener.
+    pub(crate) async_event_listener: Option<TestEventSender>,
 }
+
+pub(crate) type TestEventSender = tokio::sync::mpsc::Sender<
+    crate::runtime::AcknowledgedMessage<crate::event::command::CommandEvent>,
+>;
 
 fn default_hosts() -> Vec<ServerAddress> {
     vec![ServerAddress::default()]
