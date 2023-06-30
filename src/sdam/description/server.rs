@@ -190,10 +190,7 @@ impl PartialEq for ServerDescription {
 impl ServerDescription {
     pub(crate) fn new(address: ServerAddress) -> Self {
         Self {
-            address: ServerAddress::Tcp {
-                host: address.host().to_lowercase(),
-                port: address.port(),
-            },
+            address,
             server_type: Default::default(),
             last_update_time: None,
             reply: Ok(None),

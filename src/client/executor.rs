@@ -99,7 +99,7 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
-        Box::pin(async {
+        async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
                 return Err(ErrorKind::InvalidArgument {
@@ -130,7 +130,7 @@ impl Client {
                 }
             }
             self.execute_operation_with_retry(op, session).await
-        })
+        }
         .await
     }
 
@@ -141,7 +141,7 @@ impl Client {
     where
         Op: Operation<O = CursorSpecification>,
     {
-        Box::pin(async {
+        async {
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned =
                 self.pin_connection_for_cursor(&details.output, &mut details.connection)?;
@@ -151,7 +151,7 @@ impl Client {
                 details.implicit_session,
                 pinned,
             ))
-        })
+        }
         .await
     }
 
@@ -212,7 +212,7 @@ impl Client {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        Box::pin(async {
+        async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
             let args = WatchArgs {
                 pipeline,
@@ -235,7 +235,7 @@ impl Client {
             let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
             Ok(ChangeStream::new(cursor, args, cs_data))
-        })
+        }
         .await
     }
 
@@ -250,7 +250,7 @@ impl Client {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        Box::pin(async {
+        async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
             let args = WatchArgs {
                 pipeline,
@@ -268,7 +268,7 @@ impl Client {
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
             Ok(SessionChangeStream::new(cursor, args, cs_data))
-        })
+        }
         .await
     }
 
