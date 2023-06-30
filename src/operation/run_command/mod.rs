@@ -11,7 +11,6 @@ use crate::{
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
-    options::WriteConcern,
     selection_criteria::SelectionCriteria,
 };
 
@@ -20,7 +19,6 @@ pub(crate) struct RunCommand<'conn> {
     db: String,
     command: RawDocumentBuf,
     selection_criteria: Option<SelectionCriteria>,
-    write_concern: Option<WriteConcern>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
 }
 
@@ -31,16 +29,10 @@ impl<'conn> RunCommand<'conn> {
         selection_criteria: Option<SelectionCriteria>,
         pinned_connection: Option<&'conn PinnedConnectionHandle>,
     ) -> Result<Self> {
-        let write_concern = command
-            .get("writeConcern")
-            .map(|doc| bson::from_bson::<WriteConcern>(doc.clone()))
-            .transpose()?;
-
         Ok(Self {
             db,
             command: RawDocumentBuf::from_document(&command)?,
             selection_criteria,
-            write_concern,
             pinned_connection,
         })
     }
@@ -52,17 +44,10 @@ impl<'conn> RunCommand<'conn> {
         selection_criteria: Option<SelectionCriteria>,
         pinned_connection: Option<&'conn PinnedConnectionHandle>,
     ) -> Result<Self> {
-        let write_concern = command
-            .get("writeConcern")?
-            .and_then(|b| b.as_document())
-            .map(|doc| bson::from_slice::<WriteConcern>(doc.as_bytes()))
-            .transpose()?;
-
         Ok(Self {
             db,
             command,
             selection_criteria,
-            write_concern,
             pinned_connection,
         })
     }
@@ -119,10 +104,6 @@ impl<'conn> OperationWithDefaults for RunCommand<'conn> {
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.selection_criteria.as_ref()
-    }
-
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        self.write_concern.as_ref()
     }
 
     fn supports_sessions(&self) -> bool {

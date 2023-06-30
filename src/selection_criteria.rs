@@ -186,9 +186,8 @@ impl<'de> Deserialize<'de> for ReadPreference {
             options: ReadPreferenceOptions,
         }
         let preference = ReadPreferenceHelper::deserialize(deserializer)?;
-
-        match preference.mode.as_str() {
-            "Primary" => {
+        match preference.mode.to_ascii_lowercase().as_str() {
+            "primary" => {
                 if !preference.options.is_default() {
                     return Err(D::Error::custom(&format!(
                         "no options can be specified with read preference mode = primary, but got \
@@ -198,16 +197,16 @@ impl<'de> Deserialize<'de> for ReadPreference {
                 }
                 Ok(ReadPreference::Primary)
             }
-            "Secondary" => Ok(ReadPreference::Secondary {
+            "secondary" => Ok(ReadPreference::Secondary {
                 options: preference.options,
             }),
-            "PrimaryPreferred" => Ok(ReadPreference::PrimaryPreferred {
+            "primarypreferred" => Ok(ReadPreference::PrimaryPreferred {
                 options: preference.options,
             }),
-            "SecondaryPreferred" | "secondaryPreferred" => Ok(ReadPreference::SecondaryPreferred {
+            "secondarypreferred" => Ok(ReadPreference::SecondaryPreferred {
                 options: preference.options,
             }),
-            "Nearest" => Ok(ReadPreference::Nearest {
+            "nearest" => Ok(ReadPreference::Nearest {
                 options: preference.options,
             }),
             other => Err(D::Error::custom(format!(
@@ -231,7 +230,6 @@ impl Serialize for ReadPreference {
             #[serde(flatten)]
             options: Option<&'a ReadPreferenceOptions>,
         }
-
         let helper = match self {
             ReadPreference::Primary => ReadPreferenceHelper {
                 mode: "primary",

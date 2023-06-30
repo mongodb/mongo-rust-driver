@@ -114,18 +114,6 @@ async fn inconsistent_write_concern_rejected() {
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
-    let error = db
-        .run_command(
-            doc! {
-                "insert": function_name!(),
-                "documents": [ {} ],
-                "writeConcern": { "w": 0, "j": true }
-            },
-            None,
-        )
-        .await
-        .expect_err("insert should fail");
-    assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
 
     let coll = db.collection(function_name!());
     let wc = WriteConcern {
@@ -149,15 +137,15 @@ async fn unacknowledged_write_concern_rejected() {
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
-    let error = db
-        .run_command(
-            doc! {
-                "insert": function_name!(),
-                "documents": [ {} ],
-                "writeConcern": { "w": 0 }
-            },
-            None,
-        )
+    let coll = db.collection(function_name!());
+    let wc = WriteConcern {
+        w: Acknowledgment::Nodes(0).into(),
+        journal: false.into(),
+        w_timeout: None,
+    };
+    let options = InsertOneOptions::builder().write_concern(wc).build();
+    let error = coll
+        .insert_one(doc! {}, options)
         .await
         .expect_err("insert should fail");
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
