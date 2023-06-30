@@ -186,7 +186,6 @@ impl<'de> Deserialize<'de> for ReadPreference {
             options: ReadPreferenceOptions,
         }
         let preference = ReadPreferenceHelper::deserialize(deserializer)?;
-
         match preference.mode.to_ascii_lowercase().as_str() {
             "primary" => {
                 if !preference.options.is_default() {
@@ -231,7 +230,6 @@ impl Serialize for ReadPreference {
             #[serde(flatten)]
             options: Option<&'a ReadPreferenceOptions>,
         }
-
         let helper = match self {
             ReadPreference::Primary => ReadPreferenceHelper {
                 mode: "primary",
