@@ -191,7 +191,7 @@ pub struct IndexOptionDefaults {
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(into)))]
+#[builder(field_defaults(default))]
 #[non_exhaustive]
 pub struct TimeseriesOptions {
     /// Name of the top-level field to be used for time. Inserted documents must have this field,
