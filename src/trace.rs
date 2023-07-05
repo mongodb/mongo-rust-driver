@@ -35,8 +35,10 @@ impl ServerAddress {
     pub(crate) fn port_tracing_representation(&self) -> Option<u16> {
         match self {
             Self::Tcp { port, .. } => Some(port.unwrap_or(DEFAULT_PORT)),
-            // TODO: RUST-802 For Unix domain sockets we should return None here, as ports
+            // For Unix domain sockets we should return None here, as ports
             // are not meaningful for those.
+            #[cfg(unix)]
+            Self::Unix { .. } => None,
         }
     }
 }
