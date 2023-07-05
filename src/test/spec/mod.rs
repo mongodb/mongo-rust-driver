@@ -63,7 +63,11 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
         .unwrap_or_else(|e| panic!("Failed to read directory at {:?}: {}", &dir_path, e))
     {
         let path = entry.unwrap().path();
-        let Some(filename) = path.file_name().and_then(OsStr::to_str).filter(|name| name.ends_with(".json")) else {
+        let Some(filename) = path
+            .file_name()
+            .and_then(OsStr::to_str)
+            .filter(|name| name.ends_with(".json"))
+        else {
             continue;
         };
 

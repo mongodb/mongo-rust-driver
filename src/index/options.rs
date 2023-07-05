@@ -29,8 +29,7 @@ pub struct IndexOptions {
     #[serde(
         rename = "expireAfterSeconds",
         default,
-        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
+        with = "serde_util::duration_option_as_int_seconds"
     )]
     pub expire_after: Option<Duration>,
 
