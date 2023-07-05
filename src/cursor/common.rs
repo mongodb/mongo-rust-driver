@@ -163,6 +163,10 @@ where
                 if get_more.exhausted {
                     self.mark_exhausted();
                 }
+                if get_more.id != 0 {
+                    self.info.id = get_more.id
+                }
+                self.info.ns = get_more.ns;
                 self.state_mut().buffer = CursorBuffer::new(get_more.batch);
                 self.state_mut().post_batch_resume_token = get_more.post_batch_resume_token;
 
