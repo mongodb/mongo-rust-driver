@@ -2,7 +2,7 @@
 
 set -o errexit
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 source ./.evergreen/feature-combinations.sh
 
 # Pin clippy to the latest version. This should be updated when new versions of Rust are released.

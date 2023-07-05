@@ -3,11 +3,11 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    bson::{Bson, Document},
-    bson_util,
+    bson::{serde_helpers, Bson, Document},
     change_stream::event::ResumeToken,
     db::options::CreateCollectionOptions,
     Namespace,
+    serde_util,
 };
 
 use bson::{Binary, RawDocumentBuf};
@@ -183,8 +183,8 @@ pub struct DatabaseSpecification {
 
     /// The amount of disk space in bytes that is consumed by the database.
     #[serde(
-        deserialize_with = "bson_util::deserialize_u64_from_bson_number",
-        serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64"
+        deserialize_with = "serde_util::deserialize_u64_from_bson_number",
+        serialize_with = "serde_helpers::serialize_u64_as_i64"
     )]
     pub size_on_disk: u64,
 

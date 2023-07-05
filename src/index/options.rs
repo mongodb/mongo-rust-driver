@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use crate::{
     bson::{serde_helpers, Document},
-    bson_util,
     collation::Collation,
+    serde_util,
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -29,8 +29,8 @@ pub struct IndexOptions {
     #[serde(
         rename = "expireAfterSeconds",
         default,
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
+        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
     )]
     pub expire_after: Option<Duration>,
 
@@ -82,7 +82,7 @@ pub struct IndexOptions {
 
     /// For `2dsphere` indexes, the number of precision of the stored geohash value of the
     /// location data. The bits value ranges from 1 to 32 inclusive.
-    #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
+    #[serde(serialize_with = "serde_util::serialize_u32_option_as_i32")]
     pub bits: Option<u32>,
 
     /// For `2dsphere` indexes, the upper inclusive boundary for the longitude and latitude
@@ -95,7 +95,7 @@ pub struct IndexOptions {
 
     /// For `geoHaystack` indexes, specify the number of units within which to group the location
     /// values.
-    #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
+    #[serde(serialize_with = "serde_util::serialize_u32_option_as_i32")]
     pub bucket_size: Option<u32>,
 
     /// If specified, the index only references documents that match the filter

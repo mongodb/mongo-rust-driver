@@ -449,7 +449,7 @@ fn special_operator_matches(
     entities: Option<&EntityMap>,
 ) -> Result<(), String> {
     match key.as_ref() {
-        "$$exists" => match_eq(&value.as_bool().unwrap(), &actual.is_some()),
+        "$$exists" => match_eq(&actual.is_some(), &value.as_bool().unwrap()),
         "$$type" => type_matches(value, actual.unwrap()),
         "$$unsetOrMatches" => {
             if actual.is_some() {

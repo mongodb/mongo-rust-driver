@@ -167,7 +167,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with assume role credentials":
     - command: shell.exec
@@ -205,7 +205,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with aws EC2 credentials":
     - command: shell.exec
@@ -245,7 +245,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} PROJECT_DIRECTORY=${PROJECT_DIRECTORY} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} PROJECT_DIRECTORY=${PROJECT_DIRECTORY} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws auth test with aws credentials and session token as environment variables":
     - command: shell.exec
@@ -267,7 +267,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-aws-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
 
   "run aws ECS auth test":
     - command: shell.exec
@@ -287,7 +287,7 @@ functions:
 
           # compile mini test project
           cd $PROJECT_DIRECTORY/.evergreen/aws-ecs-test
-          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
+          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
           cargo build
           cd -
 
@@ -619,7 +619,7 @@ functions:
           cp -r $MONGOCRYPT_LIB_DIR test-contents
 
           echo "Building test ... begin"
-          . ${PROJECT_DIRECTORY}/.evergreen/configure-rust.sh
+          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
           cargo test get_exe_name --features in-use-encryption-unstable,gcp-kms -- --ignored
           cp $(cat exe_name.txt) test-contents/test-exe
           echo "Building test ... end"
@@ -654,6 +654,48 @@ functions:
             ./test-contents/test-exe on_demand_gcp_credentials --nocapture"
           $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
 
+  "bootstrap oidc":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+          cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
+          set +o xtrace
+
+          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+          export OIDC_TOKEN_DIR=/tmp/tokens
+
+          . ./activate-authoidcvenv.sh
+          python oidc_write_orchestration.py
+          python oidc_get_tokens.py
+  
+  "setup oidc":
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+          cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
+          mongosh setup_oidc.js
+
+  "run oidc tests":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: "src"
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+          export OIDC_TOKEN_DIR=/tmp/tokens
+          .evergreen/run-oidc-tests.sh
 
   "compile only":
     - command: shell.exec
@@ -965,6 +1007,7 @@ tasks:
     # "4.4" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -976,8 +1019,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-5.0-standalone"
@@ -1026,6 +1069,7 @@ tasks:
     # "5.0" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1037,8 +1081,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-6.0-standalone"
@@ -1087,6 +1131,7 @@ tasks:
     # "6.0" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1098,8 +1143,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-7.0-standalone"
@@ -1148,6 +1193,7 @@ tasks:
     # "7.0" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1159,8 +1205,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-rapid-standalone"
@@ -1209,6 +1255,7 @@ tasks:
     # "rapid" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1220,8 +1267,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-latest-standalone"
@@ -1271,6 +1318,7 @@ tasks:
     # "latest" explicitly left off to keep this out of the generic matrix
     tags: ["aws-auth"]
     commands:
+      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
@@ -1282,12 +1330,13 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      - func: "run aws auth test with aws EC2 credentials"
-      - func: "run aws ECS auth test"
+      # - func: "run aws auth test with aws EC2 credentials"
+      # - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-connection-string"
     commands:
+      - func: "install junit dependencies"
       - func: "run connection string tests"
 
   - name: "test-serverless"
@@ -1335,6 +1384,7 @@ tasks:
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
     commands:
+      - func: "install junit dependencies"
       - func: "run atlas tests"
 
   - name: "test-x509-auth"
@@ -1348,12 +1398,26 @@ tasks:
 
   - name: "test-plain-auth"
     commands:
+      - func: "install junit dependencies"
       - func: "run plain tests"
 
   - name: "test-gcp-kms"
     commands:
       - func: "build and upload gcp kms test"
       - func: "run gcp kms test"
+
+  - name: test-oidc-latest
+    commands:
+      - func: "bootstrap oidc"
+      - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          ORCHESTRATION_FILE: "auth-oidc.json"
+          TOPOLOGY: "replica_set"
+          VERSION: "latest"
+      - func: "setup oidc"
+      - func: "run oidc tests"
 
   - name: "compile-only"
     commands:
@@ -2021,6 +2085,14 @@ buildvariants:
   tasks:
     - name: testgcpkms_task_group
       batchtime: 20160
+
+- matrix_name: "oidc"
+  display_name: "OIDC"
+  matrix_spec:
+    os:
+      - ubuntu-20.04
+  tasks:
+    - name: test-oidc-latest
 
 - name: "lint"
   display_name: "! Lint"

@@ -26,6 +26,6 @@ fi
 git fetch origin tag $TAG --no-tags
 git checkout $TAG
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 
 cargo publish --token $TOKEN

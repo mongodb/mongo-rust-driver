@@ -27,7 +27,6 @@ use typed_builder::TypedBuilder;
 use crate::srv::LookupHosts;
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util,
     client::auth::{AuthMechanism, Credential},
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
@@ -36,6 +35,7 @@ use crate::{
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
+    serde_util,
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
@@ -587,7 +587,14 @@ pub(crate) struct TestOptions {
 
     /// Mock response for `SrvPollingMonitor::lookup_hosts`.
     pub(crate) mock_lookup_hosts: Option<Result<LookupHosts>>,
+
+    /// Async-capable command event listener.
+    pub(crate) async_event_listener: Option<TestEventSender>,
 }
+
+pub(crate) type TestEventSender = tokio::sync::mpsc::Sender<
+    crate::runtime::AcknowledgedMessage<crate::event::command::CommandEvent>,
+>;
 
 fn default_hosts() -> Vec<ServerAddress> {
     vec![ServerAddress::default()]
@@ -609,7 +616,7 @@ impl Serialize for ClientOptions {
         struct ClientOptionsHelper<'a> {
             appname: &'a Option<String>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             connecttimeoutms: &'a Option<Duration>,
 
             #[serde(flatten, serialize_with = "Credential::serialize_for_client_options")]
@@ -617,13 +624,13 @@ impl Serialize for ClientOptions {
 
             directconnection: &'a Option<bool>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             heartbeatfrequencyms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             localthresholdms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             maxidletimems: &'a Option<Duration>,
 
             maxpoolsize: &'a Option<u32>,
@@ -645,10 +652,10 @@ impl Serialize for ClientOptions {
             )]
             selectioncriteria: &'a Option<SelectionCriteria>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             serverselectiontimeoutms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             sockettimeoutms: &'a Option<Duration>,
 
             #[serde(flatten, serialize_with = "Tls::serialize_for_client_options")]
@@ -829,7 +836,7 @@ pub struct ConnectionString {
 }
 
 /// Elements from the connection string that are not top-level fields in `ConnectionString`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ConnectionStringParts {
     read_preference_tags: Option<Vec<TagSet>>,
     max_staleness: Option<Duration>,
@@ -1658,8 +1665,8 @@ impl ConnectionString {
                     credential.mechanism_properties = Some(doc);
                 }
 
+                credential.mechanism = Some(mechanism.clone());
                 mechanism.validate_credential(credential)?;
-                credential.mechanism = parts.auth_mechanism.take();
             }
             None => {
                 if let Some(ref mut credential) = conn_str.credential {
@@ -1890,6 +1897,11 @@ impl ConnectionString {
                         Some(index) => {
                             let (k, v) = exclusive_split_at(kvp, index);
                             let key = k.ok_or_else(err_func)?;
+                            if key == "ALLOWED_HOSTS" {
+                                return Err(Error::invalid_argument(
+                                    "ALLOWED_HOSTS must only be specified through client options",
+                                ));
+                            }
                             let value = v.ok_or_else(err_func)?;
                             doc.insert(key, value);
                         }
@@ -2687,8 +2699,8 @@ pub struct TransactionOptions {
     /// The maximum amount of time to allow a single commitTransaction to run.
     #[builder(default)]
     #[serde(
-        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
+        serialize_with = "serde_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis",
         rename(serialize = "maxTimeMS", deserialize = "maxCommitTimeMS"),
         default
     )]

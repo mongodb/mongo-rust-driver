@@ -25,7 +25,7 @@ for arg; do
         echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >> ${CARGO_HOME}/env
         echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ${CARGO_HOME}/env
 
-        source .evergreen/configure-rust.sh
+        source .evergreen/env.sh
         rustup toolchain install nightly -c rustfmt
         # TODO RUST-1674: remove this workaround
         rustup default 1.69

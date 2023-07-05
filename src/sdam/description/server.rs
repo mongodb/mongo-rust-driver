@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{oid::ObjectId, DateTime},
-    bson_util,
     client::ClusterTime,
     error::{Error, ErrorKind, Result},
     hello::{HelloCommandResponse, HelloReply},
     options::ServerAddress,
     selection_criteria::TagSet,
+    serde_util,
 };
 
 const DRIVER_MIN_DB_VERSION: &str = "3.6";
@@ -133,7 +133,7 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the hello reply by propagating with `?`.
-    #[serde(serialize_with = "bson_util::serialize_result_error_as_string")]
+    #[serde(serialize_with = "serde_util::serialize_result_error_as_string")]
     pub(crate) reply: Result<Option<HelloReply>>,
 }
 

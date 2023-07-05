@@ -41,7 +41,6 @@ use super::{
 
 use crate::{
     bson::{doc, to_bson, Bson, Document},
-    bson_util,
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
     coll::options::Hint,
@@ -75,6 +74,7 @@ use crate::{
     },
     runtime,
     selection_criteria::ReadPreference,
+    serde_util,
     test::FailPoint,
     Collection,
     Database,
@@ -514,7 +514,7 @@ pub(super) struct Find {
     #[serde(
         default,
         rename = "maxTimeMS",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
     )]
     max_time: Option<Duration>,
     min: Option<Document>,
@@ -1610,10 +1610,8 @@ pub(super) struct RunCommand {
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "commandName")]
     _command_name: String,
-    read_concern: Option<Document>,
     read_preference: Option<SelectionCriteria>,
     session: Option<String>,
-    write_concern: Option<Document>,
 }
 
 impl TestOperation for RunCommand {
@@ -1623,13 +1621,7 @@ impl TestOperation for RunCommand {
         test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            let mut command = self.command.clone();
-            if let Some(ref read_concern) = self.read_concern {
-                command.insert("readConcern", read_concern.clone());
-            }
-            if let Some(ref write_concern) = self.write_concern {
-                command.insert("writeConcern", write_concern.clone());
-            }
+            let command = self.command.clone();
 
             let db = test_runner.get_database(id).await;
             let result = match &self.session {

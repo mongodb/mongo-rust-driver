@@ -2,9 +2,10 @@ mod test_file;
 
 use std::{sync::Arc, time::Duration};
 
+use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{Mutex, RwLockReadGuard, RwLockWriteGuard};
 
 use test_file::{TestFile, TestResult};
 
@@ -13,11 +14,11 @@ use crate::{
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::CommandEventHandler,
+        command::{CommandEvent, CommandEventHandler},
     },
     options::{ClientOptions, FindOptions, InsertManyOptions},
     runtime,
-    runtime::AsyncJoinHandle,
+    runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         assert_matches,
@@ -35,6 +36,7 @@ use crate::{
         CLIENT_OPTIONS,
         LOCK,
     },
+    Client,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -498,4 +500,96 @@ async fn retry_write_pool_cleared() {
     }
 
     assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
+}
+
+/// Prose test from retryable writes spec verifying that the original error is returned after
+/// encountering a WriteConcernError with a RetryableWriteError label.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_write_retryable_write_error() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    client_options.retry_writes = Some(true);
+    let (event_tx, event_rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
+    // The listener needs to be active on client startup, but also needs a handle to the client
+    // itself for the trigger action.
+    let listener_client: Arc<Mutex<Option<TestClient>>> = Arc::new(Mutex::new(None));
+    // Set up event listener
+    let (fp_tx, mut fp_rx) = tokio::sync::mpsc::unbounded_channel();
+    {
+        let client = listener_client.clone();
+        let mut event_rx = event_rx;
+        let fp_tx = fp_tx.clone();
+        // Spawn a task to watch the event channel
+        spawn(async move {
+            while let Some(msg) = event_rx.recv().await {
+                if let CommandEvent::Succeeded(ev) = &*msg {
+                    if let Some(Bson::Document(wc_err)) = ev.reply.get("writeConcernError") {
+                        if ev.command_name == "insert" && wc_err.get_i32("code") == Ok(91) {
+                            // Spawn a new task so events continue to process
+                            let client = client.clone();
+                            let fp_tx = fp_tx.clone();
+                            spawn(async move {
+                                // Enable the failpoint.
+                                let fp_guard = {
+                                    let client = client.lock().await;
+                                    FailPoint::fail_command(
+                                        &["insert"],
+                                        FailPointMode::Times(1),
+                                        FailCommandOptions::builder()
+                                            .error_code(10107)
+                                            .error_labels(vec![
+                                                "RetryableWriteError".to_string(),
+                                                "NoWritesPerformed".to_string(),
+                                            ])
+                                            .build(),
+                                    )
+                                    .enable(client.as_ref().unwrap(), None)
+                                    .await
+                                    .unwrap()
+                                };
+                                fp_tx.send(fp_guard).unwrap();
+                                // Defer acknowledging the message until the failpoint has been set
+                                // up so the retry hits it.
+                                msg.acknowledge(());
+                            });
+                        }
+                    }
+                }
+            }
+        });
+    }
+    client_options.test_options_mut().async_event_listener = Some(event_tx);
+    let client = Client::test_builder().options(client_options).build().await;
+    *listener_client.lock().await = Some(client.clone());
+
+    if !client.is_replica_set() || client.server_version_lt(6, 0) {
+        log_uncaptured("skipping retry_write_retryable_write_error: invalid topology");
+        return;
+    }
+
+    let _fp_guard = FailPoint::fail_command(
+        &["insert"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .write_concern_error(doc! {
+                "code": 91,
+                "errorLabels": ["RetryableWriteError"],
+            })
+            .build(),
+    )
+    .enable(&client, None)
+    .await
+    .unwrap();
+
+    let result = client
+        .database("test")
+        .collection::<Document>("test")
+        .insert_one(doc! { "hello": "there" }, None)
+        .await;
+    assert_eq!(result.unwrap_err().code(), Some(91));
+
+    // Consume failpoint guard.
+    let _ = fp_rx.recv().await;
 }

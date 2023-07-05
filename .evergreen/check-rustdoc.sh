@@ -2,7 +2,7 @@
 
 set -o errexit
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 
 # docs.rs builds the driver on a read-only file system. to create a more realistic environment, we first
 # build the driver to ensure we have all the deps already in src, and then limit the permissions on that directory

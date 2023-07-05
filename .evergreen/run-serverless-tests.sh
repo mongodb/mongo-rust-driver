@@ -3,37 +3,16 @@
 set -o errexit
 set -o pipefail
 
-source ./.evergreen/env.sh
+source .evergreen/env.sh
+source .evergreen/cargo-test.sh
 
-FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression"
-DEFAULT_FEATURES=""
+FEATURE_FLAGS+=("zstd-compression" "snappy-compression" "zlib-compression" "${TLS_FEATURE}")
 
-if [ "$ASYNC_RUNTIME" = "async-std" ]; then
-    FEATURE_FLAGS="${FEATURE_FLAGS},async-std-runtime"
-    DEFAULT_FEATURES="--no-default-features"
-elif [ "$ASYNC_RUNTIME" != "tokio" ]; then
-    echo "invalid async runtime: ${ASYNC_RUNTIME}" >&2
-    exit 1
-fi
+use_async_runtime
 
-OPTIONS="-- -Z unstable-options --format json --report-time"
+echo "cargo test options: $(cargo_test_options)"
 
-if [ "$SINGLE_THREAD" = true ]; then
-	OPTIONS="$OPTIONS --test-threads=1"
-fi
-
-FEATURE_FLAGS=${FEATURE_FLAGS},${TLS_FEATURE}
-
-echo "cargo test options: ${DEFAULT_FEATURES} --features $FEATURE_FLAGS ${OPTIONS}"
-
-CARGO_RESULT=0
-
-cargo_test() {
-    RUST_BACKTRACE=1 \
-    SERVERLESS="serverless" \
-        cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $1 $OPTIONS | cargo2junit
-    (( CARGO_RESULT = $CARGO_RESULT || $? ))
-}
+export SERVERLESS="serverless"
 
 set +o errexit
 

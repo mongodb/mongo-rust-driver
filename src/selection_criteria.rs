@@ -6,10 +6,10 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::doc,
-    bson_util,
     error::{ErrorKind, Result},
     options::ServerAddress,
     sdam::public::ServerInfo,
+    serde_util,
 };
 
 /// Describes which servers are suitable for a given operation.
@@ -186,9 +186,8 @@ impl<'de> Deserialize<'de> for ReadPreference {
             options: ReadPreferenceOptions,
         }
         let preference = ReadPreferenceHelper::deserialize(deserializer)?;
-
-        match preference.mode.as_str() {
-            "Primary" => {
+        match preference.mode.to_ascii_lowercase().as_str() {
+            "primary" => {
                 if !preference.options.is_default() {
                     return Err(D::Error::custom(&format!(
                         "no options can be specified with read preference mode = primary, but got \
@@ -198,16 +197,16 @@ impl<'de> Deserialize<'de> for ReadPreference {
                 }
                 Ok(ReadPreference::Primary)
             }
-            "Secondary" => Ok(ReadPreference::Secondary {
+            "secondary" => Ok(ReadPreference::Secondary {
                 options: preference.options,
             }),
-            "PrimaryPreferred" => Ok(ReadPreference::PrimaryPreferred {
+            "primarypreferred" => Ok(ReadPreference::PrimaryPreferred {
                 options: preference.options,
             }),
-            "SecondaryPreferred" | "secondaryPreferred" => Ok(ReadPreference::SecondaryPreferred {
+            "secondarypreferred" => Ok(ReadPreference::SecondaryPreferred {
                 options: preference.options,
             }),
-            "Nearest" => Ok(ReadPreference::Nearest {
+            "nearest" => Ok(ReadPreference::Nearest {
                 options: preference.options,
             }),
             other => Err(D::Error::custom(format!(
@@ -231,7 +230,6 @@ impl Serialize for ReadPreference {
             #[serde(flatten)]
             options: Option<&'a ReadPreferenceOptions>,
         }
-
         let helper = match self {
             ReadPreference::Primary => ReadPreferenceHelper {
                 mode: "primary",
@@ -279,8 +277,8 @@ pub struct ReadPreferenceOptions {
     #[serde(
         rename = "maxStalenessSeconds",
         default,
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_seconds",
+        serialize_with = "serde_util::serialize_duration_option_as_int_secs"
     )]
     pub max_staleness: Option<Duration>,
 
@@ -390,7 +388,7 @@ impl ReadPreference {
 
             readpreferencetags: Option<&'a Vec<HashMap<String, String>>>,
 
-            #[serde(serialize_with = "crate::bson_util::serialize_duration_option_as_int_secs")]
+            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_secs")]
             maxstalenessseconds: Option<Duration>,
         }
 

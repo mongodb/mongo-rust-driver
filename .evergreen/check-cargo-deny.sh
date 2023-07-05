@@ -2,7 +2,7 @@
 
 set -o errexit
 
-source ./.evergreen/configure-rust.sh
+source ./.evergreen/env.sh
 
 cargo install --locked cargo-deny
 cargo deny --all-features check

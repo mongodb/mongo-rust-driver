@@ -4,10 +4,10 @@ use serde::Deserialize;
 
 use super::State;
 use crate::{
-    bson_util,
     cmap::options::ConnectionPoolOptions,
     error::Result,
     event::cmap::CmapEvent,
+    serde_util,
     test::RunOn,
 };
 use bson::Document;
@@ -75,7 +75,7 @@ pub enum Operation {
     WaitForEvent {
         event: String,
         count: usize,
-        #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
+        #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
         #[serde(default)]
         timeout: Option<Duration>,
     },

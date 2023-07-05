@@ -64,6 +64,7 @@ impl FailPoint {
     }
 }
 
+#[derive(Debug)]
 pub struct FailPointGuard {
     client: Client,
     failpoint_name: String,
@@ -103,7 +104,7 @@ pub enum FailPointMode {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, TypedBuilder, Serialize)]
+#[derive(Debug, Default, TypedBuilder, Serialize)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub struct FailCommandOptions {

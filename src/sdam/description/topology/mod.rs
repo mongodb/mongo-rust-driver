@@ -228,8 +228,9 @@ impl TopologyDescription {
                     },
                     Some(other) => other,
                 };
-
-                command.set_read_preference(resolved_read_pref)
+                if resolved_read_pref != ReadPreference::Primary {
+                    command.set_read_preference(resolved_read_pref)
+                }
             }
             _ => {
                 let read_pref = match criteria {
@@ -239,7 +240,9 @@ impl TopologyDescription {
                     },
                     None => ReadPreference::Primary,
                 };
-                command.set_read_preference(read_pref)
+                if read_pref != ReadPreference::Primary {
+                    command.set_read_preference(read_pref)
+                }
             }
         }
     }

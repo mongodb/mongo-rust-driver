@@ -1,15 +1,13 @@
 use std::{
     convert::TryFrom,
     io::{Read, Write},
-    time::Duration,
 };
 
 use bson::RawBsonRef;
-use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    bson::{doc, Bson, Document},
-    error::{Error, ErrorKind, Result},
+    bson::{Bson, Document},
+    error::{ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
 
@@ -84,102 +82,6 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
     }
 }
 
-pub(crate) fn serialize_duration_option_as_int_millis<S: Serializer>(
-    val: &Option<Duration>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(duration) if duration.as_millis() > i32::MAX as u128 => {
-            serializer.serialize_i64(duration.as_millis() as i64)
-        }
-        Some(duration) => serializer.serialize_i32(duration.as_millis() as i32),
-        None => serializer.serialize_none(),
-    }
-}
-
-pub(crate) fn serialize_duration_option_as_int_secs<S: Serializer>(
-    val: &Option<Duration>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(duration) if duration.as_secs() > i32::MAX as u64 => {
-            serializer.serialize_i64(duration.as_secs() as i64)
-        }
-        Some(duration) => serializer.serialize_i32(duration.as_secs() as i32),
-        None => serializer.serialize_none(),
-    }
-}
-
-pub(crate) fn deserialize_duration_option_from_u64_millis<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<Duration>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let millis = Option::<u64>::deserialize(deserializer)?;
-    Ok(millis.map(Duration::from_millis))
-}
-
-pub(crate) fn deserialize_duration_option_from_u64_seconds<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<Duration>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let millis = Option::<u64>::deserialize(deserializer)?;
-    Ok(millis.map(Duration::from_secs))
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
-    val: &Option<u32>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(ref val) => bson::serde_helpers::serialize_u32_as_i32(val, serializer),
-        None => serializer.serialize_none(),
-    }
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-pub(crate) fn serialize_u32_option_as_batch_size<S: Serializer>(
-    val: &Option<u32>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(val) if *val <= std::i32::MAX as u32 => (doc! {
-            "batchSize": (*val as i32)
-        })
-        .serialize(serializer),
-        None => Document::new().serialize(serializer),
-        _ => Err(ser::Error::custom(
-            "batch size must be able to fit into a signed 32-bit integer",
-        )),
-    }
-}
-
-pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
-    val: &Option<u64>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    match val {
-        Some(ref v) => bson::serde_helpers::serialize_u64_as_i64(v, serializer),
-        None => serializer.serialize_none(),
-    }
-}
-
-/// Deserialize an u64 from any BSON number type if it could be done losslessly.
-pub(crate) fn deserialize_u64_from_bson_number<'de, D>(
-    deserializer: D,
-) -> std::result::Result<u64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let bson = Bson::deserialize(deserializer)?;
-    get_u64(&bson)
-        .ok_or_else(|| D::Error::custom(format!("could not deserialize u64 from {:?}", bson)))
-}
-
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
 pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> u64 {
     //   * type (1 byte)
@@ -215,24 +117,6 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
 
     Ok(bytes)
-}
-
-/// Serializes an Error as a string.
-pub(crate) fn serialize_error_as_string<S: Serializer>(
-    val: &Error,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    serializer.serialize_str(&val.to_string())
-}
-
-/// Serializes a Result, serializing the error value as a string if present.
-pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
-    val: &Result<T>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    val.as_ref()
-        .map_err(|e| e.to_string())
-        .serialize(serializer)
 }
 
 #[cfg(test)]
