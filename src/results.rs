@@ -6,6 +6,7 @@ use crate::{
     bson::{serde_helpers, Bson, Document},
     change_stream::event::ResumeToken,
     db::options::CreateCollectionOptions,
+    Namespace,
     serde_util,
 };
 
@@ -108,6 +109,8 @@ pub(crate) struct GetMoreResult {
     pub(crate) batch: VecDeque<RawDocumentBuf>,
     pub(crate) exhausted: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
+    pub(crate) ns: Namespace,
+    pub(crate) id: i64,
 }
 
 /// Describes the type of data store returned when executing

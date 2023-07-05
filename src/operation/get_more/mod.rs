@@ -95,6 +95,8 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
             batch: response.cursor.next_batch,
             exhausted: response.cursor.id == 0,
             post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token),
+            id: response.cursor.id,
+            ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
         })
     }
 
@@ -118,4 +120,5 @@ struct NextBatchBody {
     id: i64,
     next_batch: VecDeque<RawDocumentBuf>,
     post_batch_resume_token: Option<RawDocumentBuf>,
+    ns: String,
 }
