@@ -185,7 +185,7 @@ impl ServerAddress {
         // checks if the address is a unix domain socket
         #[cfg(unix)]
         {
-            if address.starts_with('/') {
+            if address.ends_with(".sock") {
                 return Ok(ServerAddress::Unix {
                     path: PathBuf::from(address),
                 });
@@ -264,7 +264,7 @@ impl ServerAddress {
             #[cfg(unix)]
             Self::Unix { path } => {
                 doc! {
-                    "path": path.to_str().unwrap(),
+                    "path": path.to_string_lossy().as_ref(),
                 }
             }
         }
@@ -1610,8 +1610,20 @@ impl ConnectionString {
             None => (None, None),
         };
 
-        let host_list: Result<Vec<_>> =
-            hosts_section.split(',').map(ServerAddress::parse).collect();
+        let host_list = hosts_section.split(',');
+        // checks if the usage of uds is correct
+        host_list.clone().try_for_each(|host| {
+            if host.ends_with(".sock") {
+                #[cfg(unix)]
+                percent_decode(host, "Unix domain sockets must be URL-encoded")?;
+                #[cfg(not(unix))]
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Unix domain sockets are not supported on this platform".into(),
+                });
+            }
+            Ok::<(), crate::error::Error>(())
+        })?;
+        let host_list: Result<Vec<_>> = host_list.map(ServerAddress::parse).collect();
 
         let host_list = host_list?;
 
