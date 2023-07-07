@@ -1,11 +1,11 @@
-use std::time::Duration;
+use std::{ops::Range, time::Duration};
 
 use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     bson::{doc, Bson, Document},
     error::{Error, ErrorKind, GridFsErrorKind},
-    gridfs::{GridFsBucket, GridFsUploadStream},
+    gridfs::{GridFsBucket, GridFsDownloadByIdOptions, GridFsUploadStream},
     options::{GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
@@ -38,19 +38,10 @@ async fn download_stream_across_buffers() {
 
     let client = TestClient::new().await;
 
-    let options = GridFsBucketOptions::builder().chunk_size_bytes(3).build();
-    let bucket = client
-        .database("download_stream_across_buffers")
-        .gridfs_bucket(options);
-    bucket.drop().await.unwrap();
+    let (id, data, bucket) =
+        mock_bucket_for_download(&client, "download_stream_across_buffers", 3, 0..20).await;
 
-    let data: Vec<u8> = (0..20).collect();
-    let id = bucket
-        .upload_from_futures_0_3_reader("test", &data[..], None)
-        .await
-        .unwrap();
-
-    let mut download_stream = bucket.open_download_stream(id.into()).await.unwrap();
+    let mut download_stream = bucket.open_download_stream(id, None).await.unwrap();
     let mut buf = vec![0u8; 12];
 
     // read in a partial chunk
@@ -76,6 +67,411 @@ async fn download_stream_across_buffers() {
     // read in the rest of the data
     download_stream.read_to_end(&mut buf).await.unwrap();
     assert_eq!(buf, data);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_start_single_chunk() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_start_single_chunk",
+        25,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder().start(5).build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[5..]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_end_single_chunk() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_end_single_chunk",
+        25,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder().end(7).build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[..7]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_start_end_single_chunk() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_start_end_single_chunk",
+        25,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(5)
+                .end(12)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[5..12]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_start_multiple_chunks() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_start_multiple_chunks",
+        3,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder().start(4).build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[4..]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_end_multiple_chunks() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_end_multiple_chunks",
+        3,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder().end(7).build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[..7]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_start_end_multiple_chunks() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_start_end_multiple_chunks",
+        3,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(5)
+                .end(13)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[5..13]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_start_end_exact_multiple_chunks() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_start_end_exact_multiple_chunks",
+        3,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(6)
+                .end(15)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[6..15]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_start_end_extract_single_chunk_in_multiple_chunks() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_start_end_extract_single_chunk",
+        3,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(9)
+                .end(12)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[9..12]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_empty_range() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, _, bucket) =
+        mock_bucket_for_download(&client, "partial_download_stream_empty_range", 3, 0..20).await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder().start(9).end(9).build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(buf, Vec::<u8>::new());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_empty_range_at_end() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, _, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_empty_range_at_end",
+        3,
+        0..20,
+    )
+    .await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(20)
+                .end(20)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(buf, Vec::<u8>::new());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_limit_to_end() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, data, bucket) =
+        mock_bucket_for_download(&client, "partial_download_stream_limit_to_end", 3, 0..20).await;
+
+    let mut download_stream = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(9)
+                .end(20)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let mut buf = Vec::new();
+
+    download_stream.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(&buf, &data[9..20]);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_invalid_range_error() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, _, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_invalid_range_error",
+        3,
+        0..20,
+    )
+    .await;
+
+    let download_error = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(10)
+                .end(9)
+                .build(),
+        )
+        .await
+        .err();
+
+    assert!(matches!(
+        *download_error.unwrap().kind,
+        ErrorKind::GridFs(GridFsErrorKind::InvalidPartialDownloadRange { start: 10, end: 9 })
+    ));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn partial_download_stream_out_of_bounds_error() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+
+    let (id, _, bucket) = mock_bucket_for_download(
+        &client,
+        "partial_download_stream_out_of_bounds_error",
+        3,
+        0..20,
+    )
+    .await;
+
+    let download_error = bucket
+        .open_download_stream(
+            id.into(),
+            GridFsDownloadByIdOptions::builder()
+                .start(18)
+                .end(21)
+                .build(),
+        )
+        .await
+        .err();
+
+    assert!(matches!(
+        *download_error.unwrap().kind,
+        ErrorKind::GridFs(GridFsErrorKind::PartialDownloadRangeOutOfBounds {
+            file_length: 20,
+            out_of_bounds_value: 21,
+        })
+    ));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -345,4 +741,25 @@ async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
         .await
         .unwrap()
         .is_none());
+}
+
+async fn mock_bucket_for_download(
+    client: &TestClient,
+    db_name: &str,
+    chunk_size_bytes: u32,
+    data: Range<u8>,
+) -> (Bson, Vec<u8>, GridFsBucket) {
+    let options = GridFsBucketOptions::builder()
+        .chunk_size_bytes(chunk_size_bytes)
+        .build();
+    let bucket = client.database(db_name).gridfs_bucket(options);
+    bucket.drop().await.unwrap();
+
+    let data: Vec<u8> = data.collect();
+    let id = bucket
+        .upload_from_futures_0_3_reader("test", &data[..], None)
+        .await
+        .unwrap();
+
+    (id.into(), data, bucket)
 }

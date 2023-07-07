@@ -14,10 +14,13 @@ use super::{options::GridFsDownloadByNameOptions, Chunk, FilesCollectionDocument
 use crate::{
     bson::{doc, Bson},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
+    gridfs::GridFsDownloadByIdOptions,
     options::{FindOneOptions, FindOptions},
     Collection,
     Cursor,
 };
+
+struct DownloadRange(Option<u64>, Option<u64>);
 
 // Utility functions for finding files within the bucket.
 impl GridFsBucket {
@@ -214,7 +217,7 @@ impl GridFsBucket {
 /// use futures_util::io::AsyncReadExt;
 ///
 /// let mut buf = Vec::new();
-/// let mut download_stream = bucket.open_download_stream(id).await?;
+/// let mut download_stream = bucket.open_download_stream(id, None).await?;
 /// download_stream.read_to_end(&mut buf).await?;
 /// # Ok(())
 /// # }
@@ -228,7 +231,7 @@ impl GridFsBucket {
 /// # async fn compat_example(bucket: GridFsBucket, id: Bson) -> Result<()> {
 /// use tokio_util::compat::FuturesAsyncReadCompatExt;
 ///
-/// let futures_upload_stream = bucket.open_download_stream(id).await?;
+/// let futures_upload_stream = bucket.open_download_stream(id, None).await?;
 /// let tokio_upload_stream = futures_upload_stream.compat();
 /// # Ok(())
 /// # }
@@ -236,7 +239,10 @@ impl GridFsBucket {
 pub struct GridFsDownloadStream {
     state: State,
     current_n: u32,
+    total_n: u32,
     file: FilesCollectionDocument,
+    to_skip: u64,
+    to_take: u64,
 }
 
 type GetBytesFuture = BoxFuture<'static, Result<(Vec<u8>, Box<Cursor<Chunk<'static>>>)>>;
@@ -264,25 +270,71 @@ impl State {
     }
 }
 
+fn validate_range_value(range_value: Option<u64>, file_length: u64) -> Result<()> {
+    if let Some(range) = range_value {
+        if range > file_length {
+            return Err(
+                ErrorKind::GridFs(GridFsErrorKind::PartialDownloadRangeOutOfBounds {
+                    file_length,
+                    out_of_bounds_value: range,
+                })
+                .into(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 impl GridFsDownloadStream {
     async fn new(
         file: FilesCollectionDocument,
         chunks: &Collection<Chunk<'static>>,
+        range: DownloadRange,
     ) -> Result<Self> {
-        let initial_state = if file.length == 0 {
+        validate_range_value(range.0, file.length)?;
+        validate_range_value(range.1, file.length)?;
+
+        let is_empty_range = match range {
+            DownloadRange(Some(start), Some(end)) => start == end,
+            _ => false,
+        };
+
+        let to_skip = range.0.unwrap_or(0);
+        let to_take = range.1.unwrap_or(file.length) - to_skip;
+        let chunk_size = file.chunk_size_bytes as u64;
+        let chunks_to_skip = to_skip / chunk_size;
+        let total_chunks = range
+            .1
+            .map(|end| end / chunk_size + u64::from(end % chunk_size != 0));
+
+        let initial_state = if file.length == 0 || is_empty_range {
             State::Done
         } else {
-            let options = FindOptions::builder().sort(doc! { "n": 1 }).build();
-            let cursor = chunks.find(doc! { "files_id": &file.id }, options).await?;
+            let options = FindOptions::builder()
+                .sort(doc! { "n": 1 })
+                .limit(total_chunks.map(|end| (end - chunks_to_skip) as i64))
+                .build();
+            let cursor = chunks
+                .find(
+                    doc! { "files_id": &file.id, "n": { "$gte": chunks_to_skip as i64 } },
+                    options,
+                )
+                .await?;
+
             State::Idle(Some(Idle {
                 buffer: Vec::new(),
                 cursor: Box::new(cursor),
             }))
         };
+
         Ok(Self {
             state: initial_state,
-            current_n: 0,
+            current_n: chunks_to_skip as u32,
+            total_n: total_chunks.map(|value| value as u32).unwrap_or(file.n()),
             file,
+            to_skip: to_skip % chunk_size,
+            to_take,
         })
     }
 }
@@ -303,12 +355,12 @@ impl AsyncRead for GridFsDownloadStream {
                     Ok((buffer, cursor))
                 } else {
                     let chunks_in_buf = FilesCollectionDocument::n_from_vals(
-                        buf.len() as u64,
+                        stream.to_skip + buf.len() as u64,
                         stream.file.chunk_size_bytes,
                     );
                     // We should read from current_n to chunks_in_buf + current_n, or, if that would
                     // exceed the total number of chunks in the file, to the last chunk in the file.
-                    let final_n = std::cmp::min(chunks_in_buf + stream.current_n, stream.file.n());
+                    let final_n = std::cmp::min(chunks_in_buf + stream.current_n, stream.total_n);
                     let n_range = stream.current_n..final_n;
 
                     stream.current_n = final_n;
@@ -320,9 +372,12 @@ impl AsyncRead for GridFsDownloadStream {
                             n_range,
                             stream.file.chunk_size_bytes,
                             stream.file.length,
+                            stream.to_skip,
                         )
                         .boxed(),
                     );
+
+                    stream.to_skip = 0;
 
                     match new_future.poll_unpin(cx) {
                         Poll::Ready(result) => result,
@@ -340,13 +395,19 @@ impl AsyncRead for GridFsDownloadStream {
 
         match result {
             Ok((mut buffer, cursor)) => {
-                let bytes_to_write = std::cmp::min(buffer.len(), buf.len());
-                buf[..bytes_to_write].copy_from_slice(buffer.drain(0..bytes_to_write).as_slice());
+                let mut bytes_to_write = std::cmp::min(buffer.len(), buf.len());
 
-                stream.state = if !buffer.is_empty() || cursor.has_next() {
-                    State::Idle(Some(Idle { buffer, cursor }))
-                } else {
+                if bytes_to_write as u64 > stream.to_take {
+                    bytes_to_write = stream.to_take as usize;
+                }
+
+                buf[..bytes_to_write].copy_from_slice(buffer.drain(0..bytes_to_write).as_slice());
+                stream.to_take -= bytes_to_write as u64;
+
+                stream.state = if stream.to_take == 0 {
                     State::Done
+                } else {
+                    State::Idle(Some(Idle { buffer, cursor }))
                 };
 
                 Poll::Ready(Ok(bytes_to_write))
@@ -365,6 +426,7 @@ async fn get_bytes(
     n_range: Range<u32>,
     chunk_size_bytes: u32,
     file_len: u64,
+    mut to_skip: u64,
 ) -> Result<(Vec<u8>, Box<Cursor<Chunk<'static>>>)> {
     for n in n_range {
         if !cursor.advance().await? {
@@ -389,19 +451,53 @@ async fn get_bytes(
             .into());
         }
 
-        buffer.extend_from_slice(chunk_bytes);
+        if to_skip >= chunk_bytes.len() as u64 {
+            to_skip -= chunk_bytes.len() as u64;
+        } else if to_skip > 0 {
+            buffer.extend_from_slice(&chunk_bytes[to_skip as usize..]);
+            to_skip = 0;
+        } else {
+            buffer.extend_from_slice(chunk_bytes);
+        }
     }
 
     Ok((buffer, cursor))
+}
+
+fn create_download_range(start: Option<u64>, end: Option<u64>) -> Result<DownloadRange> {
+    match (start, end) {
+        (Some(start), Some(end)) => {
+            if start <= end {
+                Ok(DownloadRange(Some(start), Some(end)))
+            } else {
+                Err(
+                    ErrorKind::GridFs(GridFsErrorKind::InvalidPartialDownloadRange { start, end })
+                        .into(),
+                )
+            }
+        }
+        _ => Ok(DownloadRange(start, end)),
+    }
 }
 
 // User functions for creating download streams.
 impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
-    pub async fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
+    pub async fn open_download_stream(
+        &self,
+        id: Bson,
+        options: impl Into<Option<GridFsDownloadByIdOptions>>,
+    ) -> Result<GridFsDownloadStream> {
+        let options: Option<GridFsDownloadByIdOptions> = options.into();
         let file = self.find_file_by_id(&id).await?;
-        GridFsDownloadStream::new(file, self.chunks()).await
+
+        let range = create_download_range(
+            options.as_ref().and_then(|options| options.start),
+            options.as_ref().and_then(|options| options.end),
+        )?;
+
+        GridFsDownloadStream::new(file, self.chunks(), range).await
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
@@ -416,9 +512,15 @@ impl GridFsBucket {
         filename: impl AsRef<str>,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<GridFsDownloadStream> {
-        let file = self
-            .find_file_by_name(filename.as_ref(), options.into())
-            .await?;
-        GridFsDownloadStream::new(file, self.chunks()).await
+        let options: Option<GridFsDownloadByNameOptions> = options.into();
+
+        let range = create_download_range(
+            options.as_ref().and_then(|options| options.start),
+            options.as_ref().and_then(|options| options.end),
+        )?;
+
+        let file = self.find_file_by_name(filename.as_ref(), options).await?;
+
+        GridFsDownloadStream::new(file, self.chunks(), range).await
     }
 }
