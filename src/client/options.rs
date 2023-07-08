@@ -1621,8 +1621,9 @@ impl ConnectionString {
                 )?);
                 #[cfg(not(unix))]
                 return Err(ErrorKind::InvalidArgument {
-                    message: "Unix domain sockets are not supported on this platform".into(),
-                });
+                    message: "Unix domain sockets are not supported on this platform".to_string(),
+                }
+                .into());
             } else {
                 host_list.push(host.to_string());
             }
