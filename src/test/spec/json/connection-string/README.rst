@@ -33,6 +33,7 @@ array of test case objects, each of which have the following keys:
 
   - ``type``: A string denoting the type of host. Possible values are "ipv4",
     "ip_literal", "hostname", and "unix". Asserting the type is *optional*.
+  - ``path``: A string representing the path of unix domain socket.
   - ``host``: A string containing the parsed host.
   - ``port``: An integer containing the parsed port number.
 - ``auth``: An object containing the following keys:

@@ -43,7 +43,6 @@ async fn run_test(test_file: TestFile) {
             || test_case.description.contains("tlsAllowInvalidHostnames")
             || test_case.description.contains("single-threaded")
             || test_case.description.contains("serverSelectionTryOnce")
-            || test_case.description.contains("Unix")
             || test_case.description.contains("relative path")
             // Compression is implemented but will only pass the tests if all
             // the appropriate feature flags are set.  That is because
@@ -63,6 +62,11 @@ async fn run_test(test_file: TestFile) {
             continue;
         }
 
+        #[cfg(not(unix))]
+        if test_case.description.contains("Unix") {
+            continue;
+        }
+
         let warning = test_case.warning.take().unwrap_or(false);
 
         if test_case.valid && !warning {
@@ -70,12 +74,25 @@ async fn run_test(test_file: TestFile) {
             // hosts
             if let Some(mut json_hosts) = test_case.hosts.take() {
                 // skip over unsupported host types
-                is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
-                    matches!(
-                        h_json.remove("type").as_ref().and_then(Bson::as_str),
-                        Some("ip_literal") | Some("unix")
-                    )
-                });
+                #[cfg(not(unix))]
+                {
+                    is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
+                        matches!(
+                            h_json.remove("type").as_ref().and_then(Bson::as_str),
+                            Some("ip_literal") | Some("unix")
+                        )
+                    });
+                }
+
+                #[cfg(unix)]
+                {
+                    is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
+                        matches!(
+                            h_json.remove("type").as_ref().and_then(Bson::as_str),
+                            Some("ip_literal")
+                        )
+                    });
+                }
 
                 if !is_unsupported_host_type {
                     let options = ClientOptions::parse(&test_case.uri).await.unwrap();

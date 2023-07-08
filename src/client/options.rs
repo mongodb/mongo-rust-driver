@@ -1610,20 +1610,24 @@ impl ConnectionString {
             None => (None, None),
         };
 
-        let host_list = hosts_section.split(',');
+        let mut host_list = Vec::with_capacity(hosts_section.len());
         // checks if the usage of uds is correct
-        host_list.clone().try_for_each(|host| {
+        for host in hosts_section.split(',') {
             if host.ends_with(".sock") {
                 #[cfg(unix)]
-                percent_decode(host, "Unix domain sockets must be URL-encoded")?;
+                host_list.push(percent_decode(
+                    host,
+                    "Unix domain sockets must be URL-encoded",
+                )?);
                 #[cfg(not(unix))]
                 return Err(ErrorKind::InvalidArgument {
                     message: "Unix domain sockets are not supported on this platform".into(),
                 });
+            } else {
+                host_list.push(host.to_string());
             }
-            Ok::<(), crate::error::Error>(())
-        })?;
-        let host_list: Result<Vec<_>> = host_list.map(ServerAddress::parse).collect();
+        }
+        let host_list: Result<Vec<_>> = host_list.into_iter().map(ServerAddress::parse).collect();
 
         let host_list = host_list?;
 
