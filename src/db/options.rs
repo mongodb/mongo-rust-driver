@@ -8,7 +8,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
-    options::Collation,
+    options::{Collation, CursorType},
     selection_criteria::SelectionCriteria,
     serde_util,
 };
@@ -311,4 +311,23 @@ pub struct ListDatabasesOptions {
 pub struct ChangeStreamPreAndPostImages {
     /// If `true`, change streams will be able to include pre- and post-images.
     pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[non_exhaustive]
+pub enum TimeoutMode {
+    Iteration,
+    CursorLifetime,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct RunCursorCommandOptions {
+    pub timeout_mode: Option<TimeoutMode>,
+    pub cursor_type: Option<CursorType>,
+    pub batch_size: Option<u32>,
+    pub max_time_ms: Option<Duration>,
+    pub comment: Option<Bson>,
 }

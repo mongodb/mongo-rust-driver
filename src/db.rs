@@ -4,6 +4,7 @@ use std::{fmt::Debug, sync::Arc};
 
 #[cfg(feature = "in-use-encryption-unstable")]
 use bson::doc;
+use bson::RawDocumentBuf;
 use futures_util::stream::TryStreamExt;
 
 use crate::{
@@ -15,12 +16,20 @@ use crate::{
         ChangeStream,
     },
     client::session::TransactionState,
-    cmap::conn::PinnedConnectionHandle,
+    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::{ReadConcern, WriteConcern},
-    cursor::Cursor,
+    cursor::{Cursor, CursorSpecification},
     error::{Error, ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
+    operation::{
+        Aggregate,
+        AggregateTarget,
+        Create,
+        DropDatabase,
+        ListCollections,
+        Operation,
+        RunCommand,
+    },
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -28,6 +37,7 @@ use crate::{
         DatabaseOptions,
         DropDatabaseOptions,
         ListCollectionsOptions,
+        RunCursorCommandOptions,
     },
     results::CollectionSpecification,
     selection_criteria::SelectionCriteria,
@@ -468,6 +478,21 @@ impl Database {
         self.run_command_common(command, selection_criteria, None, None)
             .await
     }
+    /// Runs a database-level command and returns a cursor to the response.
+    pub async fn run_cursor_command(
+        &self,
+        command: Document,
+        options: RunCursorCommandOptions,
+        // operation: impl Operation<HandleResponse>,
+    ) -> Result<Cursor<Document>> {
+        let rcc = RunCommand::new(self.name().to_string(), command, None, None)?;
+        let rc_command = RunCursorCommand {
+            run_command: rcc,
+            options: options,
+        };
+        let client = self.client();
+        client.execute_cursor_operation(rc_command).await
+    }
 
     /// Runs a database-level command using the provided `ClientSession`.
     ///
@@ -605,5 +630,90 @@ impl Database {
     /// Creates a new [`GridFsBucket`] in the database with the given options.
     pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
         GridFsBucket::new(self.clone(), options.into().unwrap_or_default())
+    }
+}
+
+pub(super) struct RunCursorCommand<'conn> {
+    run_command: RunCommand<'conn>,
+    options: RunCursorCommandOptions,
+}
+
+impl<'conn> Operation for RunCursorCommand<'conn> {
+    type O = CursorSpecification;
+    type Command = RawDocumentBuf;
+
+    const NAME: &'static str = "run_cursor_command";
+
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+        Operation::build(&mut self.run_command, _description)
+    }
+
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+        Operation::serialize_command(&mut self.run_command, cmd)
+    }
+
+    fn extract_at_cluster_time(
+        &self,
+        _response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        Operation::extract_at_cluster_time(&self.run_command, _response)
+    }
+
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        Err(error)
+    }
+
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        Operation::selection_criteria(&self.run_command)
+    }
+
+    fn is_acknowledged(&self) -> bool {
+        Operation::is_acknowledged(&self.run_command)
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        Operation::write_concern(&self.run_command)
+    }
+
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        Operation::supports_read_concern(&self.run_command, _description)
+    }
+
+    fn supports_sessions(&self) -> bool {
+        Operation::supports_sessions(&self.run_command)
+    }
+
+    fn retryability(&self) -> crate::operation::Retryability {
+        Operation::retryability(&self.run_command)
+    }
+
+    fn update_for_retry(&mut self) {
+        Operation::update_for_retry(&mut self.run_command)
+    }
+
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        Operation::pinned_connection(&self.run_command)
+    }
+
+    fn name(&self) -> &str {
+        Operation::name(&self.run_command)
+    }
+
+    fn handle_response(
+        &self,
+        response: RawCommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
+        let doc = Operation::handle_response(&self.run_command, response, description)?;
+        let cursor_info = bson::from_document(doc)?;
+        // let response: CursorBody = response.body()?;
+        // let temp = bson::from_bson(self.options.comment.to_owned().unwrap());
+        Ok(CursorSpecification::new(
+            cursor_info,
+            description.server_address.clone(),
+            self.options.batch_size,
+            self.options.max_time_ms,
+            self.options.comment.clone(),
+        ))
     }
 }
