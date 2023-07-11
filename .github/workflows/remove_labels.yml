@@ -6,7 +6,7 @@ on:
     types: [created, edited]
 jobs:
   remove-labels:
-    if: ${{ github.actor != 'Tom Selander' &&  github.actor != 'patrickfreed'
+    if: ${{ github.actor != 'Tom Selander'
         && github.actor != 'abr-egn' && github.actor != 'isabelatkinson'}}
     runs-on: ubuntu-latest
     steps:
