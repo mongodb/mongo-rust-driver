@@ -48,6 +48,8 @@ use crate::{
     SessionCursor,
 };
 
+use self::options::RunCursorCommandWithSessionOptions;
+
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
 /// database-level operations or to obtain handles to specific collections within the database. A
 /// `Database` can only be obtained through a [`Client`](struct.Client.html) by calling either
@@ -478,17 +480,45 @@ impl Database {
         self.run_command_common(command, selection_criteria, None, None)
             .await
     }
+
     /// Runs a database-level command and returns a cursor to the response.
     pub async fn run_cursor_command(
         &self,
         command: Document,
         options: RunCursorCommandOptions,
-        // operation: impl Operation<HandleResponse>,
     ) -> Result<Cursor<Document>> {
         let rcc = RunCommand::new(self.name().to_string(), command, None, None)?;
         let rc_command = RunCursorCommand {
             run_command: rcc,
-            options: options,
+            options,
+        };
+        let client = self.client();
+        client.execute_cursor_operation(rc_command).await
+    }
+
+    /// Runs a database-level command and returns a cursor to the response.
+    pub async fn run_cursor_command_with_session(
+        &self,
+        command: Document,
+        options: RunCursorCommandWithSessionOptions,
+        session: &mut ClientSession,
+    ) -> Result<Cursor<Document>> {
+        match session.transaction.state {
+            TransactionState::Starting | TransactionState::InProgress => {
+                if command.contains_key("readConcern") {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "Cannot set read concern after starting a transaction".into(),
+                    }
+                    .into());
+                }
+            }
+            _ => {}
+        }
+        let rcc = RunCommand::new(self.name().to_string(), command, options.read_preference.clone(), None)?;
+        let rc_command = RunCursorCommandWithSession {
+            run_command: rcc,
+            options,
+            session,
         };
         let client = self.client();
         client.execute_cursor_operation(rc_command).await
@@ -645,18 +675,18 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
     const NAME: &'static str = "run_cursor_command";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
-        Operation::build(&mut self.run_command, _description)
+        self.run_command.build(_description)
     }
 
     fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        Operation::serialize_command(&mut self.run_command, cmd)
+        self.run_command.serialize_command(cmd)
     }
 
     fn extract_at_cluster_time(
         &self,
         _response: &bson::RawDocument,
     ) -> Result<Option<bson::Timestamp>> {
-        Operation::extract_at_cluster_time(&self.run_command, _response)
+        self.run_command.extract_at_cluster_time(_response)
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {
@@ -664,39 +694,39 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Operation::selection_criteria(&self.run_command)
+        self.run_command.selection_criteria()
     }
 
     fn is_acknowledged(&self) -> bool {
-        Operation::is_acknowledged(&self.run_command)
+        self.run_command.is_acknowledged()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
-        Operation::write_concern(&self.run_command)
+        self.run_command.write_concern()
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        Operation::supports_read_concern(&self.run_command, _description)
+        self.run_command.supports_read_concern(_description)
     }
 
     fn supports_sessions(&self) -> bool {
-        Operation::supports_sessions(&self.run_command)
+        self.run_command.supports_sessions()
     }
 
     fn retryability(&self) -> crate::operation::Retryability {
-        Operation::retryability(&self.run_command)
+        self.run_command.retryability()
     }
 
     fn update_for_retry(&mut self) {
-        Operation::update_for_retry(&mut self.run_command)
+        self.run_command.update_for_retry()
     }
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-        Operation::pinned_connection(&self.run_command)
+        self.run_command.pinned_connection()
     }
 
     fn name(&self) -> &str {
-        Operation::name(&self.run_command)
+        self.run_command.name()
     }
 
     fn handle_response(
@@ -706,8 +736,90 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
     ) -> Result<Self::O> {
         let doc = Operation::handle_response(&self.run_command, response, description)?;
         let cursor_info = bson::from_document(doc)?;
-        // let response: CursorBody = response.body()?;
-        // let temp = bson::from_bson(self.options.comment.to_owned().unwrap());
+        Ok(CursorSpecification::new(
+            cursor_info,
+            description.server_address.clone(),
+            self.options.batch_size,
+            self.options.max_time_ms,
+            self.options.comment.clone(),
+        ))
+    }
+}
+
+pub(super) struct RunCursorCommandWithSession<'conn> {
+    run_command: RunCommand<'conn>,
+    options: RunCursorCommandWithSessionOptions,
+    session: &'conn mut ClientSession,
+}
+
+impl<'conn> Operation for RunCursorCommandWithSession<'conn> {
+    type O = CursorSpecification;
+    type Command = RawDocumentBuf;
+
+    const NAME: &'static str = "run_cursor_command";
+
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+        self.run_command.build(_description)
+    }
+
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+        self.run_command.serialize_command(cmd)
+    }
+
+    fn extract_at_cluster_time(
+        &self,
+        _response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        self.run_command.extract_at_cluster_time(_response)
+    }
+
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        Err(error)
+    }
+
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.run_command.selection_criteria()
+    }
+
+    fn is_acknowledged(&self) -> bool {
+        self.run_command.is_acknowledged()
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.run_command.write_concern()
+    }
+
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        self.run_command.supports_read_concern(_description)
+    }
+
+    fn supports_sessions(&self) -> bool {
+        self.run_command.supports_sessions()
+    }
+
+    fn retryability(&self) -> crate::operation::Retryability {
+        self.run_command.retryability()
+    }
+
+    fn update_for_retry(&mut self) {
+        self.run_command.update_for_retry()
+    }
+
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        self.run_command.pinned_connection()
+    }
+
+    fn name(&self) -> &str {
+        self.run_command.name()
+    }
+
+    fn handle_response(
+        &self,
+        response: RawCommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
+        let doc = Operation::handle_response(&self.run_command, response, description)?;
+        let cursor_info = bson::from_document(doc)?;
         Ok(CursorSpecification::new(
             cursor_info,
             description.server_address.clone(),
