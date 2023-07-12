@@ -501,18 +501,23 @@ impl Database {
         options: RunCursorCommandOptions,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
+        let mut selection_criteria = SelectionCriteria::ReadPreference(options.read_preference.clone().unwrap()).into();
         match session.transaction.state {
             TransactionState::Starting | TransactionState::InProgress => {
-                if command.contains_key("readConcern") {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Cannot set read concern after starting a transaction".into(),
+                selection_criteria = match selection_criteria {
+                    Some(selection_criteria) => Some(selection_criteria),
+                    None => {
+                        if let Some(ref options) = session.transaction.options {
+                            options.selection_criteria.clone()
+                        } else {
+                            None
+                        }
                     }
-                    .into());
-                }
+                };     
             }
             _ => {}
         }
-        let rcc = RunCommand::new(self.name().to_string(), command, options.read_preference.clone(), None)?;
+        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
         let rc_command = RunCursorCommand {
             run_command: rcc,
             options,

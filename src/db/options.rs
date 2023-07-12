@@ -9,7 +9,7 @@ use crate::{
     bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
     options::{Collation, CursorType},
-    selection_criteria::SelectionCriteria,
+    selection_criteria::{SelectionCriteria, ReadPreference},
     serde_util,
 };
 
@@ -332,7 +332,7 @@ pub struct RunCursorCommandOptions {
     /// Optional string enum value, one of 'iteration' | 'cursorLifetime'.
     pub timeout_mode: Option<TimeoutMode>,
     /// The default read preference for operations.
-    pub read_preference: Option<SelectionCriteria>,
+    pub read_preference: Option<ReadPreference>,
     /// Optional string enum value, one of 'tailable' | 'tailableAwait' | 'nonTailable'.
     pub cursor_type: Option<CursorType>,
     /// Number of documents to return per batch.
@@ -343,6 +343,4 @@ pub struct RunCursorCommandOptions {
     /// Optional BSON value. Use this value to configure the comment option sent on subsequent
     /// getMore commands.
     pub comment: Option<Bson>,
-    /// The session to run this command with.
-    pub session: Option<String>,
 }

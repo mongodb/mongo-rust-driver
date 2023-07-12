@@ -74,7 +74,7 @@ pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
-pub const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
+const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
 
 /// A trait modeling the behavior of a server side operation.
 ///
