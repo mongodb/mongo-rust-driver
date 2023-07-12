@@ -346,28 +346,3 @@ pub struct RunCursorCommandOptions {
     /// The session to run this command with.
     pub session: Option<String>,
 }
-
-
-/// Specifies the options to a
-/// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command_with_session) operation.
-#[derive(Clone, Debug, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
-#[non_exhaustive]
-pub struct RunCursorCommandWithSessionOptions {
-    /// Optional string enum value, one of 'iteration' | 'cursorLifetime'.
-    pub timeout_mode: Option<TimeoutMode>,
-    /// The default read preference for operations.
-    pub read_preference: Option<SelectionCriteria>,
-    /// Optional string enum value, one of 'tailable' | 'tailableAwait' | 'nonTailable'.
-    pub cursor_type: Option<CursorType>,
-    /// Number of documents to return per batch.
-    pub batch_size: Option<u32>,
-    /// Optional non-negative integer value. Use this value to configure the maxTimeMS option sent
-    /// on subsequent getMore commands.
-    pub max_time_ms: Option<Duration>,
-    /// Optional BSON value. Use this value to configure the comment option sent on subsequent
-    /// getMore commands.
-    pub comment: Option<Bson>,
-    /// The session to run this command with.
-    pub session: Option<String>,
-}
