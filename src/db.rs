@@ -501,7 +501,9 @@ impl Database {
         options: RunCursorCommandOptions,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
-        let mut selection_criteria = SelectionCriteria::ReadPreference(options.read_preference.clone().unwrap()).into();
+        let mut selection_criteria = options.read_preference
+            .clone()
+            .map(SelectionCriteria::ReadPreference);        
         match session.transaction.state {
             TransactionState::Starting | TransactionState::InProgress => {
                 selection_criteria = match selection_criteria {
