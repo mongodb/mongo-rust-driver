@@ -313,33 +313,21 @@ pub struct ChangeStreamPreAndPostImages {
     pub enabled: bool,
 }
 
-/// Determines the lifetime of a cursor.
-#[derive(Clone, Debug)]
-#[non_exhaustive]
-pub enum TimeoutMode {
-    /// Times out after one Iteration.
-    Iteration,
-    /// Times out after the end of the Cursor Lifetime.
-    CursorLifetime,
-}
-
 /// Specifies the options to a
 /// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command) operation.
 #[derive(Clone, Debug, Default, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct RunCursorCommandOptions {
-    /// Optional string enum value, one of 'iteration' | 'cursorLifetime'.
-    pub timeout_mode: Option<TimeoutMode>,
     /// The default read preference for operations.
     pub read_preference: Option<ReadPreference>,
-    /// Optional string enum value, one of 'tailable' | 'tailableAwait' | 'nonTailable'.
+    /// The type of cursor to return.
     pub cursor_type: Option<CursorType>,
     /// Number of documents to return per batch.
     pub batch_size: Option<u32>,
     /// Optional non-negative integer value. Use this value to configure the maxTimeMS option sent
     /// on subsequent getMore commands.
-    pub max_time_ms: Option<Duration>,
+    pub max_time: Option<Duration>,
     /// Optional BSON value. Use this value to configure the comment option sent on subsequent
     /// getMore commands.
     pub comment: Option<Bson>,

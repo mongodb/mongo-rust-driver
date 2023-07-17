@@ -485,7 +485,10 @@ impl Database {
         command: Document,
         options: RunCursorCommandOptions,
     ) -> Result<Cursor<Document>> {
-        let rcc = RunCommand::new(self.name().to_string(), command, None, None)?;
+        let selection_criteria = options.read_preference
+            .clone()
+            .map(SelectionCriteria::ReadPreference);
+        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
         let rc_command = RunCursorCommand {
             run_command: rcc,
             options,
@@ -744,7 +747,7 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
             cursor_info,
             description.server_address.clone(),
             self.options.batch_size,
-            self.options.max_time_ms,
+            self.options.max_time,
             self.options.comment.clone(),
         ))
     }
