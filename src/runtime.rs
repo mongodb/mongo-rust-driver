@@ -1,4 +1,5 @@
 mod acknowledged_message;
+mod async_resource;
 #[cfg(feature = "reqwest")]
 mod http;
 #[cfg(feature = "async-std-runtime")]

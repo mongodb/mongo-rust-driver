@@ -241,6 +241,7 @@ impl ConnectionPoolWorker {
     /// emit a pool closed event.
     async fn execute(mut self) {
         let mut maintenance_interval = runtime::interval(self.maintenance_frequency);
+        let mut notify = None;
 
         loop {
             let task = tokio::select! {
@@ -304,6 +305,10 @@ impl ConnectionPoolWorker {
                     PoolManagementRequest::HandleConnectionFailed => {
                         self.handle_connection_failed();
                     }
+                    PoolManagementRequest::Terminate(tx) => {
+                        notify = Some(tx);
+                        break
+                    }
                     #[cfg(test)]
                     PoolManagementRequest::Sync(tx) => {
                         let _ = tx.send(());
@@ -331,6 +336,9 @@ impl ConnectionPoolWorker {
             }
             .into()
         });
+        if let Some(tx) = notify {
+            let _ = tx.send(());
+        }
     }
 
     fn below_max_connections(&self) -> bool {

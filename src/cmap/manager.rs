@@ -1,6 +1,4 @@
-use tokio::sync::mpsc;
-#[cfg(test)]
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
 use super::Connection;
 use crate::{bson::oid::ObjectId, error::Error, runtime::AcknowledgedMessage};
@@ -78,6 +76,12 @@ impl PoolManager {
             .send(PoolManagementRequest::HandleConnectionSucceeded(conn));
     }
 
+    pub(super) fn terminate(&self) -> oneshot::Receiver<()> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.sender.send(PoolManagementRequest::Terminate(tx));
+        rx
+    }
+
     /// Create a synchronization point for the pool's worker.
     #[cfg(test)]
     pub(super) fn sync_worker(&self) -> oneshot::Receiver<()> {
@@ -121,6 +125,9 @@ pub(super) enum PoolManagementRequest {
     /// Update the pool after a successful connection, optionally populating the pool
     /// with the successful connection.
     HandleConnectionSucceeded(ConnectionSucceeded),
+
+    /// Terminate the worker.
+    Terminate(oneshot::Sender<()>),
 
     /// Synchronize the worker queue state with an external caller, i.e. a test.
     #[cfg(test)]

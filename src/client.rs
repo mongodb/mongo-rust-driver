@@ -461,6 +461,13 @@ impl Client {
             .await
     }
 
+    /// dbg!
+    pub async fn terminate(self) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.inner.topology.terminate(tx).await;
+        let _ = rx.await;
+    }
+
     /// Check in a server session to the server session pool. The session will be discarded if it is
     /// expired or dirty.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {

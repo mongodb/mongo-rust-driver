@@ -195,6 +195,10 @@ impl Topology {
             .update_command_with_read_pref(server_address, command, criteria)
     }
 
+    pub(crate) async fn terminate(&self, notify: tokio::sync::oneshot::Sender<()>) {
+        self.updater.terminate(notify).await;
+    }
+
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
@@ -253,6 +257,7 @@ pub(crate) enum UpdateMessage {
         error: Error,
         phase: HandshakePhase,
     },
+    Terminate(tokio::sync::oneshot::Sender<()>),
     #[cfg(test)]
     SyncWorkers,
 }
@@ -331,6 +336,7 @@ impl TopologyWorker {
     fn start(mut self) {
         runtime::execute(async move {
             self.initialize().await;
+            let mut notify = None;
 
             loop {
                 tokio::select! {
@@ -353,6 +359,16 @@ impl TopologyWorker {
                                 error,
                                 phase,
                             } => self.handle_application_error(address, error, phase).await,
+                            UpdateMessage::Terminate(tx) => {
+                                let rxen: FuturesUnordered<_> = self
+                                    .servers
+                                    .values()
+                                    .map(|v| v.pool.terminate())
+                                    .collect();
+                                let _: Vec<_> = rxen.collect().await;
+                                notify = Some(tx);
+                                break
+                            },
                             #[cfg(test)]
                             UpdateMessage::SyncWorkers => {
                                 let rxen: FuturesUnordered<_> = self
@@ -392,6 +408,10 @@ impl TopologyWorker {
                         topology_id: self.id,
                     }))
                     .await;
+            }
+
+            if let Some(tx) = notify {
+                let _ = tx.send(());
             }
         });
     }
@@ -812,6 +832,10 @@ impl TopologyUpdater {
     /// This will start server monitors for the newly added servers.
     pub(crate) async fn sync_hosts(&self, hosts: HashSet<ServerAddress>) {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
+    }
+
+    pub(crate) async fn terminate(&self, notify: tokio::sync::oneshot::Sender<()>) {
+        self.send_message(UpdateMessage::Terminate(notify)).await;
     }
 
     #[cfg(test)]
