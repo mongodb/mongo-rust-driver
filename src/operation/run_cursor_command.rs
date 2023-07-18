@@ -44,8 +44,8 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
 
     const NAME: &'static str = "run_cursor_command";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
-        self.run_command.build(_description)
+    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+        self.run_command.build(description)
     }
 
     fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
@@ -54,9 +54,9 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
 
     fn extract_at_cluster_time(
         &self,
-        _response: &bson::RawDocument,
+        response: &bson::RawDocument,
     ) -> Result<Option<bson::Timestamp>> {
-        self.run_command.extract_at_cluster_time(_response)
+        self.run_command.extract_at_cluster_time(response)
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {
@@ -75,8 +75,8 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         self.run_command.write_concern()
     }
 
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        self.run_command.supports_read_concern(_description)
+    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
+        self.run_command.supports_read_concern(description)
     }
 
     fn supports_sessions(&self) -> bool {

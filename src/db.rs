@@ -484,10 +484,7 @@ impl Database {
         command: Document,
         options: RunCursorCommandOptions,
     ) -> Result<Cursor<Document>> {
-        let selection_criteria = options.read_preference
-            .clone()
-            .map(SelectionCriteria::ReadPreference);
-        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
+        let rcc = RunCommand::new(self.name().to_string(), command, options.read_preference.clone(), None)?;
         let rc_command = RunCursorCommand::new(rcc, options)?; 
         let client = self.client();
         client.execute_cursor_operation(rc_command).await
@@ -500,9 +497,7 @@ impl Database {
         options: RunCursorCommandOptions,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
-        let mut selection_criteria = options.read_preference
-            .clone()
-            .map(SelectionCriteria::ReadPreference);        
+        let mut selection_criteria = options.read_preference.clone();      
         match session.transaction.state {
             TransactionState::Starting | TransactionState::InProgress => {
                 selection_criteria = match selection_criteria {

@@ -320,7 +320,7 @@ pub struct ChangeStreamPreAndPostImages {
 #[non_exhaustive]
 pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
-    pub read_preference: Option<ReadPreference>,
+    pub read_preference: Option<SelectionCriteria>,
     /// The type of cursor to return.
     pub cursor_type: Option<CursorType>,
     /// Number of documents to return per batch.
