@@ -7,7 +7,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -18,7 +19,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -29,7 +31,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/ /mongodb-27017.sock"
+                host: "/tmp/ /mongodb-27017.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -40,10 +43,12 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
             -
                 type: "unix"
-                path: "/tmp/mongodb-27018.sock"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -58,7 +63,8 @@ tests:
                 port: 27017
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -69,10 +75,12 @@ tests:
         hosts:
             -
                 type: "hostname"
-                path: "mongodb-27017.sock"
+                host: "mongodb-27017.sock"
+                port: ~
             -
                 type: "unix"
-                path: "/tmp/mongodb-27018.sock"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -83,7 +91,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
         auth:
             username: "alice"
             password: "foo"
@@ -97,7 +106,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/path.to.sock/mongodb-27017.sock"
+                host: "/tmp/path.to.sock/mongodb-27017.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -108,7 +118,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/path.to.sock/mongodb-27017.sock"
+                host: "/tmp/path.to.sock/mongodb-27017.sock"
+                port: ~
         auth: ~
         options: ~
     -
@@ -119,7 +130,8 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/path.to.sock/mongodb-27017.sock"
+                host: "/tmp/path.to.sock/mongodb-27017.sock"
+                port: ~
         auth:
             username: "bob"
             password: "bar"
@@ -133,10 +145,12 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
             -
                 type: "unix"
-                path: "/tmp/mongodb-27018.sock"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
         auth:
             username: ~
             password: ~
@@ -150,10 +164,12 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
             -
                 type: "unix"
-                path: "/tmp/mongodb-27018.sock"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
         auth:
             username: ~
             password: ~
@@ -167,10 +183,12 @@ tests:
         hosts:
             -
                 type: "unix"
-                path: "/tmp/mongodb-27017.sock"
+                host: "/tmp/mongodb-27017.sock"
+                port: ~
             -
                 type: "unix"
-                path: "/tmp/mongodb-27018.sock"
+                host: "/tmp/mongodb-27018.sock"
+                port: ~
         auth:
             username: "bob"
             password: "bar"

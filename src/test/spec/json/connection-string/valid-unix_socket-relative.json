@@ -8,7 +8,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -22,7 +23,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -36,7 +38,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/ /mongodb-27017.sock"
+          "host": "rel/ /mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -50,11 +53,13 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         },
         {
           "type": "unix",
-          "path": "rel/mongodb-27018.sock"
+          "host": "rel/mongodb-27018.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -68,11 +73,13 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         },
         {
           "type": "unix",
-          "path": "/tmp/mongodb-27018.sock"
+          "host": "/tmp/mongodb-27018.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -91,7 +98,8 @@
         },
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -105,11 +113,13 @@
       "hosts": [
         {
           "type": "hostname",
-          "path": "mongodb-27017.sock"
+          "host": "mongodb-27017.sock",
+          "port": null
         },
         {
           "type": "unix",
-          "path": "rel/mongodb-27018.sock"
+          "host": "rel/mongodb-27018.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -123,7 +133,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": {
@@ -141,7 +152,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/path.to.sock/mongodb-27017.sock"
+          "host": "rel/path.to.sock/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -155,7 +167,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/path.to.sock/mongodb-27017.sock"
+          "host": "rel/path.to.sock/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": null,
@@ -169,7 +182,8 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/path.to.sock/mongodb-27017.sock"
+          "host": "rel/path.to.sock/mongodb-27017.sock",
+          "port": null
         }
       ],
       "auth": {
@@ -187,11 +201,13 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         },
         {
           "type": "unix",
-          "path": "rel/mongodb-27018.sock"
+          "host": "rel/mongodb-27018.sock",
+          "port": null
         }
       ],
       "auth": {
@@ -209,11 +225,13 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         },
         {
           "type": "unix",
-          "path": "rel/mongodb-27018.sock"
+          "host": "rel/mongodb-27018.sock",
+          "port": null
         }
       ],
       "auth": {
@@ -231,11 +249,13 @@
       "hosts": [
         {
           "type": "unix",
-          "path": "rel/mongodb-27017.sock"
+          "host": "rel/mongodb-27017.sock",
+          "port": null
         },
         {
           "type": "unix",
-          "path": "rel/mongodb-27018.sock"
+          "host": "rel/mongodb-27018.sock",
+          "port": null
         }
       ],
       "auth": {

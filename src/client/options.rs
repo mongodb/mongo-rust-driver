@@ -91,7 +91,7 @@ lazy_static! {
     };
 
     static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
-        ['/', '\\', ' ', '"', '$', '.'].iter().collect()
+        ['/', '\\', ' ', '"', '$'].iter().collect()
     };
 }
 
@@ -264,7 +264,8 @@ impl ServerAddress {
             #[cfg(unix)]
             Self::Unix { path } => {
                 doc! {
-                    "path": path.to_string_lossy().as_ref(),
+                    "host": path.to_string_lossy().as_ref(),
+                    "port": Bson::Null,
                 }
             }
         }
