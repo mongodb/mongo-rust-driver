@@ -482,7 +482,7 @@ impl Database {
     pub async fn run_cursor_command(
         &self,
         command: Document,
-        options: RunCursorCommandOptions,
+        options: impl Into<Option<RunCursorCommandOptions>>,
     ) -> Result<Cursor<Document>> {
         let rcc = RunCommand::new(self.name().to_string(), command, options.read_preference.clone(), None)?;
         let rc_command = RunCursorCommand::new(rcc, options)?; 
