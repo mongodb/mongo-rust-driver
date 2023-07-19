@@ -1,37 +1,29 @@
-
-
 #[cfg(feature = "in-use-encryption-unstable")]
 use bson::doc;
 use bson::RawDocumentBuf;
 
-
 use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    concern::{WriteConcern},
-    cursor::{CursorSpecification},
+    concern::WriteConcern,
+    cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{
-        Operation,
-        RunCommand,
-    },
-    options::{
-        RunCursorCommandOptions,
-    },
+    operation::{Operation, RunCommand},
+    options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
 };
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCursorCommand<'conn> {
     run_command: RunCommand<'conn>,
-    options: RunCursorCommandOptions,
+    options: Option<RunCursorCommandOptions>,
 }
 
-impl<'conn> RunCursorCommand<'conn>{
-    pub(crate) fn new (
+impl<'conn> RunCursorCommand<'conn> {
+    pub(crate) fn new(
         run_command: RunCommand<'conn>,
-        options: RunCursorCommandOptions,
+        options: Option<RunCursorCommandOptions>,
     ) -> Result<Self> {
-        Ok(Self{
+        Ok(Self {
             run_command,
             options,
         })
@@ -106,12 +98,24 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
     ) -> Result<Self::O> {
         let doc = Operation::handle_response(&self.run_command, response, description)?;
         let cursor_info = bson::from_document(doc)?;
+        let batch_size = match &self.options {
+            Some(options) => options.batch_size.clone(),
+            None => None,
+        };
+        let max_time = match &self.options {
+            Some(options) => options.max_time.clone(),
+            None => None,
+        };
+        let comment = match &self.options {
+            Some(options) => options.comment.clone(),
+            None => None,
+        };
         Ok(CursorSpecification::new(
             cursor_info,
             description.server_address.clone(),
-            self.options.batch_size,
-            self.options.max_time,
-            self.options.comment.clone(),
+            batch_size,
+            max_time,
+            comment,
         ))
     }
 }
