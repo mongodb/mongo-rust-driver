@@ -4,6 +4,7 @@ mod test;
 mod resolver_config;
 
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
@@ -271,11 +272,11 @@ impl ServerAddress {
         }
     }
 
-    pub(crate) fn host(&self) -> &str {
+    pub(crate) fn host(&self) -> Cow<'_, str> {
         match self {
-            Self::Tcp { host, .. } => host.as_str(),
+            Self::Tcp { host, .. } => Cow::Borrowed(host.as_str()),
             #[cfg(unix)]
-            Self::Unix { path } => path.to_str().unwrap(),
+            Self::Unix { path } => path.to_string_lossy(),
         }
     }
 
@@ -1612,26 +1613,25 @@ impl ConnectionString {
         };
 
         let mut host_list = Vec::with_capacity(hosts_section.len());
-        // checks if the usage of uds is correct
         for host in hosts_section.split(',') {
-            if host.ends_with(".sock") {
+            let address = if host.ends_with(".sock") {
                 #[cfg(unix)]
-                host_list.push(percent_decode(
-                    host,
-                    "Unix domain sockets must be URL-encoded",
-                )?);
+                {
+                    ServerAddress::parse(percent_decode(
+                        host,
+                        "Unix domain sockets must be URL-encoded",
+                    )?)
+                }
                 #[cfg(not(unix))]
                 return Err(ErrorKind::InvalidArgument {
                     message: "Unix domain sockets are not supported on this platform".to_string(),
                 }
                 .into());
             } else {
-                host_list.push(host.to_string());
-            }
+                ServerAddress::parse(host)
+            }?;
+            host_list.push(address);
         }
-        let host_list: Result<Vec<_>> = host_list.into_iter().map(ServerAddress::parse).collect();
-
-        let host_list = host_list?;
 
         let hosts = if srv {
             if host_list.len() != 1 {

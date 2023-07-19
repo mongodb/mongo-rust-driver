@@ -106,7 +106,7 @@ impl ServerSelectionTracingEventEmitter<'_> {
                 operation = self.operation_name,
                 selector = self.criteria.tracing_representation(),
                 topologyDescription = topology_description.tracing_representation(),
-                serverHost = server.address().host(),
+                serverHost = server.address().host().as_ref(),
                 serverPort = server.address().port_tracing_representation(),
                 "Server selection succeeded"
             );

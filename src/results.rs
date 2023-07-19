@@ -6,8 +6,8 @@ use crate::{
     bson::{serde_helpers, Bson, Document},
     change_stream::event::ResumeToken,
     db::options::CreateCollectionOptions,
-    Namespace,
     serde_util,
+    Namespace,
 };
 
 use bson::{Binary, RawDocumentBuf};
