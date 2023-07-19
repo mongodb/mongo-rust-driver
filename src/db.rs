@@ -482,9 +482,9 @@ impl Database {
     pub async fn run_cursor_command(
         &self,
         command: Document,
-        options: impl Into<Option<RunCursorCommandOptions>>,
+        options: RunCursorCommandOptions,
     ) -> Result<Cursor<Document>> {
-        let rcc = RunCommand::new(self.name().to_string(), command, options.read_preference.clone(), None)?;
+        let rcc = RunCommand::new(self.name().to_string(), command, options.selection_criteria.clone(), None)?;
         let rc_command = RunCursorCommand::new(rcc, options)?; 
         let client = self.client();
         client.execute_cursor_operation(rc_command).await
@@ -494,29 +494,23 @@ impl Database {
     pub async fn run_cursor_command_with_session(
         &self,
         command: Document,
-        options: RunCursorCommandOptions,
+        options: impl Into<Option<RunCursorCommandOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
-        let mut selection_criteria = options.read_preference.clone();      
-        match session.transaction.state {
-            TransactionState::Starting | TransactionState::InProgress => {
-                selection_criteria = match selection_criteria {
-                    Some(selection_criteria) => Some(selection_criteria),
-                    None => {
-                        if let Some(ref options) = session.transaction.options {
-                            options.selection_criteria.clone()
-                        } else {
-                            None
-                        }
-                    }
-                };     
-            }
-            _ => {}
-        }
+        let mut options: Option<RunCursorCommandOptions> = options.into().clone();
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
+        let selection_criteria = match options.clone() {
+            Some(options) => options.selection_criteria,
+            None => None,
+        };
+        let option = match options.clone() {
+            Some(options) => options,
+            None => RunCursorCommandOptions::default(),
+        };
         let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
-        let rc_command = RunCursorCommand::new(rcc, options)?; 
+        let rc_command = RunCursorCommand::new(rcc, option)?; 
         let client = self.client();
-        client.execute_session_cursor_operation(rc_command, session).await
+        client.execute_session_cursor_operation(rc_command, session).await  
     }
 
     /// Runs a database-level command using the provided `ClientSession`.

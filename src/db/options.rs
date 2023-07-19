@@ -9,7 +9,7 @@ use crate::{
     bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
     options::{Collation, CursorType},
-    selection_criteria::{SelectionCriteria, ReadPreference},
+    selection_criteria::{SelectionCriteria},
     serde_util,
 };
 
