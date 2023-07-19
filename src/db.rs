@@ -3,8 +3,8 @@ pub mod options;
 use std::{fmt::Debug, sync::Arc};
 
 #[cfg(feature = "in-use-encryption-unstable")]
+use bson::doc;
 use futures_util::stream::TryStreamExt;
-use futures_util::TryStreamExt;
 
 use crate::{
     bson::{Bson, Document},
