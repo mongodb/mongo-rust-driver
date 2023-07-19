@@ -170,8 +170,9 @@ pub(crate) async fn resolve_address(
 
     #[cfg(feature = "async-std-runtime")]
     {
-        let host = (address.host(), address.port().unwrap_or(27017));
-        let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
+        use async_std::net::ToSocketAddrs;
+
+        let socket_addrs = format!("{}", address).to_socket_addrs().await?;
         Ok(socket_addrs)
     }
 }
