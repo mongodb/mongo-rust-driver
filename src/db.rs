@@ -20,7 +20,15 @@ use crate::{
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
+    operation::{
+        Aggregate,
+        AggregateTarget,
+        Create,
+        DropDatabase,
+        ListCollections,
+        RunCommand,
+        RunCursorCommand,
+    },
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -28,6 +36,7 @@ use crate::{
         DatabaseOptions,
         DropDatabaseOptions,
         ListCollectionsOptions,
+        RunCursorCommandOptions,
     },
     results::CollectionSpecification,
     selection_criteria::SelectionCriteria,
@@ -466,6 +475,42 @@ impl Database {
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
         self.run_command_common(command, selection_criteria, None, None)
+            .await
+    }
+
+    /// Runs a database-level command and returns a cursor to the response.
+    pub async fn run_cursor_command(
+        &self,
+        command: Document,
+        options: impl Into<Option<RunCursorCommandOptions>>,
+    ) -> Result<Cursor<Document>> {
+        let options: Option<RunCursorCommandOptions> = options.into();
+        let selection_criteria = options
+            .as_ref()
+            .and_then(|options| options.selection_criteria.clone());
+        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
+        let rc_command = RunCursorCommand::new(rcc, options)?;
+        let client = self.client();
+        client.execute_cursor_operation(rc_command).await
+    }
+
+    /// Runs a database-level command and returns a cursor to the response.
+    pub async fn run_cursor_command_with_session(
+        &self,
+        command: Document,
+        options: impl Into<Option<RunCursorCommandOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor<Document>> {
+        let mut options: Option<RunCursorCommandOptions> = options.into();
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
+        let selection_criteria = options
+            .as_ref()
+            .and_then(|options| options.selection_criteria.clone());
+        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
+        let rc_command = RunCursorCommand::new(rcc, options)?;
+        let client = self.client();
+        client
+            .execute_session_cursor_operation(rc_command, session)
             .await
     }
 

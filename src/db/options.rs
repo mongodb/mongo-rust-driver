@@ -8,7 +8,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
-    options::Collation,
+    options::{Collation, CursorType},
     selection_criteria::SelectionCriteria,
     serde_util,
 };
@@ -311,4 +311,24 @@ pub struct ListDatabasesOptions {
 pub struct ChangeStreamPreAndPostImages {
     /// If `true`, change streams will be able to include pre- and post-images.
     pub enabled: bool,
+}
+
+/// Specifies the options to a
+/// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command) operation.
+#[derive(Clone, Debug, Default, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct RunCursorCommandOptions {
+    /// The default read preference for operations.
+    pub selection_criteria: Option<SelectionCriteria>,
+    /// The type of cursor to return.
+    pub cursor_type: Option<CursorType>,
+    /// Number of documents to return per batch.
+    pub batch_size: Option<u32>,
+    /// Optional non-negative integer value. Use this value to configure the maxTimeMS option sent
+    /// on subsequent getMore commands.
+    pub max_time: Option<Duration>,
+    /// Optional BSON value. Use this value to configure the comment option sent on subsequent
+    /// getMore commands.
+    pub comment: Option<Bson>,
 }
