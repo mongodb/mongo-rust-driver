@@ -484,7 +484,7 @@ impl Database {
         command: Document,
         options: impl Into<Option<RunCursorCommandOptions>>,
     ) -> Result<Cursor<Document>> {
-        let options: Option<RunCursorCommandOptions> = options.into().clone();
+        let options: Option<RunCursorCommandOptions> = options.into();
         let selection_criteria = options
             .as_ref()
             .and_then(|options| options.selection_criteria.clone());
