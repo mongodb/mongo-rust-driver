@@ -446,6 +446,8 @@ impl TopologyWorker {
                 let mut servers = diff.changed_servers.into_iter().collect::<Vec<_>>();
                 servers.sort_by_key(|(addr, _)| match addr {
                     ServerAddress::Tcp { host, port } => (host, port),
+                    #[cfg(unix)]
+                    ServerAddress::Unix { .. } => unreachable!(),
                 });
                 servers
             };
@@ -477,6 +479,8 @@ impl TopologyWorker {
                 let mut addresses = diff.removed_addresses.into_iter().collect::<Vec<_>>();
                 addresses.sort_by_key(|addr| match addr {
                     ServerAddress::Tcp { host, port } => (host, port),
+                    #[cfg(unix)]
+                    ServerAddress::Unix { .. } => unreachable!(),
                 });
                 addresses
             };
@@ -513,6 +517,8 @@ impl TopologyWorker {
                 let mut addresses = diff.added_addresses.into_iter().collect::<Vec<_>>();
                 addresses.sort_by_key(|addr| match addr {
                     ServerAddress::Tcp { host, port } => (host, port),
+                    #[cfg(unix)]
+                    ServerAddress::Unix { .. } => unreachable!(),
                 });
                 addresses
             };

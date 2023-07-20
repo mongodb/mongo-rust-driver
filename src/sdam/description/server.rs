@@ -190,9 +190,13 @@ impl PartialEq for ServerDescription {
 impl ServerDescription {
     pub(crate) fn new(address: ServerAddress) -> Self {
         Self {
-            address: ServerAddress::Tcp {
-                host: address.host().to_lowercase(),
-                port: address.port(),
+            address: match address {
+                ServerAddress::Tcp { host, port } => ServerAddress::Tcp {
+                    host: host.to_lowercase(),
+                    port,
+                },
+                #[cfg(unix)]
+                ServerAddress::Unix { path } => ServerAddress::Unix { path },
             },
             server_type: Default::default(),
             last_update_time: None,

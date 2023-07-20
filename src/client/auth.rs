@@ -397,29 +397,6 @@ pub struct Credential {
 }
 
 impl Credential {
-    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
-    pub(crate) fn into_document(mut self) -> Document {
-        use crate::bson::Bson;
-
-        let mut doc = Document::new();
-
-        if let Some(s) = self.username.take() {
-            doc.insert("username", s);
-        }
-
-        if let Some(s) = self.password.take() {
-            doc.insert("password", s);
-        } else {
-            doc.insert("password", Bson::Null);
-        }
-
-        if let Some(s) = self.source.take() {
-            doc.insert("db", s);
-        }
-
-        doc
-    }
-
     pub(crate) fn resolved_source(&self) -> &str {
         self.mechanism
             .as_ref()

@@ -20,13 +20,30 @@ struct TestFile {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TestCase {
-    pub description: String,
-    pub uri: String,
-    pub valid: bool,
-    pub warning: Option<bool>,
-    pub hosts: Option<Vec<Document>>,
-    pub auth: Option<Document>,
-    pub options: Option<Document>,
+    description: String,
+    uri: String,
+    valid: bool,
+    warning: Option<bool>,
+    hosts: Option<Vec<Document>>,
+    auth: Option<TestAuth>,
+    options: Option<Document>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TestAuth {
+    username: Option<String>,
+    password: Option<String>,
+    db: Option<String>,
+}
+
+impl TestAuth {
+    fn matches_client_options(&self, options: &ClientOptions) -> bool {
+        let credential = options.credential.as_ref();
+        self.username.as_ref() == credential.and_then(|cred| cred.username.as_ref())
+            && self.password.as_ref() == credential.and_then(|cred| cred.password.as_ref())
+            && self.db.as_ref() == options.default_database.as_ref()
+    }
 }
 
 async fn run_test(test_file: TestFile) {
@@ -43,7 +60,6 @@ async fn run_test(test_file: TestFile) {
             || test_case.description.contains("tlsAllowInvalidHostnames")
             || test_case.description.contains("single-threaded")
             || test_case.description.contains("serverSelectionTryOnce")
-            || test_case.description.contains("Unix")
             || test_case.description.contains("relative path")
             // Compression is implemented but will only pass the tests if all
             // the appropriate feature flags are set.  That is because
@@ -63,6 +79,11 @@ async fn run_test(test_file: TestFile) {
             continue;
         }
 
+        #[cfg(not(unix))]
+        if test_case.description.contains("Unix") {
+            continue;
+        }
+
         let warning = test_case.warning.take().unwrap_or(false);
 
         if test_case.valid && !warning {
@@ -70,12 +91,25 @@ async fn run_test(test_file: TestFile) {
             // hosts
             if let Some(mut json_hosts) = test_case.hosts.take() {
                 // skip over unsupported host types
-                is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
-                    matches!(
-                        h_json.remove("type").as_ref().and_then(Bson::as_str),
-                        Some("ip_literal") | Some("unix")
-                    )
-                });
+                #[cfg(not(unix))]
+                {
+                    is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
+                        matches!(
+                            h_json.remove("type").as_ref().and_then(Bson::as_str),
+                            Some("ip_literal") | Some("unix")
+                        )
+                    });
+                }
+
+                #[cfg(unix)]
+                {
+                    is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
+                        matches!(
+                            h_json.remove("type").as_ref().and_then(Bson::as_str),
+                            Some("ip_literal")
+                        )
+                    });
+                }
 
                 if !is_unsupported_host_type {
                     let options = ClientOptions::parse(&test_case.uri).await.unwrap();
@@ -154,27 +188,10 @@ async fn run_test(test_file: TestFile) {
 
                     assert_eq!(options_doc, json_options, "{}", test_case.description)
                 }
-                // auth
-                if let Some(json_auth) = test_case.auth {
-                    let json_auth: Document = json_auth
-                        .into_iter()
-                        .filter_map(|(k, v)| {
-                            if let Bson::Null = v {
-                                None
-                            } else {
-                                Some((k.to_lowercase(), v))
-                            }
-                        })
-                        .collect();
 
+                if let Some(test_auth) = test_case.auth {
                     let options = ClientOptions::parse(&test_case.uri).await.unwrap();
-                    let mut expected_auth = options.credential.unwrap_or_default().into_document();
-                    expected_auth = expected_auth
-                        .into_iter()
-                        .filter(|(ref key, _)| json_auth.contains_key(key))
-                        .collect();
-
-                    assert_eq!(expected_auth, json_auth);
+                    assert!(test_auth.matches_client_options(&options));
                 }
             }
         } else {
@@ -276,25 +293,6 @@ async fn parse_unknown_options() {
     )
     .await;
     parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn parse_with_default_database() {
-    let uri = "mongodb://localhost/abc";
-
-    assert_eq!(
-        ClientOptions::parse(uri).await.unwrap(),
-        ClientOptions {
-            hosts: vec![ServerAddress::Tcp {
-                host: "localhost".to_string(),
-                port: None
-            }],
-            original_uri: Some(uri.into()),
-            default_database: Some("abc".to_string()),
-            ..Default::default()
-        }
-    );
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

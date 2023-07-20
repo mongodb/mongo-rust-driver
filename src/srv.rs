@@ -94,7 +94,8 @@ impl SrvResolver {
 
             let domain_name = &hostname_parts[1..];
 
-            let mut hostname_parts: Vec<_> = address.host().split('.').collect();
+            let host = address.host();
+            let mut hostname_parts: Vec<_> = host.split('.').collect();
 
             // Remove empty final section, which indicates a trailing dot.
             if hostname_parts.last().map(|s| s.is_empty()).unwrap_or(false) {
