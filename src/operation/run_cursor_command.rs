@@ -1,5 +1,3 @@
-#[cfg(feature = "in-use-encryption-unstable")]
-use bson::doc;
 use bson::RawDocumentBuf;
 
 use crate::{
@@ -99,11 +97,11 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         let doc = Operation::handle_response(&self.run_command, response, description)?;
         let cursor_info = bson::from_document(doc)?;
         let batch_size = match &self.options {
-            Some(options) => options.batch_size.clone(),
+            Some(options) => options.batch_size,
             None => None,
         };
         let max_time = match &self.options {
-            Some(options) => options.max_time.clone(),
+            Some(options) => options.max_time,
             None => None,
         };
         let comment = match &self.options {
