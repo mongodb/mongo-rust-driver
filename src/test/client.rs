@@ -849,26 +849,17 @@ async fn retry_commit_txn_check_out() {
 /// Verifies that `Client::shutdown` succeeds.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn shutdown_checked_ok() {
+async fn manual_shutdown() {
+    let _guard = LOCK.run_concurrently().await;
     let client = Client::test_builder().build().await.into_client();
-    assert!(client.shutdown().await.is_ok());
+    client.shutdown().await;
 }
 
-/// Verifies that `Client::shutdown` succeeds.
+/// Verifies that `Client::shutdown_immediate` succeeds.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn shutdown_checked_err() {
+async fn manual_shutdown_immediate() {
+    let _guard = LOCK.run_concurrently().await;
     let client = Client::test_builder().build().await.into_client();
-    let evil_client = client.clone();
-    assert!(client.shutdown().await.is_err());
-    assert!(evil_client.shutdown().await.is_ok());
-}
-
-/// Verifies that `Client::shutdown_unchecked` terminates when other live references exist.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn shutdown_unchecked() {
-    let client = Client::test_builder().build().await.into_client();
-    let _evil_client = client.clone();
-    client.shutdown_unchecked().await;
+    client.shutdown_immediate().await;
 }

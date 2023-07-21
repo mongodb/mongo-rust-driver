@@ -474,20 +474,15 @@ impl Client {
             // await points in between.
             let id = id_rx.await.unwrap();
             // If the cleanup channel is closed, that task was dropped.
-            //dbg!("==> waiting for cleanup");
             let cleanup = if let Ok(f) = cleanup_rx.await {
                 f
             } else {
                 return
             };
-            //dbg!("==> running cleanup");
             cleanup.await;
-            //dbg!("==> cleanup done");
             if let Some(client) = weak.upgrade() {
-                //dbg!("==> removing from pending");
                 client.inner.pending_drops.lock().unwrap().remove(&id);
             }
-            //dbg!("==> drop task done");
         });
         let id = self.inner.pending_drops.lock().unwrap().insert(handle);
         let _ = id_tx.send(id);
@@ -495,11 +490,10 @@ impl Client {
     }
 
     /// Shut down this `Client`, terminating background thread workers and closing connections.  This
-    /// will fail (and return the `Client` un-shutdown) if any clones of this `Client` or referencing
-    /// types are still live.  Referencing types are `Database`, `Collection`, `ClientSession`,
-    /// `Cursor`, `SessionCursor`, and `GridFsUploadStream`.
-    pub async fn shutdown(self) -> std::result::Result<(), Self> {
-        // Optimistically wait for any pending drops to finish in case they're holding references.
+    /// will wait for any live handles to server-side resources (cursors, sessions) to be dropped and
+    /// any associated server-side operations to finish.  Calling any methods on clones of this `Client`
+    /// or derived handles after this will return errors.
+    pub async fn shutdown(self) {
         // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the lifetime of
         // the temporary unnamed `MutexLock` until the end of the *statement*, causing the lock to be
         // held for the duration of the join, which deadlocks.
@@ -509,21 +503,17 @@ impl Client {
         {
             TrackingArc::print_live(&self.inner);
         }
-        
-        match TrackingArc::try_unwrap(self.inner) {
-            Ok(inner) => {
-                inner.shutdown().await;
-                Ok(())
-            }
-            Err(inner) => Err(Self { inner })
-        }
+        self.shutdown_immediate().await;
     }
 
-    /// Shut down this `Client`, terminating background thread workers and closing connections.  If any
-    /// referencing types are live, attempting to call any method on them will fail.  See `shutdown` for
-    /// the list of referencing types.
-    pub async fn shutdown_unchecked(self) {
-        self.inner.shutdown().await;
+    /// Shut down this `Client`, terminating background thread workers and closing connections.  This
+    /// does *not* wait for other pending resources to be cleaned up, which may cause both client-side
+    /// errors and server-side resource leaks. Calling any methods on clones of this `Client` or derived
+    /// handles after this will return errors.
+    pub async fn shutdown_immediate(self) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.inner.topology.shutdown(tx).await;
+        let _ = rx.await;
     }
 
     /// Check in a server session to the server session pool. The session will be discarded if it is
@@ -714,15 +704,6 @@ impl Client {
     #[cfg(test)]
     pub(crate) fn options(&self) -> &ClientOptions {
         &self.inner.options
-    }
-}
-
-impl ClientInner {
-    async fn shutdown(&self) {
-        join_all(self.pending_drops.lock().unwrap().extract()).await;
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        self.topology.shutdown(tx).await;
-        let _ = rx.await;
     }
 }
 

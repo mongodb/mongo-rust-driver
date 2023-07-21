@@ -33,6 +33,7 @@ impl<T> TrackingArc<T> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn try_unwrap(tracked: Self) -> Result<T, Self> {
         let inner = tracked.inner.clone();
         #[cfg(feature = "internal-track-arc")]
