@@ -183,8 +183,8 @@ impl ConnectionPool {
         self.generation_subscriber.generation()
     }
 
-    pub(crate) fn terminate(&self) -> tokio::sync::oneshot::Receiver<()> {
-        self.manager.terminate()
+    pub(crate) fn shutdown(&self) -> tokio::sync::oneshot::Receiver<()> {
+        self.manager.shutdown()
     }
 
     #[cfg(test)]

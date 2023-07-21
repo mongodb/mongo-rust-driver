@@ -305,7 +305,7 @@ impl ConnectionPoolWorker {
                     PoolManagementRequest::HandleConnectionFailed => {
                         self.handle_connection_failed();
                     }
-                    PoolManagementRequest::Terminate(tx) => {
+                    PoolManagementRequest::Shutdown(tx) => {
                         notify = Some(tx);
                         break
                     }

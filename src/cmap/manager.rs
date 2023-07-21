@@ -76,9 +76,9 @@ impl PoolManager {
             .send(PoolManagementRequest::HandleConnectionSucceeded(conn));
     }
 
-    pub(super) fn terminate(&self) -> oneshot::Receiver<()> {
+    pub(super) fn shutdown(&self) -> oneshot::Receiver<()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.sender.send(PoolManagementRequest::Terminate(tx));
+        let _ = self.sender.send(PoolManagementRequest::Shutdown(tx));
         rx
     }
 
@@ -126,8 +126,8 @@ pub(super) enum PoolManagementRequest {
     /// with the successful connection.
     HandleConnectionSucceeded(ConnectionSucceeded),
 
-    /// Terminate the worker.
-    Terminate(oneshot::Sender<()>),
+    /// Shut down the worker.
+    Shutdown(oneshot::Sender<()>),
 
     /// Synchronize the worker queue state with an external caller, i.e. a test.
     #[cfg(test)]

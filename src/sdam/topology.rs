@@ -195,8 +195,8 @@ impl Topology {
             .update_command_with_read_pref(server_address, command, criteria)
     }
 
-    pub(crate) async fn terminate(&self, notify: tokio::sync::oneshot::Sender<()>) {
-        self.updater.terminate(notify).await;
+    pub(crate) async fn shutdown(&self, notify: tokio::sync::oneshot::Sender<()>) {
+        self.updater.shutdown(notify).await;
     }
 
     /// Gets the addresses of the servers in the cluster.
@@ -257,7 +257,7 @@ pub(crate) enum UpdateMessage {
         error: Error,
         phase: HandshakePhase,
     },
-    Terminate(tokio::sync::oneshot::Sender<()>),
+    Shutdown(tokio::sync::oneshot::Sender<()>),
     #[cfg(test)]
     SyncWorkers,
 }
@@ -359,11 +359,11 @@ impl TopologyWorker {
                                 error,
                                 phase,
                             } => self.handle_application_error(address, error, phase).await,
-                            UpdateMessage::Terminate(tx) => {
+                            UpdateMessage::Shutdown(tx) => {
                                 let rxen: FuturesUnordered<_> = self
                                     .servers
                                     .values()
-                                    .map(|v| v.pool.terminate())
+                                    .map(|v| v.pool.shutdown())
                                     .collect();
                                 let _: Vec<_> = rxen.collect().await;
                                 notify = Some(tx);
@@ -834,8 +834,8 @@ impl TopologyUpdater {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
     }
 
-    pub(crate) async fn terminate(&self, notify: tokio::sync::oneshot::Sender<()>) {
-        self.send_message(UpdateMessage::Terminate(notify)).await;
+    pub(crate) async fn shutdown(&self, notify: tokio::sync::oneshot::Sender<()>) {
+        self.send_message(UpdateMessage::Shutdown(notify)).await;
     }
 
     #[cfg(test)]

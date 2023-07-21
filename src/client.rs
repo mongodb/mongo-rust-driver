@@ -461,10 +461,9 @@ impl Client {
             .await
     }
 
-    /// dbg!
-    pub async fn terminate(self) {
+    pub async fn shutdown_unchecked(self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.inner.topology.terminate(tx).await;
+        self.inner.topology.shutdown(tx).await;
         let _ = rx.await;
     }
 
