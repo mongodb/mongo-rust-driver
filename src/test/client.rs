@@ -846,12 +846,20 @@ async fn retry_commit_txn_check_out() {
         .expect("should see checked out event");
 }
 
-/// Test verifies that `Client::shutdown` fails when referencing values are live.
+/// Verifies that `Client::shutdown` succeeds.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn shutdown_checked() {
+async fn shutdown_checked_ok() {
     let client = Client::test_builder().build().await.into_client();
-    //let evil_client = client.clone();
     assert!(client.shutdown().await.is_ok());
-    //assert!(evil_client.shutdown().await.is_ok());
+}
+
+/// Verifies that `Client::shutdown` succeeds.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn shutdown_checked_err() {
+    let client = Client::test_builder().build().await.into_client();
+    let evil_client = client.clone();
+    assert!(client.shutdown().await.is_err());
+    assert!(evil_client.shutdown().await.is_ok());
 }
