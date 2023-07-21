@@ -17,8 +17,7 @@ use crate::{
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
     options::{CreateCollectionOptions, FindOneOptions, ReadPreference, SelectionCriteria},
-    runtime,
-    Collection,
+    Collection, client::AsyncDropToken,
 };
 
 // User functions for uploading from readers.
@@ -317,6 +316,7 @@ pub struct GridFsUploadStream {
     // taken and inserted into a FilesCollectionDocument when the stream is closed.
     filename: Option<String>,
     metadata: Option<Option<Document>>,
+    drop_token: AsyncDropToken,
 }
 
 type WriteBytesFuture = BoxFuture<'static, Result<(u32, Vec<u8>)>>;
@@ -376,7 +376,7 @@ impl Drop for GridFsUploadStream {
         if !matches!(self.state, State::Closed) {
             let chunks = self.bucket.chunks().clone();
             let id = self.id.clone();
-            runtime::execute(async move {
+            self.drop_token.spawn(async move {
                 let _result = chunks.delete_many(doc! { "files_id": id }, None).await;
             })
         }
@@ -616,6 +616,7 @@ impl GridFsBucket {
                 .and_then(|opts| opts.chunk_size_bytes)
                 .unwrap_or_else(|| self.chunk_size_bytes()),
             metadata: Some(options.and_then(|opts| opts.metadata)),
+            drop_token: self.client().register_async_drop(),
         }
     }
 }

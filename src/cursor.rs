@@ -19,7 +19,7 @@ use tokio::sync::oneshot;
 
 use crate::{
     change_stream::event::ResumeToken,
-    client::options::ServerAddress,
+    client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
     error::{Error, Result},
     operation::GetMore,
@@ -102,6 +102,7 @@ pub(crate) use common::{
 #[derive(Debug)]
 pub struct Cursor<T> {
     client: Client,
+    drop_token: AsyncDropToken,
     // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor
     // that's had `with_type` called; in all other circumstances it will be `Some`.
     wrapped_cursor: Option<ImplicitSessionCursor>,
@@ -122,6 +123,7 @@ impl<T> Cursor<T> {
 
         Self {
             client: client.clone(),
+            drop_token: client.register_async_drop(),
             wrapped_cursor: Some(ImplicitSessionCursor::new(
                 client,
                 spec,
@@ -271,6 +273,7 @@ impl<T> Cursor<T> {
     {
         Cursor {
             client: self.client.clone(),
+            drop_token: self.drop_token.take(),
             wrapped_cursor: self.wrapped_cursor.take(),
             drop_address: self.drop_address.take(),
             #[cfg(test)]
@@ -332,6 +335,7 @@ impl<T> Drop for Cursor<T> {
 
         kill_cursor(
             self.client.clone(),
+            &mut self.drop_token,
             wrapped_cursor.namespace(),
             wrapped_cursor.id(),
             wrapped_cursor.pinned_connection().replicate(),

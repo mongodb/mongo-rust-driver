@@ -13,8 +13,8 @@ use std::{
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
-use futures_core::Future;
-use futures_util::future::join_all;
+use futures_core::{Future, future::BoxFuture};
+use futures_util::{future::join_all, FutureExt};
 
 #[cfg(test)]
 use crate::options::ServerAddress;
@@ -465,20 +465,33 @@ impl Client {
             .await
     }
 
-    pub(crate) fn spawn_drop(&self, fut: impl Future<Output = ()> + Send + 'static) {
-        let (tx, rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
+    pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
+        let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
+        let (id_tx, id_rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
         let weak = self.weak();
         let handle = crate::runtime::spawn(async move {
             // Unwrap safety: the id is sent immediately after task creation, with no
             // await points in between.
-            let id = rx.await.unwrap();
-            fut.await;
+            let id = id_rx.await.unwrap();
+            // If the cleanup channel is closed, that task was dropped.
+            //dbg!("==> waiting for cleanup");
+            let cleanup = if let Ok(f) = cleanup_rx.await {
+                f
+            } else {
+                return
+            };
+            //dbg!("==> running cleanup");
+            cleanup.await;
+            //dbg!("==> cleanup done");
             if let Some(client) = weak.upgrade() {
+                //dbg!("==> removing from pending");
                 client.inner.pending_drops.lock().unwrap().remove(&id);
             }
+            //dbg!("==> drop task done");
         });
         let id = self.inner.pending_drops.lock().unwrap().insert(handle);
-        let _ = tx.send(id);
+        let _ = id_tx.send(id);
+        AsyncDropToken { tx:Some(cleanup_tx) }
     }
 
     /// Shut down this `Client`, terminating background thread workers and closing connections.  This
@@ -721,5 +734,27 @@ pub(crate) struct WeakClient {
 impl WeakClient {
     pub(crate) fn upgrade(&self) -> Option<Client> {
         self.inner.upgrade().map(|inner| Client { inner })
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub(crate) struct AsyncDropToken {
+    #[derivative(Debug = "ignore")]
+    tx: Option<tokio::sync::oneshot::Sender<BoxFuture<'static, ()>>>,
+}
+
+impl AsyncDropToken {
+    pub(crate) fn spawn(&mut self, fut: impl Future<Output = ()> + Send + 'static) {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send(fut.boxed());
+        } else {
+            #[cfg(debug_assertions)]
+            panic!("exhausted AsyncDropToken");
+        }
+    }
+
+    pub(crate) fn take(&mut self) -> Self {
+        Self { tx: self.tx.take() }
     }
 }

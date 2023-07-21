@@ -19,9 +19,8 @@ use crate::{
     operation,
     options::ServerAddress,
     results::GetMoreResult,
-    runtime,
     Client,
-    Namespace,
+    Namespace, client::AsyncDropToken,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -444,6 +443,7 @@ impl PinnedConnection {
 
 pub(super) fn kill_cursor(
     client: Client,
+    drop_token: &mut AsyncDropToken,
     ns: &Namespace,
     cursor_id: i64,
     pinned_conn: PinnedConnection,
@@ -453,7 +453,7 @@ pub(super) fn kill_cursor(
     let coll = client
         .database(ns.db.as_str())
         .collection::<Document>(ns.coll.as_str());
-    runtime::execute(async move {
+    drop_token.spawn(async move {
         if !pinned_conn.is_invalid() {
             let _ = coll
                 .kill_cursor(cursor_id, pinned_conn.handle(), drop_address)
