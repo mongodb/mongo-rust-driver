@@ -18,7 +18,6 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
-    runtime,
     sdam::{ServerInfo, TransactionSupportStatus},
     selection_criteria::SelectionCriteria,
     Client,
@@ -719,14 +718,16 @@ impl Drop for ClientSession {
                 snapshot_time: self.snapshot_time,
                 operation_time: self.operation_time,
             };
-            runtime::execute(async move {
+            // TODO aegnor: replace this and other spawn-in-drop with a client
+            // method that tracks the joinhandle
+            self.client.spawn_drop(async move {
                 let mut session: ClientSession = dropped_session.into();
                 let _result = session.abort_transaction().await;
             });
         } else {
             let client = self.client.clone();
             let server_session = self.server_session.clone();
-            runtime::execute(async move {
+            self.client.spawn_drop(async move {
                 client.check_in_server_session(server_session).await;
             });
         }

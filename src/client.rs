@@ -6,13 +6,15 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::Arc,
+    sync::{Arc, Mutex as SyncMutex},
     time::{Duration, Instant},
 };
 
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
+use futures_core::Future;
+use futures_util::future::join_all;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
@@ -47,7 +49,7 @@ use crate::{
     },
     results::DatabaseSpecification,
     sdam::{server_selection, SelectedServer, Topology},
-    ClientSession,
+    ClientSession, id_set::IdSet,
 };
 
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -103,9 +105,35 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// driver does not set ``tcp_keepalive_intvl``. See the
 /// [MongoDB Diagnostics FAQ keepalive section](https://www.mongodb.com/docs/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
 /// for instructions on setting these values at the system level.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Client {
     inner: Arc<ClientInner>,
+    #[cfg(test)]
+    clone_id: Option<crate::id_set::Id>,
+}
+
+impl Clone for Client {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        let clone_id = {
+            let bt = backtrace::Backtrace::new_unresolved();
+            Some(self.inner.clones.lock().unwrap().insert(bt))
+        };
+        Self {
+            inner: self.inner.clone(),
+            #[cfg(test)]
+            clone_id,
+        }
+    }
+}
+
+#[cfg(test)]
+impl Drop for Client {
+    fn drop(&mut self) {
+        if let Some(id) = &self.clone_id {
+            self.inner.clones.lock().unwrap().remove(&id);
+        }
+    }
 }
 
 #[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
@@ -124,6 +152,9 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
+    pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
+    #[cfg(test)]
+    clones: SyncMutex<IdSet<backtrace::Backtrace>>,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
 }
@@ -147,11 +178,18 @@ impl Client {
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
+            options,
+            pending_drops: SyncMutex::new(IdSet::new()),
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
-            options,
+            #[cfg(test)]
+            clones: SyncMutex::new(IdSet::new()),
         });
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            #[cfg(test)]
+            clone_id: None,
+        })
     }
 
     /// Return an `EncryptedClientBuilder` for constructing a `Client` with auto-encryption enabled.
@@ -461,10 +499,70 @@ impl Client {
             .await
     }
 
+    pub(crate) fn spawn_drop(&self, fut: impl Future<Output = ()> + Send + 'static) {
+        let (tx, rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
+        let weak = self.weak();
+        let handle = crate::runtime::spawn(async move {
+            // Unwrap safety: the id is sent immediately after task creation, with no
+            // await points in between.
+            let id = rx.await.unwrap();
+            fut.await;
+            if let Some(client) = weak.upgrade() {
+                client.inner.pending_drops.lock().unwrap().remove(&id);
+            }
+        });
+        let id = self.inner.pending_drops.lock().unwrap().insert(handle);
+        let _ = tx.send(id);
+    }
+
+    /// Shut down this `Client`, terminating background thread workers and closing connections.  This
+    /// will fail (and return the `Client` un-shutdown) if any clones of this `Client` or referencing
+    /// types are still live.  Referencing types are `Database`, `Collection`, `ClientSession`,
+    /// `Cursor`, `SessionCursor`, and `GridFsUploadStream`.
+    pub async fn shutdown(self) -> std::result::Result<(), Self> {
+        // Optimistically wait for any pending drops to finish in case they're holding references.
+        // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the lifetime of
+        // the temporary unnamed `MutexLock` until the end of the *statement*, causing the lock to be
+        // held for the duration of the join, which deadlocks.
+        let pending = self.inner.pending_drops.lock().unwrap().extract();
+        join_all(pending).await;
+        #[cfg(not(test))]
+        let Self { inner } = self;
+        #[cfg(test)]
+        let (inner, clone_id) = {
+            let inner = self.inner.clone();
+            let mut self_ = self;
+            let clone_id = self_.clone_id.take();
+            (inner, clone_id)
+        };
+        dbg!(Arc::strong_count(&inner));
+        dbg!(Arc::weak_count(&inner));
+        #[cfg(test)]
+        {
+            for mut bt in inner.clones.lock().unwrap().extract() {
+                bt.resolve();
+                println!("{:?}", bt);
+            }
+        }
+        
+        match Arc::try_unwrap(inner) {
+            Ok(inner) => {
+                inner.shutdown().await;
+                Ok(())
+            }
+            Err(inner) => Err(Self {
+                inner,
+                #[cfg(test)]
+                clone_id,
+            })
+        }
+    }
+
+    /// Shut down this `Client`, terminating background thread workers and closing connections.  If any
+    /// referencing types are live, attempting to call any method on them will fail.  See `shutdown` for
+    /// the list of referencing types.
     pub async fn shutdown_unchecked(self) {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        self.inner.topology.shutdown(tx).await;
-        let _ = rx.await;
+        self.inner.shutdown().await;
     }
 
     /// Check in a server session to the server session pool. The session will be discarded if it is
@@ -636,7 +734,6 @@ impl Client {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {
             inner: Arc::downgrade(&self.inner),
@@ -659,16 +756,23 @@ impl Client {
     }
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
+impl ClientInner {
+    async fn shutdown(&self) {
+        join_all(self.pending_drops.lock().unwrap().extract()).await;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.topology.shutdown(tx).await;
+        let _ = rx.await;
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct WeakClient {
     inner: std::sync::Weak<ClientInner>,
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
 impl WeakClient {
     #[allow(dead_code)]
     pub(crate) fn upgrade(&self) -> Option<Client> {
-        self.inner.upgrade().map(|inner| Client { inner })
+        self.inner.upgrade().map(|inner| Client { inner, #[cfg(test)] clone_id: None })
     }
 }

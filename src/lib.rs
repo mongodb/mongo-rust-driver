@@ -329,6 +329,7 @@ pub mod error;
 pub mod event;
 pub mod gridfs;
 mod hello;
+pub(crate) mod id_set;
 mod index;
 mod operation;
 pub mod results;
