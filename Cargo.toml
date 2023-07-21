@@ -86,8 +86,11 @@ in-use-encryption-unstable = ["mongocrypt", "rayon", "num_cpus"]
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
 tracing-unstable = ["tracing", "log"]
 
+internal-track-arc = ["backtrace"]
+
 [dependencies]
 async-trait = "0.1.42"
+backtrace = { version = "0.3.68", optional = true }
 base64 = "0.13.0"
 bitflags = "1.1.0"
 bson = { git = "https://github.com/mongodb/bson-rust", branch = "main" }
@@ -180,7 +183,6 @@ features = ["v4"]
 anyhow = { version = "1.0", features = ["backtrace"] }
 approx = "0.5.1"
 async_once = "0.2.6"
-backtrace = "0.3.68"
 ctrlc = "3.2.2"
 function_name = "0.2.1"
 futures = "0.3"

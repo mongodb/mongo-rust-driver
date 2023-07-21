@@ -127,8 +127,6 @@ struct ClientInner {
     options: ClientOptions,
     session_pool: ServerSessionPool,
     pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
-    #[cfg(test)]
-    clones: SyncMutex<IdSet<backtrace::Backtrace>>,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
 }
@@ -156,8 +154,6 @@ impl Client {
             pending_drops: SyncMutex::new(IdSet::new()),
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
-            #[cfg(test)]
-            clones: SyncMutex::new(IdSet::new()),
         });
         Ok(Self { inner })
     }
@@ -496,7 +492,7 @@ impl Client {
         // held for the duration of the join, which deadlocks.
         let pending = self.inner.pending_drops.lock().unwrap().extract();
         join_all(pending).await;
-        #[cfg(test)]
+        #[cfg(feature = "internal-track-arc")]
         {
             TrackingArc::print_live(&self.inner);
         }
