@@ -1,57 +1,100 @@
-use std::sync::mpsc;
+use std::sync::{Arc, Weak};
 
-use futures_util::FutureExt;
+use tokio::sync::{Mutex, MutexGuard};
 
-use crate::client::auth::oidc::BoxFuture;
-
-use super::spawn_blocking;
+use crate::error::{Error, ErrorKind, Result};
 
 #[async_trait::async_trait]
 pub(crate) trait AsyncDrop {
     async fn async_drop(&mut self);
 }
 
+#[async_trait::async_trait]
+impl<T: AsyncDrop + Send> AsyncDrop for Option<T> {
+    async fn async_drop(&mut self) {
+        if let Some(mut v) = self.take() {
+            v.async_drop().await;
+        }
+    }
+}
+
 pub(crate) struct AsyncResource<T> where T: AsyncDrop + Send + 'static {
-    value: Option<T>,
-    sender: mpsc::Sender<DropMessage>,
+    value: Arc<Mutex<Option<T>>>,
+}
+
+fn shutdown_err<T>() -> Result<T> {
+    Result::Err(Error::new(ErrorKind::Shutdown, None::<Vec<String>>))
 }
 
 impl<T: AsyncDrop + Send + 'static> AsyncResource<T> {
-    pub(crate) fn new(value: T) -> Self {
-        let (sender, receiver) = mpsc::channel();
-        let handle = tokio::runtime::Handle::current();
-        spawn_blocking(|| async_drop_thread(receiver, handle));
-        Self {
-            value: Some(value),
-            sender,
+    pub(crate) async fn get(&self) -> Result<Guard<'_, T>> {
+        let inner = self.value.lock().await;
+        if inner.is_none() {
+            return shutdown_err();
         }
+        Ok(Guard { inner })
     }
 
-    pub(crate) fn add_child<C: AsyncDrop + Send + 'static>(&self, value: C) -> AsyncResource<C> {
-        AsyncResource { value: Some(value), sender: self.sender.clone() }
-    }
-
-    pub(crate) async fn terminate(self) {
-        // TODO: needs to be able to terminate children
-        // add_child spawns a task listening on a one-shot that has an Arc<> to the value?
+    async fn shutdown(self) {
+        self.value.lock().await.async_drop().await;
     }
 }
 
 impl<T: AsyncDrop + Send + 'static> Drop for AsyncResource<T> {
     fn drop(&mut self) {
-        if let Some(mut v) = self.value.take() {
-            let fut = async move {
-                v.async_drop().await;
-            }.boxed();
-            self.sender.send(fut).unwrap();
-        }
+        let mut v = crate::runtime::block_on(async { 
+            self.value.lock().await.take()
+        });
+        crate::runtime::spawn(async move { v.async_drop().await });
     }
 }
 
-type DropMessage = BoxFuture<'static, ()>;
+pub(crate) struct Guard<'a, T> {
+    inner: MutexGuard<'a, Option<T>>,
+}
 
-fn async_drop_thread(receiver: mpsc::Receiver<DropMessage>, runtime: tokio::runtime::Handle) {
-    while let Ok(drop_fut) = receiver.recv() {
-        runtime.block_on(drop_fut);
+impl<'a, T> std::ops::Deref for Guard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref().unwrap()
+    }
+}
+
+impl<'a, T> std::ops::DerefMut for Guard<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner.as_mut().unwrap()
+    }
+}
+
+impl<'a, T> Drop for Guard<'a, T> {
+    fn drop(&mut self) {
+        
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Registry {
+    // TODO: this is a memory leak; needs a garbage collection task or something?
+    children: Vec<Weak<Mutex<dyn AsyncDrop + Send + Sync>>>,
+}
+
+impl Registry {
+    pub(crate) fn new() -> Self {
+        Self { children: vec![] }
+    }
+
+    pub(crate) fn add<T: AsyncDrop + Send + Sync + 'static>(&mut self, value: T) -> AsyncResource<T> {
+        let value = Arc::new(Mutex::new(Some(value)));
+        self.children.push(Arc::downgrade(&value) as Weak<Mutex<_>>);
+        AsyncResource { value }
+    }
+
+    pub(crate) async fn shutdown(&mut self) {
+        // TODO: This could be parallelized if it turns out to be a bottleneck.
+        for child in self.children.drain(..) {
+            if let Some(value) = child.upgrade() {
+                value.lock().await.async_drop().await;
+            }
+        }
     }
 }

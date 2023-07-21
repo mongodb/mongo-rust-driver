@@ -1,5 +1,6 @@
 mod acknowledged_message;
-mod async_resource;
+#[allow(unused)]
+pub(crate) mod async_resource;
 #[cfg(feature = "reqwest")]
 mod http;
 #[cfg(feature = "async-std-runtime")]
@@ -83,14 +84,13 @@ where
     spawn(fut);
 }
 
-#[cfg(any(test, feature = "sync", feature = "tokio-sync"))]
 pub(crate) fn block_on<F, T>(fut: F) -> T
 where
     F: Future<Output = T>,
 {
     #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
     {
-        tokio::task::block_in_place(|| futures::executor::block_on(fut))
+        tokio::task::block_in_place(|| futures_executor::block_on(fut))
     }
 
     #[cfg(feature = "tokio-sync")]

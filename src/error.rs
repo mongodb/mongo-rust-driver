@@ -465,6 +465,7 @@ impl Error {
             | ErrorKind::MissingResumeToken
             | ErrorKind::Authentication { .. }
             | ErrorKind::Custom(_)
+            | ErrorKind::Shutdown
             | ErrorKind::GridFs(_) => {}
             #[cfg(feature = "in-use-encryption-unstable")]
             ErrorKind::Encryption(_) => {}
@@ -624,6 +625,10 @@ pub enum ErrorKind {
     /// A custom value produced by user code.
     #[error("Custom user error")]
     Custom(Arc<dyn Any + Send + Sync>),
+
+    /// A method was called on a client that was shut down.
+    #[error("Client has been shut down")]
+    Shutdown,
 }
 
 impl ErrorKind {
