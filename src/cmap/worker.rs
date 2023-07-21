@@ -307,7 +307,7 @@ impl ConnectionPoolWorker {
                     }
                     PoolManagementRequest::Shutdown(tx) => {
                         notify = Some(tx);
-                        break
+                        break;
                     }
                     #[cfg(test)]
                     PoolManagementRequest::Sync(tx) => {

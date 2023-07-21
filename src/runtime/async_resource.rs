@@ -18,7 +18,10 @@ impl<T: AsyncDrop + Send> AsyncDrop for Option<T> {
     }
 }
 
-pub(crate) struct AsyncResource<T> where T: AsyncDrop + Send + 'static {
+pub(crate) struct AsyncResource<T>
+where
+    T: AsyncDrop + Send + 'static,
+{
     value: Arc<Mutex<Option<T>>>,
 }
 
@@ -42,9 +45,7 @@ impl<T: AsyncDrop + Send + 'static> AsyncResource<T> {
 
 impl<T: AsyncDrop + Send + 'static> Drop for AsyncResource<T> {
     fn drop(&mut self) {
-        let mut v = crate::runtime::block_on(async { 
-            self.value.lock().await.take()
-        });
+        let mut v = crate::runtime::block_on(async { self.value.lock().await.take() });
         crate::runtime::spawn(async move { v.async_drop().await });
     }
 }
@@ -67,9 +68,7 @@ impl<'a, T> std::ops::DerefMut for Guard<'a, T> {
 }
 
 impl<'a, T> Drop for Guard<'a, T> {
-    fn drop(&mut self) {
-        
-    }
+    fn drop(&mut self) {}
 }
 
 #[derive(Debug)]
@@ -83,7 +82,10 @@ impl Registry {
         Self { children: vec![] }
     }
 
-    pub(crate) fn add<T: AsyncDrop + Send + Sync + 'static>(&mut self, value: T) -> AsyncResource<T> {
+    pub(crate) fn add<T: AsyncDrop + Send + Sync + 'static>(
+        &mut self,
+        value: T,
+    ) -> AsyncResource<T> {
         let value = Arc::new(Mutex::new(Some(value)));
         self.children.push(Arc::downgrade(&value) as Weak<Mutex<_>>);
         AsyncResource { value }

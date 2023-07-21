@@ -14,13 +14,14 @@ use tokio::sync::oneshot;
 use crate::{
     bson::{Bson, Document},
     change_stream::event::ResumeToken,
+    client::AsyncDropToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
     results::GetMoreResult,
     Client,
-    Namespace, client::AsyncDropToken,
+    Namespace,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.

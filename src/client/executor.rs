@@ -53,7 +53,8 @@ use crate::{
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
-    ClusterTime, tracking_arc::TrackingArc,
+    tracking_arc::TrackingArc,
+    ClusterTime,
 };
 
 lazy_static! {

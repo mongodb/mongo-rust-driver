@@ -14,10 +14,11 @@ use super::{options::GridFsUploadOptions, Chunk, FilesCollectionDocument, GridFs
 use crate::{
     bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
     bson_util::get_int,
+    client::AsyncDropToken,
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
     options::{CreateCollectionOptions, FindOneOptions, ReadPreference, SelectionCriteria},
-    Collection, client::AsyncDropToken,
+    Collection,
 };
 
 // User functions for uploading from readers.

@@ -1,8 +1,8 @@
+#[cfg(feature = "internal-track-arc")]
+use crate::id_set::{self, IdSet};
 use std::sync::Arc;
 #[cfg(feature = "internal-track-arc")]
 use std::sync::Mutex as SyncMutex;
-#[cfg(feature = "internal-track-arc")]
-use crate::id_set::{self, IdSet};
 
 /// An `Arc` that records the backtraces of construction of live clones.  When not compiled
 /// with the `internal-track-arc` feature, a zero-cost `Arc` wrapper.
@@ -47,12 +47,14 @@ impl<T> TrackingArc<T> {
                 inner,
                 #[cfg(feature = "internal-track-arc")]
                 clone_id,
-            })
+            }),
         }
     }
 
     pub(crate) fn downgrade(tracked: &Self) -> Weak<T> {
-        Weak { inner: Arc::downgrade(&tracked.inner) }
+        Weak {
+            inner: Arc::downgrade(&tracked.inner),
+        }
     }
 
     pub(crate) fn ptr_eq(this: &Self, other: &Self) -> bool {
@@ -61,7 +63,14 @@ impl<T> TrackingArc<T> {
 
     #[cfg(feature = "internal-track-arc")]
     pub(crate) fn print_live(tracked: &Self) {
-        let current: Vec<_> = tracked.inner.clones.lock().unwrap().values().cloned().collect();
+        let current: Vec<_> = tracked
+            .inner
+            .clones
+            .lock()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect();
         for mut bt in current {
             bt.resolve();
             println!("{:?}", bt);
@@ -87,7 +96,7 @@ impl<T> Clone for TrackingArc<T> {
 impl<T> Drop for TrackingArc<T> {
     fn drop(&mut self) {
         #[cfg(feature = "internal-track-arc")]
-         if let Some(id) = &self.clone_id {
+        if let Some(id) = &self.clone_id {
             self.inner.clones.lock().unwrap().remove(&id);
         }
     }
@@ -107,7 +116,9 @@ pub(crate) struct Weak<T> {
 
 impl<T> Clone for Weak<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone() }
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 }
 

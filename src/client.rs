@@ -13,7 +13,7 @@ use std::{
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
-use futures_core::{Future, future::BoxFuture};
+use futures_core::{future::BoxFuture, Future};
 use futures_util::{future::join_all, FutureExt};
 
 #[cfg(test)]
@@ -38,6 +38,7 @@ use crate::{
     db::Database,
     error::{Error, ErrorKind, Result},
     event::command::{handle_command_event, CommandEvent},
+    id_set::IdSet,
     operation::{AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
@@ -49,7 +50,8 @@ use crate::{
     },
     results::DatabaseSpecification,
     sdam::{server_selection, SelectedServer, Topology},
-    ClientSession, id_set::IdSet, tracking_arc::TrackingArc,
+    tracking_arc::TrackingArc,
+    ClientSession,
 };
 
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -477,7 +479,7 @@ impl Client {
             let cleanup = if let Ok(f) = cleanup_rx.await {
                 f
             } else {
-                return
+                return;
             };
             cleanup.await;
             if let Some(client) = weak.upgrade() {
@@ -486,17 +488,19 @@ impl Client {
         });
         let id = self.inner.pending_drops.lock().unwrap().insert(handle);
         let _ = id_tx.send(id);
-        AsyncDropToken { tx:Some(cleanup_tx) }
+        AsyncDropToken {
+            tx: Some(cleanup_tx),
+        }
     }
 
-    /// Shut down this `Client`, terminating background thread workers and closing connections.  This
-    /// will wait for any live handles to server-side resources (cursors, sessions) to be dropped and
-    /// any associated server-side operations to finish.  Calling any methods on clones of this `Client`
-    /// or derived handles after this will return errors.
+    /// Shut down this `Client`, terminating background thread workers and closing connections.
+    /// This will wait for any live handles to server-side resources (cursors, sessions) to be
+    /// dropped and any associated server-side operations to finish.  Calling any methods on
+    /// clones of this `Client` or derived handles after this will return errors.
     pub async fn shutdown(self) {
-        // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the lifetime of
-        // the temporary unnamed `MutexLock` until the end of the *statement*, causing the lock to be
-        // held for the duration of the join, which deadlocks.
+        // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
+        // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
+        // causing the lock to be held for the duration of the join, which deadlocks.
         let pending = self.inner.pending_drops.lock().unwrap().extract();
         join_all(pending).await;
         #[cfg(feature = "internal-track-arc")]
@@ -506,10 +510,10 @@ impl Client {
         self.shutdown_immediate().await;
     }
 
-    /// Shut down this `Client`, terminating background thread workers and closing connections.  This
-    /// does *not* wait for other pending resources to be cleaned up, which may cause both client-side
-    /// errors and server-side resource leaks. Calling any methods on clones of this `Client` or derived
-    /// handles after this will return errors.
+    /// Shut down this `Client`, terminating background thread workers and closing connections.
+    /// This does *not* wait for other pending resources to be cleaned up, which may cause both
+    /// client-side errors and server-side resource leaks. Calling any methods on clones of this
+    /// `Client` or derived handles after this will return errors.
     pub async fn shutdown_immediate(self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.inner.topology.shutdown(tx).await;

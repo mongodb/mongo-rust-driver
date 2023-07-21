@@ -32,7 +32,7 @@ impl<T> IdSet<T> {
     }
 
     #[cfg(feature = "internal-track-arc")]
-    pub(crate) fn values(&self) -> impl Iterator<Item=&T> {
+    pub(crate) fn values(&self) -> impl Iterator<Item = &T> {
         self.values.values()
     }
 
