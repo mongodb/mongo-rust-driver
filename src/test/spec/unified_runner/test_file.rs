@@ -446,12 +446,12 @@ pub(crate) struct ExpectedMessages {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct ExpectedMessage {
-    #[serde(default, deserialize_with = "deserialize_tracing_level")]
+    #[serde(default, deserialize_with = "deserialize_option_tracing_level")]
     pub(crate) level: Option<tracing::Level>,
     #[serde(
         default,
         rename = "component",
-        deserialize_with = "deserialize_tracing_target"
+        deserialize_with = "deserialize_option_tracing_target"
     )]
     pub(crate) target: Option<String>,
     pub(crate) failure_is_redacted: Option<bool>,
@@ -651,7 +651,7 @@ where
 }
 
 #[cfg(feature = "tracing-unstable")]
-fn deserialize_tracing_target<'de, D>(
+fn deserialize_option_tracing_target<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<String>, D::Error>
 where
@@ -672,7 +672,7 @@ fn log_component_as_tracing_target(component: &String) -> String {
 }
 
 #[cfg(feature = "tracing-unstable")]
-fn deserialize_tracing_level<'de, D>(
+fn deserialize_option_tracing_level<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<tracing::Level>, D::Error>
 where
@@ -680,6 +680,6 @@ where
 {
     String::deserialize(deserializer)?
         .parse::<tracing::Level>()
-        .map(|level| Some(level))
+        .map(Some)
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))
 }
