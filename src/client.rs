@@ -6,7 +6,7 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::{Arc, Mutex as SyncMutex},
+    sync::Mutex as SyncMutex,
     time::{Duration, Instant},
 };
 
@@ -49,7 +49,7 @@ use crate::{
     },
     results::DatabaseSpecification,
     sdam::{server_selection, SelectedServer, Topology},
-    ClientSession, id_set::IdSet,
+    ClientSession, id_set::IdSet, tracking_arc::TrackingArc,
 };
 
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -105,35 +105,9 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// driver does not set ``tcp_keepalive_intvl``. See the
 /// [MongoDB Diagnostics FAQ keepalive section](https://www.mongodb.com/docs/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
 /// for instructions on setting these values at the system level.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
-    inner: Arc<ClientInner>,
-    #[cfg(test)]
-    clone_id: Option<crate::id_set::Id>,
-}
-
-impl Clone for Client {
-    fn clone(&self) -> Self {
-        #[cfg(test)]
-        let clone_id = {
-            let bt = backtrace::Backtrace::new_unresolved();
-            Some(self.inner.clones.lock().unwrap().insert(bt))
-        };
-        Self {
-            inner: self.inner.clone(),
-            #[cfg(test)]
-            clone_id,
-        }
-    }
-}
-
-#[cfg(test)]
-impl Drop for Client {
-    fn drop(&mut self) {
-        if let Some(id) = &self.clone_id {
-            self.inner.clones.lock().unwrap().remove(&id);
-        }
-    }
+    inner: TrackingArc<ClientInner>,
 }
 
 #[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
@@ -175,7 +149,7 @@ impl Client {
     pub fn with_options(options: ClientOptions) -> Result<Self> {
         options.validate()?;
 
-        let inner = Arc::new(ClientInner {
+        let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
@@ -185,11 +159,7 @@ impl Client {
             #[cfg(test)]
             clones: SyncMutex::new(IdSet::new()),
         });
-        Ok(Self {
-            inner,
-            #[cfg(test)]
-            clone_id: None,
-        })
+        Ok(Self { inner })
     }
 
     /// Return an `EncryptedClientBuilder` for constructing a `Client` with auto-encryption enabled.
@@ -526,35 +496,17 @@ impl Client {
         // held for the duration of the join, which deadlocks.
         let pending = self.inner.pending_drops.lock().unwrap().extract();
         join_all(pending).await;
-        #[cfg(not(test))]
-        let Self { inner } = self;
-        #[cfg(test)]
-        let (inner, clone_id) = {
-            let inner = self.inner.clone();
-            let mut self_ = self;
-            let clone_id = self_.clone_id.take();
-            (inner, clone_id)
-        };
-        dbg!(Arc::strong_count(&inner));
-        dbg!(Arc::weak_count(&inner));
         #[cfg(test)]
         {
-            for mut bt in inner.clones.lock().unwrap().extract() {
-                bt.resolve();
-                println!("{:?}", bt);
-            }
+            TrackingArc::print_live(&self.inner);
         }
         
-        match Arc::try_unwrap(inner) {
+        match TrackingArc::try_unwrap(self.inner) {
             Ok(inner) => {
                 inner.shutdown().await;
                 Ok(())
             }
-            Err(inner) => Err(Self {
-                inner,
-                #[cfg(test)]
-                clone_id,
-            })
+            Err(inner) => Err(Self { inner })
         }
     }
 
@@ -736,7 +688,7 @@ impl Client {
 
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {
-            inner: Arc::downgrade(&self.inner),
+            inner: TrackingArc::downgrade(&self.inner),
         }
     }
 
@@ -767,12 +719,11 @@ impl ClientInner {
 
 #[derive(Clone, Debug)]
 pub(crate) struct WeakClient {
-    inner: std::sync::Weak<ClientInner>,
+    inner: crate::tracking_arc::Weak<ClientInner>,
 }
 
 impl WeakClient {
-    #[allow(dead_code)]
     pub(crate) fn upgrade(&self) -> Option<Client> {
-        self.inner.upgrade().map(|inner| Client { inner, #[cfg(test)] clone_id: None })
+        self.inner.upgrade().map(|inner| Client { inner })
     }
 }

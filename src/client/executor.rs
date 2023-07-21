@@ -53,7 +53,7 @@ use crate::{
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
-    ClusterTime,
+    ClusterTime, tracking_arc::TrackingArc,
 };
 
 lazy_static! {
@@ -109,7 +109,7 @@ impl Client {
             }
             let session = session.into();
             if let Some(session) = &session {
-                if !Arc::ptr_eq(&self.inner, &session.client().inner) {
+                if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
                     return Err(ErrorKind::InvalidArgument {
                         message: "the session provided to an operation must be created from the \
                                   same client as the collection/database"

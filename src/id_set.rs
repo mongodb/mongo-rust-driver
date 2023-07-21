@@ -31,6 +31,11 @@ impl<T> IdSet<T> {
         self.values.remove(&id.0);
     }
 
+    #[cfg(test)]
+    pub(crate) fn values(&self) -> impl Iterator<Item=&T> {
+        self.values.values()
+    }
+
     pub(crate) fn extract(&mut self) -> Vec<T> {
         self.values.drain().map(|(_, v)| v).collect()
     }

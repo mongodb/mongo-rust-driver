@@ -344,6 +344,7 @@ pub mod sync;
 mod test;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
+pub(crate) mod tracking_arc;
 
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use crate::client::csfle::client_encryption;
