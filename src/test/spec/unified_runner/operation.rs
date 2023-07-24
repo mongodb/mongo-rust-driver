@@ -43,7 +43,7 @@ use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
-    coll::options::{Hint},
+    coll::options::{Hint, CursorType},
     collation::Collation,
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
@@ -1653,7 +1653,11 @@ pub(super) struct RunCursorCommand {
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "commandName")]
     _command_name: String,
-    options: Option<RunCursorCommandOptions>,
+    selection_criteria: Option<SelectionCriteria>,
+    cursor_type: Option<CursorType>,
+    batch_size: Option<u32>,
+    max_time_m_s: Option<Duration>,
+    comment: Option<Bson>,
     session: Option<String>,
 }
 
@@ -1666,17 +1670,18 @@ impl TestOperation for RunCursorCommand {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
+            let options = RunCursorCommandOptions::builder().max_time(self.max_time_m_s).cursor_type(self.cursor_type).selection_criteria(self.selection_criteria.clone()).comment(self.comment.clone()).batch_size(self.batch_size).build();
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        let mut cursor = db.run_cursor_command_with_session(command, self.options.clone(), session)
+                        let mut cursor = db.run_cursor_command_with_session(command, options, session)
                         .await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
                     .await?
                 }
                 None => {
-                    let cursor = db.run_cursor_command(command, self.options.clone()).await?;
+                    let cursor = db.run_cursor_command(command, options).await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
@@ -1694,7 +1699,11 @@ pub struct CreateCommandCursor {
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "commandName")]
     _command_name: String,
-    options: Option<RunCursorCommandOptions>,
+    selection_criteria: Option<SelectionCriteria>,
+    cursor_type: Option<CursorType>,
+    batch_size: Option<u32>,
+    max_time_m_s: Option<Duration>,
+    comment: Option<Bson>,
     session: Option<String>,
 }
 
@@ -1707,11 +1716,12 @@ impl TestOperation for CreateCommandCursor {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
+            let options = RunCursorCommandOptions::builder().max_time(self.max_time_m_s).cursor_type(self.cursor_type).selection_criteria(self.selection_criteria.clone()).comment(self.comment.clone()).batch_size(self.batch_size).build();
             let result = match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;
                     with_mut_session!(test_runner, session_id, |session| async {
-                        ses_cursor = Some(db.run_cursor_command_with_session(command, self.options.clone(), session)
+                        ses_cursor = Some(db.run_cursor_command_with_session(command, options, session)
                         .await);
                     })
                     .await;
@@ -1722,7 +1732,7 @@ impl TestOperation for CreateCommandCursor {
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
                 None => {
-                    let doc_cursor  = db.run_cursor_command(command, self.options.clone()).await?;
+                    let doc_cursor  = db.run_cursor_command(command, options).await?;
                     let test_cursor = TestCursor::Normal(Mutex::new(doc_cursor));
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
