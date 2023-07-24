@@ -198,4 +198,20 @@ impl Client {
         ))
         .map(SessionChangeStream::new)
     }
+
+    /// Shut down this `Client`, terminating background thread workers and closing connections.
+    /// This will wait for any live handles to server-side resources (cursors, sessions) to be
+    /// dropped and any associated server-side operations to finish.  Calling any methods on
+    /// clones of this `Client` or derived handles after this will return errors.
+    pub fn shutdown(self) {
+        runtime::block_on(self.async_client.shutdown());
+    }
+
+    /// Shut down this `Client`, terminating background thread workers and closing connections.
+    /// This does *not* wait for other pending resources to be cleaned up, which may cause both
+    /// client-side errors and server-side resource leaks. Calling any methods on clones of this
+    /// `Client` or derived handles after this will return errors.
+    pub fn shutdown_immediate(self) {
+        runtime::block_on(self.async_client.shutdown_immediate());
+    }
 }
