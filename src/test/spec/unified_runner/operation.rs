@@ -43,7 +43,7 @@ use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
-    coll::options::Hint,
+    coll::options::{Hint},
     collation::Collation,
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
@@ -80,7 +80,7 @@ use crate::{
     Database,
     IndexModel,
     ServerType,
-    TopologyType,
+    TopologyType, db::options::RunCursorCommandOptions,
 };
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
@@ -314,6 +314,7 @@ impl<'de> Deserialize<'de> for Operation {
             "createCollection" => deserialize_op::<CreateCollection>(definition.arguments),
             "dropCollection" => deserialize_op::<DropCollection>(definition.arguments),
             "runCommand" => deserialize_op::<RunCommand>(definition.arguments),
+            "runCursorCommand" => deserialize_op::<RunCursorCommand>(definition.arguments),
             "endSession" => deserialize_op::<EndSession>(definition.arguments),
             "assertSessionTransactionState" => {
                 deserialize_op::<AssertSessionTransactionState>(definition.arguments)
@@ -638,7 +639,7 @@ pub(super) struct CreateFindCursor {
     batch_size: Option<u32>,
     comment: Option<Bson>,
     hint: Option<Hint>,
-    limit: Option<i64>,
+    limit: Option<i64>, 
     max: Option<Document>,
     max_scan: Option<u64>,
     #[serde(rename = "maxTimeMS")]
@@ -1641,6 +1642,98 @@ impl TestOperation for RunCommand {
             Ok(Some(result.into()))
         }
         .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RunCursorCommand {
+    command: Document,
+    // We don't need to use this field, but it needs to be included during deserialization so that
+    // we can use the deny_unknown_fields tag.
+    #[serde(rename = "commandName")]
+    _command_name: String,
+    options: Option<RunCursorCommandOptions>,
+    session: Option<String>,
+}
+
+impl TestOperation for RunCursorCommand {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let command = self.command.clone();
+            let db = test_runner.get_database(id).await;
+            let result = match &self.session {
+                Some(session_id) => {
+                    with_mut_session!(test_runner, session_id, |session| async {
+                        let mut cursor = db.run_cursor_command_with_session(command, self.options.clone(), session)
+                        .await?;
+                        cursor.stream(session).try_collect::<Vec<_>>().await
+                    })
+                    .await?
+                }
+                None => {
+                    let cursor = db.run_cursor_command(command, self.options.clone()).await?;
+                    cursor.try_collect::<Vec<_>>().await?
+                }
+            };
+            Ok(Some(bson::to_bson(&result)?.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateCommandCursor {
+    command: Document,
+    // We don't need to use this field, but it needs to be included during deserialization so that
+    // we can use the deny_unknown_fields tag.
+    #[serde(rename = "commandName")]
+    _command_name: String,
+    options: Option<RunCursorCommandOptions>,
+    session: Option<String>,
+}
+
+impl TestOperation for CreateCommandCursor {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let command = self.command.clone();
+            let db = test_runner.get_database(id).await;
+            let result = match &self.session {
+                Some(session_id) => {
+                    let mut ses_cursor = None;
+                    with_mut_session!(test_runner, session_id, |session| async {
+                        ses_cursor = Some(db.run_cursor_command_with_session(command, self.options.clone(), session)
+                        .await);
+                    })
+                    .await;
+                    let test_cursor = TestCursor::Session {
+                        cursor: ses_cursor.unwrap().unwrap(),
+                        session_id: session_id.clone(),
+                    };
+                    Ok(Some(Entity::Cursor(test_cursor)))
+                }
+                None => {
+                    let doc_cursor  = db.run_cursor_command(command, self.options.clone()).await?;
+                    let test_cursor = TestCursor::Normal(Mutex::new(doc_cursor));
+                    Ok(Some(Entity::Cursor(test_cursor)))
+                }
+            };
+            result
+        }
+        .boxed()
+    }
+
+    fn returns_root_documents(&self) -> bool {
+        false
     }
 }
 
