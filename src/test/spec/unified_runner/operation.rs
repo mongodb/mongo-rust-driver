@@ -2147,7 +2147,7 @@ impl TestOperation for Close {
             let target_entity = entities.get(id).unwrap();
             match target_entity {
                 Entity::Client(_) => {
-                    let mut client = entities.get_mut(id).unwrap().as_mut_client();
+                    let client = entities.get_mut(id).unwrap().as_mut_client();
                     let closed_client_topology_id = client.topology_id;
                     client.client = None;
 

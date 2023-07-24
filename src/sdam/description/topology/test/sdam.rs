@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
@@ -807,7 +807,6 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     assert_eq!(
         topology
             .watch()
-            .borrow()
             .server_description(&address)
             .unwrap()
             .server_type,
