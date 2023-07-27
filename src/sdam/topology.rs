@@ -80,8 +80,6 @@ impl Topology {
                 let tracing_emitter =
                     TopologyTracingEventEmitter::new(options.tracing_max_document_length_bytes, id);
                 let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
-                // Spin up a task to handle events so that a user's event handling code can't block
-                // the TopologyWorker.
                 runtime::execute(async move {
                     while let Some(event) = rx.recv().await {
                         let (event, ack) = event.into_parts();
