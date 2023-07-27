@@ -492,10 +492,22 @@ impl Client {
             };
             cleanup.await;
             if let Some(client) = weak.upgrade() {
-                client.inner.shutdown.lock().unwrap().pending_drops.remove(&id);
+                client
+                    .inner
+                    .shutdown
+                    .lock()
+                    .unwrap()
+                    .pending_drops
+                    .remove(&id);
             }
         });
-        let id = self.inner.shutdown.lock().unwrap().pending_drops.insert(handle);
+        let id = self
+            .inner
+            .shutdown
+            .lock()
+            .unwrap()
+            .pending_drops
+            .insert(handle);
         let _ = id_tx.send(id);
         AsyncDropToken {
             tx: Some(cleanup_tx),
@@ -509,7 +521,7 @@ impl Client {
     /// indefinitely.  It's strongly recommended to structure your usage to avoid this, e.g. by
     /// only using those types in shorter-lived scopes than the `Client`.  If this is not possible,
     /// see `shutdown_immediate`.
-    /// 
+    ///
     /// Calling any methods on  clones of this `Client` or derived handles after this will return
     /// errors.
     pub async fn shutdown(self) {
