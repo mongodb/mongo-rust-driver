@@ -121,6 +121,14 @@ pub struct ServerHeartbeatStartedEvent {
 
     /// Determines if this heartbeat event is from an awaitable `hello`.
     pub awaited: bool,
+
+    /// The driver-generated ID for the connection used for the heartbeat.
+    pub driver_connection_id: u32,
+
+    /// The server-generated ID for the connection used for the heartbeat. This value is only
+    /// present on server versions 4.2+. If this event corresponds to the first heartbeat on a
+    /// new monitoring connection, this value will not be present.
+    pub server_connection_id: Option<i64>,
 }
 
 /// Published when a server monitor's `hello` or legacy hello command succeeds.
@@ -139,6 +147,13 @@ pub struct ServerHeartbeatSucceededEvent {
 
     /// Determines if this heartbeat event is from an awaitable `hello`.
     pub awaited: bool,
+
+    /// The driver-generated ID for the connection used for the heartbeat.
+    pub driver_connection_id: u32,
+
+    /// The server-generated ID for the connection used for the heartbeat. This value is only
+    /// present for server versions 4.2+.
+    pub server_connection_id: Option<i64>,
 }
 
 /// Published when a server monitor's `hello` or legacy hello command fails.
@@ -158,6 +173,14 @@ pub struct ServerHeartbeatFailedEvent {
 
     /// Determines if this heartbeat event is from an awaitable `hello`.
     pub awaited: bool,
+
+    /// The driver-generated ID for the connection used for the heartbeat.
+    pub driver_connection_id: u32,
+
+    /// The server-generated ID for the connection used for the heartbeat. This value is only
+    /// present on server versions 4.2+. If this event corresponds to the first heartbeat on a
+    /// new monitoring connection, this value will not be present.
+    pub server_connection_id: Option<i64>,
 }
 
 #[derive(Clone, Debug)]

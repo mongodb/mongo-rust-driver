@@ -31,9 +31,10 @@ use crate::{
         SERVER_API,
     },
     trace::{
-        command::{truncate_on_char_boundary, DEFAULT_MAX_DOCUMENT_LENGTH_BYTES},
+        truncate_on_char_boundary,
         TracingRepresentation,
         COMMAND_TRACING_EVENT_TARGET,
+        DEFAULT_MAX_DOCUMENT_LENGTH_BYTES,
     },
     TopologyType,
 };

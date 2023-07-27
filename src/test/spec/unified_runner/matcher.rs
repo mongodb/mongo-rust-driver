@@ -1,7 +1,7 @@
-use bson::Document;
+use std::fmt::Debug;
 
 use crate::{
-    bson::{doc, spec::ElementType, Bson},
+    bson::{doc, spec::ElementType, Bson, Document},
     bson_util::get_int,
     event::{cmap::CmapEvent, command::CommandEvent, sdam::ServerDescription},
     test::{Event, SdamEvent},
@@ -19,6 +19,14 @@ use super::{
 use super::test_file::ExpectedMessage;
 #[cfg(feature = "tracing-unstable")]
 use crate::test::util::{TracingEvent, TracingEventValue};
+
+#[cfg(feature = "tracing-unstable")]
+fn mismatch_message(kind: &str, actual: impl Debug, expected: impl Debug) -> String {
+    format!(
+        "{} do not match. Actual:\n{:?}\nExpected:\n{:?}",
+        kind, actual, expected
+    )
+}
 
 use std::convert::TryInto;
 
@@ -51,17 +59,23 @@ pub(crate) fn tracing_events_match(
     actual: &TracingEvent,
     expected: &ExpectedMessage,
 ) -> Result<(), String> {
-    if actual.target != expected.target {
-        return Err(format!(
-            "Expected and actual tracing event components do not match: expected {}, got {}",
-            expected.target, actual.target
-        ));
+    if let Some(ref target) = expected.target {
+        if &actual.target != target {
+            return Err(mismatch_message(
+                "tracing event components",
+                &actual.target,
+                target,
+            ));
+        }
     }
-    if actual.level != expected.level {
-        return Err(format!(
-            "Expected and actual tracing event levels do not match: expected {}. got {}",
-            expected.level, actual.level
-        ));
+    if let Some(level) = expected.level {
+        if actual.level != level {
+            return Err(mismatch_message(
+                "tracing event levels",
+                actual.level,
+                level,
+            ));
+        }
     }
 
     use lazy_static::lazy_static;
@@ -333,6 +347,13 @@ fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result
             SdamEvent::TopologyDescriptionChanged(_),
             ExpectedSdamEvent::TopologyDescriptionChanged {},
         ) => Ok(()),
+        (
+            SdamEvent::ServerHeartbeatSucceeded(_),
+            ExpectedSdamEvent::ServerHeartbeatSucceeded {},
+        ) => Ok(()),
+        (SdamEvent::ServerHeartbeatFailed(_), ExpectedSdamEvent::ServerHeartbeatFailed {}) => {
+            Ok(())
+        }
         _ => expected_err(actual, expected),
     }
 }
@@ -417,10 +438,7 @@ fn results_match_inner(
     }
 }
 
-fn expected_err<A: std::fmt::Debug, B: std::fmt::Debug>(
-    actual: &A,
-    expected: &B,
-) -> Result<(), String> {
+fn expected_err<A: Debug, B: Debug>(actual: &A, expected: &B) -> Result<(), String> {
     Err(format!("expected {:?}, got {:?}", expected, actual))
 }
 
@@ -450,7 +468,16 @@ fn special_operator_matches(
 ) -> Result<(), String> {
     match key.as_ref() {
         "$$exists" => match_eq(&actual.is_some(), &value.as_bool().unwrap()),
-        "$$type" => type_matches(value, actual.unwrap()),
+        "$$type" => {
+            if let Some(actual) = actual {
+                type_matches(value, actual)
+            } else {
+                Err(format!(
+                    "Expected value to have type {:?} but got None",
+                    value
+                ))
+            }
+        }
         "$$unsetOrMatches" => {
             if actual.is_some() {
                 results_match_inner(actual, value, false, false, entities)

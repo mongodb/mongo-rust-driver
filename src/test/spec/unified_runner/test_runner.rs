@@ -74,7 +74,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 14, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 16, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
@@ -115,7 +115,7 @@ impl TestRunner {
         let schema_version = &test_file.schema_version;
         assert!(
             schema_version >= &MIN_SPEC_VERSION && schema_version <= &MAX_SPEC_VERSION,
-            "Test runner not compatible with specification version {}",
+            "Test runner not compatible with schema version {}",
             schema_version
         );
 
@@ -277,9 +277,9 @@ impl TestRunner {
                     for (actual, expected) in actual_events.iter().zip(expected_events) {
                         if let Err(e) = events_match(actual, expected, Some(&entities)) {
                             panic!(
-                                "event mismatch: expected = {:#?}, actual = {:#?}\nall \
-                                 expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",
-                                expected, actual, expected_events, actual_events, e,
+                                "event mismatch: expected = {:#?}, actual = {:#?}\nmismatch \
+                                 detail: {}",
+                                expected, actual, e,
                             );
                         }
                     }
@@ -299,22 +299,39 @@ impl TestRunner {
 
                     let client_actual_events: Vec<_> = all_tracing_events
                         .iter()
-                        .filter(|e| e.topology_id() == client_topology_id.to_hex())
+                        .filter(|e| {
+                            if e.topology_id() != client_topology_id.to_hex() {
+                                return false;
+                            }
+                            if let Some(ref ignored_messages) = expectation.ignore_messages {
+                                for ignored_message in ignored_messages {
+                                    if tracing_events_match(e, ignored_message).is_ok() {
+                                        return false;
+                                    }
+                                }
+                            }
+                            true
+                        })
                         .collect();
                     let expected_events = &expectation.messages;
 
-                    assert_eq!(
-                        client_actual_events.len(),
-                        expected_events.len(),
-                        "Actual tracing event count should match expected"
-                    );
+                    if expectation.ignore_extra_messages != Some(true) {
+                        assert_eq!(
+                            client_actual_events.len(),
+                            expected_events.len(),
+                            "Actual tracing event count should match expected. Expected events = \
+                             {:#?}, actual events = {:#?}",
+                            expected_events,
+                            client_actual_events,
+                        );
+                    }
 
                     for (actual, expected) in client_actual_events.iter().zip(expected_events) {
                         if let Err(e) = tracing_events_match(actual, expected) {
                             panic!(
-                                "tracing event mismatch: expected = {:#?}, actual = {:#?}\nall \
-                                 expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",
-                                expected, actual, expected_events, client_actual_events, e,
+                                "tracing event mismatch: expected = {:#?}, actual = \
+                                 {:#?}\nmismatch detail: {}",
+                                expected, actual, e,
                             );
                         }
                     }

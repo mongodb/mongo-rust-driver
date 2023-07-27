@@ -71,7 +71,7 @@ impl EventObserver {
             .collect()
     }
 
-    pub async fn wait_for_matching_events(
+    pub(crate) async fn wait_for_matching_events(
         &mut self,
         event: &ExpectedEvent,
         count: usize,

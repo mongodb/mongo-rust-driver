@@ -146,9 +146,10 @@ impl ConnectionEstablisher {
     pub(crate) async fn establish_monitoring_connection(
         &self,
         address: ServerAddress,
+        id: u32,
     ) -> Result<(Connection, HelloReply)> {
         let stream = self.make_stream(address.clone()).await?;
-        let mut connection = Connection::new_monitoring(address, stream);
+        let mut connection = Connection::new_monitoring(address, stream, id);
 
         let hello_reply = self.handshaker.handshake(&mut connection, None).await?;
 

@@ -1,6 +1,6 @@
 {
   "description": "rediscover-quickly-after-step-down",
-  "schemaVersion": "1.10",
+  "schemaVersion": "1.4",
   "runOnRequirements": [
     {
       "minServerVersion": "4.4",
@@ -117,7 +117,7 @@
               "replSetFreeze": 0
             },
             "readPreference": {
-              "mode": "Secondary"
+              "mode": "secondary"
             },
             "commandName": "replSetFreeze"
           }

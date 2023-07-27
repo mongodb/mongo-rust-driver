@@ -71,6 +71,12 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
             continue;
         };
 
+        if let Ok(unskipped_filename) = std::env::var("TEST_FILE") {
+            if filename != unskipped_filename {
+                continue;
+            }
+        }
+
         if let Some(skipped_files) = skipped_files {
             if skipped_files.contains(&filename) {
                 log_uncaptured(format!("Skipping deserializing {:?}", &path));
