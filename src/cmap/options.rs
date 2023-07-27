@@ -62,6 +62,11 @@ pub(crate) struct ConnectionPoolOptions {
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: Option<bool>,
+
+    /// The maximum number of new connections that can be created concurrently.
+    ///
+    /// The default is 2.
+    pub(crate) max_connecting: Option<u32>,
 }
 
 impl ConnectionPoolOptions {
@@ -77,6 +82,7 @@ impl ConnectionPoolOptions {
             ready: None,
             load_balanced: options.load_balanced,
             credential: options.credential.clone(),
+            max_connecting: options.max_connecting,
         }
     }
 
