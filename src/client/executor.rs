@@ -100,6 +100,9 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
+        if self.inner.shutdown.lock().unwrap().executed {
+            return Err(ErrorKind::Shutdown.into());
+        }
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {

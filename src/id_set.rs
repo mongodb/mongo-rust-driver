@@ -31,7 +31,7 @@ impl<T> IdSet<T> {
         self.values.remove(&id.0);
     }
 
-    #[cfg(feature = "internal-track-arc")]
+    #[cfg(test)]
     pub(crate) fn values(&self) -> impl Iterator<Item = &T> {
         self.values.values()
     }

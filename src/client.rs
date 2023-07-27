@@ -128,9 +128,15 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
+    shutdown: SyncMutex<Shutdown>,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
+}
+
+#[derive(Debug)]
+struct Shutdown {
+    pending_drops: IdSet<crate::runtime::AsyncJoinHandle<()>>,
+    executed: bool,
 }
 
 impl Client {
@@ -153,7 +159,10 @@ impl Client {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
-            pending_drops: SyncMutex::new(IdSet::new()),
+            shutdown: SyncMutex::new(Shutdown {
+                pending_drops: IdSet::new(),
+                executed: false,
+            }),
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
         });
@@ -483,10 +492,10 @@ impl Client {
             };
             cleanup.await;
             if let Some(client) = weak.upgrade() {
-                client.inner.pending_drops.lock().unwrap().remove(&id);
+                client.inner.shutdown.lock().unwrap().pending_drops.remove(&id);
             }
         });
-        let id = self.inner.pending_drops.lock().unwrap().insert(handle);
+        let id = self.inner.shutdown.lock().unwrap().pending_drops.insert(handle);
         let _ = id_tx.send(id);
         AsyncDropToken {
             tx: Some(cleanup_tx),
@@ -495,15 +504,25 @@ impl Client {
 
     /// Shut down this `Client`, terminating background thread workers and closing connections.
     /// This will wait for any live handles to server-side resources (cursors, sessions) to be
-    /// dropped and any associated server-side operations to finish.  Calling any methods on
-    /// clones of this `Client` or derived handles after this will return errors.
+    /// dropped and any associated server-side operations to finish.  IMPORTANT: this means that
+    /// any live cursor or session values that are not dropped will cause this method to wait
+    /// indefinitely.  It's strongly recommended to structure your usage to avoid this, e.g. by
+    /// only using those types in shorter-lived scopes than the `Client`.  If this is not possible,
+    /// see `shutdown_immediate`.
+    /// 
+    /// Calling any methods on  clones of this `Client` or derived handles after this will return
+    /// errors.
     pub async fn shutdown(self) {
         // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
         // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
         // causing the lock to be held for the duration of the join, which deadlocks.
-        let pending = self.inner.pending_drops.lock().unwrap().extract();
+        let pending = {
+            let mut shutdown = self.inner.shutdown.lock().unwrap();
+            shutdown.executed = true;
+            shutdown.pending_drops.extract()
+        };
         join_all(pending).await;
-        #[cfg(feature = "internal-track-arc")]
+        #[cfg(test)]
         {
             TrackingArc::print_live(&self.inner);
         }
