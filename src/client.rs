@@ -107,21 +107,22 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// driver does not set ``tcp_keepalive_intvl``. See the
 /// [MongoDB Diagnostics FAQ keepalive section](https://www.mongodb.com/docs/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
 /// for instructions on setting these values at the system level.
-/// 
+///
 /// ## Clean shutdown
-/// Because Rust has no async equivalent of `Drop`, values that require server-side cleanup when dropped
-/// spawn a new async task to perform that cleanup.  This can cause two potential issues:
-/// 
+/// Because Rust has no async equivalent of `Drop`, values that require server-side cleanup when
+/// dropped spawn a new async task to perform that cleanup.  This can cause two potential issues:
+///
 /// * Drop tasks pending or in progress when the async runtime shuts down may not complete, causing
 ///   server-side resources to not be freed.
-/// * Drop tasks may run at an arbitrary time even after no `Client` values exist, making it hard to reason
-///   about associated resources (e.g. event handlers).
-/// 
-/// To address these issues, we highly recommend you use [`Client::shutdown`] in the termination path of your
-/// application.  This will ensure that outstanding resources have been cleaned up and terminate internal worker
-/// tasks before returning.  Please note that `shutdown` will wait for _all_ outstanding resource handles to be
-/// dropped, so they must either have been dropped before calling `shutdown` or in a concurrent task; see the 
-/// documentation of `shutdown` for more details.
+/// * Drop tasks may run at an arbitrary time even after no `Client` values exist, making it hard to
+///   reason about associated resources (e.g. event handlers).
+///
+/// To address these issues, we highly recommend you use [`Client::shutdown`] in the termination
+/// path of your application.  This will ensure that outstanding resources have been cleaned up and
+/// terminate internal worker tasks before returning.  Please note that `shutdown` will wait for
+/// _all_ outstanding resource handles to be dropped, so they must either have been dropped before
+/// calling `shutdown` or in a concurrent task; see the documentation of `shutdown` for more
+/// details.
 #[derive(Debug, Clone)]
 pub struct Client {
     inner: TrackingArc<ClientInner>,
@@ -532,12 +533,12 @@ impl Client {
     /// Shut down this `Client`, terminating background thread workers and closing connections.
     /// This will wait for any live handles to server-side resources (see below) to be
     /// dropped and any associated server-side operations to finish.
-    /// 
+    ///
     /// IMPORTANT: Any live resource handles that are not dropped will cause this method to wait
     /// indefinitely.  It's strongly recommended to structure your usage to avoid this, e.g. by
     /// only using those types in shorter-lived scopes than the `Client`.  If this is not possible,
     /// see [`shutdown_immediate`](Client::shutdown_immediate).  For example:
-    /// 
+    ///
     /// ```rust
     /// # use mongodb::{Client, GridFsBucket, error::Result};
     /// async fn upload_data(bucket: &GridFsBucket) {
@@ -548,15 +549,15 @@ impl Client {
     /// # async fn run() -> Result<()> {
     /// let client = Client::with_uri_str("mongodb://example.com").await?;
     /// let bucket = client.database("test").gridfs_bucket(None);
-    /// upload_data(&bucket).await; 
+    /// upload_data(&bucket).await;
     /// client.shutdown().await;
     /// // Background cleanup work from `upload_data` is guaranteed to have run.
     /// # Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     /// If the handle is used in the same scope as `shutdown`, explicit `drop` may be needed:
-    /// 
+    ///
     /// ```rust
     /// # use mongodb::{Client, error::Result};
     /// # async fn run() -> Result<()> {
@@ -570,11 +571,12 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     /// Calling any methods on  clones of this `Client` or derived handles after this will return
     /// errors.
-    /// 
-    /// Handles to server-side resources are `Cursor`, `SessionCursor`, `Session`, or `GridFsUploadStream`.
+    ///
+    /// Handles to server-side resources are `Cursor`, `SessionCursor`, `Session`, or
+    /// `GridFsUploadStream`.
     pub async fn shutdown(self) {
         // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
         // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
@@ -588,7 +590,7 @@ impl Client {
     /// This does *not* wait for other pending resources to be cleaned up, which may cause both
     /// client-side errors and server-side resource leaks. Calling any methods on clones of this
     /// `Client` or derived handles after this will return errors.
-    /// 
+    ///
     /// ```rust
     /// # use mongodb::{Client, error::Result};
     /// # async fn run() -> Result<()> {
