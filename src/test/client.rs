@@ -25,7 +25,7 @@ use crate::{
         LOCK,
     },
     Client,
-    ServerType,
+    ServerType, coll::options::FindOptions,
 };
 
 #[derive(Debug, Deserialize)]
@@ -849,17 +849,91 @@ async fn retry_commit_txn_check_out() {
 /// Verifies that `Client::shutdown` succeeds.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn manual_shutdown() {
-    let _guard = LOCK.run_concurrently().await;
+async fn manual_shutdown_with_nothing() {
+    let _guard = LOCK.run_exclusively().await;
     let client = Client::test_builder().build().await.into_client();
     client.shutdown().await;
+}
+
+/// Verifies that `Client::shutdown` succeeds when resources have been dropped.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn manual_shutdown_with_resources() {
+    let _guard = LOCK.run_exclusively().await;
+    let events = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(Arc::clone(&events))
+        .build()
+        .await;
+    let db = client.database("shutdown_test");
+    db.drop(None).await.unwrap();
+    let coll = db.collection::<Document>("test");
+    coll.insert_many([doc! { }, doc! { }], None).await.unwrap();
+    let bucket = db.gridfs_bucket(None);
+    // Scope to force drop of resources
+    {
+        // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
+        let _cursor = coll.find(
+            None,
+            FindOptions::builder()
+                .batch_size(1)
+                .build(),
+        ).await.unwrap();
+        // Similarly, sessions need an in-progress transaction to have cleanup.
+        let mut session = client.start_session(None).await.unwrap();
+        session.start_transaction(None).await.unwrap();
+        coll.insert_one_with_session(doc! { }, None, &mut session).await.unwrap();
+        let _stream = bucket.open_upload_stream("test", None);
+    }
+    client.into_client().shutdown().await;
+    assert!(!events.get_command_started_events(&["killCursors"]).is_empty());
+    assert!(!events.get_command_started_events(&["abortTransaction"]).is_empty());
+    assert!(!events.get_command_started_events(&["delete"]).is_empty());
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn manual_shutdown_immediate() {
-    let _guard = LOCK.run_concurrently().await;
+async fn manual_shutdown_immediate_with_nothing() {
+    let _guard = LOCK.run_exclusively().await;
     let client = Client::test_builder().build().await.into_client();
     client.shutdown_immediate().await;
+}
+
+/// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn manual_shutdown_immediate_with_resources() {
+    let _guard = LOCK.run_exclusively().await;
+    let events = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(Arc::clone(&events))
+        .build()
+        .await;
+    let db = client.database("shutdown_test");
+    db.drop(None).await.unwrap();
+    let coll = db.collection::<Document>("test");
+    coll.insert_many([doc! { }, doc! { }], None).await.unwrap();
+    let bucket = db.gridfs_bucket(None);
+    
+    // Resources are scoped to past the `shutdown_immediate`.
+
+    // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
+    let _cursor = coll.find(
+        None,
+        FindOptions::builder()
+            .batch_size(1)
+            .build(),
+    ).await.unwrap();
+    // Similarly, sessions need an in-progress transaction to have cleanup.
+    let mut session = client.start_session(None).await.unwrap();
+    session.start_transaction(None).await.unwrap();
+    coll.insert_one_with_session(doc! { }, None, &mut session).await.unwrap();
+    let _stream = bucket.open_upload_stream("test", None);
+
+    client.into_client().shutdown_immediate().await;
+
+    assert!(events.get_command_started_events(&["killCursors"]).is_empty());
+    assert!(events.get_command_started_events(&["abortTransaction"]).is_empty());
+    assert!(events.get_command_started_events(&["delete"]).is_empty());
 }

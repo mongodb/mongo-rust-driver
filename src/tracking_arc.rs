@@ -62,6 +62,7 @@ impl<T> TrackingArc<T> {
     }
 
     #[cfg(test)]
+    #[allow(unused)]
     pub(crate) fn print_live(tracked: &Self) {
         let current: Vec<_> = tracked
             .inner
