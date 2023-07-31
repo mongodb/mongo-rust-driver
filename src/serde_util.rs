@@ -129,14 +129,29 @@ pub(crate) fn serialize_true<S: Serializer>(s: S) -> std::result::Result<S::Ok, 
 }
 
 #[cfg(feature = "aws-auth")]
-pub(crate) fn deserialize_datetime_option_from_double<'de, D>(
+pub(crate) fn deserialize_datetime_option_from_double_or_string<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<bson::DateTime>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let millis = f64::deserialize(deserializer)? * 1000.0;
-    Ok(Some(bson::DateTime::from_millis(millis as i64)))
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum AwsDateTime {
+        Double(f64),
+        String(String),
+    }
+
+    let date_time = match AwsDateTime::deserialize(deserializer)? {
+        AwsDateTime::Double(seconds) => {
+            let millis = seconds * 1000.0;
+            bson::DateTime::from_millis(millis as i64)
+        }
+        AwsDateTime::String(string) => bson::DateTime::parse_rfc3339_str(string)
+            .map_err(|e| serde::de::Error::custom(format!("invalid RFC 3339 string: {}", e)))?,
+    };
+
+    Ok(Some(date_time))
 }
 
 #[cfg(test)]
