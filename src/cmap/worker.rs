@@ -342,7 +342,7 @@ impl ConnectionPoolWorker {
             .into()
         });
         if let Some(tx) = shutdown_ack {
-            let _ = tx.acknowledge(());
+            tx.acknowledge(());
         }
     }
 
