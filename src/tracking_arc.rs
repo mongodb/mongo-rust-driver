@@ -98,7 +98,7 @@ impl<T> Drop for TrackingArc<T> {
     fn drop(&mut self) {
         #[cfg(test)]
         if let Some(id) = &self.clone_id {
-            self.inner.clones.lock().unwrap().remove(&id);
+            self.inner.clones.lock().unwrap().remove(id);
         }
     }
 }

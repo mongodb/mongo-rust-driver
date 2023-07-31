@@ -866,6 +866,10 @@ async fn manual_shutdown_with_resources() {
         .event_handler(Arc::clone(&events))
         .build()
         .await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping manual_shutdown_with_resources: no transaction support");
+        return;
+    }
     let db = client.database("shutdown_test");
     db.drop(None).await.unwrap();
     let coll = db.collection::<Document>("test");
@@ -915,6 +919,10 @@ async fn manual_shutdown_immediate_with_resources() {
         .event_handler(Arc::clone(&events))
         .build()
         .await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping manual_shutdown_immediate_with_resources: no transaction support");
+        return;
+    }
     let db = client.database("shutdown_test");
     db.drop(None).await.unwrap();
     let coll = db.collection::<Document>("test");
