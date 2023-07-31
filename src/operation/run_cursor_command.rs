@@ -4,12 +4,13 @@ use bson::RawDocumentBuf;
 
 use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
+    coll::options::CursorType,
     concern::WriteConcern,
-    cursor::{CursorSpecification},
+    cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{Operation, RunCommand, CursorBody},
+    operation::{CursorBody, Operation, RunCommand},
     options::RunCursorCommandOptions,
-    selection_criteria::SelectionCriteria, coll::options::CursorType,
+    selection_criteria::SelectionCriteria,
 };
 
 #[derive(Debug, Clone)]
@@ -96,26 +97,18 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        let doc = Operation::handle_response(&self.run_command, response, description)?;
-        let cursor_info = bson::from_document(doc)?;
-        let batch_size = match &self.options {
-            Some(options) => options.batch_size.clone(),
-            None => None,
-        };
-        let max_time = match &self.options {
-            Some(options) => options.max_time.clone(),
-            None => None,
-        };
+        let cursor_response: CursorBody = response.body()?;
+
         let comment = match &self.options {
             Some(options) => options.comment.clone(),
             None => None,
         };
 
-        let mut max_time = Some(Duration::new(0,0));
+        let mut max_time = Some(Duration::new(0, 0));
 
         if let Some(ref options) = self.options {
             match options.cursor_type {
-                Some(CursorType::Tailable) |  Some(CursorType::TailableAwait) => {
+                Some(CursorType::Tailable) | Some(CursorType::TailableAwait) => {
                     match &self.options {
                         Some(options) => options.max_time.clone(),
                         None => None,

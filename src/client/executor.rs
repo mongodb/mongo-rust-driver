@@ -378,7 +378,7 @@ impl Client {
                     txn_number,
                     retryability,
                 )
-                .await 
+                .await
             {
                 Ok(output) => ExecutionDetails {
                     output,
@@ -400,7 +400,7 @@ impl Client {
                                 .to_string();
                         }
                     }
-                    
+
                     self.inner
                         .topology
                         .handle_application_error(
@@ -420,7 +420,7 @@ impl Client {
                             || err.is_write_retryable())
                             && !err.contains_label("NoWritesPerformed")
                         {
-                            return Err(err); 
+                            return Err(err);
                         } else {
                             return Err(r.first_error);
                         }
@@ -650,7 +650,7 @@ impl Client {
                         .transpose()?;
 
                     let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
-      
+
                     client
                         .update_cluster_time(cluster_time, at_cluster_time, session)
                         .await;

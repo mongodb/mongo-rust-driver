@@ -43,8 +43,9 @@ use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
-    coll::options::{Hint, CursorType},
+    coll::options::{CursorType, Hint},
     collation::Collation,
+    db::options::RunCursorCommandOptions,
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{
@@ -80,7 +81,7 @@ use crate::{
     Database,
     IndexModel,
     ServerType,
-    TopologyType, db::options::RunCursorCommandOptions,
+    TopologyType,
 };
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
@@ -640,7 +641,7 @@ pub(super) struct CreateFindCursor {
     batch_size: Option<u32>,
     comment: Option<Bson>,
     hint: Option<Hint>,
-    limit: Option<i64>, 
+    limit: Option<i64>,
     max: Option<Document>,
     max_scan: Option<u64>,
     #[serde(rename = "maxTimeMS")]
@@ -1673,23 +1674,31 @@ impl TestOperation for RunCursorCommand {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-            let cursor_type = match self.cursor_type.clone().unwrap_or_default().to_ascii_lowercase().as_str() {
+            let cursor_type = match self
+                .cursor_type
+                .clone()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+                .as_str()
+            {
                 "tailable" => Some(CursorType::Tailable),
                 "tailableawait" => Some(CursorType::TailableAwait),
                 "nontailable" => Some(CursorType::NonTailable),
                 _ => None,
             };
-            let options = RunCursorCommandOptions::builder().
-                max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default())).
-                cursor_type(cursor_type).
-                selection_criteria(self.selection_criteria.clone()).
-                comment(self.comment.clone()).
-                batch_size(self.batch_size).build();
+            let options = RunCursorCommandOptions::builder()
+                .max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default()))
+                .cursor_type(cursor_type)
+                .selection_criteria(self.selection_criteria.clone())
+                .comment(self.comment.clone())
+                .batch_size(self.batch_size)
+                .build();
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        let mut cursor = db.run_cursor_command_with_session(command, options, session)
-                        .await?;
+                        let mut cursor = db
+                            .run_cursor_command_with_session(command, options, session)
+                            .await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
                     .await?
@@ -1730,24 +1739,33 @@ impl TestOperation for CreateCommandCursor {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-            let cursor_type = match self.cursor_type.clone().unwrap_or_default().to_ascii_lowercase().as_str() {
+            let cursor_type = match self
+                .cursor_type
+                .clone()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+                .as_str()
+            {
                 "tailable" => Some(CursorType::Tailable),
                 "tailableawait" => Some(CursorType::TailableAwait),
                 "nontailable" => Some(CursorType::NonTailable),
                 _ => None,
             };
-            let options = RunCursorCommandOptions::builder().
-                max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default())).
-                cursor_type(cursor_type).
-                selection_criteria(self.selection_criteria.clone()).
-                comment(self.comment.clone()).
-                batch_size(self.batch_size).build();
+            let options = RunCursorCommandOptions::builder()
+                .max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default()))
+                .cursor_type(cursor_type)
+                .selection_criteria(self.selection_criteria.clone())
+                .comment(self.comment.clone())
+                .batch_size(self.batch_size)
+                .build();
             let result = match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;
                     with_mut_session!(test_runner, session_id, |session| async {
-                        ses_cursor = Some(db.run_cursor_command_with_session(command, options, session)
-                        .await);
+                        ses_cursor = Some(
+                            db.run_cursor_command_with_session(command, options, session)
+                                .await,
+                        );
                     })
                     .await;
                     let test_cursor = TestCursor::Session {
@@ -1757,7 +1775,7 @@ impl TestOperation for CreateCommandCursor {
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
                 None => {
-                    let doc_cursor  = db.run_cursor_command(command, options).await?;
+                    let doc_cursor = db.run_cursor_command(command, options).await?;
                     let test_cursor = TestCursor::Normal(Mutex::new(doc_cursor));
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
