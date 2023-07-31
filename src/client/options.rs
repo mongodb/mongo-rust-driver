@@ -493,7 +493,7 @@ pub struct ClientOptions {
 
     /// The maximum number of new connections that can be created concurrently.
     ///
-    /// The default is 2.
+    /// If specified, this value must be greater than 0. The default is 2.
     #[builder(default)]
     pub max_connecting: Option<u32>,
 
