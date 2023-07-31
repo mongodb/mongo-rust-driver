@@ -1,13 +1,15 @@
+#[cfg(feature = "in-use-encryption-unstable")]
+use bson::doc;
 use bson::RawDocumentBuf;
 
 use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
-    cursor::CursorSpecification,
+    cursor::{CursorSpecification},
     error::{Error, Result},
-    operation::{Operation, RunCommand},
+    operation::{Operation, RunCommand, CursorBody},
     options::RunCursorCommandOptions,
-    selection_criteria::SelectionCriteria,
+    selection_criteria::SelectionCriteria, coll::options::CursorType,
 };
 
 #[derive(Debug, Clone)]
@@ -97,21 +99,36 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         let doc = Operation::handle_response(&self.run_command, response, description)?;
         let cursor_info = bson::from_document(doc)?;
         let batch_size = match &self.options {
-            Some(options) => options.batch_size,
+            Some(options) => options.batch_size.clone(),
             None => None,
         };
         let max_time = match &self.options {
-            Some(options) => options.max_time,
+            Some(options) => options.max_time.clone(),
             None => None,
         };
         let comment = match &self.options {
             Some(options) => options.comment.clone(),
             None => None,
         };
+
+        let mut max_time = Some(Duration::new(0,0));
+
+        if let Some(ref options) = self.options {
+            match options.cursor_type {
+                Some(CursorType::Tailable) |  Some(CursorType::TailableAwait) => {
+                    match &self.options {
+                        Some(options) => options.max_time.clone(),
+                        None => None,
+                    };
+                }
+                _ => max_time = None,
+            };
+        }
+
         Ok(CursorSpecification::new(
-            cursor_info,
+            cursor_response.cursor.clone(),
             description.server_address.clone(),
-            batch_size,
+            self.options.as_ref().and_then(|opts| opts.batch_size),
             max_time,
             comment,
         ))

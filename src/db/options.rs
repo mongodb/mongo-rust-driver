@@ -316,6 +316,7 @@ pub struct ChangeStreamPreAndPostImages {
 /// Specifies the options to a
 /// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct RunCursorCommandOptions {

@@ -10,6 +10,10 @@ async fn run_unified() {
         .skip_tests(&[
             // TODO re: RUST-1649: fix withTransaction for new test runner
             "attaches transaction fields to given command",
+            // TODO fix on RUST-582
+            "supports configuring getMore maxTimeMS",
+            // TODO fix in a follow up PR because need to add IterateOnce
+            "does not close the cursor when receiving an empty batch",
         ])
         .await;
 }

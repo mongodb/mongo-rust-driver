@@ -288,6 +288,7 @@ impl<'de> Deserialize<'de> for Operation {
             "deleteOne" => deserialize_op::<DeleteOne>(definition.arguments),
             "find" => deserialize_op::<Find>(definition.arguments),
             "createFindCursor" => deserialize_op::<CreateFindCursor>(definition.arguments),
+            "createCommandCursor" => deserialize_op::<CreateCommandCursor>(definition.arguments),
             "aggregate" => deserialize_op::<Aggregate>(definition.arguments),
             "distinct" => deserialize_op::<Distinct>(definition.arguments),
             "countDocuments" => deserialize_op::<CountDocuments>(definition.arguments),
@@ -1545,7 +1546,7 @@ impl TestOperation for CreateCollection {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let database = test_runner.get_database(id).await;
-
+            let collection: Entity;
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
                     database
@@ -1557,12 +1558,14 @@ impl TestOperation for CreateCollection {
                         .await
                 })
                 .await?;
+                collection = Entity::Collection(database.collection(&self.collection));
             } else {
                 database
                     .create_collection(&self.collection, self.options.clone())
                     .await?;
+                collection = Entity::Collection(database.collection(&self.collection));
             }
-            Ok(None)
+            Ok(Some(collection))
         }
         .boxed()
     }
@@ -1654,9 +1657,9 @@ pub(super) struct RunCursorCommand {
     #[serde(rename = "commandName")]
     _command_name: String,
     selection_criteria: Option<SelectionCriteria>,
-    cursor_type: Option<CursorType>,
+    cursor_type: Option<String>,
     batch_size: Option<u32>,
-    max_time_m_s: Option<Duration>,
+    max_time_m_s: Option<u64>,
     comment: Option<Bson>,
     session: Option<String>,
 }
@@ -1670,7 +1673,18 @@ impl TestOperation for RunCursorCommand {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-            let options = RunCursorCommandOptions::builder().max_time(self.max_time_m_s).cursor_type(self.cursor_type).selection_criteria(self.selection_criteria.clone()).comment(self.comment.clone()).batch_size(self.batch_size).build();
+            let cursor_type = match self.cursor_type.clone().unwrap_or_default().to_ascii_lowercase().as_str() {
+                "tailable" => Some(CursorType::Tailable),
+                "tailableawait" => Some(CursorType::TailableAwait),
+                "nontailable" => Some(CursorType::NonTailable),
+                _ => None,
+            };
+            let options = RunCursorCommandOptions::builder().
+                max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default())).
+                cursor_type(cursor_type).
+                selection_criteria(self.selection_criteria.clone()).
+                comment(self.comment.clone()).
+                batch_size(self.batch_size).build();
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
@@ -1700,9 +1714,9 @@ pub struct CreateCommandCursor {
     #[serde(rename = "commandName")]
     _command_name: String,
     selection_criteria: Option<SelectionCriteria>,
-    cursor_type: Option<CursorType>,
+    cursor_type: Option<String>,
     batch_size: Option<u32>,
-    max_time_m_s: Option<Duration>,
+    max_time_m_s: Option<u64>,
     comment: Option<Bson>,
     session: Option<String>,
 }
@@ -1716,7 +1730,18 @@ impl TestOperation for CreateCommandCursor {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-            let options = RunCursorCommandOptions::builder().max_time(self.max_time_m_s).cursor_type(self.cursor_type).selection_criteria(self.selection_criteria.clone()).comment(self.comment.clone()).batch_size(self.batch_size).build();
+            let cursor_type = match self.cursor_type.clone().unwrap_or_default().to_ascii_lowercase().as_str() {
+                "tailable" => Some(CursorType::Tailable),
+                "tailableawait" => Some(CursorType::TailableAwait),
+                "nontailable" => Some(CursorType::NonTailable),
+                _ => None,
+            };
+            let options = RunCursorCommandOptions::builder().
+                max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default())).
+                cursor_type(cursor_type).
+                selection_criteria(self.selection_criteria.clone()).
+                comment(self.comment.clone()).
+                batch_size(self.batch_size).build();
             let result = match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;

@@ -1206,7 +1206,6 @@ where
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
             let insert = Insert::new_encrypted(self.namespace(), docs, options.clone(), encrypted);
-
             match self
                 .client()
                 .execute_operation(insert, session.as_deref_mut())
