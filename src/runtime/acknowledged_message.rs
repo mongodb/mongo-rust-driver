@@ -1,3 +1,7 @@
+use std::{pin::Pin, task::Poll};
+
+use futures_core::Future;
+
 /// A message type that includes an acknowledgement mechanism.
 /// When this is dropped or `acknowledge` is called, the sender will be notified.
 #[derive(Debug)]
@@ -61,5 +65,16 @@ impl<R> AcknowledgmentReceiver<R> {
     /// was dropped without the receiving end explicitly sending anything back.
     pub(crate) async fn wait_for_acknowledgment(self) -> Option<R> {
         self.receiver.await.ok()
+    }
+}
+
+impl<R> Future for AcknowledgmentReceiver<R> {
+    type Output = Option<R>;
+
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.get_mut().receiver).poll(cx) {
+            Poll::Ready(r) => Poll::Ready(r.ok()),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }

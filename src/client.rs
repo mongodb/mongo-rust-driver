@@ -604,9 +604,7 @@ impl Client {
     /// # }
     /// ```
     pub async fn shutdown_immediate(self) {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        self.inner.topology.shutdown(tx).await;
-        let _ = rx.await;
+        self.inner.topology.shutdown().await;
         // This has to happen last to allow pending cleanup to execute commands.
         self.inner.shutdown.lock().unwrap().executed = true;
     }

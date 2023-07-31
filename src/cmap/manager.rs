@@ -1,7 +1,7 @@
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::{bson::oid::ObjectId, error::Error, runtime::AcknowledgedMessage};
+use crate::{bson::oid::ObjectId, error::Error, runtime::{AcknowledgedMessage, AcknowledgmentReceiver}, sdam::BroadcastMessage};
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -76,18 +76,10 @@ impl PoolManager {
             .send(PoolManagementRequest::HandleConnectionSucceeded(conn));
     }
 
-    pub(super) fn shutdown(&self) -> oneshot::Receiver<()> {
-        let (tx, rx) = oneshot::channel();
-        let _ = self.sender.send(PoolManagementRequest::Shutdown(tx));
-        rx
-    }
-
-    /// Create a synchronization point for the pool's worker.
-    #[cfg(test)]
-    pub(super) fn sync_worker(&self) -> oneshot::Receiver<()> {
-        let (tx, rx) = oneshot::channel();
-        let _ = self.sender.send(PoolManagementRequest::Sync(tx));
-        rx
+    pub(super) fn broadcast(&self, msg: BroadcastMessage) -> AcknowledgmentReceiver<()> {
+        let (msg, ack) = AcknowledgedMessage::package(msg);
+        let _ = self.sender.send(PoolManagementRequest::Broadcast(msg));
+        ack
     }
 }
 
@@ -126,12 +118,8 @@ pub(super) enum PoolManagementRequest {
     /// with the successful connection.
     HandleConnectionSucceeded(ConnectionSucceeded),
 
-    /// Shut down the worker.
-    Shutdown(oneshot::Sender<()>),
-
-    /// Synchronize the worker queue state with an external caller, i.e. a test.
-    #[cfg(test)]
-    Sync(oneshot::Sender<()>),
+    /// Handle a broadcast message.
+    Broadcast(AcknowledgedMessage<BroadcastMessage>),
 }
 
 impl PoolManagementRequest {

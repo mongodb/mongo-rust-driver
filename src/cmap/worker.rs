@@ -32,7 +32,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime::{self, WorkerHandleListener},
-    sdam::TopologyUpdater,
+    sdam::{TopologyUpdater, BroadcastMessage},
 };
 
 use std::{
@@ -241,7 +241,7 @@ impl ConnectionPoolWorker {
     /// emit a pool closed event.
     async fn execute(mut self) {
         let mut maintenance_interval = runtime::interval(self.maintenance_frequency);
-        let mut notify = None;
+        let mut shutdown_ack = None;
 
         loop {
             let task = tokio::select! {
@@ -305,13 +305,18 @@ impl ConnectionPoolWorker {
                     PoolManagementRequest::HandleConnectionFailed => {
                         self.handle_connection_failed();
                     }
-                    PoolManagementRequest::Shutdown(tx) => {
-                        notify = Some(tx);
-                        break;
-                    }
-                    #[cfg(test)]
-                    PoolManagementRequest::Sync(tx) => {
-                        let _ = tx.send(());
+                    PoolManagementRequest::Broadcast(msg) => {
+                        let (msg, ack) = msg.into_parts();
+                        match msg {
+                            BroadcastMessage::Shutdown => {
+                                shutdown_ack = Some(ack);
+                                break;
+                            }
+                            #[cfg(test)]
+                            BroadcastMessage::SyncWorkers => {
+                                ack.acknowledge(());
+                            }
+                        }
                     }
                 },
                 PoolTask::Maintenance => {
@@ -336,8 +341,8 @@ impl ConnectionPoolWorker {
             }
             .into()
         });
-        if let Some(tx) = notify {
-            let _ = tx.send(());
+        if let Some(tx) = shutdown_ack {
+            let _ = tx.acknowledge(());
         }
     }
 
