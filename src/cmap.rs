@@ -34,7 +34,8 @@ use crate::{
         PoolCreatedEvent,
     },
     options::ServerAddress,
-    sdam::{TopologyUpdater, BroadcastMessage}, runtime::AcknowledgmentReceiver,
+    runtime::AcknowledgmentReceiver,
+    sdam::{BroadcastMessage, TopologyUpdater},
 };
 use connection_requester::ConnectionRequester;
 use manager::PoolManager;

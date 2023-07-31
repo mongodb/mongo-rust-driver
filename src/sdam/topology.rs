@@ -836,12 +836,14 @@ impl TopologyUpdater {
     }
 
     pub(crate) async fn shutdown(&self) {
-        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::Shutdown)).await;
+        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::Shutdown))
+            .await;
     }
 
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
-        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::SyncWorkers)).await;
+        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::SyncWorkers))
+            .await;
     }
 }
 

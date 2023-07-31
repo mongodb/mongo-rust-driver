@@ -32,7 +32,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime::{self, WorkerHandleListener},
-    sdam::{TopologyUpdater, BroadcastMessage},
+    sdam::{BroadcastMessage, TopologyUpdater},
 };
 
 use std::{

@@ -1,7 +1,12 @@
 use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::{bson::oid::ObjectId, error::Error, runtime::{AcknowledgedMessage, AcknowledgmentReceiver}, sdam::BroadcastMessage};
+use crate::{
+    bson::oid::ObjectId,
+    error::Error,
+    runtime::{AcknowledgedMessage, AcknowledgmentReceiver},
+    sdam::BroadcastMessage,
+};
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
