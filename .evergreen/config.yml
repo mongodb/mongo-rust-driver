@@ -859,6 +859,18 @@ functions:
           ${PREPARE_SHELL}
           ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh stop
 
+  "tear down aws":
+    - command: shell.exec
+      params:
+        shell: "bash"
+        script: |
+          ${PREPARE_SHELL}
+          cd "${DRIVERS_TOOLS}/.evergreen/auth_aws"
+          if [ -f "./aws_e2e_setup.json" ]; then
+            . ./activate-authawsvenv.sh
+            python ./lib/aws_assign_instance_profile.py
+          fi
+
   "upload test results":
     - command: attach.xunit_results
       params:
@@ -878,6 +890,7 @@ pre:
 post:
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
+  - func: "tear down aws"
   - func: "upload test results"
   - func: "upload-mo-artifacts"
   - func: "cleanup"
