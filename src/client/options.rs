@@ -1298,17 +1298,6 @@ impl ClientOptions {
             }
         }
 
-        let max_connecting = if let Some(mc) = conn_str.max_connecting {
-            // maxConnecting must be greater than 0
-            if mc == 0 {
-                None
-            } else {
-                Some(mc)
-            }
-        } else {
-            None
-        };
-
         Self {
             hosts: vec![],
             app_name: conn_str.app_name,
@@ -1322,7 +1311,7 @@ impl ClientOptions {
             max_pool_size: conn_str.max_pool_size,
             min_pool_size: conn_str.min_pool_size,
             max_idle_time: conn_str.max_idle_time,
-            max_connecting: max_connecting,
+            max_connecting: conn_str.max_connecting,
             server_selection_timeout: conn_str.server_selection_timeout,
             compressors: conn_str.compressors,
             connect_timeout: conn_str.connect_timeout,
@@ -1401,6 +1390,10 @@ impl ClientOptions {
 
         if let Some(0) = self.max_pool_size {
             return Err(Error::invalid_argument("cannot specify maxPoolSize=0"));
+        }
+
+        if let Some(0) = self.max_connecting {
+            return Err(Error::invalid_argument("cannot specify maxConnecting=0"));
         }
 
         if let Some(SelectionCriteria::ReadPreference(ref rp)) = self.selection_criteria {
@@ -2052,6 +2045,9 @@ impl ConnectionString {
             }
             k @ "minpoolsize" => {
                 self.min_pool_size = Some(get_u32!(value, k));
+            }
+            k @ "maxconnecting" => {
+                self.max_connecting = Some(get_u32!(value, k));
             }
             "readconcernlevel" => {
                 self.read_concern = Some(ReadConcernLevel::from_str(value).into());
