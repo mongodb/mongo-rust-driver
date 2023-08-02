@@ -24,6 +24,12 @@ use crate::{
     Namespace,
 };
 
+pub(super) enum AdvanceResult {
+    Advanced,
+    Exhausted,
+    Waiting,
+}
+
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -95,33 +101,42 @@ where
         self.state.as_ref().unwrap()
     }
 
-    /// Advance the cursor forward to the next document.
-    /// If there are no documents cached locally, perform getMores until
-    /// the cursor is exhausted or a result/error has been received.
+    /// Advance the cursor forward to the next document. If there are no documents cached locally,
+    /// perform getMores until the cursor is exhausted or a result/error has been received. This
+    /// method will return false if the cursor is exhausted.
     pub(super) async fn advance(&mut self) -> Result<bool> {
         loop {
-            self.state_mut().buffer.advance();
-
-            if !self.state().buffer.is_empty() {
-                break;
+            match self.try_advance().await? {
+                AdvanceResult::Advanced => return Ok(true),
+                AdvanceResult::Exhausted => return Ok(false),
+                AdvanceResult::Waiting => continue,
             }
+        }
+    }
 
-            // if moving the offset puts us at the end of the buffer, perform another
-            // getMore if the cursor is still alive.
-
-            if self.state().exhausted {
-                return Ok(false);
-            }
-
-            let client = self.client.clone();
-            let spec = self.info.clone();
-            let pin = self.state().pinned_connection.replicate();
-
-            let result = self.provider.execute(spec, client, pin).await;
-            self.handle_get_more_result(result)?;
+    /// Attempt to advance the cursor forward to the next document. If there are no documents cached
+    /// locally, perform one getMore to attempt to retrieve more documents.
+    pub(super) async fn try_advance(&mut self) -> Result<AdvanceResult> {
+        if self.state_mut().buffer.advance() {
+            return Ok(AdvanceResult::Advanced);
+        } else if self.is_exhausted() {
+            return Ok(AdvanceResult::Exhausted);
         }
 
-        Ok(true)
+        // If the buffer is empty but the cursor is not exhausted, perform a getMore.
+        let client = self.client.clone();
+        let spec = self.info.clone();
+        let pin = self.state().pinned_connection.replicate();
+
+        let result = self.provider.execute(spec, client, pin).await;
+        self.handle_get_more_result(result)?;
+
+        // If the getMore result refilled the buffer, then the cursor has been advanced. Otherwise
+        // getMore returned an empty batch.
+        match self.state_mut().buffer.advance() {
+            true => Ok(AdvanceResult::Advanced),
+            false => Ok(AdvanceResult::Waiting),
+        }
     }
 
     pub(super) fn take_state(&mut self) -> CursorState {
@@ -494,21 +509,27 @@ impl CursorBuffer {
         self.docs.is_empty()
     }
 
+    /// Removes and returns the document in the front of the buffer.
     pub(crate) fn next(&mut self) -> Option<RawDocumentBuf> {
         self.fresh = false;
         self.docs.pop_front()
     }
 
-    pub(crate) fn advance(&mut self) {
-        // if at the front of the buffer, don't move forward as the first document
-        // hasn't been consumed yet.
+    /// Advances the buffer to the next document. Returns whether there are any documents remaining
+    /// in the buffer after advancing.
+    pub(crate) fn advance(&mut self) -> bool {
+        // If at the front of the buffer, don't move forward as the first document hasn't been
+        // consumed yet.
         if self.fresh {
             self.fresh = false;
-            return;
+            return !self.is_empty();
         }
-        self.next();
+        self.docs.pop_front();
+        !self.is_empty()
     }
 
+    /// Returns the item at the front of the buffer, if there is one. This method does not change
+    /// the state of the buffer.
     pub(crate) fn current(&self) -> Option<&RawDocument> {
         self.docs.front().map(|d| d.as_ref())
     }
@@ -518,4 +539,25 @@ impl AsRef<VecDeque<RawDocumentBuf>> for CursorBuffer {
     fn as_ref(&self) -> &VecDeque<RawDocumentBuf> {
         &self.docs
     }
+}
+
+#[test]
+fn test_buffer() {
+    use bson::rawdoc;
+
+    let queue: VecDeque<RawDocumentBuf> =
+        [rawdoc! { "x": 1 }, rawdoc! { "x": 2 }, rawdoc! { "x": 3 }].into();
+    let mut buffer = CursorBuffer::new(queue);
+
+    assert!(buffer.advance());
+    assert_eq!(buffer.current(), Some(rawdoc! { "x": 1 }.as_ref()));
+
+    assert!(buffer.advance());
+    assert_eq!(buffer.current(), Some(rawdoc! { "x": 2 }.as_ref()));
+
+    assert!(buffer.advance());
+    assert_eq!(buffer.current(), Some(rawdoc! { "x": 3 }.as_ref()));
+
+    assert!(!buffer.advance());
+    assert_eq!(buffer.current(), None);
 }

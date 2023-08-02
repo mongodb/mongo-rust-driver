@@ -208,6 +208,13 @@ impl<T> Cursor<T> {
         self.wrapped_cursor.as_mut().unwrap().advance().await
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) async fn try_advance(&mut self) -> Result<()> {
+        let _ = self.wrapped_cursor.as_mut().unwrap().try_advance().await?;
+        Ok(())
+    }
+
     /// Returns a reference to the current result in the cursor.
     ///
     /// # Panics
