@@ -19,6 +19,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
         - [Getting a handle to a database](#getting-a-handle-to-a-database)
         - [Inserting documents into a collection](#inserting-documents-into-a-collection)
         - [Finding documents in a collection](#finding-documents-in-a-collection)
+        - [Updating a document in a collection](#updating-document-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
 - [Web Framework Examples](#web-framework-examples)
 - [Note on connecting to Atlas deployments](#note-on-connecting-to-atlas-deployments)
@@ -196,6 +197,17 @@ let mut cursor = typed_collection.find(filter, find_options).await?;
 while let Some(book) = cursor.try_next().await? {
     println!("title: {}", book.title);
 }
+```
+
+#### Updating a document in a collection
+```rust
+let new_book = Book {
+    title: "The Grapes of Wrath".to_string(),
+    author: "John Steinbeck".to_string(),
+};
+let filter = doc! {"name": &new_book.name};
+let update = doc! {"$set": new_book };
+typed_collection.update_one(filter, update, None).await?
 ```
 
 ### Using the sync API
