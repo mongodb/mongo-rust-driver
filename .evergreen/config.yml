@@ -859,6 +859,18 @@ functions:
           ${PREPARE_SHELL}
           ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh stop
 
+  "tear down aws":
+    - command: shell.exec
+      params:
+        shell: "bash"
+        script: |
+          ${PREPARE_SHELL}
+          cd "${DRIVERS_TOOLS}/.evergreen/auth_aws"
+          if [ -f "./aws_e2e_setup.json" ]; then
+            . ./activate-authawsvenv.sh
+            python ./lib/aws_assign_instance_profile.py
+          fi
+
   "upload test results":
     - command: attach.xunit_results
       params:
@@ -878,6 +890,7 @@ pre:
 post:
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
+  - func: "tear down aws"
   - func: "upload test results"
   - func: "upload-mo-artifacts"
   - func: "cleanup"
@@ -1019,8 +1032,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      # - func: "run aws auth test with aws EC2 credentials"
-      # - func: "run aws ECS auth test"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-5.0-standalone"
@@ -1081,8 +1094,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      # - func: "run aws auth test with aws EC2 credentials"
-      # - func: "run aws ECS auth test"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-6.0-standalone"
@@ -1143,8 +1156,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      # - func: "run aws auth test with aws EC2 credentials"
-      # - func: "run aws ECS auth test"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-7.0-standalone"
@@ -1205,8 +1218,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      # - func: "run aws auth test with aws EC2 credentials"
-      # - func: "run aws ECS auth test"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-rapid-standalone"
@@ -1267,8 +1280,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      # - func: "run aws auth test with aws EC2 credentials"
-      # - func: "run aws ECS auth test"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-latest-standalone"
@@ -1330,8 +1343,8 @@ tasks:
       - func: "run aws auth test with assume role credentials"
       - func: "run aws auth test with aws credentials as environment variables"
       - func: "run aws auth test with aws credentials and session token as environment variables"
-      # - func: "run aws auth test with aws EC2 credentials"
-      # - func: "run aws ECS auth test"
+      - func: "run aws auth test with aws EC2 credentials"
+      - func: "run aws ECS auth test"
       - func: "run aws assume role with web identity test"
 
   - name: "test-connection-string"

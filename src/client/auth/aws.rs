@@ -167,7 +167,7 @@ pub(crate) struct AwsCredential {
 
     #[serde(
         default,
-        deserialize_with = "serde_util::deserialize_datetime_option_from_double"
+        deserialize_with = "serde_util::deserialize_datetime_option_from_double_or_string"
     )]
     expiration: Option<bson::DateTime>,
 }
