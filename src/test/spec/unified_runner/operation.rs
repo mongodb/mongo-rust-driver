@@ -1547,6 +1547,7 @@ impl TestOperation for CreateCollection {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let database = test_runner.get_database(id).await;
+            
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
                     database
