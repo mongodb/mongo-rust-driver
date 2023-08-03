@@ -70,7 +70,6 @@ async fn run_test<F: Future>(
     test(client, db, coll).await;
 }
 
-#[function_name::named]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn get_more() {
@@ -116,10 +115,9 @@ async fn get_more() {
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
-    run_test(function_name!(), get_more_test).await;
+    run_test("get_more", get_more_test).await;
 }
 
-#[function_name::named]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn notwritableprimary_keep_pool() {
@@ -167,7 +165,11 @@ async fn notwritableprimary_keep_pool() {
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
-    run_test(function_name!(), notwritableprimary_keep_pool_test).await;
+    run_test(
+        "notwritableprimary_keep_pool",
+        notwritableprimary_keep_pool_test,
+    )
+    .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -226,7 +228,6 @@ async fn notwritableprimary_reset_pool() {
     .await;
 }
 
-#[function_name::named]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn shutdown_in_progress() {
@@ -273,10 +274,9 @@ async fn shutdown_in_progress() {
             .expect("insert should have succeeded");
     }
 
-    run_test(function_name!(), shutdown_in_progress_test).await;
+    run_test("shutdown_in_progress", shutdown_in_progress_test).await;
 }
 
-#[function_name::named]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn interrupted_at_shutdown() {
@@ -325,5 +325,5 @@ async fn interrupted_at_shutdown() {
         runtime::delay_for(Duration::from_millis(250)).await;
     }
 
-    run_test(function_name!(), interrupted_at_shutdown_test).await;
+    run_test("interrupted_at_shutdown", interrupted_at_shutdown_test).await;
 }

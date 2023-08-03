@@ -1679,7 +1679,7 @@ impl ConnectionString {
 
         // Set username and password.
         if let Some(u) = username {
-            let mut credential = conn_str.credential.get_or_insert_with(Default::default);
+            let credential = conn_str.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
 
@@ -1701,7 +1701,7 @@ impl ConnectionString {
 
         match parts.auth_mechanism {
             Some(ref mechanism) => {
-                let mut credential = conn_str.credential.get_or_insert_with(Default::default);
+                let credential = conn_str.credential.get_or_insert_with(Default::default);
                 credential.source = parts.auth_source;
 
                 if let Some(mut doc) = parts.auth_mechanism_properties.take() {
@@ -1989,7 +1989,7 @@ impl ConnectionString {
                 self.heartbeat_frequency = Some(Duration::from_millis(get_duration!(value, k)));
             }
             k @ "journal" => {
-                let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
+                let write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.journal = Some(get_bool!(value, k));
             }
             k @ "loadbalanced" => {
@@ -2216,7 +2216,7 @@ impl ConnectionString {
                 }
             },
             "w" => {
-                let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
+                let write_concern = self.write_concern.get_or_insert_with(Default::default);
 
                 match value.parse::<i32>() {
                     Ok(w) => match u32::try_from(w) {
