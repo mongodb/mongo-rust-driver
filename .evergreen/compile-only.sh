@@ -4,16 +4,17 @@ set -o errexit
 set -o xtrace
 
 source ./.evergreen/env.sh
-rustup update $RUST_VERSION
 
-# pin dependencies who have bumped their MSRVs to > ours in recent releases.
-if [  "$MSRV" = "true" ]; then
+# Install the MSRV and pin dependencies who have bumped their MSRVs to > ours in recent releases.
+if [  "$RUST_VERSION" != "" ]; then
+    rustup toolchain install $RUST_VERSION
+    TOOLCHAIN="+${RUST_VERSION}"
     cp .evergreen/MSRV-Cargo.lock Cargo.lock
 fi
 
 source ./.evergreen/feature-combinations.sh
 
-# build with all available features to ensure all optional dependencies are brought in too.
+# Test compilation with all feature combinations.
 for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
-    rustup run $RUST_VERSION cargo build ${FEATURE_COMBINATIONS[$i]}
+    cargo $TOOLCHAIN build ${FEATURE_COMBINATIONS[$i]}
 done

@@ -11,8 +11,6 @@ set -o errexit  # Exit the script with error if any of the commands fail
 #  MONGODB_URI    Set the URI, including an optional username/password to use
 #                 to connect to the server via MONGODB-AWS authentication
 #                 mechanism.
-# ASYNC_RUNTIME   Specify the async runtime to use. Must be either "tokio" or
-#                 "async-std".
 
 echo "Running MONGODB-AWS authentication tests"
 # ensure no secrets are printed in log files
@@ -40,6 +38,8 @@ fi
 # show test output
 set -x
 
+echo "uri length: ${#MONGODB_URI}"
+
 set -o errexit
 
 source .evergreen/env.sh
@@ -51,7 +51,10 @@ set +o errexit
 
 cargo_test auth_aws auth_aws.xml
 cargo_test lambda_examples::auth::test_handler lambda_handler.xml
+cargo_test spec::auth spec.xml
+cargo_test uri_options uri_options.xml
+cargo_test connection_string connection_string.xml
 
-junit-report-merger results.xml auth_aws.xml lambda_handler.xml
+junit-report-merger results.xml auth_aws.xml lambda_handler.xml spec.xml uri_options.xml connection_string.xml
 
 exit $CARGO_RESULT

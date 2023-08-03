@@ -5,16 +5,6 @@ TEST_OPTIONS=()
 FEATURE_FLAGS=()
 CARGO_RESULT=0
 
-use_async_runtime() {
-    if [ "${ASYNC_RUNTIME}" = "async-std" ]; then
-        FEATURE_FLAGS+=("async-std-runtime")
-        CARGO_OPTIONS+=("--no-default-features")
-    elif [ "${ASYNC_RUNTIME}" != "tokio" ]; then
-        echo "invalid async runtime: ${ASYNC_RUNTIME}" >&2
-        exit 1
-    fi
-}
-
 join_by() { local IFS="$1"; shift; echo "$*"; }
 
 cargo_test_options() {

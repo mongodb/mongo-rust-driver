@@ -6,12 +6,6 @@ set -o pipefail
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-FEATURE_FLAGS+=("zstd-compression" "snappy-compression" "zlib-compression" "${TLS_FEATURE}")
-
-use_async_runtime
-
-echo "cargo test options: $(cargo_test_options)"
-
 export SERVERLESS="serverless"
 
 set +o errexit

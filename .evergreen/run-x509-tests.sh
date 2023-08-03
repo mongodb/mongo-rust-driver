@@ -15,12 +15,8 @@ export SUBJECT=${SUBJECT#"subject="}
 # Remove any leading or trailing whitespace
 export SUBJECT=`echo "$SUBJECT" | awk '{$1=$1;print}'`
 
-use_async_runtime
-
-FEATURE_FLAGS+=("${TLS_FEATURE}")
-
 set +o errexit
 
-MONGO_X509_USER="$SUBJECT" cargo_test "" results.xml
+MONGO_X509_USER="$SUBJECT" cargo_test x509_auth results.xml
 
 exit ${CARGO_RESULT}
