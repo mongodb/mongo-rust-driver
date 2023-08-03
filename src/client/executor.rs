@@ -6,7 +6,7 @@ use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
 
-use std::{collections::HashSet, sync::Arc, time::Instant};
+use std::{collections::HashSet, sync::{Arc, atomic::Ordering}, time::Instant};
 
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
@@ -100,7 +100,7 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
-        if self.inner.shutdown.lock().unwrap().executed {
+        if self.inner.shutdown.executed.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
         }
         Box::pin(async {

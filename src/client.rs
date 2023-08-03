@@ -6,7 +6,7 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::Mutex as SyncMutex,
+    sync::{Mutex as SyncMutex, atomic::{AtomicBool, Ordering}},
     time::{Duration, Instant},
 };
 
@@ -144,15 +144,15 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    shutdown: SyncMutex<Shutdown>,
+    shutdown: Shutdown,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
 }
 
 #[derive(Debug)]
 struct Shutdown {
-    pending_drops: IdSet<crate::runtime::AsyncJoinHandle<()>>,
-    executed: bool,
+    pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
+    executed: AtomicBool,
 }
 
 impl Client {
@@ -175,10 +175,10 @@ impl Client {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
-            shutdown: SyncMutex::new(Shutdown {
-                pending_drops: IdSet::new(),
-                executed: false,
-            }),
+            shutdown: Shutdown {
+                pending_drops: SyncMutex::new(IdSet::new()),
+                executed: AtomicBool::new(false),
+            },
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
         });
@@ -511,18 +511,18 @@ impl Client {
                 client
                     .inner
                     .shutdown
+                    .pending_drops
                     .lock()
                     .unwrap()
-                    .pending_drops
                     .remove(&id);
             }
         });
         let id = self
             .inner
             .shutdown
+            .pending_drops
             .lock()
             .unwrap()
-            .pending_drops
             .insert(handle);
         let _ = id_tx.send(id);
         AsyncDropToken {
@@ -581,7 +581,7 @@ impl Client {
         // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
         // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
         // causing the lock to be held for the duration of the join, which deadlocks.
-        let pending = self.inner.shutdown.lock().unwrap().pending_drops.extract();
+        let pending = self.inner.shutdown.pending_drops.lock().unwrap().extract();
         join_all(pending).await;
         self.shutdown_immediate().await;
     }
@@ -606,7 +606,7 @@ impl Client {
     pub async fn shutdown_immediate(self) {
         self.inner.topology.shutdown().await;
         // This has to happen last to allow pending cleanup to execute commands.
-        self.inner.shutdown.lock().unwrap().executed = true;
+        self.inner.shutdown.executed.store(true, Ordering::SeqCst);
     }
 
     /// Check in a server session to the server session pool. The session will be discarded if it is
