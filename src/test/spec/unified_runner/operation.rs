@@ -1547,7 +1547,6 @@ impl TestOperation for CreateCollection {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let database = test_runner.get_database(id).await;
-            let collection: Entity;
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
                     database
@@ -1559,14 +1558,14 @@ impl TestOperation for CreateCollection {
                         .await
                 })
                 .await?;
-                collection = Entity::Collection(database.collection(&self.collection));
             } else {
                 database
                     .create_collection(&self.collection, self.options.clone())
                     .await?;
-                collection = Entity::Collection(database.collection(&self.collection));
             }
-            Ok(Some(collection))
+            Ok(Some(Entity::Collection(
+                database.collection(&self.collection),
+            )))
         }
         .boxed()
     }

@@ -125,6 +125,7 @@ impl Client {
                     }
                     .into());
                 }
+
                 if let Some(SelectionCriteria::ReadPreference(read_preference)) =
                     op.selection_criteria()
                 {
@@ -326,6 +327,7 @@ impl Client {
                 Ok(c) => c,
                 Err(mut err) => {
                     retry.first_error()?;
+
                     err.add_labels_and_update_pin(None, &mut session, None)?;
                     if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
                         err.add_label(RETRYABLE_WRITE_ERROR);
@@ -370,6 +372,7 @@ impl Client {
                 .as_ref()
                 .and_then(|r| r.prior_txn_number)
                 .or_else(|| get_txn_number(&mut session, retryability));
+
             let details = match self
                 .execute_operation_on_connection(
                     &mut op,
@@ -614,6 +617,7 @@ impl Client {
             })
         })
         .await;
+
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
@@ -654,6 +658,7 @@ impl Client {
                     client
                         .update_cluster_time(cluster_time, at_cluster_time, session)
                         .await;
+
                     if let (Some(session), Some(ts)) = (
                         session.as_mut(),
                         raw_doc
@@ -662,6 +667,7 @@ impl Client {
                     ) {
                         session.advance_operation_time(ts);
                     }
+
                     if ok == 1 {
                         if let Some(ref mut session) = session {
                             if is_sharded && session.in_transaction() {
@@ -731,6 +737,7 @@ impl Client {
                             .body()
                             .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
                     };
+
                     CommandEvent::Succeeded(CommandSucceededEvent {
                         duration,
                         reply,

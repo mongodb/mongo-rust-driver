@@ -110,7 +110,7 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
             match options.cursor_type {
                 Some(CursorType::Tailable) | Some(CursorType::TailableAwait) => {
                     match &self.options {
-                        Some(options) => options.max_time.clone(),
+                        Some(options) => options.max_time,
                         None => None,
                     };
                 }
@@ -119,7 +119,7 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         }
 
         Ok(CursorSpecification::new(
-            cursor_response.cursor.clone(),
+            cursor_response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             max_time,
