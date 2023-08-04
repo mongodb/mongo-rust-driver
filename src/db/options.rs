@@ -315,16 +315,21 @@ pub struct ChangeStreamPreAndPostImages {
 
 /// Specifies the options to a
 /// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command) operation.
-#[derive(Clone, Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
+    #[serde(deserialize_with = "serde_util::deserialize_cursor_type")]
     /// The type of cursor to return.
     pub cursor_type: Option<CursorType>,
+    #[serde(default)]
     /// Number of documents to return per batch.
     pub batch_size: Option<u32>,
+    #[serde(rename = "maxtime", alias = "maxTimeMS")]
+    #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
     /// Optional non-negative integer value. Use this value to configure the maxTimeMS option sent
     /// on subsequent getMore commands.
     pub max_time: Option<Duration>,

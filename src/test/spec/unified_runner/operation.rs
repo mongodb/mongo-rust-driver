@@ -1657,11 +1657,9 @@ pub(super) struct RunCursorCommand {
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "commandName")]
     _command_name: String,
-    selection_criteria: Option<SelectionCriteria>,
-    cursor_type: Option<String>,
-    batch_size: Option<u32>,
-    max_time_m_s: Option<u64>,
-    comment: Option<Bson>,
+
+    #[serde(flatten)]
+    options: Option<RunCursorCommandOptions>,
     session: Option<String>,
 }
 
@@ -1674,25 +1672,21 @@ impl TestOperation for RunCursorCommand {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-            let cursor_type = match self
-                .cursor_type
-                .clone()
-                .unwrap_or_default()
-                .to_ascii_lowercase()
-                .as_str()
-            {
-                "tailable" => Some(CursorType::Tailable),
-                "tailableawait" => Some(CursorType::TailableAwait),
-                "nontailable" => Some(CursorType::NonTailable),
-                _ => None,
-            };
+
+            let max_time = self.options.as_ref().and_then(|opts| opts.max_time);
+            let cursor_type = self.options.as_ref().and_then(|opts| opts.cursor_type);
+            let selection_criteria = self.options.as_ref().and_then(|opts| opts.selection_criteria.clone());
+            let comment = self.options.as_ref().and_then(|opts| opts.comment.clone());
+            let batch_size = dbg!(self.options.as_ref().and_then(|opts| opts.batch_size));
+
             let options = RunCursorCommandOptions::builder()
-                .max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default()))
+                .max_time(max_time)
                 .cursor_type(cursor_type)
-                .selection_criteria(self.selection_criteria.clone())
-                .comment(self.comment.clone())
-                .batch_size(self.batch_size)
+                .selection_criteria(selection_criteria)
+                .comment(comment)
+                .batch_size(batch_size)
                 .build();
+
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
@@ -1708,6 +1702,7 @@ impl TestOperation for RunCursorCommand {
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
+            
             Ok(Some(bson::to_bson(&result)?.into()))
         }
         .boxed()

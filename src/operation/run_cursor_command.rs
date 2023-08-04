@@ -4,7 +4,6 @@ use bson::RawDocumentBuf;
 
 use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    coll::options::CursorType,
     concern::WriteConcern,
     cursor::CursorSpecification,
     error::{Error, Result},
@@ -104,25 +103,11 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
             None => None,
         };
 
-        let mut max_time = Some(Duration::new(0, 0));
-
-        if let Some(ref options) = self.options {
-            match options.cursor_type {
-                Some(CursorType::Tailable) | Some(CursorType::TailableAwait) => {
-                    match &self.options {
-                        Some(options) => options.max_time,
-                        None => None,
-                    };
-                }
-                _ => max_time = None,
-            };
-        }
-
         Ok(CursorSpecification::new(
             cursor_response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
-            max_time,
+            self.options.as_ref().and_then(|opts| opts.max_time),
             comment,
         ))
     }

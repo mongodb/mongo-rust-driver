@@ -1,11 +1,11 @@
-use std::time::Duration;
+use std::{time::Duration};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bson::{doc, Bson, Document},
     bson_util::get_u64,
-    error::{Error, Result},
+    error::{Error, Result}, coll::options::CursorType,
 };
 
 pub(crate) mod duration_option_as_int_seconds {
@@ -56,6 +56,27 @@ where
 {
     let millis = Option::<u64>::deserialize(deserializer)?;
     Ok(millis.map(Duration::from_millis))
+}
+
+pub(crate) fn deserialize_cursor_type<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<CursorType>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let cursor_string = dbg!(Option::<&str>::deserialize(deserializer)?);
+    let cursor_type = match cursor_string
+                .clone()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+                .as_str()
+            {
+                "tailable" => Some(CursorType::Tailable),
+                "tailableawait" => Some(CursorType::TailableAwait),
+                "nontailable" => Some(CursorType::NonTailable),
+                _ => None,
+            };
+    Ok(cursor_type)
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]

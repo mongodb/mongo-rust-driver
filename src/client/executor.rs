@@ -692,7 +692,6 @@ impl Client {
                             }))
                     }
                 }
-
                 handle_response(self, op, session, is_sharded, response).await
             }
             Err(err) => Err(err),
