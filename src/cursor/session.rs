@@ -350,7 +350,9 @@ impl<T> SessionCursor<T> {
 
 impl<T> SessionCursor<T> {
     fn mark_exhausted(&mut self) {
-        self.state.as_mut().unwrap().exhausted = true;
+        if let Some(state) = self.state.as_mut() {
+            state.exhausted = true;
+        }
     }
 
     pub(crate) fn is_exhausted(&self) -> bool {
