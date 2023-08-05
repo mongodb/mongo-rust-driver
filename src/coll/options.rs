@@ -28,6 +28,10 @@ pub struct CollectionOptions {
 
     /// The default write concern for operations.
     pub write_concern: Option<WriteConcern>,
+
+    /// Sets the [`bson::SerializerOptions::human_readable`] option for the [`Bson`] serializer.
+    /// The default value is `false`.
+    pub human_readable_serialization: Option<bool>,
 }
 
 /// Specifies whether a
@@ -299,10 +303,6 @@ pub struct ReplaceOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
-
-    /// Sets the [`bson::SerializerOptions::human_readable`] option for the [`Bson`] serializer.
-    /// The default value is true.
-    pub human_readable: Option<bool>,
 }
 
 /// Specifies the options to a
@@ -447,10 +447,6 @@ pub struct FindOneAndReplaceOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
-
-    /// Sets the [`bson::SerializerOptions::human_readable`] option for the [`Bson`] serializer.
-    /// The default value is true.
-    pub human_readable: Option<bool>,
 }
 
 /// Specifies the options to a
