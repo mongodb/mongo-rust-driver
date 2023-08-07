@@ -323,6 +323,7 @@ pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
     #[serde(deserialize_with = "serde_util::deserialize_cursor_type")]
+    #[serde(default)]
     /// The type of cursor to return.
     pub cursor_type: Option<CursorType>,
     #[serde(default)]
@@ -330,6 +331,7 @@ pub struct RunCursorCommandOptions {
     pub batch_size: Option<u32>,
     #[serde(rename = "maxtime", alias = "maxTimeMS")]
     #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
+    #[serde(default)]
     /// Optional non-negative integer value. Use this value to configure the maxTimeMS option sent
     /// on subsequent getMore commands.
     pub max_time: Option<Duration>,

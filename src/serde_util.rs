@@ -1,11 +1,12 @@
-use std::{time::Duration};
+use std::time::Duration;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bson::{doc, Bson, Document},
     bson_util::get_u64,
-    error::{Error, Result}, coll::options::CursorType,
+    coll::options::CursorType,
+    error::{Error, Result},
 };
 
 pub(crate) mod duration_option_as_int_seconds {
@@ -66,16 +67,16 @@ where
 {
     let cursor_string = dbg!(Option::<&str>::deserialize(deserializer)?);
     let cursor_type = match cursor_string
-                .clone()
-                .unwrap_or_default()
-                .to_ascii_lowercase()
-                .as_str()
-            {
-                "tailable" => Some(CursorType::Tailable),
-                "tailableawait" => Some(CursorType::TailableAwait),
-                "nontailable" => Some(CursorType::NonTailable),
-                _ => None,
-            };
+        .clone()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "tailable" => Some(CursorType::Tailable),
+        "tailableawait" => Some(CursorType::TailableAwait),
+        "nontailable" => Some(CursorType::NonTailable),
+        _ => None,
+    };
     Ok(cursor_type)
 }
 

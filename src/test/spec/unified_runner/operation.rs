@@ -1659,7 +1659,7 @@ pub(super) struct RunCursorCommand {
     _command_name: String,
 
     #[serde(flatten)]
-    options: Option<RunCursorCommandOptions>,
+    options: RunCursorCommandOptions,
     session: Option<String>,
 }
 
@@ -1673,11 +1673,11 @@ impl TestOperation for RunCursorCommand {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
 
-            let max_time = self.options.as_ref().and_then(|opts| opts.max_time);
-            let cursor_type = self.options.as_ref().and_then(|opts| opts.cursor_type);
-            let selection_criteria = self.options.as_ref().and_then(|opts| opts.selection_criteria.clone());
-            let comment = self.options.as_ref().and_then(|opts| opts.comment.clone());
-            let batch_size = dbg!(self.options.as_ref().and_then(|opts| opts.batch_size));
+            let max_time = self.options.max_time;
+            let cursor_type = self.options.cursor_type;
+            let selection_criteria = self.options.selection_criteria.clone();
+            let comment = self.options.comment.clone();
+            let batch_size = self.options.batch_size;
 
             let options = RunCursorCommandOptions::builder()
                 .max_time(max_time)
@@ -1702,7 +1702,7 @@ impl TestOperation for RunCursorCommand {
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
-            
+
             Ok(Some(bson::to_bson(&result)?.into()))
         }
         .boxed()
