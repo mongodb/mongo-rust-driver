@@ -6,7 +6,10 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::{Mutex as SyncMutex, atomic::{AtomicBool, Ordering}},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex as SyncMutex,
+    },
     time::{Duration, Instant},
 };
 

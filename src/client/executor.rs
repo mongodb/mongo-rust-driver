@@ -6,7 +6,11 @@ use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
 
-use std::{collections::HashSet, sync::{Arc, atomic::Ordering}, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::{atomic::Ordering, Arc},
+    time::Instant,
+};
 
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{

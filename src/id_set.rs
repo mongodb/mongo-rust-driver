@@ -31,7 +31,7 @@ impl<T> IdSet<T> {
         self.values.remove(&id.0);
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, mongodb_internal_tracking_arc))]
     pub(crate) fn values(&self) -> impl Iterator<Item = &T> {
         self.values.values()
     }
