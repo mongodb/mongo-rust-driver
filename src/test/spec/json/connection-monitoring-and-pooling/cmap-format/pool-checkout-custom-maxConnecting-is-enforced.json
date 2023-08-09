@@ -1,7 +1,7 @@
 {
     "version": 1,
     "style": "integration",
-    "description": "maxConnecting is enforced",
+    "description": "custom maxConnecting is enforced",
     "runOn": [
       {
         "minServerVersion": "4.4.0"
