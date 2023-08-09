@@ -161,6 +161,9 @@ async fn run_test(test_file: TestFile) {
                     if let Ok(max) = json_options.get_i32("maxpoolsize") {
                         json_options.insert("maxpoolsize", Bson::Int64(max.into()));
                     }
+                    if let Ok(max_connecting) = json_options.get_i32("maxconnecting") {
+                        json_options.insert("maxconnecting", Bson::Int64(max_connecting.into()));
+                    }
 
                     options_doc = options_doc
                         .into_iter()
@@ -185,7 +188,6 @@ async fn run_test(test_file: TestFile) {
                             }
                         }
                     }
-
                     assert_eq!(options_doc, json_options, "{}", test_case.description)
                 }
 

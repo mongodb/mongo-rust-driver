@@ -676,6 +676,8 @@ impl Serialize for ClientOptions {
 
             minpoolsize: &'a Option<u32>,
 
+            maxconnecting: &'a Option<u32>,
+
             #[serde(flatten, serialize_with = "ReadConcern::serialize_for_client_options")]
             readconcern: &'a Option<ReadConcern>,
 
@@ -718,6 +720,7 @@ impl Serialize for ClientOptions {
             maxidletimems: &self.max_idle_time,
             maxpoolsize: &self.max_pool_size,
             minpoolsize: &self.min_pool_size,
+            maxconnecting: &self.max_connecting,
             readconcern: &self.read_concern,
             replicaset: &self.repl_set_name,
             retryreads: &self.retry_reads,
