@@ -54,7 +54,7 @@ use crate::{
 /// # use mongodb::{Client, error::Result, bson::doc,
 /// # change_stream::event::ChangeStreamEvent};
 /// # #[cfg(feature = "async-std-runtime")]
-/// # use async_std::task;
+/// # use async_std::{task, stream::StreamExt};
 /// # #[cfg(feature = "tokio-runtime")]
 /// # use tokio::task;
 /// #
