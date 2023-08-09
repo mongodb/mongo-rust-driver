@@ -11,9 +11,9 @@ FEATURE_FLAGS+=("aws-auth")
 
 set +o errexit
 
-cargo_test spec::auth > spec.xml
-cargo_test uri_options > uri_options.xml
-cargo_test connection_string > connection_string.xml
+cargo_test spec::auth spec.xml
+cargo_test uri_options uri_options.xml
+cargo_test connection_string connection_string.xml
 
 junit-report-merger results.xml spec.xml uri_options.xml connection_string.xml
 

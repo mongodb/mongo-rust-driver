@@ -35,13 +35,14 @@ for arg; do
         cargo install mdbook
     elif [ $arg == "junit-dependencies" ]; then
         source ${CARGO_HOME}/env
-        # Install tool for converting cargo test output to junit
-        cargo install cargo2junit
 
         # install npm/node
         ./.evergreen/install-node.sh
 
         source ./.evergreen/env.sh
+
+        # Install junit-compatible test runner
+        cargo install cargo-nextest --locked
 
         # Install tool for merging different junit reports into a single one
         set +o errexit

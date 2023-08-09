@@ -23,13 +23,13 @@ echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
 
-cargo_test test::csfle > prose.xml
-cargo_test test::spec::client_side_encryption > spec.xml
+cargo_test test::csfle prose.xml
+cargo_test test::spec::client_side_encryption spec.xml
 
 # Unset variables for on-demand credential failure tests.
 unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
-cargo_test test::csfle::on_demand_aws_failure > failure.xml
+cargo_test test::csfle::on_demand_aws_failure failure.xml
 
 junit-report-merger results.xml prose.xml spec.xml failure.xml
 

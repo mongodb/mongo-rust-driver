@@ -21,6 +21,6 @@ FEATURE_FLAGS+=("${TLS_FEATURE}")
 
 set +o errexit
 
-MONGO_X509_USER="$SUBJECT" cargo_test > results.xml
+MONGO_X509_USER="$SUBJECT" cargo_test "" results.xml
 
 exit ${CARGO_RESULT}

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CARGO_OPTIONS=()
-TEST_OPTIONS=("-Z unstable-options" "--format json" "--report-time")
+TEST_OPTIONS=()
 FEATURE_FLAGS=()
 CARGO_RESULT=0
 
@@ -26,17 +26,11 @@ cargo_test_options() {
     if (( ${#FILTERED[@]} != 0 )); then
         FEATURE_OPTION="--features $(join_by , "${FILTERED[@]}")"
     fi
-    local THREAD_OPTION=""
-    if [ "${SINGLE_THREAD}" = true ]; then
-        THREAD_OPTION="--test-threads=1"
-    fi
-    echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]} ${THREAD_OPTION}
+    echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {
-    RUST_BACKTRACE=1 \
-        cargo test $(cargo_test_options $1) \
-        | grep -v '{"t":' \
-        | cargo2junit
+    RUST_BACKTRACE=1 cargo nextest run --profile ci $(cargo_test_options $1)
     (( CARGO_RESULT = ${CARGO_RESULT} || $? ))
+    mv target/nextest/ci/junit.xml $2
 }

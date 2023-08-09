@@ -49,8 +49,8 @@ FEATURE_FLAGS+=("aws-auth")
 
 set +o errexit
 
-cargo_test auth_aws > auth_aws.xml
-cargo_test lambda_examples::auth::test_handler > lambda_handler.xml
+cargo_test auth_aws auth_aws.xml
+cargo_test lambda_examples::auth::test_handler lambda_handler.xml
 
 junit-report-merger results.xml auth_aws.xml lambda_handler.xml
 
