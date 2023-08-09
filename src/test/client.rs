@@ -889,9 +889,15 @@ async fn manual_shutdown_with_resources() {
             log_uncaptured("Skipping manual_shutdown_with_resources: transaction start failed");
             return;
         }
-        coll.insert_one_with_session(doc! {}, None, &mut session)
+        if coll
+            .insert_one_with_session(doc! {}, None, &mut session)
             .await
-            .unwrap();
+            .is_err()
+        {
+            // Likewise for transaction operations.
+            log_uncaptured("Skipping manual_shutdown_with_resources: transaction operation failed");
+            return;
+        }
         let _stream = bucket.open_upload_stream("test", None);
     }
     client.into_client().shutdown().await;
