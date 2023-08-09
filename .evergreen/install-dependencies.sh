@@ -27,8 +27,6 @@ for arg; do
 
         source .evergreen/env.sh
         rustup toolchain install nightly -c rustfmt
-        # TODO RUST-1674: remove this workaround
-        rustup default 1.69
     elif [ $arg == "mdbook" ]; then
         source ${CARGO_HOME}/env
         # Install the manual rendering tool
