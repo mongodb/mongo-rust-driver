@@ -900,10 +900,14 @@ async fn manual_shutdown_with_resources() {
         }
         let _stream = bucket.open_upload_stream("test", None);
     }
+    let is_sharded = client.is_sharded();
     client.into_client().shutdown().await;
-    assert!(!events
-        .get_command_started_events(&["killCursors"])
-        .is_empty());
+    if !is_sharded {
+        // killCursors doesn't always execute on sharded clusters due to connection pinning
+        assert!(!events
+            .get_command_started_events(&["killCursors"])
+            .is_empty());
+    }
     assert!(!events
         .get_command_started_events(&["abortTransaction"])
         .is_empty());
