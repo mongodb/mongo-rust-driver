@@ -322,7 +322,6 @@ pub struct ChangeStreamPreAndPostImages {
 pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
-    #[serde(deserialize_with = "serde_util::deserialize_cursor_type")]
     #[serde(default)]
     /// The type of cursor to return.
     pub cursor_type: Option<CursorType>,

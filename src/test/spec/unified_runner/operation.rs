@@ -43,7 +43,7 @@ use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
-    coll::options::{CursorType, Hint},
+    coll::options::{Hint},
     collation::Collation,
     db::options::RunCursorCommandOptions,
     error::{ErrorKind, Result},
@@ -1673,18 +1673,12 @@ impl TestOperation for RunCursorCommand {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
 
-            let max_time = self.options.max_time;
-            let cursor_type = self.options.cursor_type;
-            let selection_criteria = self.options.selection_criteria.clone();
-            let comment = self.options.comment.clone();
-            let batch_size = self.options.batch_size;
-
             let options = RunCursorCommandOptions::builder()
-                .max_time(max_time)
-                .cursor_type(cursor_type)
-                .selection_criteria(selection_criteria)
-                .comment(comment)
-                .batch_size(batch_size)
+                .max_time(self.options.max_time)
+                .cursor_type(self.options.cursor_type)
+                .selection_criteria(self.options.selection_criteria.clone())
+                .comment(self.options.comment.clone())
+                .batch_size(self.options.batch_size)
                 .build();
 
             let result = match &self.session {
@@ -1717,11 +1711,9 @@ pub struct CreateCommandCursor {
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "commandName")]
     _command_name: String,
-    selection_criteria: Option<SelectionCriteria>,
-    cursor_type: Option<String>,
-    batch_size: Option<u32>,
-    max_time_m_s: Option<u64>,
-    comment: Option<Bson>,
+   
+    #[serde(flatten)]
+    options: RunCursorCommandOptions,
     session: Option<String>,
 }
 
@@ -1734,24 +1726,13 @@ impl TestOperation for CreateCommandCursor {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-            let cursor_type = match self
-                .cursor_type
-                .clone()
-                .unwrap_or_default()
-                .to_ascii_lowercase()
-                .as_str()
-            {
-                "tailable" => Some(CursorType::Tailable),
-                "tailableawait" => Some(CursorType::TailableAwait),
-                "nontailable" => Some(CursorType::NonTailable),
-                _ => None,
-            };
+
             let options = RunCursorCommandOptions::builder()
-                .max_time(Duration::from_secs(self.max_time_m_s.unwrap_or_default()))
-                .cursor_type(cursor_type)
-                .selection_criteria(self.selection_criteria.clone())
-                .comment(self.comment.clone())
-                .batch_size(self.batch_size)
+                .max_time(self.options.max_time)
+                .cursor_type(self.options.cursor_type)
+                .selection_criteria(self.options.selection_criteria.clone())
+                .comment(self.options.comment.clone())
+                .batch_size(self.options.batch_size)
                 .build();
             let result = match &self.session {
                 Some(session_id) => {
