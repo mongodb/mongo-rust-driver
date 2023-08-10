@@ -6,13 +6,18 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex as SyncMutex,
+    },
     time::{Duration, Instant},
 };
 
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
+use futures_core::{future::BoxFuture, Future};
+use futures_util::{future::join_all, FutureExt};
 
 #[cfg(test)]
 use crate::options::ServerAddress;
@@ -36,6 +41,7 @@ use crate::{
     db::Database,
     error::{Error, ErrorKind, Result},
     event::command::{handle_command_event, CommandEvent},
+    id_set::IdSet,
     operation::{AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
@@ -47,6 +53,7 @@ use crate::{
     },
     results::DatabaseSpecification,
     sdam::{server_selection, SelectedServer, Topology},
+    tracking_arc::TrackingArc,
     ClientSession,
 };
 
@@ -103,9 +110,25 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// driver does not set ``tcp_keepalive_intvl``. See the
 /// [MongoDB Diagnostics FAQ keepalive section](https://www.mongodb.com/docs/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
 /// for instructions on setting these values at the system level.
-#[derive(Clone, Debug)]
+///
+/// ## Clean shutdown
+/// Because Rust has no async equivalent of `Drop`, values that require server-side cleanup when
+/// dropped spawn a new async task to perform that cleanup.  This can cause two potential issues:
+///
+/// * Drop tasks pending or in progress when the async runtime shuts down may not complete, causing
+///   server-side resources to not be freed.
+/// * Drop tasks may run at an arbitrary time even after no `Client` values exist, making it hard to
+///   reason about associated resources (e.g. event handlers).
+///
+/// To address these issues, we highly recommend you use [`Client::shutdown`] in the termination
+/// path of your application.  This will ensure that outstanding resources have been cleaned up and
+/// terminate internal worker tasks before returning.  Please note that `shutdown` will wait for
+/// _all_ outstanding resource handles to be dropped, so they must either have been dropped before
+/// calling `shutdown` or in a concurrent task; see the documentation of `shutdown` for more
+/// details.
+#[derive(Debug, Clone)]
 pub struct Client {
-    inner: Arc<ClientInner>,
+    inner: TrackingArc<ClientInner>,
 }
 
 #[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
@@ -124,8 +147,15 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
+    shutdown: Shutdown,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
+}
+
+#[derive(Debug)]
+struct Shutdown {
+    pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
+    executed: AtomicBool,
 }
 
 impl Client {
@@ -144,12 +174,16 @@ impl Client {
     pub fn with_options(options: ClientOptions) -> Result<Self> {
         options.validate()?;
 
-        let inner = Arc::new(ClientInner {
+        let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
+            options,
+            shutdown: Shutdown {
+                pending_drops: SyncMutex::new(IdSet::new()),
+                executed: AtomicBool::new(false),
+            },
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
-            options,
         });
         Ok(Self { inner })
     }
@@ -461,6 +495,123 @@ impl Client {
             .await
     }
 
+    pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
+        let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
+        let (id_tx, id_rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
+        let weak = self.weak();
+        let handle = crate::runtime::spawn(async move {
+            // Unwrap safety: the id is sent immediately after task creation, with no
+            // await points in between.
+            let id = id_rx.await.unwrap();
+            // If the cleanup channel is closed, that task was dropped.
+            let cleanup = if let Ok(f) = cleanup_rx.await {
+                f
+            } else {
+                return;
+            };
+            cleanup.await;
+            if let Some(client) = weak.upgrade() {
+                client
+                    .inner
+                    .shutdown
+                    .pending_drops
+                    .lock()
+                    .unwrap()
+                    .remove(&id);
+            }
+        });
+        let id = self
+            .inner
+            .shutdown
+            .pending_drops
+            .lock()
+            .unwrap()
+            .insert(handle);
+        let _ = id_tx.send(id);
+        AsyncDropToken {
+            tx: Some(cleanup_tx),
+        }
+    }
+
+    /// Shut down this `Client`, terminating background thread workers and closing connections.
+    /// This will wait for any live handles to server-side resources (see below) to be
+    /// dropped and any associated server-side operations to finish.
+    ///
+    /// IMPORTANT: Any live resource handles that are not dropped will cause this method to wait
+    /// indefinitely.  It's strongly recommended to structure your usage to avoid this, e.g. by
+    /// only using those types in shorter-lived scopes than the `Client`.  If this is not possible,
+    /// see [`shutdown_immediate`](Client::shutdown_immediate).  For example:
+    ///
+    /// ```rust
+    /// # use mongodb::{Client, GridFsBucket, error::Result};
+    /// async fn upload_data(bucket: &GridFsBucket) {
+    ///   let stream = bucket.open_upload_stream("test", None);
+    ///    // .. write to the stream ..
+    /// }
+    ///
+    /// # async fn run() -> Result<()> {
+    /// let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// let bucket = client.database("test").gridfs_bucket(None);
+    /// upload_data(&bucket).await;
+    /// client.shutdown().await;
+    /// // Background cleanup work from `upload_data` is guaranteed to have run.
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// If the handle is used in the same scope as `shutdown`, explicit `drop` may be needed:
+    ///
+    /// ```rust
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn run() -> Result<()> {
+    /// let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// let bucket = client.database("test").gridfs_bucket(None);
+    /// let stream = bucket.open_upload_stream("test", None);
+    /// // .. write to the stream ..
+    /// drop(stream);
+    /// client.shutdown().await;
+    /// // Background cleanup work for `stream` is guaranteed to have run.
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Calling any methods on  clones of this `Client` or derived handles after this will return
+    /// errors.
+    ///
+    /// Handles to server-side resources are `Cursor`, `SessionCursor`, `Session`, or
+    /// `GridFsUploadStream`.
+    pub async fn shutdown(self) {
+        // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
+        // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
+        // causing the lock to be held for the duration of the join, which deadlocks.
+        let pending = self.inner.shutdown.pending_drops.lock().unwrap().extract();
+        join_all(pending).await;
+        self.shutdown_immediate().await;
+    }
+
+    /// Shut down this `Client`, terminating background thread workers and closing connections.
+    /// This does *not* wait for other pending resources to be cleaned up, which may cause both
+    /// client-side errors and server-side resource leaks. Calling any methods on clones of this
+    /// `Client` or derived handles after this will return errors.
+    ///
+    /// ```rust
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn run() -> Result<()> {
+    /// let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// let bucket = client.database("test").gridfs_bucket(None);
+    /// let stream = bucket.open_upload_stream("test", None);
+    /// // .. write to the stream ..
+    /// client.shutdown_immediate().await;
+    /// // Background cleanup work for `stream` may or may not have run.
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn shutdown_immediate(self) {
+        self.inner.topology.shutdown().await;
+        // This has to happen last to allow pending cleanup to execute commands.
+        self.inner.shutdown.executed.store(true, Ordering::SeqCst);
+    }
+
     /// Check in a server session to the server session pool. The session will be discarded if it is
     /// expired or dirty.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
@@ -630,10 +781,9 @@ impl Client {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {
-            inner: Arc::downgrade(&self.inner),
+            inner: TrackingArc::downgrade(&self.inner),
         }
     }
 
@@ -653,16 +803,35 @@ impl Client {
     }
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
 #[derive(Clone, Debug)]
 pub(crate) struct WeakClient {
-    inner: std::sync::Weak<ClientInner>,
+    inner: crate::tracking_arc::Weak<ClientInner>,
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
 impl WeakClient {
-    #[allow(dead_code)]
     pub(crate) fn upgrade(&self) -> Option<Client> {
         self.inner.upgrade().map(|inner| Client { inner })
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub(crate) struct AsyncDropToken {
+    #[derivative(Debug = "ignore")]
+    tx: Option<tokio::sync::oneshot::Sender<BoxFuture<'static, ()>>>,
+}
+
+impl AsyncDropToken {
+    pub(crate) fn spawn(&mut self, fut: impl Future<Output = ()> + Send + 'static) {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send(fut.boxed());
+        } else {
+            #[cfg(debug_assertions)]
+            panic!("exhausted AsyncDropToken");
+        }
+    }
+
+    pub(crate) fn take(&mut self) -> Self {
+        Self { tx: self.tx.take() }
     }
 }

@@ -210,6 +210,10 @@ impl Topology {
             .update_command_with_read_pref(server_address, command, criteria)
     }
 
+    pub(crate) async fn shutdown(&self) {
+        self.updater.shutdown().await;
+    }
+
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
@@ -268,6 +272,12 @@ pub(crate) enum UpdateMessage {
         error: Error,
         phase: HandshakePhase,
     },
+    Broadcast(BroadcastMessage),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum BroadcastMessage {
+    Shutdown,
     #[cfg(test)]
     SyncWorkers,
 }
@@ -346,11 +356,13 @@ impl TopologyWorker {
     fn start(mut self) {
         runtime::execute(async move {
             self.initialize().await;
+            let mut shutdown_ack = None;
 
             loop {
                 tokio::select! {
                     Some(update) = self.update_receiver.recv() => {
                         let (update, ack) = update.into_parts();
+                        let mut ack = Some(ack);
                         let changed = match update {
                             UpdateMessage::AdvanceClusterTime(to) => {
                                 self.advance_cluster_time(to);
@@ -368,18 +380,23 @@ impl TopologyWorker {
                                 error,
                                 phase,
                             } => self.handle_application_error(address, error, phase).await,
-                            #[cfg(test)]
-                            UpdateMessage::SyncWorkers => {
+                            UpdateMessage::Broadcast(msg) => {
                                 let rxen: FuturesUnordered<_> = self
                                     .servers
                                     .values()
-                                    .map(|v| v.pool.sync_worker())
+                                    .map(|v| v.pool.broadcast(msg.clone()))
                                     .collect();
                                 let _: Vec<_> = rxen.collect().await;
+                                if matches!(msg, BroadcastMessage::Shutdown) {
+                                    shutdown_ack = ack.take();
+                                    break
+                                }
                                 false
                             }
                         };
-                        ack.acknowledge(changed);
+                        if let Some(ack) = ack {
+                            ack.acknowledge(changed);
+                        }
                     },
                     _ = self.handle_listener.wait_for_all_handle_drops() => {
                         break
@@ -430,6 +447,10 @@ impl TopologyWorker {
                         topology_id: self.id,
                     }))
                     .await;
+            }
+
+            if let Some(ack) = shutdown_ack {
+                ack.acknowledge(true);
             }
         });
     }
@@ -851,9 +872,15 @@ impl TopologyUpdater {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
     }
 
+    pub(crate) async fn shutdown(&self) {
+        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::Shutdown))
+            .await;
+    }
+
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
-        self.send_message(UpdateMessage::SyncWorkers).await;
+        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::SyncWorkers))
+            .await;
     }
 }
 

@@ -6,6 +6,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, Bson},
+    coll::options::FindOptions,
     error::{CommandError, Error, ErrorKind},
     event::cmap::CmapEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -844,4 +845,126 @@ async fn retry_commit_txn_check_out() {
         })
         .await
         .expect("should see checked out event");
+}
+
+/// Verifies that `Client::shutdown` succeeds.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn manual_shutdown_with_nothing() {
+    let _guard = LOCK.run_exclusively().await;
+    let client = Client::test_builder().build().await.into_client();
+    client.shutdown().await;
+}
+
+/// Verifies that `Client::shutdown` succeeds when resources have been dropped.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn manual_shutdown_with_resources() {
+    let _guard = LOCK.run_exclusively().await;
+    let events = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(Arc::clone(&events))
+        .build()
+        .await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping manual_shutdown_with_resources: no transaction support");
+        return;
+    }
+    let db = client.database("shutdown_test");
+    db.drop(None).await.unwrap();
+    let coll = db.collection::<Document>("test");
+    coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
+    let bucket = db.gridfs_bucket(None);
+    // Scope to force drop of resources
+    {
+        // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
+        let _cursor = coll
+            .find(None, FindOptions::builder().batch_size(1).build())
+            .await
+            .unwrap();
+        // Similarly, sessions need an in-progress transaction to have cleanup.
+        let mut session = client.start_session(None).await.unwrap();
+        if session.start_transaction(None).await.is_err() {
+            // Transaction start can transiently fail; if so, just bail out of the test.
+            log_uncaptured("Skipping manual_shutdown_with_resources: transaction start failed");
+            return;
+        }
+        if coll
+            .insert_one_with_session(doc! {}, None, &mut session)
+            .await
+            .is_err()
+        {
+            // Likewise for transaction operations.
+            log_uncaptured("Skipping manual_shutdown_with_resources: transaction operation failed");
+            return;
+        }
+        let _stream = bucket.open_upload_stream("test", None);
+    }
+    let is_sharded = client.is_sharded();
+    client.into_client().shutdown().await;
+    if !is_sharded {
+        // killCursors doesn't always execute on sharded clusters due to connection pinning
+        assert!(!events
+            .get_command_started_events(&["killCursors"])
+            .is_empty());
+    }
+    assert!(!events
+        .get_command_started_events(&["abortTransaction"])
+        .is_empty());
+    assert!(!events.get_command_started_events(&["delete"]).is_empty());
+}
+
+/// Verifies that `Client::shutdown_immediate` succeeds.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn manual_shutdown_immediate_with_nothing() {
+    let _guard = LOCK.run_exclusively().await;
+    let client = Client::test_builder().build().await.into_client();
+    client.shutdown_immediate().await;
+}
+
+/// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn manual_shutdown_immediate_with_resources() {
+    let _guard = LOCK.run_exclusively().await;
+    let events = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(Arc::clone(&events))
+        .build()
+        .await;
+    if !client.supports_transactions() {
+        log_uncaptured("Skipping manual_shutdown_immediate_with_resources: no transaction support");
+        return;
+    }
+    let db = client.database("shutdown_test");
+    db.drop(None).await.unwrap();
+    let coll = db.collection::<Document>("test");
+    coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
+    let bucket = db.gridfs_bucket(None);
+
+    // Resources are scoped to past the `shutdown_immediate`.
+
+    // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
+    let _cursor = coll
+        .find(None, FindOptions::builder().batch_size(1).build())
+        .await
+        .unwrap();
+    // Similarly, sessions need an in-progress transaction to have cleanup.
+    let mut session = client.start_session(None).await.unwrap();
+    session.start_transaction(None).await.unwrap();
+    coll.insert_one_with_session(doc! {}, None, &mut session)
+        .await
+        .unwrap();
+    let _stream = bucket.open_upload_stream("test", None);
+
+    client.into_client().shutdown_immediate().await;
+
+    assert!(events
+        .get_command_started_events(&["killCursors"])
+        .is_empty());
+    assert!(events
+        .get_command_started_events(&["abortTransaction"])
+        .is_empty());
+    assert!(events.get_command_started_events(&["delete"]).is_empty());
 }

@@ -18,7 +18,6 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
-    runtime,
     sdam::{ServerInfo, TransactionSupportStatus},
     selection_criteria::SelectionCriteria,
     Client,
@@ -26,7 +25,7 @@ use crate::{
 pub use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
 
-use super::options::ServerAddress;
+use super::{options::ServerAddress, AsyncDropToken};
 
 lazy_static! {
     pub(crate) static ref SESSIONS_UNSUPPORTED_COMMANDS: HashSet<&'static str> = {
@@ -107,6 +106,7 @@ pub struct ClientSession {
     client: Client,
     is_implicit: bool,
     options: Option<SessionOptions>,
+    drop_token: AsyncDropToken,
     pub(crate) transaction: Transaction,
     pub(crate) snapshot_time: Option<Timestamp>,
     pub(crate) operation_time: Option<Timestamp>,
@@ -212,6 +212,7 @@ impl ClientSession {
         let timeout = client.inner.topology.logical_session_timeout();
         let server_session = client.inner.session_pool.check_out(timeout).await;
         Self {
+            drop_token: client.register_async_drop(),
             client,
             server_session,
             cluster_time: None,
@@ -694,6 +695,7 @@ impl From<DroppedClientSession> for ClientSession {
         Self {
             cluster_time: dropped_session.cluster_time,
             server_session: dropped_session.server_session,
+            drop_token: dropped_session.client.register_async_drop(),
             client: dropped_session.client,
             is_implicit: dropped_session.is_implicit,
             options: dropped_session.options,
@@ -719,14 +721,14 @@ impl Drop for ClientSession {
                 snapshot_time: self.snapshot_time,
                 operation_time: self.operation_time,
             };
-            runtime::execute(async move {
+            self.drop_token.spawn(async move {
                 let mut session: ClientSession = dropped_session.into();
                 let _result = session.abort_transaction().await;
             });
         } else {
             let client = self.client.clone();
             let server_session = self.server_session.clone();
-            runtime::execute(async move {
+            self.drop_token.spawn(async move {
                 client.check_in_server_session(server_session).await;
             });
         }

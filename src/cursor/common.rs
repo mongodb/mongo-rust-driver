@@ -14,12 +14,12 @@ use tokio::sync::oneshot;
 use crate::{
     bson::{Bson, Document},
     change_stream::event::ResumeToken,
+    client::AsyncDropToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
     results::GetMoreResult,
-    runtime,
     Client,
     Namespace,
 };
@@ -444,6 +444,7 @@ impl PinnedConnection {
 
 pub(super) fn kill_cursor(
     client: Client,
+    drop_token: &mut AsyncDropToken,
     ns: &Namespace,
     cursor_id: i64,
     pinned_conn: PinnedConnection,
@@ -453,7 +454,7 @@ pub(super) fn kill_cursor(
     let coll = client
         .database(ns.db.as_str())
         .collection::<Document>(ns.coll.as_str());
-    runtime::execute(async move {
+    drop_token.spawn(async move {
         if !pinned_conn.is_invalid() {
             let _ = coll
                 .kill_cursor(cursor_id, pinned_conn.handle(), drop_address)

@@ -6,7 +6,11 @@ use futures_core::future::BoxFuture;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
 
-use std::{collections::HashSet, sync::Arc, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::{atomic::Ordering, Arc},
+    time::Instant,
+};
 
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
@@ -53,6 +57,7 @@ use crate::{
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
+    tracking_arc::TrackingArc,
     ClusterTime,
 };
 
@@ -99,6 +104,9 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
+        if self.inner.shutdown.executed.load(Ordering::SeqCst) {
+            return Err(ErrorKind::Shutdown.into());
+        }
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
@@ -109,7 +117,7 @@ impl Client {
             }
             let session = session.into();
             if let Some(session) = &session {
-                if !Arc::ptr_eq(&self.inner, &session.client().inner) {
+                if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
                     return Err(ErrorKind::InvalidArgument {
                         message: "the session provided to an operation must be created from the \
                                   same client as the collection/database"

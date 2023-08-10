@@ -29,7 +29,7 @@ use super::{
 use crate::{
     bson::Document,
     change_stream::event::ResumeToken,
-    client::options::ServerAddress,
+    client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
     cursor::CursorSpecification,
     error::{Error, Result},
@@ -73,6 +73,7 @@ use crate::{
 #[derive(Debug)]
 pub struct SessionCursor<T> {
     client: Client,
+    drop_token: AsyncDropToken,
     info: CursorInformation,
     state: Option<CursorState>,
     drop_address: Option<ServerAddress>,
@@ -90,6 +91,7 @@ impl<T> SessionCursor<T> {
         let exhausted = spec.info.id == 0;
 
         Self {
+            drop_token: client.register_async_drop(),
             client,
             info: spec.info,
             drop_address: None,
@@ -311,6 +313,7 @@ impl<T> SessionCursor<T> {
     {
         let out = SessionCursor {
             client: self.client.clone(),
+            drop_token: self.drop_token.take(),
             info: self.info.clone(),
             state: Some(self.take_state()),
             drop_address: self.drop_address.take(),
@@ -368,6 +371,7 @@ impl<T> Drop for SessionCursor<T> {
 
         kill_cursor(
             self.client.clone(),
+            &mut self.drop_token,
             &self.info.ns,
             self.info.id,
             self.state.as_ref().unwrap().pinned_connection.replicate(),

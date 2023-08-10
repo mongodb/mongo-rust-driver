@@ -156,7 +156,6 @@ impl GridFsBucket {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn client(&self) -> &crate::Client {
         self.inner.files.client()
     }

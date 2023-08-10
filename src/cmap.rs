@@ -10,8 +10,6 @@ mod status;
 mod worker;
 
 use derivative::Derivative;
-#[cfg(test)]
-use tokio::sync::oneshot;
 
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
@@ -36,7 +34,8 @@ use crate::{
         PoolCreatedEvent,
     },
     options::ServerAddress,
-    sdam::TopologyUpdater,
+    runtime::AcknowledgmentReceiver,
+    sdam::{BroadcastMessage, TopologyUpdater},
 };
 use connection_requester::ConnectionRequester;
 use manager::PoolManager;
@@ -183,8 +182,7 @@ impl ConnectionPool {
         self.generation_subscriber.generation()
     }
 
-    #[cfg(test)]
-    pub(crate) fn sync_worker(&self) -> oneshot::Receiver<()> {
-        self.manager.sync_worker()
+    pub(crate) fn broadcast(&self, msg: BroadcastMessage) -> AcknowledgmentReceiver<()> {
+        self.manager.broadcast(msg)
     }
 }
