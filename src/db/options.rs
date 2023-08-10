@@ -318,19 +318,17 @@ pub struct ChangeStreamPreAndPostImages {
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 #[non_exhaustive]
 pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
-    #[serde(default)]
     /// The type of cursor to return.
     pub cursor_type: Option<CursorType>,
-    #[serde(default)]
     /// Number of documents to return per batch.
     pub batch_size: Option<u32>,
     #[serde(rename = "maxtime", alias = "maxTimeMS")]
     #[serde(deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis")]
-    #[serde(default)]
     /// Optional non-negative integer value. Use this value to configure the maxTimeMS option sent
     /// on subsequent getMore commands.
     pub max_time: Option<Duration>,
