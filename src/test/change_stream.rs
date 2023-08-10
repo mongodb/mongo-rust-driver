@@ -718,7 +718,7 @@ async fn split_large_event() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
     let client = Client::test_builder().build().await;
-    if !client.server_version_gte(7, 0) {
+    if !(client.server_version_matches(">= 6.0.9") || client.server_version_matches(">= 7.0")) {
         log_uncaptured(format!(
             "skipping change stream test on unsupported version {:?}",
             client.server_version

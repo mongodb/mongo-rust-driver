@@ -326,16 +326,21 @@ impl TestClient {
 
     pub(crate) fn supports_fail_command(&self) -> bool {
         let version = if self.is_sharded() {
-            VersionReq::parse(">= 4.1.5").unwrap()
+            ">= 4.1.5"
         } else {
-            VersionReq::parse(">= 4.0").unwrap()
+            ">= 4.0"
         };
-        version.matches(&self.server_version)
+        self.server_version_matches(version)
+    }
+
+    pub(crate) fn server_version_matches(&self, req: &str) -> bool {
+        VersionReq::parse(req)
+            .unwrap()
+            .matches(&self.server_version)
     }
 
     pub(crate) fn supports_block_connection(&self) -> bool {
-        let version = VersionReq::parse(">= 4.2.9").unwrap();
-        version.matches(&self.server_version)
+        self.server_version_matches(">= 4.2.9")
     }
 
     /// Whether the deployment supports failing the initial handshake
