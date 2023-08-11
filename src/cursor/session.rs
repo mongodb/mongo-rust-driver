@@ -321,7 +321,6 @@ impl<T> SessionCursor<T> {
             #[cfg(test)]
             kill_watcher: self.kill_watcher.take(),
         };
-        self.mark_exhausted(); // prevent a `kill_cursor` call in `drop`
         out
     }
 
@@ -349,10 +348,9 @@ impl<T> SessionCursor<T> {
 }
 
 impl<T> SessionCursor<T> {
+    #[allow(unused)]
     fn mark_exhausted(&mut self) {
-        if let Some(state) = self.state.as_mut() {
-            state.exhausted = true;
-        }
+        self.state.as_mut().unwrap().exhausted = true;
     }
 
     pub(crate) fn is_exhausted(&self) -> bool {
