@@ -31,6 +31,7 @@ pub struct CollectionOptions {
 
     /// Sets the [`bson::SerializerOptions::human_readable`] option for the [`Bson`] serializer.
     /// The default value is `false`.
+    /// Note: Specifying `true` for this value will decrease the performance of insert operations.
     pub human_readable_serialization: Option<bool>,
 }
 
