@@ -79,9 +79,6 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         let mut docs = RawArrayBuf::new();
         let mut size = 0;
         let batch_size_limit = description.max_bson_object_size as u64;
-        let serializer_options = bson::SerializerOptions::builder()
-            .human_readable(self.human_readable_serialization)
-            .build();
 
         for (i, d) in self
             .documents
@@ -89,10 +86,17 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
             .take(description.max_write_batch_size as usize)
             .enumerate()
         {
-            let mut doc = bson::RawDocumentBuf::from_document(&bson::to_document_with_options(
-                d,
-                serializer_options.clone(),
-            )?)?;
+            let mut doc = if self.human_readable_serialization {
+                let serializer_options = bson::SerializerOptions::builder()
+                    .human_readable(true)
+                    .build();
+                bson::RawDocumentBuf::from_document(&bson::to_document_with_options(
+                    d,
+                    serializer_options,
+                )?)?
+            } else {
+                bson::to_raw_document_buf(d)?
+            };
             let id = match doc.get("_id")? {
                 Some(b) => b.try_into()?,
                 None => {
