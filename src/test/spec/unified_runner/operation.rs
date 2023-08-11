@@ -43,7 +43,7 @@ use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
-    coll::options::{Hint},
+    coll::options::Hint,
     collation::Collation,
     db::options::RunCursorCommandOptions,
     error::{ErrorKind, Result},
@@ -1711,7 +1711,7 @@ pub struct CreateCommandCursor {
     // we can use the deny_unknown_fields tag.
     #[serde(rename = "commandName")]
     _command_name: String,
-   
+
     #[serde(flatten)]
     options: RunCursorCommandOptions,
     session: Option<String>,
