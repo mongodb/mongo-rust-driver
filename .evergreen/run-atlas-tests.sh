@@ -10,6 +10,6 @@ use_async_runtime
 
 set +o errexit
 
-cargo_test atlas_connectivity > results.xml
+cargo_test atlas_connectivity results.xml
 
 exit $CARGO_RESULT

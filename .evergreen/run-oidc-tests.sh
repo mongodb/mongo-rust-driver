@@ -8,7 +8,7 @@ set -o xtrace
 
 set +o errexit
 
-cargo_test test::spec::oidc > prose.xml
+cargo_test test::spec::oidc prose.xml
 
 junit-report-merger results.xml prose.xml
 

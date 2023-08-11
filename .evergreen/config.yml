@@ -13,8 +13,8 @@ stepback: true
 command_type: system
 
 # Protect ourself against rogue test case, or curl gone wild, that runs forever
-# 12 minutes is the longest we'll ever run
-exec_timeout_secs: 3600 # 12 minutes is the longest we'll ever run
+# TODO RUST-1721 Reduce this
+exec_timeout_secs: 5400
 
 # What to do when evergreen hits the timeout (`post:` tasks are run automatically)
 timeout:
@@ -453,8 +453,7 @@ functions:
           SNAPPY_COMPRESSION_ENABLED=${SNAPPY_COMPRESSION_ENABLED} \
           ZLIB_COMPRESSION_ENABLED=${ZLIB_COMPRESSION_ENABLED} \
           ZSTD_COMPRESSION_ENABLED=${ZSTD_COMPRESSION_ENABLED} \
-          SINGLE_THREAD=${SINGLE_THREAD} \
-            ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} \
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
             TLS_FEATURE=${TLS_FEATURE} \
             .evergreen/run-tests.sh
@@ -477,9 +476,8 @@ functions:
           . .evergreen/generate-uri.sh
 
           SNAPPY_COMPRESSION_ENABLED="true" \
-          ZLIB_COMPRESSION_ENABLED="true" \
-          ZSTD_COMPRESSION_ENABLED="true" \
-          SINGLE_THREAD=${SINGLE_THREAD} \
+            ZLIB_COMPRESSION_ENABLED="true" \
+            ZSTD_COMPRESSION_ENABLED="true" \
             ASYNC_RUNTIME=${ASYNC_RUNTIME} \
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
             TLS_FEATURE=${TLS_FEATURE} \
@@ -1625,7 +1623,6 @@ axes:
         display_name: "MacOS 11.00"
         run_on: macos-1100
         variables:
-          SINGLE_THREAD: true
           VENV_BIN_DIR: "bin"
           LIBMONGOCRYPT_OS: "macos"
       - id: windows-64-vs2017

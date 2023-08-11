@@ -72,6 +72,7 @@
 //! ## Using the async API
 //! ### Connecting to a MongoDB deployment
 //! ```no_run
+//! # #[cfg(not(any(feature = "sync", feature = "tokio-sync")))]
 //! # async fn foo() -> mongodb::error::Result<()> {
 //! use mongodb::{Client, options::ClientOptions};
 //!
@@ -218,7 +219,7 @@
 //!     title: String,
 //!     author: String,
 //! }
-//!
+//! # fn wrapper() -> mongodb::error::Result<()> {
 //! let client = Client::with_uri_str("mongodb://localhost:27017")?;
 //! let database = client.database("mydb");
 //! let collection = database.collection::<Book>("books");
@@ -245,6 +246,8 @@
 //! for result in cursor {
 //!     println!("title: {}", result?.title);
 //! }
+//! # Ok(())
+//! # }
 //! # }
 //! ```
 //!

@@ -34,12 +34,14 @@ echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
 
-cargo_test > async-tests.xml
+cargo_test "" async-tests.xml
 FEATURE_FLAGS+=("${SYNC_FEATURE}")
-cargo_test sync > sync-tests.xml
-CARGO_OPTIONS+=("--doc")
-cargo_test sync > sync-doc-tests.xml
+cargo_test sync sync-tests.xml
 
-junit-report-merger results.xml async-tests.xml sync-tests.xml sync-doc-tests.xml
+junit-report-merger results.xml async-tests.xml sync-tests.xml
+
+# cargo-nextest doesn't support doc tests
+RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)
+(( CARGO_RESULT = ${CARGO_RESULT} || $? ))
 
 exit $CARGO_RESULT
