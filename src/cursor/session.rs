@@ -311,7 +311,7 @@ impl<T> SessionCursor<T> {
     where
         D: Deserialize<'a>,
     {
-        let out = SessionCursor {
+        SessionCursor {
             client: self.client.clone(),
             drop_token: self.drop_token.take(),
             info: self.info.clone(),
@@ -320,8 +320,7 @@ impl<T> SessionCursor<T> {
             _phantom: Default::default(),
             #[cfg(test)]
             kill_watcher: self.kill_watcher.take(),
-        };
-        out
+        }
     }
 
     pub(crate) fn address(&self) -> &ServerAddress {
@@ -348,11 +347,6 @@ impl<T> SessionCursor<T> {
 }
 
 impl<T> SessionCursor<T> {
-    #[allow(unused)]
-    fn mark_exhausted(&mut self) {
-        self.state.as_mut().unwrap().exhausted = true;
-    }
-
     pub(crate) fn is_exhausted(&self) -> bool {
         self.state.as_ref().map_or(true, |state| state.exhausted)
     }
