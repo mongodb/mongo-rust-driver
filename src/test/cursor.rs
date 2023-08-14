@@ -235,3 +235,33 @@ async fn borrowed_deserialization() {
         i += 1;
     }
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn session_cursor_with_type() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let client = TestClient::new().await;
+
+    let mut session = client.start_session(None).await.unwrap();
+    let coll = client.database("db").collection("coll");
+    coll.drop_with_session(None, &mut session).await.unwrap();
+
+    coll.insert_many_with_session(
+        vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }],
+        None,
+        &mut session,
+    )
+    .await
+    .unwrap();
+
+    let mut cursor: crate::SessionCursor<bson::Document> = coll
+        .find_with_session(doc! {}, None, &mut session)
+        .await
+        .unwrap();
+
+    let _ = cursor.next(&mut session).await.unwrap().unwrap();
+
+    let mut cursor_with_type: crate::SessionCursor<bson::RawDocumentBuf> = cursor.with_type();
+
+    let _ = cursor_with_type.next(&mut session).await.unwrap().unwrap();
+}
