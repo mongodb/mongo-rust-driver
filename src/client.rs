@@ -615,9 +615,10 @@ impl Client {
     /// Add connections to the connection pool up to `min_pool_size`.  This is normally not needed -
     /// the connection pool will be filled in the background, and new connections created as needed
     /// up to `max_pool_size`.  However, it can sometimes be preferable to pay the (larger) cost of
-    /// creating new connections up-front so that individual operations execute as quickly as possible.
-    /// 
-    /// Note that topology changes require rebuilding the connection pool, so this method cannot 
+    /// creating new connections up-front so that individual operations execute as quickly as
+    /// possible.
+    ///
+    /// Note that topology changes require rebuilding the connection pool, so this method cannot
     /// guarantee that the pool will always be filled for the lifetime of the `Client`.
     pub async fn warm_connection_pool(&self) {
         if !self.inner.options.min_pool_size.map_or(false, |s| s > 0) {

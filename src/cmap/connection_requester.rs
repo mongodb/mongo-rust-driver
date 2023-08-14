@@ -34,7 +34,12 @@ impl ConnectionRequester {
 
         // this only errors if the receiver end is dropped, which can't happen because
         // we own a handle to the worker, keeping it alive.
-        self.sender.send(ConnectionRequest { sender, warm_pool: false }).unwrap();
+        self.sender
+            .send(ConnectionRequest {
+                sender,
+                warm_pool: false,
+            })
+            .unwrap();
 
         // similarly, the receiver only returns an error if the sender is dropped, which
         // can't happen due to the handle.
@@ -42,7 +47,9 @@ impl ConnectionRequester {
     }
 
     pub(super) fn weak(&self) -> WeakConnectionRequester {
-        WeakConnectionRequester { sender: self.sender.clone() }
+        WeakConnectionRequester {
+            sender: self.sender.clone(),
+        }
     }
 }
 
@@ -56,7 +63,14 @@ pub(super) struct WeakConnectionRequester {
 impl WeakConnectionRequester {
     pub(super) async fn request_warm_pool(&self) -> Option<ConnectionRequestResult> {
         let (sender, receiver) = oneshot::channel();
-        if self.sender.send(ConnectionRequest { sender, warm_pool: true }).is_err() {
+        if self
+            .sender
+            .send(ConnectionRequest {
+                sender,
+                warm_pool: true,
+            })
+            .is_err()
+        {
             return None;
         }
         receiver.await.ok()
@@ -71,9 +85,7 @@ pub(super) struct ConnectionRequestReceiver {
 
 impl ConnectionRequestReceiver {
     pub(super) async fn recv(&mut self) -> Option<ConnectionRequest> {
-        self.receiver
-            .recv()
-            .await
+        self.receiver.recv().await
     }
 }
 

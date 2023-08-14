@@ -980,7 +980,8 @@ async fn warm_connection_pool() {
             opts.min_pool_size = Some(10);
             opts
         })
-        .build().await;
+        .build()
+        .await;
 
     client.warm_connection_pool().await;
     // Validate that a command executes.

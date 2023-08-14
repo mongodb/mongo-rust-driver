@@ -7,7 +7,8 @@ use super::{
         ConnectionRequest,
         ConnectionRequestReceiver,
         ConnectionRequestResult,
-        ConnectionRequester, WeakConnectionRequester,
+        ConnectionRequester,
+        WeakConnectionRequester,
     },
     establish::ConnectionEstablisher,
     manager,
@@ -318,7 +319,10 @@ impl ConnectionPoolWorker {
                                 break;
                             }
                             BroadcastMessage::FillPool => {
-                                crate::runtime::execute(fill_pool(self.weak_requester.clone(), ack));
+                                crate::runtime::execute(fill_pool(
+                                    self.weak_requester.clone(),
+                                    ack,
+                                ));
                             }
                             #[cfg(test)]
                             BroadcastMessage::SyncWorkers => {
@@ -392,7 +396,9 @@ impl ConnectionPoolWorker {
                 }
 
                 conn.mark_as_in_use(self.manager.clone());
-                if let Err(request) = request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn))) {
+                if let Err(request) =
+                    request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
+                {
                     // checking out thread stopped listening, indicating it hit the WaitQueue
                     // timeout, so we put connection back into pool.
                     let mut connection = request.unwrap_pooled_connection();
