@@ -619,7 +619,7 @@ impl Client {
     /// 
     /// Note that topology changes require rebuilding the connection pool, so this method cannot 
     /// guarantee that the pool will always be filled for the lifetime of the `Client`.
-    pub async fn warm_connection_pool(self) {
+    pub async fn warm_connection_pool(&self) {
         if !self.inner.options.min_pool_size.map_or(false, |s| s > 0) {
             // No-op when min_pool_size is zero.
             return;
