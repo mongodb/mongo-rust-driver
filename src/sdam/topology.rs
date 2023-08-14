@@ -214,6 +214,10 @@ impl Topology {
         self.updater.shutdown().await;
     }
 
+    pub(crate) async fn warm_pool(&self) {
+        self.updater.fill_pool().await;
+    }
+
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
@@ -278,6 +282,7 @@ pub(crate) enum UpdateMessage {
 #[derive(Debug, Clone)]
 pub(crate) enum BroadcastMessage {
     Shutdown,
+    FillPool,
     #[cfg(test)]
     SyncWorkers,
 }
@@ -874,6 +879,11 @@ impl TopologyUpdater {
 
     pub(crate) async fn shutdown(&self) {
         self.send_message(UpdateMessage::Broadcast(BroadcastMessage::Shutdown))
+            .await;
+    }
+
+    pub(crate) async fn fill_pool(&self) {
+        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::FillPool))
             .await;
     }
 

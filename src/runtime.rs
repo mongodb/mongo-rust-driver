@@ -21,7 +21,7 @@ mod worker_handle;
 use std::{future::Future, net::SocketAddr, time::Duration};
 
 pub(crate) use self::{
-    acknowledged_message::{AcknowledgedMessage, AcknowledgmentReceiver},
+    acknowledged_message::{AcknowledgedMessage, AcknowledgmentReceiver, AcknowledgmentSender},
     join_handle::AsyncJoinHandle,
     resolver::AsyncResolver,
     stream::AsyncStream,
