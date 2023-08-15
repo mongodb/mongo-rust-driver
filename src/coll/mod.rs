@@ -15,7 +15,7 @@ use serde::{
 
 use self::options::*;
 use crate::{
-    bson::{doc, to_document_with_options, Bson, Document, SerializerOptions},
+    bson::{doc, to_document, Bson, Document},
     bson_util,
     change_stream::{
         event::ChangeStreamEvent,
@@ -1119,10 +1119,7 @@ where
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
-        let replacement = to_document_with_options(
-            replacement.borrow(),
-            SerializerOptions::builder().human_readable(false).build(),
-        )?;
+        let replacement = to_document(replacement.borrow())?;
 
         let session = session.into();
 
@@ -1382,10 +1379,7 @@ where
         options: impl Into<Option<ReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
-        let replacement = to_document_with_options(
-            replacement.borrow(),
-            SerializerOptions::builder().human_readable(false).build(),
-        )?;
+        let replacement = to_document(replacement.borrow())?;
 
         bson_util::replacement_document_check(&replacement)?;
 
