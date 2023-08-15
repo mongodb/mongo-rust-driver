@@ -56,13 +56,17 @@
       "name": "waitForEvent",
       "event": "ConnectionCreated",
       "count": 3
+    },
+    {
+      "name": "waitForEvent",
+      "event": "ConnectionReady",
+      "count": 3
     }
   ],
   "events": [
     {
       "type": "ConnectionCreated",
-      "address": 42,
-      "connectionId": 1
+      "address": 42
     },
     {
       "type": "ConnectionCreated",
@@ -70,13 +74,11 @@
     },
     {
       "type": "ConnectionCreated",
-      "address": 42,
-      "connectionId": 3
+      "address": 42
     },
     {
       "type": "ConnectionReady",
-      "address": 42,
-      "connectionId": 1
+      "address": 42
     },
     {
       "type": "ConnectionReady",
