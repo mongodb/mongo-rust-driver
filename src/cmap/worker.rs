@@ -694,17 +694,23 @@ async fn fill_pool(
     requester: WeakConnectionRequester,
     ack: crate::runtime::AcknowledgmentSender<()>,
 ) {
+    let mut establishing = vec![];
     loop {
         let result = requester.request_warm_pool().await;
         match result {
             None => break,
             Some(ConnectionRequestResult::Establishing(handle)) => {
-                let _ = handle.await;
-                // The connection will be dropped here, returning it to the pool.
+                // Let connections finish establishing in parallel.
+                establishing.push(crate::runtime::spawn(async move {
+                    let _ = handle.await;
+                    // The connection is dropped here, returning it to the pool.
+                }));
             }
             _ => break,
         };
     }
+    // Wait for all connections to finish establishing before reporting completion.
+    futures_util::future::join_all(establishing).await;
     ack.acknowledge(());
 }
 
