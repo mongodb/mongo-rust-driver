@@ -9,20 +9,21 @@
   ],
   "failPoint": {
     "configureFailPoint": "failCommand",
-    "mode": {
-      "times": 50
-    },
+    "mode": "alwaysOn",
     "data": {
-      "failCommands": ["isMaster", "hello"],
+      "failCommands": [
+        "isMaster",
+        "hello"
+      ],
       "closeConnection": false,
       "blockConnection": true,
-      "blockTimeMS": 750
+      "blockTimeMS": 500
     }
   },
   "poolOptions": {
-    "maxPoolSize": 10,
-    "waitQueueTimeoutMS": 5000,
-    "maxConnecting": 3
+    "maxConnecting": 1,
+    "maxPoolSize": 2,
+    "waitQueueTimeoutMS": 5000
   },
   "operations": [
     {
@@ -37,56 +38,36 @@
       "target": "thread2"
     },
     {
-      "name": "start",
-      "target": "thread3"
-    },
-    {
       "name": "checkOut",
       "thread": "thread1"
+    },
+    {
+      "name": "waitForEvent",
+      "event": "ConnectionCreated",
+      "count": 1
     },
     {
       "name": "checkOut",
       "thread": "thread2"
     },
     {
-      "name": "checkOut",
-      "thread": "thread3"
-    },
-    {
-      "name": "waitForEvent",
-      "event": "ConnectionCreated",
-      "count": 3
-    },
-    {
       "name": "waitForEvent",
       "event": "ConnectionReady",
-      "count": 3
+      "count": 2
     }
   ],
   "events": [
     {
-      "type": "ConnectionCreated",
-      "address": 42
+      "type": "ConnectionCreated"
     },
     {
-      "type": "ConnectionCreated",
-      "address": 42
+      "type": "ConnectionReady"
     },
     {
-      "type": "ConnectionCreated",
-      "address": 42
+      "type": "ConnectionCreated"
     },
     {
-      "type": "ConnectionReady",
-      "address": 42
-    },
-    {
-      "type": "ConnectionReady",
-      "address": 42
-    },
-    {
-      "type": "ConnectionReady",
-      "address": 42
+      "type": "ConnectionReady"
     }
   ],
   "ignore": [
