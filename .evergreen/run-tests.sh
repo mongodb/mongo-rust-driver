@@ -1,12 +1,14 @@
 #!/bin/bash
 
+${PREPARE_SHELL}
+
 set -o errexit
 set -o pipefail
 
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-FEATURE_FLAGS+=("tracing-unstable" "${TLS_FEATURE}")
+FEATURE_FLAGS+=("tracing-unstable")
 
 if [ "$ASYNC_STD" = true ]; then
     CARGO_OPTIONS+=("--no-default-features")

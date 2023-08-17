@@ -1,5 +1,7 @@
 #!/bin/bash
 
+. ${PREPARE_SHELL}
+
 set -o errexit
 set -o pipefail
 

@@ -16,6 +16,7 @@ pre_error_fails_task: true
 # Functions to run before all tasks. These are overridden for tasks in task groups.
 pre:
   - func: "fetch source"
+  - func: "create expansions"
   - func: "prepare resources"
   - func: "windows fix"
   - func: "fix absolute paths"
@@ -44,14 +45,6 @@ timeout:
 ##################
 # Build Variants #
 ##################
-#
-# Operating systems tested:
-#   - RHEL 8.0
-#   - Ubuntu 20.04 (ARM64)
-#   - MacOS 11.00
-#   - Windows (VS 2017)
-# 
-# Tasks that only need to run on one OS should use RHEL.
 buildvariants:
   - name: compile
     display_name: "Compile Only"
@@ -93,7 +86,6 @@ buildvariants:
       - name: .standalone !.3.6 !.4.0 !.4.2
       - name: .replicaset !.3.6 !.4.0 !.4.2
       - name: .sharded !.3.6 !.4.0 !.4.2
-
 
   - name: macos-11.00
     display_name: "MacOS 11.00"
@@ -214,9 +206,6 @@ buildvariants:
     display_name: "No Auth/TLS"
     run_on:
       - rhel80-test
-    expansions:
-      AUTH: "noauth"
-      SSL: "nossl"
     tasks:
       - .rapid .replicaset
 
@@ -231,10 +220,11 @@ buildvariants:
     tasks:
       - .rapid .replicaset
 
+  # isabeltodo fix
   - name: stable-api
     display_name: "Stable API V1"
     run_on:
-      - rhel80-test
+      - ubuntu2004-test
     expansions:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
@@ -250,7 +240,8 @@ buildvariants:
     run_on:
       - rhel80-test
     expansions:
-      SYNC: true
+      AUTH: auth
+      SSL: ssl
     tasks:
       - .sync
 
@@ -268,13 +259,14 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
+      ORCHESTRATION_FILE: auth-aws.json
     tasks:
       - .aws-auth
 
   - name: azure-kms
     display_name: "Azure KMS"
     run_on:
-      # The Azure CLI is not available on RHEL machines.
+      # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
     expansions:
       LIBMONGOCRYPT_OS: "debian11"
@@ -287,6 +279,7 @@ buildvariants:
   - name: gcp-kms
     display_name: "GCP KMS"
     run_on:
+      # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
     expansions:
       LIBMONGOCRYPT_OS: "debian11"
@@ -334,6 +327,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: "fetch source"
+      - func: "create-expansions"
       - func: "prepare resources"
       - func: "windows fix"
       - func: "fix absolute paths"
@@ -377,6 +371,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: "fetch source"
+      - func: "create expansions"
       - func: "prepare resources"
       - func: "windows fix"
       - func: "fix absolute paths"
@@ -441,6 +436,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: "fetch source"
+      - func: "create expansions"
       - func: "prepare resources"
       - func: "windows fix"
       - func: "fix absolute paths"
@@ -528,6 +524,7 @@ tasks:
         vars:
           MONGODB_VERSION: 3.6
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.0-standalone
@@ -538,6 +535,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.0
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.2-standalone
@@ -548,6 +546,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.4-standalone
@@ -558,6 +557,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-5.0-standalone
@@ -568,6 +568,7 @@ tasks:
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-6.0-standalone
@@ -578,6 +579,7 @@ tasks:
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-7.0-standalone
@@ -588,6 +590,7 @@ tasks:
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-rapid-standalone
@@ -598,6 +601,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-latest-standalone
@@ -608,6 +612,7 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-3.6-replicaset
@@ -618,6 +623,7 @@ tasks:
         vars:
           MONGODB_VERSION: 3.6
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.0-replicaset
@@ -628,6 +634,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.0
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.2-replicaset
@@ -638,6 +645,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.4-replicaset
@@ -648,6 +656,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-5.0-replicaset
@@ -658,6 +667,7 @@ tasks:
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-6.0-replicaset
@@ -668,6 +678,7 @@ tasks:
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-7.0-replicaset
@@ -678,6 +689,7 @@ tasks:
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-rapid-replicaset
@@ -688,6 +700,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-latest-replicaset
@@ -698,6 +711,7 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-3.6-sharded
@@ -708,6 +722,7 @@ tasks:
         vars:
           MONGODB_VERSION: 3.6
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.0-sharded
@@ -718,6 +733,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.0
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.2-sharded
@@ -728,6 +744,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.4-sharded
@@ -738,6 +755,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-5.0-sharded
@@ -748,6 +766,7 @@ tasks:
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-6.0-sharded
@@ -758,6 +777,7 @@ tasks:
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-7.0-sharded
@@ -768,6 +788,7 @@ tasks:
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-rapid-sharded
@@ -778,6 +799,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-latest-sharded
@@ -788,6 +810,7 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: sharded_cluster
+      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-compression
@@ -797,6 +820,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run driver test suite"
         vars:
           COMPRESSION: true
@@ -810,6 +834,7 @@ tasks:
           ORCHESTRATION_FILE: "auth-aws.json"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "server"
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with regular aws credentials"
   
@@ -822,6 +847,7 @@ tasks:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with assume role credentials"
 
@@ -834,6 +860,7 @@ tasks:
           ORCHESTRATION_FILE: "auth-aws.json"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "server"
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws credentials as environment variables"
 
@@ -846,6 +873,7 @@ tasks:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws credentials and session token as environment variables"
 
@@ -858,6 +886,7 @@ tasks:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws EC2 credentials"
 
@@ -877,6 +906,7 @@ tasks:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws assume role with web identity test"
 
@@ -889,6 +919,7 @@ tasks:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws assume role with web identity test"
         vars:
@@ -921,6 +952,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run x509 tests"
 
   - name: test-plain-auth
@@ -930,11 +962,13 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
+      - func: "generate uris"
       - func: "run plain tests"
 
   - name: test-serverless
     commands:
       - func: "install junit dependencies"
+      - func: "generate uris"
       - func: "run serverless tests"
 
   - name: test-tokio-sync
@@ -945,6 +979,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
+      - func: "generate uris"
       - func: "run sync tests"
 
   - name: test-async-std-sync
@@ -955,6 +990,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGYD: replica_set
+      - func: "generate uris"
       - func: "run sync tests"
         vars:
           ASYNC_STD: true
@@ -964,84 +1000,25 @@ tasks:
 #############
 functions:
   "fetch source":
-    # Executes git clone and applies the submitted patch, if any
+    # Executes git clone and applies the submitted patch, if any.
     - command: git.get_project
       params:
         directory: "src"
-    # Make an evergreen exapanstion file with dynamic values
-    - command: shell.exec
+
+  "create expansions":
+    - command: subprocess.exec
       params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          # Get the current unique version of this checkout
-          if [ "${is_patch}" = "true" ]; then
-             CURRENT_VERSION=$(git describe)-patch-${version_id}
-          else
-             CURRENT_VERSION=latest
-          fi
-
-          export DRIVERS_TOOLS="$(pwd)/../drivers-tools"
-
-          # Python has cygwin path problems on Windows. Detect prospective mongo-orchestration home directory
-          if [ "Windows_NT" = "$OS" ]; then # Magic variable in cygwin
-             export DRIVERS_TOOLS=$(cygpath -m $DRIVERS_TOOLS)
-          fi
-
-          export MONGO_ORCHESTRATION_HOME="$DRIVERS_TOOLS/.evergreen/orchestration"
-          export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
-          export UPLOAD_BUCKET="${project}"
-          export PROJECT_DIRECTORY="$(pwd)"
-          LIBMONGOCRYPT_SUFFIX_DIR="lib"
-          # The RHEL path is 'lib64', not 'lib'
-          if [ "${LIBMONGOCRYPT_OS}" = "rhel-80-64-bit" ]; then
-            LIBMONGOCRYPT_SUFFIX_DIR="lib64"
-          fi
-          export MONGOCRYPT_LIB_DIR="$PROJECT_DIRECTORY/libmongocrypt/${LIBMONGOCRYPT_OS}/$LIBMONGOCRYPT_SUFFIX_DIR"
-          export LD_LIBRARY_PATH="$MONGOCRYPT_LIB_DIR:$LD_LIBRARY_PATH"
-
-          cat <<EOT > expansion.yml
-          CURRENT_VERSION: "$CURRENT_VERSION"
-          DRIVERS_TOOLS: "$DRIVERS_TOOLS"
-          MONGO_ORCHESTRATION_HOME: "$MONGO_ORCHESTRATION_HOME"
-          MONGODB_BINARIES: "$MONGODB_BINARIES"
-          UPLOAD_BUCKET: "$UPLOAD_BUCKET"
-          PROJECT_DIRECTORY: "$PROJECT_DIRECTORY"
-          PREPARE_SHELL: |
-            set -o errexit
-            set -o xtrace
-            export DRIVERS_TOOLS="$DRIVERS_TOOLS"
-            export MONGO_ORCHESTRATION_HOME="$MONGO_ORCHESTRATION_HOME"
-            export MONGODB_BINARIES="$MONGODB_BINARIES"
-            export UPLOAD_BUCKET="$UPLOAD_BUCKET"
-            export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
-            export DRIVERS_TOOLS_X509="$DRIVERS_TOOLS/.evergreen/x509gen"
-            export MONGOCRYPT_LIB_DIR="$MONGOCRYPT_LIB_DIR"
-            export LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
-
-            export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
-            export PATH="$MONGODB_BINARIES:$PATH"
-            export PROJECT="${project}"
-
-            export AUTH="$AUTH"
-            export SSL="$SSL"
-
-            export AZURE_IMDS_MOCK_PORT=44175
-
-            export SESSION_TEST_REQUIRE_MONGOCRYPTD=1
-
-            if [ "Windows_NT" != "$OS" ]; then
-                ulimit -n 64000
-            fi
-          EOT
-          # See what we've done
-          cat expansion.yml
-
-    # Load the expansion file to make an evergreen variable with the current unique version
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/create-expansions.sh
+        # Pull in all of the default expansions, the expansions set for the build variant, and the
+        # expansions defined in the project's settings page.
+        add_expansions_to_env: true
     - command: expansions.update
       params:
         file: src/expansion.yml
-
+  
   "add aws auth variables to file":
     - command: shell.exec
       type: test
@@ -1305,8 +1282,6 @@ functions:
           ${PREPARE_SHELL}
 
           export MONGODB_URI="${MONGODB_URI}"
-          . .evergreen/generate-uri.sh
-
           export CERT_PATH=$DRIVERS_TOOLS/.evergreen/x509gen/client.pem
 
           .evergreen/run-x509-tests.sh
@@ -1356,59 +1331,60 @@ functions:
         .evergreen/install-dependencies.sh junit-dependencies
 
   "bootstrap mongo-orchestration":
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        script: |
-          ${PREPARE_SHELL}
-
-          ORCHESTRATION_FILE=${ORCHESTRATION_FILE} \
-            MONGODB_VERSION=${MONGODB_VERSION} \
-            TOPOLOGY=${TOPOLOGY} \
-            AUTH=${AUTH} \
-            SSL=${SSL} \
-            REQUIRE_API_VERSION=${REQUIRE_API_VERSION} \
-            LOAD_BALANCER=${LOAD_BALANCER} \
-            sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
-    # run-orchestration generates expansion file with the MONGODB_URI for the cluster
+        binary: sh
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
+        add_expansions_to_env: true
+    # Add MONGODB_URI to expansions.
     - command: expansions.update
       params:
         file: mo-expansion.yml
 
+  "generate uris":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/generate-uri.sh
+        add_expansions_to_env: true
+    - command: expansions.update
+      params:
+        file: src/uri-expansions.yml
+
   "run driver test suite":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-
-          export MONGODB_URI="${MONGODB_URI}"
-          export SINGLE_MONGOS_LB_URI="${SINGLE_MONGOS_LB_URI}"
-          export MULTI_MONGOS_LB_URI="${MULTI_MONGOS_LB_URI}"
-          . .evergreen/generate-uri.sh
-
-          export COMPRESSION=${COMPRESSION}
-          export SINGLE_THREAD=${SINGLE_THREAD}
-          export ASYNC_STD=${ASYNC_STD}
-          export MONGODB_API_VERSION=${MONGODB_API_VERSION}
-          export OPENSSL=${OPENSSL}
-          
-          .evergreen/run-tests.sh
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-tests.sh
+        # The driver uses the absence/presence of variables defined in the project's settings to
+        # determine how to create a test client, so the relevant expansions here MUST be listed
+        # explicitly rather than setting add_expansions_to_env: true.
+        include_expansions_in_env:
+          - PREPARE_SHELL
+          - PROJECT_DIRECTORY
+          - ASYNC_STD
+          - OPENSSL
+          - COMPRESSION
+          - MONGODB_URI
 
   "run sync tests":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-
-          export MONGODB_URI="${MONGODB_URI}"
-          export ASYNC_STD="${ASYNC_STD}"
-
-          .evergreen/run-sync-tests.sh
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-sync-tests.sh
+        include_expansions_in_env:
+          - PREPARE_SHELL
+          - PROJECT_DIRECTORY
+          - ASYNC_STD
 
   "run serverless tests":
     - command: shell.exec
@@ -1421,10 +1397,10 @@ functions:
 
           # Export without xtrace to avoid leaking credentials.
           set +o xtrace
-          export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
-          export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
+          export SERVERLESS_ATLAS_USER=${SERVERLESS_ATLAS_USER}
+          export SERVERLESS_ATLAS_PASSWORD=${SERVERLESS_ATLAS_PASSWORD}
 
-          export SINGLE_MONGOS_LB_URI="${SERVERLESS_URI}"
+          export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
           . .evergreen/generate-uri.sh
 
           .evergreen/run-serverless-tests.sh
@@ -1536,11 +1512,11 @@ functions:
 
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
-          export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
-          export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
+          export SERVERLESS_ATLAS_USER=${SERVERLESS_ATLAS_USER}
+          export SERVERLESS_ATLAS_PASSWORD=${SERVERLESS_ATLAS_PASSWORD}
           set -o xtrace
 
-          export SINGLE_MONGOS_LB_URI="${SERVERLESS_URI}"
+          export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
           . .evergreen/generate-uri.sh
           export SERVERLESS=serverless
 
@@ -1727,7 +1703,7 @@ functions:
         script: |
           ${PREPARE_SHELL}
 
-          cd "$MONGO_ORCHESTRATION_HOME"
+          cd ${MONGO_ORCHESTRATION_HOME}
           # source the mongo-orchestration virtualenv if it exists
           if [ -f venv/bin/activate ]; then
             . venv/bin/activate
