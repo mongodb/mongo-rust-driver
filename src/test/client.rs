@@ -968,3 +968,22 @@ async fn manual_shutdown_immediate_with_resources() {
         .is_empty());
     assert!(events.get_command_started_events(&["delete"]).is_empty());
 }
+
+// Verifies that `Client::warm_connection_pool` succeeds.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn warm_connection_pool() {
+    let _guard = LOCK.run_exclusively().await;
+    let client = Client::test_builder()
+        .options({
+            let mut opts = CLIENT_OPTIONS.get().await.clone();
+            opts.min_pool_size = Some(10);
+            opts
+        })
+        .build()
+        .await;
+
+    client.warm_connection_pool().await;
+    // Validate that a command executes.
+    client.list_database_names(None, None).await.unwrap();
+}

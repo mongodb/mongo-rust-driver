@@ -134,6 +134,9 @@ impl ConnectionPool {
             ConnectionRequestResult::PoolCleared(e) => {
                 Err(Error::pool_cleared_error(&self.address, &e))
             }
+            ConnectionRequestResult::PoolWarmed => {
+                Err(Error::internal("Invalid result from connection requester"))
+            }
         };
 
         match conn {

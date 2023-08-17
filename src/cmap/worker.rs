@@ -8,6 +8,7 @@ use super::{
         ConnectionRequestReceiver,
         ConnectionRequestResult,
         ConnectionRequester,
+        WeakConnectionRequester,
     },
     establish::ConnectionEstablisher,
     manager,
@@ -109,6 +110,10 @@ pub(crate) struct ConnectionPoolWorker {
     /// Receiver used to determine if any threads hold references to this pool. If all the
     /// sender ends of this receiver drop, this worker will be notified and drop too.
     handle_listener: WorkerHandleListener,
+
+    /// Sender for connection check out requests.  Does not keep the worker alive the way
+    /// a `ConnectionRequeter` would since it doesn't hold a `WorkerHandle`.
+    weak_requester: WeakConnectionRequester,
 
     /// Receiver for incoming connection check out requests.
     request_receiver: ConnectionRequestReceiver,
@@ -218,6 +223,7 @@ impl ConnectionPoolWorker {
             service_connection_count: HashMap::new(),
             available_connections: VecDeque::new(),
             max_pool_size,
+            weak_requester: connection_requester.weak(),
             request_receiver,
             wait_queue: Default::default(),
             management_receiver,
@@ -312,6 +318,12 @@ impl ConnectionPoolWorker {
                                 shutdown_ack = Some(ack);
                                 break;
                             }
+                            BroadcastMessage::FillPool => {
+                                crate::runtime::execute(fill_pool(
+                                    self.weak_requester.clone(),
+                                    ack,
+                                ));
+                            }
                             #[cfg(test)]
                             BroadcastMessage::SyncWorkers => {
                                 ack.acknowledge(());
@@ -363,30 +375,39 @@ impl ConnectionPoolWorker {
     }
 
     fn check_out(&mut self, request: ConnectionRequest) {
-        // first attempt to check out an available connection
-        while let Some(mut conn) = self.available_connections.pop_back() {
-            // Close the connection if it's stale.
-            if conn.generation.is_stale(&self.generation) {
-                self.close_connection(conn, ConnectionClosedReason::Stale);
-                continue;
+        if request.is_warm_pool() {
+            if self.total_connection_count >= self.min_pool_size.unwrap_or(0) {
+                let _ = request.fulfill(ConnectionRequestResult::PoolWarmed);
+                return;
             }
+        } else {
+            // first attempt to check out an available connection
+            while let Some(mut conn) = self.available_connections.pop_back() {
+                // Close the connection if it's stale.
+                if conn.generation.is_stale(&self.generation) {
+                    self.close_connection(conn, ConnectionClosedReason::Stale);
+                    continue;
+                }
 
-            // Close the connection if it's idle.
-            if conn.is_idle(self.max_idle_time) {
-                self.close_connection(conn, ConnectionClosedReason::Idle);
-                continue;
+                // Close the connection if it's idle.
+                if conn.is_idle(self.max_idle_time) {
+                    self.close_connection(conn, ConnectionClosedReason::Idle);
+                    continue;
+                }
+
+                conn.mark_as_in_use(self.manager.clone());
+                if let Err(request) =
+                    request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
+                {
+                    // checking out thread stopped listening, indicating it hit the WaitQueue
+                    // timeout, so we put connection back into pool.
+                    let mut connection = request.unwrap_pooled_connection();
+                    connection.mark_as_available();
+                    self.available_connections.push_back(connection);
+                }
+
+                return;
             }
-
-            conn.mark_as_in_use(self.manager.clone());
-            if let Err(request) = request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn))) {
-                // checking out thread stopped listening, indicating it hit the WaitQueue
-                // timeout, so we put connection back into pool.
-                let mut connection = request.unwrap_pooled_connection();
-                connection.mark_as_available();
-                self.available_connections.push_back(connection);
-            }
-
-            return;
         }
 
         // otherwise, attempt to create a connection.
@@ -667,6 +688,30 @@ async fn establish_connection(
     }
 
     establish_result.map_err(|e| e.cause)
+}
+
+async fn fill_pool(
+    requester: WeakConnectionRequester,
+    ack: crate::runtime::AcknowledgmentSender<()>,
+) {
+    let mut establishing = vec![];
+    loop {
+        let result = requester.request_warm_pool().await;
+        match result {
+            None => break,
+            Some(ConnectionRequestResult::Establishing(handle)) => {
+                // Let connections finish establishing in parallel.
+                establishing.push(crate::runtime::spawn(async move {
+                    let _ = handle.await;
+                    // The connection is dropped here, returning it to the pool.
+                }));
+            }
+            _ => break,
+        };
+    }
+    // Wait for all connections to finish establishing before reporting completion.
+    futures_util::future::join_all(establishing).await;
+    ack.acknowledge(());
 }
 
 /// Enum modeling the possible pool states as described in the CMAP spec.

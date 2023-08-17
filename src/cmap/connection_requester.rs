@@ -23,7 +23,7 @@ pub(super) fn channel(handle: WorkerHandle) -> (ConnectionRequester, ConnectionR
 /// the pool will stop servicing requests, drop its available connections, and close.
 #[derive(Clone, Debug)]
 pub(super) struct ConnectionRequester {
-    sender: mpsc::UnboundedSender<oneshot::Sender<ConnectionRequestResult>>,
+    sender: mpsc::UnboundedSender<ConnectionRequest>,
     _handle: WorkerHandle,
 }
 
@@ -34,26 +34,58 @@ impl ConnectionRequester {
 
         // this only errors if the receiver end is dropped, which can't happen because
         // we own a handle to the worker, keeping it alive.
-        self.sender.send(sender).unwrap();
+        self.sender
+            .send(ConnectionRequest {
+                sender,
+                warm_pool: false,
+            })
+            .unwrap();
 
         // similarly, the receiver only returns an error if the sender is dropped, which
         // can't happen due to the handle.
         receiver.await.unwrap()
+    }
+
+    pub(super) fn weak(&self) -> WeakConnectionRequester {
+        WeakConnectionRequester {
+            sender: self.sender.clone(),
+        }
+    }
+}
+
+/// Handle for requesting Connections from the pool.  This does *not* keep the
+/// pool alive.
+#[derive(Clone, Debug)]
+pub(super) struct WeakConnectionRequester {
+    sender: mpsc::UnboundedSender<ConnectionRequest>,
+}
+
+impl WeakConnectionRequester {
+    pub(super) async fn request_warm_pool(&self) -> Option<ConnectionRequestResult> {
+        let (sender, receiver) = oneshot::channel();
+        if self
+            .sender
+            .send(ConnectionRequest {
+                sender,
+                warm_pool: true,
+            })
+            .is_err()
+        {
+            return None;
+        }
+        receiver.await.ok()
     }
 }
 
 /// Receiving end of a given ConnectionRequester.
 #[derive(Debug)]
 pub(super) struct ConnectionRequestReceiver {
-    receiver: mpsc::UnboundedReceiver<oneshot::Sender<ConnectionRequestResult>>,
+    receiver: mpsc::UnboundedReceiver<ConnectionRequest>,
 }
 
 impl ConnectionRequestReceiver {
     pub(super) async fn recv(&mut self) -> Option<ConnectionRequest> {
-        self.receiver
-            .recv()
-            .await
-            .map(|sender| ConnectionRequest { sender })
+        self.receiver.recv().await
     }
 }
 
@@ -61,6 +93,7 @@ impl ConnectionRequestReceiver {
 #[derive(Debug)]
 pub(super) struct ConnectionRequest {
     sender: oneshot::Sender<ConnectionRequestResult>,
+    warm_pool: bool,
 }
 
 impl ConnectionRequest {
@@ -71,6 +104,10 @@ impl ConnectionRequest {
         result: ConnectionRequestResult,
     ) -> std::result::Result<(), ConnectionRequestResult> {
         self.sender.send(result)
+    }
+
+    pub(super) fn is_warm_pool(&self) -> bool {
+        self.warm_pool
     }
 }
 
@@ -86,6 +123,9 @@ pub(super) enum ConnectionRequestResult {
     /// The request was rejected because the pool was cleared before it could
     /// be fulfilled. The error that caused the pool to be cleared is returned.
     PoolCleared(Error),
+
+    /// The request set `warm_pool: true` and the pool has reached `min_pool_size`.
+    PoolWarmed,
 }
 
 impl ConnectionRequestResult {
