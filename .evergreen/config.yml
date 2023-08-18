@@ -1089,6 +1089,7 @@ functions:
     - command: shell.exec
       type: test
       params:
+        shell: bash
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
@@ -1125,6 +1126,7 @@ functions:
     - command: shell.exec
       type: test
       params:
+        shell: bash
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
@@ -1146,6 +1148,7 @@ functions:
     - command: shell.exec
       type: test
       params:
+        shell: bash
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
@@ -1176,6 +1179,7 @@ functions:
     - command: shell.exec
       type: test
       params:
+        shell: bash
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
@@ -1786,7 +1790,7 @@ functions:
   "tear down aws":
     - command: shell.exec
       params:
-        shell: "bash"
+        shell: bash
         script: |
           ${PREPARE_SHELL}
           cd "${DRIVERS_TOOLS}/.evergreen/auth_aws"
