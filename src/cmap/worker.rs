@@ -41,7 +41,7 @@ use std::{
     time::Duration,
 };
 
-const MAX_CONNECTING: u32 = 2;
+const DEFAULT_MAX_CONNECTING: u32 = 2;
 const MAINTENACE_FREQUENCY: Duration = Duration::from_millis(500);
 
 /// A worker task that manages the shared state of the pool.
@@ -134,6 +134,9 @@ pub(crate) struct ConnectionPoolWorker {
     /// A handle used to notify SDAM that a connection establishment error happened. This will
     /// allow the server to transition to Unknown and clear the pool as necessary.
     server_updater: TopologyUpdater,
+
+    /// The maximum number of new connections that can be created concurrently.
+    max_connecting: u32,
 }
 
 impl ConnectionPoolWorker {
@@ -158,6 +161,10 @@ impl ConnectionPoolWorker {
             .as_ref()
             .and_then(|opts| opts.max_pool_size)
             .unwrap_or(DEFAULT_MAX_POOL_SIZE);
+        let max_connecting = options
+            .as_ref()
+            .and_then(|opts| opts.max_connecting)
+            .unwrap_or(DEFAULT_MAX_CONNECTING);
 
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
 
@@ -233,6 +240,7 @@ impl ConnectionPoolWorker {
             generation_publisher,
             maintenance_frequency,
             server_updater,
+            max_connecting,
         };
 
         runtime::execute(async move {
@@ -371,7 +379,7 @@ impl ConnectionPoolWorker {
             return true;
         }
 
-        self.below_max_connections() && self.pending_connection_count < MAX_CONNECTING
+        self.below_max_connections() && self.pending_connection_count < self.max_connecting
     }
 
     fn check_out(&mut self, request: ConnectionRequest) {
@@ -612,7 +620,7 @@ impl ConnectionPoolWorker {
     fn ensure_min_connections(&mut self) {
         if let Some(min_pool_size) = self.min_pool_size {
             while self.total_connection_count < min_pool_size
-                && self.pending_connection_count < MAX_CONNECTING
+                && self.pending_connection_count < self.max_connecting
             {
                 let pending_connection = self.create_pending_connection();
                 let event_handler = self.event_emitter.clone();
