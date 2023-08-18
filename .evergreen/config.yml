@@ -254,7 +254,7 @@ buildvariants:
   - name: aws-auth
     display_name: "AWS Authentication"
     run_on:
-      - rhel80-test
+      - ubuntu1804-small
     expansions:
       AUTH: auth
       SSL: ssl
