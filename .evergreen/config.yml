@@ -220,7 +220,6 @@ buildvariants:
     tasks:
       - .rapid .replicaset
 
-  # isabeltodo fix
   - name: stable-api
     display_name: "Stable API V1"
     run_on:
@@ -229,7 +228,7 @@ buildvariants:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
       AUTH: auth
-      SSL: ssl
+      # Configuring SSL: ssl causes errors in bootstrap mongo-orchestration.
     tasks:
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
       # setting REQUIRE_API_VERSION on standalones.
@@ -1366,12 +1365,12 @@ functions:
         # determine how to create a test client, so the relevant expansions here MUST be listed
         # explicitly rather than setting add_expansions_to_env: true.
         include_expansions_in_env:
-          - PREPARE_SHELL
           - PROJECT_DIRECTORY
           - ASYNC_STD
           - OPENSSL
           - COMPRESSION
           - MONGODB_URI
+          - MONGODB_API_VERSION
 
   "run sync tests":
     - command: subprocess.exec
@@ -1381,8 +1380,8 @@ functions:
         binary: bash
         args:
           - .evergreen/run-sync-tests.sh
+        # Ditto comment above regarding explicitly listing expansions.
         include_expansions_in_env:
-          - PREPARE_SHELL
           - PROJECT_DIRECTORY
           - ASYNC_STD
 
