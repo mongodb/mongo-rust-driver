@@ -1384,6 +1384,7 @@ functions:
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - ASYNC_STD
+          - MONGODB_URI
 
   "run serverless tests":
     - command: shell.exec
