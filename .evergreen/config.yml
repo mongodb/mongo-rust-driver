@@ -49,7 +49,7 @@ buildvariants:
   - name: compile
     display_name: "Compile Only"
     run_on:
-      - rhel80-test
+      - rhel80-small
     tasks:
       - name: compile-on-latest
       - name: compile-on-msrv
@@ -57,14 +57,14 @@ buildvariants:
   - name: lint
     display_name: "Lint"
     run_on:
-      - rhel80-test
+      - rhel80-small
     tasks:
       - name: .lint
 
   - name: rhel-8.0
     display_name: "RHEL 8.0"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -76,7 +76,7 @@ buildvariants:
   - name: ubuntu-20.04-arm64
     display_name: "Ubuntu 20.04 (ARM64)"
     run_on:
-      - ubuntu2004-arm64-test
+      - ubuntu2004-arm64-small
     expansions:
       VENV_BIN_DIR: bin
       AUTH: auth
@@ -104,7 +104,7 @@ buildvariants:
   - name: windows-64-vs2017
     display_name: "Windows (VS 2017)"
     run_on:
-      - windows-64-vs2017-test
+      - windows-64-vs2017-small
     expansions:
       VENV_BIN_DIR: Scripts
       AUTH: auth
@@ -117,7 +117,7 @@ buildvariants:
   - name: async-std-ubuntu
     display_name: "async-std Runtime (Ubuntu)"
     run_on:
-      - ubuntu2004-arm64-test
+      - ubuntu2004-arm64-small
     expansions:
       ASYNC_STD: true
       AUTH: auth
@@ -128,7 +128,7 @@ buildvariants:
   - name: async-std-rhel
     display_name: "async-std Runtime (RHEL)"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       ASYNC_STD: true
       AUTH: auth
@@ -150,7 +150,7 @@ buildvariants:
   - name: async-std-windows
     display_name: "async-std Runtime (Windows)"
     run_on:
-      - windows-64-vs2017-test
+      - windows-64-vs2017-small
     expansions:
       ASYNC_STD: true
       AUTH: auth
@@ -161,7 +161,7 @@ buildvariants:
   - name: openssl-ubuntu
     display_name: "OpenSSL (Ubuntu)"
     run_on:
-      - ubuntu2004-arm64-test
+      - ubuntu2004-arm64-small
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -172,7 +172,7 @@ buildvariants:
   - name: openssl-rhel
     display_name: "OpenSSL (RHEL)"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -194,7 +194,7 @@ buildvariants:
   - name: openssl-windows
     display_name: "OpenSSL (Windows)"
     run_on:
-      - windows-64-vs2017-test
+      - windows-64-vs2017-small
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -205,14 +205,14 @@ buildvariants:
   - name: no-auth-tls
     display_name: "No Auth/TLS"
     run_on:
-      - rhel80-test
+      - rhel80-small
     tasks:
       - .rapid .replicaset
 
   - name: compression
     display_name: "Compression"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       COMPRESSION: true
       AUTH: auth
@@ -223,7 +223,7 @@ buildvariants:
   - name: stable-api
     display_name: "Stable API V1"
     run_on:
-      - ubuntu2004-test
+      - ubuntu2004-small
     expansions:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
@@ -237,7 +237,7 @@ buildvariants:
   - name: sync-api
     display_name: "Sync API"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -247,7 +247,7 @@ buildvariants:
   - name: atlas-connectivity
     display_name: "Atlas Connectivity"
     run_on:
-      - rhel80-test
+      - rhel80-small
     tasks:
       - test-atlas-connectivity
 
@@ -291,7 +291,7 @@ buildvariants:
   - name: x509-auth
     display_name: "x509 Authentication"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -301,7 +301,7 @@ buildvariants:
   - name: plain-auth
     display_name: "Plain Authentication"
     run_on:
-      - rhel80-test
+      - rhel80-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -313,7 +313,7 @@ buildvariants:
     disable: true
     display_name: "Serverless"
     run_on:
-      - rhel80-test
+      - rhel80-small
     tasks:
       - serverless-task-group
 
@@ -1058,6 +1058,7 @@ functions:
     - command: shell.exec
       type: test
       params:
+        shell: bash
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
