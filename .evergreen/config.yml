@@ -893,6 +893,11 @@ tasks:
     tags: [aws-auth]
     commands:
       - func: "install junit dependencies"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
       - func: "add aws auth variables to file"
       - func: "run aws ecs auth test"
 
@@ -1228,13 +1233,10 @@ functions:
           cp $PROJECT_DIRECTORY/.evergreen/aws-ecs-test/target/debug/aws-ecs-test $ECS_SRC_DIR
 
           cd $AUTH_AWS_DIR
-          cat <<EOF > setup.js
-            const mongo_binaries = "$MONGODB_BINARIES";
-            const project_dir = "$ECS_SRC_DIR";
-          EOF
-
-          cat setup.js
-          mongo --nodb setup.js aws_e2e_ecs.js
+          . ./activate-authawsvenv.sh
+          export MONGODB_BINARIES=${MONGODB_BINARIES}
+          export PROJECT_DIRECTORY="$ECS_SRC_DIR"
+          python aws_tester.py ecs
 
   "run aws assume role with web identity test":
     - command: shell.exec
