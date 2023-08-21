@@ -73,16 +73,16 @@ buildvariants:
       - name: .replicaset
       - name: .sharded
 
-  - name: ubuntu-20.04-arm64
-    display_name: "Ubuntu 20.04 (ARM64)"
+  - name: ubuntu-22.04-arm64
+    display_name: "Ubuntu 22.04 (ARM64)"
     run_on:
-      - ubuntu2004-arm64-small
+      - ubuntu2204-arm64-small
     expansions:
       VENV_BIN_DIR: bin
       AUTH: auth
       SSL: ssl
     tasks:
-      # Ubuntu 20.04 does not support MongoDB versions 3.6, 4.0, and 4.2.
+      # Ubuntu 22.04 does not support MongoDB versions 3.6, 4.0, and 4.2.
       - name: .standalone !.3.6 !.4.0 !.4.2
       - name: .replicaset !.3.6 !.4.0 !.4.2
       - name: .sharded !.3.6 !.4.0 !.4.2
@@ -117,7 +117,7 @@ buildvariants:
   - name: async-std-ubuntu
     display_name: "async-std Runtime (Ubuntu)"
     run_on:
-      - ubuntu2004-arm64-small
+      - ubuntu2204-arm64-small
     expansions:
       ASYNC_STD: true
       AUTH: auth
@@ -161,7 +161,7 @@ buildvariants:
   - name: openssl-ubuntu
     display_name: "OpenSSL (Ubuntu)"
     run_on:
-      - ubuntu2004-arm64-small
+      - ubuntu2204-arm64-small
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -223,7 +223,7 @@ buildvariants:
   - name: stable-api
     display_name: "Stable API V1"
     run_on:
-      - ubuntu2004-small
+      - ubuntu2204-small
     expansions:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
