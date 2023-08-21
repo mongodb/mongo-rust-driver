@@ -1721,7 +1721,7 @@ impl TestOperation for CreateCommandCursor {
             let db = test_runner.get_database(id).await;
             let options = self.options.clone();
 
-            let result = match &self.session {
+            match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;
                     with_mut_session!(test_runner, session_id, |session| async {
@@ -1742,8 +1742,7 @@ impl TestOperation for CreateCommandCursor {
                     let test_cursor = TestCursor::Normal(Mutex::new(doc_cursor));
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
-            };
-            result
+            }
         }
         .boxed()
     }
