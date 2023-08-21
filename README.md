@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flags.
 
 For more detailed documentation, see [the manual](https://mongodb.github.io/mongo-rust-driver/manual/).
 
@@ -72,20 +72,20 @@ Using the `"sync"` feature also requires using `default-features = false`.
 
 ### All Feature Flags
 
-| Feature              | Description                                                                                                                           | Extra dependencies                  | Default |
-|:---------------------|:--------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------|:--------|
-| `tokio-runtime`      | Enable support for the `tokio` async runtime                                                                                          | `tokio` 1.0 with the `full` feature | yes     |
-| `async-std-runtime`  | Enable support for the `async-std` runtime                                                                                            | `async-std` 1.0                     | no      |
-| `sync`               | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
-| `aws-auth`           | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
-| `bson-uuid-0_8`      | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
-| `bson-uuid-1`        | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
-| `bson-chrono-0_4`    | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
-| `bson-serde_with`    | Enable support for the [`serde_with`](docs.rs/serde_with/latest) crate in the public API of the re-exported `bson` crate.             | `serde_with` 1.0                    | no      |
-| `zlib-compression`   | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                              | `flate2` 1.0                        | no      |
-| `zstd-compression`   | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/).  This flag requires Rust version 1.54.        | `zstd` 0.9.0                        | no      |
-| `snappy-compression` | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/)                                              | `snap` 1.0.5                        | no      |
-| `openssl-tls`        | Switch TLS connection handling to use ['openssl'](https://docs.rs/openssl/0.10.38/).                                                  | `openssl` 0.10.38                       | no      |
+| Feature              | Description                                                                                                                           | Extra dependencies              | Default |
+|:---------------------|:--------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------|:--------|
+| `tokio-runtime`      | Enable support for the `tokio` async runtime                                                                                          | `tokio` with the `full` feature | yes     |
+| `async-std-runtime`  | Enable support for the `async-std` runtime                                                                                            | `async-std`                     | no      |
+| `sync`               | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std`                     | no      |
+| `aws-auth`           | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest`                       | no      |
+| `bson-uuid-0_8`      | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |
+| `bson-uuid-1`        | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |
+| `bson-chrono-0_4`    | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                             | no      |
+| `bson-serde_with`    | Enable support for the [`serde_with`](docs.rs/serde_with/latest) crate in the public API of the re-exported `bson` crate.             | `serde_with`                    | no      |
+| `zlib-compression`   | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                              | `flate2`                        | no      |
+| `zstd-compression`   | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/).                                               | `zstd`                          | no      |
+| `snappy-compression` | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/)                                              | `snap`                          | no      |
+| `openssl-tls`        | Switch TLS connection handling to use ['openssl'](https://docs.rs/openssl/0.10.38/).                                                  | `openssl`                       | no      |
 
 ## Example Usage
 Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/latest).
@@ -282,7 +282,7 @@ In async Rust, it is common to implement cancellation and timeouts by dropping a
 certain period of time instead of polling it to completion. This is how
 [`tokio::time::timeout`](https://docs.rs/tokio/1.10.1/tokio/time/fn.timeout.html) works, for
 example. However, doing this with futures returned by the driver can leave the driver's internals in
-an inconsistent state, which may lead to unpredictable or incorrect behavior (see RUST-937 for more
+an inconsistent state, which may lead to unpredictable or incorrect behavior (see [RUST-937](https://jira.mongodb.org/browse/RUST-937) for more
 details). As such, it is **_highly_** recommended to poll all futures returned from the driver to
 completion. In order to still use timeout mechanisms like `tokio::time::timeout` with the driver,
 one option is to spawn tasks and time out on their
