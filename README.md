@@ -282,7 +282,7 @@ In async Rust, it is common to implement cancellation and timeouts by dropping a
 certain period of time instead of polling it to completion. This is how
 [`tokio::time::timeout`](https://docs.rs/tokio/1.10.1/tokio/time/fn.timeout.html) works, for
 example. However, doing this with futures returned by the driver can leave the driver's internals in
-an inconsistent state, which may lead to unpredictable or incorrect behavior (see RUST-937 for more
+an inconsistent state, which may lead to unpredictable or incorrect behavior (see [RUST-937](https://jira.mongodb.org/browse/RUST-937) for more
 details). As such, it is **_highly_** recommended to poll all futures returned from the driver to
 completion. In order to still use timeout mechanisms like `tokio::time::timeout` with the driver,
 one option is to spawn tasks and time out on their
