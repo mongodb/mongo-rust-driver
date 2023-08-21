@@ -1672,14 +1672,7 @@ impl TestOperation for RunCursorCommand {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
-
-            let options = RunCursorCommandOptions::builder()
-                .max_time(self.options.max_time)
-                .cursor_type(self.options.cursor_type)
-                .selection_criteria(self.options.selection_criteria.clone())
-                .comment(self.options.comment.clone())
-                .batch_size(self.options.batch_size)
-                .build();
+            let options = self.options.clone();
 
             let result = match &self.session {
                 Some(session_id) => {
@@ -1726,14 +1719,8 @@ impl TestOperation for CreateCommandCursor {
         async move {
             let command = self.command.clone();
             let db = test_runner.get_database(id).await;
+            let options = self.options.clone();
 
-            let options = RunCursorCommandOptions::builder()
-                .max_time(self.options.max_time)
-                .cursor_type(self.options.cursor_type)
-                .selection_criteria(self.options.selection_criteria.clone())
-                .comment(self.options.comment.clone())
-                .batch_size(self.options.batch_size)
-                .build();
             let result = match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;
