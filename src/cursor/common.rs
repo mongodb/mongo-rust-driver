@@ -24,9 +24,13 @@ use crate::{
     Namespace,
 };
 
+/// The result of one attempt to advance a cursor.
 pub(super) enum AdvanceResult {
+    /// The cursor was successfully advanced and the buffer has at least one item.
     Advanced,
+    /// The cursor does not have any more items and will not return any more in the future.
     Exhausted,
+    /// The cursor does not currently have any items, but future calls to getMore may yield more.
     Waiting,
 }
 
@@ -101,9 +105,9 @@ where
         self.state.as_ref().unwrap()
     }
 
-    /// Advance the cursor forward to the next document. If there are no documents cached locally,
-    /// perform getMores until the cursor is exhausted or a result/error has been received. This
-    /// method will return false if the cursor is exhausted.
+    /// Attempt to advance the cursor forward to the next item. If there are no items cached
+    /// locally, perform getMores until the cursor is exhausted or the buffer has been refilled.
+    /// Return whether or not the cursor has been advanced.
     pub(super) async fn advance(&mut self) -> Result<bool> {
         loop {
             match self.try_advance().await? {
@@ -114,8 +118,8 @@ where
         }
     }
 
-    /// Attempt to advance the cursor forward to the next document. If there are no documents cached
-    /// locally, perform one getMore to attempt to retrieve more documents.
+    /// Attempt to advance the cursor forward to the next item. If there are no items cached
+    /// locally, perform a single getMore to attempt to retrieve more.
     pub(super) async fn try_advance(&mut self) -> Result<AdvanceResult> {
         if self.state_mut().buffer.advance() {
             return Ok(AdvanceResult::Advanced);
@@ -131,11 +135,13 @@ where
         let result = self.provider.execute(spec, client, pin).await;
         self.handle_get_more_result(result)?;
 
-        // If the getMore result refilled the buffer, then the cursor has been advanced. Otherwise
-        // getMore returned an empty batch.
-        match self.state_mut().buffer.advance() {
-            true => Ok(AdvanceResult::Advanced),
-            false => Ok(AdvanceResult::Waiting),
+        if self.is_exhausted() {
+            Ok(AdvanceResult::Exhausted)
+        } else {
+            match self.state_mut().buffer.advance() {
+                true => Ok(AdvanceResult::Advanced),
+                false => Ok(AdvanceResult::Waiting),
+            }
         }
     }
 
