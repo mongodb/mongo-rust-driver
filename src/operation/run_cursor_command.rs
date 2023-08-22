@@ -5,7 +5,7 @@ use crate::{
     concern::WriteConcern,
     cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{Operation, RunCommand},
+    operation::{CursorBody, Operation, RunCommand},
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
 };
@@ -94,25 +94,18 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        let doc = Operation::handle_response(&self.run_command, response, description)?;
-        let cursor_info = bson::from_document(doc)?;
-        let batch_size = match &self.options {
-            Some(options) => options.batch_size,
-            None => None,
-        };
-        let max_time = match &self.options {
-            Some(options) => options.max_time,
-            None => None,
-        };
+        let cursor_response: CursorBody = response.body()?;
+
         let comment = match &self.options {
             Some(options) => options.comment.clone(),
             None => None,
         };
+
         Ok(CursorSpecification::new(
-            cursor_info,
+            cursor_response.cursor,
             description.server_address.clone(),
-            batch_size,
-            max_time,
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            self.options.as_ref().and_then(|opts| opts.max_time),
             comment,
         ))
     }
