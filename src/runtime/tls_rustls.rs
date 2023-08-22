@@ -117,7 +117,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
                 ta.name_constraints,
             )
         });
-        store.add_server_trust_anchors(trust_anchors);
+        store.add_trust_anchors(trust_anchors);
     }
 
     let mut config = if let Some(path) = cfg.cert_key_file_path {
@@ -164,7 +164,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         ClientConfig::builder()
             .with_safe_defaults()
             .with_root_certificates(store)
-            .with_single_cert(certs, key)
+            .with_client_auth_cert(certs, key)
             .map_err(|error| ErrorKind::InvalidTlsConfig {
                 message: error.to_string(),
             })?
