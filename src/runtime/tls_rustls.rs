@@ -10,10 +10,7 @@ use std::{
 
 use rustls::{
     client::{ClientConfig, ServerCertVerified, ServerCertVerifier, ServerName},
-    Certificate,
-    Error as TlsError,
-    OwnedTrustAnchor,
-    RootCertStore,
+    Certificate, Error as TlsError, OwnedTrustAnchor, RootCertStore,
 };
 use rustls_pemfile::{certs, read_one, Item};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -113,7 +110,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         })?;
         store.add_parsable_certificates(&ders);
     } else {
-        let trust_anchors = TLS_SERVER_ROOTS.0.iter().map(|ta| {
+        let trust_anchors = TLS_SERVER_ROOTS.iter().map(|ta| {
             OwnedTrustAnchor::from_subject_spki_name_constraints(
                 ta.subject,
                 ta.spki,

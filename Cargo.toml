@@ -127,7 +127,7 @@ tracing = { version = "0.1.36", optional = true }
 trust-dns-proto = "0.21.2"
 trust-dns-resolver = "0.21.2"
 typed-builder = "0.10.0"
-webpki-roots = "0.22.4"
+webpki-roots = "0.25.2"
 zstd = { version = "0.11.2", optional = true }
 
 [dependencies.async-std]
