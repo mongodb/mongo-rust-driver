@@ -143,6 +143,7 @@ struct CollectionInner {
     selection_criteria: Option<SelectionCriteria>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
+    human_readable_serialization: bool,
 }
 
 impl<T> Collection<T> {
@@ -157,6 +158,7 @@ impl<T> Collection<T> {
         let write_concern = options
             .write_concern
             .or_else(|| db.write_concern().cloned());
+        let human_readable_serialization = options.human_readable_serialization.unwrap_or_default();
 
         Self {
             inner: Arc::new(CollectionInner {
@@ -166,6 +168,7 @@ impl<T> Collection<T> {
                 selection_criteria,
                 read_concern,
                 write_concern,
+                human_readable_serialization,
             }),
             _phantom: Default::default(),
         }
@@ -1119,14 +1122,16 @@ where
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
+        let mut options = options.into();
         let replacement = to_document_with_options(
             replacement.borrow(),
-            SerializerOptions::builder().human_readable(false).build(),
+            SerializerOptions::builder()
+                .human_readable(self.inner.human_readable_serialization)
+                .build(),
         )?;
 
         let session = session.into();
 
-        let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
@@ -1205,7 +1210,13 @@ where
 
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert = Insert::new_encrypted(self.namespace(), docs, options.clone(), encrypted);
+            let insert = Insert::new_encrypted(
+                self.namespace(),
+                docs,
+                options.clone(),
+                encrypted,
+                self.inner.human_readable_serialization,
+            );
 
             match self
                 .client()
@@ -1332,6 +1343,7 @@ where
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
+            self.inner.human_readable_serialization,
         );
         self.client()
             .execute_operation(insert, session)
@@ -1382,16 +1394,18 @@ where
         options: impl Into<Option<ReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
+        let mut options = options.into();
         let replacement = to_document_with_options(
             replacement.borrow(),
-            SerializerOptions::builder().human_readable(false).build(),
+            SerializerOptions::builder()
+                .human_readable(self.inner.human_readable_serialization)
+                .build(),
         )?;
 
         bson_util::replacement_document_check(&replacement)?;
 
         let session = session.into();
 
-        let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let update = Update::new(

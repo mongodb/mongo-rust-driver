@@ -31,6 +31,7 @@ pub(crate) struct Insert<'a, T> {
     inserted_ids: Vec<Bson>,
     options: Option<InsertManyOptions>,
     encrypted: bool,
+    human_readable_serialization: bool,
 }
 
 impl<'a, T> Insert<'a, T> {
@@ -38,8 +39,9 @@ impl<'a, T> Insert<'a, T> {
         ns: Namespace,
         documents: Vec<&'a T>,
         options: Option<InsertManyOptions>,
+        human_readable_serialization: bool,
     ) -> Self {
-        Self::new_encrypted(ns, documents, options, false)
+        Self::new_encrypted(ns, documents, options, false, human_readable_serialization)
     }
 
     pub(crate) fn new_encrypted(
@@ -47,6 +49,7 @@ impl<'a, T> Insert<'a, T> {
         documents: Vec<&'a T>,
         options: Option<InsertManyOptions>,
         encrypted: bool,
+        human_readable_serialization: bool,
     ) -> Self {
         Self {
             ns,
@@ -54,6 +57,7 @@ impl<'a, T> Insert<'a, T> {
             documents,
             inserted_ids: vec![],
             encrypted,
+            human_readable_serialization,
         }
     }
 
@@ -82,7 +86,17 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
             .take(description.max_write_batch_size as usize)
             .enumerate()
         {
-            let mut doc = bson::to_raw_document_buf(d)?;
+            let mut doc = if self.human_readable_serialization {
+                let serializer_options = bson::SerializerOptions::builder()
+                    .human_readable(true)
+                    .build();
+                bson::RawDocumentBuf::from_document(&bson::to_document_with_options(
+                    d,
+                    serializer_options,
+                )?)?
+            } else {
+                bson::to_raw_document_buf(d)?
+            };
             let id = match doc.get("_id")? {
                 Some(b) => b.try_into()?,
                 None => {

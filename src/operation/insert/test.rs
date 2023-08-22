@@ -49,6 +49,7 @@ fn fixtures(opts: Option<InsertManyOptions>) -> TestFixtures {
         },
         DOCUMENTS.iter().collect(),
         Some(options.clone()),
+        false,
     );
 
     TestFixtures {
@@ -116,7 +117,7 @@ fn build() {
 #[test]
 fn build_ordered() {
     let docs = vec![Document::new()];
-    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
+    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None, false);
     let cmd = insert
         .build(&StreamDescription::new_testing())
         .expect("should succeed");
@@ -128,6 +129,7 @@ fn build_ordered() {
         Namespace::empty(),
         docs.iter().collect(),
         Some(InsertManyOptions::builder().ordered(false).build()),
+        false,
     );
     let cmd = insert
         .build(&StreamDescription::new_testing())
@@ -140,6 +142,7 @@ fn build_ordered() {
         Namespace::empty(),
         docs.iter().collect(),
         Some(InsertManyOptions::builder().ordered(true).build()),
+        false,
     );
     let cmd = insert
         .build(&StreamDescription::new_testing())
@@ -152,6 +155,7 @@ fn build_ordered() {
         Namespace::empty(),
         docs.iter().collect(),
         Some(InsertManyOptions::builder().build()),
+        false,
     );
     let cmd = insert
         .build(&StreamDescription::new_testing())
@@ -170,7 +174,7 @@ struct Documents<D> {
 fn generate_ids() {
     let docs = vec![doc! { "x": 1 }, doc! { "_id": 1_i32, "x": 2 }];
 
-    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
+    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None, false);
     let cmd = insert.build(&StreamDescription::new_testing()).unwrap();
     let serialized = insert.serialize_command(cmd).unwrap();
 
@@ -253,7 +257,7 @@ fn serialize_all_types() {
         "_id": ObjectId::new(),
     }];
 
-    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
+    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None, false);
     let cmd = insert.build(&StreamDescription::new_testing()).unwrap();
     let serialized = insert.serialize_command(cmd).unwrap();
     let cmd: Documents<Document> = bson::from_slice(serialized.as_slice()).unwrap();
