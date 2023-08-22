@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the current unique version of this checkout.
-if [[ $is_patch = true ]]; then
+if [[ "$is_patch" = true ]]; then
     CURRENT_VERSION=$(git describe)-patch-${version_id}
 else
     CURRENT_VERSION=latest
@@ -11,7 +11,7 @@ DRIVERS_TOOLS="$(pwd)/../drivers-tools"
 
 # Python has cygwin path problems on Windows. Detect prospective mongo-orchestration home
 # directory.
-if [[ $OS = "Windows_NT" ]]; then
+if [[ "${OS}" = "Windows_NT" ]]; then
     export DRIVERS_TOOLS=$(cygpath -m $DRIVERS_TOOLS)
 fi
 
@@ -31,17 +31,22 @@ TMPDIR="${MONGO_ORCHESTRATION_HOME}/db"
 PATH="${MONGODB_BINARIES}:${PATH}"
 PROJECT="${project}"
 
+SESSION_TEST_REQUIRE_MONGOCRYPTD=true
+
 cat <<EOT > expansion.yml
-CURRENT_VERSION: ${CURRENT_VERSION}
-DRIVERS_TOOLS: ${DRIVERS_TOOLS}
-MONGO_ORCHESTRATION_HOME: ${MONGO_ORCHESTRATION_HOME}
-MONGODB_BINARIES: ${MONGODB_BINARIES}
-UPLOAD_BUCKET: ${UPLOAD_BUCKET}
-PROJECT_DIRECTORY: ${PROJECT_DIRECTORY}
-MONGOCRYPT_LIB_DIR: ${MONGOCRYPT_LIB_DIR}
-TMPDIR: ${TMPDIR}
-PATH: ${PATH}
-PROJECT: ${PROJECT}
+CURRENT_VERSION: "${CURRENT_VERSION}"
+DRIVERS_TOOLS: "${DRIVERS_TOOLS}"
+MONGO_ORCHESTRATION_HOME: "${MONGO_ORCHESTRATION_HOME}"
+MONGODB_BINARIES: "${MONGODB_BINARIES}"
+UPLOAD_BUCKET: "${UPLOAD_BUCKET}"
+PROJECT_DIRECTORY: "${PROJECT_DIRECTORY}"
+MONGOCRYPT_LIB_DIR: "${MONGOCRYPT_LIB_DIR}"
+LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}"
+TMPDIR: "${TMPDIR}"
+PATH: "${PATH}"
+PROJECT: "${PROJECT}"
+AZURE_IMDS_MOCK_PORT: 44175
+SESSION_TEST_REQUIRE_MONGOCRYPTD: "${SESSION_TEST_REQUIRE_MONGOCRYPTD}"
 PREPARE_SHELL: |
     set -o errexit
     set -o xtrace
@@ -58,9 +63,7 @@ PREPARE_SHELL: |
     export PATH="${PATH}"
     export PROJECT="${PROJECT}"
 
-    export AZURE_IMDS_MOCK_PORT=44175
-
-    export SESSION_TEST_REQUIRE_MONGOCRYPTD=1
+    export SESSION_TEST_REQUIRE_MONGOCRYPTD="${SESSION_TEST_REQUIRE_MONGOCRYPTD}"
 
     if [[ "$OS" != "Windows_NT" ]]; then
         ulimit -n 64000

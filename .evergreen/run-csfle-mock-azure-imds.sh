@@ -6,4 +6,4 @@ PYTHON=$(find_python3)
 function prepend() { while read line; do echo "${1}${line}"; done; }
 
 cd ${DRIVERS_TOOLS}/.evergreen/csfle
-${PYTHON} bottle.py fake_azure:imds -b localhost:${AZURE_IMDS_MOCK_PORT} 2>&1 | prepend "[MOCK AZURE IMDS] "
+${PYTHON} bottle.py fake_azure:imds -b localhost:${AZURE_IMDS_MOCK_PORT} &

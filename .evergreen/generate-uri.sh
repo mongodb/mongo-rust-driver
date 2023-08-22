@@ -3,7 +3,7 @@
 set -o errexit
 set -o xtrace
 
-if [[ $SSL = "ssl" ]]; then
+if [[ "$SSL" = "ssl" ]]; then
 	DRIVERS_TOOLS_X509="${DRIVERS_TOOLS}/.evergreen/x509gen"
 	DRIVERS_TOOLS_X509_ENCODED=$(echo "$DRIVERS_TOOLS_X509" | sed 's/\//%2F/g')
 	CA_FILE="${DRIVERS_TOOLS_X509_ENCODED}%2Fca.pem"

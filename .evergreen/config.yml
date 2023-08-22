@@ -169,8 +169,8 @@ buildvariants:
     run_on:
       - ubuntu2204-arm64-small
     expansions:
-      # Needed to skip installation of the legacy shell in boostrap mongo-orchestration, which is
-      # not available on Ubuntu 22.04.
+      # Needed to skip installation of the legacy shell (which is not available on Ubuntu 22.04) in
+      # boostrap mongo-orchestration.
       SKIP_LEGACY_SHELL: true
       OPENSSL: true
       AUTH: auth
@@ -229,8 +229,8 @@ buildvariants:
     tasks:
       - .rapid .replicaset
 
-  - name: stable-api-rhel
-    display_name: "Stable API V1 rhel"
+  - name: stable-api
+    display_name: "Stable API V1"
     run_on:
       - rhel87-small
     expansions:
@@ -325,6 +325,60 @@ buildvariants:
       - rhel87-small
     tasks:
       - serverless-task-group
+
+  - name: oidc
+    display_name: OIDC
+    run_on:
+      - rhel87-small
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - test-oidc
+
+  - name: in-use-encryption
+    display_name: "In-Use Encryption"
+    run_on:
+      - rhel80-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - .in-use-encryption
+
+  - name: in-use-encryption-disable-crypt-shared
+    display_name: "In-Use Encryption (disable crypt_shared)"
+    run_on:
+      - rhel80-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      AUTH: auth
+      SSL: ssl
+      DISABLE_CRYPT_SHARED: true
+    tasks:
+      - .in-use-encryption
+
+  - name: in-use-encryption-kmip
+    display_name: "In-Use Encryption (KMIP)"
+    run_on:
+      - rhel80-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      AUTH: auth
+      SSL: ssl
+      OPENSSL: true
+    tasks:
+      - test-in-use-encryption-kmip
+
+  - name: in-use-encryption-serverless
+    # TODO: Enable this build variant when the serverless issues are fixed.
+    disable: true
+    display_name: In-Use Encryption (Serverless)
+    run_on:
+      - rhel87-small
+    tasks:
+      - test-in-use-encryption-serverless
 
 ###############
 # Task Groups #
@@ -1002,11 +1056,142 @@ tasks:
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
-          TOPOLOGYD: replica_set
+          TOPOLOGY: replica_set
       - func: "generate uris"
       - func: "run sync tests"
         vars:
           ASYNC_STD: true
+
+  - name: test-oidc
+    commands:
+      - func: bootstrap oidc
+      - func: install junit dependencies
+      - func: bootstrap mongo-orchestration
+        vars:
+          AUTH: auth
+          ORCHESTRATION_FILE: auth-oidc.json
+          MONGODB_VERSION: latest
+          TOPOLOGY: replica_set
+      - func: setup oidc
+      - func: run oidc tests
+
+  - name: test-in-use-encryption-4.2
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 4.2
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-4.4
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 4.4
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-5.0
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 5.0
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-6.0
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 6.0
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-7.0
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 7.0
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-rapid
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-latest
+    tags: [in-use-encryption]
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-kmip
+    commands:
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "generate uris"
+      - func: "run kmip server"
+      - func: "run mock azure imds server"
+      - func: "run csfle tests"
+
+  - name: test-in-use-encryption-serverless
+    commands:
+      - command: expansions.update
+        params:
+          file: src/expansion.yml
+      - command: expansions.update
+        params:
+          file: serverless-expansion.yml
+      - func: "install junit dependencies"
+      - func: "install libmongocrypt"
+      - func: "run kmip server"
+      - func: "run mock azure imds server"
+      - func: "run csfle serverless tests"
 
 #############
 # Functions #
@@ -1025,8 +1210,6 @@ functions:
         binary: bash
         args:
           - .evergreen/create-expansions.sh
-        # Pull in all of the default expansions, the expansions set for the build variant, and the
-        # expansions defined in the project's settings page.
         add_expansions_to_env: true
     - command: expansions.update
       params:
@@ -1387,6 +1570,7 @@ functions:
           - COMPRESSION
           - MONGODB_URI
           - MONGODB_API_VERSION
+          - SESSION_TEST_REQUIRE_MONGOCRYPTD
 
   "run sync tests":
     - command: subprocess.exec
@@ -1460,61 +1644,24 @@ functions:
           .evergreen/run-csfle-kmip-servers.sh
 
   "run mock azure imds server":
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        shell: bash
-        working_dir: "src"
+        working_dir: src
         background: true
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/run-csfle-mock-azure-imds.sh
-
-  "build csfle expansions":
-    - command: shell.exec
-      params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          . ${DRIVERS_TOOLS}/.evergreen/find-python3.sh
-          PYTHON=$(find_python3)
-          set +o xtrace
-          cat <<EOT > csfle-expansions.yml
-          PREPARE_CSFLE: |
-            export ASYNC_RUNTIME=${ASYNC_RUNTIME}
-            export CSFLE_TLS_CERT_DIR=$DRIVERS_TOOLS_X509
-            export DISABLE_CRYPT_SHARED=${DISABLE_CRYPT_SHARED}
-            export TLS_FEATURE=${TLS_FEATURE}
-            export CRYPT_SHARED_LIB_PATH=${CRYPT_SHARED_LIB_PATH}
-            export PYTHON=$PYTHON
-            $PYTHON -m pip install boto3
-            # Exported without xtrace to avoid leaking credentials
-            set +o xtrace
-            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            export AZURE_TENANT_ID=${AZURE_TENANT_ID}
-            export AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-            export AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-            export GCP_EMAIL=${GCP_EMAIL}
-            export GCP_PRIVATE_KEY=${GCP_PRIVATE_KEY}
-            export CSFLE_LOCAL_KEY=${CSFLE_LOCAL_KEY}
-            set -o xtrace
-          EOT
-    - command: expansions.update
-      params:
-        file: src/csfle-expansions.yml
+        binary: bash
+        args:
+          - .evergreen/run-csfle-mock-azure-imds.sh
+        add_expansions_to_env: true
 
   "run csfle tests":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        shell: bash
         working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          ${PREPARE_CSFLE}
-
-          .evergreen/run-csfle-tests.sh
+        binary: bash
+        args:
+          - .evergreen/run-csfle-tests.sh
+        add_expansions_to_env: true
 
   "run csfle serverless tests":
     - command: shell.exec

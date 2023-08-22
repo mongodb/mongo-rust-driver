@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ "$TLS_FEATURE" != "openssl-tls" ]; then
-    echo "Skipping kms servers: openssl-tls not enabled"
-    exit
-fi
-
 cd ${DRIVERS_TOOLS}/.evergreen/csfle
 . ./activate-kmstlsvenv.sh
 # TMPDIR is required to avoid "AF_UNIX path too long" errors.
