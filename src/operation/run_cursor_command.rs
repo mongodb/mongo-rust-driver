@@ -1,5 +1,3 @@
-#[cfg(feature = "in-use-encryption-unstable")]
-use bson::doc;
 use bson::RawDocumentBuf;
 
 use crate::{
