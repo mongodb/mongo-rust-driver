@@ -528,9 +528,9 @@ impl CursorBuffer {
         // consumed yet.
         if self.fresh {
             self.fresh = false;
-            return !self.is_empty();
+        } else {
+            self.docs.pop_front();
         }
-        self.docs.pop_front();
         !self.is_empty()
     }
 
