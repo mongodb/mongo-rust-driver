@@ -171,7 +171,7 @@ tokio::time::timeout(Duration::from_secs(5), handle).await???;
 </span><span class="boring">}
 </span><span class="boring">}</span></code></pre></pre>
 <h2 id="minimum-supported-rust-version-msrv"><a class="header" href="#minimum-supported-rust-version-msrv">Minimum supported Rust version (MSRV)</a></h2>
-<p>The MSRV for this crate is currently 1.57.0. This will rarely be increased, and if it ever is,
+<p>The MSRV for this crate is currently 1.60.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="installation-and-features"><a class="header" href="#installation-and-features">Installation and Features</a></h1>
 <h2 id="importing"><a class="header" href="#importing">Importing</a></h2>
@@ -183,14 +183,14 @@ mongodb = &quot;2.1.0&quot;
 <p>The driver supports both of the most popular async runtime crates, namely <a href="https://crates.io/crates/tokio"><code>tokio</code></a> and <a href="https://crates.io/crates/async-std"><code>async-std</code></a>. By default, the driver will use <a href="https://crates.io/crates/tokio"><code>tokio</code></a>, but you can explicitly choose a runtime by specifying one of <code>&quot;tokio-runtime&quot;</code> or <code>&quot;async-std-runtime&quot;</code> feature flags in your <code>Cargo.toml</code>.</p>
 <p>For example, to instruct the driver to work with <a href="https://crates.io/crates/async-std"><code>async-std</code></a>, add the following to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies.mongodb]
-version = &quot;2.1.0&quot;
+version = &quot;2.6.0&quot;
 default-features = false
 features = [&quot;async-std-runtime&quot;]
 </code></pre>
 <h2 id="enabling-the-sync-api"><a class="header" href="#enabling-the-sync-api">Enabling the sync API</a></h2>
 <p>The driver also provides a blocking sync API. To enable this, add the <code>&quot;sync&quot;</code> or <code>&quot;tokio-sync&quot;</code> feature to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies.mongodb]
-version = &quot;2.3.0&quot;
+version = &quot;2.6.0&quot;
 features = [&quot;tokio-sync&quot;]
 </code></pre>
 <p>Using the <code>&quot;sync&quot;</code> feature also requires using <code>default-features = false</code>.

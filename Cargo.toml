@@ -127,7 +127,7 @@ tracing = { version = "0.1.36", optional = true }
 trust-dns-proto = "0.21.2"
 trust-dns-resolver = "0.21.2"
 typed-builder = "0.10.0"
-webpki-roots = "0.22.4"
+webpki-roots = "0.25.2"
 zstd = { version = "0.11.2", optional = true }
 
 [dependencies.async-std]
@@ -149,7 +149,7 @@ default-features = false
 features = ["json", "rustls-tls"]
 
 [dependencies.rustls]
-version = "0.20.4"
+version = "0.21.6"
 features = ["dangerous_configuration"]
 
 [dependencies.serde]
@@ -165,7 +165,7 @@ version = "1.17.0"
 features = ["io-util", "sync", "macros"]
 
 [dependencies.tokio-rustls]
-version = "0.23.2"
+version = "0.24.1"
 features = ["dangerous_configuration"]
 
 [dependencies.tokio-util]
