@@ -10,7 +10,10 @@ use std::{
 
 use rustls::{
     client::{ClientConfig, ServerCertVerified, ServerCertVerifier, ServerName},
-    Certificate, Error as TlsError, OwnedTrustAnchor, RootCertStore,
+    Certificate,
+    Error as TlsError,
+    OwnedTrustAnchor,
+    RootCertStore,
 };
 use rustls_pemfile::{certs, read_one, Item};
 use tokio::io::{AsyncRead, AsyncWrite};

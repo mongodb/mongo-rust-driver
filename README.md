@@ -33,7 +33,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 
 ## Installation
 ### Requirements
-- Rust 1.57+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
+- Rust 1.60+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
 - MongoDB 3.6+
 
 #### Supported Platforms
@@ -372,7 +372,7 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 ## Minimum supported Rust version (MSRV) policy
 
-The MSRV for this crate is currently 1.57.0. This will rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.60.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## License
