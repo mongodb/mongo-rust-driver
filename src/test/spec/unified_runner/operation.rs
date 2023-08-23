@@ -382,6 +382,7 @@ impl<'de> Deserialize<'de> for Operation {
             "getKeys" => deserialize_op::<GetKeys>(definition.arguments),
             #[cfg(feature = "in-use-encryption-unstable")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
+            "iterateOnce" => deserialize_op::<IterateOnce>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
@@ -2188,13 +2189,7 @@ impl TestOperation for IterateUntilDocumentOrError {
         async move {
             // A `SessionCursor` also requires a `&mut Session`, which would cause conflicting
             // borrows, so take the cursor from the map and return it after execution instead.
-            let mut cursor = test_runner
-                .entities
-                .write()
-                .await
-                .remove(id)
-                .unwrap()
-                .into_cursor();
+            let mut cursor = test_runner.take_cursor(id).await;
             let next = match &mut cursor {
                 TestCursor::Normal(cursor) => {
                     let mut cursor = cursor.lock().await;
@@ -2224,11 +2219,7 @@ impl TestOperation for IterateUntilDocumentOrError {
                 }
                 TestCursor::Closed => None,
             };
-            test_runner
-                .entities
-                .write()
-                .await
-                .insert(id.to_string(), Entity::Cursor(cursor));
+            test_runner.return_cursor(id, cursor).await;
             next.transpose()
                 .map(|opt| opt.map(|doc| Entity::Bson(Bson::Document(doc))))
         }
@@ -2960,6 +2951,49 @@ impl TestOperation for Upload {
                 .await?;
 
             Ok(Some(Entity::Bson(id.into())))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct IterateOnce {}
+
+impl TestOperation for IterateOnce {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let mut cursor = test_runner.take_cursor(id).await;
+            match &mut cursor {
+                TestCursor::Normal(cursor) => {
+                    let mut cursor = cursor.lock().await;
+                    cursor.try_advance().await?;
+                }
+                TestCursor::Session { cursor, session_id } => {
+                    cursor
+                        .try_advance(
+                            test_runner
+                                .entities
+                                .write()
+                                .await
+                                .get_mut(session_id)
+                                .unwrap()
+                                .as_mut_session_entity(),
+                        )
+                        .await?;
+                }
+                TestCursor::ChangeStream(change_stream) => {
+                    let mut change_stream = change_stream.lock().await;
+                    change_stream.next_if_any().await?;
+                }
+                TestCursor::Closed => panic!("Attempted to call IterateOnce on a closed cursor"),
+            }
+            test_runner.return_cursor(id, cursor).await;
+            Ok(None)
         }
         .boxed()
     }

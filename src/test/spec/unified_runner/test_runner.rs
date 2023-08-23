@@ -50,6 +50,7 @@ use super::{
     CollectionData,
     Entity,
     SessionEntity,
+    TestCursor,
     TestFileEntity,
 };
 
@@ -697,6 +698,27 @@ impl TestRunner {
             .unwrap()
             .as_client_encryption()
             .clone()
+    }
+
+    /// Removes the cursor with the given ID from the entity map. This method passes ownership of
+    /// the cursor to the caller so that a mutable reference to a ClientSession can be accessed from
+    /// the entity map simultaneously. Once the caller is finished with the cursor, it MUST be
+    /// returned to the test runner via the return_cursor method below.
+    pub(crate) async fn take_cursor(&self, id: impl AsRef<str>) -> TestCursor {
+        self.entities
+            .write()
+            .await
+            .remove(id.as_ref())
+            .unwrap()
+            .into_cursor()
+    }
+
+    /// Returns the given cursor to the entity map. This method must be called after take_cursor.
+    pub(crate) async fn return_cursor(&self, id: impl AsRef<str>, cursor: TestCursor) {
+        self.entities
+            .write()
+            .await
+            .insert(id.as_ref().into(), Entity::Cursor(cursor));
     }
 }
 

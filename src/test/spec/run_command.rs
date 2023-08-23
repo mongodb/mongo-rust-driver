@@ -6,10 +6,8 @@ async fn run_unified() {
     let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["run-command", "unified"])
         .skip_tests(&[
-            // TODO re: RUST-1649: fix withTransaction for new test runner
+            // TODO RUST-1649: unskip when withTransaction is implemented
             "attaches transaction fields to given command",
-            // TODO fix in a follow up PR because need to add IterateOnce
-            "does not close the cursor when receiving an empty batch",
         ])
         .await;
 }

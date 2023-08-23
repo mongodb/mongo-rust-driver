@@ -245,6 +245,15 @@ impl<T> SessionCursor<T> {
         self.make_stream(session).generic_cursor.advance().await
     }
 
+    #[cfg(test)]
+    pub(crate) async fn try_advance(&mut self, session: &mut ClientSession) -> Result<()> {
+        self.make_stream(session)
+            .generic_cursor
+            .try_advance()
+            .await
+            .map(|_| ())
+    }
+
     /// Returns a reference to the current result in the cursor.
     ///
     /// # Panics
