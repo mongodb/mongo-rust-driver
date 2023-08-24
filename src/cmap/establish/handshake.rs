@@ -33,7 +33,7 @@ struct ClientMetadata {
     driver: DriverMetadata,
     os: OsMetadata,
     platform: String,
-    env: Option<FaasEnvironment>,
+    env: Option<RuntimeEnvironment>,
 }
 
 #[derive(Clone, Debug)]
@@ -55,17 +55,18 @@ struct OsMetadata {
     version: Option<String>,
 }
 
-#[derive(Clone, Debug)]
-struct FaasEnvironment {
-    name: FaasEnvironmentName,
+#[derive(Clone, Debug, PartialEq)]
+struct RuntimeEnvironment {
+    name: Option<FaasEnvironmentName>,
     runtime: Option<String>,
     timeout_sec: Option<i32>,
     memory_mb: Option<i32>,
     region: Option<String>,
     url: Option<String>,
+    container: Option<Document>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum FaasEnvironmentName {
     AwsLambda,
     AzureFunc,
@@ -120,19 +121,21 @@ impl From<OsMetadata> for Bson {
     }
 }
 
-impl From<FaasEnvironment> for Bson {
-    fn from(env: FaasEnvironment) -> Self {
-        let FaasEnvironment {
+impl From<RuntimeEnvironment> for Bson {
+    fn from(env: RuntimeEnvironment) -> Self {
+        let RuntimeEnvironment {
             name,
             runtime,
             timeout_sec,
             memory_mb,
             region,
             url,
+            container,
         } = env;
-        let mut out = doc! {
-            "name": name.name(),
-        };
+        let mut out = doc! {};
+        if let Some(name) = name {
+            out.insert("name", name.name());
+        }
         if let Some(rt) = runtime {
             out.insert("runtime", rt);
         }
@@ -148,70 +151,68 @@ impl From<FaasEnvironment> for Bson {
         if let Some(u) = url {
             out.insert("url", u);
         }
+        if let Some(c) = container {
+            out.insert("container", c);
+        }
         Bson::Document(out)
     }
 }
 
-impl FaasEnvironment {
-    const UNSET: Self = FaasEnvironment {
-        name: FaasEnvironmentName::AwsLambda,
+impl RuntimeEnvironment {
+    const UNSET: Self = RuntimeEnvironment {
+        name: None,
         runtime: None,
         timeout_sec: None,
         memory_mb: None,
         region: None,
         url: None,
+        container: None,
     };
 
     fn new() -> Option<Self> {
-        let name = FaasEnvironmentName::new()?;
-        Some(match name {
-            FaasEnvironmentName::AwsLambda => {
-                let runtime = env::var("AWS_EXECUTION_ENV").ok();
-                let region = env::var("AWS_REGION").ok();
-                let memory_mb = env::var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
-                    .ok()
-                    .and_then(|s| s.parse().ok());
-                Self {
-                    name,
-                    runtime,
-                    region,
-                    memory_mb,
-                    ..Self::UNSET
+        let mut out = Self::UNSET;
+        if let Some(name) = FaasEnvironmentName::new() {
+            out.name = Some(name);
+            match name {
+                FaasEnvironmentName::AwsLambda => {
+                    out.runtime = env::var("AWS_EXECUTION_ENV").ok();
+                    out.region = env::var("AWS_REGION").ok();
+                    out.memory_mb = env::var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
+                        .ok()
+                        .and_then(|s| s.parse().ok());
+                }
+                FaasEnvironmentName::AzureFunc => {
+                    out.runtime = env::var("FUNCTIONS_WORKER_RUNTIME").ok();
+                }
+                FaasEnvironmentName::GcpFunc => {
+                    out.memory_mb = env::var("FUNCTION_MEMORY_MB")
+                        .ok()
+                        .and_then(|s| s.parse().ok());
+                    out.timeout_sec = env::var("FUNCTION_TIMEOUT_SEC")
+                        .ok()
+                        .and_then(|s| s.parse().ok());
+                    out.region = env::var("FUNCTION_REGION").ok();
+                }
+                FaasEnvironmentName::Vercel => {
+                    out.region = env::var("VERCEL_REGION").ok();
                 }
             }
-            FaasEnvironmentName::AzureFunc => {
-                let runtime = env::var("FUNCTIONS_WORKER_RUNTIME").ok();
-                Self {
-                    name,
-                    runtime,
-                    ..Self::UNSET
-                }
-            }
-            FaasEnvironmentName::GcpFunc => {
-                let memory_mb = env::var("FUNCTION_MEMORY_MB")
-                    .ok()
-                    .and_then(|s| s.parse().ok());
-                let timeout_sec = env::var("FUNCTION_TIMEOUT_SEC")
-                    .ok()
-                    .and_then(|s| s.parse().ok());
-                let region = env::var("FUNCTION_REGION").ok();
-                Self {
-                    name,
-                    memory_mb,
-                    timeout_sec,
-                    region,
-                    ..Self::UNSET
-                }
-            }
-            FaasEnvironmentName::Vercel => {
-                let region = env::var("VERCEL_REGION").ok();
-                Self {
-                    name,
-                    region,
-                    ..Self::UNSET
-                }
-            }
-        })
+        }
+        let mut container = doc! {};
+        if std::path::Path::new("/.dockerenv").exists() {
+            container.insert("runtime", "docker");
+        }
+        if var_set("KUBERNETES_SERVICE_HOST") {
+            container.insert("orchestrator", "kubernetes");
+        }
+        if !container.is_empty() {
+            out.container = Some(container);
+        }
+        if out == Self::UNSET {
+            None
+        } else {
+            Some(out)
+        }
     }
 }
 
@@ -288,9 +289,9 @@ const METADATA_TRUNCATIONS: &[Truncation] = &[
     // clear `env.*` except `name`
     |metadata| {
         if let Some(env) = &mut metadata.env {
-            *env = FaasEnvironment {
+            *env = RuntimeEnvironment {
                 name: env.name,
-                ..FaasEnvironment::UNSET
+                ..RuntimeEnvironment::UNSET
             }
         }
     },
@@ -364,7 +365,7 @@ impl Handshaker {
             }
         }
 
-        metadata.env = FaasEnvironment::new();
+        metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
             command.body.insert("loadBalanced", true);
