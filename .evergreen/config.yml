@@ -368,6 +368,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
+      SESSION_TEST_REQUIRE_MONGOCRYPTD: true
     tasks:
       - .in-use-encryption
 
@@ -1555,7 +1556,6 @@ functions:
           - COMPRESSION
           - MONGODB_URI
           - MONGODB_API_VERSION
-          - SESSION_TEST_REQUIRE_MONGOCRYPTD
 
   "run sync tests":
     - command: subprocess.exec
