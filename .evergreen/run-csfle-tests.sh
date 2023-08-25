@@ -10,8 +10,6 @@ set -o xtrace
 
 export CSFLE_TLS_CERT_DIR="${DRIVERS_TOOLS}/.evergreen/x509gen"
 
-echo "ld library path in script: $LD_LIBRARY_PATH"
-
 cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
 . ./activate-authawsvenv.sh
 cd -

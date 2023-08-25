@@ -13,7 +13,7 @@ command_type: system
 # If any of the pre tasks fails, the task will be marked as a failure.
 pre_error_fails_task: true
 
-# Functions to run before all tasks. These are overridden for tasks in task groups.
+# Functions to run before all tasks (except those in task groups).
 pre:
   - func: "fetch source"
   - func: "create expansions"
@@ -23,8 +23,9 @@ pre:
   - func: "init test-results"
   - func: "make files executable"
   - func: "install rust"
+  - func: "install junit dependencies"
 
-# Functions to run after all tasks. These are overridden for tasks in task groups.
+# Functions to run after all tasks (except those in task groups).
 post:
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
@@ -33,7 +34,7 @@ post:
   - func: "upload-mo-artifacts"
   - func: "cleanup"
 
-# Cause a timeout if a task runs longer for 12 minutes.
+# Cause a timeout if a task does not complete within an hour.
 exec_timeout_secs: 3600
 # What to do if the timeout is hit. Post-task functions will still run.
 timeout:
@@ -81,7 +82,6 @@ buildvariants:
       # Needed to skip installation of the legacy shell in boostrap mongo-orchestration, which is
       # not available on Ubuntu 22.04.
       SKIP_LEGACY_SHELL: true
-      VENV_BIN_DIR: bin
       AUTH: auth
       SSL: ssl
     tasks:
@@ -95,7 +95,6 @@ buildvariants:
     run_on:
       - macos-1100
     expansions:
-      VENV_BIN_DIR: bin
       SINGLE_THREAD: true
       AUTH: auth
       SSL: ssl
@@ -109,7 +108,6 @@ buildvariants:
     run_on:
       - windows-64-vs2017-small
     expansions:
-      VENV_BIN_DIR: Scripts
       AUTH: auth
       SSL: ssl
     tasks:
@@ -164,8 +162,20 @@ buildvariants:
     tasks:
       - name: .rapid .replicaset
 
+  - name: openssl-rhel
+    display_name: "OpenSSL (RHEL)"
+    run_on:
+      - rhel87-small
+    expansions:
+      OPENSSL: true
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - name: .rapid .replicaset
+
   - name: openssl-ubuntu
     display_name: "OpenSSL (Ubuntu)"
+    # patchable: false
     run_on:
       - ubuntu2204-arm64-small
     expansions:
@@ -178,19 +188,9 @@ buildvariants:
     tasks:
       - name: .rapid .replicaset
 
-  - name: openssl-rhel
-    display_name: "OpenSSL (RHEL)"
-    run_on:
-      - rhel87-small
-    expansions:
-      OPENSSL: true
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - name: .rapid .replicaset
-
   - name: openssl-macos
     display_name: "OpenSSL (MacOS)"
+    # patchable: false
     run_on:
       - macos-1100
     expansions:
@@ -202,6 +202,7 @@ buildvariants:
 
   - name: openssl-windows
     display_name: "OpenSSL (Windows)"
+    # patchable: false
     run_on:
       - windows-64-vs2017-small
     expansions:
@@ -220,6 +221,7 @@ buildvariants:
 
   - name: compression
     display_name: "Compression"
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -231,6 +233,7 @@ buildvariants:
 
   - name: stable-api
     display_name: "Stable API V1"
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -245,6 +248,7 @@ buildvariants:
 
   - name: sync-api
     display_name: "Sync API"
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -255,6 +259,7 @@ buildvariants:
 
   - name: atlas-connectivity
     display_name: "Atlas Connectivity"
+    # patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -262,6 +267,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
+    # patchable: false
     run_on:
       - ubuntu1804-small
     expansions:
@@ -273,6 +279,7 @@ buildvariants:
 
   - name: azure-kms
     display_name: "Azure KMS"
+    # patchable: false
     run_on:
       # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -286,6 +293,7 @@ buildvariants:
 
   - name: gcp-kms
     display_name: "GCP KMS"
+    # patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -299,6 +307,7 @@ buildvariants:
 
   - name: x509-auth
     display_name: "x509 Authentication"
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -309,6 +318,7 @@ buildvariants:
 
   - name: plain-auth
     display_name: "Plain Authentication"
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -320,6 +330,7 @@ buildvariants:
   - name: serverless
     # TODO: Enable this build variant when the serverless issues are fixed.
     disable: true
+    # patchable: false
     display_name: "Serverless"
     run_on:
       - rhel87-small
@@ -328,6 +339,7 @@ buildvariants:
 
   - name: oidc
     display_name: OIDC
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -349,6 +361,7 @@ buildvariants:
 
   - name: in-use-encryption-disable-crypt-shared
     display_name: "In-Use Encryption (disable crypt_shared)"
+    # patchable: false
     run_on:
       - rhel80-small
     expansions:
@@ -359,8 +372,9 @@ buildvariants:
     tasks:
       - .in-use-encryption
 
-  - name: in-use-encryption-kmip
-    display_name: "In-Use Encryption (KMIP)"
+  - name: in-use-encryption-openssl
+    display_name: "In-Use Encryption (OpenSSL)"
+    # patchable: false
     run_on:
       - rhel80-small
     expansions:
@@ -369,16 +383,24 @@ buildvariants:
       SSL: ssl
       OPENSSL: true
     tasks:
-      - test-in-use-encryption-kmip
+      - test-in-use-encryption-openssl
 
   - name: in-use-encryption-serverless
     # TODO: Enable this build variant when the serverless issues are fixed.
     disable: true
+    # patchable: false
     display_name: In-Use Encryption (Serverless)
     run_on:
       - rhel87-small
     tasks:
       - test-in-use-encryption-serverless
+
+  - name: load-balancer
+    display_name: "Load Balancer"
+    run_on:
+      - rhel87-small
+    tasks:
+      - .load-balancer
 
 ###############
 # Task Groups #
@@ -389,7 +411,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: "fetch source"
-      - func: "create-expansions"
+      - func: "create expansions"
       - func: "prepare resources"
       - func: "windows fix"
       - func: "fix absolute paths"
@@ -581,308 +603,252 @@ tasks:
   - name: test-3.6-standalone
     tags: [3.6, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 3.6
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.0-standalone
     tags: [4.0, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.0
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.2-standalone
     tags: [4.2, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.4-standalone
     tags: [4.4, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-5.0-standalone
     tags: [5.0, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-6.0-standalone
     tags: [6.0, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-7.0-standalone
     tags: [7.0, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-rapid-standalone
     tags: [rapid, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-latest-standalone
     tags: [latest, standalone]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-3.6-replicaset
     tags: [3.6, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 3.6
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.0-replicaset
     tags: [4.0, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.2-replicaset
     tags: [4.2, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.4-replicaset
     tags: [4.4, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-5.0-replicaset
     tags: [5.0, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-6.0-replicaset
     tags: [6.0, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-7.0-replicaset
     tags: [7.0, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-rapid-replicaset
     tags: [rapid, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-latest-replicaset
     tags: [latest, replicaset]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-3.6-sharded
     tags: [3.6, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 3.6
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.0-sharded
     tags: [4.0, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.0
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.2-sharded
     tags: [4.2, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-4.4-sharded
     tags: [4.4, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-5.0-sharded
     tags: [5.0, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-6.0-sharded
     tags: [6.0, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-7.0-sharded
     tags: [7.0, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-rapid-sharded
     tags: [rapid, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-latest-sharded
     tags: [latest, sharded]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: sharded_cluster
-      - func: "generate uris"
       - func: "run driver test suite"
 
   - name: test-compression
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run driver test suite"
         vars:
           COMPRESSION: true
@@ -890,72 +856,61 @@ tasks:
   - name: test-aws-auth-regular-credentials
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "server"
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with regular aws credentials"
   
   - name: test-aws-auth-assume-role-credentials
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with assume role credentials"
 
   - name: test-aws-auth-environment-variables
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "server"
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws credentials as environment variables"
 
   - name: test-aws-auth-environment-variables-session-token
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws credentials and session token as environment variables"
 
   - name: test-aws-auth-ec2
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws EC2 credentials"
 
   - name: test-aws-auth-ecs
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: auth-aws.json
@@ -967,26 +922,22 @@ tasks:
   - name: test-aws-auth-assume-role-with-web-identity
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws assume role with web identity test"
 
   - name: test-aws-auth-assume-role-with-web-identity-session-name
     tags: [aws-auth]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: auth-aws.json
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "add aws auth variables to file"
       - func: "run aws assume role with web identity test"
         vars:
@@ -994,7 +945,6 @@ tasks:
 
   - name: test-atlas-connectivity
     commands:
-      - func: "install junit dependencies"
       - func: "run atlas tests"
 
   - name: test-gcp-kms
@@ -1006,7 +956,7 @@ tasks:
     commands:
       - command: shell.exec
         params:
-          working_dir: "src"
+          working_dir: src
           script: |
             ${PREPARE_SHELL}
             ${AZURE_SHELL}
@@ -1014,50 +964,40 @@ tasks:
 
   - name: test-x509-auth
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run x509 tests"
 
   - name: test-plain-auth
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
-      - func: "generate uris"
       - func: "run plain tests"
 
   - name: test-serverless
     commands:
-      - func: "install junit dependencies"
-      - func: "generate uris"
       - func: "run serverless tests"
 
   - name: test-tokio-sync
     tags: [sync]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run sync tests"
 
   - name: test-async-std-sync
     tags: [sync]
     commands:
-      - func: "install junit dependencies"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run sync tests"
         vars:
           ASYNC_STD: true
@@ -1065,7 +1005,6 @@ tasks:
   - name: test-oidc
     commands:
       - func: bootstrap oidc
-      - func: install junit dependencies
       - func: bootstrap mongo-orchestration
         vars:
           AUTH: auth
@@ -1078,103 +1017,87 @@ tasks:
   - name: test-in-use-encryption-4.2
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-4.4
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-5.0
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-6.0
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-7.0
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-rapid
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-latest
     tags: [in-use-encryption]
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
 
-  - name: test-in-use-encryption-kmip
+  - name: test-in-use-encryption-openssl
     commands:
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "generate uris"
       - func: "run kmip server"
       - func: "run mock azure imds server"
       - func: "run csfle tests"
@@ -1187,11 +1110,65 @@ tasks:
       - command: expansions.update
         params:
           file: serverless-expansion.yml
-      - func: "install junit dependencies"
       - func: "install libmongocrypt"
       - func: "run kmip server"
       - func: "run mock azure imds server"
       - func: "run csfle serverless tests"
+
+  - name: test-load-balancer-5.0
+    tags: [load-balancer]
+    commands:
+      - func: bootstrap mongo-orchestration
+        vars:
+          MONGODB_VERSION: 5.0
+          TOPOLOGY: sharded_cluster
+          LOAD_BALANCER: true
+      - func: start load balancer
+      - func: run driver test suite
+
+  - name: test-load-balancer-6.0
+    tags: [load-balancer]
+    commands:
+      - func: bootstrap mongo-orchestration
+        vars:
+          MONGODB_VERSION: 6.0
+          TOPOLOGY: sharded_cluster
+          LOAD_BALANCER: true
+      - func: start load balancer
+      - func: run driver test suite
+
+  - name: test-load-balancer-7.0
+    tags: [load-balancer]
+    commands:
+      - func: bootstrap mongo-orchestration
+        vars:
+          MONGODB_VERSION: 7.0
+          TOPOLOGY: sharded_cluster
+          LOAD_BALANCER: true
+      - func: start load balancer
+      - func: run driver test suite
+
+  - name: test-load-balancer-rapid
+    tags: [load-balancer]
+    commands:
+      - func: bootstrap mongo-orchestration
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: sharded_cluster
+          LOAD_BALANCER: true
+      - func: start load balancer
+      - func: run driver test suite
+
+  - name: test-load-balancer-latest
+    tags: [load-balancer]
+    commands:
+      - func: bootstrap mongo-orchestration
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: sharded_cluster
+          LOAD_BALANCER: true
+      - func: start load balancer
+      - func: run driver test suite
 
 #############
 # Functions #
@@ -1219,7 +1196,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         silent: true
         script: |
           cat <<EOF > ${DRIVERS_TOOLS}/.evergreen/auth_aws/aws_e2e_setup.json
@@ -1250,8 +1227,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
@@ -1260,7 +1237,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         silent: true
         script: |
           cat <<'EOF' > "${PROJECT_DIRECTORY}/prepare_mongodb_aws.sh"
@@ -1272,7 +1249,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         script: |
           ${PREPARE_SHELL}
           SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
@@ -1281,8 +1258,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
@@ -1291,7 +1268,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         silent: true
         script: |
           # DO NOT ECHO WITH XTRACE (which PREPARE_SHELL does)
@@ -1309,7 +1286,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         script: |
           ${PREPARE_SHELL}
           SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
@@ -1318,8 +1295,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
@@ -1328,7 +1305,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         script: |
           ${PREPARE_SHELL}
           # Write an empty prepare_mongodb_aws so no auth environment variables
@@ -1340,8 +1317,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
@@ -1350,7 +1327,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         silent: true
         script: |
           cat <<'EOF' > "${PROJECT_DIRECTORY}/prepare_mongodb_aws.sh"
@@ -1360,7 +1337,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         script: |
           ${PREPARE_SHELL}
           PROJECT_DIRECTORY=${PROJECT_DIRECTORY} \
@@ -1371,8 +1348,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
@@ -1381,7 +1358,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         silent: true
         script: |
           # DO NOT ECHO WITH XTRACE (which PREPARE_SHELL does)
@@ -1394,7 +1371,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         script: |
           ${PREPARE_SHELL}
           SKIP_CREDENTIAL_CACHING_TESTS=1 .evergreen/run-aws-tests.sh
@@ -1403,8 +1380,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
 
@@ -1439,8 +1416,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
@@ -1449,7 +1426,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         silent: true
         script: |
           # DO NOT ECHO WITH XTRACE (which PREPARE_SHELL does)
@@ -1463,8 +1440,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           PROJECT_DIRECTORY=${PROJECT_DIRECTORY} \
             ASSERT_NO_URI_CREDS=true \
@@ -1474,8 +1451,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
 
@@ -1488,8 +1465,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
 
@@ -1507,7 +1484,7 @@ functions:
   "install rust":
     command: shell.exec
     params:
-      working_dir: "src"
+      working_dir: src
       script: |
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh rust
@@ -1515,7 +1492,7 @@ functions:
   "install libmongocrypt":
     command: shell.exec
     params:
-      working_dir: "src"
+      working_dir: src
       script: |
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh libmongocrypt
@@ -1523,7 +1500,7 @@ functions:
   "install junit dependencies":
     command: shell.exec
     params:
-      working_dir: "src"
+      working_dir: src
       script: |
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh junit-dependencies
@@ -1535,10 +1512,19 @@ functions:
         args:
           - ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
         add_expansions_to_env: true
-    # Add MONGODB_URI to expansions.
     - command: expansions.update
       params:
         file: mo-expansion.yml
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/generate-uri.sh
+        add_expansions_to_env: true
+    - command: expansions.update
+      params:
+        file: src/uri-expansions.yml
 
   "generate uris":
     - command: subprocess.exec
@@ -1590,8 +1576,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
 
@@ -1609,9 +1595,9 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         silent: true
         shell: bash
-        working_dir: "src"
         script: |
           set +x
           export MONGO_ATLAS_TESTS=1
@@ -1635,8 +1621,8 @@ functions:
   "run kmip server":
     - command: shell.exec
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         background: true
         script: |
           ${PREPARE_SHELL}
@@ -1657,7 +1643,7 @@ functions:
     - command: subprocess.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
@@ -1667,8 +1653,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           ${PREPARE_CSFLE}
@@ -1688,8 +1674,8 @@ functions:
   "build and upload gcp kms test":
     - command: shell.exec
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
 
@@ -1722,8 +1708,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
 
@@ -1745,7 +1731,7 @@ functions:
         role_arn: ${aws_test_secrets_role}
     - command: shell.exec
       params:
-        working_dir: "src"
+        working_dir: src
         shell: bash
         script: |
           ${PREPARE_SHELL}
@@ -1764,7 +1750,7 @@ functions:
   "setup oidc":
     - command: shell.exec
       params:
-        working_dir: "src"
+        working_dir: src
         shell: bash
         script: |
           ${PREPARE_SHELL}
@@ -1775,7 +1761,7 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src"
+        working_dir: src
         shell: bash
         script: |
           ${PREPARE_SHELL}
@@ -1786,8 +1772,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
@@ -1796,8 +1782,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-cargo-deny.sh
@@ -1806,8 +1792,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-rustfmt.sh
@@ -1816,8 +1802,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-clippy.sh
@@ -1826,8 +1812,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-rustdoc.sh
@@ -1836,8 +1822,8 @@ functions:
     - command: shell.exec
       type: test
       params:
+        working_dir: src
         shell: bash
-        working_dir: "src"
         script: |
           ${PREPARE_SHELL}
           .evergreen/install-dependencies.sh mdbook

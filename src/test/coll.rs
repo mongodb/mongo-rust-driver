@@ -107,11 +107,6 @@ async fn insert_err_details() {
 async fn count() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    crate::test::log_uncaptured(format!(
-        "uri in count: {}",
-        std::env::var("MONGODB_URI").unwrap()
-    ));
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())

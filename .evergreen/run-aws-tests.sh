@@ -38,8 +38,6 @@ fi
 # show test output
 set -x
 
-echo "uri length: ${#MONGODB_URI}"
-
 set -o errexit
 
 source .evergreen/env.sh

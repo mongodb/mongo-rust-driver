@@ -193,8 +193,6 @@ impl TestClient {
     }
 
     async fn from_client(client: Client) -> Self {
-        log_uncaptured(format!("client options: {:?}", client.options()));
-
         let hello = hello_command(
             client.options().server_api.as_ref(),
             client.options().load_balanced,

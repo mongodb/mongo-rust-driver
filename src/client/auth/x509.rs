@@ -63,8 +63,6 @@ pub(super) async fn authenticate_stream(
         .and_then(crate::bson_util::get_int)
         != Some(1)
     {
-        #[cfg(test)]
-        crate::test::log_uncaptured(format!("{}", server_response));
         return Err(Error::authentication_error(
             "MONGODB-X509",
             "Authentication failed",

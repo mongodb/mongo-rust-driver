@@ -191,38 +191,33 @@ impl AwsCredential {
             .map(|s| s.to_string())
             .or_else(|| std::env::var("AWS_SESSION_TOKEN").ok());
 
-        match (access_key, secret_key, session_token) {
-            (Some(access_key), Some(secret_key), session_token) => {
-                #[cfg(test)]
-                crate::test::log_uncaptured(format!(
-                    "access key len: {}, secret key len: {}",
-                    access_key.len(),
-                    secret_key.len()
-                ));
-                return Ok(Self {
-                    access_key_id: access_key,
-                    secret_access_key: secret_key,
-                    session_token,
-                    expiration: None,
-                });
-            }
-            (Some(_), None, _) | (None, Some(_), _) => {
-                return Err(Error::authentication_error(
-                    MECH_NAME,
-                    "cannot specify only one of access key and secret key; either both or neither \
-                     must be provided",
-                ));
-            }
-            (_, _, Some(_)) => {
-                return Err(Error::authentication_error(
-                    MECH_NAME,
-                    "cannot specify session token without both access key and secret key",
-                ));
-            }
-            _ => {
-                #[cfg(test)]
-                crate::test::log_uncaptured("no vars");
-            }
+        let found_access_key = access_key.is_some();
+        let found_secret_key = secret_key.is_some();
+
+        // If we have an access key and secret key, we can continue with the credentials we've
+        // found.
+        if let (Some(access_key), Some(secret_key)) = (access_key, secret_key) {
+            return Ok(Self {
+                access_key_id: access_key,
+                secret_access_key: secret_key,
+                session_token,
+                expiration: None,
+            });
+        }
+
+        if found_access_key || found_secret_key {
+            return Err(Error::authentication_error(
+                MECH_NAME,
+                "cannot specify only one of access key and secret key; either both or neither \
+                 must be provided",
+            ));
+        }
+
+        if session_token.is_some() {
+            return Err(Error::authentication_error(
+                MECH_NAME,
+                "cannot specify session token without both access key and secret key",
+            ));
         }
 
         if let (Ok(token_file), Ok(role_arn)) = (
