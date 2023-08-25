@@ -9,10 +9,10 @@ source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
 if [ "$ASYNC_STD" = true ]; then
-    CARGO_OPTIONS+=("--no-default-features")
-    FEATURE_FLAGS+=("sync")
+  CARGO_OPTIONS+=("--no-default-features")
+  FEATURE_FLAGS+=("sync")
 else
-    FEATURE_FLAGS+=("tokio-sync")
+  FEATURE_FLAGS+=("tokio-sync")
 fi
 
 echo "cargo test options: $(cargo_test_options)"

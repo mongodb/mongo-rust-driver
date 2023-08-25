@@ -17,13 +17,13 @@ cd -
 FEATURE_FLAGS+=("in-use-encryption-unstable" "aws-auth" "azure-kms")
 
 if [[ "$OPENSSL" = true ]]; then
-    FEATURE_FLAGS+=("openssl-tls")
+  FEATURE_FLAGS+=("openssl-tls")
 fi
 
 if [ "$OS" = "Windows_NT" ]; then
-    export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
-    export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)
-    export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
+  export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
+  export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)
+  export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
 export AWS_DEFAULT_REGION=us-east-1

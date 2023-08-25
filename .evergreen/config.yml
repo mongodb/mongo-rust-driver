@@ -138,7 +138,7 @@ buildvariants:
       SSL: ssl
     tasks:
       - name: .rapid .replicaset
-  
+
   - name: async-std-macos
     display_name: "async-std Runtime (MacOS)"
     run_on:
@@ -149,7 +149,7 @@ buildvariants:
       SSL: ssl
     tasks:
       - name: .rapid .replicaset
-  
+
   - name: async-std-windows
     display_name: "async-std Runtime (Windows)"
     run_on:
@@ -449,7 +449,7 @@ task_groups:
 
     tasks:
       - "test-serverless"
-  
+
   - name: azure-kms-task-group
     setup_group_can_fail_task: true
     setup_group_timeout_secs: 1800 # 30 minutes
@@ -491,12 +491,12 @@ task_groups:
         params:
           shell: bash
           script: |-
-              cat <<EOT > azure_shell.yml
-              AZURE_SHELL: |
-                export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
-                export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
-                export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
-              EOT
+            cat <<EOT > azure_shell.yml
+            AZURE_SHELL: |
+              export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
+              export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+              export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
+            EOT
       - command: expansions.update
         params:
           file: azure_shell.yml
@@ -558,7 +558,6 @@ task_groups:
             $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/delete-instance.sh
     tasks:
       - test-gcp-kms
-
 
 #########
 # Tasks #
@@ -863,7 +862,7 @@ tasks:
           TOPOLOGY: "server"
       - func: "add aws auth variables to file"
       - func: "run aws auth test with regular aws credentials"
-  
+
   - name: test-aws-auth-assume-role-credentials
     tags: [aws-auth]
     commands:
@@ -1191,7 +1190,7 @@ functions:
     - command: expansions.update
       params:
         file: src/expansion.yml
-  
+
   "add aws auth variables to file":
     - command: shell.exec
       type: test

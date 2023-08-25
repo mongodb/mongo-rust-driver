@@ -14,13 +14,13 @@ set +x
 set -o errexit
 
 if [[ -z "$TAG" ]]; then
-	>&2 echo "\$TAG must be set to the git tag of the release"
-	exit 1
+  echo >&2 "\$TAG must be set to the git tag of the release"
+  exit 1
 fi
 
 if [[ -z "$TOKEN" ]]; then
-	>&2 echo "\$TOKEN must be set to the crates.io authentication token"
-	exit 1
+  echo >&2 "\$TOKEN must be set to the crates.io authentication token"
+  exit 1
 fi
 
 git fetch origin tag $TAG --no-tags

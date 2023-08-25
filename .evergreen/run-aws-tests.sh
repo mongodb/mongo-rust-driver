@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o xtrace
-set -o errexit  # Exit the script with error if any of the commands fail
+set -o errexit # Exit the script with error if any of the commands fail
 
 ############################################
 #            Main Program                  #
@@ -23,16 +23,16 @@ shopt -s expand_aliases # needed for `urlencode` alias
 MONGODB_URI=${MONGODB_URI:-"mongodb://localhost"}
 MONGODB_URI="${MONGODB_URI}/aws?authMechanism=MONGODB-AWS"
 if [[ -n ${SESSION_TOKEN} ]]; then
-    MONGODB_URI="${MONGODB_URI}&authMechanismProperties=AWS_SESSION_TOKEN:${SESSION_TOKEN}"
+  MONGODB_URI="${MONGODB_URI}&authMechanismProperties=AWS_SESSION_TOKEN:${SESSION_TOKEN}"
 fi
 
 export MONGODB_URI="$MONGODB_URI"
 
 if [ "$ASSERT_NO_URI_CREDS" = "true" ]; then
-    if echo "$MONGODB_URI" | grep -q "@"; then
-        echo "MONGODB_URI unexpectedly contains user credentials!";
-        exit 1
-    fi
+  if echo "$MONGODB_URI" | grep -q "@"; then
+    echo "MONGODB_URI unexpectedly contains user credentials!"
+    exit 1
+  fi
 fi
 
 # show test output
