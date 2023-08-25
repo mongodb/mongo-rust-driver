@@ -34,8 +34,8 @@ post:
   - func: "upload-mo-artifacts"
   - func: "cleanup"
 
-# Cause a timeout if a task does not complete within an hour.
-exec_timeout_secs: 3600
+# Cause a timeout if a task does not complete within 90 minutes. TODO RUST-1721: reduce this.
+exec_timeout_secs: 5400
 # What to do if the timeout is hit. Post-task functions will still run.
 timeout:
   - command: shell.exec
@@ -95,7 +95,6 @@ buildvariants:
     run_on:
       - macos-1100
     expansions:
-      SINGLE_THREAD: true
       AUTH: auth
       SSL: ssl
     tasks:
