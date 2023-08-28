@@ -28,7 +28,7 @@ impl<'a, T: Serialize> UpdateOrReplace<'a, T> {
                 UpdateModifications::Document(document) => {
                     Ok(RawDocumentBuf::from_document(document)?.into())
                 }
-                UpdateModifications::Pipeline(pipeline) => bson_util::to_raw_bson_array(&pipeline),
+                UpdateModifications::Pipeline(pipeline) => bson_util::to_raw_bson_array(pipeline),
             },
             Self::Replacement(replacement) => {
                 let replacement_doc =
