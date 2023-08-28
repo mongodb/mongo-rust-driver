@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use bson::serde_helpers;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, serde_helpers, Bson, Document, RawBson, RawDocumentBuf},
     concern::{ReadConcern, WriteConcern},
+    error::Result,
     options::Collation,
     selection_criteria::SelectionCriteria,
     serde_util,
@@ -74,11 +74,19 @@ pub enum Hint {
 }
 
 impl Hint {
+    #[cfg(test)]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
             Hint::Keys(ref d) => Bson::Document(d.clone()),
             Hint::Name(ref s) => Bson::String(s.clone()),
         }
+    }
+
+    pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
+        Ok(match self {
+            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::from_document(&d)?),
+            Hint::Name(ref s) => RawBson::String(s.clone()),
+        })
     }
 }
 
@@ -174,17 +182,6 @@ pub enum UpdateModifications {
     Pipeline(Vec<Document>),
 }
 
-impl UpdateModifications {
-    pub(crate) fn to_bson(&self) -> Bson {
-        match self {
-            UpdateModifications::Document(ref d) => Bson::Document(d.clone()),
-            UpdateModifications::Pipeline(ref p) => {
-                Bson::Array(p.iter().map(|d| Bson::Document(d.clone())).collect())
-            }
-        }
-    }
-}
-
 impl From<Document> for UpdateModifications {
     fn from(item: Document) -> Self {
         UpdateModifications::Document(item)
@@ -201,7 +198,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]

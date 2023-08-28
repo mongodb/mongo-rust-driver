@@ -15,7 +15,7 @@ use serde::{
 
 use self::options::*;
 use crate::{
-    bson::{doc, to_document_with_options, Bson, Document, SerializerOptions},
+    bson::{doc, Bson, Document},
     bson_util,
     change_stream::{
         event::ChangeStreamEvent,
@@ -753,7 +753,14 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new(self.namespace(), query, update, true, options);
+        let update = Update::new_update(
+            self.namespace(),
+            query,
+            update,
+            true,
+            options,
+            self.inner.human_readable_serialization,
+        );
         self.client().execute_operation(update, session).await
     }
 
@@ -806,7 +813,14 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new(self.namespace(), query, update, false, options);
+        let update = Update::new_update(
+            self.namespace(),
+            query,
+            update,
+            false,
+            options,
+            self.inner.human_readable_serialization,
+        );
         self.client().execute_operation(update, session).await
     }
 
@@ -1018,7 +1032,7 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let op = FindAndModify::<T>::with_delete(self.namespace(), filter, options);
+        let op = FindAndModify::with_delete(self.namespace(), filter, options);
         self.client().execute_operation(op, session).await
     }
 
@@ -1067,7 +1081,7 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let op = FindAndModify::<T>::with_update(self.namespace(), filter, update, options)?;
+        let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
         self.client().execute_operation(op, session).await
     }
 
@@ -1123,18 +1137,16 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
         let mut options = options.into();
-        let replacement = to_document_with_options(
-            replacement.borrow(),
-            SerializerOptions::builder()
-                .human_readable(self.inner.human_readable_serialization)
-                .build(),
-        )?;
-
         let session = session.into();
-
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
+        let op = FindAndModify::with_replace(
+            self.namespace(),
+            filter,
+            replacement.borrow(),
+            options,
+            self.inner.human_readable_serialization,
+        )?;
         self.client().execute_operation(op, session).await
     }
 
@@ -1395,25 +1407,18 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
         let mut options = options.into();
-        let replacement = to_document_with_options(
-            replacement.borrow(),
-            SerializerOptions::builder()
-                .human_readable(self.inner.human_readable_serialization)
-                .build(),
-        )?;
-
-        bson_util::replacement_document_check(&replacement)?;
 
         let session = session.into();
 
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new(
+        let update = Update::new_replace(
             self.namespace(),
             query,
-            UpdateModifications::Document(replacement),
+            replacement.borrow(),
             false,
             options.map(UpdateOptions::from_replace_options),
+            self.inner.human_readable_serialization,
         );
         self.client().execute_operation(update, session).await
     }

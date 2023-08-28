@@ -3,10 +3,8 @@ use std::{
     io::{Read, Write},
 };
 
-use bson::RawBsonRef;
-
 use crate::{
-    bson::{Bson, Document},
+    bson::{Bson, Document, RawArrayBuf, RawBson, RawBsonRef, RawDocumentBuf},
     error::{ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
@@ -48,6 +46,14 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
     Bson::Array(docs.iter().map(|doc| Bson::Document(doc.clone())).collect())
 }
 
+pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
+    let mut array = RawArrayBuf::new();
+    for doc in docs {
+        array.push(RawDocumentBuf::from_document(doc)?);
+    }
+    Ok(RawBson::Array(array))
+}
+
 #[cfg(test)]
 pub(crate) fn sort_document(document: &mut Document) {
     let temp = std::mem::take(document);
@@ -62,11 +68,11 @@ pub(crate) fn first_key(document: &Document) -> Option<&str> {
     document.keys().next().map(String::as_str)
 }
 
-pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
-    match first_key(replacement) {
-        Some(s) if !s.starts_with('$') => Ok(()),
+pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
+    match replacement.iter().next().transpose()? {
+        Some((key, _)) if !key.starts_with('$') => Ok(()),
         _ => Err(ErrorKind::InvalidArgument {
-            message: "replace document must have first key not starting with '$".to_string(),
+            message: "replace document must have first key not starting with '$'".to_string(),
         }
         .into()),
     }

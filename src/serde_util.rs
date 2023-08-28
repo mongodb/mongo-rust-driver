@@ -1,9 +1,10 @@
 use std::time::Duration;
 
+use bson::SerializerOptions;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, RawDocumentBuf},
     bson_util::get_u64,
     error::{Error, Result},
 };
@@ -124,10 +125,6 @@ pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
         .serialize(serializer)
 }
 
-pub(crate) fn serialize_true<S: Serializer>(s: S) -> std::result::Result<S::Ok, S::Error> {
-    s.serialize_bool(true)
-}
-
 #[cfg(feature = "aws-auth")]
 pub(crate) fn deserialize_datetime_option_from_double_or_string<'de, D>(
     deserializer: D,
@@ -152,6 +149,22 @@ where
     };
 
     Ok(Some(date_time))
+}
+
+pub(crate) fn to_raw_document_buf_with_options<T: Serialize>(
+    doc: &T,
+    human_readable_serialization: bool,
+) -> Result<RawDocumentBuf> {
+    let raw_doc = if human_readable_serialization {
+        let doc = bson::to_document_with_options(
+            doc,
+            SerializerOptions::builder().human_readable(true).build(),
+        )?;
+        RawDocumentBuf::from_document(&doc)?
+    } else {
+        bson::to_raw_document_buf(doc)?
+    };
+    Ok(raw_doc)
 }
 
 #[cfg(test)]
