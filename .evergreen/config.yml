@@ -268,6 +268,7 @@ buildvariants:
     display_name: "AWS Authentication"
     # patchable: false
     run_on:
+      # Use ubuntu1804. AWS tasks require legacy `mongo` shell. Legacy `mongo` shell is not available on newer distros.
       - ubuntu1804-small
     expansions:
       AUTH: auth
@@ -284,8 +285,6 @@ buildvariants:
       - debian11-small
     expansions:
       LIBMONGOCRYPT_OS: "debian11"
-      AUTH: auth
-      SSL: ssl
     tasks:
       - name: azure-kms-task-group
     batchtime: 20160
@@ -298,8 +297,6 @@ buildvariants:
       - debian11-small
     expansions:
       LIBMONGOCRYPT_OS: "debian11"
-      AUTH: auth
-      SSL: ssl
     tasks:
       - name: gcp-kms-task-group
     batchtime: 20160
