@@ -324,7 +324,7 @@ buildvariants:
       - test-plain-auth
 
   - name: serverless
-    # TODO: Enable this build variant when the serverless issues are fixed.
+    # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
     disable: true
     # patchable: false
     display_name: "Serverless"
@@ -365,7 +365,6 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
-      SESSION_TEST_REQUIRE_MONGOCRYPTD: true
     tasks:
       - .in-use-encryption
 
@@ -383,7 +382,7 @@ buildvariants:
       - test-in-use-encryption-openssl
 
   - name: in-use-encryption-serverless
-    # TODO: Enable this build variant when the serverless issues are fixed.
+    # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
     disable: true
     # patchable: false
     display_name: In-Use Encryption (Serverless)
@@ -1552,6 +1551,7 @@ functions:
           - COMPRESSION
           - MONGODB_URI
           - MONGODB_API_VERSION
+          - PATH
 
   "run sync tests":
     - command: subprocess.exec
