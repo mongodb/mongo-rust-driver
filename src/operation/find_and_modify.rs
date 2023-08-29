@@ -29,10 +29,7 @@ use crate::{
     options::WriteConcern,
 };
 
-pub(crate) struct FindAndModify<'a, R, T = Document>
-where
-    T: DeserializeOwned,
-{
+pub(crate) struct FindAndModify<'a, R, T: DeserializeOwned> {
     ns: Namespace,
     query: Document,
     modification: Modification<'a, R>,

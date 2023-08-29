@@ -198,7 +198,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]

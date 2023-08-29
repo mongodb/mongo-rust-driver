@@ -65,7 +65,7 @@ pub(crate) struct Update<'a, T> {
 impl Update<'_, ()> {
     #[cfg(test)]
     fn empty() -> Self {
-        Self::new_update(
+        Self::with_update(
             Namespace::new("db", "coll"),
             doc! {},
             UpdateModifications::Document(doc! {}),
@@ -75,7 +75,7 @@ impl Update<'_, ()> {
         )
     }
 
-    pub(crate) fn new_update(
+    pub(crate) fn with_update(
         ns: Namespace,
         filter: Document,
         update: UpdateModifications,
@@ -87,7 +87,7 @@ impl Update<'_, ()> {
             ns,
             filter,
             update: update.into(),
-            multi: if multi { Some(true) } else { None },
+            multi: multi.then_some(true),
             options,
             human_readable_serialization,
         }
@@ -95,7 +95,7 @@ impl Update<'_, ()> {
 }
 
 impl<'a, T: Serialize> Update<'a, T> {
-    pub(crate) fn new_replace(
+    pub(crate) fn with_replace(
         ns: Namespace,
         filter: Document,
         update: &'a T,
@@ -107,7 +107,7 @@ impl<'a, T: Serialize> Update<'a, T> {
             ns,
             filter,
             update: update.into(),
-            multi: if multi { Some(true) } else { None },
+            multi: multi.then_some(true),
             options,
             human_readable_serialization,
         }

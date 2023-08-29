@@ -753,7 +753,7 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new_update(
+        let update = Update::with_update(
             self.namespace(),
             query,
             update,
@@ -813,7 +813,7 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new_update(
+        let update = Update::with_update(
             self.namespace(),
             query,
             update,
@@ -1412,7 +1412,7 @@ where
 
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new_replace(
+        let update = Update::with_replace(
             self.namespace(),
             query,
             replacement.borrow(),
