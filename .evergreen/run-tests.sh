@@ -6,42 +6,31 @@ set -o pipefail
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-use_async_runtime
+FEATURE_FLAGS+=("tracing-unstable")
 
-FEATURE_FLAGS+=("tracing-unstable" "${TLS_FEATURE}")
-
-if [ "$SNAPPY_COMPRESSION_ENABLED" = true ]; then
-	FEATURE_FLAGS+=("snappy-compression")
-fi
-if [ "$ZLIB_COMPRESSION_ENABLED" = true ]; then
-	FEATURE_FLAGS+=("zlib-compression")
-fi
-if [ "$ZSTD_COMPRESSION_ENABLED" = true ]; then
-	FEATURE_FLAGS+=("zstd-compression")
+if [ "$ASYNC_STD" = true ]; then
+  CARGO_OPTIONS+=("--no-default-features")
+  FEATURE_FLAGS+=("async-std-runtime")
 fi
 
-SYNC_FEATURE=""
-if [ "$ASYNC_RUNTIME" = "tokio" ]; then
-    SYNC_FEATURE="tokio-sync"
-elif [ "$ASYNC_RUNTIME" = "async-std" ]; then
-    SYNC_FEATURE="sync"
-else
-    echo "invalid async runtime: ${ASYNC_RUNTIME}" >&2
-    exit 1
+if [ "$OPENSSL" = true ]; then
+  FEATURE_FLAGS+=("openssl-tls")
 fi
+
+if [ "$COMPRESSION" = true ]; then
+  FEATURE_FLAGS+=("snappy-compression", "zlib-compression", "zstd-compression")
+fi
+
+export SESSION_TEST_REQUIRE_MONGOCRYPTD=true
 
 echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
 
-cargo_test "" async-tests.xml
-FEATURE_FLAGS+=("${SYNC_FEATURE}")
-cargo_test sync sync-tests.xml
-
-junit-report-merger results.xml async-tests.xml sync-tests.xml
+cargo_test "" results.xml
 
 # cargo-nextest doesn't support doc tests
 RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)
-(( CARGO_RESULT = ${CARGO_RESULT} || $? ))
+((CARGO_RESULT = ${CARGO_RESULT} || $?))
 
 exit $CARGO_RESULT

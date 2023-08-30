@@ -24,6 +24,7 @@ use crate::{
         SdamEvent,
         CLIENT_OPTIONS,
         LOCK,
+        SERVER_API,
     },
     Client,
     ServerType,
@@ -376,6 +377,12 @@ async fn auth_test_uri(
     mechanism: Option<AuthMechanism>,
     should_succeed: bool,
 ) {
+    // A server API version cannot be set in the connection string.
+    if SERVER_API.is_some() {
+        log_uncaptured("Skipping URI auth test due to server API version being set");
+        return;
+    }
+
     let host = CLIENT_OPTIONS
         .get()
         .await
