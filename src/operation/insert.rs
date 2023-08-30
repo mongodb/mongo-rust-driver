@@ -19,6 +19,7 @@ use crate::{
     },
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
+    serde_util,
     Namespace,
 };
 
@@ -86,10 +87,8 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
             .take(description.max_write_batch_size as usize)
             .enumerate()
         {
-            let mut doc = crate::serde_util::to_raw_document_buf_with_options(
-                d,
-                self.human_readable_serialization,
-            )?;
+            let mut doc =
+                serde_util::to_raw_document_buf_with_options(d, self.human_readable_serialization)?;
             let id = match doc.get("_id")? {
                 Some(b) => b.try_into()?,
                 None => {

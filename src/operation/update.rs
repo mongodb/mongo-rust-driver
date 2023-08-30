@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub(crate) enum UpdateOrReplace<'a, T> {
+pub(crate) enum UpdateOrReplace<'a, T = ()> {
     UpdateModifications(UpdateModifications),
     Replacement(&'a T),
 }
@@ -40,7 +40,7 @@ impl<'a, T: Serialize> UpdateOrReplace<'a, T> {
     }
 }
 
-impl<'a> From<UpdateModifications> for UpdateOrReplace<'a, ()> {
+impl From<UpdateModifications> for UpdateOrReplace<'_> {
     fn from(update_modifications: UpdateModifications) -> Self {
         Self::UpdateModifications(update_modifications)
     }
@@ -53,7 +53,7 @@ impl<'a, T: Serialize> From<&'a T> for UpdateOrReplace<'a, T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Update<'a, T> {
+pub(crate) struct Update<'a, T = ()> {
     ns: Namespace,
     filter: Document,
     update: UpdateOrReplace<'a, T>,
@@ -62,7 +62,7 @@ pub(crate) struct Update<'a, T> {
     human_readable_serialization: bool,
 }
 
-impl Update<'_, ()> {
+impl Update<'_> {
     #[cfg(test)]
     fn empty() -> Self {
         Self::with_update(
