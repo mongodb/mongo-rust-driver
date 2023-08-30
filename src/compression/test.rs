@@ -9,10 +9,8 @@ use bson::{doc, Bson};
 use crate::{
     client::options::ClientOptions,
     compression::{Compressor, CompressorId, Decoder},
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
+    test::{TestClient, CLIENT_OPTIONS},
 };
-
-use tokio::sync::RwLockReadGuard;
 
 #[cfg(feature = "zlib-compression")]
 #[test]

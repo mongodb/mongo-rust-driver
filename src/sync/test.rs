@@ -6,7 +6,6 @@ use std::{
 use lazy_static::lazy_static;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Document},
@@ -22,7 +21,7 @@ use crate::{
     },
     runtime,
     sync::{Client, ClientSession, Collection},
-    test::{TestClient as AsyncTestClient, LOCK},
+    test::TestClient as AsyncTestClient,
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
