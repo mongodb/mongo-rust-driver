@@ -9,7 +9,7 @@ use std::{
 use derive_more::From;
 use serde::Serialize;
 use time::OffsetDateTime;
-use tokio::sync::{broadcast::error::SendError, RwLockReadGuard};
+use tokio::sync::broadcast::error::SendError;
 
 use super::{subscriber::EventSubscriber, TestClient, TestClientBuilder};
 use crate::{
@@ -52,7 +52,7 @@ use crate::{
     },
     options::ClientOptions,
     runtime,
-    test::{spec::ExpectedEventType, LOCK},
+    test::spec::ExpectedEventType,
     Client,
 };
 
@@ -693,8 +693,6 @@ impl EventClient {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_started_event_count() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     let coll = client.database("foo").collection("bar");
 

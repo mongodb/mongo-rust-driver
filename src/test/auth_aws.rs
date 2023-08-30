@@ -1,16 +1,12 @@
 use std::env::{remove_var, set_var, var};
 
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
-
 use crate::{bson::Document, client::auth::aws::test_utils::*, test::DEFAULT_URI, Client};
 
-use super::{TestClient, LOCK};
+use super::TestClient;
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn auth_aws() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
 
@@ -30,8 +26,6 @@ async fn credential_caching() {
     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
         return;
     }
-
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     clear_cached_credential().await;
 
@@ -73,8 +67,6 @@ async fn credential_caching_environment_vars() {
     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
         return;
     }
-
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     clear_cached_credential().await;
 

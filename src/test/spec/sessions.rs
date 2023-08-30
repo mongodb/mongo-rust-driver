@@ -5,7 +5,6 @@ use std::{
 
 use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, Document},
@@ -21,7 +20,6 @@ use crate::{
         EventClient,
         TestClient,
         CLIENT_OPTIONS,
-        LOCK,
     },
     Client,
 };
@@ -29,8 +27,6 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     // TODO RUST-1414: unskip this file
     let mut skipped_files = vec!["implicit-sessions-default-causal-consistency.json"];
     let client = TestClient::new().await;
@@ -60,8 +56,6 @@ async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn explicit_session_created_on_same_client() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let client0 = TestClient::new().await;
     let client1 = TestClient::new().await;
 
@@ -108,7 +102,6 @@ async fn implicit_session_after_connection() {
         }
     }
 
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
     let event_handler = Arc::new(EventHandler {
         lsids: Mutex::new(vec![]),
     });
@@ -236,8 +229,6 @@ async fn clean_up_mongocryptd(mut process: Process, name: &str) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sessions_not_supported_implicit_session_ignored() {
-    let _guard = LOCK.run_exclusively().await;
-
     let name = "sessions_not_supported_implicit_session_ignored";
 
     let Some((client, process)) = spawn_mongocryptd(name).await else {
@@ -282,8 +273,6 @@ async fn sessions_not_supported_implicit_session_ignored() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sessions_not_supported_explicit_session_error() {
-    let _guard = LOCK.run_exclusively().await;
-
     let name = "sessions_not_supported_explicit_session_error";
 
     let Some((client, process)) = spawn_mongocryptd(name).await else {

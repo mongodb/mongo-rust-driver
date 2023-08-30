@@ -5,7 +5,6 @@ use futures::stream::{StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, to_document, Bson, Document},
@@ -34,7 +33,6 @@ use crate::{
         log_uncaptured,
         util::{drop_collection, EventClient, TestClient},
         CLIENT_OPTIONS,
-        LOCK,
     },
     Collection,
     IndexModel,
@@ -44,8 +42,6 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn insert_err_details() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -105,8 +101,6 @@ async fn insert_err_details() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn count() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -129,8 +123,6 @@ async fn count() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -157,8 +149,6 @@ async fn find() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn update() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -197,8 +187,6 @@ async fn update() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn delete() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -223,8 +211,6 @@ async fn delete() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn aggregate_out() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
@@ -279,8 +265,6 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn kill_cursors_on_drop() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
@@ -317,8 +301,6 @@ async fn kill_cursors_on_drop() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
@@ -410,8 +392,6 @@ async fn large_insert() {
         return;
     }
 
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let docs = vec![LARGE_DOC.clone(); 35000];
 
     let client = TestClient::new().await;
@@ -460,8 +440,6 @@ async fn large_insert_unordered_with_errors() {
         return;
     }
 
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let docs = multibatch_documents_with_duplicate_keys();
 
     let client = TestClient::new().await;
@@ -501,8 +479,6 @@ async fn large_insert_ordered_with_errors() {
         return;
     }
 
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let docs = multibatch_documents_with_duplicate_keys();
 
     let client = TestClient::new().await;
@@ -539,8 +515,6 @@ async fn large_insert_ordered_with_errors() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn empty_insert() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .database(function_name!())
@@ -579,8 +553,6 @@ async fn find_allow_disk_use_not_specified() {
 
 #[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let event_client = EventClient::new().await;
     if event_client.server_version_lt(4, 3) {
         log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
@@ -602,8 +574,6 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn ns_not_found_suppression() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client.get_coll(function_name!(), function_name!());
     coll.drop(None).await.expect("drop should not fail");
@@ -611,8 +581,6 @@ async fn ns_not_found_suppression() {
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     let coll = client.database(name).collection::<Document>(name);
     let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
@@ -657,7 +625,6 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
     let req = VersionReq::parse(">= 4.2").unwrap();
@@ -708,8 +675,6 @@ async fn find_one_and_delete_hint_not_specified() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find_one_and_delete_hint_server_version() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     let coll = client
         .database(function_name!())
@@ -737,8 +702,6 @@ async fn find_one_and_delete_hint_server_version() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
@@ -776,7 +739,6 @@ struct UserType {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn typed_insert_one() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
 
     let coll = client
@@ -823,8 +785,6 @@ where
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn typed_insert_many() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
@@ -857,8 +817,6 @@ async fn typed_insert_many() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn typed_find_one_and_replace() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
@@ -889,8 +847,6 @@ async fn typed_find_one_and_replace() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn typed_replace_one() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
@@ -917,8 +873,6 @@ async fn typed_replace_one() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn typed_returns() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
@@ -955,8 +909,6 @@ async fn typed_returns() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn count_documents_with_wc() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let mut options = CLIENT_OPTIONS.get().await.clone();
     options.write_concern = WriteConcern::builder()
         .w(Acknowledgment::Majority)
@@ -980,8 +932,6 @@ async fn count_documents_with_wc() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn collection_options_inherited() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     let read_concern = ReadConcern::majority();
@@ -1021,8 +971,6 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn drop_skip_serializing_none() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll: Collection<Document> = client
         .database(function_name!())
@@ -1035,8 +983,6 @@ async fn drop_skip_serializing_none() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn collection_generic_bounds() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     #[derive(Deserialize)]
     struct Foo;
 
@@ -1063,8 +1009,6 @@ async fn collection_generic_bounds() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn cursor_batch_size() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll("cursor_batch_size", "cursor_batch_size")
@@ -1107,8 +1051,6 @@ async fn cursor_batch_size() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid_utf8_response() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .init_db_and_coll("invalid_uft8_handling", "invalid_uft8_handling")

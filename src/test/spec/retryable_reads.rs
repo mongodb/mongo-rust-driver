@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use bson::doc;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     error::Result,
@@ -21,21 +20,18 @@ use crate::{
         FailPointMode,
         TestClient,
         CLIENT_OPTIONS,
-        LOCK,
     },
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_v2_tests(&["retryable-reads", "legacy"]).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["retryable-reads", "unified"]).await;
 }
 
@@ -44,8 +40,6 @@ async fn run_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_releases_connection() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
@@ -78,8 +72,6 @@ async fn retry_releases_connection() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_read_pool_cleared() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let handler = Arc::new(EventHandler::new());
 
     let mut client_options = CLIENT_OPTIONS.get().await.clone();

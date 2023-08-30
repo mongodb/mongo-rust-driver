@@ -3,13 +3,12 @@ mod aggregation_data;
 use bson::Document;
 use futures::TryStreamExt;
 use semver::Version;
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
     error::Result,
     options::{ClientOptions, FindOptions, ServerApi, ServerApiVersion},
-    test::{log_uncaptured, TestClient, DEFAULT_URI, LOCK},
+    test::{log_uncaptured, TestClient, DEFAULT_URI},
     Client,
     Collection,
 };
@@ -1904,8 +1903,6 @@ async fn convenient_transaction_examples() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let coll = client
         .database("documentation_examples")

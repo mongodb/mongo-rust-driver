@@ -1,11 +1,8 @@
-use tokio::sync::RwLockWriteGuard;
-
-use crate::test::{spec::unified_runner::run_unified_tests, LOCK};
+use crate::test::spec::unified_runner::run_unified_tests;
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["crud", "unified"])
         .skip_files(&[
             // The Rust driver does not support unacknowledged writes (and does not intend to in

@@ -9,10 +9,8 @@ use bson::{doc, Bson};
 use crate::{
     client::options::ClientOptions,
     compression::{Compressor, CompressorId, Decoder},
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
+    test::{TestClient, CLIENT_OPTIONS},
 };
-
-use tokio::sync::RwLockReadGuard;
 
 #[cfg(feature = "zlib-compression")]
 #[test]
@@ -110,7 +108,6 @@ async fn ping_server_with_all_compressors() {
 }
 
 async fn send_ping_with_compression(client_options: ClientOptions) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::with_options(Some(client_options)).await;
     let ret = client
         .database("admin")

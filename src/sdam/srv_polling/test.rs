@@ -1,7 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
 use pretty_assertions::assert_eq;
-use tokio::sync::RwLockReadGuard;
 
 use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
     options::{ClientOptions, ServerAddress},
     runtime,
     sdam::Topology,
-    test::{log_uncaptured, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, CLIENT_OPTIONS},
 };
 
 fn localhost_test_build_10gen(port: u16) -> ServerAddress {
@@ -27,8 +26,6 @@ lazy_static::lazy_static! {
 }
 
 async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
     options.test_options_mut().disable_monitoring_threads = true;
@@ -117,8 +114,6 @@ async fn no_results() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced_no_srv_polling() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     if CLIENT_OPTIONS.get().await.load_balanced != Some(true) {
         log_uncaptured("skipping load_balanced_no_srv_polling due to not load balanced topology");
         return;

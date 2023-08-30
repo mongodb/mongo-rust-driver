@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
-use tokio::sync::{Mutex, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::Mutex;
 
 use test_file::{TestFile, TestResult};
 
@@ -34,7 +34,6 @@ use crate::{
         FailPointMode,
         TestClient,
         CLIENT_OPTIONS,
-        LOCK,
     },
     Client,
 };
@@ -42,7 +41,6 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["retryable-writes", "unified"]).await;
 }
 
@@ -181,7 +179,6 @@ async fn run_legacy() {
         }
     }
 
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test(&["retryable-writes", "legacy"], run_test).await;
 }
 
@@ -189,8 +186,6 @@ async fn run_legacy() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_ids_excluded() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -243,8 +238,6 @@ async fn transaction_ids_excluded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_ids_included() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -305,8 +298,6 @@ async fn transaction_ids_included() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn mmapv1_error_raised() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
@@ -348,14 +339,12 @@ async fn mmapv1_error_raised() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_first_read_error() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     label_not_added(false).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_second_read_error() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     label_not_added(true).await;
 }
 
@@ -406,8 +395,6 @@ async fn label_not_added(retry_reads: bool) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_write_pool_cleared() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let handler = Arc::new(EventHandler::new());
 
     let mut client_options = CLIENT_OPTIONS.get().await.clone();
@@ -507,8 +494,6 @@ async fn retry_write_pool_cleared() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_write_retryable_write_error() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     let mut client_options = CLIENT_OPTIONS.get().await.clone();
     client_options.retry_writes = Some(true);
     let (event_tx, event_rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);

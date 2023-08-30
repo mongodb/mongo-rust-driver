@@ -27,7 +27,6 @@ use crate::{
         TestClient,
         CLIENT_OPTIONS,
         DEFAULT_GLOBAL_TRACING_HANDLER,
-        LOCK,
         SERVER_API,
     },
     trace::{
@@ -80,7 +79,6 @@ fn tracing_truncation() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_truncation_default_limit() {
-    let _guard = LOCK.run_exclusively().await;
     let client = TestClient::new().await;
     let coll = client.init_db_and_coll("tracing_test", "truncation").await;
 
@@ -123,8 +121,6 @@ async fn command_logging_truncation_default_limit() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_truncation_explicit_limit() {
-    let _guard = LOCK.run_exclusively().await;
-
     let mut client_opts = CLIENT_OPTIONS.get().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(5);
     let client = TestClient::with_options(Some(client_opts)).await;
@@ -162,8 +158,6 @@ async fn command_logging_truncation_explicit_limit() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_truncation_mid_codepoint() {
-    let _guard = LOCK.run_exclusively().await;
-
     let mut client_opts = CLIENT_OPTIONS.get().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(215);
     let client = TestClient::with_options(Some(client_opts)).await;
@@ -496,7 +490,6 @@ fn topology_description_tracing_representation() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_unified() {
-    let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["command-logging-and-monitoring", "logging"])
         // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
         .skip_tests(&[
@@ -508,7 +501,6 @@ async fn command_logging_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn connection_logging_unified() {
-    let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["connection-monitoring-and-pooling", "logging"])
         .skip_tests(&[
             // TODO: RUST-1096 Unskip when configurable maxConnecting is added.
@@ -526,7 +518,6 @@ async fn connection_logging_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_logging_unified() {
-    let _guard = LOCK.run_exclusively().await;
     run_unified_tests(&["server-selection", "logging"])
         .skip_tests(&[
             // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite

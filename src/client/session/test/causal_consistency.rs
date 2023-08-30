@@ -1,6 +1,5 @@
 use bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     client::options::SessionOptions,
@@ -8,7 +7,7 @@ use crate::{
     error::Result,
     event::command::CommandEvent,
     options::ReadConcern,
-    test::{log_uncaptured, EventClient, LOCK},
+    test::{log_uncaptured, EventClient},
     ClientSession,
     Collection,
 };
@@ -146,8 +145,6 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn new_session_operation_time_null() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -165,8 +162,6 @@ async fn new_session_operation_time_null() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn first_read_no_after_cluser_time() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -204,8 +199,6 @@ async fn first_read_no_after_cluser_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn first_op_update_op_time() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -254,8 +247,6 @@ async fn first_op_update_op_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn read_includes_after_cluster_time() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -299,8 +290,6 @@ async fn read_includes_after_cluster_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn find_after_write_includes_after_cluster_time() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -341,8 +330,6 @@ async fn find_after_write_includes_after_cluster_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_causally_consistent_omits_after_cluster_time() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -379,8 +366,6 @@ async fn not_causally_consistent_omits_after_cluster_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn omit_after_cluster_time_standalone() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
@@ -414,8 +399,6 @@ async fn omit_after_cluster_time_standalone() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn omit_default_read_concern_level() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -455,8 +438,6 @@ async fn omit_default_read_concern_level() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_causal_consistency_read_concern_merge() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(
@@ -505,8 +486,6 @@ async fn test_causal_consistency_read_concern_merge() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn omit_cluster_time_standalone() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     if !client.is_standalone() {
         log_uncaptured("skipping omit_cluster_time_standalone due to unsupported topology");
@@ -527,8 +506,6 @@ async fn omit_cluster_time_standalone() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn cluster_time_sent_in_commands() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured("skipping cluster_time_sent_in_commands due to unsupported topology");
