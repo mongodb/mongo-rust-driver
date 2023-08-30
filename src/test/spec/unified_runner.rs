@@ -10,9 +10,8 @@ use std::future::IntoFuture;
 
 use futures::future::{BoxFuture, FutureExt};
 use serde::Deserialize;
-use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{file_level_log, log_uncaptured, spec::deserialize_spec_tests, LOCK};
+use crate::test::{file_level_log, log_uncaptured, spec::deserialize_spec_tests};
 
 pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
@@ -104,8 +103,6 @@ impl IntoFuture for RunUnifiedTestsAction {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_pass() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let mut skipped_files = vec![
         // TODO RUST-1570: unskip this file
         "collectionData-createOptions.json",
@@ -139,14 +136,12 @@ async fn valid_pass() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn valid_fail() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     expect_failures(&["unified-test-format", "valid-fail"], None).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     expect_failures(
         &["unified-test-format", "invalid"],
         // We don't do the schema validation required by these tests to avoid lengthy

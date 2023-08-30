@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, Document},
@@ -15,7 +14,6 @@ use crate::{
         FailPointMode,
         TestClient,
         CLIENT_OPTIONS,
-        LOCK,
     },
     Client,
     Collection,
@@ -24,7 +22,6 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_v2_tests(&["transactions", "legacy"])
         // TODO RUST-582: unskip this file
         .skip_files(&["error-labels-blockConnection.json"])
@@ -34,7 +31,6 @@ async fn run_legacy() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_legacy_convenient_api() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_v2_tests(&["transactions-convenient-api"]).await;
 }
 
@@ -42,7 +38,6 @@ async fn run_legacy_convenient_api() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_unified_tests(&["transactions", "unified"])
         // TODO RUST-1656: unskip these files
         .skip_files(&["retryable-abort-handshake.json", "retryable-commit-handshake.json"])
@@ -54,8 +49,6 @@ async fn run_unified() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn deserialize_recovery_token() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     #[derive(Debug, Serialize)]
     struct A {
         num: i32,
@@ -107,7 +100,6 @@ async fn deserialize_recovery_token() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_custom_error() {
-    let _guard = LOCK.run_concurrently().await;
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
@@ -143,7 +135,6 @@ async fn convenient_api_custom_error() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_returned_value() {
-    let _guard = LOCK.run_concurrently().await;
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
@@ -175,7 +166,6 @@ async fn convenient_api_returned_value() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_retry_timeout_callback() {
-    let _guard = LOCK.run_concurrently().await;
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
@@ -211,7 +201,6 @@ async fn convenient_api_retry_timeout_callback() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_retry_timeout_commit_unknown() {
-    let _guard = LOCK.run_exclusively().await;
     let mut options = CLIENT_OPTIONS.get().await.clone();
     if Client::test_builder().build().await.is_sharded() {
         options.direct_connection = Some(true);
@@ -267,7 +256,6 @@ async fn convenient_api_retry_timeout_commit_unknown() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_retry_timeout_commit_transient() {
-    let _guard = LOCK.run_exclusively().await;
     let mut options = CLIENT_OPTIONS.get().await.clone();
     if Client::test_builder().build().await.is_sharded() {
         options.direct_connection = Some(true);

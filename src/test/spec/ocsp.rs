@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use bson::doc;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    test::{log_uncaptured, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, CLIENT_OPTIONS},
     Client,
 };
 
@@ -15,8 +14,6 @@ async fn run() {
         log_uncaptured("skipping test due to missing environment variable MONGO_OCSP_TESTS");
         return;
     }
-
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let should_succeed = std::env::var("OCSP_TLS_SHOULD_SUCCEED")
         .unwrap()

@@ -1,5 +1,4 @@
 use std::time::Duration;
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson, Document},
@@ -22,7 +21,7 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    test::{EventClient, TestClient, LOCK},
+    test::{EventClient, TestClient},
     Collection,
 };
 
@@ -110,8 +109,6 @@ fn write_concern_deserialize() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn inconsistent_write_concern_rejected() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let db = client.database(function_name!());
 
@@ -133,8 +130,6 @@ async fn inconsistent_write_concern_rejected() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
@@ -155,8 +150,6 @@ async fn unacknowledged_write_concern_rejected() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn snapshot_read_concern() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     // snapshot read concern was introduced in 4.0
     if client.server_version_lt(4, 0) {
@@ -213,7 +206,6 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -264,7 +256,6 @@ async fn command_contains_write_concern_insert_one() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -315,7 +306,6 @@ async fn command_contains_write_concern_insert_many() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -369,7 +359,6 @@ async fn command_contains_write_concern_update_one() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -425,7 +414,6 @@ async fn command_contains_write_concern_update_many() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_replace_one() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -479,7 +467,6 @@ async fn command_contains_write_concern_replace_one() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_delete_one() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -533,7 +520,6 @@ async fn command_contains_write_concern_delete_one() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_delete_many() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -590,7 +576,6 @@ async fn command_contains_write_concern_delete_many() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -644,7 +629,6 @@ async fn command_contains_write_concern_find_one_and_delete() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -700,7 +684,6 @@ async fn command_contains_write_concern_find_one_and_replace() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -756,7 +739,6 @@ async fn command_contains_write_concern_find_one_and_update() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_aggregate() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -816,7 +798,6 @@ async fn command_contains_write_concern_aggregate() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
@@ -868,7 +849,6 @@ async fn command_contains_write_concern_drop() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn command_contains_write_concern_create_collection() {
-    let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let db = client.database("test");
     let coll: Collection<Document> = db.collection(function_name!());

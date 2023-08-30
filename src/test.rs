@@ -45,7 +45,6 @@ use async_once::AsyncOnce;
 use home::home_dir;
 use lazy_static::lazy_static;
 
-use self::util::TestLock;
 #[cfg(feature = "tracing-unstable")]
 use self::util::TracingHandler;
 use crate::{
@@ -65,7 +64,6 @@ lazy_static! {
         update_options_for_testing(&mut options);
         options
     });
-    pub(crate) static ref LOCK: TestLock = TestLock::new();
     pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
     {

@@ -67,7 +67,6 @@ use super::{
     FailPointMode,
     TestClient,
     CLIENT_OPTIONS,
-    LOCK,
     SERVERLESS,
 };
 
@@ -201,7 +200,6 @@ async fn custom_key_material() -> Result<()> {
     if !check_env("custom_key_material", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let (client, datakeys) = init_client().await?;
     let enc = ClientEncryption::new(
@@ -254,7 +252,6 @@ async fn data_key_double_encryption() -> Result<()> {
     if !check_env("data_key_double_encryption", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // Setup: drop stale data.
     let (client, _) = init_client().await?;
@@ -449,7 +446,6 @@ async fn external_key_vault() -> Result<()> {
     if !check_env("external_key_vault", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     for with_external_key_vault in [false, true] {
         // Setup: initialize db.
@@ -553,7 +549,6 @@ async fn bson_size_limits() -> Result<()> {
     if !check_env("bson_size_limits", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
@@ -678,7 +673,6 @@ async fn views_prohibited() -> Result<()> {
     if !check_env("views_prohibited", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // Setup: db initialization.
     let (client, _) = init_client().await?;
@@ -755,7 +749,6 @@ async fn corpus_coll_schema() -> Result<()> {
     if !check_env("corpus_coll_schema", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
     run_corpus_test(false).await?;
     Ok(())
 }
@@ -767,7 +760,6 @@ async fn corpus_local_schema() -> Result<()> {
     if !check_env("corpus_local_schema", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
     run_corpus_test(true).await?;
     Ok(())
 }
@@ -1052,7 +1044,6 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_aws_no_endpoint", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     custom_endpoint_aws_ok(None).await
 }
@@ -1064,7 +1055,6 @@ async fn custom_endpoint_aws_no_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_no_port", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com".to_string())).await
 }
@@ -1076,7 +1066,6 @@ async fn custom_endpoint_aws_with_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_with_port", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com:443".to_string())).await
 }
@@ -1088,7 +1077,6 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_port", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let client_encryption = custom_endpoint_setup(true).await?;
 
@@ -1113,7 +1101,6 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_region", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let client_encryption = custom_endpoint_setup(true).await?;
 
@@ -1138,7 +1125,6 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_domain", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let client_encryption = custom_endpoint_setup(true).await?;
 
@@ -1163,7 +1149,6 @@ async fn custom_endpoint_azure() -> Result<()> {
     if !check_env("custom_endpoint_azure", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let master_key = MasterKey::Azure {
         key_vault_endpoint: "key-vault-csfle.vault.azure.net".to_string(),
@@ -1195,7 +1180,6 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
     if !check_env("custom_endpoint_gcp_valid", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let master_key = MasterKey::Gcp {
         project_id: "devprod-drivers".to_string(),
@@ -1230,7 +1214,6 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
     if !check_env("custom_endpoint_gcp_invalid", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let master_key = MasterKey::Gcp {
         project_id: "devprod-drivers".to_string(),
@@ -1261,7 +1244,6 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_no_endpoint", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let master_key = MasterKey::Kmip {
         key_id: Some("1".to_string()),
@@ -1292,7 +1274,6 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_valid_endpoint", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let master_key = MasterKey::Kmip {
         key_id: Some("1".to_string()),
@@ -1311,7 +1292,6 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_invalid_endpoint", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let master_key = MasterKey::Kmip {
         key_id: Some("1".to_string()),
@@ -1332,7 +1312,6 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_shared_library", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     if *DISABLE_CRYPT_SHARED {
         log_uncaptured(
@@ -1381,7 +1360,6 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_spawn", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // Setup: encrypted client.
     let extra_options = doc! {
@@ -1418,8 +1396,6 @@ enum Bypass {
 }
 
 async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     // Setup: encrypted client.
     let extra_options = doc! {
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
@@ -1481,7 +1457,6 @@ async fn deadlock() -> Result<()> {
     if !check_env("deadlock", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // Case 1
     DeadlockTestCase {
@@ -1752,7 +1727,6 @@ async fn kms_tls() -> Result<()> {
     if !check_env("kms_tls", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // Invalid KMS Certificate
     let err = run_kms_tls_test("127.0.0.1:9000").await.unwrap_err();
@@ -1802,7 +1776,6 @@ async fn kms_tls_options() -> Result<()> {
     if !check_env("kms_tls_options", true) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     fn providers_with_tls(
         mut providers: HashMap<KmsProvider, (Document, Option<TlsOptions>)>,
@@ -2092,7 +2065,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
     if !fle2v2_ok("explicit_encryption_case_1").await {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
+
     let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
         None => return Ok(()),
@@ -2152,7 +2125,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
     if !fle2v2_ok("explicit_encryption_case_2").await {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
@@ -2234,7 +2206,6 @@ async fn explicit_encryption_case_3() -> Result<()> {
     if !fle2v2_ok("explicit_encryption_case_3").await {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
@@ -2285,7 +2256,6 @@ async fn explicit_encryption_case_4() -> Result<()> {
     if !fle2v2_ok("explicit_encryption_case_4").await {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
@@ -2322,7 +2292,6 @@ async fn explicit_encryption_case_5() -> Result<()> {
     if !fle2v2_ok("explicit_encryption_case_5").await {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let testdata = match explicit_encryption_setup().await? {
         Some(t) => t,
@@ -2433,7 +2402,6 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     if !check_env("unique_index_keyaltnames_create_data_key", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let (client_encryption, _) = unique_index_keyaltnames_setup().await?;
 
@@ -2480,7 +2448,6 @@ async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
     if !check_env("unique_index_keyaltnames_add_key_alt_name", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let (client_encryption, key) = unique_index_keyaltnames_setup().await?;
 
@@ -2571,7 +2538,6 @@ async fn decryption_events_command_error() -> Result<()> {
     if !check_env("decryption_events_command_error", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
@@ -2602,7 +2568,6 @@ async fn decryption_events_network_error() -> Result<()> {
     if !check_env("decryption_events_network_error", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
@@ -2636,7 +2601,6 @@ async fn decryption_events_decrypt_error() -> Result<()> {
     if !check_env("decryption_events_decrypt_error", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
@@ -2673,7 +2637,6 @@ async fn decryption_events_decrypt_success() -> Result<()> {
     if !check_env("decryption_events_decrypt_success", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
@@ -2806,7 +2769,6 @@ async fn on_demand_aws_failure() -> Result<()> {
         log_uncaptured("Skipping on_demand_aws_failure: credentials set");
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let ce = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
@@ -2835,7 +2797,6 @@ async fn on_demand_aws_success() -> Result<()> {
     if !check_env("on_demand_aws_success", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let ce = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
@@ -2861,8 +2822,6 @@ async fn on_demand_aws_success() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn on_demand_gcp_credentials() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
-
     let util_client = TestClient::new().await.into_client();
     let client_encryption = ClientEncryption::new(
         util_client,
@@ -2906,7 +2865,6 @@ async fn azure_imds() -> Result<()> {
     if !check_env("azure_imds", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_concurrently().await;
 
     let mut azure_exec = crate::client::csfle::state_machine::azure::ExecutorState::new()?;
     azure_exec.test_host = Some((
@@ -2979,7 +2937,6 @@ async fn azure_imds_integration_failure() -> Result<()> {
     if !check_env("azure_imds_integration_failure", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_concurrently().await;
 
     let c = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
@@ -3009,7 +2966,6 @@ async fn bypass_mongocryptd_client() -> Result<()> {
     if !check_env("bypass_mongocryptd_client", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     if *DISABLE_CRYPT_SHARED {
         log_uncaptured("Skipping bypass mongocryptd client test: crypt_shared is disabled.");
@@ -3077,7 +3033,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     if !fle2v2_ok("auto_encryption_keys").await {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     let client = Client::test_builder().build().await;
     if client.server_version_lt(6, 0) {
@@ -3269,7 +3224,6 @@ async fn range_explicit_encryption_test(
     bson_type: &str,
     range_options: RangeOptions,
 ) -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
     let util_client = TestClient::new().await;
 
     let encrypted_fields =
@@ -3583,7 +3537,6 @@ async fn fle2_example() -> Result<()> {
     if !check_env("fle2_example", false) {
         return Ok(());
     }
-    let _guard = LOCK.run_exclusively().await;
 
     // FLE 2 is not supported on Standalone topology.
     let test_client = Client::test_builder().build().await;

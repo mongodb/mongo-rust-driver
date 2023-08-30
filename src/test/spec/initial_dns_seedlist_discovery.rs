@@ -1,14 +1,13 @@
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
     client::Client,
     options::{ClientOptions, ResolverConfig},
     runtime,
-    test::{log_uncaptured, run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, run_spec_test, TestClient, CLIENT_OPTIONS},
 };
 
 #[derive(Debug, Deserialize)]
@@ -208,7 +207,6 @@ async fn run_test(mut test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn replica_set() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     let skip =
         if client.is_replica_set() && client.options().repl_set_name.as_deref() != Some("repl0") {
@@ -233,7 +231,6 @@ async fn replica_set() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     if !client.is_load_balanced() {
         log_uncaptured(
@@ -252,7 +249,6 @@ async fn load_balanced() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sharded() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
     if !client.is_sharded() {
         log_uncaptured(

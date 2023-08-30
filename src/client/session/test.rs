@@ -4,7 +4,6 @@ use std::{future::Future, sync::Arc, time::Duration};
 
 use bson::Document;
 use futures::stream::StreamExt;
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
@@ -22,7 +21,6 @@ use crate::{
         SdamEvent,
         TestClient,
         CLIENT_OPTIONS,
-        LOCK,
     },
     Client,
     Collection,
@@ -212,8 +210,6 @@ macro_rules! for_each_op {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn pool_is_lifo() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
     runtime::delay_for(Duration::from_millis(500)).await;
@@ -248,8 +244,6 @@ async fn pool_is_lifo() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn cluster_time_in_commands() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let test_client = TestClient::new().await;
     if test_client.is_standalone() {
         log_uncaptured("skipping cluster_time_in_commands test due to standalone topology");
@@ -402,8 +396,6 @@ async fn cluster_time_in_commands() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn session_usage() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
     if client.is_standalone() {
         return;
@@ -432,8 +424,6 @@ async fn session_usage() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -475,8 +465,6 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -527,8 +515,6 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(

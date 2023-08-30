@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use bson::{doc, Document};
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -17,7 +16,6 @@ use crate::{
         SdamEvent,
         TestClient,
         CLIENT_OPTIONS,
-        LOCK,
     },
     Client,
 };
@@ -25,8 +23,6 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-
     // TODO RUST-1222: Unskip this file
     let mut skipped_files = vec!["interruptInUse-pool-clear.json"];
     if cfg!(not(feature = "tracing-unstable")) {
@@ -52,8 +48,6 @@ async fn run_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn streaming_min_heartbeat_frequency() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let test_client = TestClient::new().await;
     if test_client.is_load_balanced() {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
@@ -105,8 +99,6 @@ async fn streaming_min_heartbeat_frequency() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn heartbeat_frequency_is_respected() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let test_client = TestClient::new().await;
     if test_client.is_load_balanced() {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
@@ -158,8 +150,6 @@ async fn heartbeat_frequency_is_respected() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn rtt_is_updated() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
     let test_client = TestClient::new().await;
     if !test_client.supports_streaming_monitoring_protocol() {
         log_uncaptured(

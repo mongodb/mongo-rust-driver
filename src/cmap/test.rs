@@ -4,7 +4,7 @@ mod integration;
 
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
-use tokio::sync::{Mutex, RwLock, RwLockWriteGuard};
+use tokio::sync::{Mutex, RwLock};
 
 use self::{
     event::EventHandler,
@@ -33,7 +33,6 @@ use crate::{
         MatchErrExt,
         Matchable,
         CLIENT_OPTIONS,
-        LOCK,
     },
 };
 use bson::doc;
@@ -428,13 +427,12 @@ impl Matchable for CmapEvent {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+
 async fn cmap_spec_tests() {
     async fn run_cmap_spec_tests(test_file: TestFile) {
         if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
             return;
         }
-
-        let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
         let mut options = CLIENT_OPTIONS.get().await.clone();
         if options.load_balanced.unwrap_or(false) {

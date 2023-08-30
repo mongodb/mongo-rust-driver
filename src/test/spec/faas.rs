@@ -2,7 +2,7 @@ use std::env;
 
 use bson::doc;
 
-use crate::{test::LOCK, Client};
+use crate::Client;
 
 type Result<T> = anyhow::Result<T>;
 
@@ -36,7 +36,6 @@ impl Drop for TempVars {
 }
 
 async fn check_faas_handshake(vars: &[(&'static str, &str)]) -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
     let _tv = TempVars::set(vars);
 
     let client = Client::test_builder().build().await;
