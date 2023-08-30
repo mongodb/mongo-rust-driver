@@ -125,6 +125,17 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+pub(crate) fn extend_raw_document_buf(
+    this: &mut RawDocumentBuf,
+    other: RawDocumentBuf,
+) -> Result<()> {
+    for result in other.iter() {
+        let (k, v) = result?;
+        this.append(k, v.to_raw_bson());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use crate::bson_util::num_decimal_digits;

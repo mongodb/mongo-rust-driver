@@ -32,7 +32,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{self, Bson, Document},
-    bson_util,
+    bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{
@@ -243,10 +243,7 @@ pub(crate) fn append_options_to_raw_document<T: Serialize>(
 ) -> Result<()> {
     if let Some(options) = options {
         let options_raw_doc = bson::to_raw_document_buf(options)?;
-        for result in options_raw_doc.into_iter() {
-            let (key, value) = result?;
-            doc.append(key, value.to_raw_bson());
-        }
+        extend_raw_document_buf(doc, options_raw_doc)?;
     }
     Ok(())
 }

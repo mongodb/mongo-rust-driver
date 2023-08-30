@@ -3,7 +3,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::Message;
 use crate::{
-    bson::Document,
+    bson::{rawdoc, Document},
+    bson_util::extend_raw_document_buf,
     client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, ErrorKind, Result},
     hello::{HelloCommandResponse, HelloReply},
@@ -174,6 +175,19 @@ impl<T> Command<T> {
             });
             inner.after_cluster_time = Some(operation_time);
         }
+    }
+}
+
+impl Command<RawDocumentBuf> {
+    pub(crate) fn into_bson_bytes(mut self) -> Result<Vec<u8>> {
+        let mut command = self.body;
+
+        // Clear the body of the command to avoid re-serializing.
+        self.body = rawdoc! {};
+        let rest_of_command = bson::to_raw_document_buf(&self)?;
+
+        extend_raw_document_buf(&mut command, rest_of_command)?;
+        Ok(command.into_bytes())
     }
 }
 
