@@ -492,6 +492,8 @@ task_groups:
               export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
               export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
               export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
+              export AZUREKMS_KEY_NAME='${testazurekms_keyname}'
+              export AZUREKMS_KEY_VAULT_ENDPOINT='${testazurekms_keyvaultendpoint}'
             EOT
       - command: expansions.update
         params:
