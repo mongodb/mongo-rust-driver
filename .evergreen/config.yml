@@ -279,7 +279,7 @@ buildvariants:
 
   - name: azure-kms
     display_name: "Azure KMS"
-    patchable: false
+    patchable: true
     run_on:
       # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
