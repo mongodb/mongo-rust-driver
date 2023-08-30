@@ -22,5 +22,5 @@ AZUREKMS_SRC=azurekms_remote.tgz \
   AZUREKMS_DST="." \
   $AZUREKMS_TOOLS/copy-file.sh
 AZUREKMS_CMD="tar xvf azurekms_remote.tgz" $AZUREKMS_TOOLS/run-command.sh
-AZUREKMS_CMD="LD_LIBRARY_PATH=./azurekms_remote/lib ./azurekms_remote/azure-kms-test" \
+AZUREKMS_CMD="LD_LIBRARY_PATH=./azurekms_remote/lib KEY_NAME='${AZUREKMS_KEY_NAME}' KEY_VAULT_ENDPOINT='${AZUREKMS_KEY_VAULT_ENDPOINT}' ./azurekms_remote/azure-kms-test" \
   $AZUREKMS_TOOLS/run-command.sh
