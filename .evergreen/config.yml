@@ -174,7 +174,7 @@ buildvariants:
 
   - name: openssl-ubuntu
     display_name: "OpenSSL (Ubuntu)"
-    # patchable: false
+    patchable: false
     run_on:
       - ubuntu2204-arm64-small
     expansions:
@@ -189,7 +189,7 @@ buildvariants:
 
   - name: openssl-macos
     display_name: "OpenSSL (MacOS)"
-    # patchable: false
+    patchable: false
     run_on:
       - macos-1100
     expansions:
@@ -201,7 +201,7 @@ buildvariants:
 
   - name: openssl-windows
     display_name: "OpenSSL (Windows)"
-    # patchable: false
+    patchable: false
     run_on:
       - windows-64-vs2017-small
     expansions:
@@ -220,7 +220,7 @@ buildvariants:
 
   - name: compression
     display_name: "Compression"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -232,7 +232,7 @@ buildvariants:
 
   - name: stable-api
     display_name: "Stable API V1"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -247,7 +247,7 @@ buildvariants:
 
   - name: sync-api
     display_name: "Sync API"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -258,7 +258,7 @@ buildvariants:
 
   - name: atlas-connectivity
     display_name: "Atlas Connectivity"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -266,7 +266,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
-    # patchable: false
+    patchable: false
     run_on:
       # Use ubuntu1804. AWS tasks require legacy `mongo` shell. Legacy `mongo` shell is not available on newer distros.
       - ubuntu1804-small
@@ -279,7 +279,7 @@ buildvariants:
 
   - name: azure-kms
     display_name: "Azure KMS"
-    # patchable: false
+    patchable: false
     run_on:
       # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -291,7 +291,7 @@ buildvariants:
 
   - name: gcp-kms
     display_name: "GCP KMS"
-    # patchable: false
+    patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -303,7 +303,7 @@ buildvariants:
 
   - name: x509-auth
     display_name: "x509 Authentication"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -314,7 +314,7 @@ buildvariants:
 
   - name: plain-auth
     display_name: "Plain Authentication"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -326,7 +326,7 @@ buildvariants:
   - name: serverless
     # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
     disable: true
-    # patchable: false
+    patchable: false
     display_name: "Serverless"
     run_on:
       - rhel87-small
@@ -335,7 +335,7 @@ buildvariants:
 
   - name: oidc
     display_name: OIDC
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -357,7 +357,7 @@ buildvariants:
 
   - name: in-use-encryption-disable-crypt-shared
     display_name: "In-Use Encryption (disable crypt_shared)"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel80-small
     expansions:
@@ -370,7 +370,7 @@ buildvariants:
 
   - name: in-use-encryption-openssl
     display_name: "In-Use Encryption (OpenSSL)"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel80-small
     expansions:
@@ -384,7 +384,7 @@ buildvariants:
   - name: in-use-encryption-serverless
     # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
     disable: true
-    # patchable: false
+    patchable: false
     display_name: In-Use Encryption (Serverless)
     run_on:
       - rhel87-small
