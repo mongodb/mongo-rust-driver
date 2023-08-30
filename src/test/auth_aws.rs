@@ -21,7 +21,6 @@ async fn get_client() -> Client {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn credential_caching() {
     // This test should only be run when authenticating using AWS endpoints.
     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
@@ -63,7 +62,6 @@ async fn credential_caching() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn credential_caching_environment_vars() {
     // This test should only be run when authenticating using AWS endpoints.
     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {

@@ -83,7 +83,6 @@ async fn acquire_connection_and_send_command() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn concurrent_connections() {
     let mut options = CLIENT_OPTIONS.get().await.clone();
     if options.load_balanced.unwrap_or(false) {

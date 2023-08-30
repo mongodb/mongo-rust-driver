@@ -151,7 +151,6 @@ async fn errors_on_missing_token() -> Result<()> {
 /// a resumable error
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn resumes_on_error() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("resumes_on_error", true).await? {
         Some(t) => t,
@@ -195,7 +194,6 @@ async fn resumes_on_error() -> Result<()> {
 /// an aggregate command
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn does_not_resume_aggregate() -> Result<()> {
     let (client, coll, _) = match init_stream("does_not_resume_aggregate", true).await? {
         Some(t) => t,
@@ -256,7 +254,6 @@ async fn empty_batch_not_closed() -> Result<()> {
 /// throw an exception
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     let (client, coll, mut stream) =
         match init_stream("resume_kill_cursor_error_suppressed", true).await? {
@@ -302,7 +299,6 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 /// stream.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn resume_start_at_operation_time() -> Result<()> {
     let (client, coll, mut stream) =
         match init_stream("resume_start_at_operation_time", true).await? {
@@ -530,7 +526,6 @@ async fn aggregate_batch() -> Result<()> {
 /// Prose test 17: Resuming a change stream with no results uses `startAfter`.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn resume_uses_start_after() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
@@ -595,7 +590,6 @@ async fn resume_uses_start_after() -> Result<()> {
 /// Prose test 18: Resuming a change stream after results uses `resumeAfter`.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn resume_uses_resume_after() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,

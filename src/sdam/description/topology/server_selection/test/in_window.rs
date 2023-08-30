@@ -113,7 +113,6 @@ async fn select_in_window() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn load_balancing_test() {
     let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
 

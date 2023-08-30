@@ -637,7 +637,6 @@ async fn topology_closed_event_last() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn heartbeat_events() {
     let mut options = CLIENT_OPTIONS.get().await.clone();
     options.hosts.drain(1..);
