@@ -15,7 +15,7 @@ homepage = "https://www.mongodb.com/docs/drivers/rust/"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "2.6.0"
+version = "2.7.0-beta"
 
 exclude = [
     "etc/**",
@@ -90,7 +90,7 @@ tracing-unstable = ["tracing", "log"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = { git = "https://github.com/mongodb/bson-rust", branch = "main" }
+bson = "2.7.0"
 chrono = { version = "0.4.7", default-features = false, features = ["clock", "std"] }
 derivative = "2.1.1"
 derive_more = "0.99.17"
@@ -104,7 +104,7 @@ hmac = "0.12.1"
 lazy_static = "1.4.0"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
-mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true }
+mongocrypt = { version = "0.1.2", optional = true }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
