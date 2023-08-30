@@ -51,6 +51,7 @@ use crate::{
 /// ```
 /// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # {
+/// # #[cfg(feature = "tokio-runtime")]
 /// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result, bson::doc,
 /// # change_stream::event::ChangeStreamEvent};

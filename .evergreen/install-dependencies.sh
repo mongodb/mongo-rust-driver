@@ -11,64 +11,64 @@ export CARGO_HOME="${PROJECT_DIRECTORY}/.cargo"
 
 # Make sure to use msvc toolchain rather than gnu, which is the default for cygwin
 if [ "Windows_NT" == "$OS" ]; then
-    export DEFAULT_HOST_OPTIONS='--default-host x86_64-pc-windows-msvc'
-    # rustup/cargo need the native Windows paths; $PROJECT_DIRECTORY is a cygwin path
-    export RUSTUP_HOME=$(cygpath ${RUSTUP_HOME} --windows)
-    export CARGO_HOME=$(cygpath ${CARGO_HOME} --windows)
+  export DEFAULT_HOST_OPTIONS='--default-host x86_64-pc-windows-msvc'
+  # rustup/cargo need the native Windows paths; $PROJECT_DIRECTORY is a cygwin path
+  export RUSTUP_HOME=$(cygpath ${RUSTUP_HOME} --windows)
+  export CARGO_HOME=$(cygpath ${CARGO_HOME} --windows)
 fi
 
 for arg; do
-    if [ $arg == "rust" ]; then
-        curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path $DEFAULT_HOST_OPTIONS
+  if [ $arg == "rust" ]; then
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path $DEFAULT_HOST_OPTIONS
 
-        # This file is not created by default on Windows
-        echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >> ${CARGO_HOME}/env
-        echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ${CARGO_HOME}/env
+    # This file is not created by default on Windows
+    echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >>${CARGO_HOME}/env
+    echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >>${CARGO_HOME}/env
 
-        source .evergreen/env.sh
-        rustup toolchain install nightly -c rustfmt
-    elif [ $arg == "mdbook" ]; then
-        source ${CARGO_HOME}/env
-        # Install the manual rendering tool
-        cargo install mdbook
-    elif [ $arg == "junit-dependencies" ]; then
-        source ${CARGO_HOME}/env
+    source .evergreen/env.sh
+    rustup toolchain install nightly -c rustfmt
+  elif [ $arg == "mdbook" ]; then
+    source ${CARGO_HOME}/env
+    # Install the manual rendering tool
+    cargo install mdbook
+  elif [ $arg == "junit-dependencies" ]; then
+    source ${CARGO_HOME}/env
 
-        # install npm/node
-        ./.evergreen/install-node.sh
+    # install npm/node
+    ./.evergreen/install-node.sh
 
-        source ./.evergreen/env.sh
+    source ./.evergreen/env.sh
 
-        # Install junit-compatible test runner
-        cargo install cargo-nextest --locked
+    # Install junit-compatible test runner
+    cargo install cargo-nextest --locked
 
-        # Install tool for merging different junit reports into a single one
-        set +o errexit
-        set -o pipefail
+    # Install tool for merging different junit reports into a single one
+    set +o errexit
+    set -o pipefail
 
-        npm install -g junit-report-merger --cache $(mktemp -d) 2>&1 | tee npm-install-output
-        RESULT=$?
-        MATCH=$(grep -o '/\S*-debug.log' npm-install-output)
-        if [[ $MATCH != "" ]]; then
-            echo ===== BEGIN NPM LOG =====
-            cat $MATCH
-            echo ===== END NPM LOG =====
-        fi
-
-        set -o errexit
-        if [ $RESULT -ne 0 ]; then
-            exit $RESULT
-        fi
-    elif [ $arg == "libmongocrypt" ]; then
-        mkdir ${PROJECT_DIRECTORY}/libmongocrypt
-        cd ${PROJECT_DIRECTORY}/libmongocrypt
-        curl -sSfO https://s3.amazonaws.com/mciuploads/libmongocrypt/all/master/latest/libmongocrypt-all.tar.gz
-        tar xzf libmongocrypt-all.tar.gz
-        if [ "Windows_NT" == "$OS" ]; then
-            chmod +x ${MONGOCRYPT_LIB_DIR}/../bin/*.dll
-        fi
-    else
-        echo Missing/unknown install option: "$arg"
-        exit 1
+    npm install -g junit-report-merger --cache $(mktemp -d) 2>&1 | tee npm-install-output
+    RESULT=$?
+    MATCH=$(grep -o '/\S*-debug.log' npm-install-output)
+    if [[ $MATCH != "" ]]; then
+      echo ===== BEGIN NPM LOG =====
+      cat $MATCH
+      echo ===== END NPM LOG =====
     fi
+
+    set -o errexit
+    if [ $RESULT -ne 0 ]; then
+      exit $RESULT
+    fi
+  elif [ $arg == "libmongocrypt" ]; then
+    mkdir ${PROJECT_DIRECTORY}/libmongocrypt
+    cd ${PROJECT_DIRECTORY}/libmongocrypt
+    curl -sSfO https://s3.amazonaws.com/mciuploads/libmongocrypt/all/master/latest/libmongocrypt-all.tar.gz
+    tar xzf libmongocrypt-all.tar.gz
+    if [ "Windows_NT" == "$OS" ]; then
+      chmod +x ${MONGOCRYPT_LIB_DIR}/../bin/*.dll
+    fi
+  else
+    echo Missing/unknown install option: "$arg"
+    exit 1
+  fi
 done

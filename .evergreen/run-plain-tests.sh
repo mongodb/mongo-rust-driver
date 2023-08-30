@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o errexit
-set -o xtrace 
+set -o xtrace
 
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh

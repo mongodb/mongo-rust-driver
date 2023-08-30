@@ -11,5 +11,5 @@ CLIPPY_VERSION=1.71.0
 rustup install $CLIPPY_VERSION
 
 for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
-    cargo +$CLIPPY_VERSION clippy --all-targets ${FEATURE_COMBINATIONS[$i]}  -p mongodb -- -D warnings
+  cargo +$CLIPPY_VERSION clippy --all-targets ${FEATURE_COMBINATIONS[$i]} -p mongodb -- -D warnings
 done
