@@ -44,7 +44,6 @@ struct DriverMetadata {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn metadata_sent_in_handshake() {
     let client = TestClient::new().await;
 
@@ -460,7 +459,6 @@ async fn scram_test(
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn scram_sha1() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -483,7 +481,6 @@ async fn scram_sha1() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn scram_sha256() {
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -505,7 +502,6 @@ async fn scram_sha256() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn scram_both() {
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {

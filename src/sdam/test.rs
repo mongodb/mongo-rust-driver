@@ -31,7 +31,6 @@ use crate::{
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn min_heartbeat_frequency() {
     let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
@@ -93,7 +92,6 @@ async fn min_heartbeat_frequency() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-
 async fn sdam_pool_management() {
     let mut options = CLIENT_OPTIONS.get().await.clone();
     if options.load_balanced.unwrap_or(false) {
