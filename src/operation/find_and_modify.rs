@@ -152,20 +152,6 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
         }
 
         response.body().map(|r: Response<T>| r.value)
-        // let response: Response = response.body()?;
-
-        // match response.value {
-        //     Bson::Document(doc) => Ok(Some(from_document(doc)?)),
-        //     Bson::Null => Ok(None),
-        //     other => Err(ErrorKind::InvalidResponse {
-        //         message: format!(
-        //             "expected document for value field of findAndModify response, but instead got
-        // \              {:?}",
-        //             other
-        //         ),
-        //     }
-        //     .into()),
-        // }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
@@ -175,9 +161,4 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct Response {
-    value: Bson,
 }
