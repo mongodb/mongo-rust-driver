@@ -34,7 +34,7 @@ pub(crate) struct FindAndModify<'a, R, T: DeserializeOwned> {
     query: Document,
     modification: Modification<'a, R>,
     human_readable_serialization: Option<bool>,
-    options: FindAndModifyOptions,
+    options: Option<FindAndModifyOptions>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -49,7 +49,7 @@ impl<T: DeserializeOwned> FindAndModify<'_, (), T> {
             query,
             modification: Modification::Delete,
             human_readable_serialization: None,
-            options: options.unwrap_or_default().into(),
+            options: options.map(Into::into),
             _phantom: Default::default(),
         }
     }
@@ -68,7 +68,7 @@ impl<T: DeserializeOwned> FindAndModify<'_, (), T> {
             query,
             modification: Modification::Update(update.into()),
             human_readable_serialization: None,
-            options: options.unwrap_or_default().into(),
+            options: options.map(Into::into),
             _phantom: Default::default(),
         })
     }
@@ -87,7 +87,7 @@ impl<'a, R: Serialize, T: DeserializeOwned> FindAndModify<'a, R, T> {
             query,
             modification: Modification::Update(replacement.into()),
             human_readable_serialization: Some(human_readable_serialization),
-            options: options.unwrap_or_default().into(),
+            options: options.map(Into::into),
             _phantom: Default::default(),
         })
     }
@@ -99,13 +99,15 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
     const NAME: &'static str = "findAndModify";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
-        if self.options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Specifying a hint to find_one_and_x is not supported on server versions \
-                          < 4.4"
-                    .to_string(),
+        if let Some(ref options) = self.options {
+            if options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Specifying a hint to find_one_and_x is not supported on server \
+                              versions < 4.4"
+                        .to_string(),
+                }
+                .into());
             }
-            .into());
         }
 
         let mut body = rawdoc! {
@@ -123,8 +125,10 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
         };
         body.append(key, modification);
 
-        remove_empty_write_concern!(Some(&mut self.options));
-        append_options_to_raw_document(&mut body, Some(&self.options).as_ref())?;
+        if let Some(ref mut options) = self.options {
+            remove_empty_write_concern!(Some(options));
+        }
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
@@ -159,7 +163,7 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
-        self.options.write_concern.as_ref()
+        self.options.as_ref().and_then(|o| o.write_concern.as_ref())
     }
 
     fn retryability(&self) -> Retryability {

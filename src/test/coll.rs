@@ -623,12 +623,11 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let event_hint = events[0].command.get_array("deletes").unwrap()[0]
         .as_document()
         .unwrap()
-        .get("hint");
-    let expected_hint = match options {
-        Some(options) => options.hint.map(|hint| hint.to_bson()),
-        None => None,
-    };
-    assert_eq!(event_hint, expected_hint.as_ref());
+        .get("hint")
+        .cloned()
+        .map(|bson| bson::from_bson(bson).unwrap());
+    let expected_hint = options.and_then(|options| options.hint);
+    assert_eq!(event_hint, expected_hint);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -672,8 +671,12 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     let events = client.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
 
-    let event_hint = events[0].command.get("hint").cloned();
-    let expected_hint = options.and_then(|options| options.hint.map(|hint| hint.to_bson()));
+    let event_hint = events[0]
+        .command
+        .get("hint")
+        .cloned()
+        .map(|bson| bson::from_bson(bson).unwrap());
+    let expected_hint = options.and_then(|options| options.hint);
     assert_eq!(event_hint, expected_hint);
 }
 
