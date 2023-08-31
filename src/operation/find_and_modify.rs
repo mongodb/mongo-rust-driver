@@ -1,14 +1,12 @@
 mod options;
-#[cfg(test)]
-mod test;
 
 use std::fmt::Debug;
 
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, from_document, Bson, Document},
+    bson::{doc, from_document, rawdoc, Bson, Document, RawDocumentBuf},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{
@@ -21,56 +19,39 @@ use crate::{
         Namespace,
     },
     error::{ErrorKind, Result},
-    operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
+    operation::{
+        append_options_to_raw_document,
+        find_and_modify::options::Modification,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+        Retryability,
+    },
     options::WriteConcern,
 };
 
-pub(crate) struct FindAndModify<T = Document>
-where
-    T: DeserializeOwned,
-{
+pub(crate) struct FindAndModify<'a, R, T: DeserializeOwned> {
     ns: Namespace,
     query: Document,
-    options: FindAndModifyOptions,
+    modification: Modification<'a, R>,
+    human_readable_serialization: Option<bool>,
+    options: Option<FindAndModifyOptions>,
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> FindAndModify<T>
-where
-    T: DeserializeOwned,
-{
+impl<T: DeserializeOwned> FindAndModify<'_, (), T> {
     pub fn with_delete(
         ns: Namespace,
         query: Document,
         options: Option<FindOneAndDeleteOptions>,
     ) -> Self {
-        let options =
-            FindAndModifyOptions::from_find_one_and_delete_options(options.unwrap_or_default());
         FindAndModify {
             ns,
             query,
-            options,
+            modification: Modification::Delete,
+            human_readable_serialization: None,
+            options: options.map(Into::into),
             _phantom: Default::default(),
         }
-    }
-
-    pub fn with_replace(
-        ns: Namespace,
-        query: Document,
-        replacement: Document,
-        options: Option<FindOneAndReplaceOptions>,
-    ) -> Result<Self> {
-        bson_util::replacement_document_check(&replacement)?;
-        let options = FindAndModifyOptions::from_find_one_and_replace_options(
-            replacement,
-            options.unwrap_or_default(),
-        );
-        Ok(FindAndModify {
-            ns,
-            query,
-            options,
-            _phantom: Default::default(),
-        })
     }
 
     pub fn with_update(
@@ -82,50 +63,82 @@ where
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
         };
-        let options = FindAndModifyOptions::from_find_one_and_update_options(
-            update,
-            options.unwrap_or_default(),
-        );
         Ok(FindAndModify {
             ns,
             query,
-            options,
+            modification: Modification::Update(update.into()),
+            human_readable_serialization: None,
+            options: options.map(Into::into),
             _phantom: Default::default(),
         })
     }
 }
 
-impl<T> OperationWithDefaults for FindAndModify<T>
-where
-    T: DeserializeOwned,
-{
+impl<'a, R: Serialize, T: DeserializeOwned> FindAndModify<'a, R, T> {
+    pub fn with_replace(
+        ns: Namespace,
+        query: Document,
+        replacement: &'a R,
+        options: Option<FindOneAndReplaceOptions>,
+        human_readable_serialization: bool,
+    ) -> Result<Self> {
+        Ok(FindAndModify {
+            ns,
+            query,
+            modification: Modification::Update(replacement.into()),
+            human_readable_serialization: Some(human_readable_serialization),
+            options: options.map(Into::into),
+            _phantom: Default::default(),
+        })
+    }
+}
+
+impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndModify<'a, R, T> {
     type O = Option<T>;
-    type Command = Document;
+    type Command = RawDocumentBuf;
     const NAME: &'static str = "findAndModify";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        if self.options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Specifying a hint to find_one_and_x is not supported on server versions \
-                          < 4.4"
-                    .to_string(),
+    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+        if let Some(ref options) = self.options {
+            if options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Specifying a hint to find_one_and_x is not supported on server \
+                              versions < 4.4"
+                        .to_string(),
+                }
+                .into());
             }
-            .into());
         }
 
-        let mut body: Document = doc! {
+        let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
-            "query": self.query.clone(),
+            "query": RawDocumentBuf::from_document(&self.query)?,
         };
 
-        remove_empty_write_concern!(Some(&mut self.options));
-        append_options(&mut body, Some(&self.options).as_ref())?;
+        let (key, modification) = match &self.modification {
+            Modification::Delete => ("remove", true.into()),
+            Modification::Update(update_or_replace) => (
+                "update",
+                update_or_replace
+                    .to_raw_bson(self.human_readable_serialization.unwrap_or_default())?,
+            ),
+        };
+        body.append(key, modification);
+
+        if let Some(ref mut options) = self.options {
+            remove_empty_write_concern!(Some(options));
+        }
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
             self.ns.db.clone(),
             body,
         ))
+    }
+
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+        cmd.into_bson_bytes()
     }
 
     fn handle_response(
@@ -150,7 +163,7 @@ where
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
-        self.options.write_concern.as_ref()
+        self.options.as_ref().and_then(|o| o.write_concern.as_ref())
     }
 
     fn retryability(&self) -> Retryability {

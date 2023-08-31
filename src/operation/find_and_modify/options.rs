@@ -11,19 +11,17 @@ use crate::{
         FindOneAndUpdateOptions,
         Hint,
         ReturnDocument,
-        UpdateModifications,
     },
     collation::Collation,
     concern::WriteConcern,
+    operation::UpdateOrReplace,
     serde_util,
 };
 
-#[derive(Clone, Debug, Serialize)]
-pub(super) enum Modification {
-    #[serde(rename = "remove", serialize_with = "serde_util::serialize_true")]
+#[derive(Clone, Debug)]
+pub(super) enum Modification<'a, T> {
     Delete,
-    #[serde(rename = "update")]
-    Update(UpdateModifications),
+    Update(UpdateOrReplace<'a, T>),
 }
 
 #[serde_with::skip_serializing_none]
@@ -31,9 +29,6 @@ pub(super) enum Modification {
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub(super) struct FindAndModifyOptions {
-    #[serde(flatten)]
-    pub(crate) modification: Modification,
-
     #[builder(default)]
     pub(crate) sort: Option<Document>,
 
@@ -77,71 +72,60 @@ pub(super) struct FindAndModifyOptions {
     pub(crate) comment: Option<Bson>,
 }
 
-impl FindAndModifyOptions {
-    pub(super) fn from_find_one_and_delete_options(
-        opts: FindOneAndDeleteOptions,
-    ) -> FindAndModifyOptions {
-        let mut modify_opts = FindAndModifyOptions::builder()
-            .modification(Modification::Delete)
-            .build();
-
-        modify_opts.collation = opts.collation;
-        modify_opts.max_time = opts.max_time;
-        modify_opts.projection = opts.projection;
-        modify_opts.sort = opts.sort;
-        modify_opts.write_concern = opts.write_concern;
-        modify_opts.hint = opts.hint;
-        modify_opts.let_vars = opts.let_vars;
-        modify_opts.comment = opts.comment;
-        modify_opts
+impl From<FindOneAndDeleteOptions> for FindAndModifyOptions {
+    fn from(options: FindOneAndDeleteOptions) -> Self {
+        Self {
+            sort: options.sort,
+            new: None,
+            upsert: None,
+            bypass_document_validation: None,
+            write_concern: options.write_concern,
+            array_filters: None,
+            max_time: options.max_time,
+            projection: options.projection,
+            collation: options.collation,
+            hint: options.hint,
+            let_vars: options.let_vars,
+            comment: options.comment,
+        }
     }
+}
 
-    pub(super) fn from_find_one_and_replace_options(
-        replacement: Document,
-        opts: FindOneAndReplaceOptions,
-    ) -> FindAndModifyOptions {
-        let replacement = UpdateModifications::Document(replacement);
-        let mut modify_opts = FindAndModifyOptions::builder()
-            .modification(Modification::Update(replacement))
-            .build();
-
-        modify_opts.collation = opts.collation;
-        modify_opts.bypass_document_validation = opts.bypass_document_validation;
-        modify_opts.max_time = opts.max_time;
-        modify_opts.projection = opts.projection;
-        modify_opts.new = return_document_to_bool(opts.return_document);
-        modify_opts.sort = opts.sort;
-        modify_opts.upsert = opts.upsert;
-        modify_opts.write_concern = opts.write_concern;
-        modify_opts.hint = opts.hint;
-        modify_opts.let_vars = opts.let_vars;
-        modify_opts.comment = opts.comment;
-
-        modify_opts
+impl From<FindOneAndUpdateOptions> for FindAndModifyOptions {
+    fn from(options: FindOneAndUpdateOptions) -> Self {
+        Self {
+            sort: options.sort,
+            new: return_document_to_bool(options.return_document),
+            upsert: options.upsert,
+            bypass_document_validation: options.bypass_document_validation,
+            write_concern: options.write_concern,
+            array_filters: options.array_filters,
+            max_time: options.max_time,
+            projection: options.projection,
+            collation: options.collation,
+            hint: options.hint,
+            let_vars: options.let_vars,
+            comment: options.comment,
+        }
     }
+}
 
-    pub(super) fn from_find_one_and_update_options(
-        update: UpdateModifications,
-        opts: FindOneAndUpdateOptions,
-    ) -> FindAndModifyOptions {
-        let mut modify_opts = FindAndModifyOptions::builder()
-            .modification(Modification::Update(update))
-            .build();
-
-        modify_opts.collation = opts.collation;
-        modify_opts.array_filters = opts.array_filters;
-        modify_opts.bypass_document_validation = opts.bypass_document_validation;
-        modify_opts.max_time = opts.max_time;
-        modify_opts.projection = opts.projection;
-        modify_opts.new = return_document_to_bool(opts.return_document);
-        modify_opts.sort = opts.sort;
-        modify_opts.upsert = opts.upsert;
-        modify_opts.write_concern = opts.write_concern;
-        modify_opts.hint = opts.hint;
-        modify_opts.let_vars = opts.let_vars;
-        modify_opts.comment = opts.comment;
-
-        modify_opts
+impl From<FindOneAndReplaceOptions> for FindAndModifyOptions {
+    fn from(options: FindOneAndReplaceOptions) -> Self {
+        Self {
+            sort: options.sort,
+            new: return_document_to_bool(options.return_document),
+            upsert: options.upsert,
+            bypass_document_validation: options.bypass_document_validation,
+            write_concern: options.write_concern,
+            array_filters: None,
+            max_time: options.max_time,
+            projection: options.projection,
+            collation: options.collation,
+            hint: options.hint,
+            let_vars: options.let_vars,
+            comment: options.comment,
+        }
     }
 }
 

@@ -32,7 +32,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{self, Bson, Document},
-    bson_util,
+    bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{
@@ -73,7 +73,7 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use raw_output::RawOutput;
 pub(crate) use run_command::RunCommand;
 pub(crate) use run_cursor_command::RunCursorCommand;
-pub(crate) use update::Update;
+pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
@@ -224,28 +224,28 @@ impl From<CommandErrorBody> for Error {
     }
 }
 
-/// Appends a serializable struct to the input document.
-/// The serializable struct MUST serialize to a Document, otherwise an error will be thrown.
+/// Appends a serializable struct to the input document. The serializable struct MUST serialize to a
+/// Document; otherwise, an error will be thrown.
 pub(crate) fn append_options<T: Serialize + Debug>(
     doc: &mut Document,
     options: Option<&T>,
 ) -> Result<()> {
-    match options {
-        Some(options) => {
-            let temp_doc = bson::to_bson(options)?;
-            match temp_doc {
-                Bson::Document(d) => {
-                    doc.extend(d);
-                    Ok(())
-                }
-                _ => Err(ErrorKind::Internal {
-                    message: format!("options did not serialize to a Document: {:?}", options),
-                }
-                .into()),
-            }
-        }
-        None => Ok(()),
+    if let Some(options) = options {
+        let options_doc = bson::to_document(options)?;
+        doc.extend(options_doc);
     }
+    Ok(())
+}
+
+pub(crate) fn append_options_to_raw_document<T: Serialize>(
+    doc: &mut RawDocumentBuf,
+    options: Option<&T>,
+) -> Result<()> {
+    if let Some(options) = options {
+        let options_raw_doc = bson::to_raw_document_buf(options)?;
+        extend_raw_document_buf(doc, options_raw_doc)?;
+    }
+    Ok(())
 }
 
 #[derive(Deserialize, Debug)]

@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use bson::serde_helpers;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, serde_helpers, Bson, Document, RawBson, RawDocumentBuf},
     concern::{ReadConcern, WriteConcern},
+    error::Result,
     options::Collation,
     selection_criteria::SelectionCriteria,
     serde_util,
@@ -63,7 +63,7 @@ impl<'de> Deserialize<'de> for ReturnDocument {
 }
 
 /// Specifies the index to use for an operation.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 #[non_exhaustive]
 pub enum Hint {
@@ -74,11 +74,11 @@ pub enum Hint {
 }
 
 impl Hint {
-    pub(crate) fn to_bson(&self) -> Bson {
-        match self {
-            Hint::Keys(ref d) => Bson::Document(d.clone()),
-            Hint::Name(ref s) => Bson::String(s.clone()),
-        }
+    pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
+        Ok(match self {
+            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::from_document(d)?),
+            Hint::Name(ref s) => RawBson::String(s.clone()),
+        })
     }
 }
 
@@ -172,17 +172,6 @@ pub enum UpdateModifications {
     /// An aggregation pipeline.
     /// Only available in MongoDB 4.2+.
     Pipeline(Vec<Document>),
-}
-
-impl UpdateModifications {
-    pub(crate) fn to_bson(&self) -> Bson {
-        match self {
-            UpdateModifications::Document(ref d) => Bson::Document(d.clone()),
-            UpdateModifications::Pipeline(ref p) => {
-                Bson::Array(p.iter().map(|d| Bson::Document(d.clone())).collect())
-            }
-        }
-    }
 }
 
 impl From<Document> for UpdateModifications {
