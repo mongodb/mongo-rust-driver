@@ -135,12 +135,14 @@ where
         let result = self.provider.execute(spec, client, pin).await;
         self.handle_get_more_result(result)?;
 
-        if self.is_exhausted() {
-            Ok(AdvanceResult::Exhausted)
-        } else {
-            match self.state_mut().buffer.advance() {
-                true => Ok(AdvanceResult::Advanced),
-                false => Ok(AdvanceResult::Waiting),
+        match self.state_mut().buffer.advance() {
+            true => Ok(AdvanceResult::Advanced),
+            false => {
+                if self.is_exhausted() {
+                    Ok(AdvanceResult::Exhausted)
+                } else {
+                    Ok(AdvanceResult::Waiting)
+                }
             }
         }
     }
