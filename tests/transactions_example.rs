@@ -57,11 +57,15 @@ async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
     let employees = client.database("hr").collection::<Document>("employees");
     let events = client.database("reporting").collection("events");
 
+    let employees_options = mongodb::options::UpdateOptions::builder()
+        .upsert(true)
+        .build();
+
     employees
         .update_one_with_session(
             doc! { "employee": 3 },
             doc! { "$set": { "status": "Inactive" } },
-            None,
+            Some(employees_options),
             session,
         )
         .await?;
