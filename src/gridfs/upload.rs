@@ -231,6 +231,9 @@ where
             n => n,
         };
         total_bytes_read += bytes_read;
+        if total_bytes_read == buf.len() {
+            break;
+        }
     }
 
     Ok(total_bytes_read)
