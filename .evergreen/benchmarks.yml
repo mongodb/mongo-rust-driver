@@ -132,6 +132,7 @@ functions:
             AUTH=${AUTH} \
             SSL=${SSL} \
             REQUIRE_API_VERSION=${REQUIRE_API_VERSION} \
+            SKIP_LEGACY_SHELL=1 \
             sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
     # run-orchestration generates expansion file with the MONGODB_URI for the cluster
     - command: expansions.update
@@ -275,33 +276,18 @@ post:
   - func: "cleanup"
 
 tasks:
-  - name: "benchmark-rapid-standalone"
-    tags: ["rapid", "standalone"]
+  - name: "benchmark-driver"
+    tags: ["driver"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
-          MONGODB_VERSION: "rapid"
-          TOPOLOGY: "server"
-      - func: "run driver benchmarks"
-      - func: "upload benchmark results"
-
-  - name: "benchmark-rapid-replica_set"
-    tags: ["rapid", "replica_set"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: "rapid"
-          TOPOLOGY: "replica_set"
-      - func: "run driver benchmarks"
-      - func: "upload benchmark results"
-
-  - name: "benchmark-rapid-sharded_cluster"
-    tags: ["rapid", "sharded_cluster"]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: "rapid"
-          TOPOLOGY: "sharded_cluster"
+          MONGODB_VERSION: "v6.0-perf"
+          # Note that drivers-evergreen-tools expects `SSL` as the environmental
+          # variable, not `TLS`, so we have to use that for the actual value used in the
+          # script; we use `TLS` for the metadata that isn't used by the actual shell
+          # scripts.
+          AUTH: "auth"
+          SSL: "ssl"
       - func: "run driver benchmarks"
       - func: "upload benchmark results"
 
@@ -317,14 +303,6 @@ tasks:
       - func: "upload benchmark results"
 
 axes:
-  - id: "mongodb-version"
-    display_name: MongoDB Version
-    values:
-      - id: "rapid"
-        display_name: "rapid"
-        variables:
-          MONGODB_VERSION: "rapid"
-
   - id: "topology"
     display_name: Topology
     values:
@@ -353,59 +331,32 @@ axes:
         variables:
           ASYNC_RUNTIME: "async-std"
 
-  # Note that drivers-evergreen-tools expects `SSL` as the environmental
-  # variable, not `TLS`, so we have to use that for the actual value used in the
-  # script; we use `TLS` for the metadata that isn't used by the actual shell
-  # scripts.
-  - id: "auth-and-tls"
-    display_name: Authentication and TLS
-    values:
-      - id: "auth-and-tls"
-        display_name: Auth TLS
-        variables:
-           AUTH: "auth"
-           SSL: "ssl"
-
   - id: "os"
     display_name: OS
     values:
-      - id: ubuntu-18.04
-        display_name: "Ubuntu 18.04"
-        run_on: ubuntu1804-test
+      - id: rhel90-dbx-perf-large
+        display_name: "RHEL 90 (perf)"
+        run_on: rhel90-dbx-perf-large
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      # TODO: RUST-990 re-enable macOS benchmarks
-      # - id: macos-10.14
-      #   display_name: "MacOS 10.14"
-      #   run_on: macos-1014
-      #   variables:
-      #     PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
-      #     VENV_BIN_DIR: "bin"
-      - id: windows-64-vs2017
-        display_name: "Windows (VS 2017)"
-        run_on: windows-64-vs2017-test
-        variables:
-          PYTHON: "/cygdrive/c/python/Python36/python"
-          VENV_BIN_DIR: "Scripts"
 
 buildvariants:
 -
   matrix_name: "driver benchmarks"
   matrix_spec:
     os:
-      - ubuntu-18.04
-      - windows-64-vs2017
-    auth-and-tls: "*"
+      - rhel90-dbx-perf-large
     async-runtime: "*"
-  display_name: "${os} ${auth-and-tls} with ${async-runtime}"
+    topology: "*"
+  display_name: "Benchmark ${topology} with ${async-runtime}"
   tasks:
-     - ".rapid"
+     - ".driver"
 -
   matrix_name: "bson benchmarks"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel90-dbx-perf-large
   display_name: "BSON Benchmarks"
   tasks:
      - ".bson"
@@ -413,9 +364,9 @@ buildvariants:
 - matrix_name: "compile-only"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - rhel90-dbx-perf-large
     async-runtime: "*"
-  display_name: "Compile on ${os} with ${async-runtime}"
+  display_name: "Compile with ${async-runtime}"
   tasks:
     - "benchmark-compile"
 
