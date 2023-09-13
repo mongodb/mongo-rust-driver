@@ -2,11 +2,12 @@ mod options;
 
 use std::fmt::Debug;
 
+use bson::{from_slice, RawBson};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, from_document, rawdoc, Bson, Document, RawDocumentBuf},
+    bson::{doc, rawdoc, Document, RawDocumentBuf},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{
@@ -147,11 +148,23 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
-        pub(crate) struct Response<T> {
-            value: Option<T>,
+        pub(crate) struct Response {
+            value: RawBson,
         }
+        let response: Response = response.body()?;
 
-        response.body().map(|r: Response<T>| r.value)
+        match response.value {
+            RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
+            RawBson::Null => Ok(None),
+            other => Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "expected document for value field of findAndModify response, but instead got \
+                     {:?}",
+                    other
+                ),
+            }
+            .into()),
+        }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
