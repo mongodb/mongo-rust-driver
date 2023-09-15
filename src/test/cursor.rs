@@ -257,3 +257,34 @@ async fn session_cursor_with_type() {
 
     let _ = cursor_with_type.next(&mut session).await.unwrap().unwrap();
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn cursor_final_batch() {
+    let client = TestClient::new().await;
+    let coll = client
+        .create_fresh_collection("test_cursor_final_batch", "test", None)
+        .await;
+    coll.insert_many(
+        vec![
+            doc! { "foo": 1 },
+            doc! { "foo": 2 },
+            doc! { "foo": 3 },
+            doc! { "foo": 4 },
+            doc! { "foo": 5 },
+        ],
+        None,
+    )
+    .await
+    .unwrap();
+
+    let mut cursor = coll
+        .find(None, FindOptions::builder().batch_size(3).build())
+        .await
+        .unwrap();
+    let mut found = 0;
+    while cursor.advance().await.unwrap() {
+        found += 1;
+    }
+    assert_eq!(found, 5);
+}
