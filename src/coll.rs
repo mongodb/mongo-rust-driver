@@ -158,6 +158,7 @@ impl<T> Collection<T> {
         let write_concern = options
             .write_concern
             .or_else(|| db.write_concern().cloned());
+        #[allow(deprecated)]
         let human_readable_serialization = options.human_readable_serialization.unwrap_or_default();
 
         Self {
