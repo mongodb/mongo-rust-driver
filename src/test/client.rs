@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
@@ -974,6 +974,39 @@ async fn manual_shutdown_immediate_with_resources() {
         .get_command_started_events(&["abortTransaction"])
         .is_empty());
     assert!(events.get_command_started_events(&["delete"]).is_empty());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn find_one_and_delete_serde_consistency() {
+    let client = Client::test_builder().build().await;
+
+    let coll = client
+        .database("find_one_and_delete_serde_consistency")
+        .collection("test");
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct Foo {
+        #[serde(with = "serde_hex::SerHexSeq::<serde_hex::StrictPfx>")]
+        problematic: Vec<u8>,
+    }
+
+    let doc = Foo {
+        problematic: vec![0, 1, 2, 3, 4, 5, 6, 7],
+    };
+
+    coll.insert_one(&doc, None).await.unwrap();
+    let rec: Foo = coll.find_one(doc! {}, None).await.unwrap().unwrap();
+    assert_eq!(doc.problematic, rec.problematic);
+    let rec: Foo = coll
+        .find_one_and_delete(doc! {}, None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(doc.problematic, rec.problematic);
+
+    let nothing = coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    assert!(nothing.is_none());
 }
 
 // Verifies that `Client::warm_connection_pool` succeeds.

@@ -4,11 +4,12 @@ mod test;
 
 use std::fmt::Debug;
 
+use bson::{from_slice, RawBson};
 use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, from_document, Bson, Document},
+    bson::{doc, Document},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{
@@ -133,11 +134,15 @@ where
         response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        #[derive(Debug, Deserialize)]
+        pub(crate) struct Response {
+            value: RawBson,
+        }
         let response: Response = response.body()?;
 
         match response.value {
-            Bson::Document(doc) => Ok(Some(from_document(doc)?)),
-            Bson::Null => Ok(None),
+            RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
+            RawBson::Null => Ok(None),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "expected document for value field of findAndModify response, but instead got \
@@ -156,9 +161,4 @@ where
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct Response {
-    value: Bson,
 }
