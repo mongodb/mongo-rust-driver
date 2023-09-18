@@ -195,6 +195,7 @@ time = "0.3.9"
 tokio = { version = ">= 0.0.0", features = ["fs"] }
 tracing-subscriber = "0.3.16"
 regex = "1.6.0"
+serde-hex = "0.1.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
