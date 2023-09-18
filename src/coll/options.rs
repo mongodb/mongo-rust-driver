@@ -21,9 +21,8 @@ use crate::{
 mod suppress_warning {
     use super::*;
 
-    /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
-    /// [`Database::collection_with_options`](../struct.Database.html#method.
-    /// collection_with_options).
+    /// These are the valid options for creating a [`Collection`](crate::Collection) with
+    /// [`Database::collection_with_options`](crate::Database::collection_with_options).
     #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
     #[builder(field_defaults(default, setter(into)))]
     #[serde(rename_all = "camelCase")]

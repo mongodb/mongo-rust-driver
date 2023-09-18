@@ -373,6 +373,7 @@ impl CollectionOrDatabaseOptions {
         }
     }
 
+    #[allow(deprecated)]
     pub(crate) fn as_collection_options(&self) -> CollectionOptions {
         CollectionOptions {
             read_concern: self.read_concern.clone(),
