@@ -1421,6 +1421,29 @@ impl ClientOptions {
             }
         }
 
+        #[cfg(feature = "tracing-unstable")]
+        {
+            let hostnames = if let Some(info) = &self.original_srv_info {
+                vec![info.hostname.to_ascii_lowercase()]
+            } else {
+                self.hosts
+                    .iter()
+                    .filter_map(|addr| match addr {
+                        ServerAddress::Tcp { host, .. } => Some(host.to_ascii_lowercase()),
+                        _ => None,
+                    })
+                    .collect()
+            };
+            if hostnames.iter().any(|s| s.ends_with(".cosmos.azure.com")) {
+                tracing::info!("You appear to be connected to a CosmosDB cluster. For more information regarding feature compatibility and support please visit https://www.mongodb.com/supportability/cosmosdb");
+            }
+            if hostnames.iter().any(|s| {
+                s.ends_with(".docdb.amazonaws.com") || s.ends_with(".docdb-elastic.amazonaws.com")
+            }) {
+                tracing::info!("You appear to be connected to a DocumentDB cluster. For more information regarding feature compatibility and support please visit https://www.mongodb.com/supportability/documentdb");
+            }
+        }
+
         Ok(())
     }
 
