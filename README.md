@@ -81,6 +81,7 @@ Using the `"sync"` feature also requires using `default-features = false`.
 | `bson-uuid-0_8`      | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |
 | `bson-uuid-1`        | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |
 | `bson-chrono-0_4`    | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                             | no      |
+| `bson-time-0_3`      | Enable support for v0.3 of the [`time`](docs.rs/time/0.3) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |
 | `bson-serde_with`    | Enable support for the [`serde_with`](docs.rs/serde_with/latest) crate in the public API of the re-exported `bson` crate.             | `serde_with`                    | no      |
 | `zlib-compression`   | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                              | `flate2`                        | no      |
 | `zstd-compression`   | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/).                                               | `zstd`                          | no      |
