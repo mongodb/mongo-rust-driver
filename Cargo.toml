@@ -39,6 +39,7 @@ tokio-runtime = [
     "serde_bytes",
 ]
 async-std-runtime = [
+    "async-executor",
     "async-std",
     "async-std/attributes",
     "async-std/unstable",
@@ -87,6 +88,7 @@ in-use-encryption-unstable = ["mongocrypt", "rayon", "num_cpus"]
 tracing-unstable = ["tracing", "log"]
 
 [dependencies]
+async-executor = { version = "=1.5.1", optional = true }  # TODO RUST-1768: remove this
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
