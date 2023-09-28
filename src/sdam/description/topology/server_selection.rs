@@ -27,12 +27,17 @@ pub(crate) const IDLE_WRITE_PERIOD: Duration = Duration::from_secs(10);
 #[derive(Debug)]
 pub(crate) struct SelectedServer {
     server: Arc<Server>,
+    retry: SelectionRetry,
 }
 
 impl SelectedServer {
-    fn new(server: Arc<Server>) -> Self {
+    fn new(server: Arc<Server>, retry: SelectionRetry) -> Self {
         server.increment_operation_count();
-        Self { server }
+        Self { server, retry }
+    }
+
+    pub(crate) fn selection_retry(&self) -> &SelectionRetry {
+        &self.retry
     }
 
     #[cfg(feature = "tracing-unstable")]
@@ -55,19 +60,38 @@ impl Drop for SelectedServer {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct SelectionRetry {
+    initial_mongos: Option<ServerAddress>,
+}
+
 /// Attempt to select a server, returning None if no server could be selected
 /// that matched the provided criteria.
 pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
+    retry: Option<&SelectionRetry>,
 ) -> Result<Option<SelectedServer>> {
-    let in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    if let Some(addr) = retry.and_then(|r| r.initial_mongos.as_ref()) {
+        if in_window.len() > 1 {
+            in_window.retain(|d| &d.address != addr);
+        }
+    }
     let in_window_servers = in_window
         .into_iter()
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
-    Ok(select_server_in_latency_window(in_window_servers).map(SelectedServer::new))
+    let selected = select_server_in_latency_window(in_window_servers);
+    Ok(selected.map(|server| {
+        let initial_mongos = if topology_description.topology_type() == TopologyType::Sharded {
+            Some(server.address.clone())
+        } else {
+            None
+        };
+        SelectedServer::new(server, SelectionRetry { initial_mongos })
+    }))
 }
 
 /// Choose a server from several suitable choices within the latency window according to

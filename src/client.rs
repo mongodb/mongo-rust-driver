@@ -52,7 +52,11 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
-    sdam::{server_selection, SelectedServer, Topology},
+    sdam::{
+        server_selection::{self, SelectionRetry},
+        SelectedServer,
+        Topology,
+    },
     tracking_arc::TrackingArc,
     ClientSession,
 };
@@ -654,17 +658,20 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self.select_server(criteria, "Test select server").await?;
+        let server = self
+            .select_server(criteria, "Test select server", None)
+            .await?;
         Ok(server.address.clone())
     }
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
-    #[allow(unused_variables)] // we only use the operation_name for tracing.
     async fn select_server(
         &self,
         criteria: Option<&SelectionCriteria>,
+        #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
+        selection_retry: Option<&SelectionRetry>,
     ) -> Result<SelectedServer> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
@@ -698,6 +705,7 @@ impl Client {
                 criteria,
                 &state.description,
                 &state.servers(),
+                selection_retry,
             );
             match result {
                 Err(error) => {
