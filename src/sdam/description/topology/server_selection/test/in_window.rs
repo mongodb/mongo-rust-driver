@@ -77,10 +77,14 @@ async fn run_test(test_file: TestFile) {
     .into();
 
     for _ in 0..test_file.iterations {
-        let selection =
-            server_selection::attempt_to_select_server(&read_pref, &topology_description, &servers)
-                .expect("selection should not fail")
-                .expect("a server should have been selected");
+        let selection = server_selection::attempt_to_select_server(
+            &read_pref,
+            &topology_description,
+            &servers,
+            None,
+        )
+        .expect("selection should not fail")
+        .expect("a server should have been selected");
         *tallies.entry(selection.address.clone()).or_insert(0) += 1;
     }
 
