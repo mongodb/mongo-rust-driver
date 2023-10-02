@@ -27,8 +27,7 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_unified() {
-    // TODO RUST-1414: unskip this file
-    let mut skipped_files = vec!["implicit-sessions-default-causal-consistency.json"];
+    let mut skipped_files = vec![];
     let client = TestClient::new().await;
     if client.is_sharded() && client.server_version_gte(7, 0) {
         // TODO RUST-1666: unskip this file

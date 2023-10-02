@@ -282,7 +282,9 @@ impl ClientSession {
     }
 
     pub(crate) fn causal_consistency(&self) -> bool {
-        self.options().and_then(|opts| opts.causal_consistency).unwrap_or(!self.is_implicit())
+        self.options()
+            .and_then(|opts| opts.causal_consistency)
+            .unwrap_or(!self.is_implicit())
     }
 
     /// Mark this session (and the underlying server session) as dirty.
