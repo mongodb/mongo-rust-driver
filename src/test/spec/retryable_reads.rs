@@ -3,10 +3,11 @@ use std::{sync::Arc, time::Duration};
 use bson::doc;
 
 use crate::{
+    Client,
     error::Result,
     event::{
         cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::CommandEventHandler,
+        command::{CommandEventHandler, CommandEvent},
     },
     runtime,
     runtime::AsyncJoinHandle,
@@ -158,4 +159,48 @@ async fn retry_read_pool_cleared() {
     }
 
     assert_eq!(handler.get_command_started_events(&["find"]).len(), 3);
+}
+
+// Retryable Reads Are Retried on a Different mongos if One is Available
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_read_different_mongos() {
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
+        log_uncaptured("skipping retry_read_different_mongos: requires sharded cluster with at least two hosts");
+        return;
+    }
+    client_options.hosts.drain(2..);
+
+    let mut guards = vec![];
+    for ix in 0..=1 {
+        let mut opts = client_options.clone();
+        opts.hosts.remove(ix);
+        let client = Client::test_builder().options(opts).build().await;
+        let fail_opts = FailCommandOptions::builder()
+            .error_code(6)
+            .close_connection(true)
+            .build();
+        let fp = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(fail_opts));
+        guards.push(client.enable_failpoint(fp, None).await.unwrap());
+    }
+
+    let client = Client::test_builder().options(client_options.clone()).event_client().build().await;
+    let result = client.database("test").collection::<bson::Document>("retry_read_different_mongos").find(doc! { }, None).await;
+    assert!(result.is_err());
+    let events = client.get_command_events(&["find"]);
+    assert!(
+        matches!(
+            &events[..],
+            &[
+                CommandEvent::Started(_),
+                CommandEvent::Failed(_),
+                CommandEvent::Started(_),
+                CommandEvent::Failed(_),
+            ]
+        ),
+        "unexpected events: {:#?}", events,
+    );
+
+    drop(guards);  // enforce lifetime
 }
