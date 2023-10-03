@@ -495,10 +495,7 @@ impl Client {
                 }
                 // If this is a causally consistent session, set `readConcern.afterClusterTime`.
                 // Causal consistency defaults to true, unless snapshot is true.
-                else if session
-                    .options()
-                    .and_then(|opts| opts.causal_consistency)
-                    .unwrap_or(true)
+                else if session.causal_consistency()
                     && matches!(
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
