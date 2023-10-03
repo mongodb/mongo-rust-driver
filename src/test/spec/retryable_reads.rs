@@ -176,6 +176,7 @@ async fn retry_read_different_mongos() {
     for ix in 0..=1 {
         let mut opts = client_options.clone();
         opts.hosts.remove(ix);
+        opts.direct_connection = Some(true);
         let client = Client::test_builder().options(opts).build().await;
         let fail_opts = FailCommandOptions::builder()
             .error_code(6)
