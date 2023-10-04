@@ -578,3 +578,104 @@ async fn retry_write_retryable_write_error() {
     // Consume failpoint guard.
     let _ = fp_rx.recv().await;
 }
+
+// Test that in a sharded cluster writes are retried on a different mongos if one available
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_write_different_mongos() {
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
+        log_uncaptured("skipping retry_write_different_mongos: requires sharded cluster with at least two hosts");
+        return;
+    }
+    client_options.hosts.drain(2..);
+    client_options.retry_writes = Some(true);
+
+    let mut guards = vec![];
+    for ix in [0, 1] {
+        let mut opts = client_options.clone();
+        opts.hosts.remove(ix);
+        opts.direct_connection = Some(true);
+        let client = Client::test_builder().options(opts).build().await;
+        if !client.supports_fail_command() {
+            log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
+            return;
+        }
+        let fail_opts = FailCommandOptions::builder()
+            .error_code(6)
+            .error_labels(vec!["RetryableWriteError".to_string()])
+            .close_connection(true)
+            .build();
+        let fp = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(fail_opts));
+        guards.push(client.enable_failpoint(fp, None).await.unwrap());
+    }
+
+    let client = Client::test_builder().options(client_options).event_client().build().await;
+    let result = client.database("test").collection::<bson::Document>("retry_write_different_mongos").insert_one(doc! { }, None).await;
+    assert!(result.is_err());
+    let events = client.get_command_events(&["insert"]);
+    assert!(
+        matches!(
+            &events[..],
+            &[
+                CommandEvent::Started(_),
+                CommandEvent::Failed(_),
+                CommandEvent::Started(_),
+                CommandEvent::Failed(_),
+            ]
+        ),
+        "unexpected events: {:#?}", events,
+    );
+
+    drop(guards);  // enforce lifetime
+}
+
+// Retryable Reads Are Retried on the Same mongos if No Others are Available
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_write_same_mongos() {
+    let init_client = Client::test_builder().build().await;
+    if !init_client.supports_fail_command() {
+        log_uncaptured("skipping retry_write_same_mongos: requires failCommand");
+        return;
+    }
+    if !init_client.is_sharded() {
+        log_uncaptured("skipping retry_write_same_mongos: requires sharded cluster");
+        return;
+    }
+
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    client_options.hosts.drain(1..);
+    client_options.retry_writes = Some(true);
+    let fp_guard = {
+        let mut client_options = client_options.clone();
+        client_options.direct_connection = Some(true);
+        let client = Client::test_builder().options(client_options).build().await;
+        let fail_opts = FailCommandOptions::builder()
+            .error_code(6)
+            .error_labels(vec!["RetryableWriteError".to_string()])
+            .close_connection(true)
+            .build();
+        let fp = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(fail_opts));
+        client.enable_failpoint(fp, None).await.unwrap()
+    };
+
+    let client = Client::test_builder().options(client_options).event_client().build().await;
+    let result = client.database("test").collection::<bson::Document>("retry_write_same_mongos").insert_one(doc! { }, None).await;
+    assert!(result.is_ok(), "{:?}", result);
+    let events = client.get_command_events(&["insert"]);
+    assert!(
+        matches!(
+            &events[..],
+            &[
+                CommandEvent::Started(_),
+                CommandEvent::Failed(_),
+                CommandEvent::Started(_),
+                CommandEvent::Succeeded(_),
+            ]
+        ),
+        "unexpected events: {:#?}", events,
+    );
+
+    drop(fp_guard);  // enforce lifetime
+}
