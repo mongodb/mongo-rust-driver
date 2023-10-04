@@ -19,8 +19,6 @@ use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future};
 use futures_util::{future::join_all, FutureExt};
 
-#[cfg(test)]
-use crate::options::ServerAddress;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
     command::CommandTracingEventEmitter,
@@ -49,14 +47,11 @@ use crate::{
         ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
+        ServerAddress,
         SessionOptions,
     },
     results::DatabaseSpecification,
-    sdam::{
-        server_selection::{self, SelectionRetry},
-        SelectedServer,
-        Topology,
-    },
+    sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
     ClientSession,
 };
@@ -671,7 +666,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
         #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
-        selection_retry: Option<&SelectionRetry>,
+        deprioritized: Option<&ServerAddress>,
     ) -> Result<SelectedServer> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
@@ -705,7 +700,7 @@ impl Client {
                 criteria,
                 &state.description,
                 &state.servers(),
-                selection_retry,
+                deprioritized,
             );
             match result {
                 Err(error) => {

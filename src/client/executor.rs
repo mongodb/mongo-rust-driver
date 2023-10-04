@@ -12,7 +12,7 @@ use std::{
     time::Instant,
 };
 
-use super::{session::TransactionState, Client, ClientSession};
+use super::{options::ServerAddress, session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
@@ -55,14 +55,7 @@ use crate::{
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
-    sdam::{
-        server_selection::SelectionRetry,
-        HandshakePhase,
-        SelectedServer,
-        ServerType,
-        TopologyType,
-        TransactionSupportStatus,
-    },
+    sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
     tracking_arc::TrackingArc,
     ClusterTime,
@@ -324,7 +317,7 @@ impl Client {
                 .select_server(
                     selection_criteria,
                     op.name(),
-                    retry.as_ref().map(|r| &r.selection_retry),
+                    retry.as_ref().map(|r| &r.first_server),
                 )
                 .await
             {
@@ -337,7 +330,6 @@ impl Client {
                 }
             };
             let server_addr = server.address.clone();
-            let selection_retry = server.selection_retry().clone();
 
             let mut conn = match get_connection(&session, &op, &server.pool).await {
                 Ok(c) => c,
@@ -358,7 +350,7 @@ impl Client {
                         retry = Some(ExecutionRetry {
                             prior_txn_number: None,
                             first_error: err,
-                            selection_retry,
+                            first_server: server_addr.clone(),
                         });
                         continue;
                     } else {
@@ -424,7 +416,7 @@ impl Client {
                     self.inner
                         .topology
                         .handle_application_error(
-                            server_addr,
+                            server_addr.clone(),
                             err.clone(),
                             HandshakePhase::after_completion(&conn),
                         )
@@ -450,7 +442,7 @@ impl Client {
                         retry = Some(ExecutionRetry {
                             prior_txn_number: txn_number,
                             first_error: err,
-                            selection_retry,
+                            first_server: server_addr.clone(),
                         });
                         continue;
                     } else {
@@ -1042,7 +1034,7 @@ struct ExecutionDetails<T: Operation> {
 struct ExecutionRetry {
     prior_txn_number: Option<i64>,
     first_error: Error,
-    selection_retry: SelectionRetry,
+    first_server: ServerAddress,
 }
 
 trait RetryHelper {
