@@ -173,11 +173,15 @@ async fn retry_read_different_mongos() {
     client_options.hosts.drain(2..);
 
     let mut guards = vec![];
-    for ix in 0..=1 {
+    for ix in [0, 1] {
         let mut opts = client_options.clone();
         opts.hosts.remove(ix);
         opts.direct_connection = Some(true);
         let client = Client::test_builder().options(opts).build().await;
+        if !client.supports_fail_command() {
+            log_uncaptured("skipping retry_read_different_mongos: requires failCommand");
+            return;
+        }
         let fail_opts = FailCommandOptions::builder()
             .error_code(6)
             .close_connection(true)
