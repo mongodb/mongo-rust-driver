@@ -171,6 +171,7 @@ async fn retry_read_different_mongos() {
         return;
     }
     client_options.hosts.drain(2..);
+    client_options.retry_reads = Some(true);
 
     let mut guards = vec![];
     for ix in [0, 1] {
@@ -190,7 +191,7 @@ async fn retry_read_different_mongos() {
         guards.push(client.enable_failpoint(fp, None).await.unwrap());
     }
 
-    let client = Client::test_builder().options(client_options.clone()).event_client().build().await;
+    let client = Client::test_builder().options(client_options).event_client().build().await;
     let result = client.database("test").collection::<bson::Document>("retry_read_different_mongos").find(doc! { }, None).await;
     assert!(result.is_err());
     let events = client.get_command_events(&["find"]);
@@ -208,4 +209,53 @@ async fn retry_read_different_mongos() {
     );
 
     drop(guards);  // enforce lifetime
+}
+
+// Retryable Reads Are Retried on the Same mongos if No Others are Available
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_read_same_mongos() {
+    let init_client = Client::test_builder().build().await;
+    if !init_client.supports_fail_command() {
+        log_uncaptured("skipping retry_read_same_mongos: requires failCommand");
+        return;
+    }
+    if !init_client.is_sharded() {
+        log_uncaptured("skipping retry_read_same_mongos: requires sharded cluster");
+        return;
+    }
+
+    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    client_options.hosts.drain(1..);
+    client_options.retry_reads = Some(true);
+    let fp_guard = {
+        let mut client_options = client_options.clone();
+        client_options.direct_connection = Some(true);
+        let client = Client::test_builder().options(client_options).build().await;
+        let fail_opts = FailCommandOptions::builder()
+            .error_code(6)
+            .close_connection(true)
+            .build();
+        let fp = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(fail_opts));
+        client.enable_failpoint(fp, None).await.unwrap()
+    };
+
+    let client = Client::test_builder().options(client_options).event_client().build().await;
+    let result = client.database("test").collection::<bson::Document>("retry_read_same_mongos").find(doc! { }, None).await;
+    assert!(result.is_ok(), "{:?}", result);
+    let events = client.get_command_events(&["find"]);
+    assert!(
+        matches!(
+            &events[..],
+            &[
+                CommandEvent::Started(_),
+                CommandEvent::Failed(_),
+                CommandEvent::Started(_),
+                CommandEvent::Succeeded(_),
+            ]
+        ),
+        "unexpected events: {:#?}", events,
+    );
+
+    drop(fp_guard);  // enforce lifetime
 }
