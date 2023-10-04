@@ -3,11 +3,10 @@ use std::{sync::Arc, time::Duration};
 use bson::doc;
 
 use crate::{
-    Client,
     error::Result,
     event::{
         cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::{CommandEventHandler, CommandEvent},
+        command::{CommandEvent, CommandEventHandler},
     },
     runtime,
     runtime::AsyncJoinHandle,
@@ -22,6 +21,7 @@ use crate::{
         TestClient,
         CLIENT_OPTIONS,
     },
+    Client,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -167,7 +167,10 @@ async fn retry_read_pool_cleared() {
 async fn retry_read_different_mongos() {
     let mut client_options = CLIENT_OPTIONS.get().await.clone();
     if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
-        log_uncaptured("skipping retry_read_different_mongos: requires sharded cluster with at least two hosts");
+        log_uncaptured(
+            "skipping retry_read_different_mongos: requires sharded cluster with at least two \
+             hosts",
+        );
         return;
     }
     client_options.hosts.drain(2..);
@@ -191,8 +194,16 @@ async fn retry_read_different_mongos() {
         guards.push(client.enable_failpoint(fp, None).await.unwrap());
     }
 
-    let client = Client::test_builder().options(client_options).event_client().build().await;
-    let result = client.database("test").collection::<bson::Document>("retry_read_different_mongos").find(doc! { }, None).await;
+    let client = Client::test_builder()
+        .options(client_options)
+        .event_client()
+        .build()
+        .await;
+    let result = client
+        .database("test")
+        .collection::<bson::Document>("retry_read_different_mongos")
+        .find(doc! {}, None)
+        .await;
     assert!(result.is_err());
     let events = client.get_command_events(&["find"]);
     assert!(
@@ -205,10 +216,11 @@ async fn retry_read_different_mongos() {
                 CommandEvent::Failed(_),
             ]
         ),
-        "unexpected events: {:#?}", events,
+        "unexpected events: {:#?}",
+        events,
     );
 
-    drop(guards);  // enforce lifetime
+    drop(guards); // enforce lifetime
 }
 
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
@@ -240,8 +252,16 @@ async fn retry_read_same_mongos() {
         client.enable_failpoint(fp, None).await.unwrap()
     };
 
-    let client = Client::test_builder().options(client_options).event_client().build().await;
-    let result = client.database("test").collection::<bson::Document>("retry_read_same_mongos").find(doc! { }, None).await;
+    let client = Client::test_builder()
+        .options(client_options)
+        .event_client()
+        .build()
+        .await;
+    let result = client
+        .database("test")
+        .collection::<bson::Document>("retry_read_same_mongos")
+        .find(doc! {}, None)
+        .await;
     assert!(result.is_ok(), "{:?}", result);
     let events = client.get_command_events(&["find"]);
     assert!(
@@ -254,8 +274,9 @@ async fn retry_read_same_mongos() {
                 CommandEvent::Succeeded(_),
             ]
         ),
-        "unexpected events: {:#?}", events,
+        "unexpected events: {:#?}",
+        events,
     );
 
-    drop(fp_guard);  // enforce lifetime
+    drop(fp_guard); // enforce lifetime
 }
