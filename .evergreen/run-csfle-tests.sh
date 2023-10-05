@@ -10,10 +10,6 @@ set -o xtrace
 
 export CSFLE_TLS_CERT_DIR="${DRIVERS_TOOLS}/.evergreen/x509gen"
 
-cd ${DRIVERS_TOOLS}/.evergreen/auth_aws
-. ./activate-authawsvenv.sh
-cd -
-
 FEATURE_FLAGS+=("in-use-encryption-unstable" "aws-auth" "azure-kms")
 
 if [[ "$OPENSSL" = true ]]; then
@@ -26,6 +22,8 @@ if [ "$OS" = "Windows_NT" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
+. ${DRIVERS_TOOLS}/.evergreen/csfle/activate_venv.sh
+export PYTHON=python  # use the venv-provided python
 export AWS_DEFAULT_REGION=us-east-1
 . ${DRIVERS_TOOLS}/.evergreen/csfle/set-temp-creds.sh
 
