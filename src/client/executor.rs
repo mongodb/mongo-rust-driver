@@ -12,7 +12,7 @@ use std::{
     time::Instant,
 };
 
-use super::{session::TransactionState, Client, ClientSession};
+use super::{options::ServerAddress, session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
@@ -313,7 +313,14 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
-            let server = match self.select_server(selection_criteria, op.name()).await {
+            let server = match self
+                .select_server(
+                    selection_criteria,
+                    op.name(),
+                    retry.as_ref().map(|r| &r.first_server),
+                )
+                .await
+            {
                 Ok(server) => server,
                 Err(mut err) => {
                     retry.first_error()?;
@@ -322,6 +329,7 @@ impl Client {
                     return Err(err);
                 }
             };
+            let server_addr = server.address.clone();
 
             let mut conn = match get_connection(&session, &op, &server.pool).await {
                 Ok(c) => c,
@@ -342,6 +350,7 @@ impl Client {
                         retry = Some(ExecutionRetry {
                             prior_txn_number: None,
                             first_error: err,
+                            first_server: server_addr.clone(),
                         });
                         continue;
                     } else {
@@ -407,7 +416,7 @@ impl Client {
                     self.inner
                         .topology
                         .handle_application_error(
-                            server.address.clone(),
+                            server_addr.clone(),
                             err.clone(),
                             HandshakePhase::after_completion(&conn),
                         )
@@ -433,6 +442,7 @@ impl Client {
                         retry = Some(ExecutionRetry {
                             prior_txn_number: txn_number,
                             first_error: err,
+                            first_server: server_addr.clone(),
                         });
                         continue;
                     } else {
@@ -806,7 +816,9 @@ impl Client {
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
                 || server_type.is_data_bearing()
         }));
-        let _: SelectedServer = self.select_server(Some(&criteria), operation_name).await?;
+        let _: SelectedServer = self
+            .select_server(Some(&criteria), operation_name, None)
+            .await?;
         Ok(())
     }
 
@@ -1019,6 +1031,7 @@ struct ExecutionDetails<T: Operation> {
 struct ExecutionRetry {
     prior_txn_number: Option<i64>,
     first_error: Error,
+    first_server: ServerAddress,
 }
 
 trait RetryHelper {

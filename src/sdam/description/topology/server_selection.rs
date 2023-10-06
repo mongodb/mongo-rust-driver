@@ -61,13 +61,20 @@ pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
+    deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
-    let in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    if let Some(addr) = deprioritized {
+        if in_window.len() > 1 {
+            in_window.retain(|d| &d.address != addr);
+        }
+    }
     let in_window_servers = in_window
         .into_iter()
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
-    Ok(select_server_in_latency_window(in_window_servers).map(SelectedServer::new))
+    let selected = select_server_in_latency_window(in_window_servers);
+    Ok(selected.map(SelectedServer::new))
 }
 
 /// Choose a server from several suitable choices within the latency window according to

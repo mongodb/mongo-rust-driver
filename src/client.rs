@@ -19,8 +19,6 @@ use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future};
 use futures_util::{future::join_all, FutureExt};
 
-#[cfg(test)]
-use crate::options::ServerAddress;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
     command::CommandTracingEventEmitter,
@@ -49,6 +47,7 @@ use crate::{
         ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
+        ServerAddress,
         SessionOptions,
     },
     results::DatabaseSpecification,
@@ -654,17 +653,20 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self.select_server(criteria, "Test select server").await?;
+        let server = self
+            .select_server(criteria, "Test select server", None)
+            .await?;
         Ok(server.address.clone())
     }
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
-    #[allow(unused_variables)] // we only use the operation_name for tracing.
     async fn select_server(
         &self,
         criteria: Option<&SelectionCriteria>,
+        #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
+        deprioritized: Option<&ServerAddress>,
     ) -> Result<SelectedServer> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
@@ -698,6 +700,7 @@ impl Client {
                 criteria,
                 &state.description,
                 &state.servers(),
+                deprioritized,
             );
             match result {
                 Err(error) => {
