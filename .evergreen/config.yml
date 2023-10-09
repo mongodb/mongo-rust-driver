@@ -327,7 +327,11 @@ buildvariants:
     #patchable: false
     display_name: "Serverless"
     run_on:
-      - rhel87-small
+      - rhel80-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      AUTH: auth
+      SSL: ssl
     tasks:
       - serverless-task-group
 
@@ -378,14 +382,6 @@ buildvariants:
       OPENSSL: true
     tasks:
       - test-in-use-encryption-openssl
-
-  - name: in-use-encryption-serverless
-    #patchable: false
-    display_name: In-Use Encryption (Serverless)
-    run_on:
-      - rhel87-small
-    tasks:
-      - test-in-use-encryption-serverless
 
   - name: load-balancer
     display_name: "Load Balancer"
@@ -441,7 +437,8 @@ task_groups:
       - func: "cleanup"
 
     tasks:
-      - "test-serverless"
+      #- "test-serverless"
+      - "test-in-use-encryption-serverless"
 
   - name: azure-kms-task-group
     setup_group_can_fail_task: true
@@ -1649,9 +1646,9 @@ functions:
       params:
         working_dir: src
         shell: bash
+        add_expansions_to_env: true
         script: |
           ${PREPARE_SHELL}
-          ${PREPARE_CSFLE}
 
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace
