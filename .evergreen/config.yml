@@ -324,9 +324,7 @@ buildvariants:
       - test-plain-auth
 
   - name: serverless
-    # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
-    disable: true
-    patchable: false
+    #patchable: false
     display_name: "Serverless"
     run_on:
       - rhel87-small
@@ -382,9 +380,7 @@ buildvariants:
       - test-in-use-encryption-openssl
 
   - name: in-use-encryption-serverless
-    # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
-    disable: true
-    patchable: false
+    #patchable: false
     display_name: In-Use Encryption (Serverless)
     run_on:
       - rhel87-small
@@ -414,6 +410,7 @@ task_groups:
       - func: "init test-results"
       - func: "make files executable"
       - func: "install rust"
+      - func: "install junit dependencies"
       - command: shell.exec
         params:
           shell: "bash"
