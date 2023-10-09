@@ -67,7 +67,6 @@ use super::{
     FailPointMode,
     TestClient,
     CLIENT_OPTIONS,
-    SERVERLESS,
 };
 
 type Result<T> = anyhow::Result<T>;
@@ -2039,10 +2038,6 @@ async fn kms_tls_options() -> Result<()> {
 }
 
 async fn fle2v2_ok(name: &str) -> bool {
-    if *SERVERLESS {
-        log_uncaptured(format!("Skipping {}: not supported on serverless", name));
-        return false;
-    }
     let setup_client = Client::test_builder().build().await;
     if setup_client.server_version_lt(7, 0) {
         log_uncaptured(format!("Skipping {}: not supported on server < 7.0", name));
@@ -3546,10 +3541,6 @@ async fn fle2_example() -> Result<()> {
     }
     if test_client.is_standalone() {
         log_uncaptured("skipping fle2 example: cannot run on standalone");
-        return Ok(());
-    }
-    if *SERVERLESS {
-        log_uncaptured("skipping fle2 example: cannot run on serverless");
         return Ok(());
     }
 
