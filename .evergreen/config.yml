@@ -437,7 +437,7 @@ task_groups:
       - func: "cleanup"
 
     tasks:
-      #- "test-serverless"
+      - "test-serverless"
       - "test-in-use-encryption-serverless"
 
   - name: azure-kms-task-group
