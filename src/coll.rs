@@ -402,8 +402,7 @@ impl<T> Collection<T> {
 
     /// Gets the number of documents matching `filter`.
     ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
+    /// Note that this method returns an accurate count.
     pub async fn count_documents(
         &self,
         filter: impl Into<Option<Document>>,
@@ -414,8 +413,7 @@ impl<T> Collection<T> {
 
     /// Gets the number of documents matching `filter` using the provided `ClientSession`.
     ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
+    /// Note that this method returns an accurate count.
     pub async fn count_documents_with_session(
         &self,
         filter: impl Into<Option<Document>>,
