@@ -34,8 +34,8 @@ post:
   - func: "upload-mo-artifacts"
   - func: "cleanup"
 
-# Cause a timeout if a task does not complete within 90 minutes. TODO RUST-1721: reduce this.
-exec_timeout_secs: 5400
+# Cause a timeout if a task does not complete within 150 minutes. TODO RUST-1721: reduce this.
+exec_timeout_secs: 9000
 # What to do if the timeout is hit. Post-task functions will still run.
 timeout:
   - command: shell.exec
@@ -324,12 +324,14 @@ buildvariants:
       - test-plain-auth
 
   - name: serverless
-    # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
-    disable: true
     patchable: false
     display_name: "Serverless"
     run_on:
-      - rhel87-small
+      - rhel80-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      AUTH: auth
+      SSL: ssl
     tasks:
       - serverless-task-group
 
@@ -381,16 +383,6 @@ buildvariants:
     tasks:
       - test-in-use-encryption-openssl
 
-  - name: in-use-encryption-serverless
-    # TODO RUST-1745: Enable this build variant when the serverless issues are fixed.
-    disable: true
-    patchable: false
-    display_name: In-Use Encryption (Serverless)
-    run_on:
-      - rhel87-small
-    tasks:
-      - test-in-use-encryption-serverless
-
   - name: load-balancer
     display_name: "Load Balancer"
     run_on:
@@ -414,6 +406,7 @@ task_groups:
       - func: "init test-results"
       - func: "make files executable"
       - func: "install rust"
+      - func: "install junit dependencies"
       - command: shell.exec
         params:
           shell: "bash"
@@ -445,6 +438,7 @@ task_groups:
 
     tasks:
       - "test-serverless"
+      - "test-in-use-encryption-serverless"
 
   - name: azure-kms-task-group
     setup_group_can_fail_task: true
@@ -1652,9 +1646,9 @@ functions:
       params:
         working_dir: src
         shell: bash
+        add_expansions_to_env: true
         script: |
           ${PREPARE_SHELL}
-          ${PREPARE_CSFLE}
 
           # Exported without xtrace to avoid leaking credentials
           set +o xtrace

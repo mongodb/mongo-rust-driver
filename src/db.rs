@@ -394,6 +394,7 @@ impl Database {
         };
         const SERVER_7_0_0_WIRE_VERSION: i32 = 21;
         match max_wire {
+            None => (),
             Some(v) if v >= SERVER_7_0_0_WIRE_VERSION => (),
             _ => {
                 return Err(ErrorKind::IncompatibleServer {
