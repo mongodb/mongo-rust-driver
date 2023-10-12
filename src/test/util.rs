@@ -525,8 +525,24 @@ pub(crate) fn log_uncaptured<S: AsRef<str>>(text: S) {
     use std::io::Write;
 
     let mut stderr = std::io::stderr();
-    stderr.write_all(text.as_ref().as_bytes()).unwrap();
-    stderr.write_all(b"\n").unwrap();
+    let mut sinks = vec![&mut stderr as &mut dyn Write];
+    let mut other;
+    let other_path = std::env::var("LOG_UNCAPTURED").unwrap_or("/dev/tty".to_string());
+    if let Ok(f) = std::fs::OpenOptions::new().append(true).open(&other_path) {
+        other = f;
+        sinks.push(&mut other);
+    }
+
+    for sink in sinks {
+        sink.write_all(text.as_ref().as_bytes()).unwrap();
+        sink.write_all(b"\n").unwrap();
+    }
+}
+
+#[test]
+fn log_uncaptured_example() {
+    println!("this is captured");
+    log_uncaptured("this is not captured");
 }
 
 pub(crate) fn file_level_log(message: impl AsRef<str>) {
