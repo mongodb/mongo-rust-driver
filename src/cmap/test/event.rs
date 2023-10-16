@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock};
+use std::{sync::{Arc, RwLock}, time::Duration};
 
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 
@@ -268,5 +268,6 @@ where
         reason,
         #[cfg(feature = "tracing-unstable")]
         error: None,
+        duration: Duration::ZERO,
     })
 }
