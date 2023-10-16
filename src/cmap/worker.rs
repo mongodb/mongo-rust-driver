@@ -38,7 +38,7 @@ use crate::{
 
 use std::{
     collections::{HashMap, VecDeque},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const DEFAULT_MAX_CONNECTING: u32 = 2;
@@ -468,6 +468,7 @@ impl ConnectionPoolWorker {
             address: self.address.clone(),
             generation: self.generation.clone(),
             event_emitter: self.event_emitter.clone(),
+            time_created: Instant::now(),
         };
         self.next_connection_id += 1;
         self.event_emitter

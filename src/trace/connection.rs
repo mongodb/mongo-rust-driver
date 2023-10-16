@@ -95,6 +95,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             serverHost = event.address.host().as_ref(),
             serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
+            durationMS = event.duration.as_millis(),
             "Connection ready",
         );
     }
@@ -130,6 +131,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             serverPort = event.address.port_tracing_representation(),
             reason = event.reason.tracing_representation(),
             error = event.error.map(|e| e.tracing_representation()),
+            durationMS = event.duration.as_millis(),
             "Connection checkout failed",
         );
     }
@@ -141,6 +143,7 @@ impl CmapEventHandler for ConnectionTracingEventEmitter {
             serverHost = event.address.host().as_ref(),
             serverPort = event.address.port_tracing_representation(),
             driverConnectionId = event.connection_id,
+            durationMS = event.duration.as_millis(),
             "Connection checked out",
         );
     }

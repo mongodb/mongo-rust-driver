@@ -9,6 +9,8 @@ pub(crate) mod options;
 mod status;
 mod worker;
 
+use std::time::Instant;
+
 use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
@@ -119,6 +121,7 @@ impl ConnectionPool {
     /// front of the wait queue, and then will block again if no available connections are in the
     /// pool and the total number of connections is not less than the max pool size.
     pub(crate) async fn check_out(&self) -> Result<Connection> {
+        let time_started = Instant::now();
         self.event_emitter.emit_event(|| {
             ConnectionCheckoutStartedEvent {
                 address: self.address.clone(),
@@ -142,25 +145,17 @@ impl ConnectionPool {
         match conn {
             Ok(ref conn) => {
                 self.event_emitter
-                    .emit_event(|| conn.checked_out_event().into());
+                    .emit_event(|| conn.checked_out_event(time_started).into());
             }
-            #[cfg(feature = "tracing-unstable")]
-            Err(ref err) => {
+            
+            Err(ref _err) => {
                 self.event_emitter.emit_event(|| {
                     ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
                         reason: ConnectionCheckoutFailedReason::ConnectionError,
-                        error: Some(err.clone()),
-                    }
-                    .into()
-                });
-            }
-            #[cfg(not(feature = "tracing-unstable"))]
-            Err(_) => {
-                self.event_emitter.emit_event(|| {
-                    ConnectionCheckoutFailedEvent {
-                        address: self.address.clone(),
-                        reason: ConnectionCheckoutFailedReason::ConnectionError,
+                        #[cfg(feature = "tracing-unstable")]
+                        error: Some(_err.clone()),
+                        duration: Instant::now() - time_started,
                     }
                     .into()
                 });

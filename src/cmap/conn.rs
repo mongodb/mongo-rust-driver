@@ -74,6 +74,8 @@ pub(crate) struct Connection {
 
     pub(crate) generation: ConnectionGeneration,
 
+    pub(crate) time_created: Instant,
+
     /// The cached StreamDescription from the connection's handshake.
     pub(super) stream_description: Option<StreamDescription>,
 
@@ -127,11 +129,13 @@ impl Connection {
         stream: AsyncStream,
         id: u32,
         generation: ConnectionGeneration,
+        time_created: Instant,
     ) -> Self {
         Self {
             id,
             server_id: None,
             generation,
+            time_created,
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
@@ -159,6 +163,7 @@ impl Connection {
             stream,
             pending_connection.id,
             generation,
+            pending_connection.time_created,
         );
         conn.event_emitter = Some(pending_connection.event_emitter);
         conn
@@ -167,7 +172,7 @@ impl Connection {
     /// Create a connection intended for monitoring purposes.
     /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
     pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream, id: u32) -> Self {
-        Self::new(address, stream, id, ConnectionGeneration::Monitoring)
+        Self::new(address, stream, id, ConnectionGeneration::Monitoring, Instant::now())
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -226,10 +231,11 @@ impl Connection {
     }
 
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
-    pub(super) fn checked_out_event(&self) -> ConnectionCheckedOutEvent {
+    pub(super) fn checked_out_event(&self, time_started: Instant) -> ConnectionCheckedOutEvent {
         ConnectionCheckedOutEvent {
             address: self.address.clone(),
             connection_id: self.id,
+            duration: Instant::now() - time_started,
         }
     }
 
@@ -246,6 +252,7 @@ impl Connection {
         ConnectionReadyEvent {
             address: self.address.clone(),
             connection_id: self.id,
+            duration: Instant::now() - self.time_created,
         }
     }
 
@@ -422,6 +429,7 @@ impl Connection {
             server_id: self.server_id,
             address: self.address.clone(),
             generation: self.generation,
+            time_created: self.time_created,
             stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
             event_emitter: self.event_emitter.take(),
             stream_description: self.stream_description.take(),
@@ -599,6 +607,7 @@ pub(crate) struct PendingConnection {
     pub(crate) address: ServerAddress,
     pub(crate) generation: PoolGeneration,
     pub(crate) event_emitter: CmapEventEmitter,
+    pub(crate) time_created: Instant,
 }
 
 impl PendingConnection {
