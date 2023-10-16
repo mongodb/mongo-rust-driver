@@ -147,7 +147,7 @@ impl ConnectionPool {
                 self.event_emitter
                     .emit_event(|| conn.checked_out_event(time_started).into());
             }
-            
+
             Err(ref _err) => {
                 self.event_emitter.emit_event(|| {
                     ConnectionCheckoutFailedEvent {

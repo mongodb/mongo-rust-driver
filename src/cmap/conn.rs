@@ -172,7 +172,13 @@ impl Connection {
     /// Create a connection intended for monitoring purposes.
     /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
     pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream, id: u32) -> Self {
-        Self::new(address, stream, id, ConnectionGeneration::Monitoring, Instant::now())
+        Self::new(
+            address,
+            stream,
+            id,
+            ConnectionGeneration::Monitoring,
+            Instant::now(),
+        )
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {

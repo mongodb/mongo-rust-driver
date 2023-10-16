@@ -1,4 +1,7 @@
-use std::{sync::{Arc, RwLock}, time::Duration};
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 
