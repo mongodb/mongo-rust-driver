@@ -137,6 +137,7 @@ pub struct ConnectionReadyEvent {
     pub connection_id: u32,
 
     /// The time it took to establish the connection.
+    #[serde(default = "Duration::default")]
     pub duration: Duration,
 }
 
@@ -221,6 +222,7 @@ pub struct ConnectionCheckoutFailedEvent {
     pub(crate) error: Option<crate::error::Error>,
 
     /// See [ConnectionCheckedOutEvent::duration].
+    #[serde(default = "Duration::default")]
     pub duration: Duration,
 }
 
@@ -253,6 +255,7 @@ pub struct ConnectionCheckedOutEvent {
     pub connection_id: u32,
 
     /// The time it took to check out the connection.
+    #[serde(default = "Duration::default")]
     pub duration: Duration,
 }
 
