@@ -586,6 +586,10 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
+    /// Limit on the number of mongos connections that may be created for sharded topologies.
+    #[builder(default)]
+    pub srv_max_hosts: Option<u32>,
+
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
     #[serde(skip)]
@@ -874,6 +878,9 @@ pub struct ConnectionString {
     /// driver; client code can use this when deserializing relevant values with
     /// [`Binary::to_uuid_with_representation`](bson::binary::Binary::to_uuid_with_representation).
     pub uuid_representation: Option<UuidRepresentation>,
+
+    /// Limit on the number of mongos connections that may be created for sharded topologies.
+    pub srv_max_hosts: Option<u32>,
 
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
@@ -1252,6 +1259,15 @@ impl ClientOptions {
                     options.load_balanced = config.load_balanced;
                 }
 
+                if matches!(options.srv_max_hosts, Some(v) if v > 0) {
+                    if options.repl_set_name.is_some() {
+                        return Err(Error::invalid_argument("srvMaxHosts and replicaSet cannot both be present"));
+                    }
+                    if options.load_balanced == Some(true) {
+                        return Err(Error::invalid_argument("srvMaxHosts and loadBalanced=true cannot both be present"));
+                    }
+                }
+
                 // Set the ClientOptions hosts to those found during the SRV lookup.
                 config.hosts
             }
@@ -1338,6 +1354,7 @@ impl ClientOptions {
             test_options: None,
             #[cfg(feature = "tracing-unstable")]
             tracing_max_document_length_bytes: None,
+            srv_max_hosts: conn_str.srv_max_hosts,
         }
     }
 
@@ -1720,6 +1737,20 @@ impl ConnectionString {
         } else {
             ConnectionStringParts::default()
         };
+
+        if let Some(srv_max_hosts) = conn_str.srv_max_hosts {
+            if !srv {
+                return Err(Error::invalid_argument("srvMaxHosts cannot be specified with a non-SRV URI"));
+            }
+            if srv_max_hosts > 0 {
+                if conn_str.replica_set.is_some() {
+                    return Err(Error::invalid_argument("srvMaxHosts and replicaSet cannot both be present"));
+                }
+                if conn_str.load_balanced == Some(true) {
+                    return Err(Error::invalid_argument("srvMaxHosts and loadBalanced=true cannot both be present"));
+                }
+            }
+        }
 
         // Set username and password.
         if let Some(u) = username {
@@ -2146,6 +2177,9 @@ impl ConnectionString {
             }
             k @ "sockettimeoutms" => {
                 self.socket_timeout = Some(Duration::from_millis(get_duration!(value, k)));
+            }
+            k @ "srvmaxhosts" => {
+                self.srv_max_hosts = Some(get_u32!(value, k));
             }
             k @ "tls" | k @ "ssl" => {
                 let tls = get_bool!(value, k);
