@@ -135,6 +135,10 @@ pub struct ConnectionReadyEvent {
     /// to identify other events related to this connection.
     #[serde(default = "default_connection_id")]
     pub connection_id: u32,
+
+    /// The time it took to establish the connection.
+    #[serde(default = "Duration::default")]
+    pub duration: Duration,
 }
 
 /// Event emitted when a connection is closed.
@@ -216,6 +220,10 @@ pub struct ConnectionCheckoutFailedEvent {
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     pub(crate) error: Option<crate::error::Error>,
+
+    /// See [ConnectionCheckedOutEvent::duration].
+    #[serde(default = "Duration::default")]
+    pub duration: Duration,
 }
 
 /// The reasons a connection may not be able to be checked out.
@@ -245,6 +253,10 @@ pub struct ConnectionCheckedOutEvent {
     /// to identify other events related to this connection.
     #[serde(default = "default_connection_id")]
     pub connection_id: u32,
+
+    /// The time it took to check out the connection.
+    #[serde(default = "Duration::default")]
+    pub duration: Duration,
 }
 
 /// Event emitted when a connection is checked back into a connection pool.
