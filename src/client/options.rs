@@ -712,6 +712,8 @@ impl Serialize for ClientOptions {
             zlibcompressionlevel: &'a Option<i32>,
 
             loadbalanced: &'a Option<bool>,
+
+            srvmaxhosts: Option<i32>,
         }
 
         let client_options = ClientOptionsHelper {
@@ -736,6 +738,7 @@ impl Serialize for ClientOptions {
             writeconcern: &self.write_concern,
             loadbalanced: &self.load_balanced,
             zlibcompressionlevel: &None,
+            srvmaxhosts: self.srv_max_hosts.map(|v| v as i32),
         };
 
         client_options.serialize(serializer)
