@@ -64,10 +64,7 @@ struct ParsedOptions {
 async fn run_test(mut test_file: TestFile) {
     if let Some(ref options) = test_file.options {
         // TODO RUST-933: Remove this skip.
-        let skip = if options.srv_max_hosts.is_some() {
-            Some("srvMaxHosts")
-        // TODO RUST-911: Remove this skip.
-        } else if options.srv_service_name.is_some() {
+        let skip = if options.srv_service_name.is_some() {
             Some("srvServiceName")
         } else {
             None
