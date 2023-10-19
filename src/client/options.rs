@@ -917,12 +917,19 @@ impl Default for HostInfo {
 }
 
 impl HostInfo {
-    async fn resolve(self, resolver_config: Option<ResolverConfig>) -> Result<ResolvedHostInfo> {
+    async fn resolve(
+        self,
+        resolver_config: Option<ResolverConfig>,
+        srv_max_hosts: Option<u32>,
+    ) -> Result<ResolvedHostInfo> {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
                 let mut resolver =
-                    SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
+                    SrvResolver::new(
+                        resolver_config.clone().map(|config| config.inner),
+                        srv_max_hosts,
+                    ).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1217,7 +1224,7 @@ impl ClientOptions {
         let mut options = Self::from_connection_string(conn_str);
         options.resolver_config = resolver_config.clone();
 
-        let resolved = host_info.resolve(resolver_config).await?;
+        let resolved = host_info.resolve(resolver_config, options.srv_max_hosts).await?;
         options.hosts = match resolved {
             ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
             ResolvedHostInfo::DnsRecord {

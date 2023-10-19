@@ -11,6 +11,7 @@ use crate::{
 
 pub(crate) struct SrvResolver {
     resolver: AsyncResolver,
+    max_hosts: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -24,7 +25,7 @@ pub(crate) struct ResolvedConfig {
 
 #[derive(Debug, Clone)]
 pub(crate) struct LookupHosts {
-    pub(crate) hosts: Vec<Result<ServerAddress>>,
+    pub(crate) hosts: Vec<ServerAddress>,
     pub(crate) min_ttl: Duration,
 }
 
@@ -34,23 +35,28 @@ pub(crate) struct OriginalSrvInfo {
     pub(crate) min_ttl: Duration,
 }
 
+pub(crate) enum DomainMismatch {
+    Error,
+    Skip,
+}
+
 impl SrvResolver {
-    pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
+    pub(crate) async fn new(
+        config: Option<ResolverConfig>,
+        max_hosts: Option<u32>,
+    ) -> Result<Self> {
         let resolver = AsyncResolver::new(config).await?;
 
-        Ok(Self { resolver })
+        Ok(Self { resolver, max_hosts })
     }
 
     pub(crate) async fn resolve_client_options(
         &mut self,
         hostname: &str,
     ) -> Result<ResolvedConfig> {
-        let lookup_result = self.get_srv_hosts(hostname).await?;
+        let lookup_result = self.get_srv_hosts(hostname, DomainMismatch::Error).await?;
         let mut config = ResolvedConfig {
-            hosts: lookup_result
-                .hosts
-                .into_iter()
-                .collect::<Result<Vec<ServerAddress>>>()?,
+            hosts: lookup_result.hosts,
             min_ttl: lookup_result.min_ttl,
             auth_source: None,
             replica_set: None,
@@ -62,7 +68,7 @@ impl SrvResolver {
         Ok(config)
     }
 
-    pub(crate) async fn get_srv_hosts(&self, original_hostname: &str) -> Result<LookupHosts> {
+    pub(crate) async fn get_srv_hosts(&self, original_hostname: &str, dm: DomainMismatch) -> Result<LookupHosts> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -76,7 +82,7 @@ impl SrvResolver {
         let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
 
         let srv_lookup = self.resolver.srv_lookup(lookup_hostname.as_str()).await?;
-        let mut srv_addresses: Vec<Result<ServerAddress>> = Vec::new();
+        let mut srv_addresses: Vec<ServerAddress> = Vec::new();
         let mut min_ttl = u32::MAX;
 
         for record in srv_lookup.as_lookup().record_iter() {
@@ -103,15 +109,18 @@ impl SrvResolver {
             }
 
             if !&hostname_parts[1..].ends_with(domain_name) {
-                srv_addresses.push(Err(ErrorKind::DnsResolve {
-                    message: format!(
-                        "SRV lookup for {} returned result {}, which does not match domain name {}",
-                        original_hostname,
-                        address,
-                        domain_name.join(".")
-                    ),
+                if matches!(dm, DomainMismatch::Error) {
+                    return Err(ErrorKind::DnsResolve {
+                        message: format!(
+                            "SRV lookup for {} returned result {}, which does not match domain name {}",
+                            original_hostname,
+                            address,
+                            domain_name.join(".")
+                        ),
+                    }
+                    .into());
                 }
-                .into()));
+                continue;
             }
 
             // The spec tests list the seeds without the trailing '.', so we remove it by
@@ -122,7 +131,7 @@ impl SrvResolver {
             };
 
             min_ttl = std::cmp::min(min_ttl, record.ttl());
-            srv_addresses.push(Ok(address));
+            srv_addresses.push(address);
         }
 
         if srv_addresses.is_empty() {
@@ -130,6 +139,14 @@ impl SrvResolver {
                 message: format!("SRV lookup for {} returned no records", original_hostname),
             }
             .into());
+        }
+
+        if let Some(max_hosts) = self.max_hosts {
+            if max_hosts > 0 && (max_hosts as usize) < srv_addresses.len() {
+                use rand::prelude::SliceRandom;
+                srv_addresses.shuffle(&mut rand::thread_rng());
+                srv_addresses.truncate(max_hosts as usize);
+            }
         }
 
         Ok(LookupHosts {
