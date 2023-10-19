@@ -129,10 +129,7 @@ impl SrvPollingMonitor {
         }
 
         let resolver =
-            SrvResolver::new(
-                self.client_options.resolver_config.clone().map(|c| c.inner),
-                self.client_options.srv_max_hosts,
-            ).await?;
+            SrvResolver::new(self.client_options.resolver_config.clone().map(|c| c.inner)).await?;
 
         // Since the connection was not `Some` above, this will always insert the new connection and
         // return a reference to it.

@@ -480,7 +480,7 @@ impl TopologyWorker {
 
     async fn sync_hosts(&mut self, hosts: HashSet<ServerAddress>) -> bool {
         let mut new_description = self.topology_description.clone();
-        new_description.sync_hosts(&hosts);
+        new_description.sync_hosts(hosts);
         self.update_topology(new_description).await
     }
 

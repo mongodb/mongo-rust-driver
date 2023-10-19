@@ -917,19 +917,12 @@ impl Default for HostInfo {
 }
 
 impl HostInfo {
-    async fn resolve(
-        self,
-        resolver_config: Option<ResolverConfig>,
-        srv_max_hosts: Option<u32>,
-    ) -> Result<ResolvedHostInfo> {
+    async fn resolve(self, resolver_config: Option<ResolverConfig>) -> Result<ResolvedHostInfo> {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
                 let mut resolver =
-                    SrvResolver::new(
-                        resolver_config.clone().map(|config| config.inner),
-                        srv_max_hosts,
-                    ).await?;
+                    SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1224,7 +1217,7 @@ impl ClientOptions {
         let mut options = Self::from_connection_string(conn_str);
         options.resolver_config = resolver_config.clone();
 
-        let resolved = host_info.resolve(resolver_config, options.srv_max_hosts).await?;
+        let resolved = host_info.resolve(resolver_config).await?;
         options.hosts = match resolved {
             ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
             ResolvedHostInfo::DnsRecord {
@@ -1266,12 +1259,17 @@ impl ClientOptions {
                     options.load_balanced = config.load_balanced;
                 }
 
-                if matches!(options.srv_max_hosts, Some(v) if v > 0) {
-                    if options.repl_set_name.is_some() {
-                        return Err(Error::invalid_argument("srvMaxHosts and replicaSet cannot both be present"));
-                    }
-                    if options.load_balanced == Some(true) {
-                        return Err(Error::invalid_argument("srvMaxHosts and loadBalanced=true cannot both be present"));
+                if let Some(max) = options.srv_max_hosts {
+                    if max > 0 {
+                        if options.repl_set_name.is_some() {
+                            return Err(Error::invalid_argument("srvMaxHosts and replicaSet cannot both be present"));
+                        }
+                        if options.load_balanced == Some(true) {
+                            return Err(Error::invalid_argument("srvMaxHosts and loadBalanced=true cannot both be present"));
+                        }
+                        use rand::prelude::SliceRandom;
+                        config.hosts.shuffle(&mut rand::thread_rng());
+                        config.hosts.truncate(max as usize);
                     }
                 }
 

@@ -11,7 +11,6 @@ use crate::{
 
 pub(crate) struct SrvResolver {
     resolver: AsyncResolver,
-    max_hosts: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -41,13 +40,10 @@ pub(crate) enum DomainMismatch {
 }
 
 impl SrvResolver {
-    pub(crate) async fn new(
-        config: Option<ResolverConfig>,
-        max_hosts: Option<u32>,
-    ) -> Result<Self> {
+    pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
         let resolver = AsyncResolver::new(config).await?;
 
-        Ok(Self { resolver, max_hosts })
+        Ok(Self { resolver })
     }
 
     pub(crate) async fn resolve_client_options(
@@ -139,14 +135,6 @@ impl SrvResolver {
                 message: format!("SRV lookup for {} returned no records", original_hostname),
             }
             .into());
-        }
-
-        if let Some(max_hosts) = self.max_hosts {
-            if max_hosts > 0 && (max_hosts as usize) < srv_addresses.len() {
-                use rand::prelude::SliceRandom;
-                srv_addresses.shuffle(&mut rand::thread_rng());
-                srv_addresses.truncate(max_hosts as usize);
-            }
         }
 
         Ok(LookupHosts {

@@ -52,6 +52,7 @@ impl TestTopologyDescription {
             local_threshold: None,
             heartbeat_freq: heartbeat_frequency,
             servers,
+            srv_max_hosts: None,
         }
     }
 }
