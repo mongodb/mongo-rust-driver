@@ -397,11 +397,9 @@ impl TopologyDescription {
         if let Some(max) = self.srv_max_hosts {
             let max = max as usize;
             if max > 0 && max < self.servers.len() + new.len() {
-                if let Some(capacity) = (max as usize).checked_sub(self.servers.len()) {
-                    use rand::prelude::SliceRandom;
-                    new.shuffle(&mut rand::thread_rng());
-                    new.truncate(capacity);
-                }
+                use rand::prelude::SliceRandom;
+                new.shuffle(&mut rand::thread_rng());
+                new.truncate(max.checked_sub(self.servers.len()).unwrap_or(0));
             }
         }
         self.servers.extend(new);

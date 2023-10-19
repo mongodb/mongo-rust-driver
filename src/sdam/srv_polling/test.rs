@@ -60,7 +60,7 @@ async fn run_test_extra(
 
 fn make_lookup_hosts(hosts: Vec<ServerAddress>) -> Result<LookupHosts> {
     Ok(LookupHosts {
-        hosts: hosts,
+        hosts,
         min_ttl: Duration::from_secs(60),
     })
 }
