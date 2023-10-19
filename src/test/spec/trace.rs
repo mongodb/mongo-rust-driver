@@ -474,6 +474,7 @@ fn topology_description_tracing_representation() {
         local_threshold: None,
         heartbeat_freq: None,
         servers,
+        srv_max_hosts: None,
     };
 
     assert_eq!(
