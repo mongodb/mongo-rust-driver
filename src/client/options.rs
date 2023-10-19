@@ -1262,10 +1262,14 @@ impl ClientOptions {
                 if let Some(max) = options.srv_max_hosts {
                     if max > 0 {
                         if options.repl_set_name.is_some() {
-                            return Err(Error::invalid_argument("srvMaxHosts and replicaSet cannot both be present"));
+                            return Err(Error::invalid_argument(
+                                "srvMaxHosts and replicaSet cannot both be present",
+                            ));
                         }
                         if options.load_balanced == Some(true) {
-                            return Err(Error::invalid_argument("srvMaxHosts and loadBalanced=true cannot both be present"));
+                            return Err(Error::invalid_argument(
+                                "srvMaxHosts and loadBalanced=true cannot both be present",
+                            ));
                         }
                         use rand::prelude::SliceRandom;
                         config.hosts.shuffle(&mut rand::thread_rng());
@@ -1745,14 +1749,20 @@ impl ConnectionString {
 
         if let Some(srv_max_hosts) = conn_str.srv_max_hosts {
             if !srv {
-                return Err(Error::invalid_argument("srvMaxHosts cannot be specified with a non-SRV URI"));
+                return Err(Error::invalid_argument(
+                    "srvMaxHosts cannot be specified with a non-SRV URI",
+                ));
             }
             if srv_max_hosts > 0 {
                 if conn_str.replica_set.is_some() {
-                    return Err(Error::invalid_argument("srvMaxHosts and replicaSet cannot both be present"));
+                    return Err(Error::invalid_argument(
+                        "srvMaxHosts and replicaSet cannot both be present",
+                    ));
                 }
                 if conn_str.load_balanced == Some(true) {
-                    return Err(Error::invalid_argument("srvMaxHosts and loadBalanced=true cannot both be present"));
+                    return Err(Error::invalid_argument(
+                        "srvMaxHosts and loadBalanced=true cannot both be present",
+                    ));
                 }
             }
         }

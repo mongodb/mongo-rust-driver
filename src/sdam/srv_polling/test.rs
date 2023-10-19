@@ -29,12 +29,19 @@ async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet
     run_test_srv(None, new_hosts, expected_hosts).await
 }
 
-async fn run_test_srv(max_hosts: Option<u32>, new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
+async fn run_test_srv(
+    max_hosts: Option<u32>,
+    new_hosts: Result<Vec<ServerAddress>>,
+    expected_hosts: HashSet<ServerAddress>,
+) {
     let actual = run_test_extra(max_hosts, new_hosts).await;
     assert_eq!(expected_hosts, actual);
 }
 
-async fn run_test_extra(max_hosts: Option<u32>, new_hosts: Result<Vec<ServerAddress>>) -> HashSet<ServerAddress> {
+async fn run_test_extra(
+    max_hosts: Option<u32>,
+    new_hosts: Result<Vec<ServerAddress>>,
+) -> HashSet<ServerAddress> {
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
     options.test_options_mut().disable_monitoring_threads = true;
@@ -161,7 +168,8 @@ async fn srv_max_hosts_zero() {
     run_test_srv(Some(0), Ok(hosts.clone()), hosts.into_iter().collect()).await;
 }
 
-// SRV polling with srvMaxHosts MongoClient option: All DNS records are selected (srvMaxHosts >= records)
+// SRV polling with srvMaxHosts MongoClient option: All DNS records are selected (srvMaxHosts >=
+// records)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn srv_max_hosts_gt_actual() {
@@ -173,7 +181,8 @@ async fn srv_max_hosts_gt_actual() {
     run_test_srv(Some(2), Ok(hosts.clone()), hosts.into_iter().collect()).await;
 }
 
-// SRV polling with srvMaxHosts MongoClient option: New DNS records are randomly selected (srvMaxHosts > 0)
+// SRV polling with srvMaxHosts MongoClient option: New DNS records are randomly selected
+// (srvMaxHosts > 0)
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn srv_max_hosts_random() {

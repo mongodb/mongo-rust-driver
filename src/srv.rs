@@ -64,7 +64,11 @@ impl SrvResolver {
         Ok(config)
     }
 
-    pub(crate) async fn get_srv_hosts(&self, original_hostname: &str, dm: DomainMismatch) -> Result<LookupHosts> {
+    pub(crate) async fn get_srv_hosts(
+        &self,
+        original_hostname: &str,
+        dm: DomainMismatch,
+    ) -> Result<LookupHosts> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -108,7 +112,8 @@ impl SrvResolver {
                 if matches!(dm, DomainMismatch::Error) {
                     return Err(ErrorKind::DnsResolve {
                         message: format!(
-                            "SRV lookup for {} returned result {}, which does not match domain name {}",
+                            "SRV lookup for {} returned result {}, which does not match domain \
+                             name {}",
                             original_hostname,
                             address,
                             domain_name.join(".")

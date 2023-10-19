@@ -120,7 +120,9 @@ impl SrvPollingMonitor {
         }
         let initial_hostname = self.initial_hostname.clone();
         let resolver = self.get_or_create_srv_resolver().await?;
-        resolver.get_srv_hosts(initial_hostname.as_str(), crate::srv::DomainMismatch::Skip).await
+        resolver
+            .get_srv_hosts(initial_hostname.as_str(), crate::srv::DomainMismatch::Skip)
+            .await
     }
 
     async fn get_or_create_srv_resolver(&mut self) -> Result<&SrvResolver> {
