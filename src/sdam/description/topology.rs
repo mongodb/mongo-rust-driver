@@ -399,7 +399,7 @@ impl TopologyDescription {
             if max > 0 && max < self.servers.len() + new.len() {
                 use rand::prelude::SliceRandom;
                 new.shuffle(&mut rand::thread_rng());
-                new.truncate(max.checked_sub(self.servers.len()).unwrap_or(0));
+                new.truncate(max.saturating_sub(self.servers.len()));
             }
         }
         self.servers.extend(new);
