@@ -6,6 +6,7 @@ use semver::VersionReq;
 use serde::Deserialize;
 
 use crate::{
+    cmap::DEFAULT_MAX_POOL_SIZE,
     coll::options::FindOptions,
     error::Result,
     event::cmap::CmapEvent,
@@ -216,7 +217,7 @@ async fn load_balancing_test() {
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
     let mut options = CLIENT_OPTIONS.get().await.clone();
-    let max_pool_size = 10;
+    let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
     options.max_pool_size = Some(max_pool_size);

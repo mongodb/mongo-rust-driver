@@ -52,11 +52,10 @@ use crate::{
         auth::Credential,
         options::{ServerApi, ServerApiVersion},
     },
+    cmap::DEFAULT_MAX_POOL_SIZE,
     options::{ClientOptions, Compressor},
 };
 use std::{fs::read_to_string, str::FromStr};
-
-const MAX_POOL_SIZE: u32 = 100;
 
 lazy_static! {
     pub(crate) static ref CLIENT_OPTIONS: AsyncOnce<ClientOptions> = AsyncOnce::new(async {
@@ -114,7 +113,7 @@ lazy_static! {
 
 pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     if options.max_pool_size.is_none() {
-        options.max_pool_size = Some(MAX_POOL_SIZE);
+        options.max_pool_size = Some(DEFAULT_MAX_POOL_SIZE);
     }
     if options.server_api.is_none() {
         options.server_api = SERVER_API.clone();

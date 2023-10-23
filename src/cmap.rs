@@ -46,7 +46,7 @@ use worker::ConnectionPoolWorker;
 #[cfg(test)]
 use crate::runtime::WorkerHandle;
 
-const DEFAULT_MAX_POOL_SIZE: u32 = 10;
+pub(crate) const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 
 /// A pool of connections implementing the CMAP spec.
 /// This type is actually a handle to task that manages the connections and is cheap to clone and
