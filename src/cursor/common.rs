@@ -14,10 +14,10 @@ use tokio::sync::oneshot;
 use crate::{
     bson::{Bson, Document},
     change_stream::event::ResumeToken,
-    client::AsyncDropToken,
+    client::{session::ClientSession, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
-    operation,
+    operation::{self, GetMore},
     options::ServerAddress,
     results::GetMoreResult,
     Client,
@@ -37,12 +37,9 @@ pub(super) enum AdvanceResult {
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(super) struct GenericCursor<P>
-where
-    P: GetMoreProvider,
-{
+pub(super) struct GenericCursor<'s, S> {
     #[derivative(Debug = "ignore")]
-    provider: P,
+    provider: GetMoreProvider<'s, S>,
     client: Client,
     info: CursorInformation,
     /// This is an `Option` to allow it to be "taken" when the cursor is no longer needed
@@ -50,20 +47,21 @@ where
     state: Option<CursorState>,
 }
 
-impl<P> GenericCursor<P>
-where
-    P: GetMoreProvider,
-{
-    pub(super) fn new(
+impl GenericCursor<'static, ImplicitClientSessionHandle> {
+    pub(super) fn with_implicit_session(
         client: Client,
         spec: CursorSpecification,
         pinned_connection: PinnedConnection,
-        get_more_provider: P,
+        session: ImplicitClientSessionHandle,
     ) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             client,
-            provider: get_more_provider,
+            provider: if exhausted {
+                GetMoreProvider::Done
+            } else {
+                GetMoreProvider::Idle(Box::new(session))
+            },
             info: spec.info,
             state: Some(CursorState {
                 buffer: CursorBuffer::new(spec.initial_buffer),
@@ -74,20 +72,29 @@ where
         }
     }
 
-    pub(super) fn from_state(
+    /// Extracts the stored implicit [`ClientSession`], if any.
+    pub(super) fn take_implicit_session(&mut self) -> Option<ClientSession> {
+        self.provider.take_implicit_session()
+    }
+}
+
+impl<'s> GenericCursor<'s, ExplicitClientSessionHandle<'s>> {
+    pub(super) fn with_explicit_session(
         state: CursorState,
         client: Client,
         info: CursorInformation,
-        provider: P,
+        session: ExplicitClientSessionHandle<'s>,
     ) -> Self {
         Self {
-            provider,
+            provider: GetMoreProvider::Idle(Box::new(session)),
             client,
             info,
             state: state.into(),
         }
     }
+}
 
+impl<'s, S: ClientSessionHandle<'s>> GenericCursor<'s, S> {
     pub(super) fn current(&self) -> Option<&RawDocument> {
         self.state().buffer.current()
     }
@@ -210,10 +217,6 @@ where
             }
         }
     }
-
-    pub(super) fn provider_mut(&mut self) -> &mut P {
-        &mut self.provider
-    }
 }
 
 pub(crate) trait CursorStream {
@@ -226,20 +229,18 @@ pub(crate) enum BatchValue {
     Exhausted,
 }
 
-impl<P> CursorStream for GenericCursor<P>
-where
-    P: GetMoreProvider,
-{
+impl<'s, S: ClientSessionHandle<'s>> CursorStream for GenericCursor<'s, S> {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         // If there is a get more in flight, check on its status.
         if let Some(future) = self.provider.executing_future() {
             match Pin::new(future).poll(cx) {
                 // If a result is ready, retrieve the buffer and update the exhausted status.
-                Poll::Ready(get_more_result) => {
-                    let (result, session) = get_more_result.into_parts();
-                    let output = self.handle_get_more_result(result);
-                    self.provider
-                        .clear_execution(session, self.state().exhausted);
+                Poll::Ready(get_more_result_and_session) => {
+                    let output = self.handle_get_more_result(get_more_result_and_session.result);
+                    self.provider.clear_execution(
+                        get_more_result_and_session.session,
+                        self.state().exhausted,
+                    );
                     output?;
                 }
                 Poll::Pending => return Poll::Pending,
@@ -308,52 +309,105 @@ where
     }
 }
 
-/// A trait implemented by objects that can provide batches of documents to a cursor via the getMore
-/// command.
-pub(super) trait GetMoreProvider: Unpin {
-    /// The result type that the future running the getMore evaluates to.
-    type ResultType: GetMoreProviderResult;
-
-    /// The type of future created by this provider when running a getMore.
-    type GetMoreFuture: Future<Output = Self::ResultType> + Unpin;
-
-    /// Get the future being evaluated, if there is one.
-    fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture>;
-
-    /// Clear out any state remaining from previous getMore executions.
-    fn clear_execution(
-        &mut self,
-        session: <Self::ResultType as GetMoreProviderResult>::Session,
-        exhausted: bool,
-    );
-
-    /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(
-        &mut self,
-        spec: CursorInformation,
-        client: Client,
-        pinned_connection: Option<&PinnedConnectionHandle>,
-    );
-
-    /// Return a future that will execute the getMore when polled.
-    /// This is useful in async functions that can await the entire getMore process.
-    /// `start_execution` and `clear_execution` should be used for contexts where the futures
-    /// need to be polled manually.
-    fn execute(
-        &mut self,
-        _spec: CursorInformation,
-        _client: Client,
-        _pinned_conn: PinnedConnection,
-    ) -> BoxFuture<'_, Result<GetMoreResult>>;
+/// Provides batches of documents to a cursor via the `getMore` command.
+enum GetMoreProvider<'s, S> {
+    Executing(BoxFuture<'s, GetMoreResultAndSession<S>>),
+    // `Box` is used to make the size of `Idle` similar to that of the other variants.
+    Idle(Box<S>),
+    Done,
 }
 
-/// Trait describing results returned from a `GetMoreProvider`.
-pub(crate) trait GetMoreProviderResult {
-    type Session;
+impl GetMoreProvider<'static, ImplicitClientSessionHandle> {
+    /// Extracts the stored implicit [`ClientSession`], if any.
+    /// The provider cannot be started again after this call.
+    fn take_implicit_session(&mut self) -> Option<ClientSession> {
+        match self {
+            Self::Idle(session) => session.take_implicit_session(),
+            Self::Executing(..) | Self::Done => None,
+        }
+    }
+}
 
-    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
+impl<'s, S: ClientSessionHandle<'s>> GetMoreProvider<'s, S> {
+    /// Get the future being evaluated, if there is one.
+    fn executing_future(&mut self) -> Option<&mut BoxFuture<'s, GetMoreResultAndSession<S>>> {
+        if let Self::Executing(future) = self {
+            Some(future)
+        } else {
+            None
+        }
+    }
 
-    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
+    /// Clear out any state remaining from previous `getMore` executions.
+    fn clear_execution(&mut self, session: S, exhausted: bool) {
+        if exhausted && session.is_implicit() {
+            *self = Self::Done
+        } else {
+            *self = Self::Idle(Box::new(session))
+        }
+    }
+
+    /// Start executing a new `getMore` if one is not already in flight.
+    fn start_execution(
+        &mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: Option<&PinnedConnectionHandle>,
+    ) {
+        take_mut::take(self, |self_| {
+            if let Self::Idle(mut session) = self_ {
+                let pinned_connection = pinned_connection.map(|c| c.replicate());
+                let future = Box::pin(async move {
+                    let get_more = GetMore::new(info, pinned_connection.as_ref());
+                    let get_more_result = client
+                        .execute_operation(get_more, session.borrow_mut())
+                        .await;
+                    GetMoreResultAndSession {
+                        result: get_more_result,
+                        session: *session,
+                    }
+                });
+                Self::Executing(future)
+            } else {
+                self_
+            }
+        })
+    }
+
+    /// Return a future that will execute the `getMore` when polled.
+    /// This is useful in `async` functions that can `.await` the entire `getMore` process.
+    /// [`GetMoreProvider::start_execution`] and [`GetMoreProvider::clear_execution`]
+    /// should be used for contexts where the futures need to be [Future::poll]ed manually.
+    fn execute(
+        &mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: PinnedConnection,
+    ) -> BoxFuture<'_, Result<GetMoreResult>> {
+        match self {
+            Self::Idle(ref mut session) => Box::pin(async move {
+                let get_more = GetMore::new(info, pinned_connection.handle());
+                client
+                    .execute_operation(get_more, session.borrow_mut())
+                    .await
+            }),
+            Self::Executing(_fut) => Box::pin(async {
+                Err(Error::internal(
+                    "streaming the cursor was cancelled while a request was in progress and must \
+                     be continued before iterating manually",
+                ))
+            }),
+            Self::Done => {
+                // this should never happen
+                Box::pin(async { Err(Error::internal("cursor iterated after already exhausted")) })
+            }
+        }
+    }
+}
+
+struct GetMoreResultAndSession<S> {
+    result: Result<GetMoreResult>,
+    session: S,
 }
 
 /// Specification used to create a new cursor.
@@ -568,4 +622,40 @@ fn test_buffer() {
 
     assert!(!buffer.advance());
     assert_eq!(buffer.current(), None);
+}
+
+pub(super) struct ImplicitClientSessionHandle(pub(super) Option<ClientSession>);
+
+impl ImplicitClientSessionHandle {
+    fn take_implicit_session(&mut self) -> Option<ClientSession> {
+        self.0.take()
+    }
+}
+
+impl ClientSessionHandle<'_> for ImplicitClientSessionHandle {
+    fn is_implicit(&self) -> bool {
+        true
+    }
+
+    fn borrow_mut(&mut self) -> Option<&mut ClientSession> {
+        self.0.as_mut()
+    }
+}
+
+pub(super) struct ExplicitClientSessionHandle<'a>(pub(super) &'a mut ClientSession);
+
+impl<'a> ClientSessionHandle<'a> for ExplicitClientSessionHandle<'a> {
+    fn is_implicit(&self) -> bool {
+        false
+    }
+
+    fn borrow_mut(&mut self) -> Option<&mut ClientSession> {
+        Some(self.0)
+    }
+}
+
+pub(super) trait ClientSessionHandle<'a>: Send + 'a {
+    fn is_implicit(&self) -> bool;
+
+    fn borrow_mut(&mut self) -> Option<&mut ClientSession>;
 }
