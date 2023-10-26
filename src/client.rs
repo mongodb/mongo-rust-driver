@@ -504,12 +504,9 @@ impl Client {
             // await points in between.
             let id = id_rx.await.unwrap();
             // If the cleanup channel is closed, that task was dropped.
-            let cleanup = if let Ok(f) = cleanup_rx.await {
-                f
-            } else {
-                return;
-            };
-            cleanup.await;
+            if let Ok(cleanup) = cleanup_rx.await {
+                cleanup.await;
+            }
             if let Some(client) = weak.upgrade() {
                 client
                     .inner
