@@ -220,7 +220,6 @@ async fn load_balancing_test() {
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
-    options.max_pool_size = Some(max_pool_size);
     options.min_pool_size = Some(max_pool_size);
     let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
 
