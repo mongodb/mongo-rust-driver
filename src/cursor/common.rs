@@ -377,7 +377,7 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreProvider<'s, S> {
     /// Return a future that will execute the `getMore` when polled.
     /// This is useful in `async` functions that can `.await` the entire `getMore` process.
     /// [`GetMoreProvider::start_execution`] and [`GetMoreProvider::clear_execution`]
-    /// should be used for contexts where the futures need to be [Future::poll]ed manually.
+    /// should be used for contexts where the futures need to be [`poll`](Future::poll)ed manually.
     fn execute(
         &mut self,
         info: CursorInformation,
