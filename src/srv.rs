@@ -109,17 +109,28 @@ impl SrvResolver {
             }
 
             if !&hostname_parts[1..].ends_with(domain_name) {
+                let message = format!(
+                    "SRV lookup for {} returned result {}, which does not match domain name {}",
+                    original_hostname,
+                    address,
+                    domain_name.join(".")
+                );
                 if matches!(dm, DomainMismatch::Error) {
-                    return Err(ErrorKind::DnsResolve {
-                        message: format!(
-                            "SRV lookup for {} returned result {}, which does not match domain \
-                             name {}",
-                            original_hostname,
-                            address,
-                            domain_name.join(".")
-                        ),
+                    return Err(ErrorKind::DnsResolve { message }.into());
+                } else {
+                    #[cfg(feature = "tracing-unstable")]
+                    {
+                        use crate::trace::SERVER_SELECTION_TRACING_EVENT_TARGET;
+                        if crate::trace::trace_or_log_enabled!(
+                            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                            crate::trace::TracingOrLogLevel::Warn
+                        ) {
+                            tracing::warn!(
+                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                message,
+                            );
+                        }
                     }
-                    .into());
                 }
                 continue;
             }
