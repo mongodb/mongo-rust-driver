@@ -802,7 +802,7 @@ pub struct ConnectionString {
     /// `max_pool_size` connections are checked out, the operation will block until an in-progress
     /// operation finishes and its connection is checked back into the pool.
     ///
-    /// The default value is 100.
+    /// The default value is 10.
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that should be available in a server's connection pool at
