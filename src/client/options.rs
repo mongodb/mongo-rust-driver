@@ -1274,9 +1274,9 @@ impl ClientOptions {
                                 "srvMaxHosts and loadBalanced=true cannot both be present",
                             ));
                         }
-                        use rand::prelude::SliceRandom;
-                        config.hosts.shuffle(&mut rand::thread_rng());
-                        config.hosts.truncate(max as usize);
+                        config.hosts = crate::sdam::choose_n(&config.hosts, max as usize)
+                            .cloned()
+                            .collect();
                     }
                 }
 

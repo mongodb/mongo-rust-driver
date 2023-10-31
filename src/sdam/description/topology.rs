@@ -397,9 +397,9 @@ impl TopologyDescription {
         if let Some(max) = self.srv_max_hosts {
             let max = max as usize;
             if max > 0 && max < self.servers.len() + new.len() {
-                use rand::prelude::SliceRandom;
-                new.shuffle(&mut rand::thread_rng());
-                new.truncate(max.saturating_sub(self.servers.len()));
+                new = choose_n(&new, max.saturating_sub(self.servers.len()))
+                    .cloned()
+                    .collect();
             }
         }
         self.servers.extend(new);
@@ -747,6 +747,11 @@ impl TopologyDescription {
             }
         }
     }
+}
+
+pub(crate) fn choose_n<T>(values: &[T], n: usize) -> impl Iterator<Item = &T> {
+    use rand::{prelude::SliceRandom, SeedableRng};
+    values.choose_multiple(&mut rand::rngs::SmallRng::from_entropy(), n)
 }
 
 /// Enum representing whether transactions are supported by the topology.

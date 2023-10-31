@@ -3,8 +3,6 @@ mod test;
 
 use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
 
-use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
-
 use super::TopologyDescription;
 use crate::{
     error::{ErrorKind, Result},
@@ -86,9 +84,7 @@ fn select_server_in_latency_window(in_window: Vec<&Arc<Server>>) -> Option<Arc<S
         return Some(in_window[0].clone());
     }
 
-    let mut rng = SmallRng::from_entropy();
-    in_window
-        .choose_multiple(&mut rng, 2)
+    super::choose_n(&in_window, 2)
         .min_by_key(|s| s.operation_count())
         .map(|server| (*server).clone())
 }
