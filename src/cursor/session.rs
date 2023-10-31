@@ -5,7 +5,7 @@ use std::{
 };
 
 use bson::RawDocument;
-use futures_core::{future::BoxFuture, Stream};
+use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
@@ -18,8 +18,6 @@ use super::{
         CursorInformation,
         CursorState,
         GenericCursor,
-        GetMoreProvider,
-        GetMoreProviderResult,
         PinnedConnection,
     },
     stream_poll_next,
@@ -31,10 +29,8 @@ use crate::{
     change_stream::event::ResumeToken,
     client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
-    cursor::CursorSpecification,
+    cursor::{common::ExplicitClientSessionHandle, CursorSpecification},
     error::{Error, Result},
-    operation::GetMore,
-    results::GetMoreResult,
     Client,
     ClientSession,
 };
@@ -195,16 +191,14 @@ impl<T> SessionCursor<T> {
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionCursorStream<'_, 'session, T> {
-        let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
-
         // Pass the state into this cursor handle for iteration.
         // It will be returned in the handle's `Drop` implementation.
         SessionCursorStream {
-            generic_cursor: ExplicitSessionCursor::from_state(
+            generic_cursor: ExplicitSessionCursor::with_explicit_session(
                 self.take_state(),
                 self.client.clone(),
                 self.info.clone(),
-                get_more_provider,
+                ExplicitClientSessionHandle(session),
             ),
             session_cursor: self,
         }
@@ -387,7 +381,8 @@ impl<T> Drop for SessionCursor<T> {
 
 /// A `GenericCursor` that borrows its session.
 /// This is to be used with cursors associated with explicit sessions borrowed from the user.
-type ExplicitSessionCursor<'session> = GenericCursor<ExplicitSessionGetMoreProvider<'session>>;
+type ExplicitSessionCursor<'session> =
+    GenericCursor<'session, ExplicitClientSessionHandle<'session>>;
 
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
 /// stream the results of a [`SessionCursor`]. Returned from [`SessionCursor::stream`].
@@ -437,114 +432,4 @@ impl<'cursor, 'session, T> Drop for SessionCursorStream<'cursor, 'session, T> {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.state = Some(self.generic_cursor.take_state());
     }
-}
-
-/// Enum determining whether a `SessionCursorHandle` is excuting a getMore or not.
-/// In charge of maintaining ownership of the session reference.
-enum ExplicitSessionGetMoreProvider<'session> {
-    /// The handle is currently executing a getMore via the future.
-    ///
-    /// This future owns the reference to the session and will return it on completion.
-    Executing(BoxFuture<'session, ExecutionResult<'session>>),
-
-    /// No future is being executed.
-    ///
-    /// This variant needs a `MutableSessionReference` struct that can be moved in order to
-    /// transition to `Executing` via `take_mut`.
-    Idle(MutableSessionReference<'session>),
-}
-
-impl<'session> ExplicitSessionGetMoreProvider<'session> {
-    fn new(session: &'session mut ClientSession) -> Self {
-        Self::Idle(MutableSessionReference { reference: session })
-    }
-}
-
-impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
-    type ResultType = ExecutionResult<'session>;
-    type GetMoreFuture = BoxFuture<'session, ExecutionResult<'session>>;
-
-    fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
-        match self {
-            Self::Executing(future) => Some(future),
-            Self::Idle { .. } => None,
-        }
-    }
-
-    fn clear_execution(&mut self, session: &'session mut ClientSession, _exhausted: bool) {
-        *self = Self::Idle(MutableSessionReference { reference: session })
-    }
-
-    fn start_execution(
-        &mut self,
-        info: CursorInformation,
-        client: Client,
-        pinned_connection: Option<&PinnedConnectionHandle>,
-    ) {
-        take_mut::take(self, |self_| {
-            if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
-                let pinned_connection = pinned_connection.map(|c| c.replicate());
-                let future = Box::pin(async move {
-                    let get_more = GetMore::new(info, pinned_connection.as_ref());
-                    let get_more_result = client
-                        .execute_operation(get_more, Some(&mut *session.reference))
-                        .await;
-                    ExecutionResult {
-                        get_more_result,
-                        session: session.reference,
-                    }
-                });
-                return ExplicitSessionGetMoreProvider::Executing(future);
-            }
-            self_
-        });
-    }
-
-    fn execute(
-        &mut self,
-        info: CursorInformation,
-        client: Client,
-        pinned_connection: PinnedConnection,
-    ) -> BoxFuture<'_, Result<GetMoreResult>> {
-        match self {
-            Self::Idle(ref mut session) => Box::pin(async move {
-                let get_more = GetMore::new(info, pinned_connection.handle());
-                client
-                    .execute_operation(get_more, Some(&mut *session.reference))
-                    .await
-            }),
-            Self::Executing(_fut) => Box::pin(async {
-                Err(Error::internal(
-                    "streaming the cursor was cancelled while a request was in progress and must \
-                     be continued before iterating manually",
-                ))
-            }),
-        }
-    }
-}
-
-/// Struct returned from awaiting on a `GetMoreFuture` containing the result of the getMore as
-/// well as the reference to the `ClientSession` used for the getMore.
-struct ExecutionResult<'session> {
-    get_more_result: Result<GetMoreResult>,
-    session: &'session mut ClientSession,
-}
-
-impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
-    type Session = &'session mut ClientSession;
-
-    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error> {
-        self.get_more_result.as_ref()
-    }
-
-    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session) {
-        (self.get_more_result, self.session)
-    }
-}
-
-/// Wrapper around a mutable reference to a `ClientSession` that provides move semantics.
-/// This is used to prevent re-borrowing of the session and forcing it to be moved instead
-/// by moving the wrapping struct.
-struct MutableSessionReference<'a> {
-    reference: &'a mut ClientSession,
 }
