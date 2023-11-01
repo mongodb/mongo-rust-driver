@@ -81,9 +81,20 @@ fn main() {
             r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
         ),
     ];
+    let bson_version_loc = Location::new(
+        "../../Cargo.toml",
+        r#"bson = (?<target>\{ git = .*? \})\n"#,
+    );
+    let mongocrypt_version_loc = Location::new(
+        "../../Cargo.toml",
+        r#"mongocrypt = (?<target>\{ git = .*? \})\n"#,
+    );
+
     let mut pending = PendingUpdates::new();
     for loc in &version_locs {
         pending.apply(loc, "2.7.1");
     }
+    pending.apply(&bson_version_loc, "\"2.7.0\"");
+    pending.apply(&mongocrypt_version_loc, "\"0.2\"");
     pending.write();
 }
