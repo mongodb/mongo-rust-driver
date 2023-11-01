@@ -50,6 +50,22 @@ impl PendingUpdates {
     }
 }
 
+#[derive(argh::FromArgs)]
+/// Update crate and git dependency versions in prep for release.
+struct Args {
+    /// new version of the mongodb crate
+    #[argh(option)]
+    version: String,
+
+    /// version of the bson crate
+    #[argh(option)]
+    bson: Option<String>,
+
+    /// version of the mongocrypt crate
+    #[argh(option)]
+    mongocrypt: Option<String>,
+}
+
 fn main() {
     let version_locs = vec![
         Location::new(
@@ -90,11 +106,17 @@ fn main() {
         r#"mongocrypt = (?<target>\{ git = .*? \})\n"#,
     );
 
+    let args: Args = argh::from_env();
+
     let mut pending = PendingUpdates::new();
     for loc in &version_locs {
-        pending.apply(loc, "2.7.1");
+        pending.apply(loc, &args.version);
     }
-    pending.apply(&bson_version_loc, "\"2.7.0\"");
-    pending.apply(&mongocrypt_version_loc, "\"0.2\"");
+    if let Some(bson) = args.bson {
+        pending.apply(&bson_version_loc, &format!("{:?}", bson));
+    }
+    if let Some(mongocrypt) = args.mongocrypt {
+        pending.apply(&mongocrypt_version_loc, &format!("{:?}", mongocrypt));
+    }
     pending.write();
 }
