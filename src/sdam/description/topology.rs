@@ -113,6 +113,9 @@ pub(crate) struct TopologyDescription {
 
     /// The server descriptions of each member of the topology.
     pub(crate) servers: HashMap<ServerAddress, ServerDescription>,
+
+    /// The maximum number of hosts.
+    pub(crate) srv_max_hosts: Option<u32>,
 }
 
 impl PartialEq for TopologyDescription {
@@ -141,6 +144,7 @@ impl Default for TopologyDescription {
             local_threshold: Default::default(),
             heartbeat_freq: Default::default(),
             servers: Default::default(),
+            srv_max_hosts: Default::default(),
         }
     }
 }
@@ -177,6 +181,7 @@ impl TopologyDescription {
         self.set_name = options.repl_set_name.clone();
         self.local_threshold = options.local_threshold;
         self.heartbeat_freq = options.heartbeat_freq;
+        self.srv_max_hosts = options.srv_max_hosts;
     }
 
     /// Gets the topology type of the cluster.
@@ -381,9 +386,23 @@ impl TopologyDescription {
     /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
     /// already present in the cluster will be added, and servers in the cluster not present in the
     /// set will be removed.
-    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<ServerAddress>) {
-        self.add_new_servers_from_addresses(hosts.iter());
+    pub(crate) fn sync_hosts(&mut self, hosts: HashSet<ServerAddress>) {
         self.servers.retain(|host, _| hosts.contains(host));
+        let mut new = vec![];
+        for host in hosts {
+            if !self.servers.contains_key(&host) {
+                new.push((host.clone(), ServerDescription::new(host)));
+            }
+        }
+        if let Some(max) = self.srv_max_hosts {
+            let max = max as usize;
+            if max > 0 && max < self.servers.len() + new.len() {
+                new = choose_n(&new, max.saturating_sub(self.servers.len()))
+                    .cloned()
+                    .collect();
+            }
+        }
+        self.servers.extend(new);
     }
 
     pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
@@ -728,6 +747,11 @@ impl TopologyDescription {
             }
         }
     }
+}
+
+pub(crate) fn choose_n<T>(values: &[T], n: usize) -> impl Iterator<Item = &T> {
+    use rand::{prelude::SliceRandom, SeedableRng};
+    values.choose_multiple(&mut rand::rngs::SmallRng::from_entropy(), n)
 }
 
 /// Enum representing whether transactions are supported by the topology.

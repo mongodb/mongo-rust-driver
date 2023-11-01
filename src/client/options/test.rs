@@ -75,6 +75,8 @@ async fn run_test(test_file: TestFile) {
                 )
             // The Rust driver disallows `maxPoolSize=0`.
             || test_case.description.contains("maxPoolSize=0 does not error")
+            // TODO RUST-933 implement custom srvServiceName support
+            || test_case.description.contains("custom srvServiceName")
         {
             continue;
         }

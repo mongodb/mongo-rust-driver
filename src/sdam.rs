@@ -13,6 +13,7 @@ pub(crate) use self::{
     description::{
         server::{ServerDescription, TopologyVersion},
         topology::{
+            choose_n,
             server_selection::{self, SelectedServer},
             verify_max_staleness,
             TopologyDescription,
