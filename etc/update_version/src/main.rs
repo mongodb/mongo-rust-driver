@@ -1,11 +1,11 @@
-use std::{path::Path, collections::HashMap};
+use std::{collections::HashMap, path::Path};
 
 use regex::Regex;
 
 #[derive(Debug)]
 struct Location {
     path: &'static Path,
-    pattern: Regex,  // must contain a (?<target>) match group
+    pattern: Regex, // must contain a (?<target>) match group
 }
 
 impl Location {
@@ -22,10 +22,17 @@ struct PendingUpdates {
 }
 
 impl PendingUpdates {
-    fn new() -> Self { Self { files: HashMap::new() } }
+    fn new() -> Self {
+        Self {
+            files: HashMap::new(),
+        }
+    }
 
     fn apply(&mut self, location: &Location, update: &str) {
-        let text = self.files.entry(location.path).or_insert_with(|| std::fs::read_to_string(location.path).unwrap());
+        let text = self
+            .files
+            .entry(location.path)
+            .or_insert_with(|| std::fs::read_to_string(location.path).unwrap());
 
         if !location.pattern.is_match(text) {
             panic!("no match for {:?}", location);
@@ -72,22 +79,13 @@ fn main() {
             "../../Cargo.toml",
             r#"name = "mongodb"\nversion = "(?<target>.*?)"\n"#,
         ),
-        Location::new(
-            "../../README.md",
-            r#"mongodb = "(?<target>.*?)"\n"#,
-        ),
+        Location::new("../../README.md", r#"mongodb = "(?<target>.*?)"\n"#),
         Location::new(
             "../../README.md",
             r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
         ),
-        Location::new(
-            "../../src/lib.rs",
-            r#"//! mongodb = "(?<target>.*?)"\n"#,
-        ),
-        Location::new(
-            "../../src/lib.rs",
-            r#"//! version = "(?<target>.*?)"\n"#,
-        ),
+        Location::new("../../src/lib.rs", r#"//! mongodb = "(?<target>.*?)"\n"#),
+        Location::new("../../src/lib.rs", r#"//! version = "(?<target>.*?)"\n"#),
         Location::new(
             "../../src/lib.rs",
             r#"html_root_url = "https://docs.rs/mongodb/(?<target>.*?)""#,
@@ -97,10 +95,8 @@ fn main() {
             r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
         ),
     ];
-    let bson_version_loc = Location::new(
-        "../../Cargo.toml",
-        r#"bson = (?<target>\{ git = .*? \})\n"#,
-    );
+    let bson_version_loc =
+        Location::new("../../Cargo.toml", r#"bson = (?<target>\{ git = .*? \})\n"#);
     let mongocrypt_version_loc = Location::new(
         "../../Cargo.toml",
         r#"mongocrypt = (?<target>\{ git = .*? \})\n"#,
