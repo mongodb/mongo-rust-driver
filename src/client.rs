@@ -1,5 +1,6 @@
 pub mod action;
 pub mod auth;
+pub(crate) mod bulk_write;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) mod csfle;
 mod executor;

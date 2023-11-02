@@ -1,5 +1,6 @@
 mod abort_transaction;
 pub(crate) mod aggregate;
+mod bulk_write;
 mod commit_transaction;
 pub(crate) mod count;
 pub(crate) mod count_documents;
