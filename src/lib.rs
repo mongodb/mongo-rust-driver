@@ -337,6 +337,7 @@ mod index;
 mod operation;
 pub mod results;
 pub(crate) mod runtime;
+mod search_index;
 mod sdam;
 mod selection_criteria;
 mod serde_util;
@@ -362,7 +363,7 @@ pub use crate::{
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
 
-pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::{SearchIndexModel, SearchIndexView}};
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(
