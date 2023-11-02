@@ -3,7 +3,7 @@
 
 This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flags.
 
-For more detailed documentation, see [the manual](https://mongodb.github.io/mongo-rust-driver/manual/).
+For more detailed documentation, see https://www.mongodb.com/docs/drivers/rust/current/. This documentation includes detailed content about features, runnable examples, troubleshooting resources, and more.
 
 ## Index
 - [Installation](#installation)
