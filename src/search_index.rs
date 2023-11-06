@@ -1,6 +1,7 @@
 use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::{CreateSearchIndexes, UpdateSearchIndex, DropSearchIndex}};
 use self::options::*;
 
+use bson::doc;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
@@ -10,7 +11,7 @@ impl<T> Collection<T> {
         let mut names = self.create_search_indexes(Some(model), options).await?;
         match names.len() {
             1 => Ok(names.pop().unwrap()),
-            n => Err(Error::internal(format!("expected 1 index name, got {}", names.len()))),
+            n => Err(Error::internal(format!("expected 1 index name, got {}", n))),
         }
     }
 
@@ -35,11 +36,23 @@ impl<T> Collection<T> {
     /// Gets index information for one or more search indexes in the collection.
     ///
     /// If name is not specified, information for all indexes on the specified collection will be returned.
-    pub async fn list_search_indexes(&self, name: impl Into<Option<&str>>, aggregation_options: impl Into<Option<AggregateOptions>>, list_index_options: impl Into<Option<ListSearchIndexOptions>>) -> Result<Cursor<Document>> {
-        todo!()
+    pub async fn list_search_indexes(&self, name: impl Into<Option<&str>>, aggregation_options: impl Into<Option<AggregateOptions>>, _list_index_options: impl Into<Option<ListSearchIndexOptions>>) -> Result<Cursor<Document>> {
+        let mut inner = doc! { };
+        if let Some(name) = name.into() {
+            inner.insert("name", name);
+        }
+        self.aggregate(
+            vec![
+                doc! {
+                    "$listSearchIndexes": inner,
+                }
+            ],
+            aggregation_options,
+        ).await
     }
 }
 
+/// Specifies the options for a search index.
 #[derive(Debug, Clone, Default, TypedBuilder, Serialize)]
 #[non_exhaustive]
 pub struct SearchIndexModel {
