@@ -1,6 +1,7 @@
-use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor};
+use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::CreateSearchIndexes};
 use self::options::*;
 
+use serde::Serialize;
 use typed_builder::TypedBuilder;
 
 impl<T> Collection<T> {
@@ -14,8 +15,9 @@ impl<T> Collection<T> {
     }
 
     /// Creates multiple search indexes on the collection.
-    pub async fn create_search_indexes(&self, models: impl IntoIterator<Item=&SearchIndexModel>, options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<Vec<String>> {
-        todo!()
+    pub async fn create_search_indexes(&self, models: impl IntoIterator<Item=&SearchIndexModel>, _options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<Vec<String>> {
+        let op = CreateSearchIndexes::new(self.namespace(), models.into_iter().cloned().collect());
+        self.client().execute_operation(op, None).await
     }
 
     /// Updates the search index with the given name to use the provided definition.
@@ -36,7 +38,7 @@ impl<T> Collection<T> {
     }
 }
 
-#[derive(Debug, Clone, Default, TypedBuilder)]
+#[derive(Debug, Clone, Default, TypedBuilder, Serialize)]
 #[non_exhaustive]
 pub struct SearchIndexModel {
     /// The definition for this index.
