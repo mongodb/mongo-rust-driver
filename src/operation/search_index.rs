@@ -98,3 +98,43 @@ impl OperationWithDefaults for UpdateSearchIndex {
         response.body()
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct DropSearchIndex {
+    ns: Namespace,
+    name: String,
+}
+
+impl DropSearchIndex {
+    pub(crate) fn new(
+        ns: Namespace,
+        name: String,
+    ) -> Self {
+        Self { ns, name }
+    }
+}
+
+impl OperationWithDefaults for DropSearchIndex {
+    type O = ();
+    type Command = Document;
+    const NAME: &'static str = "dropSearchIndex";
+
+    fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command<Self::Command>> {
+        Ok(Command::new(
+            Self::NAME.to_string(),
+            self.ns.db.clone(),
+            doc! {
+                Self::NAME: self.ns.coll.clone(),
+                "name": &self.name,
+            },
+        ))
+    }
+
+    fn handle_response(
+        &self,
+        response: crate::cmap::RawCommandResponse,
+        _description: &crate::cmap::StreamDescription,
+    ) -> Result<Self::O> {
+        response.body()
+    }
+}

@@ -1,4 +1,4 @@
-use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::{CreateSearchIndexes, UpdateSearchIndex}};
+use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::{CreateSearchIndexes, UpdateSearchIndex, DropSearchIndex}};
 use self::options::*;
 
 use serde::Serialize;
@@ -27,8 +27,9 @@ impl<T> Collection<T> {
     }
 
     /// Drops the search index with the given name.
-    pub async fn drop_search_index(&self, name: &str, options: impl Into<Option<DropSearchIndexOptions>>) -> Result<()> {
-        todo!()
+    pub async fn drop_search_index(&self, name: &str, _options: impl Into<Option<DropSearchIndexOptions>>) -> Result<()> {
+        let op = DropSearchIndex::new(self.namespace(), name.to_string());
+        self.client().execute_operation(op, None).await
     }
 
     /// Gets index information for one or more search indexes in the collection.

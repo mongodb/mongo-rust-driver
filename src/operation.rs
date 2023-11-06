@@ -58,7 +58,7 @@ pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;
 pub(crate) use create::Create;
 pub(crate) use create_indexes::CreateIndexes;
-pub(crate) use search_index::{CreateSearchIndexes, UpdateSearchIndex};
+pub(crate) use search_index::{CreateSearchIndexes, UpdateSearchIndex, DropSearchIndex};
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
 pub(crate) use drop_collection::DropCollection;
