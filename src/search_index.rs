@@ -1,33 +1,37 @@
-use crate::{bson::Document, Collection, error::Result, coll::options::AggregateOptions, Cursor};
+use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor};
 use self::options::*;
 
 use typed_builder::TypedBuilder;
 
 impl<T> Collection<T> {
     /// Convenience method for creating a single search index.
-    pub async fn create_search_index(model: &SearchIndexModel, options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<String> {
-        todo!()
+    pub async fn create_search_index(&self, model: &SearchIndexModel, options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<String> {
+        let mut names = self.create_search_indexes(Some(model), options).await?;
+        match names.len() {
+            1 => Ok(names.pop().unwrap()),
+            n => Err(Error::internal(format!("expected 1 index name, got {}", names.len()))),
+        }
     }
 
     /// Creates multiple search indexes on the collection.
-    pub async fn create_search_indexes(models: impl IntoIterator<Item=&SearchIndexModel>, options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<Vec<String>> {
+    pub async fn create_search_indexes(&self, models: impl IntoIterator<Item=&SearchIndexModel>, options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<Vec<String>> {
         todo!()
     }
 
     /// Updates the search index with the given name to use the provided definition.
-    pub async fn update_search_index(name: &str, definition: &Document, options: impl Into<Option<UpdateSearchIndexOptions>>) -> Result<()> {
+    pub async fn update_search_index(&self, name: &str, definition: &Document, options: impl Into<Option<UpdateSearchIndexOptions>>) -> Result<()> {
         todo!()
     }
 
     /// Drops the search index with the given name.
-    pub async fn drop_search_index(name: &str, options: impl Into<Option<DropSearchIndexOptions>>) -> Result<()> {
+    pub async fn drop_search_index(&self, name: &str, options: impl Into<Option<DropSearchIndexOptions>>) -> Result<()> {
         todo!()
     }
 
     /// Gets index information for one or more search indexes in the collection.
     ///
     /// If name is not specified, information for all indexes on the specified collection will be returned.
-    pub async fn list_search_indexes(name: impl Into<Option<&str>>, aggregation_options: impl Into<Option<AggregateOptions>>, list_index_options: impl Into<Option<ListSearchIndexOptions>>) -> Result<Cursor<Document>> {
+    pub async fn list_search_indexes(&self, name: impl Into<Option<&str>>, aggregation_options: impl Into<Option<AggregateOptions>>, list_index_options: impl Into<Option<ListSearchIndexOptions>>) -> Result<Cursor<Document>> {
         todo!()
     }
 }
