@@ -25,6 +25,7 @@ struct CreateSearchIndexesResponse {
 
 #[derive(Debug, Deserialize)]
 struct CreatedSearchIndex {
+    #[allow(unused)]
     id: String,
     name: String,
 }

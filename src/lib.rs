@@ -363,7 +363,7 @@ pub use crate::{
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
 
-pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::{SearchIndexModel, SearchIndexView}};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(

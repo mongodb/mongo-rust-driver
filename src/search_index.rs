@@ -1,4 +1,4 @@
-use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::CreateSearchIndexes};
+use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::{CreateSearchIndexes, UpdateSearchIndex}};
 use self::options::*;
 
 use serde::Serialize;
@@ -21,8 +21,9 @@ impl<T> Collection<T> {
     }
 
     /// Updates the search index with the given name to use the provided definition.
-    pub async fn update_search_index(&self, name: &str, definition: &Document, options: impl Into<Option<UpdateSearchIndexOptions>>) -> Result<()> {
-        todo!()
+    pub async fn update_search_index(&self, name: &str, definition: &Document, _options: impl Into<Option<UpdateSearchIndexOptions>>) -> Result<()> {
+        let op = UpdateSearchIndex::new(self.namespace(), name.to_string(), definition.clone());
+        self.client().execute_operation(op, None).await
     }
 
     /// Drops the search index with the given name.
