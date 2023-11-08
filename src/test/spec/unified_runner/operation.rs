@@ -293,6 +293,7 @@ impl<'de> Deserialize<'de> for Operation {
             "createFindCursor" => deserialize_op::<CreateFindCursor>(definition.arguments),
             "createCommandCursor" => deserialize_op::<CreateCommandCursor>(definition.arguments),
             "createSearchIndex" => deserialize_op::<search_index::CreateSearchIndex>(definition.arguments),
+            "createSearchIndexes" => deserialize_op::<search_index::CreateSearchIndexes>(definition.arguments),
             "aggregate" => deserialize_op::<Aggregate>(definition.arguments),
             "distinct" => deserialize_op::<Distinct>(definition.arguments),
             "countDocuments" => deserialize_op::<CountDocuments>(definition.arguments),
