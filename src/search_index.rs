@@ -74,17 +74,17 @@ pub mod options {
     pub struct CreateSearchIndexOptions { }
 
     /// Options for [Collection::update_search_index].  Present to allow additional options to be added in the future as a non-breaking change.
-    #[derive(Clone, Debug, Default, TypedBuilder)]
+    #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
     pub struct UpdateSearchIndexOptions { }
 
     /// Options for [Collection::list_search_indexes].  Present to allow additional options to be added in the future as a non-breaking change.
-    #[derive(Clone, Debug, Default, TypedBuilder)]
+    #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
     pub struct ListSearchIndexOptions { }
 
     /// Options for [Collection::drop_search_index].  Present to allow additional options to be added in the future as a non-breaking change.
-    #[derive(Clone, Debug, Default, TypedBuilder)]
+    #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
     pub struct DropSearchIndexOptions { }
 }
