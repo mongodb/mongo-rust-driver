@@ -1,9 +1,9 @@
 use bson::{Bson, to_bson};
 use futures_core::future::BoxFuture;
-use futures_util::FutureExt;
+use futures_util::{FutureExt, TryStreamExt};
 use serde::Deserialize;
 
-use crate::{error::Result, search_index::options::{CreateSearchIndexOptions, DropSearchIndexOptions}, SearchIndexModel, test::spec::unified_runner::{TestRunner, Entity}};
+use crate::{error::Result, search_index::options::{CreateSearchIndexOptions, DropSearchIndexOptions, ListSearchIndexOptions}, SearchIndexModel, test::spec::unified_runner::{TestRunner, Entity}, coll::options::AggregateOptions};
 
 use super::TestOperation;
 
@@ -69,6 +69,31 @@ impl TestOperation for DropSearchIndex {
             let collection = test_runner.get_collection(id).await;
             collection.drop_search_index(&self.name, self.options.clone()).await?;
             Ok(None)
+        }.boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct ListSearchIndexes {
+    name: Option<String>,
+    #[serde(flatten)]
+    aggregate_options: AggregateOptions,
+    #[serde(flatten)]
+    options: ListSearchIndexOptions,
+}
+
+impl TestOperation for ListSearchIndexes {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let collection = test_runner.get_collection(id).await;
+            let cursor = collection.list_search_indexes(self.name.as_ref().map(|s| s.as_str()), self.aggregate_options.clone(), self.options.clone()).await?;
+            let values: Vec<_> = cursor.try_collect().await?;
+            Ok(Some(to_bson(&values)?.into()))
         }.boxed()
     }
 }
