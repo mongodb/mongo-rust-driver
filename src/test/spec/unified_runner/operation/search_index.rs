@@ -1,9 +1,9 @@
-use bson::{Bson, to_bson};
+use bson::{Bson, to_bson, Document};
 use futures_core::future::BoxFuture;
 use futures_util::{FutureExt, TryStreamExt};
 use serde::Deserialize;
 
-use crate::{error::Result, search_index::options::{CreateSearchIndexOptions, DropSearchIndexOptions, ListSearchIndexOptions}, SearchIndexModel, test::spec::unified_runner::{TestRunner, Entity}, coll::options::AggregateOptions};
+use crate::{error::Result, search_index::options::{CreateSearchIndexOptions, DropSearchIndexOptions, ListSearchIndexOptions, UpdateSearchIndexOptions}, SearchIndexModel, test::spec::unified_runner::{TestRunner, Entity}, coll::options::AggregateOptions};
 
 use super::TestOperation;
 
@@ -94,6 +94,29 @@ impl TestOperation for ListSearchIndexes {
             let cursor = collection.list_search_indexes(self.name.as_ref().map(|s| s.as_str()), self.aggregate_options.clone(), self.options.clone()).await?;
             let values: Vec<_> = cursor.try_collect().await?;
             Ok(Some(to_bson(&values)?.into()))
+        }.boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct UpdateSearchIndex {
+    name: String,
+    definition: Document,
+    #[serde(flatten)]
+    options: UpdateSearchIndexOptions,
+}
+
+impl TestOperation for UpdateSearchIndex {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let collection = test_runner.get_collection(id).await;
+            collection.update_search_index(&self.name, self.definition.clone(), self.options.clone()).await?;
+            Ok(None)
         }.boxed()
     }
 }
