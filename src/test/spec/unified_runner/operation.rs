@@ -292,8 +292,6 @@ impl<'de> Deserialize<'de> for Operation {
             "find" => deserialize_op::<Find>(definition.arguments),
             "createFindCursor" => deserialize_op::<CreateFindCursor>(definition.arguments),
             "createCommandCursor" => deserialize_op::<CreateCommandCursor>(definition.arguments),
-            "createSearchIndex" => deserialize_op::<search_index::CreateSearchIndex>(definition.arguments),
-            "createSearchIndexes" => deserialize_op::<search_index::CreateSearchIndexes>(definition.arguments),
             "aggregate" => deserialize_op::<Aggregate>(definition.arguments),
             "distinct" => deserialize_op::<Distinct>(definition.arguments),
             "countDocuments" => deserialize_op::<CountDocuments>(definition.arguments),
@@ -387,6 +385,9 @@ impl<'de> Deserialize<'de> for Operation {
             #[cfg(feature = "in-use-encryption-unstable")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
             "iterateOnce" => deserialize_op::<IterateOnce>(definition.arguments),
+            "createSearchIndex" => deserialize_op::<search_index::CreateSearchIndex>(definition.arguments),
+            "createSearchIndexes" => deserialize_op::<search_index::CreateSearchIndexes>(definition.arguments),
+            "dropSearchIndex" => deserialize_op::<search_index::DropSearchIndex>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
