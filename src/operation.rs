@@ -5,7 +5,6 @@ mod count;
 mod count_documents;
 mod create;
 mod create_indexes;
-mod search_index;
 mod delete;
 mod distinct;
 mod drop_collection;
@@ -21,6 +20,7 @@ mod list_indexes;
 mod raw_output;
 mod run_command;
 mod run_cursor_command;
+mod search_index;
 mod update;
 
 #[cfg(test)]
@@ -58,7 +58,6 @@ pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;
 pub(crate) use create::Create;
 pub(crate) use create_indexes::CreateIndexes;
-pub(crate) use search_index::{CreateSearchIndexes, UpdateSearchIndex, DropSearchIndex};
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
 pub(crate) use drop_collection::DropCollection;
@@ -75,6 +74,7 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use raw_output::RawOutput;
 pub(crate) use run_command::RunCommand;
 pub(crate) use run_cursor_command::RunCursorCommand;
+pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;

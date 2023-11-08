@@ -1,7 +1,7 @@
-use bson::{Document, doc};
+use bson::{doc, Document};
 use serde::Deserialize;
 
-use crate::{SearchIndexModel, Namespace, error::Result, cmap::Command};
+use crate::{cmap::Command, error::Result, Namespace, SearchIndexModel};
 
 use super::OperationWithDefaults;
 
@@ -52,7 +52,11 @@ impl OperationWithDefaults for CreateSearchIndexes {
         }
 
         let response: Response = response.body()?;
-        Ok(response.indexes_created.into_iter().map(|ci| ci.name).collect())
+        Ok(response
+            .indexes_created
+            .into_iter()
+            .map(|ci| ci.name)
+            .collect())
     }
 }
 
@@ -64,12 +68,12 @@ pub(crate) struct UpdateSearchIndex {
 }
 
 impl UpdateSearchIndex {
-    pub(crate) fn new(
-        ns: Namespace,
-        name: String,
-        definition: Document,
-    ) -> Self {
-        Self { ns, name, definition }
+    pub(crate) fn new(ns: Namespace, name: String, definition: Document) -> Self {
+        Self {
+            ns,
+            name,
+            definition,
+        }
     }
 }
 
@@ -78,7 +82,10 @@ impl OperationWithDefaults for UpdateSearchIndex {
     type Command = Document;
     const NAME: &'static str = "updateSearchIndex";
 
-    fn build(&mut self, _description: &crate::cmap::StreamDescription) -> crate::error::Result<crate::cmap::Command<Self::Command>> {
+    fn build(
+        &mut self,
+        _description: &crate::cmap::StreamDescription,
+    ) -> crate::error::Result<crate::cmap::Command<Self::Command>> {
         Ok(Command::new(
             Self::NAME.to_string(),
             self.ns.db.clone(),
@@ -106,10 +113,7 @@ pub(crate) struct DropSearchIndex {
 }
 
 impl DropSearchIndex {
-    pub(crate) fn new(
-        ns: Namespace,
-        name: String,
-    ) -> Self {
+    pub(crate) fn new(ns: Namespace, name: String) -> Self {
         Self { ns, name }
     }
 }
@@ -119,7 +123,10 @@ impl OperationWithDefaults for DropSearchIndex {
     type Command = Document;
     const NAME: &'static str = "dropSearchIndex";
 
-    fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(
+        &mut self,
+        _description: &crate::cmap::StreamDescription,
+    ) -> Result<Command<Self::Command>> {
         Ok(Command::new(
             Self::NAME.to_string(),
             self.ns.db.clone(),

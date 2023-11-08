@@ -1,13 +1,24 @@
-use crate::{bson::Document, Collection, error::{Error, Result}, coll::options::AggregateOptions, Cursor, operation::{CreateSearchIndexes, UpdateSearchIndex, DropSearchIndex}};
 use self::options::*;
+use crate::{
+    bson::Document,
+    coll::options::AggregateOptions,
+    error::{Error, Result},
+    operation::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex},
+    Collection,
+    Cursor,
+};
 
 use bson::doc;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 impl<T> Collection<T> {
     /// Convenience method for creating a single search index.
-    pub async fn create_search_index(&self, model: SearchIndexModel, options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<String> {
+    pub async fn create_search_index(
+        &self,
+        model: SearchIndexModel,
+        options: impl Into<Option<CreateSearchIndexOptions>>,
+    ) -> Result<String> {
         let mut names = self.create_search_indexes(Some(model), options).await?;
         match names.len() {
             1 => Ok(names.pop().unwrap()),
@@ -16,40 +27,61 @@ impl<T> Collection<T> {
     }
 
     /// Creates multiple search indexes on the collection.
-    pub async fn create_search_indexes(&self, models: impl IntoIterator<Item=SearchIndexModel>, _options: impl Into<Option<CreateSearchIndexOptions>>) -> Result<Vec<String>> {
+    pub async fn create_search_indexes(
+        &self,
+        models: impl IntoIterator<Item = SearchIndexModel>,
+        _options: impl Into<Option<CreateSearchIndexOptions>>,
+    ) -> Result<Vec<String>> {
         let op = CreateSearchIndexes::new(self.namespace(), models.into_iter().collect());
         self.client().execute_operation(op, None).await
     }
 
     /// Updates the search index with the given name to use the provided definition.
-    pub async fn update_search_index(&self, name: impl AsRef<str>, definition: Document, _options: impl Into<Option<UpdateSearchIndexOptions>>) -> Result<()> {
-        let op = UpdateSearchIndex::new(self.namespace(), name.as_ref().to_string(), definition.clone());
+    pub async fn update_search_index(
+        &self,
+        name: impl AsRef<str>,
+        definition: Document,
+        _options: impl Into<Option<UpdateSearchIndexOptions>>,
+    ) -> Result<()> {
+        let op = UpdateSearchIndex::new(
+            self.namespace(),
+            name.as_ref().to_string(),
+            definition.clone(),
+        );
         self.client().execute_operation(op, None).await
     }
 
     /// Drops the search index with the given name.
-    pub async fn drop_search_index(&self, name: impl AsRef<str>, _options: impl Into<Option<DropSearchIndexOptions>>) -> Result<()> {
+    pub async fn drop_search_index(
+        &self,
+        name: impl AsRef<str>,
+        _options: impl Into<Option<DropSearchIndexOptions>>,
+    ) -> Result<()> {
         let op = DropSearchIndex::new(self.namespace(), name.as_ref().to_string());
         self.client().execute_operation(op, None).await
     }
 
     /// Gets index information for one or more search indexes in the collection.
     ///
-    /// If name is not specified, information for all indexes on the specified collection will be returned.
-    pub async fn list_search_indexes(&self, name: impl Into<Option<&str>>, aggregation_options: impl Into<Option<AggregateOptions>>, _list_index_options: impl Into<Option<ListSearchIndexOptions>>) -> Result<Cursor<Document>>
-    {
-        let mut inner = doc! { };
+    /// If name is not specified, information for all indexes on the specified collection will be
+    /// returned.
+    pub async fn list_search_indexes(
+        &self,
+        name: impl Into<Option<&str>>,
+        aggregation_options: impl Into<Option<AggregateOptions>>,
+        _list_index_options: impl Into<Option<ListSearchIndexOptions>>,
+    ) -> Result<Cursor<Document>> {
+        let mut inner = doc! {};
         if let Some(name) = name.into() {
             inner.insert("name", name.to_string());
         }
         self.aggregate(
-            vec![
-                doc! {
-                    "$listSearchIndexes": inner,
-                }
-            ],
+            vec![doc! {
+                "$listSearchIndexes": inner,
+            }],
             aggregation_options,
-        ).await
+        )
+        .await
     }
 }
 
@@ -69,23 +101,27 @@ pub mod options {
     use serde::Deserialize;
     use typed_builder::TypedBuilder;
 
-    /// Options for [Collection::create_search_index].  Present to allow additional options to be added in the future as a non-breaking change.
+    /// Options for [Collection::create_search_index].  Present to allow additional options to be
+    /// added in the future as a non-breaking change.
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
-    pub struct CreateSearchIndexOptions { }
+    pub struct CreateSearchIndexOptions {}
 
-    /// Options for [Collection::update_search_index].  Present to allow additional options to be added in the future as a non-breaking change.
+    /// Options for [Collection::update_search_index].  Present to allow additional options to be
+    /// added in the future as a non-breaking change.
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
-    pub struct UpdateSearchIndexOptions { }
+    pub struct UpdateSearchIndexOptions {}
 
-    /// Options for [Collection::list_search_indexes].  Present to allow additional options to be added in the future as a non-breaking change.
+    /// Options for [Collection::list_search_indexes].  Present to allow additional options to be
+    /// added in the future as a non-breaking change.
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
-    pub struct ListSearchIndexOptions { }
+    pub struct ListSearchIndexOptions {}
 
-    /// Options for [Collection::drop_search_index].  Present to allow additional options to be added in the future as a non-breaking change.
+    /// Options for [Collection::drop_search_index].  Present to allow additional options to be
+    /// added in the future as a non-breaking change.
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[non_exhaustive]
-    pub struct DropSearchIndexOptions { }
+    pub struct DropSearchIndexOptions {}
 }

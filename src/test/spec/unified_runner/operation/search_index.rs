@@ -1,9 +1,20 @@
-use bson::{Bson, to_bson, Document};
+use bson::{to_bson, Bson, Document};
 use futures_core::future::BoxFuture;
 use futures_util::{FutureExt, TryStreamExt};
 use serde::Deserialize;
 
-use crate::{error::Result, search_index::options::{CreateSearchIndexOptions, DropSearchIndexOptions, ListSearchIndexOptions, UpdateSearchIndexOptions}, SearchIndexModel, test::spec::unified_runner::{TestRunner, Entity}, coll::options::AggregateOptions};
+use crate::{
+    coll::options::AggregateOptions,
+    error::Result,
+    search_index::options::{
+        CreateSearchIndexOptions,
+        DropSearchIndexOptions,
+        ListSearchIndexOptions,
+        UpdateSearchIndexOptions,
+    },
+    test::spec::unified_runner::{Entity, TestRunner},
+    SearchIndexModel,
+};
 
 use super::TestOperation;
 
@@ -23,9 +34,12 @@ impl TestOperation for CreateSearchIndex {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
-            let name = collection.create_search_index(self.model.clone(), self.options.clone()).await?;
+            let name = collection
+                .create_search_index(self.model.clone(), self.options.clone())
+                .await?;
             Ok(Some(Bson::String(name).into()))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -45,9 +59,12 @@ impl TestOperation for CreateSearchIndexes {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
-            let names = collection.create_search_indexes(self.models.clone(), self.options.clone()).await?;
+            let names = collection
+                .create_search_indexes(self.models.clone(), self.options.clone())
+                .await?;
             Ok(Some(to_bson(&names)?.into()))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -67,9 +84,12 @@ impl TestOperation for DropSearchIndex {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
-            collection.drop_search_index(&self.name, self.options.clone()).await?;
+            collection
+                .drop_search_index(&self.name, self.options.clone())
+                .await?;
             Ok(None)
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -90,10 +110,17 @@ impl TestOperation for ListSearchIndexes {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
-            let cursor = collection.list_search_indexes(self.name.as_ref().map(|s| s.as_str()), self.aggregation_options.clone(), self.options.clone()).await?;
+            let cursor = collection
+                .list_search_indexes(
+                    self.name.as_ref().map(|s| s.as_str()),
+                    self.aggregation_options.clone(),
+                    self.options.clone(),
+                )
+                .await?;
             let values: Vec<_> = cursor.try_collect().await?;
             Ok(Some(to_bson(&values)?.into()))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -114,8 +141,11 @@ impl TestOperation for UpdateSearchIndex {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
-            collection.update_search_index(&self.name, self.definition.clone(), self.options.clone()).await?;
+            collection
+                .update_search_index(&self.name, self.definition.clone(), self.options.clone())
+                .await?;
             Ok(None)
-        }.boxed()
+        }
+        .boxed()
     }
 }
