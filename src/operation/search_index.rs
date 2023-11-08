@@ -137,4 +137,12 @@ impl OperationWithDefaults for DropSearchIndex {
     ) -> Result<Self::O> {
         response.body()
     }
+
+    fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {
+        if error.is_ns_not_found() {
+            Ok(())
+        } else {
+            Err(error)
+        }
+    }
 }
