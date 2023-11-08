@@ -10,6 +10,7 @@ mod crud;
 mod crud_v1;
 mod faas;
 mod gridfs;
+mod index_management;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;

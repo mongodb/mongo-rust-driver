@@ -26,10 +26,10 @@ impl OperationWithDefaults for CreateSearchIndexes {
         Ok(Command::new(
             Self::NAME.to_string(),
             self.ns.db.clone(),
-            doc! {
+            dbg!(doc! {
                 Self::NAME: self.ns.coll.clone(),
                 "indexes": bson::to_bson(&self.indexes)?,
-            }
+            })
         ))
     }
 
