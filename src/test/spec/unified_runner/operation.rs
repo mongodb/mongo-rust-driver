@@ -3,6 +3,8 @@ mod csfle;
 #[cfg(feature = "in-use-encryption-unstable")]
 use self::csfle::*;
 
+mod search_index;
+
 use std::{
     collections::HashMap,
     convert::TryInto,
@@ -290,6 +292,7 @@ impl<'de> Deserialize<'de> for Operation {
             "find" => deserialize_op::<Find>(definition.arguments),
             "createFindCursor" => deserialize_op::<CreateFindCursor>(definition.arguments),
             "createCommandCursor" => deserialize_op::<CreateCommandCursor>(definition.arguments),
+            "createSearchIndex" => deserialize_op::<search_index::CreateSearchIndex>(definition.arguments),
             "aggregate" => deserialize_op::<Aggregate>(definition.arguments),
             "distinct" => deserialize_op::<Distinct>(definition.arguments),
             "countDocuments" => deserialize_op::<CountDocuments>(definition.arguments),
