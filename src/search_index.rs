@@ -61,6 +61,7 @@ pub struct SearchIndexModel {
     pub definition: Document,
 
     /// The name for this index, if present.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
 
