@@ -98,10 +98,10 @@ pub struct SearchIndexModel {
 }
 
 pub mod options {
-    use serde::Deserialize;
-    use typed_builder::TypedBuilder;
     #[cfg(docsrs)]
     use crate::Collection;
+    use serde::Deserialize;
+    use typed_builder::TypedBuilder;
 
     /// Options for [Collection::create_search_index].  Present to allow additional options to be
     /// added in the future as a non-breaking change.
