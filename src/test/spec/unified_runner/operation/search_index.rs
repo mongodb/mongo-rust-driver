@@ -112,7 +112,7 @@ impl TestOperation for ListSearchIndexes {
             let collection = test_runner.get_collection(id).await;
             let cursor = collection
                 .list_search_indexes(
-                    self.name.as_ref().map(|s| s.as_str()),
+                    self.name.as_deref(),
                     self.aggregation_options.clone(),
                     self.options.clone(),
                 )
