@@ -75,13 +75,14 @@ impl<T> Collection<T> {
         if let Some(name) = name.into() {
             inner.insert("name", name.to_string());
         }
-        self.aggregate(
-            vec![doc! {
-                "$listSearchIndexes": inner,
-            }],
-            aggregation_options,
-        )
-        .await
+        self.clone_unconcerned()
+            .aggregate(
+                vec![doc! {
+                    "$listSearchIndexes": inner,
+                }],
+                aggregation_options,
+            )
+            .await
     }
 }
 

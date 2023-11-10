@@ -135,7 +135,7 @@ impl<T> Clone for Collection<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CollectionInner {
     client: Client,
     db: Database,
@@ -179,6 +179,16 @@ impl<T> Collection<T> {
     pub fn clone_with_type<U>(&self) -> Collection<U> {
         Collection {
             inner: self.inner.clone(),
+            _phantom: Default::default(),
+        }
+    }
+
+    pub(crate) fn clone_unconcerned(&self) -> Self {
+        let mut new_inner = CollectionInner::clone(&self.inner);
+        new_inner.write_concern = None;
+        new_inner.read_concern = None;
+        Self {
+            inner: Arc::new(new_inner),
             _phantom: Default::default(),
         }
     }

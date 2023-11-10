@@ -58,6 +58,14 @@ impl OperationWithDefaults for CreateSearchIndexes {
             .map(|ci| ci.name)
             .collect())
     }
+
+    fn supports_sessions(&self) -> bool {
+        false
+    }
+
+    fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -103,6 +111,14 @@ impl OperationWithDefaults for UpdateSearchIndex {
         _description: &crate::cmap::StreamDescription,
     ) -> crate::error::Result<Self::O> {
         response.body()
+    }
+
+    fn supports_sessions(&self) -> bool {
+        false
+    }
+
+    fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
+        false
     }
 }
 
@@ -151,5 +167,13 @@ impl OperationWithDefaults for DropSearchIndex {
         } else {
             Err(error)
         }
+    }
+
+    fn supports_sessions(&self) -> bool {
+        false
+    }
+
+    fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
+        false
     }
 }
