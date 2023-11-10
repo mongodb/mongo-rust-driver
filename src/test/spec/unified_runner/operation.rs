@@ -1,3 +1,5 @@
+mod bulk_write;
+
 #[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
 #[cfg(feature = "in-use-encryption-unstable")]
@@ -77,7 +79,7 @@ use crate::{
     runtime,
     selection_criteria::ReadPreference,
     serde_util,
-    test::FailPoint,
+    test::{spec::unified_runner::operation::bulk_write::BulkWrite, FailPoint},
     Collection,
     Database,
     IndexModel,
@@ -399,6 +401,7 @@ impl<'de> Deserialize<'de> for Operation {
             "updateSearchIndex" => {
                 deserialize_op::<search_index::UpdateSearchIndex>(definition.arguments)
             }
+            "bulkWrite" => deserialize_op::<BulkWrite>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),

@@ -65,7 +65,6 @@ use crate::test::{
 };
 
 const SKIPPED_OPERATIONS: &[&str] = &[
-    "bulkWrite",
     "count",
     "listCollectionObjects",
     "listDatabaseObjects",

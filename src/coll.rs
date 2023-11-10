@@ -740,7 +740,7 @@ where
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
     /// The name of the database associated with this namespace.
     pub db: String,
@@ -793,9 +793,25 @@ impl<'de> Deserialize<'de> for Namespace {
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s)
-            .ok_or_else(|| D::Error::custom("Missing one or more fields in namespace"))
+        #[derive(Deserialize)]
+        struct NamespaceHelper {
+            db: String,
+            coll: String,
+        }
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum NamespaceOptions {
+            String(String),
+            Object(NamespaceHelper),
+        }
+        match NamespaceOptions::deserialize(deserializer)? {
+            NamespaceOptions::String(string) => Self::from_str(&string)
+                .ok_or_else(|| D::Error::custom("Missing one or more fields in namespace")),
+            NamespaceOptions::Object(object) => Ok(Self {
+                db: object.db,
+                coll: object.coll,
+            }),
+        }
     }
 }
 
