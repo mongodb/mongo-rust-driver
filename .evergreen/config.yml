@@ -390,6 +390,13 @@ buildvariants:
     tasks:
       - .load-balancer
 
+  - name: search-index
+    display_name: "Search Index Helpers"
+    run_on:
+      - rhel87-small
+    tasks:
+      - name: search-index-task-group
+
 ###############
 # Task Groups #
 ###############
@@ -550,6 +557,42 @@ task_groups:
             $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/delete-instance.sh
     tasks:
       - test-gcp-kms
+
+  - name: search-index-task-group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install junit dependencies"
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          add_expansions_to_env: true
+          env:
+            MONGODB_VERSION: "7.0"
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
+      - command: expansions.update
+        params:
+          file: src/atlas-expansion.yml
+    teardown_group:
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
+    tasks:
+      - test-search-index
 
 #########
 # Tasks #
@@ -952,6 +995,15 @@ tasks:
             ${PREPARE_SHELL}
             ${AZURE_SHELL}
             .evergreen/run-azure-kms-test.sh
+
+  - name: test-search-index
+    commands:
+      - command: shell.exec
+        params:
+          working_dir: src
+          script: |
+            ${PREPARE_SHELL}
+            .evergreen/run-search-index-test.sh
 
   - name: test-x509-auth
     commands:
