@@ -1,17 +1,24 @@
-use std::time::{Instant, Duration};
-use std::env;
+use std::{
+    env,
+    time::{Duration, Instant},
+};
 
-use bson::{oid::ObjectId, Document, doc};
+use bson::{doc, oid::ObjectId, Document};
 use futures_util::TryStreamExt;
 
-use crate::test::log_uncaptured;
-use crate::{test::spec::unified_runner::run_unified_tests, Client, SearchIndexModel};
+use crate::{
+    test::{log_uncaptured, spec::unified_runner::run_unified_tests},
+    Client,
+    SearchIndexModel,
+};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     if env::var("INDEX_MANAGEMENT_TEST_UNIFIED").is_err() {
-        log_uncaptured("Skipping index management unified tests: INDEX_MANAGEMENT_TEST_UNIFIED not set");
+        log_uncaptured(
+            "Skipping index management unified tests: INDEX_MANAGEMENT_TEST_UNIFIED not set",
+        );
         return;
     }
     run_unified_tests(&["index-management"]).await;
@@ -34,13 +41,16 @@ async fn search_index_create_list() {
     db.create_collection(&coll_name, None).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let name = coll0.create_search_index(
-        SearchIndexModel::builder()
-            .name(String::from("test-search-index"))
-            .definition(doc! { "mappings": { "dynamic": false } })
-            .build(),
-        None,
-    ).await.unwrap();
+    let name = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(name, "test-search-index");
 
     let found = 'outer: loop {
@@ -56,7 +66,10 @@ async fn search_index_create_list() {
         }
     };
 
-    assert_eq!(found.get_document("latestDefinition"), Ok(&doc! { "mappings": { "dynamic": false } }));
+    assert_eq!(
+        found.get_document("latestDefinition"),
+        Ok(&doc! { "mappings": { "dynamic": false } })
+    );
 }
 
 /// Search Index Case 2: Driver can successfully create multiple indexes in batch
@@ -76,17 +89,22 @@ async fn search_index_create_multiple() {
     db.create_collection(&coll_name, None).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let names = coll0.create_search_indexes([
-        SearchIndexModel::builder()
-            .name(String::from("test-search-index-1"))
-            .definition(doc! { "mappings": { "dynamic": false } })
-            .build(),
-        SearchIndexModel::builder()
-            .name(String::from("test-search-index-2"))
-            .definition(doc! { "mappings": { "dynamic": false } })
-            .build(),
-    ],
-    None).await.unwrap();
+    let names = coll0
+        .create_search_indexes(
+            [
+                SearchIndexModel::builder()
+                    .name(String::from("test-search-index-1"))
+                    .definition(doc! { "mappings": { "dynamic": false } })
+                    .build(),
+                SearchIndexModel::builder()
+                    .name(String::from("test-search-index-2"))
+                    .definition(doc! { "mappings": { "dynamic": false } })
+                    .build(),
+            ],
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(names, ["test-search-index-1", "test-search-index-2"]);
 
     let mut index1 = None;
@@ -94,9 +112,12 @@ async fn search_index_create_multiple() {
     loop {
         let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index-1") && d.get_bool("queryable") == Ok(true) {
+            if d.get_str("name") == Ok("test-search-index-1") && d.get_bool("queryable") == Ok(true)
+            {
                 index1 = Some(d);
-            } else if d.get_str("name") == Ok("test-search-index-2") && d.get_bool("queryable") == Ok(true) {
+            } else if d.get_str("name") == Ok("test-search-index-2")
+                && d.get_bool("queryable") == Ok(true)
+            {
                 index2 = Some(d);
             }
         }
@@ -109,8 +130,14 @@ async fn search_index_create_multiple() {
         }
     }
 
-    assert_eq!(index1.unwrap().get_document("latestDefinition"), Ok(&doc! { "mappings": { "dynamic": false } }));
-    assert_eq!(index2.unwrap().get_document("latestDefinition"), Ok(&doc! { "mappings": { "dynamic": false } }));
+    assert_eq!(
+        index1.unwrap().get_document("latestDefinition"),
+        Ok(&doc! { "mappings": { "dynamic": false } })
+    );
+    assert_eq!(
+        index2.unwrap().get_document("latestDefinition"),
+        Ok(&doc! { "mappings": { "dynamic": false } })
+    );
 }
 
 /// Search Index Case 3: Driver can successfully drop search indexes
@@ -130,13 +157,16 @@ async fn search_index_drop() {
     db.create_collection(&coll_name, None).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let name = coll0.create_search_index(
-        SearchIndexModel::builder()
-            .name(String::from("test-search-index"))
-            .definition(doc! { "mappings": { "dynamic": false } })
-            .build(),
-        None,
-    ).await.unwrap();
+    let name = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
@@ -150,9 +180,12 @@ async fn search_index_drop() {
         if Instant::now() > deadline {
             panic!("search index creation timed out");
         }
-    };
+    }
 
-    coll0.drop_search_index("test-search-index", None).await.unwrap();
+    coll0
+        .drop_search_index("test-search-index", None)
+        .await
+        .unwrap();
 
     loop {
         let cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
@@ -183,13 +216,16 @@ async fn search_index_update() {
     db.create_collection(&coll_name, None).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let name = coll0.create_search_index(
-        SearchIndexModel::builder()
-            .name(String::from("test-search-index"))
-            .definition(doc! { "mappings": { "dynamic": false } })
-            .build(),
-        None,
-    ).await.unwrap();
+    let name = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
@@ -203,18 +239,24 @@ async fn search_index_update() {
         if Instant::now() > deadline {
             panic!("search index creation timed out");
         }
-    };
+    }
 
-    coll0.update_search_index(
-        "test-search-index",
-        doc! { "mappings": { "dynamic": true } },
-        None,
-    ).await.unwrap();
+    coll0
+        .update_search_index(
+            "test-search-index",
+            doc! { "mappings": { "dynamic": true } },
+            None,
+        )
+        .await
+        .unwrap();
 
     let found = 'find: loop {
         let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) && d.get_str("status") == Ok("READY") {
+            if d.get_str("name") == Ok("test-search-index")
+                && d.get_bool("queryable") == Ok(true)
+                && d.get_str("status") == Ok("READY")
+            {
                 break 'find d;
             }
         }
@@ -224,7 +266,10 @@ async fn search_index_update() {
         }
     };
 
-    assert_eq!(found.get_document("latestDefinition"), Ok(&doc! { "mappings": { "dynamic": true } }));
+    assert_eq!(
+        found.get_document("latestDefinition"),
+        Ok(&doc! { "mappings": { "dynamic": true } })
+    );
 }
 
 /// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
@@ -237,7 +282,12 @@ async fn search_index_drop_not_found() {
     }
     let client = Client::test_builder().build().await;
     let coll_name = ObjectId::new().to_hex();
-    let coll0 = client.database("search_index_test").collection::<Document>(&coll_name);
+    let coll0 = client
+        .database("search_index_test")
+        .collection::<Document>(&coll_name);
 
-    coll0.drop_search_index("test-search-index", None).await.unwrap();
+    coll0
+        .drop_search_index("test-search-index", None)
+        .await
+        .unwrap();
 }
