@@ -107,10 +107,10 @@ impl OperationWithDefaults for UpdateSearchIndex {
 
     fn handle_response(
         &self,
-        response: crate::cmap::RawCommandResponse,
+        _response: crate::cmap::RawCommandResponse,
         _description: &crate::cmap::StreamDescription,
     ) -> crate::error::Result<Self::O> {
-        response.body()
+        Ok(())
     }
 
     fn supports_sessions(&self) -> bool {
@@ -155,10 +155,10 @@ impl OperationWithDefaults for DropSearchIndex {
 
     fn handle_response(
         &self,
-        response: crate::cmap::RawCommandResponse,
+        _response: crate::cmap::RawCommandResponse,
         _description: &crate::cmap::StreamDescription,
     ) -> Result<Self::O> {
-        response.body()
+        Ok(())
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {
