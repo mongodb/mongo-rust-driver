@@ -20,6 +20,7 @@ mod list_indexes;
 mod raw_output;
 mod run_command;
 mod run_cursor_command;
+mod search_index;
 mod update;
 
 #[cfg(test)]
@@ -73,6 +74,7 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use raw_output::RawOutput;
 pub(crate) use run_command::RunCommand;
 pub(crate) use run_cursor_command::RunCursorCommand;
+pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;

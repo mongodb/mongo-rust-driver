@@ -25,6 +25,7 @@ pub use crate::{
     db::options::*,
     gridfs::options::*,
     index::options::*,
+    search_index::options::*,
     selection_criteria::*,
 };
 
