@@ -1003,6 +1003,7 @@ tasks:
           working_dir: src
           script: |
             ${PREPARE_SHELL}
+            export MONGODB_URI=${MONGODB_URI}
             .evergreen/run-search-index-test.sh
 
   - name: test-x509-auth
