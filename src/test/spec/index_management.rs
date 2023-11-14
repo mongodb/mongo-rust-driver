@@ -147,3 +147,71 @@ async fn search_index_drop() {
         }
     }
 }
+
+/// Search Index Case 4: Driver can update a search index
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn search_index_update() {
+    let start = Instant::now();
+    let deadline = start + Duration::from_secs(60 * 5);
+
+    let client = Client::test_builder().build().await;
+    let db = client.database("search_index_test");
+    let coll_name = ObjectId::new().to_hex();
+    db.create_collection(&coll_name, None).await.unwrap();
+    let coll0 = db.collection::<Document>(&coll_name);
+
+    let name = coll0.create_search_index(
+        SearchIndexModel::builder()
+            .name(String::from("test-search-index"))
+            .definition(doc! { "mappings": { "dynamic": false } })
+            .build(),
+        None,
+    ).await.unwrap();
+    assert_eq!(name, "test-search-index");
+
+    'outer: loop {
+        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        while let Some(d) = cursor.try_next().await.unwrap() {
+            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
+                break 'outer;
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        if Instant::now() > deadline {
+            panic!("search index creation timed out");
+        }
+    };
+
+    coll0.update_search_index(
+        "test-search-index",
+        doc! { "mappings": { "dynamic": true } },
+        None,
+    ).await.unwrap();
+
+    let found = 'find: loop {
+        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        while let Some(d) = cursor.try_next().await.unwrap() {
+            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) && d.get_str("status") == Ok("READY") {
+                break 'find d;
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        if Instant::now() > deadline {
+            panic!("search index update timed out");
+        }
+    };
+
+    assert_eq!(found.get_document("latestDefinition"), Ok(&doc! { "mappings": { "dynamic": true } }));
+}
+
+/// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn search_index_drop_not_found() {
+    let client = Client::test_builder().build().await;
+    let coll_name = ObjectId::new().to_hex();
+    let coll0 = client.database("search_index_test").collection::<Document>(&coll_name);
+
+    coll0.drop_search_index("test-search-index", None).await.unwrap();
+}
