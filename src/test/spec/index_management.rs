@@ -1,13 +1,19 @@
 use std::time::{Instant, Duration};
+use std::env;
 
 use bson::{oid::ObjectId, Document, doc};
 use futures_util::TryStreamExt;
 
+use crate::test::log_uncaptured;
 use crate::{test::spec::unified_runner::run_unified_tests, Client, SearchIndexModel};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
+    if env::var("INDEX_MANAGEMENT_TEST_UNIFIED").is_err() {
+        log_uncaptured("Skipping index management unified tests: INDEX_MANAGEMENT_TEST_UNIFIED not set");
+        return;
+    }
     run_unified_tests(&["index-management"]).await;
 }
 
@@ -15,6 +21,10 @@ async fn run() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn search_index_create_list() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -53,6 +63,10 @@ async fn search_index_create_list() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn search_index_create_multiple() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -103,6 +117,10 @@ async fn search_index_create_multiple() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn search_index_drop() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -152,6 +170,10 @@ async fn search_index_drop() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn search_index_update() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -209,6 +231,10 @@ async fn search_index_update() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn search_index_drop_not_found() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
     let client = Client::test_builder().build().await;
     let coll_name = ObjectId::new().to_hex();
     let coll0 = client.database("search_index_test").collection::<Document>(&coll_name);
