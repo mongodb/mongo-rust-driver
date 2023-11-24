@@ -8,7 +8,7 @@ use crate::{
     options::{ClientOptions, ServerAddress},
     runtime,
     sdam::Topology,
-    test::{log_uncaptured, CLIENT_OPTIONS},
+    test::{get_client_options, log_uncaptured},
 };
 
 fn localhost_test_build_10gen(port: u16) -> ServerAddress {
@@ -131,7 +131,7 @@ async fn no_results() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced_no_srv_polling() {
-    if CLIENT_OPTIONS.get().await.load_balanced != Some(true) {
+    if get_client_options().await.load_balanced != Some(true) {
         log_uncaptured("skipping load_balanced_no_srv_polling due to not load balanced topology");
         return;
     }

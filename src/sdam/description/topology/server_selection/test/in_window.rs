@@ -16,6 +16,7 @@ use crate::{
     sdam::{description::topology::server_selection, Server},
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
+        get_client_options,
         log_uncaptured,
         run_spec_test,
         Event,
@@ -24,7 +25,6 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
     },
     ServerInfo,
 };
@@ -119,7 +119,7 @@ async fn select_in_window() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balancing_test() {
-    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut setup_client_options = get_client_options().await.clone();
 
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping load_balancing_test test due to load-balanced topology");
@@ -149,7 +149,7 @@ async fn load_balancing_test() {
         return;
     }
 
-    if CLIENT_OPTIONS.get().await.hosts.len() != 2 {
+    if get_client_options().await.hosts.len() != 2 {
         log_uncaptured("skipping load_balancing_test test due to topology not having 2 mongoses");
         return;
     }
@@ -216,7 +216,7 @@ async fn load_balancing_test() {
 
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
@@ -260,7 +260,7 @@ async fn load_balancing_test() {
         .build();
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
 
-    let slow_host = CLIENT_OPTIONS.get().await.hosts[0].clone();
+    let slow_host = get_client_options().await.hosts[0].clone();
     let criteria = SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
     let fp_guard = setup_client
         .enable_failpoint(failpoint, criteria)

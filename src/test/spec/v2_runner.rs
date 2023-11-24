@@ -19,12 +19,12 @@ use crate::{
     selection_criteria::SelectionCriteria,
     test::{
         file_level_log,
+        get_client_options,
         log_uncaptured,
         spec::deserialize_spec_tests,
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
-        CLIENT_OPTIONS,
         SERVERLESS,
     },
     Client,
@@ -194,7 +194,7 @@ impl TestContext {
         let mut additional_options = match &test.client_options {
             Some(opts) => ClientOptions::parse_uri(&opts.uri, None).await.unwrap(),
             None => ClientOptions::builder()
-                .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
+                .hosts(get_client_options().await.hosts.clone())
                 .build(),
         };
         if additional_options.heartbeat_freq.is_none() {

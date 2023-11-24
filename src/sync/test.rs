@@ -38,7 +38,7 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
 
 lazy_static! {
     static ref CLIENT_OPTIONS: ClientOptions =
-        runtime::block_on(async { crate::test::CLIENT_OPTIONS.get().await.clone() });
+        runtime::block_on(async { crate::test::get_client_options().await.clone() });
 }
 
 #[test]

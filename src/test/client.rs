@@ -13,6 +13,7 @@ use crate::{
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
+        get_client_options,
         log_uncaptured,
         util::TestClient,
         Event,
@@ -21,7 +22,6 @@ use crate::{
         FailPoint,
         FailPointMode,
         SdamEvent,
-        CLIENT_OPTIONS,
         SERVER_API,
     },
     Client,
@@ -108,7 +108,7 @@ async fn metadata_sent_in_handshake() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn connection_drop_during_read() {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.max_pool_size = Some(1);
 
     let client = Client::with_options(options.clone()).unwrap();
@@ -144,7 +144,7 @@ async fn connection_drop_during_read() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_timeout_message() {
-    if CLIENT_OPTIONS.get().await.repl_set_name.is_none() {
+    if get_client_options().await.repl_set_name.is_none() {
         log_uncaptured("skipping server_selection_timeout_message due to missing replica set name");
         return;
     }
@@ -158,7 +158,7 @@ async fn server_selection_timeout_message() {
             .build(),
     };
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.server_selection_timeout = Some(Duration::from_millis(500));
 
     let client = Client::with_options(options.clone()).unwrap();
@@ -293,7 +293,7 @@ async fn list_authorized_databases() {
     }
 
     for name in dbs {
-        let mut options = CLIENT_OPTIONS.get().await.clone();
+        let mut options = get_client_options().await.clone();
         let credential = Credential::builder()
             .username(format!("user_{}", name))
             .password(String::from("pwd"))
@@ -340,7 +340,7 @@ async fn auth_test_options(
     mechanism: Option<AuthMechanism>,
     success: bool,
 ) {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.max_pool_size = Some(1);
     options.credential = Credential {
         username: Some(user.to_string()),
@@ -369,8 +369,7 @@ async fn auth_test_uri(
         return;
     }
 
-    let host = CLIENT_OPTIONS
-        .get()
+    let host = get_client_options()
         .await
         .hosts
         .iter()
@@ -389,7 +388,7 @@ async fn auth_test_uri(
         mechanism_str.as_ref()
     );
 
-    if let Some(ref tls_options) = CLIENT_OPTIONS.get().await.tls_options() {
+    if let Some(ref tls_options) = get_client_options().await.tls_options() {
         if let Some(true) = tls_options.allow_invalid_certificates {
             uri.push_str("&tlsAllowInvalidCertificates=true");
         }
@@ -417,7 +416,7 @@ async fn auth_test_uri(
         }
     }
 
-    if let Some(true) = CLIENT_OPTIONS.get().await.load_balanced {
+    if let Some(true) = get_client_options().await.load_balanced {
         uri.push_str("&loadBalanced=true");
     }
 
@@ -624,7 +623,7 @@ async fn x509_auth() {
         .await
         .unwrap();
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.credential = Some(
         Credential::builder()
             .mechanism(AuthMechanism::MongoDbX509)
@@ -720,7 +719,7 @@ async fn retry_commit_txn_check_out() {
         .await
         .unwrap();
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone());
     options.sdam_event_handler = Some(handler.clone());
@@ -979,7 +978,7 @@ async fn find_one_and_delete_serde_consistency() {
 async fn warm_connection_pool() {
     let client = Client::test_builder()
         .options({
-            let mut opts = CLIENT_OPTIONS.get().await.clone();
+            let mut opts = get_client_options().await.clone();
             opts.min_pool_size = Some(10);
             opts
         })

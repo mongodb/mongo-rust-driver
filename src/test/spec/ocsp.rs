@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::doc;
 
 use crate::{
-    test::{log_uncaptured, CLIENT_OPTIONS},
+    test::{get_client_options, log_uncaptured},
     Client,
 };
 
@@ -19,7 +19,7 @@ async fn run() {
         .unwrap()
         .to_lowercase();
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     let mut tls_options = options.tls_options().unwrap();
     options.server_selection_timeout = Duration::from_millis(200).into();
 

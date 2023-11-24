@@ -11,6 +11,7 @@ use crate::{
     runtime,
     runtime::AsyncJoinHandle,
     test::{
+        get_client_options,
         log_uncaptured,
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
         Event,
@@ -19,7 +20,6 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
 };
@@ -41,7 +41,7 @@ async fn run_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_releases_connection() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
@@ -75,7 +75,7 @@ async fn retry_releases_connection() {
 async fn retry_read_pool_cleared() {
     let handler = Arc::new(EventHandler::new());
 
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
@@ -165,7 +165,7 @@ async fn retry_read_pool_cleared() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_read_different_mongos() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
         log_uncaptured(
             "skipping retry_read_different_mongos: requires sharded cluster with at least two \
@@ -237,7 +237,7 @@ async fn retry_read_same_mongos() {
         return;
     }
 
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
     let fp_guard = {

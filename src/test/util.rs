@@ -34,7 +34,7 @@ use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::CLIENT_OPTIONS;
+use super::get_client_options;
 use crate::{
     error::{CommandError, ErrorKind, Result},
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
@@ -137,7 +137,7 @@ impl TestClientBuilder {
     pub(crate) async fn build(self) -> TestClient {
         let mut options = match self.options {
             Some(options) => options,
-            None => CLIENT_OPTIONS.get().await.clone(),
+            None => get_client_options().await.clone(),
         };
 
         if let Some(handler) = self.handler {
@@ -463,7 +463,7 @@ impl TestClient {
         let is_load_balanced = options
             .as_ref()
             .and_then(|o| o.load_balanced)
-            .or(CLIENT_OPTIONS.get().await.load_balanced)
+            .or(get_client_options().await.load_balanced)
             .unwrap_or(false);
         let default_options = if is_load_balanced {
             // for serverless testing, ignore use_multiple_mongoses.
@@ -480,7 +480,7 @@ impl TestClient {
             update_options_for_testing(&mut o);
             o
         } else {
-            CLIENT_OPTIONS.get().await.clone()
+            get_client_options().await.clone()
         };
         let mut options = match options {
             Some(mut options) => {

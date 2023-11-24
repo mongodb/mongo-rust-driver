@@ -22,6 +22,7 @@ use crate::{
     sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         assert_matches,
+        get_client_options,
         log_uncaptured,
         run_spec_test,
         spec::unified_runner::run_unified_tests,
@@ -33,7 +34,6 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
 };
@@ -53,7 +53,7 @@ async fn run_legacy() {
                 continue;
             }
             let mut options = test_case.client_options.unwrap_or_default();
-            options.hosts = CLIENT_OPTIONS.get().await.hosts.clone();
+            options.hosts = get_client_options().await.hosts.clone();
             if options.heartbeat_freq.is_none() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
@@ -397,7 +397,7 @@ async fn label_not_added(retry_reads: bool) {
 async fn retry_write_pool_cleared() {
     let handler = Arc::new(EventHandler::new());
 
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
@@ -494,7 +494,7 @@ async fn retry_write_pool_cleared() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_write_retryable_write_error() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     let (event_tx, event_rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
     // The listener needs to be active on client startup, but also needs a handle to the client
@@ -583,7 +583,7 @@ async fn retry_write_retryable_write_error() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn retry_write_different_mongos() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
         log_uncaptured(
             "skipping retry_write_different_mongos: requires sharded cluster with at least two \
@@ -656,7 +656,7 @@ async fn retry_write_same_mongos() {
         return;
     }
 
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_writes = Some(true);
     let fp_guard = {

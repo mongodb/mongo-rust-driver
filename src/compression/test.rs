@@ -9,7 +9,7 @@ use bson::{doc, Bson};
 use crate::{
     client::options::ClientOptions,
     compression::{Compressor, CompressorId, Decoder},
-    test::{TestClient, CLIENT_OPTIONS},
+    test::{get_client_options, TestClient},
 };
 
 #[cfg(feature = "zlib-compression")]
@@ -67,7 +67,7 @@ fn test_snappy_compressor() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[cfg(feature = "zlib-compression")]
 async fn ping_server_with_zlib_compression() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.compressors = Some(vec![Compressor::Zlib { level: Some(4) }]);
     send_ping_with_compression(client_options).await;
 }
@@ -76,7 +76,7 @@ async fn ping_server_with_zlib_compression() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[cfg(feature = "zstd-compression")]
 async fn ping_server_with_zstd_compression() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.compressors = Some(vec![Compressor::Zstd { level: None }]);
     send_ping_with_compression(client_options).await;
 }
@@ -85,7 +85,7 @@ async fn ping_server_with_zstd_compression() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[cfg(feature = "snappy-compression")]
 async fn ping_server_with_snappy_compression() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.compressors = Some(vec![Compressor::Snappy]);
     send_ping_with_compression(client_options).await;
 }
@@ -98,7 +98,7 @@ async fn ping_server_with_snappy_compression() {
     feature = "snappy-compression"
 ))]
 async fn ping_server_with_all_compressors() {
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut client_options = get_client_options().await.clone();
     client_options.compressors = Some(vec![
         Compressor::Zlib { level: None },
         Compressor::Snappy,

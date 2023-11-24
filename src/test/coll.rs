@@ -30,9 +30,9 @@ use crate::{
     results::DeleteResult,
     runtime,
     test::{
+        get_client_options,
         log_uncaptured,
         util::{drop_collection, EventClient, TestClient},
-        CLIENT_OPTIONS,
     },
     Collection,
     IndexModel,
@@ -912,7 +912,7 @@ async fn typed_returns() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn count_documents_with_wc() {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.write_concern = WriteConcern::builder()
         .w(Acknowledgment::Majority)
         .journal(true)
