@@ -392,6 +392,7 @@ buildvariants:
 
   - name: search-index
     display_name: "Search Index Helpers"
+    patchable: true  # TODO RUST-1684 change to false before merge
     run_on:
       - rhel87-small
     tasks:
@@ -998,13 +999,13 @@ tasks:
 
   - name: test-search-index
     commands:
-      - command: shell.exec
+      - command: subprocess.exec
         params:
           working_dir: src
-          script: |
-            ${PREPARE_SHELL}
-            export MONGODB_URI=${MONGODB_URI}
-            .evergreen/run-search-index-test.sh
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - .evergreen/run-search-index-test.sh
 
   - name: test-x509-auth
     commands:
