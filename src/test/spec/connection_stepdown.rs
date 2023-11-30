@@ -15,6 +15,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
+    selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, util::EventClient},
     Collection,
     Database,
@@ -94,9 +95,22 @@ async fn get_more() {
             .await
             .unwrap();
 
+        let db = client.database("admin");
+
+        db.run_command(
+            doc! { "replSetFreeze": 0 },
+            SelectionCriteria::ReadPreference(
+                crate::selection_criteria::ReadPreference::Secondary {
+                    options: Default::default(),
+                },
+            ),
+        )
+        .await
+        .expect("replSetFreeze should have succeeded");
+
         client
             .database("admin")
-            .run_command(doc! { "replSetStepDown": 5, "force": true }, None)
+            .run_command(doc! { "replSetStepDown": 30, "force": true }, None)
             .await
             .expect("stepdown should have succeeded");
 
