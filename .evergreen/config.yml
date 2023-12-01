@@ -323,15 +323,30 @@ buildvariants:
     tasks:
       - test-plain-auth
 
-  - name: serverless
+  - name: serverless-passthrough
     patchable: false
-    display_name: "Serverless"
+    display_name: "Serverless (Passthrough)"
     run_on:
       - rhel80-small
     expansions:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
       SSL: ssl
+      SERVERLESS_PROXY_TYPE: passthrough
+    tasks:
+      - serverless-task-group
+
+
+  - name: serverless-terminating
+    patchable: false
+    display_name: "Serverless (Terminating)"
+    run_on:
+      - rhel80-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      AUTH: auth
+      SSL: ssl
+      SERVERLESS_PROXY_TYPE: terminating
     tasks:
       - serverless-task-group
 
@@ -421,7 +436,12 @@ task_groups:
           script: |
             ${PREPARE_SHELL}
             set +o xtrace
-            SERVERLESS_DRIVERS_GROUP=${SERVERLESS_DRIVERS_GROUP} \
+            if [ "terminating" = "${SERVERLESS_PROXY_TYPE}" ]; then
+              SERVERLESS_GROUP=${TERMINATING_PROXY_SERVERLESS_DRIVERS_GROUP}
+            else
+              SERVERLESS_GROUP=${SERVERLESS_DRIVERS_GROUP}
+            fi
+            SERVERLESS_DRIVERS_GROUP=$SERVERLESS_GROUP \
             SERVERLESS_API_PUBLIC_KEY=${SERVERLESS_API_PUBLIC_KEY} \
             SERVERLESS_API_PRIVATE_KEY=${SERVERLESS_API_PRIVATE_KEY} \
             LOADBALANCED=ON \
@@ -435,7 +455,12 @@ task_groups:
           script: |
             ${PREPARE_SHELL}
             set +o xtrace
-            SERVERLESS_DRIVERS_GROUP=${SERVERLESS_DRIVERS_GROUP} \
+            if [ "terminating" = "${SERVERLESS_PROXY_TYPE}" ]; then
+              SERVERLESS_GROUP=${TERMINATING_PROXY_SERVERLESS_DRIVERS_GROUP}
+            else
+              SERVERLESS_GROUP=${SERVERLESS_DRIVERS_GROUP}
+            fi
+            SERVERLESS_DRIVERS_GROUP=$SERVERLESS_GROUP \
             SERVERLESS_API_PUBLIC_KEY=${SERVERLESS_API_PUBLIC_KEY} \
             SERVERLESS_API_PRIVATE_KEY=${SERVERLESS_API_PRIVATE_KEY} \
             SERVERLESS_INSTANCE_NAME=${SERVERLESS_INSTANCE_NAME} \
