@@ -24,6 +24,7 @@ use crate::{
     },
     selection_criteria::TagSet,
     test::{
+        get_client_options,
         log_uncaptured,
         run_spec_test,
         Event,
@@ -34,7 +35,6 @@ use crate::{
         FailPointMode,
         SdamEvent,
         TestClient,
-        CLIENT_OPTIONS,
     },
 };
 
@@ -638,7 +638,7 @@ async fn topology_closed_event_last() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn heartbeat_events() {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
@@ -721,7 +721,7 @@ async fn direct_connection() {
         .await
         .expect("failed to select secondary");
 
-    let mut secondary_options = CLIENT_OPTIONS.get().await.clone();
+    let mut secondary_options = get_client_options().await.clone();
     secondary_options.hosts = vec![secondary_address];
 
     let mut direct_false_options = secondary_options.clone();

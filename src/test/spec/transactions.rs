@@ -7,13 +7,13 @@ use crate::{
     bson::{doc, Document},
     error::{Error, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
     test::{
+        get_client_options,
         log_uncaptured,
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
         FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
     Collection,
@@ -201,7 +201,7 @@ async fn convenient_api_retry_timeout_callback() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_retry_timeout_commit_unknown() {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     if Client::test_builder().build().await.is_sharded() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
@@ -256,7 +256,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn convenient_api_retry_timeout_commit_transient() {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     if Client::test_builder().build().await.is_sharded() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);

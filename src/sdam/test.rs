@@ -15,6 +15,7 @@ use crate::{
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     sdam::{ServerDescription, Topology},
     test::{
+        get_client_options,
         log_uncaptured,
         Event,
         EventClient,
@@ -24,7 +25,6 @@ use crate::{
         FailPointMode,
         SdamEvent,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
 };
@@ -32,7 +32,7 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn min_heartbeat_frequency() {
-    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut setup_client_options = get_client_options().await.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping min_heartbeat_frequency test due to load-balanced topology");
         return;
@@ -93,7 +93,7 @@ async fn min_heartbeat_frequency() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_pool_management() {
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping sdam_pool_management test due to load-balanced topology");
         return;
@@ -175,7 +175,7 @@ async fn sdam_pool_management() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn hello_ok_true() {
-    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut setup_client_options = get_client_options().await.clone();
     setup_client_options.hosts.drain(1..);
 
     if setup_client_options.server_api.is_some() {
@@ -245,7 +245,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
         return Ok(());
     }
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
     options.repl_set_name = Some("invalid".to_string());

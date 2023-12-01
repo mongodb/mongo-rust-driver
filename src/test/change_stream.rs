@@ -17,7 +17,7 @@ use crate::{
     Collection,
 };
 
-use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS};
+use super::{get_client_options, log_uncaptured, EventClient, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -41,7 +41,7 @@ async fn init_stream(
         return Ok(None);
     }
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     // Direct connection is needed for reliable behavior with fail points.
     if direct_connection && init_client.is_sharded() {
         options.direct_connection = Some(true);

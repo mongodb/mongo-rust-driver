@@ -14,13 +14,13 @@ use crate::{
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{
+        get_client_options,
         log_uncaptured,
         Event,
         EventClient,
         EventHandler,
         SdamEvent,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
     Collection,
@@ -307,7 +307,7 @@ async fn cluster_time_in_commands() {
     }
 
     let handler = Arc::new(EventHandler::new());
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
     options.command_event_handler = Some(handler.clone());
     options.sdam_event_handler = Some(handler.clone());

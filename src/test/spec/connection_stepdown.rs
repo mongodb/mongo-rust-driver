@@ -15,7 +15,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{log_uncaptured, util::EventClient, CLIENT_OPTIONS},
+    test::{get_client_options, log_uncaptured, util::EventClient},
     Collection,
     Database,
 };
@@ -25,7 +25,7 @@ async fn run_test<F: Future>(
     test: impl Fn(EventClient, Database, Collection<Document>) -> F,
 ) {
     let options = ClientOptions::builder()
-        .hosts(CLIENT_OPTIONS.get().await.hosts.clone())
+        .hosts(get_client_options().await.hosts.clone())
         .retry_writes(false)
         .build();
     let client = EventClient::with_additional_options(Some(options), None, None, None).await;

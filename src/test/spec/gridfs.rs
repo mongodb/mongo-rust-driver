@@ -9,12 +9,12 @@ use crate::{
     options::{GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
+        get_client_options,
         spec::unified_runner::run_unified_tests,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
     },
 };
 
@@ -186,7 +186,7 @@ async fn upload_stream_multiple_buffers() {
 async fn upload_stream_errors() {
     let client = TestClient::new().await;
     let client = if client.is_sharded() {
-        let mut options = CLIENT_OPTIONS.get().await.clone();
+        let mut options = get_client_options().await.clone();
         options.hosts.drain(1..);
         TestClient::with_options(options).await
     } else {

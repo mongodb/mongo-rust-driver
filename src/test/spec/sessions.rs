@@ -14,12 +14,12 @@ use crate::{
     options::SessionOptions,
     runtime::process::Process,
     test::{
+        get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
         util::Event,
         EventClient,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
 };
@@ -109,7 +109,7 @@ async fn implicit_session_after_connection() {
     let mut max_lsids = 0usize;
     for _ in 0..5 {
         let client = {
-            let mut options = CLIENT_OPTIONS.get().await.clone();
+            let mut options = get_client_options().await.clone();
             options.max_pool_size = Some(1);
             options.retry_writes = Some(true);
             options.hosts.drain(1..);

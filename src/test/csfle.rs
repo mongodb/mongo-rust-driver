@@ -60,13 +60,13 @@ use crate::{
 };
 
 use super::{
+    get_client_options,
     log_uncaptured,
     EventClient,
     FailCommandOptions,
     FailPoint,
     FailPointMode,
     TestClient,
-    CLIENT_OPTIONS,
 };
 
 type Result<T> = anyhow::Result<T>;
@@ -272,7 +272,7 @@ async fn data_key_double_encryption() -> Result<()> {
         },
     )];
     let client_encrypted = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         KMS_PROVIDERS.clone(),
     )?
@@ -455,7 +455,7 @@ async fn external_key_vault() -> Result<()> {
 
         // Setup: test options.
         let kv_client = if with_external_key_vault {
-            let mut opts = CLIENT_OPTIONS.get().await.clone();
+            let mut opts = get_client_options().await.clone();
             opts.credential = Some(
                 Credential::builder()
                     .username("fake-user".to_string())
@@ -469,7 +469,7 @@ async fn external_key_vault() -> Result<()> {
 
         // Setup: encrypted client.
         let client_encrypted = Client::encrypted_builder(
-            CLIENT_OPTIONS.get().await.clone(),
+            get_client_options().await.clone(),
             KV_NAMESPACE.clone(),
             LOCAL_KMS.clone(),
         )?
@@ -565,7 +565,7 @@ async fn bson_size_limits() -> Result<()> {
         .await?;
 
     // Setup: encrypted client.
-    let mut opts = CLIENT_OPTIONS.get().await.clone();
+    let mut opts = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
     let mut events = handler.subscribe();
     opts.command_event_handler = Some(handler.clone());
@@ -692,7 +692,7 @@ async fn views_prohibited() -> Result<()> {
 
     // Setup: encrypted client.
     let client_encrypted = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -793,7 +793,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     // Setup: encrypted client and manual encryption.
     let client_encrypted = {
         let mut enc_builder = Client::encrypted_builder(
-            CLIENT_OPTIONS.get().await.clone(),
+            get_client_options().await.clone(),
             KV_NAMESPACE.clone(),
             KMS_PROVIDERS.clone(),
         )?
@@ -1321,7 +1321,7 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
 
     // Setup: encrypted client.
     let client_encrypted = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -1367,7 +1367,7 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
     let client_encrypted = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -1400,7 +1400,7 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
         "mongocryptdSpawnArgs": [ "--pidfilepath=bypass-spawning-mongocryptd.pid", "--port=27021"],
     };
     let builder = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -1571,7 +1571,7 @@ impl DeadlockTestCase {
         // Setup
         let client_test = TestClient::new().await;
         let client_keyvault = EventClient::with_options({
-            let mut opts = CLIENT_OPTIONS.get().await.clone();
+            let mut opts = get_client_options().await.clone();
             opts.max_pool_size = Some(1);
             opts
         })
@@ -1625,7 +1625,7 @@ impl DeadlockTestCase {
         // Run test case
         let event_handler = Arc::new(EventHandler::new());
         let mut encrypted_events = event_handler.subscribe();
-        let mut opts = CLIENT_OPTIONS.get().await.clone();
+        let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
         opts.command_event_handler = Some(event_handler.clone());
         opts.sdam_event_handler = Some(event_handler.clone());
@@ -2373,7 +2373,7 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
         LOCAL_KMS.clone(),
     )?;
     let encrypted_client = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -2699,7 +2699,7 @@ impl DecryptionEventsTestdata {
         *last = last.wrapping_add(1);
 
         let ev_handler = DecryptionEventsHandler::new();
-        let mut opts = CLIENT_OPTIONS.get().await.clone();
+        let mut opts = get_client_options().await.clone();
         opts.retry_reads = Some(false);
         opts.command_event_handler = Some(ev_handler.clone());
         let encrypted_client =
@@ -2979,7 +2979,7 @@ async fn bypass_mongocryptd_client() -> Result<()> {
     };
 
     let client_encrypted = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -3278,7 +3278,7 @@ async fn range_explicit_encryption_test(
     )?;
 
     let encrypted_client = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?
@@ -3583,7 +3583,7 @@ async fn fle2_example() -> Result<()> {
 
     // Create an FLE 2 collection.
     let encrypted_client = Client::encrypted_builder(
-        CLIENT_OPTIONS.get().await.clone(),
+        get_client_options().await.clone(),
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?

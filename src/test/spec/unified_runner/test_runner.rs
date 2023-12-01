@@ -20,6 +20,7 @@ use crate::{
     runtime,
     sdam::{TopologyDescription, MIN_HEARTBEAT_FREQUENCY},
     test::{
+        get_client_options,
         log_uncaptured,
         spec::unified_runner::{
             entity::EventList,
@@ -30,7 +31,6 @@ use crate::{
         util::FailPointGuard,
         EventHandler,
         TestClient,
-        CLIENT_OPTIONS,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
@@ -431,7 +431,7 @@ impl TestRunner {
                         client.observe_sensitive_commands.unwrap_or(false);
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
 
-                    let given_uri = if CLIENT_OPTIONS.get().await.load_balanced.unwrap_or(false) {
+                    let given_uri = if get_client_options().await.load_balanced.unwrap_or(false) {
                         // for serverless testing, ignore use_multiple_mongoses.
                         if client.use_multiple_mongoses() && !*SERVERLESS {
                             LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(

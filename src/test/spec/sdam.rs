@@ -6,6 +6,7 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
+        get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
         Event,
@@ -15,7 +16,6 @@ use crate::{
         FailPointMode,
         SdamEvent,
         TestClient,
-        CLIENT_OPTIONS,
     },
     Client,
 };
@@ -55,7 +55,7 @@ async fn streaming_min_heartbeat_frequency() {
     }
 
     let handler = Arc::new(EventHandler::new());
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
     options.sdam_event_handler = Some(handler.clone());
 
@@ -106,7 +106,7 @@ async fn heartbeat_frequency_is_respected() {
     }
 
     let handler = Arc::new(EventHandler::new());
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(1000));
     options.sdam_event_handler = Some(handler.clone());
 
@@ -171,7 +171,7 @@ async fn rtt_is_updated() {
     let app_name = "streamingRttTest";
 
     let handler = Arc::new(EventHandler::new());
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
     options.app_name = Some(app_name.to_string());
     options.sdam_event_handler = Some(handler.clone());

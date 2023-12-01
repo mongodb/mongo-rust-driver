@@ -22,10 +22,10 @@ use crate::{
         SelectionCriteria,
     },
     test::{
+        get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
         TestClient,
-        CLIENT_OPTIONS,
         DEFAULT_GLOBAL_TRACING_HANDLER,
         SERVER_API,
     },
@@ -121,7 +121,7 @@ async fn command_logging_truncation_default_limit() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_truncation_explicit_limit() {
-    let mut client_opts = CLIENT_OPTIONS.get().await.clone();
+    let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(5);
     let client = TestClient::with_options(Some(client_opts)).await;
 
@@ -158,7 +158,7 @@ async fn command_logging_truncation_explicit_limit() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_logging_truncation_mid_codepoint() {
-    let mut client_opts = CLIENT_OPTIONS.get().await.clone();
+    let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(215);
     let client = TestClient::with_options(Some(client_opts)).await;
     // On non-standalone topologies the command includes a clusterTime and so gets truncated
