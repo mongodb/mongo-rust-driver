@@ -22,7 +22,9 @@ if [ "$OS" = "Windows_NT" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
-. ${DRIVERS_TOOLS}/.evergreen/csfle/activate_venv.sh
+pushd ${DRIVERS_TOOLS}/.evergreen/csfle
+. ./activate-kmstlsvenv.sh
+popd
 export PYTHON=python  # use the venv-provided python
 export AWS_DEFAULT_REGION=us-east-1
 . ${DRIVERS_TOOLS}/.evergreen/csfle/set-temp-creds.sh
