@@ -16,8 +16,9 @@ use crate::{bson::Document, options::ServerAddress, sdam::TopologyVersion};
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
 const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
-const RETRYABLE_READ_CODES: [i32; 11] =
-    [11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
+const RETRYABLE_READ_CODES: [i32; 12] = [
+    11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 134,
+];
 const RETRYABLE_WRITE_CODES: [i32; 12] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
 ];
