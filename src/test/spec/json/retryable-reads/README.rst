@@ -232,9 +232,79 @@ This test requires MongoDB 4.2.9+ for ``blockConnection`` support in the failpoi
 
 9. Disable the failpoint.
 
+Retrying Reads in a Sharded Cluster
+===================================
+
+These tests will be used to ensure drivers properly retry reads on a different
+mongos.
+
+Retryable Reads Are Retried on a Different mongos if One is Available
+---------------------------------------------------------------------
+
+This test MUST be executed against a sharded cluster that has at least two
+mongos instances.
+
+1. Ensure that a test is run against a sharded cluster that has at least two
+   mongoses. If there are more than two mongoses in the cluster, pick two to
+   test against.
+
+2. Create a client per mongos using the direct connection, and configure the
+   following fail points on each mongos::
+
+     {
+         configureFailPoint: "failCommand",
+         mode: { times: 1 },
+         data: {
+             failCommands: ["find"],
+             errorCode: 6,
+             closeConnection: true
+         }
+     }
+
+3. Create a client with ``retryReads=true`` that connects to the cluster,
+   providing the two selected mongoses as seeds.
+
+4. Enable command monitoring, and execute a ``find`` command that is
+   supposed to fail on both mongoses.
+
+5. Asserts that there were failed command events from each mongos.
+
+6. Disable the fail points.
+
+
+Retryable Reads Are Retried on the Same mongos if No Others are Available
+-------------------------------------------------------------------------
+
+1. Ensure that a test is run against a sharded cluster. If there are multiple
+   mongoses in the cluster, pick one to test against.
+
+2. Create a client that connects to the mongos using the direct connection,
+   and configure the following fail point on the mongos::
+
+     {
+         configureFailPoint: "failCommand",
+         mode: { times: 1 },
+         data: {
+             failCommands: ["find"],
+             errorCode: 6,
+             closeConnection: true
+         }
+     }
+
+3. Create a client with ``retryReads=true`` that connects to the cluster,
+   providing the selected mongos as the seed.
+
+4. Enable command monitoring, and execute a ``find`` command.
+
+5. Asserts that there was a failed command and a successful command event.
+
+6. Disable the fail point.
+
 
 Changelog
 =========
+
+:2023-08-26 Add prose tests for retrying in a sharded cluster.
 
 :2022-04-22: Clarifications to ``serverless`` and ``useMultipleMongoses``.
 
