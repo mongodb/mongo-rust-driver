@@ -142,6 +142,14 @@ impl ClientSession {
     /// caller.  If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
     /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    ///
+    /// If a command inside the callback fails, it may cause the transaction on the server to be
+    /// aborted. This situation is normally handled transparently by the driver. However, if the
+    /// application does not return that error from the callback, the driver will not be able to
+    /// determine whether the transaction was aborted or not. The driver will then retry the
+    /// callback indefinitely. To avoid this situation, the application must not silently handle
+    /// errors within the callback. If the application needs to handle errors within the
+    /// callback, it MUST return them after doing so.
     pub fn with_transaction<R, F>(
         &mut self,
         mut callback: F,
