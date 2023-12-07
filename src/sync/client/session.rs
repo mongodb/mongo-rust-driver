@@ -147,7 +147,7 @@ impl ClientSession {
     /// aborted. This situation is normally handled transparently by the driver. However, if the
     /// application does not return that error from the callback, the driver will not be able to
     /// determine whether the transaction was aborted or not. The driver will then retry the
-    /// callback indefinitely. To avoid this situation, the application must not silently handle
+    /// callback indefinitely. To avoid this situation, the application MUST NOT silently handle
     /// errors within the callback. If the application needs to handle errors within the
     /// callback, it MUST return them after doing so.
     pub fn with_transaction<R, F>(
