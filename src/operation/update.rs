@@ -198,7 +198,11 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
             .and_then(|doc| doc.get("_id"))
             .cloned();
 
-        let matched_count = if upserted_id.is_some() { 0 } else { response.n };
+        let matched_count = if upserted_id.is_some() {
+            0
+        } else {
+            response.body.n
+        };
 
         Ok(UpdateResult {
             matched_count,
@@ -224,6 +228,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
 
 #[derive(Deserialize)]
 pub(crate) struct UpdateBody {
+    n: u64,
     #[serde(rename = "nModified")]
     n_modified: u64,
     upserted: Option<Vec<Document>>,

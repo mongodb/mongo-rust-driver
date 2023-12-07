@@ -40,7 +40,139 @@
   ],
   "tests": [
     {
-      "description": "Client bulkWrite replaceOne",
+      "description": "Client bulkWrite replaceOne verbose",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "replaceOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$gt": 1
+                    }
+                  },
+                  "replacement": {
+                    "x": 222
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 1,
+            "modifiedCount": 1,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "0": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              }
+            },
+            "deleteResults": {}
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 222
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Client bulkWrite replaceOne summary",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "replaceOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$gt": 1
+                    }
+                  },
+                  "replacement": {
+                    "x": 222
+                  }
+                }
+              }
+            ],
+            "verboseResults": false
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 1,
+            "modifiedCount": 1,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 222
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Client bulkWrite replaceOne defaults to summary",
       "runOnRequirements": [
         {
           "minServerVersion": "7.0"
@@ -69,6 +201,20 @@
                 }
               }
             ]
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 1,
+            "modifiedCount": 1,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
           }
         }
       ],

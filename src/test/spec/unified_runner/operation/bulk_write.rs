@@ -14,8 +14,10 @@ use crate::{
 use super::TestOperation;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct BulkWrite {
     requests: Vec<WriteModel>,
+    verbose_results: Option<bool>,
 }
 
 impl<'de> Deserialize<'de> for WriteModel {
@@ -87,8 +89,15 @@ impl TestOperation for BulkWrite {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let client = test_runner.get_client(id).await;
-            client.bulk_write(self.requests.clone(), None).await?;
-            Ok(None)
+            let action = client.bulk_write(self.requests.clone());
+            let bson = if let Some(true) = self.verbose_results {
+                let result = action.verbose_results().await?;
+                bson::to_bson(&result)?
+            } else {
+                let result = action.await?;
+                bson::to_bson(&result)?
+            };
+            Ok(Some(bson.into()))
         }
         .boxed()
     }

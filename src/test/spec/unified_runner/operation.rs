@@ -270,16 +270,12 @@ impl<'de> Deserialize<'de> for Operation {
         struct OperationDefinition {
             pub(crate) name: String,
             pub(crate) object: OperationObject,
-            #[serde(default = "default_arguments")]
+            #[serde(default = "Document::new")]
             pub(crate) arguments: Document,
             pub(crate) expect_error: Option<ExpectError>,
             pub(crate) expect_result: Option<Bson>,
             pub(crate) save_result_as_entity: Option<String>,
             pub(crate) ignore_result_and_error: Option<bool>,
-        }
-
-        fn default_arguments() -> Document {
-            doc! {}
         }
 
         let definition = OperationDefinition::deserialize(deserializer)?;

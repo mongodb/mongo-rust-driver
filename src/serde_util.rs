@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
 
 use bson::SerializerOptions;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -190,4 +193,15 @@ where
         )));
     }
     Ok(Some(vec))
+}
+
+pub(crate) fn serialize_indexed_map<S: Serializer, T: Serialize>(
+    map: &HashMap<usize, T>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    let string_map: BTreeMap<_, _> = map
+        .iter()
+        .map(|(index, result)| (index.to_string(), result))
+        .collect();
+    string_map.serialize(serializer)
 }

@@ -1,39 +1,31 @@
 #![allow(missing_docs, unused_variables, dead_code)]
 
+pub(crate) mod actions;
 pub(crate) mod models;
+pub(crate) mod results;
 
 use serde::{Deserialize, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{Bson, Document},
-    error::Result,
-    operation::BulkWrite,
     Client,
 };
 
-use models::{add_ids_to_insert_one_models, WriteModel};
+use actions::SummaryBulkWriteAction;
+use models::WriteModel;
 
 impl Client {
-    pub async fn bulk_write(
+    pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = WriteModel>,
-        options: impl Into<Option<BulkWriteOptions>>,
-    ) -> Result<()> {
-        let mut models: Vec<_> = models.into_iter().collect();
-        let inserted_ids = add_ids_to_insert_one_models(&mut models)?;
-
-        let bulk_write = BulkWrite {
-            models: models,
-            options: options.into(),
-            client: self.clone(),
-        };
-        self.execute_operation(bulk_write, None).await.map(|_| ())
+    ) -> SummaryBulkWriteAction {
+        SummaryBulkWriteAction::new(self.clone(), models.into_iter().collect())
     }
 }
 
 #[skip_serializing_none]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct BulkWriteOptions {

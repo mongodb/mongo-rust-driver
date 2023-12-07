@@ -53,7 +53,7 @@ use crate::{
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
-pub(crate) use bulk_write::BulkWrite;
+pub(crate) use bulk_write::{BulkWrite, BulkWriteOperationResponse, BulkWriteSummaryInfo};
 pub(crate) use commit_transaction::CommitTransaction;
 pub(crate) use create_indexes::CreateIndexes;
 pub(crate) use delete::Delete;
@@ -244,7 +244,9 @@ pub(crate) fn append_options_to_raw_document<T: Serialize>(
 }
 
 #[derive(Deserialize, Debug)]
-pub(crate) struct EmptyBody {}
+pub(crate) struct SingleWriteBody {
+    n: u64,
+}
 
 /// Body of a write response that could possibly have a write concern error but not write errors.
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -269,11 +271,9 @@ impl WriteConcernOnlyBody {
 }
 
 #[derive(Deserialize, Debug)]
-pub(crate) struct WriteResponseBody<T = EmptyBody> {
+pub(crate) struct WriteResponseBody<T = SingleWriteBody> {
     #[serde(flatten)]
     body: T,
-
-    n: u64,
 
     #[serde(rename = "writeErrors")]
     write_errors: Option<Vec<BulkWriteError>>,

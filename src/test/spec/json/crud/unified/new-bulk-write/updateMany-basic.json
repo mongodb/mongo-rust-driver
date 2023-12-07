@@ -44,7 +44,151 @@
   ],
   "tests": [
     {
-      "description": "Client bulkWrite updateMany",
+      "description": "Client bulkWrite updateMany verbose",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "updateMany": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$gt": 1
+                    }
+                  },
+                  "update": {
+                    "$inc": {
+                      "x": 1
+                    }
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 2,
+            "modifiedCount": 2,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "0": {
+                "matchedCount": 2,
+                "modifiedCount": 2,
+                "upsertedId": null
+              }
+            },
+            "deleteResults": {}
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 23
+            },
+            {
+              "_id": 3,
+              "x": 34
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Client bulkWrite updateMany summary",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "updateMany": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$gt": 1
+                    }
+                  },
+                  "update": {
+                    "$inc": {
+                      "x": 1
+                    }
+                  }
+                }
+              }
+            ],
+            "verboseResults": false
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 2,
+            "modifiedCount": 2,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 23
+            },
+            {
+              "_id": 3,
+              "x": 34
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Client bulkWrite updateMany defaults to summary",
       "runOnRequirements": [
         {
           "minServerVersion": "7.0"
@@ -75,6 +219,20 @@
                 }
               }
             ]
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 2,
+            "modifiedCount": 2,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
           }
         }
       ],

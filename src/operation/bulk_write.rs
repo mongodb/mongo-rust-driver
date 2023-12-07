@@ -2,20 +2,26 @@
 
 use std::collections::HashMap;
 
+use serde::Deserialize;
+
 use crate::{
-    bson::{rawdoc, RawArrayBuf, RawDocumentBuf},
+    bson::{rawdoc, Bson, RawArrayBuf, RawDocumentBuf},
     bson_util,
     client::bulk_write::{models::WriteModel, BulkWriteOptions},
     cmap::{Command, RawCommandResponse, StreamDescription},
+    cursor::CursorSpecification,
     error::{Error, Result},
     operation::OperationWithDefaults,
     Client,
+    Cursor,
     Namespace,
 };
 
-pub(crate) struct BulkWrite {
-    pub(crate) models: Vec<WriteModel>,
-    pub(crate) options: Option<BulkWriteOptions>,
+use super::{CursorInfo, WriteResponseBody};
+
+pub(crate) struct BulkWrite<'a> {
+    pub(crate) models: &'a [WriteModel],
+    pub(crate) options: BulkWriteOptions,
     pub(crate) client: Client,
 }
 /// A helper struct for tracking namespace information.
@@ -50,8 +56,8 @@ impl<'a> NamespaceInfo<'a> {
     }
 }
 
-impl OperationWithDefaults for BulkWrite {
-    type O = ();
+impl<'a> OperationWithDefaults for BulkWrite<'a> {
+    type O = (Cursor<BulkWriteOperationResponse>, BulkWriteSummaryInfo);
 
     type Command = RawDocumentBuf;
 
@@ -60,7 +66,7 @@ impl OperationWithDefaults for BulkWrite {
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut namespace_info = NamespaceInfo::new();
         let mut ops = RawArrayBuf::new();
-        for model in &self.models {
+        for model in self.models {
             let namespace_index = namespace_info.get_index(model.namespace());
 
             let mut model_doc = rawdoc! { model.operation_name(): namespace_index as i32 };
@@ -84,11 +90,54 @@ impl OperationWithDefaults for BulkWrite {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<RawDocumentBuf>()?;
-        Ok(())
+        let response: WriteResponseBody<BulkWriteResponse> = response.body()?;
+
+        let specification = CursorSpecification::new(
+            response.body.cursor,
+            description.server_address.clone(),
+            None,
+            None,
+            None,
+        );
+        let cursor = Cursor::new(self.client.clone(), specification, None, None);
+
+        Ok((cursor, response.body.summary))
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         Err(error)
+    }
+}
+
+#[derive(Deserialize)]
+struct BulkWriteResponse {
+    cursor: CursorInfo,
+    #[serde(flatten)]
+    summary: BulkWriteSummaryInfo,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BulkWriteSummaryInfo {
+    pub(crate) n_inserted: i64,
+    pub(crate) n_matched: i64,
+    pub(crate) n_modified: i64,
+    pub(crate) n_upserted: i64,
+    pub(crate) n_deleted: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BulkWriteOperationResponse {
+    #[serde(rename = "idx")]
+    pub(crate) index: usize,
+    pub(crate) n: u64,
+    pub(crate) n_modified: Option<u64>,
+    pub(crate) upserted: Option<Bson>,
+}
+
+impl BulkWriteOperationResponse {
+    pub(crate) fn is_update_result(&self) -> bool {
+        self.n_modified.is_some() || self.upserted.is_some()
     }
 }

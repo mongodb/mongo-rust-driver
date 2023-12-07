@@ -41,7 +41,121 @@
   ],
   "tests": [
     {
-      "description": "Client bulkWrite deleteMany",
+      "description": "Client bulkWrite deleteMany verbose",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "deleteMany": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$lte": 2
+                    }
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 2,
+            "insertResults": {},
+            "updateResults": {},
+            "deleteResults": {
+              "0": {
+                "deletedCount": 2
+              }
+            }
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Client bulkWrite deleteMany summary",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "deleteMany": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$lte": 2
+                    }
+                  }
+                }
+              }
+            ],
+            "verboseResults": false
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 2,
+            "insertResults": {},
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Client bulkWrite deleteMany defaults to summary",
       "runOnRequirements": [
         {
           "minServerVersion": "7.0"
@@ -67,6 +181,20 @@
                 }
               }
             ]
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 2,
+            "insertResults": {},
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
           }
         }
       ],
