@@ -112,7 +112,7 @@ fn main() {
         pending.apply(&bson_version_loc, &format!("{:?}", bson));
     }
     if let Some(mongocrypt) = args.mongocrypt {
-        pending.apply(&mongocrypt_version_loc, &format!("{:?}", mongocrypt));
+        pending.apply(&mongocrypt_version_loc, &format!("{{ version = {:?}, optional = true }}", mongocrypt));
     }
     pending.write();
 }
