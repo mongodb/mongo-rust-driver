@@ -3,20 +3,21 @@ use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
+    action::bulk_write::{write_models::WriteModel, BulkWriteOptions},
     bson::{Array, Bson, Document},
-    client::bulk_write::{models::WriteModel, BulkWriteOptions},
     coll::options::UpdateModifications,
     error::Result,
     test::spec::unified_runner::{Entity, TestRunner},
     Namespace,
 };
 
-use super::TestOperation;
+use super::{with_mut_session, TestOperation};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct BulkWrite {
-    requests: Vec<WriteModel>,
+    session: Option<String>,
+    models: Vec<WriteModel>,
     #[serde(flatten)]
     options: BulkWriteOptions,
 }
@@ -26,13 +27,14 @@ impl<'de> Deserialize<'de> for WriteModel {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(Debug, Deserialize)]
         #[serde(rename_all = "camelCase")]
         enum WriteModelHelper {
             InsertOne {
                 namespace: Namespace,
                 document: Document,
             },
+            #[serde(rename_all = "camelCase")]
             UpdateOne {
                 namespace: Namespace,
                 filter: Document,
@@ -42,6 +44,7 @@ impl<'de> Deserialize<'de> for WriteModel {
                 hint: Option<Bson>,
                 upsert: Option<bool>,
             },
+            #[serde(rename_all = "camelCase")]
             UpdateMany {
                 namespace: Namespace,
                 filter: Document,
@@ -51,6 +54,7 @@ impl<'de> Deserialize<'de> for WriteModel {
                 hint: Option<Bson>,
                 upsert: Option<bool>,
             },
+            #[serde(rename_all = "camelCase")]
             ReplaceOne {
                 namespace: Namespace,
                 filter: Document,
@@ -170,26 +174,25 @@ impl TestOperation for BulkWrite {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let client = test_runner.get_client(id).await;
-            let mut action = client.bulk_write(self.requests.clone());
-            if let Some(ordered) = self.options.ordered {
-                action = action.ordered(ordered);
-            }
-            if let Some(bypass_document_validation) = self.options.bypass_document_validation {
-                action = action.bypass_document_validation(bypass_document_validation);
-            }
-            if let Some(ref comment) = self.options.comment {
-                action = action.comment(comment.clone());
-            }
-            if let Some(ref let_vars) = self.options.let_vars {
-                action = action.let_vars(let_vars.clone());
-            }
-            let bson = if let Some(true) = self.options.verbose_results {
-                let result = action.verbose_results().await?;
-                bson::to_bson(&result)
-            } else {
-                let result = action.await?;
-                bson::to_bson(&result)
+            let result = match self.session {
+                Some(ref session_id) => {
+                    with_mut_session!(test_runner, session_id, |session| async {
+                        client
+                            .bulk_write(self.models.clone())
+                            .with_options(self.options.clone())
+                            .session(session)
+                            .await
+                    })
+                    .await
+                }
+                None => {
+                    client
+                        .bulk_write(self.models.clone())
+                        .with_options(self.options.clone())
+                        .await
+                }
             }?;
+            let bson = bson::to_bson(&result)?;
             Ok(Some(bson.into()))
         }
         .boxed()

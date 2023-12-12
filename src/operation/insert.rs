@@ -1,24 +1,32 @@
-#[cfg(test)]
-mod test;
+use std::collections::HashMap;
 
-use std::{collections::HashMap, convert::TryInto};
-
-use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocumentBuf};
+use bson::{Bson, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
     bson::rawdoc,
-    bson_util,
+    bson_util::{
+        array_entry_size_bytes,
+        extend_raw_document_buf,
+        get_or_prepend_id_field,
+        vec_to_raw_array_buf,
+    },
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     serde_util,
+    ClientSession,
     Namespace,
 };
 
-use super::{COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
+use super::{
+    handle_response_sync,
+    OperationResponse,
+    COMMAND_OVERHEAD_SIZE,
+    MAX_ENCRYPTED_WRITE_SIZE,
+};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a, T> {
@@ -64,9 +72,9 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         let mut docs = Vec::new();
         let mut size = 0;
 
-        let max_doc_size = description.max_bson_object_size as u64;
+        let max_doc_size = description.max_bson_object_size as usize;
         let max_doc_sequence_size =
-            description.max_message_size_bytes as u64 - COMMAND_OVERHEAD_SIZE;
+            description.max_message_size_bytes as usize - COMMAND_OVERHEAD_SIZE;
 
         for (i, d) in self
             .documents
@@ -76,31 +84,9 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         {
             let mut doc =
                 serde_util::to_raw_document_buf_with_options(d, self.human_readable_serialization)?;
-            let id = match doc.get("_id")? {
-                Some(b) => b.try_into()?,
-                None => {
-                    let mut new_doc = RawDocumentBuf::new();
-                    let oid = ObjectId::new();
-                    new_doc.append("_id", oid);
+            let id = get_or_prepend_id_field(&mut doc)?;
 
-                    let mut new_bytes = new_doc.into_bytes();
-                    new_bytes.pop(); // remove trailing null byte
-
-                    let mut bytes = doc.into_bytes();
-                    let oid_slice = &new_bytes[4..];
-                    // insert oid at beginning of document
-                    bytes.splice(4..4, oid_slice.iter().cloned());
-
-                    // overwrite old length
-                    let new_length = (bytes.len() as i32).to_le_bytes();
-                    bytes[0..4].copy_from_slice(&new_length);
-                    doc = RawDocumentBuf::from_bytes(bytes)?;
-
-                    Bson::ObjectId(oid)
-                }
-            };
-
-            let doc_size = doc.as_bytes().len() as u64;
+            let doc_size = doc.as_bytes().len();
             if doc_size > max_doc_size {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
@@ -116,7 +102,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
             // automatic encryption. I.e. if a single document has size larger than 2MiB (but less
             // than `maxBsonObjectSize`) proceed with automatic encryption.
             if self.encrypted && i != 0 {
-                let doc_entry_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len());
+                let doc_entry_size = array_entry_size_bytes(i, doc.as_bytes().len());
                 if size + doc_entry_size >= MAX_ENCRYPTED_WRITE_SIZE {
                     break;
                 }
@@ -134,15 +120,11 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         };
 
         let options_doc = bson::to_raw_document_buf(&self.options)?;
-        bson_util::extend_raw_document_buf(&mut body, options_doc)?;
+        extend_raw_document_buf(&mut body, options_doc)?;
 
         if self.encrypted {
             // Auto-encryption does not support document sequences
-            let mut raw_array = RawArrayBuf::new();
-            for doc in docs {
-                raw_array.push(doc);
-            }
-            body.append("documents", raw_array);
+            body.append("documents", vec_to_raw_array_buf(docs));
             Ok(Command::new(Self::NAME, &self.ns.db, body))
         } else {
             let mut command = Command::new(Self::NAME, &self.ns.db, body);
@@ -155,46 +137,49 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         &self,
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteResponseBody = raw_response.body_utf8_lossy()?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteResponseBody = raw_response.body_utf8_lossy()?;
 
-        let mut map = HashMap::new();
-        if self.options.ordered == Some(true) {
-            // in ordered inserts, only the first n were attempted.
-            for (i, id) in self
-                .inserted_ids
-                .iter()
-                .enumerate()
-                .take(response.n as usize)
-            {
-                map.insert(i, id.clone());
-            }
-        } else {
-            // for unordered, add all the attempted ids and then remove the ones that have
-            // associated write errors.
-            for (i, id) in self.inserted_ids.iter().enumerate() {
-                map.insert(i, id.clone());
-            }
+            let mut map = HashMap::new();
+            if self.options.ordered == Some(true) {
+                // in ordered inserts, only the first n were attempted.
+                for (i, id) in self
+                    .inserted_ids
+                    .iter()
+                    .enumerate()
+                    .take(response.n as usize)
+                {
+                    map.insert(i, id.clone());
+                }
+            } else {
+                // for unordered, add all the attempted ids and then remove the ones that have
+                // associated write errors.
+                for (i, id) in self.inserted_ids.iter().enumerate() {
+                    map.insert(i, id.clone());
+                }
 
-            if let Some(write_errors) = response.write_errors.as_ref() {
-                for err in write_errors {
-                    map.remove(&err.index);
+                if let Some(write_errors) = response.write_errors.as_ref() {
+                    for err in write_errors {
+                        map.remove(&err.index);
+                    }
                 }
             }
-        }
 
-        if response.write_errors.is_some() || response.write_concern_error.is_some() {
-            return Err(Error::new(
-                ErrorKind::BulkWrite(BulkWriteFailure {
-                    write_errors: response.write_errors,
-                    write_concern_error: response.write_concern_error,
-                    inserted_ids: map,
-                }),
-                response.labels,
-            ));
-        }
+            if response.write_errors.is_some() || response.write_concern_error.is_some() {
+                return Err(Error::new(
+                    ErrorKind::BulkWrite(BulkWriteFailure {
+                        write_errors: response.write_errors,
+                        write_concern_error: response.write_concern_error,
+                        inserted_ids: map,
+                    }),
+                    response.labels,
+                ));
+            }
 
-        Ok(InsertManyResult { inserted_ids: map })
+            Ok(InsertManyResult { inserted_ids: map })
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

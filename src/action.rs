@@ -1,6 +1,7 @@
 //! Action builder types.
 
 mod aggregate;
+pub(crate) mod bulk_write;
 mod count;
 mod create_collection;
 mod create_index;
@@ -22,8 +23,10 @@ mod watch;
 
 use std::{marker::PhantomData, ops::Deref};
 
+use crate::bson::Document;
+
 pub use aggregate::Aggregate;
-use bson::Document;
+pub use bulk_write::BulkWrite;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
 pub use create_index::CreateIndex;

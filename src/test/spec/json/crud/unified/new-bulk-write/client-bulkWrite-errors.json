@@ -1,0 +1,437 @@
+{
+  "description": "client bulkWrite errors",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ],
+        "uriOptions": {
+          "retryWrites": false
+        }
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "crud-tests"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "coll0"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "collectionName": "coll0",
+      "databaseName": "crud-tests",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 1
+        },
+        {
+          "_id": 2,
+          "x": 2
+        },
+        {
+          "_id": 3,
+          "x": 3
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "description": "an individual operation fails during an ordered bulkWrite",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 1
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$expr": {
+                      "$eq": [
+                        "$_id",
+                        "$$id2"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 3
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectError": {
+            "expectResult": {
+              "insertedCount": 0,
+              "upsertedCount": 0,
+              "matchedCount": 0,
+              "modifiedCount": 0,
+              "deletedCount": 1,
+              "insertResults": {},
+              "updateResults": {},
+              "deleteResults": {
+                "0": {
+                  "deletedCount": 1
+                }
+              }
+            },
+            "writeErrors": {
+              "1": {
+                "code": 17276
+              }
+            }
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 2,
+              "x": 2
+            },
+            {
+              "_id": 3,
+              "x": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "an individual operation fails during an unordered bulkWrite",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 1
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$expr": {
+                      "$eq": [
+                        "$_id",
+                        "$$id2"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 3
+                  }
+                }
+              }
+            ],
+            "verboseResults": true,
+            "ordered": false
+          },
+          "expectError": {
+            "expectResult": {
+              "insertedCount": 0,
+              "upsertedCount": 0,
+              "matchedCount": 0,
+              "modifiedCount": 0,
+              "deletedCount": 2,
+              "insertResults": {},
+              "updateResults": {},
+              "deleteResults": {
+                "0": {
+                  "deletedCount": 1
+                },
+                "2": {
+                  "deletedCount": 1
+                }
+              }
+            },
+            "writeErrors": {
+              "1": {
+                "code": 17276
+              }
+            }
+          }
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 2,
+              "x": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "detailed results are omitted from error when verboseResults is false",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 1
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$expr": {
+                      "$eq": [
+                        "$_id",
+                        "$$id2"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 3
+                  }
+                }
+              }
+            ],
+            "verboseResults": false
+          },
+          "expectError": {
+            "expectResult": {
+              "insertedCount": 0,
+              "upsertedCount": 0,
+              "matchedCount": 0,
+              "modifiedCount": 0,
+              "deletedCount": 1,
+              "insertResults": {
+                "$$unsetOrMatches": {}
+              },
+              "updateResults": {
+                "$$unsetOrMatches": {}
+              },
+              "deleteResults": {
+                "$$unsetOrMatches": {}
+              }
+            },
+            "writeErrors": {
+              "1": {
+                "code": 17276
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "a top-level failure occurs during a bulkWrite",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "bulkWrite"
+                ],
+                "errorCode": 8
+              }
+            }
+          }
+        },
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "x": 1
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectError": {
+            "errorCode": 8
+          }
+        }
+      ]
+    },
+    {
+      "description": "a write concern error occurs during a bulkWrite",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "bulkWrite"
+                ],
+                "writeConcernError": {
+                  "code": 91,
+                  "errmsg": "Replication is being shut down"
+                }
+              }
+            }
+          }
+        },
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "_id": 10
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectError": {
+            "expectResult": {
+              "insertedCount": 1,
+              "upsertedCount": 0,
+              "matchedCount": 0,
+              "modifiedCount": 0,
+              "deletedCount": 0,
+              "insertResults": {
+                "0": {
+                  "insertedId": 10
+                }
+              },
+              "updateResults": {},
+              "deleteResults": {}
+            },
+            "writeConcernErrors": [
+              {
+                "code": 91,
+                "errmsg": "Replication is being shut down"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

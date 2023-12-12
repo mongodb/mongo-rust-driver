@@ -4,7 +4,16 @@ use std::{
 };
 
 use crate::{
-    bson::{Bson, Document, RawArrayBuf, RawBson, RawBsonRef, RawDocumentBuf},
+    bson::{
+        oid::ObjectId,
+        rawdoc,
+        Bson,
+        Document,
+        RawArrayBuf,
+        RawBson,
+        RawBsonRef,
+        RawDocumentBuf,
+    },
     error::{ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
@@ -54,16 +63,6 @@ pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     Ok(RawBson::Array(array))
 }
 
-#[cfg(test)]
-pub(crate) fn sort_document(document: &mut Document) {
-    let temp = std::mem::take(document);
-
-    let mut elements: Vec<_> = temp.into_iter().collect();
-    elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
-
-    document.extend(elements);
-}
-
 pub(crate) fn first_key(document: &Document) -> Option<&str> {
     document.keys().next().map(String::as_str)
 }
@@ -89,18 +88,26 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
 }
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
-pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> u64 {
+pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> usize {
     //   * type (1 byte)
     //   * number of decimal digits in key
     //   * null terminator for the key (1 byte)
     //   * size of value
 
-    1 + num_decimal_digits(index) + 1 + doc_len as u64
+    1 + num_decimal_digits(index) + 1 + doc_len
+}
+
+pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> RawArrayBuf {
+    let mut array = RawArrayBuf::new();
+    for doc in docs {
+        array.push(doc);
+    }
+    array
 }
 
 /// The number of digits in `n` in base 10.
 /// Useful for calculating the size of an array entry in BSON.
-fn num_decimal_digits(mut n: usize) -> u64 {
+fn num_decimal_digits(mut n: usize) -> usize {
     let mut digits = 0;
 
     loop {
@@ -134,6 +141,30 @@ pub(crate) fn extend_raw_document_buf(
         this.append(k, v.to_raw_bson());
     }
     Ok(())
+}
+
+/// Returns the _id field of this document, prepending the field to the document if one is not
+/// already present.
+pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> {
+    match doc.get("_id")? {
+        Some(id) => Ok(id.try_into()?),
+        None => {
+            let id = ObjectId::new();
+            let mut new_bytes = rawdoc! { "_id": id }.into_bytes();
+
+            // Remove the trailing null byte (which will be replaced by the null byte in the given
+            // document) and append the document's elements
+            new_bytes.pop();
+            new_bytes.extend(&doc.as_bytes()[4..]);
+
+            let new_length = (new_bytes.len() as i32).to_le_bytes();
+            new_bytes[0..4].copy_from_slice(&new_length);
+
+            *doc = RawDocumentBuf::from_bytes(new_bytes)?;
+
+            Ok(id.into())
+        }
+    }
 }
 
 #[cfg(test)]

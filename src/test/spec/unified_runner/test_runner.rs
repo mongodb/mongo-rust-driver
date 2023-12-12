@@ -65,6 +65,7 @@ use crate::test::{
 };
 
 const SKIPPED_OPERATIONS: &[&str] = &[
+    "bulkWrite",
     "count",
     "listCollectionObjects",
     "listDatabaseObjects",
@@ -74,7 +75,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 17, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 18, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
@@ -365,7 +366,7 @@ impl TestRunner {
                         .await
                         .unwrap();
 
-                    assert_eq!(expected_data.documents, actual_data);
+                    assert_eq!(actual_data, expected_data.documents);
                 }
             }
         }

@@ -5,7 +5,10 @@ use crate::{
     error::Result,
     operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
@@ -56,15 +59,18 @@ impl OperationWithDefaults for ListCollections {
         &self,
         raw_response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: CursorBody = raw_response.body()?;
-        Ok(CursorSpecification::new(
-            response.cursor,
-            description.server_address.clone(),
-            self.options.as_ref().and_then(|opts| opts.batch_size),
-            None,
-            None,
-        ))
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: CursorBody = raw_response.body()?;
+            Ok(CursorSpecification::new(
+                response.cursor,
+                description.server_address.clone(),
+                self.options.as_ref().and_then(|opts| opts.batch_size),
+                None,
+                None,
+            ))
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

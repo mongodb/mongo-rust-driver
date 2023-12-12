@@ -1,0 +1,322 @@
+{
+  "description": "client bulkWrite top-level options",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ]
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "crud-tests"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "coll0"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "collectionName": "coll0",
+      "databaseName": "crud-tests",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 11
+        },
+        {
+          "_id": 2,
+          "x": 22
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "description": "client bulkWrite comment",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "_id": 3,
+                    "x": 33
+                  }
+                }
+              }
+            ],
+            "comment": {
+              "bulk": "write"
+            },
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 1,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 0,
+            "insertResults": {
+              "0": {
+                "insertedId": 3
+              }
+            },
+            "updateResults": {},
+            "deleteResults": {}
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "bulkWrite": 1,
+                  "comment": {
+                    "bulk": "write"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            },
+            {
+              "_id": 3,
+              "x": 33
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "client bulkWrite bypassDocumentValidation",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "_id": 4,
+                    "x": 44
+                  }
+                }
+              }
+            ],
+            "bypassDocumentValidation": true,
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 1,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 0,
+            "insertResults": {
+              "0": {
+                "insertedId": 4
+              }
+            },
+            "updateResults": {},
+            "deleteResults": {}
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "bulkWrite": 1,
+                  "bypassDocumentValidation": true
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            },
+            {
+              "_id": 4,
+              "x": 44
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "client bulkWrite let",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "updateOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$expr": {
+                      "$eq": [
+                        "$_id",
+                        "$$id1"
+                      ]
+                    }
+                  },
+                  "update": {
+                    "$inc": {
+                      "x": 1
+                    }
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$expr": {
+                      "$eq": [
+                        "$_id",
+                        "$$id2"
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "let": {
+              "id1": 1,
+              "id2": 2
+            },
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 1,
+            "modifiedCount": 1,
+            "deletedCount": 1,
+            "insertResults": {},
+            "updateResults": {
+              "0": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              }
+            },
+            "deleteResults": {
+              "1": {
+                "deletedCount": 1
+              }
+            }
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "bulkWrite": 1,
+                  "let": {
+                    "id1": 1,
+                    "id2": 2
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "databaseName": "crud-tests",
+          "collectionName": "coll0",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 12
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,4 @@
-#[cfg(feature = "tracing-unstable")]
-use std::collections::HashMap;
-use std::{borrow::Cow, fmt::Write, sync::Arc, time::Duration};
+use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::Arc, time::Duration};
 
 use percent_encoding::NON_ALPHANUMERIC;
 use regex::Regex;
@@ -13,10 +11,11 @@ use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 #[cfg(feature = "tracing-unstable")]
 use crate::trace;
 use crate::{
+    action::bulk_write::error::BulkWriteError,
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     client::options::{ServerApi, ServerApiVersion},
     concern::{Acknowledgment, ReadConcernLevel},
-    error::Error,
+    error::{Error, ErrorKind},
     gridfs::options::GridFsBucketOptions,
     options::{
         ClientOptions,
@@ -475,6 +474,9 @@ pub(crate) struct ExpectError {
     #[serde(default, deserialize_with = "serde_util::deserialize_nonempty_vec")]
     pub(crate) error_labels_omit: Option<Vec<String>>,
     pub(crate) expect_result: Option<Bson>,
+    #[serde(default, deserialize_with = "serde_util::deserialize_indexed_map")]
+    pub(crate) write_errors: Option<HashMap<usize, Bson>>,
+    pub(crate) write_concern_errors: Option<Vec<Bson>>,
 }
 
 impl ExpectError {
@@ -493,6 +495,7 @@ impl ExpectError {
                 ));
             }
         }
+
         if let Some(error_contains) = &self.error_contains {
             match &error.message() {
                 Some(msg) if msg.contains(error_contains) => (),
@@ -504,8 +507,9 @@ impl ExpectError {
                 }
             }
         }
+
         if let Some(error_code) = self.error_code {
-            match &error.sdam_code() {
+            match &error.code() {
                 Some(code) => {
                     if code != &error_code {
                         return Err(format!(
@@ -545,6 +549,7 @@ impl ExpectError {
                 }
             }
         }
+
         if let Some(error_labels_contain) = &self.error_labels_contain {
             for label in error_labels_contain {
                 if !error.contains_label(label) {
@@ -555,6 +560,7 @@ impl ExpectError {
                 }
             }
         }
+
         if let Some(error_labels_omit) = &self.error_labels_omit {
             for label in error_labels_omit {
                 if error.contains_label(label) {
@@ -565,9 +571,69 @@ impl ExpectError {
                 }
             }
         }
-        if self.expect_result.is_some() {
-            // TODO RUST-260: match against partial results
+
+        if let Some(ref expected_result) = self.expect_result {
+            let actual_result = match *error.kind {
+                ErrorKind::ClientBulkWrite(BulkWriteError {
+                    partial_result: Some(ref partial_result),
+                    ..
+                }) => Some(bson::to_bson(partial_result).map_err(|e| e.to_string())?),
+                _ => None,
+            };
+            results_match(actual_result.as_ref(), expected_result, false, None)?;
         }
+
+        if let Some(ref write_errors) = self.write_errors {
+            let actual_write_errors = match *error.kind {
+                ErrorKind::ClientBulkWrite(ref bulk_write_error) => &bulk_write_error.write_errors,
+                ref other => {
+                    return Err(format!(
+                        "{}: expected bulk write error, got {:?}",
+                        description, other
+                    ))
+                }
+            };
+
+            for (expected_index, expected_error) in write_errors {
+                let actual_error = actual_write_errors.get(expected_index).ok_or_else(|| {
+                    format!(
+                        "{}: expected error for operation at index {}",
+                        description, expected_index
+                    )
+                })?;
+                let actual_error = bson::to_bson(&actual_error).map_err(|e| e.to_string())?;
+                results_match(Some(&actual_error), expected_error, true, None)?;
+            }
+        }
+
+        if let Some(ref write_concern_errors) = self.write_concern_errors {
+            let actual_write_concern_errors = match *error.kind {
+                ErrorKind::ClientBulkWrite(ref bulk_write_error) => {
+                    &bulk_write_error.write_concern_errors
+                }
+                ref other => {
+                    return Err(format!(
+                        "{}: expected bulk write error, got {:?}",
+                        description, other
+                    ))
+                }
+            };
+
+            if actual_write_concern_errors.len() != write_concern_errors.len() {
+                return Err(format!(
+                    "{}: got {} write errors, expected {}",
+                    description,
+                    actual_write_concern_errors.len(),
+                    write_concern_errors.len()
+                ));
+            }
+
+            for (actual, expected) in actual_write_concern_errors.iter().zip(write_concern_errors) {
+                let actual = bson::to_bson(&actual).map_err(|e| e.to_string())?;
+                results_match(Some(&actual), expected, true, None)?;
+            }
+        }
+
         Ok(())
     }
 }

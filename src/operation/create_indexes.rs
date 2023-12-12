@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -9,10 +6,11 @@ use crate::{
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
+    ClientSession,
     Namespace,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{handle_response_sync, OperationResponse, WriteConcernOnlyBody};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -31,18 +29,6 @@ impl CreateIndexes {
             ns,
             indexes,
             options,
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_indexes(indexes: Vec<IndexModel>) -> Self {
-        Self {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            indexes,
-            options: None,
         }
     }
 }
@@ -89,11 +75,14 @@ impl OperationWithDefaults for CreateIndexes {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()?;
-        let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
-        Ok(CreateIndexesResult { index_names })
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteConcernOnlyBody = response.body()?;
+            response.validate()?;
+            let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
+            Ok(CreateIndexesResult { index_names })
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

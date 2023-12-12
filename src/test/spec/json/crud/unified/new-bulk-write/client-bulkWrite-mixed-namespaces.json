@@ -1,5 +1,5 @@
 {
-  "description": "bulkWrite namespaces",
+  "description": "client bulkWrite with mixed namespaces",
   "schemaVersion": "1.0",
   "createEntities": [
     {
@@ -61,7 +61,8 @@
           "x": 11
         },
         {
-          "_id": 2
+          "_id": 2,
+          "x": 22
         }
       ]
     },
@@ -70,28 +71,30 @@
       "collectionName": "coll2",
       "documents": [
         {
-          "_id": 3
+          "_id": 3,
+          "x": 33
         },
         {
-          "_id": 4
+          "_id": 4,
+          "x": 44
         }
       ]
     }
   ],
   "tests": [
     {
-      "description": "bulkWrite mixed namespaces",
+      "description": "client bulkWrite with mixed namespaces",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {

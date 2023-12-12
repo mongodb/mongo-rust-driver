@@ -1,0 +1,401 @@
+{
+  "description": "client bulkWrite transactions",
+  "schemaVersion": "1.18",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.0",
+      "topologies": [
+        "replicaset",
+        "sharded",
+        "load-balanced"
+      ]
+    }
+  ],
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ]
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "transaction-tests"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "coll0"
+      }
+    },
+    {
+      "session": {
+        "id": "session0",
+        "client": "client0"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "databaseName": "transaction-tests",
+      "collectionName": "coll0",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 11
+        },
+        {
+          "_id": 2,
+          "x": 22
+        },
+        {
+          "_id": 3,
+          "x": 33
+        },
+        {
+          "_id": 5,
+          "x": 55
+        },
+        {
+          "_id": 6,
+          "x": 66
+        },
+        {
+          "_id": 7,
+          "x": 77
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "description": "transactional client bulkWrite",
+      "operations": [
+        {
+          "object": "session0",
+          "name": "startTransaction"
+        },
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "session": "session0",
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "transaction-tests",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "_id": 8,
+                    "x": 88
+                  }
+                }
+              },
+              {
+                "updateOne": {
+                  "namespace": {
+                    "db": "transaction-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 1
+                  },
+                  "update": {
+                    "$inc": {
+                      "x": 1
+                    }
+                  }
+                }
+              },
+              {
+                "updateMany": {
+                  "namespace": {
+                    "db": "transaction-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$and": [
+                      {
+                        "_id": {
+                          "$gt": 1
+                        }
+                      },
+                      {
+                        "_id": {
+                          "$lte": 3
+                        }
+                      }
+                    ]
+                  },
+                  "update": {
+                    "$inc": {
+                      "x": 2
+                    }
+                  }
+                }
+              },
+              {
+                "replaceOne": {
+                  "namespace": {
+                    "db": "transaction-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 4
+                  },
+                  "replacement": {
+                    "x": 44
+                  },
+                  "upsert": true
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "transaction-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 5
+                  }
+                }
+              },
+              {
+                "deleteMany": {
+                  "namespace": {
+                    "db": "transaction-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "$and": [
+                      {
+                        "_id": {
+                          "$gt": 5
+                        }
+                      },
+                      {
+                        "_id": {
+                          "$lte": 7
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 1,
+            "upsertedCount": 1,
+            "matchedCount": 3,
+            "modifiedCount": 3,
+            "deletedCount": 3,
+            "insertResults": {
+              "0": {
+                "insertedId": 8
+              }
+            },
+            "updateResults": {
+              "1": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              },
+              "2": {
+                "matchedCount": 2,
+                "modifiedCount": 2,
+                "upsertedId": null
+              },
+              "3": {
+                "matchedCount": 1,
+                "modifiedCount": 0,
+                "upsertedId": 4
+              }
+            },
+            "deleteResults": {
+              "4": {
+                "deletedCount": 1
+              },
+              "5": {
+                "deletedCount": 2
+              }
+            }
+          }
+        },
+        {
+          "object": "session0",
+          "name": "commitTransaction"
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
+                "command": {
+                  "bulkWrite": 1,
+                  "lsid": {
+                    "$$sessionLsid": "session0"
+                  },
+                  "txnNumber": 1,
+                  "startTransaction": true,
+                  "autocommit": false,
+                  "writeConcern": {
+                    "$$exists": false
+                  },
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 8,
+                        "x": 88
+                      }
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 1
+                        }
+                      },
+                      "multi": false
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 1
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 3
+                            }
+                          }
+                        ]
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 2
+                        }
+                      },
+                      "multi": true
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 4
+                      },
+                      "updateMods": {
+                        "x": 44
+                      },
+                      "upsert": true,
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": 5
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 5
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 7
+                            }
+                          }
+                        ]
+                      },
+                      "multi": true
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "transaction-tests.coll0"
+                    }
+                  ],
+                  "errorsOnly": false,
+                  "ordered": true
+                }
+              }
+            },
+            {
+              "commandStartedEvent": {
+                "commandName": "commitTransaction",
+                "databaseName": "admin",
+                "command": {
+                  "commitTransaction": 1,
+                  "lsid": {
+                    "$$sessionLsid": "session0"
+                  },
+                  "txnNumber": 1,
+                  "startTransaction": {
+                    "$$exists": false
+                  },
+                  "autocommit": false,
+                  "writeConcern": {
+                    "$$exists": false
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "transaction-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 12
+            },
+            {
+              "_id": 2,
+              "x": 24
+            },
+            {
+              "_id": 3,
+              "x": 35
+            },
+            {
+              "_id": 4,
+              "x": 44
+            },
+            {
+              "_id": 8,
+              "x": 88
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -12,7 +12,10 @@ use crate::{
         WriteConcernOnlyBody,
     },
     options::WriteConcern,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
@@ -51,9 +54,12 @@ impl OperationWithDefaults for DropDatabase {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteConcernOnlyBody = response.body()?;
+            response.validate()
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

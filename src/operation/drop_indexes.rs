@@ -1,14 +1,14 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{DropIndexOptions, WriteConcern},
+    ClientSession,
     Namespace,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 pub(crate) struct DropIndexes {
     ns: Namespace,
@@ -19,18 +19,6 @@ pub(crate) struct DropIndexes {
 impl DropIndexes {
     pub(crate) fn new(ns: Namespace, name: String, options: Option<DropIndexOptions>) -> Self {
         Self { ns, name, options }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            name: String::new(),
-            options: None,
-        }
     }
 }
 
@@ -59,8 +47,9 @@ impl OperationWithDefaults for DropIndexes {
         &self,
         _response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        Ok(())
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{ Ok(()) }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

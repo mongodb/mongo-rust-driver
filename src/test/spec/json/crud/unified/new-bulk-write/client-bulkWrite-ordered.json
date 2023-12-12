@@ -1,5 +1,5 @@
 {
-  "description": "client bulkWrite ordered option",
+  "description": "client bulkWrite with ordered option",
   "schemaVersion": "1.0",
   "createEntities": [
     {
@@ -34,18 +34,18 @@
   ],
   "tests": [
     {
-      "description": "unordered bulkWrite",
+      "description": "client bulkWrite with ordered: false",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {
@@ -53,7 +53,7 @@
                     "coll": "coll0"
                   },
                   "document": {
-                    "_id": 4
+                    "_id": 1
                   }
                 }
               }
@@ -69,7 +69,7 @@
             "deletedCount": 0,
             "insertResults": {
               "0": {
-                "insertedId": 4
+                "insertedId": 1
               }
             },
             "updateResults": {},
@@ -85,14 +85,6 @@
               "commandStartedEvent": {
                 "command": {
                   "bulkWrite": 1,
-                  "ops": [
-                    {
-                      "insert": 0,
-                      "document": {
-                        "_id": 4
-                      }
-                    }
-                  ],
                   "ordered": false
                 }
               }
@@ -106,25 +98,25 @@
           "databaseName": "crud-tests",
           "documents": [
             {
-              "_id": 4
+              "_id": 1
             }
           ]
         }
       ]
     },
     {
-      "description": "ordered bulkWrite",
+      "description": "client bulkWrite with ordered: true",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {
@@ -164,14 +156,6 @@
               "commandStartedEvent": {
                 "command": {
                   "bulkWrite": 1,
-                  "ops": [
-                    {
-                      "insert": 0,
-                      "document": {
-                        "_id": 4
-                      }
-                    }
-                  ],
                   "ordered": true
                 }
               }
@@ -192,18 +176,18 @@
       ]
     },
     {
-      "description": "bulkWrite defaults to ordered",
+      "description": "client bulkWrite defaults to ordered: true",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {

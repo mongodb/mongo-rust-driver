@@ -205,3 +205,22 @@ pub(crate) fn serialize_indexed_map<S: Serializer, T: Serialize>(
         .collect();
     string_map.serialize(serializer)
 }
+
+#[cfg(test)]
+pub(crate) fn deserialize_indexed_map<'de, D, T>(
+    deserializer: D,
+) -> std::result::Result<Option<HashMap<usize, T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    use std::str::FromStr;
+
+    let string_map: HashMap<String, T> = HashMap::deserialize(deserializer)?;
+    Ok(Some(
+        string_map
+            .into_iter()
+            .map(|(index, t)| (usize::from_str(&index).unwrap(), t))
+            .collect(),
+    ))
+}

@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use serde::Serialize;
 use serde_with::skip_serializing_none;
 
 use crate::{
-    bson::{oid::ObjectId, Array, Bson, Document, RawDocumentBuf},
+    bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
+    bson_util::get_or_prepend_id_field,
     error::Result,
     options::UpdateModifications,
     Namespace,
@@ -12,7 +11,7 @@ use crate::{
 
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize)]
-#[serde(untagged, rename_all = "camelCase")]
+#[serde(untagged)]
 #[non_exhaustive]
 pub enum WriteModel {
     #[non_exhaustive]
@@ -22,6 +21,7 @@ pub enum WriteModel {
         document: Document,
     },
     #[non_exhaustive]
+    #[serde(rename_all = "camelCase")]
     UpdateOne {
         #[serde(skip)]
         namespace: Namespace,
@@ -34,6 +34,7 @@ pub enum WriteModel {
         upsert: Option<bool>,
     },
     #[non_exhaustive]
+    #[serde(rename_all = "camelCase")]
     UpdateMany {
         #[serde(skip)]
         namespace: Namespace,
@@ -46,6 +47,7 @@ pub enum WriteModel {
         upsert: Option<bool>,
     },
     #[non_exhaustive]
+    #[serde(rename_all = "camelCase")]
     ReplaceOne {
         #[serde(skip)]
         namespace: Namespace,
@@ -75,6 +77,12 @@ pub enum WriteModel {
     },
 }
 
+pub(crate) enum OperationType {
+    Insert,
+    Update,
+    Delete,
+}
+
 impl WriteModel {
     pub(crate) fn namespace(&self) -> &Namespace {
         match self {
@@ -87,45 +95,55 @@ impl WriteModel {
         }
     }
 
-    pub(crate) fn operation_name(&self) -> &'static str {
+    pub(crate) fn operation_type(&self) -> OperationType {
         match self {
-            Self::DeleteOne { .. } | Self::DeleteMany { .. } => "delete",
-            Self::InsertOne { .. } => "insert",
-            Self::ReplaceOne { .. } | Self::UpdateOne { .. } | Self::UpdateMany { .. } => "update",
+            Self::InsertOne { .. } => OperationType::Insert,
+            Self::UpdateOne { .. } | Self::UpdateMany { .. } | Self::ReplaceOne { .. } => {
+                OperationType::Update
+            }
+            Self::DeleteOne { .. } | Self::DeleteMany { .. } => OperationType::Delete,
         }
     }
 
-    pub(crate) fn to_raw_doc(&self) -> Result<RawDocumentBuf> {
-        let mut doc = bson::to_raw_document_buf(&self)?;
+    /// Whether this operation should apply to all documents that match the filter. Returns None if
+    /// the operation does not use a filter.
+    pub(crate) fn multi(&self) -> Option<bool> {
         match self {
+            Self::UpdateMany { .. } | Self::DeleteMany { .. } => Some(true),
             Self::UpdateOne { .. } | Self::ReplaceOne { .. } | Self::DeleteOne { .. } => {
-                doc.append("multi", false);
+                Some(false)
             }
-            Self::UpdateMany { .. } | Self::DeleteMany { .. } => {
-                doc.append("multi", true);
-            }
-            _ => {}
+            Self::InsertOne { .. } => None,
         }
-        Ok(doc)
     }
-}
 
-pub(crate) fn add_ids_to_insert_one_models(
-    models: &mut [WriteModel],
-) -> Result<HashMap<usize, Bson>> {
-    let mut ids = HashMap::new();
-    for (i, model) in models.iter_mut().enumerate() {
-        if let WriteModel::InsertOne { document, .. } = model {
-            let id = match document.get("_id") {
-                Some(id) => id.clone(),
-                None => {
-                    let id = ObjectId::new();
-                    document.insert("_id", id);
-                    Bson::ObjectId(id)
-                }
-            };
-            ids.insert(i, id);
+    pub(crate) fn operation_name(&self) -> &'static str {
+        match self.operation_type() {
+            OperationType::Insert => "insert",
+            OperationType::Update => "update",
+            OperationType::Delete => "delete",
         }
     }
-    Ok(ids)
+
+    // Returns the operation-specific fields that should be included in this model's entry in the
+    // ops array. Also returns an inserted ID if this is an insert operation.
+    pub(crate) fn get_ops_document_contents(&self) -> Result<(RawDocumentBuf, Option<Bson>)> {
+        let (mut model_document, inserted_id) = match self {
+            Self::InsertOne { document, .. } => {
+                let mut insert_document = RawDocumentBuf::from_document(document)?;
+                let inserted_id = get_or_prepend_id_field(&mut insert_document)?;
+                (rawdoc! { "document": insert_document }, Some(inserted_id))
+            }
+            _ => {
+                let model_document = bson::to_raw_document_buf(&self)?;
+                (model_document, None)
+            }
+        };
+
+        if let Some(multi) = self.multi() {
+            model_document.append("multi", multi);
+        }
+
+        Ok((model_document, inserted_id))
+    }
 }

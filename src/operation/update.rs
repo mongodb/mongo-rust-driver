@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,8 +9,11 @@ use crate::{
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     serde_util::to_raw_document_buf_with_options,
+    ClientSession,
     Namespace,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace<'a, T = ()> {
@@ -63,18 +63,6 @@ pub(crate) struct Update<'a, T = ()> {
 }
 
 impl Update<'_> {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::with_update(
-            Namespace::new("db", "coll"),
-            doc! {},
-            UpdateModifications::Document(doc! {}),
-            false,
-            None,
-            false,
-        )
-    }
-
     pub(crate) fn with_update(
         ns: Namespace,
         filter: Document,
@@ -186,29 +174,32 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
         &self,
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteResponseBody<UpdateBody> = raw_response.body_utf8_lossy()?;
-        response.validate().map_err(convert_bulk_errors)?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteResponseBody<UpdateBody> = raw_response.body_utf8_lossy()?;
+            response.validate().map_err(convert_bulk_errors)?;
 
-        let modified_count = response.n_modified;
-        let upserted_id = response
-            .upserted
-            .as_ref()
-            .and_then(|v| v.first())
-            .and_then(|doc| doc.get("_id"))
-            .cloned();
+            let modified_count = response.n_modified;
+            let upserted_id = response
+                .upserted
+                .as_ref()
+                .and_then(|v| v.first())
+                .and_then(|doc| doc.get("_id"))
+                .cloned();
 
-        let matched_count = if upserted_id.is_some() {
-            0
-        } else {
-            response.body.n
-        };
+            let matched_count = if upserted_id.is_some() {
+                0
+            } else {
+                response.body.n
+            };
 
-        Ok(UpdateResult {
-            matched_count,
-            modified_count,
-            upserted_id,
-        })
+            Ok(UpdateResult {
+                matched_count,
+                modified_count,
+                upserted_id,
+            })
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

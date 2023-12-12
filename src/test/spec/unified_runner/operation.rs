@@ -1,10 +1,6 @@
 mod bulk_write;
-
 #[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
-#[cfg(feature = "in-use-encryption-unstable")]
-use self::csfle::*;
-
 mod search_index;
 
 use std::{
@@ -79,13 +75,18 @@ use crate::{
     runtime,
     selection_criteria::ReadPreference,
     serde_util,
-    test::{spec::unified_runner::operation::bulk_write::BulkWrite, FailPoint},
+    test::FailPoint,
     Collection,
     Database,
     IndexModel,
     ServerType,
     TopologyType,
 };
+
+use bulk_write::*;
+#[cfg(feature = "in-use-encryption-unstable")]
+use csfle::*;
+use search_index::*;
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_test_runner_operation<'a>(
@@ -155,6 +156,7 @@ macro_rules! with_mut_session {
         }
     };
 }
+use with_mut_session;
 
 #[derive(Debug)]
 pub(crate) struct Operation {
@@ -382,22 +384,12 @@ impl<'de> Deserialize<'de> for Operation {
             #[cfg(feature = "in-use-encryption-unstable")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
             "iterateOnce" => deserialize_op::<IterateOnce>(definition.arguments),
-            "createSearchIndex" => {
-                deserialize_op::<search_index::CreateSearchIndex>(definition.arguments)
-            }
-            "createSearchIndexes" => {
-                deserialize_op::<search_index::CreateSearchIndexes>(definition.arguments)
-            }
-            "dropSearchIndex" => {
-                deserialize_op::<search_index::DropSearchIndex>(definition.arguments)
-            }
-            "listSearchIndexes" => {
-                deserialize_op::<search_index::ListSearchIndexes>(definition.arguments)
-            }
-            "updateSearchIndex" => {
-                deserialize_op::<search_index::UpdateSearchIndex>(definition.arguments)
-            }
-            "bulkWrite" => deserialize_op::<BulkWrite>(definition.arguments),
+            "createSearchIndex" => deserialize_op::<CreateSearchIndex>(definition.arguments),
+            "createSearchIndexes" => deserialize_op::<CreateSearchIndexes>(definition.arguments),
+            "dropSearchIndex" => deserialize_op::<DropSearchIndex>(definition.arguments),
+            "listSearchIndexes" => deserialize_op::<ListSearchIndexes>(definition.arguments),
+            "updateSearchIndex" => deserialize_op::<UpdateSearchIndex>(definition.arguments),
+            "clientBulkWrite" => deserialize_op::<BulkWrite>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),

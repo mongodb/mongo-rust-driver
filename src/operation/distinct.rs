@@ -8,7 +8,10 @@ use crate::{
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -72,9 +75,12 @@ impl OperationWithDefaults for Distinct {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: Response = response.body()?;
-        Ok(response.values)
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: Response = response.body()?;
+            Ok(response.values)
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

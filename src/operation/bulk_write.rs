@@ -1,152 +1,359 @@
 #![allow(unused_variables, dead_code)]
 
+mod server_responses;
+
 use std::collections::HashMap;
 
-use serde::Deserialize;
+use futures_core::TryStream;
+use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
-    bson::{rawdoc, Bson, RawArrayBuf, RawDocumentBuf},
-    bson_util,
-    client::bulk_write::{models::WriteModel, BulkWriteOptions},
+    action::bulk_write::{
+        error::BulkWriteError,
+        results::BulkWriteResult,
+        write_models::{OperationType, WriteModel},
+        BulkWriteOptions,
+    },
+    bson::{rawdoc, Bson, RawDocumentBuf},
+    bson_util::{self, array_entry_size_bytes, extend_raw_document_buf, vec_to_raw_array_buf},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{Error, Result},
+    error::{Error, ErrorKind, Result},
     operation::OperationWithDefaults,
+    results::{DeleteResult, InsertOneResult, UpdateResult},
     Client,
+    ClientSession,
     Cursor,
     Namespace,
+    SessionCursor,
 };
 
-use super::{CursorInfo, WriteResponseBody};
+use super::{
+    OperationResponse,
+    Retryability,
+    WriteResponseBody,
+    COMMAND_OVERHEAD_SIZE,
+    MAX_ENCRYPTED_WRITE_SIZE,
+};
+
+use server_responses::*;
 
 pub(crate) struct BulkWrite<'a> {
-    pub(crate) models: &'a [WriteModel],
-    pub(crate) options: BulkWriteOptions,
-    pub(crate) client: Client,
+    client: Client,
+    models: &'a [WriteModel],
+    offset: usize,
+    options: Option<&'a BulkWriteOptions>,
+    encrypted: bool,
+    /// The _ids of the inserted documents. This value is populated in `build`.
+    inserted_ids: HashMap<usize, Bson>,
+    /// The number of writes that were sent to the server. This value is populated in `build`.
+    pub(crate) n_attempted: usize,
 }
+
+impl<'a> BulkWrite<'a> {
+    pub(crate) async fn new(
+        client: Client,
+        models: &'a [WriteModel],
+        offset: usize,
+        options: Option<&'a BulkWriteOptions>,
+    ) -> Self {
+        let encrypted = client.should_auto_encrypt().await;
+        Self {
+            client,
+            models,
+            offset,
+            options,
+            encrypted,
+            n_attempted: 0,
+            inserted_ids: HashMap::new(),
+        }
+    }
+
+    async fn iterate_results_cursor(
+        &self,
+        mut stream: impl TryStream<Ok = SingleOperationResponse, Error = Error> + Unpin,
+        error: &mut BulkWriteError,
+    ) -> Result<()> {
+        let result = &mut error.partial_result;
+
+        while let Some(response) = stream.try_next().await? {
+            match response.result {
+                SingleOperationResult::Success {
+                    n,
+                    n_modified,
+                    upserted,
+                } => {
+                    let result_index = response.index + self.offset;
+                    let model = self.get_model(response.index)?;
+                    match model.operation_type() {
+                        OperationType::Insert => {
+                            let inserted_id = self.get_inserted_id(result_index)?;
+                            let insert_result = InsertOneResult { inserted_id };
+                            result
+                                .get_or_insert_with(Default::default)
+                                .add_insert_result(result_index, insert_result);
+                        }
+                        OperationType::Update => {
+                            let modified_count =
+                                n_modified.ok_or_else(|| ErrorKind::InvalidResponse {
+                                    message: "nModified value not returned for update bulkWrite \
+                                              operation"
+                                        .into(),
+                                })?;
+                            let update_result = UpdateResult {
+                                matched_count: n,
+                                modified_count,
+                                upserted_id: upserted.map(|upserted| upserted.id),
+                            };
+                            result
+                                .get_or_insert_with(Default::default)
+                                .add_update_result(result_index, update_result);
+                        }
+                        OperationType::Delete => {
+                            let delete_result = DeleteResult { deleted_count: n };
+                            result
+                                .get_or_insert_with(Default::default)
+                                .add_delete_result(result_index, delete_result);
+                        }
+                    }
+                }
+                SingleOperationResult::Error(write_error) => {
+                    error.write_errors.insert(response.index, write_error);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_model(&self, index: usize) -> Result<&WriteModel> {
+        self.models.get(index).ok_or_else(|| {
+            ErrorKind::InvalidResponse {
+                message: format!("invalid operation index returned from bulkWrite: {}", index),
+            }
+            .into()
+        })
+    }
+
+    fn get_inserted_id(&self, index: usize) -> Result<Bson> {
+        match self.inserted_ids.get(&index) {
+            Some(inserted_id) => Ok(inserted_id.clone()),
+            None => Err(ErrorKind::InvalidResponse {
+                message: format!("invalid index returned for insert operation: {}", index),
+            }
+            .into()),
+        }
+    }
+}
+
 /// A helper struct for tracking namespace information.
 struct NamespaceInfo<'a> {
-    namespaces: RawArrayBuf,
-    // Cache the namespaces and their indexes to avoid traversing the namespaces array each time a
-    // namespace is looked up or added.
+    namespaces: Vec<RawDocumentBuf>,
+    /// Cache the namespaces and their indexes to avoid traversing the namespaces array each time a
+    /// namespace is looked up or added.
     cache: HashMap<&'a Namespace, usize>,
 }
 
 impl<'a> NamespaceInfo<'a> {
     fn new() -> Self {
         Self {
-            namespaces: RawArrayBuf::new(),
+            namespaces: Vec::new(),
             cache: HashMap::new(),
         }
     }
 
     /// Gets the index for the given namespace in the nsInfo list, adding it to the list if it is
     /// not already present.
-    fn get_index(&mut self, namespace: &'a Namespace) -> usize {
+    fn get_index(&mut self, namespace: &'a Namespace) -> (usize, usize) {
         match self.cache.get(namespace) {
-            Some(index) => *index,
+            Some(index) => (*index, 0),
             None => {
-                self.namespaces
-                    .push(rawdoc! { "ns": namespace.to_string() });
+                let namespace_doc = rawdoc! { "ns": namespace.to_string() };
+                let length_added = namespace_doc.as_bytes().len();
+                self.namespaces.push(namespace_doc);
                 let next_index = self.cache.len();
                 self.cache.insert(namespace, next_index);
-                next_index
+                (next_index, length_added)
             }
         }
     }
 }
 
 impl<'a> OperationWithDefaults for BulkWrite<'a> {
-    type O = (Cursor<BulkWriteOperationResponse>, BulkWriteSummaryInfo);
+    type O = BulkWriteResult;
 
     type Command = RawDocumentBuf;
 
     const NAME: &'static str = "bulkWrite";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+        let max_operations = description.max_write_batch_size;
+        let max_doc_size = description.max_bson_object_size as usize;
+        let max_message_size = description.max_message_size_bytes as usize - COMMAND_OVERHEAD_SIZE;
+
         let mut namespace_info = NamespaceInfo::new();
-        let mut ops = RawArrayBuf::new();
-        for model in self.models {
-            let namespace_index = namespace_info.get_index(model.namespace());
+        let mut ops = Vec::new();
+        let mut size = 0;
+        for (i, model) in self.models.iter().take(max_operations as usize).enumerate() {
+            let (namespace_index, namespace_size) = namespace_info.get_index(model.namespace());
 
-            let mut model_doc = rawdoc! { model.operation_name(): namespace_index as i32 };
-            let model_fields = model.to_raw_doc()?;
-            bson_util::extend_raw_document_buf(&mut model_doc, model_fields)?;
+            let mut operation = rawdoc! { model.operation_name(): namespace_index as i32 };
+            let (model_doc, inserted_id) = model.get_ops_document_contents()?;
+            extend_raw_document_buf(&mut operation, model_doc)?;
 
-            ops.push(model_doc);
+            let operation_size = operation.as_bytes().len();
+            if operation_size > max_doc_size {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!(
+                        "bulk write operations must be within {} bytes, but document provided is \
+                         {} bytes",
+                        max_doc_size, operation_size
+                    ),
+                }
+                .into());
+            }
+
+            if let Some(inserted_id) = inserted_id {
+                self.inserted_ids.insert(i, inserted_id);
+            }
+
+            let mut split = false;
+            if self.encrypted && i != 0 {
+                let model_entry_size = array_entry_size_bytes(i, operation_size);
+                let namespace_entry_size = if namespace_size > 0 {
+                    array_entry_size_bytes(namespace_index, namespace_size)
+                } else {
+                    0
+                };
+                if size + model_entry_size + namespace_entry_size > MAX_ENCRYPTED_WRITE_SIZE {
+                    split = true;
+                }
+            } else if size + namespace_size + operation_size > max_message_size {
+                split = true;
+            }
+
+            if split {
+                // Remove the namespace doc from the list if one was added for this operation
+                if namespace_size > 0 {
+                    let last_index = namespace_info.namespaces.len() - 1;
+                    namespace_info.namespaces.remove(last_index);
+                }
+                break;
+            } else {
+                size += namespace_size + operation_size;
+                ops.push(operation);
+            }
         }
 
-        let mut command = rawdoc! {
-            Self::NAME: 1,
-            "ops": ops,
-            "nsInfo": namespace_info.namespaces,
-        };
+        let mut body = rawdoc! { Self::NAME: 1 };
+        let options = match self.options {
+            Some(options) => bson::to_raw_document_buf(options),
+            None => bson::to_raw_document_buf(&BulkWriteOptions::default()),
+        }?;
+        bson_util::extend_raw_document_buf(&mut body, options)?;
 
-        let options = bson::to_raw_document_buf(&self.options)?;
-        bson_util::extend_raw_document_buf(&mut command, options)?;
+        self.n_attempted = ops.len();
 
-        Ok(Command::new(Self::NAME, "admin", command))
+        if self.encrypted {
+            body.append("nsInfo", vec_to_raw_array_buf(namespace_info.namespaces));
+            body.append("ops", vec_to_raw_array_buf(ops));
+            Ok(Command::new(Self::NAME, "admin", body))
+        } else {
+            let mut command = Command::new(Self::NAME, "admin", body);
+            command.add_document_sequence("nsInfo", namespace_info.namespaces);
+            command.add_document_sequence("ops", ops);
+            Ok(command)
+        }
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'b>(
+        &'b self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteResponseBody<BulkWriteResponse> = response.body()?;
+        description: &'b StreamDescription,
+        session: Option<&'b mut ClientSession>,
+    ) -> OperationResponse<'b, Self::O> {
+        OperationResponse::Async(
+            async move {
+                let response: WriteResponseBody<Response> = response.body()?;
 
-        let specification = CursorSpecification::new(
-            response.body.cursor,
-            description.server_address.clone(),
-            None,
-            None,
-            None,
-        );
-        let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                let mut bulk_write_error = BulkWriteError::default();
 
-        Ok((cursor, response.body.summary))
+                // A partial result with summary info should only be created if one or more
+                // operations were successful.
+                if response.summary.n_errors < self.n_attempted as i64 {
+                    bulk_write_error
+                        .partial_result
+                        .get_or_insert_with(Default::default)
+                        .populate_summary_info(&response.summary);
+                }
+
+                if let Some(write_concern_error) = response.write_concern_error {
+                    bulk_write_error
+                        .write_concern_errors
+                        .push(write_concern_error);
+                }
+
+                let specification = CursorSpecification::new(
+                    response.body.cursor,
+                    description.server_address.clone(),
+                    None,
+                    None,
+                    self.options.and_then(|options| options.comment.clone()),
+                );
+                let iteration_result = match session {
+                    Some(session) => {
+                        let mut session_cursor =
+                            SessionCursor::new(self.client.clone(), specification, None);
+                        self.iterate_results_cursor(
+                            session_cursor.stream(session),
+                            &mut bulk_write_error,
+                        )
+                        .await
+                    }
+                    None => {
+                        let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                        self.iterate_results_cursor(cursor, &mut bulk_write_error)
+                            .await
+                    }
+                };
+
+                match iteration_result {
+                    Ok(()) => {
+                        if bulk_write_error.write_errors.is_empty()
+                            && bulk_write_error.write_concern_errors.is_empty()
+                        {
+                            Ok(bulk_write_error.partial_result.unwrap_or_default())
+                        } else {
+                            let error = Error::new(
+                                ErrorKind::ClientBulkWrite(bulk_write_error),
+                                response.labels,
+                            );
+                            Err(error)
+                        }
+                    }
+                    Err(error) => {
+                        let error = Error::new(
+                            ErrorKind::ClientBulkWrite(bulk_write_error),
+                            response.labels,
+                        )
+                        .with_source(error);
+                        Err(error)
+                    }
+                }
+            }
+            .boxed(),
+        )
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         Err(error)
     }
-}
 
-#[derive(Deserialize)]
-struct BulkWriteResponse {
-    cursor: CursorInfo,
-    #[serde(flatten)]
-    summary: BulkWriteSummaryInfo,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BulkWriteSummaryInfo {
-    pub(crate) n_inserted: i64,
-    pub(crate) n_matched: i64,
-    pub(crate) n_modified: i64,
-    pub(crate) n_upserted: i64,
-    pub(crate) n_deleted: i64,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BulkWriteOperationResponse {
-    #[serde(rename = "idx")]
-    pub(crate) index: usize,
-    pub(crate) n: u64,
-    pub(crate) n_modified: Option<u64>,
-    pub(crate) upserted: Option<UpsertedId>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct UpsertedId {
-    #[serde(rename = "_id")]
-    pub(crate) id: Bson,
-}
-
-impl BulkWriteOperationResponse {
-    pub(crate) fn is_update_result(&self) -> bool {
-        self.n_modified.is_some() || self.upserted.is_some()
+    fn retryability(&self) -> Retryability {
+        if self.models.iter().any(|model| model.multi() == Some(true)) {
+            Retryability::None
+        } else {
+            Retryability::Write
+        }
     }
 }

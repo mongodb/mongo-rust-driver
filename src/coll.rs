@@ -484,10 +484,6 @@ where
         }
 
         let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
         let mut error_labels: HashSet<String> = Default::default();
@@ -501,7 +497,7 @@ where
                 self.namespace(),
                 docs,
                 options.clone(),
-                encrypted,
+                self.client().should_auto_encrypt().await,
                 self.inner.human_readable_serialization,
             );
 
@@ -626,16 +622,11 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
-
         let insert = Insert::new(
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
-            encrypted,
+            self.client().should_auto_encrypt().await,
             self.inner.human_readable_serialization,
         );
         self.client()
@@ -758,14 +749,6 @@ impl Namespace {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            db: String::new(),
-            coll: String::new(),
-        }
-    }
-
     pub(crate) fn from_str(s: &str) -> Option<Self> {
         let mut parts = s.split('.');
 
@@ -794,23 +777,15 @@ impl<'de> Deserialize<'de> for Namespace {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        struct NamespaceHelper {
-            db: String,
-            coll: String,
-        }
-        #[derive(Deserialize)]
         #[serde(untagged)]
-        enum NamespaceOptions {
+        enum NamespaceHelper {
             String(String),
-            Object(NamespaceHelper),
+            Object { db: String, coll: String },
         }
-        match NamespaceOptions::deserialize(deserializer)? {
-            NamespaceOptions::String(string) => Self::from_str(&string)
+        match NamespaceHelper::deserialize(deserializer)? {
+            NamespaceHelper::String(string) => Self::from_str(&string)
                 .ok_or_else(|| D::Error::custom("Missing one or more fields in namespace")),
-            NamespaceOptions::Object(object) => Ok(Self {
-                db: object.db,
-                coll: object.coll,
-            }),
+            NamespaceHelper::Object { db, coll } => Ok(Self { db, coll }),
         }
     }
 }

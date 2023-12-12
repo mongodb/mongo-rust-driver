@@ -1,6 +1,6 @@
 mod abort_transaction;
 pub(crate) mod aggregate;
-mod bulk_write;
+pub(crate) mod bulk_write;
 mod commit_transaction;
 pub(crate) mod count;
 pub(crate) mod count_documents;
@@ -24,9 +24,6 @@ pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
-#[cfg(test)]
-mod test;
-
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
 use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
@@ -49,6 +46,8 @@ use crate::{
     },
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
+    BoxFuture,
+    ClientSession,
     Namespace,
 };
 
@@ -73,9 +72,33 @@ const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
 // The maximum number of bytes that may be included in a write payload when auto-encryption is
 // enabled.
-const MAX_ENCRYPTED_WRITE_SIZE: u64 = 2_097_152;
+const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
 // The amount of overhead bytes to account for when building a document sequence.
-const COMMAND_OVERHEAD_SIZE: u64 = 16_000;
+const COMMAND_OVERHEAD_SIZE: usize = 16_000;
+
+pub(crate) enum OperationResponse<'a, O> {
+    Sync(Result<O>),
+    Async(BoxFuture<'a, Result<O>>),
+}
+
+impl<'a, O> OperationResponse<'a, O> {
+    /// Returns the sync result contained within this `OperationResponse`. Use responsibly, when it
+    /// is known that the response is not async.
+    fn get_sync_result(self) -> Result<O> {
+        match self {
+            Self::Sync(result) => result,
+            Self::Async(_) => unreachable!(),
+        }
+    }
+}
+
+macro_rules! handle_response_sync {
+    ($result:block) => {
+        let result = || $result;
+        OperationResponse::Sync(result())
+    };
+}
+use handle_response_sync;
 
 /// A trait modeling the behavior of a server side operation.
 ///
@@ -100,11 +123,12 @@ pub(crate) trait Operation {
     fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>>;
 
     /// Interprets the server response to the command.
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-    ) -> Result<Self::O>;
+        description: &'a StreamDescription,
+        session: Option<&'a mut ClientSession>,
+    ) -> OperationResponse<'a, Self::O>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -413,11 +437,12 @@ pub(crate) trait OperationWithDefaults {
     }
 
     /// Interprets the server response to the command.
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-    ) -> Result<Self::O>;
+        description: &'a StreamDescription,
+        session: Option<&'a mut ClientSession>,
+    ) -> OperationResponse<'a, Self::O>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -479,12 +504,13 @@ impl<T: OperationWithDefaults> Operation for T {
     fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
         self.extract_at_cluster_time(response)
     }
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-    ) -> Result<Self::O> {
-        self.handle_response(response, description)
+        description: &'a StreamDescription,
+        session: Option<&'a mut ClientSession>,
+    ) -> OperationResponse<'a, Self::O> {
+        self.handle_response(response, description, session)
     }
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)

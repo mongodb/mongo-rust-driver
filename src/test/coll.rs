@@ -1,11 +1,6 @@
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
-use crate::{
-    event::command::CommandEvent,
-    test::{Event, EventHandler},
-    Client,
-    Namespace,
-};
+use crate::{test::EventHandler, Client, Namespace};
 use bson::{rawdoc, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
@@ -1279,19 +1274,11 @@ async fn insert_many_document_sequences() {
     ];
     collection.insert_many(docs, None).await.unwrap();
 
-    let event = subscriber
-        .filter_map_event(Duration::from_millis(500), |e| match e {
-            Event::Command(command_event) => match command_event {
-                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
-                    Some(started)
-                }
-                _ => None,
-            },
-            _ => None,
-        })
+    let (started, _) = subscriber
+        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
         .await
-        .expect("did not observe command started event for insert");
-    let insert_documents = event.command.get_array("documents").unwrap();
+        .expect("did not observe successful command events for insert");
+    let insert_documents = started.command.get_array("documents").unwrap();
     assert_eq!(insert_documents.len(), 2);
 
     // Build up a list of documents that exceeds max_message_size
@@ -1307,33 +1294,17 @@ async fn insert_many_document_sequences() {
     let total_docs = docs.len();
     collection.insert_many(docs, None).await.unwrap();
 
-    let first_event = subscriber
-        .filter_map_event(Duration::from_millis(500), |e| match e {
-            Event::Command(command_event) => match command_event {
-                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
-                    Some(started)
-                }
-                _ => None,
-            },
-            _ => None,
-        })
+    let (first_started, _) = subscriber
+        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
         .await
-        .expect("did not observe command started event for insert");
-    let first_batch_len = first_event.command.get_array("documents").unwrap().len();
+        .expect("did not observe successful command events for insert");
+    let first_batch_len = first_started.command.get_array("documents").unwrap().len();
     assert!(first_batch_len < total_docs);
 
-    let second_event = subscriber
-        .filter_map_event(Duration::from_millis(500), |e| match e {
-            Event::Command(command_event) => match command_event {
-                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
-                    Some(started)
-                }
-                _ => None,
-            },
-            _ => None,
-        })
+    let (second_started, _) = subscriber
+        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
         .await
-        .expect("did not observe command started event for insert");
-    let second_batch_len = second_event.command.get_array("documents").unwrap().len();
+        .expect("did not observe successful command events for insert");
+    let second_batch_len = second_started.command.get_array("documents").unwrap().len();
     assert_eq!(first_batch_len + second_batch_len, total_docs);
 }

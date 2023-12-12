@@ -1,6 +1,6 @@
 {
   "description": "client bulkWrite results",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.18",
   "createEntities": [
     {
       "client": {
@@ -59,18 +59,18 @@
   ],
   "tests": [
     {
-      "description": "verbose bulkWrite returns detailed results",
+      "description": "client bulkWrite with verboseResults: true returns detailed results",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {
@@ -180,7 +180,7 @@
           "expectResult": {
             "insertedCount": 1,
             "upsertedCount": 1,
-            "matchedCount": 4,
+            "matchedCount": 3,
             "modifiedCount": 3,
             "deletedCount": 3,
             "insertResults": {
@@ -224,7 +224,92 @@
               "commandStartedEvent": {
                 "command": {
                   "bulkWrite": 1,
-                  "errorsOnly": false
+                  "errorsOnly": false,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 8,
+                        "x": 88
+                      }
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 1
+                        }
+                      },
+                      "multi": false
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 1
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 3
+                            }
+                          }
+                        ]
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 2
+                        }
+                      },
+                      "multi": true
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 4
+                      },
+                      "updateMods": {
+                        "x": 44
+                      },
+                      "upsert": true,
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": 5
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 5
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 7
+                            }
+                          }
+                        ]
+                      },
+                      "multi": true
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -261,18 +346,18 @@
       ]
     },
     {
-      "description": "summary bulkWrite omits detailed results",
+      "description": "client bulkWrite with verboseResults: false omits detailed results",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {
@@ -382,13 +467,11 @@
           "expectResult": {
             "insertedCount": 1,
             "upsertedCount": 1,
-            "matchedCount": 4,
+            "matchedCount": 3,
             "modifiedCount": 3,
             "deletedCount": 3,
             "insertResults": {
-              "0": {
-                "insertedId": 8
-              }
+              "$$unsetOrMatches": {}
             },
             "updateResults": {
               "$$unsetOrMatches": {}
@@ -407,7 +490,92 @@
               "commandStartedEvent": {
                 "command": {
                   "bulkWrite": 1,
-                  "errorsOnly": true
+                  "errorsOnly": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 8,
+                        "x": 88
+                      }
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 1
+                        }
+                      },
+                      "multi": false
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 1
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 3
+                            }
+                          }
+                        ]
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 2
+                        }
+                      },
+                      "multi": true
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 4
+                      },
+                      "updateMods": {
+                        "x": 44
+                      },
+                      "upsert": true,
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": 5
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 5
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 7
+                            }
+                          }
+                        ]
+                      },
+                      "multi": true
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -444,18 +612,18 @@
       ]
     },
     {
-      "description": "bulkWrite defaults to summary results",
+      "description": "client bulkWrite defaults to verboseResults: false",
       "runOnRequirements": [
         {
-          "minServerVersion": "7.0"
+          "minServerVersion": "8.0"
         }
       ],
       "operations": [
         {
           "object": "client0",
-          "name": "bulkWrite",
+          "name": "clientBulkWrite",
           "arguments": {
-            "requests": [
+            "models": [
               {
                 "insertOne": {
                   "namespace": {
@@ -564,13 +732,11 @@
           "expectResult": {
             "insertedCount": 1,
             "upsertedCount": 1,
-            "matchedCount": 4,
+            "matchedCount": 3,
             "modifiedCount": 3,
             "deletedCount": 3,
             "insertResults": {
-              "0": {
-                "insertedId": 8
-              }
+              "$$unsetOrMatches": {}
             },
             "updateResults": {
               "$$unsetOrMatches": {}
@@ -589,7 +755,92 @@
               "commandStartedEvent": {
                 "command": {
                   "bulkWrite": 1,
-                  "errorsOnly": true
+                  "errorsOnly": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 8,
+                        "x": 88
+                      }
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 1
+                        }
+                      },
+                      "multi": false
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 1
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 3
+                            }
+                          }
+                        ]
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 2
+                        }
+                      },
+                      "multi": true
+                    },
+                    {
+                      "update": 0,
+                      "filter": {
+                        "_id": 4
+                      },
+                      "updateMods": {
+                        "x": 44
+                      },
+                      "upsert": true,
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": 5
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "$and": [
+                          {
+                            "_id": {
+                              "$gt": 5
+                            }
+                          },
+                          {
+                            "_id": {
+                              "$lte": 7
+                            }
+                          }
+                        ]
+                      },
+                      "multi": true
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }

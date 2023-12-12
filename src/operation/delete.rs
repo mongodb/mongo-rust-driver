@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -16,7 +13,10 @@ use crate::{
     },
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct Delete {
@@ -29,19 +29,6 @@ pub(crate) struct Delete {
 }
 
 impl Delete {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            Document::new(),
-            None,
-            None,
-        )
-    }
-
     pub(crate) fn new(
         ns: Namespace,
         filter: Document,
@@ -99,13 +86,16 @@ impl OperationWithDefaults for Delete {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteResponseBody = response.body()?;
-        response.validate().map_err(convert_bulk_errors)?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteResponseBody = response.body()?;
+            response.validate().map_err(convert_bulk_errors)?;
 
-        Ok(DeleteResult {
-            deleted_count: response.n,
-        })
+            Ok(DeleteResult {
+                deleted_count: response.n,
+            })
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

@@ -8,7 +8,10 @@ use crate::{
     error::{Error, Result},
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -46,9 +49,12 @@ impl OperationWithDefaults for Count {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response_body: ResponseBody = response.body()?;
-        Ok(response_body.n)
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response_body: ResponseBody = response.body()?;
+            Ok(response_body.n)
+        }}
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {

@@ -1,0 +1,260 @@
+{
+  "description": "client bulkWrite delete options",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ]
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "crud-tests"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "coll0"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "collectionName": "coll0",
+      "databaseName": "crud-tests",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 11
+        },
+        {
+          "_id": 2,
+          "x": 22
+        },
+        {
+          "_id": 3,
+          "x": 33
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "description": "client bulk write delete with collation",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 1
+                  },
+                  "collation": {
+                    "locale": "simple"
+                  }
+                }
+              },
+              {
+                "deleteMany": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$gt": 1
+                    }
+                  },
+                  "collation": {
+                    "locale": "simple"
+                  }
+                }
+              }
+            ]
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 3,
+            "insertResults": {
+              "$$unsetOrMatches": {}
+            },
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "bulkWrite": 1,
+                  "ops": [
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "collation": {
+                        "locale": "simple"
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": {
+                          "$gt": 1
+                        }
+                      },
+                      "collation": {
+                        "locale": "simple"
+                      },
+                      "multi": true
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "databaseName": "crud-tests",
+          "collectionName": "coll0",
+          "documents": []
+        }
+      ]
+    },
+    {
+      "description": "client bulk write delete with hint",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "8.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": 1
+                  },
+                  "hint": "_id_"
+                }
+              },
+              {
+                "deleteMany": {
+                  "namespace": {
+                    "db": "crud-tests",
+                    "coll": "coll0"
+                  },
+                  "filter": {
+                    "_id": {
+                      "$gt": 1
+                    }
+                  },
+                  "hint": "_id_"
+                }
+              }
+            ]
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 3,
+            "insertResults": {
+              "$$unsetOrMatches": {}
+            },
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "bulkWrite": 1,
+                  "ops": [
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "hint": "_id_",
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "_id": {
+                          "$gt": 1
+                        }
+                      },
+                      "hint": "_id_",
+                      "multi": true
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "databaseName": "crud-tests",
+          "collectionName": "coll0",
+          "documents": []
+        }
+      ]
+    }
+  ]
+}

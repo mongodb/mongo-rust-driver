@@ -6,9 +6,10 @@ use crate::{
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
+    ClientSession,
 };
 
-use super::Aggregate;
+use super::{handle_response_sync, Aggregate, OperationResponse};
 
 pub(crate) struct ChangeStreamAggregate {
     inner: Aggregate,
@@ -86,31 +87,37 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         &self,
         response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let op_time = response
-            .raw_body()
-            .get("operationTime")?
-            .and_then(bson::RawBsonRef::as_timestamp);
-        let spec = self.inner.handle_response(response, description)?;
+        session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let op_time = response
+                .raw_body()
+                .get("operationTime")?
+                .and_then(bson::RawBsonRef::as_timestamp);
+            let spec = self
+                .inner
+                .handle_response(response, description, session)
+                .get_sync_result()?;
 
-        let mut data = ChangeStreamData {
-            resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
-            ..ChangeStreamData::default()
-        };
-        let has_no_time = |o: &ChangeStreamOptions| {
-            o.start_at_operation_time.is_none()
-                && o.resume_after.is_none()
-                && o.start_after.is_none()
-        };
-        if self.args.options.as_ref().map_or(true, has_no_time)
-            && description.max_wire_version.map_or(false, |v| v >= 7)
-            && spec.initial_buffer.is_empty()
-            && spec.post_batch_resume_token.is_none()
-        {
-            data.initial_operation_time = op_time;
-        }
+            let mut data = ChangeStreamData {
+                resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
+                ..ChangeStreamData::default()
+            };
+            let has_no_time = |o: &ChangeStreamOptions| {
+                o.start_at_operation_time.is_none()
+                    && o.resume_after.is_none()
+                    && o.start_after.is_none()
+            };
+            if self.args.options.as_ref().map_or(true, has_no_time)
+                && description.max_wire_version.map_or(false, |v| v >= 7)
+                && spec.initial_buffer.is_empty()
+                && spec.post_batch_resume_token.is_none()
+            {
+                data.initial_operation_time = op_time;
+            }
 
-        Ok((spec, data))
+            Ok((spec, data))
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
