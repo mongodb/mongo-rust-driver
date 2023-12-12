@@ -76,11 +76,14 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
             ops.push(model_doc);
         }
 
-        let command = rawdoc! {
+        let mut command = rawdoc! {
             Self::NAME: 1,
             "ops": ops,
             "nsInfo": namespace_info.namespaces,
         };
+
+        let options = bson::to_raw_document_buf(&self.options)?;
+        bson_util::extend_raw_document_buf(&mut command, options)?;
 
         Ok(Command::new(Self::NAME, "admin", command))
     }
@@ -133,7 +136,13 @@ pub(crate) struct BulkWriteOperationResponse {
     pub(crate) index: usize,
     pub(crate) n: u64,
     pub(crate) n_modified: Option<u64>,
-    pub(crate) upserted: Option<Bson>,
+    pub(crate) upserted: Option<UpsertedId>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct UpsertedId {
+    #[serde(rename = "_id")]
+    pub(crate) id: Bson,
 }
 
 impl BulkWriteOperationResponse {

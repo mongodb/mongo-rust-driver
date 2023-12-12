@@ -75,7 +75,7 @@ impl TryFrom<BulkWriteOperationResponse> for UpdateResult {
         Ok(Self {
             matched_count: response.n,
             modified_count,
-            upserted_id: response.upserted,
+            upserted_id: response.upserted.map(|upserted| upserted.id),
         })
     }
 }

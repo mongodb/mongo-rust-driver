@@ -28,15 +28,24 @@ impl Client {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct BulkWriteOptions {
+pub(crate) struct BulkWriteOptions {
+    #[serde(default = "some_true")]
     pub ordered: Option<bool>,
     pub bypass_document_validation: Option<bool>,
     pub comment: Option<Bson>,
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
     #[serialize_always]
-    #[serde(rename = "errorsOnly", serialize_with = "serialize_opposite_bool")]
+    #[serde(
+        alias = "verboseResults",
+        rename = "errorsOnly",
+        serialize_with = "serialize_opposite_bool"
+    )]
     pub verbose_results: Option<bool>,
+}
+
+fn some_true() -> Option<bool> {
+    Some(true)
 }
 
 fn serialize_opposite_bool<S: Serializer>(

@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_with::skip_serializing_none;
 
 use crate::{
-    bson::{oid::ObjectId, Bson, Document, RawDocumentBuf},
+    bson::{oid::ObjectId, Array, Bson, Document, RawDocumentBuf},
     error::Result,
     options::UpdateModifications,
     Namespace,
@@ -28,6 +28,10 @@ pub enum WriteModel {
         filter: Document,
         #[serde(rename = "updateMods")]
         update: UpdateModifications,
+        array_filters: Option<Array>,
+        collation: Option<Document>,
+        hint: Option<Bson>,
+        upsert: Option<bool>,
     },
     #[non_exhaustive]
     UpdateMany {
@@ -36,6 +40,10 @@ pub enum WriteModel {
         filter: Document,
         #[serde(rename = "updateMods")]
         update: UpdateModifications,
+        array_filters: Option<Array>,
+        collation: Option<Document>,
+        hint: Option<Bson>,
+        upsert: Option<bool>,
     },
     #[non_exhaustive]
     ReplaceOne {
@@ -44,18 +52,26 @@ pub enum WriteModel {
         filter: Document,
         #[serde(rename = "updateMods")]
         replacement: Document,
+        array_filters: Option<Array>,
+        collation: Option<Document>,
+        hint: Option<Bson>,
+        upsert: Option<bool>,
     },
     #[non_exhaustive]
     DeleteOne {
         #[serde(skip)]
         namespace: Namespace,
         filter: Document,
+        collation: Option<Document>,
+        hint: Option<Bson>,
     },
     #[non_exhaustive]
     DeleteMany {
         #[serde(skip)]
         namespace: Namespace,
         filter: Document,
+        collation: Option<Document>,
+        hint: Option<Bson>,
     },
 }
 

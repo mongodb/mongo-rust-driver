@@ -3,8 +3,8 @@ use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::Document,
-    client::bulk_write::models::WriteModel,
+    bson::{Array, Bson, Document},
+    client::bulk_write::{models::WriteModel, BulkWriteOptions},
     coll::options::UpdateModifications,
     error::Result,
     test::spec::unified_runner::{Entity, TestRunner},
@@ -17,7 +17,8 @@ use super::TestOperation;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct BulkWrite {
     requests: Vec<WriteModel>,
-    verbose_results: Option<bool>,
+    #[serde(flatten)]
+    options: BulkWriteOptions,
 }
 
 impl<'de> Deserialize<'de> for WriteModel {
@@ -25,56 +26,136 @@ impl<'de> Deserialize<'de> for WriteModel {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Error as DeError;
-
         #[derive(Deserialize)]
-        struct WriteModelHelper {
-            namespace: Namespace,
-            document: Option<Document>,
-            filter: Option<Document>,
-            update: Option<UpdateModifications>,
-            replacement: Option<Document>,
+        #[serde(rename_all = "camelCase")]
+        enum WriteModelHelper {
+            InsertOne {
+                namespace: Namespace,
+                document: Document,
+            },
+            UpdateOne {
+                namespace: Namespace,
+                filter: Document,
+                update: UpdateModifications,
+                array_filters: Option<Array>,
+                collation: Option<Document>,
+                hint: Option<Bson>,
+                upsert: Option<bool>,
+            },
+            UpdateMany {
+                namespace: Namespace,
+                filter: Document,
+                update: UpdateModifications,
+                array_filters: Option<Array>,
+                collation: Option<Document>,
+                hint: Option<Bson>,
+                upsert: Option<bool>,
+            },
+            ReplaceOne {
+                namespace: Namespace,
+                filter: Document,
+                replacement: Document,
+                array_filters: Option<Array>,
+                collation: Option<Document>,
+                hint: Option<Bson>,
+                upsert: Option<bool>,
+            },
+            DeleteOne {
+                namespace: Namespace,
+                filter: Document,
+                collation: Option<Document>,
+                hint: Option<Bson>,
+            },
+            DeleteMany {
+                namespace: Namespace,
+                filter: Document,
+                collation: Option<Document>,
+                hint: Option<Bson>,
+            },
         }
 
-        let model_doc = Document::deserialize(deserializer)?;
-        let Some((key, value)) = model_doc.into_iter().next() else {
-            return Err(DeError::custom("empty write model"));
-        };
-        let body: WriteModelHelper = bson::from_bson(value).map_err(DeError::custom)?;
-
-        let model = match key.as_str() {
-            "insertOne" => WriteModel::InsertOne {
-                namespace: body.namespace,
-                document: body.document.unwrap(),
+        let helper = WriteModelHelper::deserialize(deserializer)?;
+        let model = match helper {
+            WriteModelHelper::InsertOne {
+                namespace,
+                document,
+            } => WriteModel::InsertOne {
+                namespace,
+                document,
             },
-            "updateOne" => WriteModel::UpdateOne {
-                namespace: body.namespace,
-                filter: body.filter.unwrap(),
-                update: body.update.unwrap(),
+            WriteModelHelper::UpdateOne {
+                namespace,
+                filter,
+                update,
+                array_filters,
+                collation,
+                hint,
+                upsert,
+            } => WriteModel::UpdateOne {
+                namespace,
+                filter,
+                update,
+                array_filters,
+                collation,
+                hint,
+                upsert,
             },
-            "updateMany" => WriteModel::UpdateMany {
-                namespace: body.namespace,
-                filter: body.filter.unwrap(),
-                update: body.update.unwrap(),
+            WriteModelHelper::UpdateMany {
+                namespace,
+                filter,
+                update,
+                array_filters,
+                collation,
+                hint,
+                upsert,
+            } => WriteModel::UpdateMany {
+                namespace,
+                filter,
+                update,
+                array_filters,
+                collation,
+                hint,
+                upsert,
             },
-            "replaceOne" => WriteModel::ReplaceOne {
-                namespace: body.namespace,
-                filter: body.filter.unwrap(),
-                replacement: body.replacement.unwrap(),
+            WriteModelHelper::ReplaceOne {
+                namespace,
+                filter,
+                replacement,
+                array_filters,
+                collation,
+                hint,
+                upsert,
+            } => WriteModel::ReplaceOne {
+                namespace,
+                filter,
+                replacement,
+                array_filters,
+                collation,
+                hint,
+                upsert,
             },
-            "deleteOne" => WriteModel::DeleteOne {
-                namespace: body.namespace,
-                filter: body.filter.unwrap(),
+            WriteModelHelper::DeleteOne {
+                namespace,
+                filter,
+                collation,
+                hint,
+            } => WriteModel::DeleteOne {
+                namespace,
+                filter,
+                collation,
+                hint,
             },
-            "deleteMany" => WriteModel::DeleteMany {
-                namespace: body.namespace,
-                filter: body.filter.unwrap(),
+            WriteModelHelper::DeleteMany {
+                namespace,
+                filter,
+                collation,
+                hint,
+            } => WriteModel::DeleteMany {
+                namespace,
+                filter,
+                collation,
+                hint,
             },
-            other => {
-                return Err(DeError::custom(format!(
-                    "unknown bulkWrite operation: {other}"
-                )))
-            }
         };
 
         Ok(model)
@@ -89,14 +170,26 @@ impl TestOperation for BulkWrite {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let client = test_runner.get_client(id).await;
-            let action = client.bulk_write(self.requests.clone());
-            let bson = if let Some(true) = self.verbose_results {
+            let mut action = client.bulk_write(self.requests.clone());
+            if let Some(ordered) = self.options.ordered {
+                action = action.ordered(ordered);
+            }
+            if let Some(bypass_document_validation) = self.options.bypass_document_validation {
+                action = action.bypass_document_validation(bypass_document_validation);
+            }
+            if let Some(ref comment) = self.options.comment {
+                action = action.comment(comment.clone());
+            }
+            if let Some(ref let_vars) = self.options.let_vars {
+                action = action.let_vars(let_vars.clone());
+            }
+            let bson = if let Some(true) = self.options.verbose_results {
                 let result = action.verbose_results().await?;
-                bson::to_bson(&result)?
+                bson::to_bson(&result)
             } else {
                 let result = action.await?;
-                bson::to_bson(&result)?
-            };
+                bson::to_bson(&result)
+            }?;
             Ok(Some(bson.into()))
         }
         .boxed()

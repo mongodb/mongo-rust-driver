@@ -4,6 +4,7 @@ use futures_core::future::BoxFuture;
 use futures_util::FutureExt;
 
 use crate::{
+    bson::{Bson, Document},
     error::{ErrorKind, Result},
     operation::BulkWrite,
     Client,
@@ -20,6 +21,28 @@ pub struct VerboseBulkWriteAction {
     client: Client,
     models: Vec<WriteModel>,
     options: BulkWriteOptions,
+}
+
+impl VerboseBulkWriteAction {
+    pub fn ordered(mut self, ordered: bool) -> Self {
+        self.options.ordered = Some(ordered);
+        self
+    }
+
+    pub fn bypass_document_validation(mut self, bypass_document_validation: bool) -> Self {
+        self.options.bypass_document_validation = Some(bypass_document_validation);
+        self
+    }
+
+    pub fn comment(mut self, comment: impl Into<Bson>) -> Self {
+        self.options.comment = Some(comment.into());
+        self
+    }
+
+    pub fn let_vars(mut self, let_vars: Document) -> Self {
+        self.options.let_vars = Some(let_vars);
+        self
+    }
 }
 
 impl IntoFuture for VerboseBulkWriteAction {
@@ -85,6 +108,32 @@ impl SummaryBulkWriteAction {
                 models,
                 options: Default::default(),
             },
+        }
+    }
+
+    pub fn ordered(self, ordered: bool) -> Self {
+        Self {
+            inner: self.inner.ordered(ordered),
+        }
+    }
+
+    pub fn bypass_document_validation(self, bypass_document_validation: bool) -> Self {
+        Self {
+            inner: self
+                .inner
+                .bypass_document_validation(bypass_document_validation),
+        }
+    }
+
+    pub fn comment(self, comment: impl Into<Bson>) -> Self {
+        Self {
+            inner: self.inner.comment(comment),
+        }
+    }
+
+    pub fn let_vars(self, let_vars: Document) -> Self {
+        Self {
+            inner: self.inner.let_vars(let_vars),
         }
     }
 

@@ -1,0 +1,320 @@
+{
+  "description": "bulkWrite namespaces",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ]
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "bulkWrite-db0"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "coll0"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection1",
+        "database": "database0",
+        "collectionName": "coll1"
+      }
+    },
+    {
+      "database": {
+        "id": "database1",
+        "client": "client0",
+        "databaseName": "bulkWrite-db1"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection2",
+        "database": "database1",
+        "collectionName": "coll2"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "databaseName": "bulkWrite-db0",
+      "collectionName": "coll0",
+      "documents": []
+    },
+    {
+      "databaseName": "bulkWrite-db0",
+      "collectionName": "coll1",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 11
+        },
+        {
+          "_id": 2
+        }
+      ]
+    },
+    {
+      "databaseName": "bulkWrite-db1",
+      "collectionName": "coll2",
+      "documents": [
+        {
+          "_id": 3
+        },
+        {
+          "_id": 4
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "description": "bulkWrite mixed namespaces",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "7.0"
+        }
+      ],
+      "operations": [
+        {
+          "object": "client0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "bulkWrite-db0",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "_id": 1
+                  }
+                }
+              },
+              {
+                "insertOne": {
+                  "namespace": {
+                    "db": "bulkWrite-db0",
+                    "coll": "coll0"
+                  },
+                  "document": {
+                    "_id": 2
+                  }
+                }
+              },
+              {
+                "updateOne": {
+                  "namespace": {
+                    "db": "bulkWrite-db0",
+                    "coll": "coll1"
+                  },
+                  "filter": {
+                    "_id": 1
+                  },
+                  "update": {
+                    "$inc": {
+                      "x": 1
+                    }
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "bulkWrite-db1",
+                    "coll": "coll2"
+                  },
+                  "filter": {
+                    "_id": 3
+                  }
+                }
+              },
+              {
+                "deleteOne": {
+                  "namespace": {
+                    "db": "bulkWrite-db0",
+                    "coll": "coll1"
+                  },
+                  "filter": {
+                    "_id": 2
+                  }
+                }
+              },
+              {
+                "replaceOne": {
+                  "namespace": {
+                    "db": "bulkWrite-db1",
+                    "coll": "coll2"
+                  },
+                  "filter": {
+                    "_id": 4
+                  },
+                  "replacement": {
+                    "x": 44
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 2,
+            "upsertedCount": 0,
+            "matchedCount": 2,
+            "modifiedCount": 2,
+            "deletedCount": 2,
+            "insertResults": {
+              "0": {
+                "insertedId": 1
+              },
+              "1": {
+                "insertedId": 2
+              }
+            },
+            "updateResults": {
+              "2": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              },
+              "5": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              }
+            },
+            "deleteResults": {
+              "3": {
+                "deletedCount": 1
+              },
+              "4": {
+                "deletedCount": 1
+              }
+            }
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "bulkWrite": 1,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 1
+                      }
+                    },
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 2
+                      }
+                    },
+                    {
+                      "update": 1,
+                      "filter": {
+                        "_id": 1
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 1
+                        }
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 2,
+                      "filter": {
+                        "_id": 3
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 1,
+                      "filter": {
+                        "_id": 2
+                      },
+                      "multi": false
+                    },
+                    {
+                      "update": 2,
+                      "filter": {
+                        "_id": 4
+                      },
+                      "updateMods": {
+                        "x": 44
+                      },
+                      "multi": false
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "bulkWrite-db0.coll0"
+                    },
+                    {
+                      "ns": "bulkWrite-db0.coll1"
+                    },
+                    {
+                      "ns": "bulkWrite-db1.coll2"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "databaseName": "bulkWrite-db0",
+          "collectionName": "coll0",
+          "documents": [
+            {
+              "_id": 1
+            },
+            {
+              "_id": 2
+            }
+          ]
+        },
+        {
+          "databaseName": "bulkWrite-db0",
+          "collectionName": "coll1",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 12
+            }
+          ]
+        },
+        {
+          "databaseName": "bulkWrite-db1",
+          "collectionName": "coll2",
+          "documents": [
+            {
+              "_id": 4,
+              "x": 44
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
