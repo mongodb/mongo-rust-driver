@@ -146,8 +146,9 @@ pub trait CommandEventHandler: Send + Sync {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[allow(missing_docs)]
 #[serde(untagged)]
-pub(crate) enum CommandEvent {
+pub enum CommandEvent {
     Started(CommandStartedEvent),
     Succeeded(CommandSucceededEvent),
     Failed(CommandFailedEvent),

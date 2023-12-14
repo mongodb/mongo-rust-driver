@@ -2,6 +2,7 @@ pub mod action;
 pub mod auth;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) mod csfle;
+mod event;
 mod executor;
 pub mod options;
 pub mod session;
@@ -140,6 +141,8 @@ struct ClientInner {
     shutdown: Shutdown,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
+    broadcast: self::event::Broadcast,
+    
 }
 
 #[derive(Debug)]
@@ -174,6 +177,7 @@ impl Client {
             },
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
+            broadcast: Default::default(),
         });
         Ok(Self { inner })
     }
@@ -257,27 +261,8 @@ impl Client {
         }
     }
 
-    #[cfg(not(feature = "tracing-unstable"))]
     pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
-        let handler = self.inner.options.command_event_handler.as_ref();
-        let test_channel = self.test_command_event_channel();
-        if handler.is_none() && test_channel.is_none() {
-            return;
-        }
-
-        let event = generate_event();
-        if let Some(tx) = test_channel {
-            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
-            let _ = tx.send(msg).await;
-            ack.wait_for_acknowledgment().await;
-        }
-        if let Some(handler) = handler {
-            handle_command_event(handler.as_ref(), event);
-        }
-    }
-
-    #[cfg(feature = "tracing-unstable")]
-    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        #[cfg(feature = "tracing-unstable")]
         let tracing_emitter = if trace_or_log_enabled!(
             target: COMMAND_TRACING_EVENT_TARGET,
             TracingOrLogLevel::Debug
@@ -291,7 +276,10 @@ impl Client {
         };
         let apm_event_handler = self.inner.options.command_event_handler.as_ref();
         let test_channel = self.test_command_event_channel();
-        if !(tracing_emitter.is_some() || apm_event_handler.is_some() || test_channel.is_some()) {
+        let should_send = apm_event_handler.is_some() || test_channel.is_some() || self.inner.broadcast.command_is_receiving();
+        #[cfg(feature = "tracing-unstable")]
+        let should_send = should_send || tracing_emitter.is_some();
+        if !should_send {
             return;
         }
 
@@ -301,16 +289,14 @@ impl Client {
             let _ = tx.send(msg).await;
             ack.wait_for_acknowledgment().await;
         }
-        if let (Some(event_handler), Some(ref tracing_emitter)) =
-            (apm_event_handler, &tracing_emitter)
-        {
-            handle_command_event(event_handler.as_ref(), event.clone());
-            handle_command_event(tracing_emitter, event);
-        } else if let Some(event_handler) = apm_event_handler {
-            handle_command_event(event_handler.as_ref(), event);
-        } else if let Some(ref tracing_emitter) = tracing_emitter {
-            handle_command_event(tracing_emitter, event);
+        if let Some(handler) = apm_event_handler {
+            handle_command_event(handler.as_ref(), event.clone());
         }
+        #[cfg(feature = "tracing-unstable")]
+        if let Some(ref tracing_emitter) = tracing_emitter {
+            handle_command_event(tracing_emitter, event.clone());
+        }
+        self.inner.broadcast.send_command(event);
     }
 
     /// Gets the default selection criteria the `Client` uses for operations..
