@@ -7,6 +7,7 @@ use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
     error::Result,
+    operation::list_databases,
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -34,7 +35,6 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
-    operation::list_databases,
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{assert_matches, log_uncaptured, FailPoint, TestClient},
     ClientSession,

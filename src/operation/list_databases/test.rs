@@ -4,7 +4,11 @@ use crate::{
     bson::{doc, Bson},
     cmap::StreamDescription,
     error::ErrorKind,
-    operation::{test::handle_response_test, list_databases::{self, ListDatabases}, Operation},
+    operation::{
+        list_databases::{self, ListDatabases},
+        test::handle_response_test,
+        Operation,
+    },
     selection_criteria::ReadPreference,
 };
 
@@ -47,10 +51,13 @@ fn build_with_name_only() {
 fn build_with_filter() {
     let filter = doc! {"something" : "something else"};
 
-    let mut list_databases_op = ListDatabases::new(false, Some(list_databases::Options {
-        filter: Some(filter.clone()),
-        ..Default::default()
-    }));
+    let mut list_databases_op = ListDatabases::new(
+        false,
+        Some(list_databases::Options {
+            filter: Some(filter.clone()),
+            ..Default::default()
+        }),
+    );
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .unwrap();

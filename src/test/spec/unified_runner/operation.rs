@@ -50,6 +50,7 @@ use crate::{
     db::options::RunCursorCommandOptions,
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
+    operation::list_databases,
     options::{
         AggregateOptions,
         CountOptions,
@@ -74,7 +75,6 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
-    operation::list_databases,
     runtime,
     selection_criteria::ReadPreference,
     serde_util,

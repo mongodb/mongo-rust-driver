@@ -1,17 +1,22 @@
 use std::{future::IntoFuture, marker::PhantomData};
 
-use bson::{Document, Bson};
+use bson::{Bson, Document};
 use futures_util::FutureExt;
 
-use crate::{Client, ClientSession, operation::list_databases as op, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture};
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::sync::Client as SyncClient;
+use crate::{
+    client::BoxFuture,
+    error::{ErrorKind, Result},
+    operation::list_databases as op,
+    results::DatabaseSpecification,
+    Client,
+    ClientSession,
+};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(
-        &self,
-    ) -> ListDatabases {
+    pub fn list_databases(&self) -> ListDatabases {
         ListDatabases {
             client: &self,
             options: Default::default(),
@@ -21,9 +26,7 @@ impl Client {
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(
-        &self,
-    ) -> ListDatabases<'_, Names> {
+    pub fn list_database_names(&self) -> ListDatabases<'_, Names> {
         ListDatabases {
             client: &self,
             options: Default::default(),
@@ -36,9 +39,7 @@ impl Client {
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl SyncClient {
     /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(
-        &self,
-    ) -> ListDatabases {
+    pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
 }
@@ -52,11 +53,10 @@ pub struct ListDatabases<'a, M: Mode = Full> {
     mode: PhantomData<M>,
 }
 
-
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Full {}
-    impl Sealed for super::Names {}    
+    impl Sealed for super::Names {}
 }
 
 pub trait Mode: private::Sealed {}
@@ -113,14 +113,18 @@ impl<'a> IntoFuture for ListDatabases<'a, Full> {
     fn into_future(self) -> Self::IntoFuture {
         async {
             let op = op::ListDatabases::new(false, self.options);
-            self.client.execute_operation(op, self.session).await.and_then(|dbs| {
-                dbs.into_iter()
-                    .map(|db_spec| {
-                        bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
-                    })
-                    .collect()
-            })
-        }.boxed()
+            self.client
+                .execute_operation(op, self.session)
+                .await
+                .and_then(|dbs| {
+                    dbs.into_iter()
+                        .map(|db_spec| {
+                            bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
+                        })
+                        .collect()
+                })
+        }
+        .boxed()
     }
 }
 
@@ -138,8 +142,8 @@ impl<'a> IntoFuture for ListDatabases<'a, Names> {
                         let name = doc
                             .get_str("name")
                             .map_err(|_| ErrorKind::InvalidResponse {
-                                message: "Expected \"name\" field in server response, but it was not \
-                                        found"
+                                message: "Expected \"name\" field in server response, but it was \
+                                          not found"
                                     .to_string(),
                             })?;
                         Ok(name.to_string())
@@ -147,13 +151,15 @@ impl<'a> IntoFuture for ListDatabases<'a, Names> {
                     .collect(),
                 Err(e) => Err(e),
             }
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl<'a, M: Mode> ListDatabases<'a, M>
-    where Self: IntoFuture
+where
+    Self: IntoFuture,
 {
     /// Synchronously execute this action.
     pub fn run(self) -> <Self as IntoFuture>::Output {

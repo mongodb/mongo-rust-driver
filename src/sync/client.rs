@@ -6,12 +6,7 @@ use crate::{
     change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     concern::{ReadConcern, WriteConcern},
     error::Result,
-    options::{
-        ClientOptions,
-        DatabaseOptions,
-        SelectionCriteria,
-        SessionOptions,
-    },
+    options::{ClientOptions, DatabaseOptions, SelectionCriteria, SessionOptions},
     runtime,
     Client as AsyncClient,
 };

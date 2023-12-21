@@ -301,7 +301,11 @@ async fn list_authorized_databases() {
         options.credential = Some(credential);
         let client = Client::with_options(options).unwrap();
 
-        let result = client.list_database_names().authorized_databases(true).await.unwrap();
+        let result = client
+            .list_database_names()
+            .authorized_databases(true)
+            .await
+            .unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(0).unwrap(), name);

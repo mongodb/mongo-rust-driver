@@ -192,11 +192,7 @@ macro_rules! for_each_op {
         $test_func("dropDatabase", db_op!($test_name, db, db.drop(None))).await;
 
         // client operations
-        $test_func(
-            "listDatabases",
-            client_op!(client, client.list_databases()),
-        )
-        .await;
+        $test_func("listDatabases", client_op!(client, client.list_databases())).await;
         $test_func(
             "listDatabases",
             client_op!(client, client.list_database_names()),
