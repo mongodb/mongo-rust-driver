@@ -194,7 +194,7 @@ macro_rules! for_each_op {
         // client operations
         $test_func(
             "listDatabases",
-            client_op!(client, client.list_databases(None, None)),
+            client_op!(client, client.list_databases()),
         )
         .await;
         $test_func(

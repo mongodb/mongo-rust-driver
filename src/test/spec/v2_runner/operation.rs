@@ -1065,7 +1065,6 @@ impl TestOperation for AssertSessionUnpinned {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabases {
-    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<ListDatabasesOptions>,
 }
@@ -1077,7 +1076,8 @@ impl TestOperation for ListDatabases {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = client
-                .list_databases(self.filter.clone(), self.options.clone())
+                .list_databases()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(bson::to_bson(&result)?))
         }
@@ -1087,7 +1087,6 @@ impl TestOperation for ListDatabases {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabaseNames {
-    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<ListDatabasesOptions>,
 }
@@ -1100,7 +1099,6 @@ impl TestOperation for ListDatabaseNames {
         async move {
             let result = client
                 .list_database_names()
-                .filter(self.filter.clone())  // TODO remove
                 .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();

@@ -193,7 +193,7 @@ async fn list_databases() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_databases(None, None).await.unwrap();
+    let prev_dbs = client.list_databases().await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|doc| doc.name.as_str() == name));
@@ -206,7 +206,7 @@ async fn list_databases() {
             .unwrap();
     }
 
-    let new_dbs = client.list_databases(None, None).await.unwrap();
+    let new_dbs = client.list_databases().await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|db_spec| expected_dbs.contains(&db_spec.name))

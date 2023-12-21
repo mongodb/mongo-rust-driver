@@ -14,19 +14,16 @@ use crate::{
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
-    filter: Option<Document>,
     name_only: bool,
     options: Option<ListDatabasesOptions>,
 }
 
 impl ListDatabases {
     pub fn new(
-        filter: Option<Document>,
         name_only: bool,
         options: Option<ListDatabasesOptions>,
     ) -> Self {
         ListDatabases {
-            filter,
             name_only,
             options,
         }
@@ -35,7 +32,6 @@ impl ListDatabases {
     #[cfg(test)]
     pub(crate) fn empty() -> Self {
         ListDatabases {
-            filter: None,
             name_only: false,
             options: None,
         }
@@ -53,10 +49,6 @@ impl OperationWithDefaults for ListDatabases {
             Self::NAME: 1,
             "nameOnly": self.name_only
         };
-
-        if let Some(ref filter) = self.filter {
-            body.insert("filter", filter.clone());
-        }
 
         append_options(&mut body, self.options.as_ref())?;
 

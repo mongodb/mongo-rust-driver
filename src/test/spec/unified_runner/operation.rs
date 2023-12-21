@@ -1171,7 +1171,6 @@ impl TestOperation for FindOne {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabases {
-    filter: Option<Document>,
     session: Option<String>,
     #[serde(flatten)]
     options: ListDatabasesOptions,
@@ -1188,19 +1187,19 @@ impl TestOperation for ListDatabases {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
+                        let session: &mut crate::ClientSession = &mut *session;
                         client
-                            .list_databases_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
+                            .list_databases()
+                            .with_options(self.options.clone())
+                            .session(session)
                             .await
                     })
                     .await?
                 }
                 None => {
                     client
-                        .list_databases(self.filter.clone(), self.options.clone())
+                        .list_databases()
+                        .with_options(self.options.clone())
                         .await?
                 }
             };
@@ -1213,7 +1212,6 @@ impl TestOperation for ListDatabases {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabaseNames {
-    filter: Option<Document>,
     #[serde(flatten)]
     options: ListDatabasesOptions,
 }
@@ -1228,7 +1226,6 @@ impl TestOperation for ListDatabaseNames {
             let client = test_runner.get_client(id).await;
             let result = client
                 .list_database_names()
-                .filter(self.filter.clone())  // TODO remove this when filter is part of options
                 .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();

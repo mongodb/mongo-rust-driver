@@ -6,7 +6,7 @@ use crate::{
     error::ErrorKind,
     operation::{test::handle_response_test, ListDatabases, Operation},
     client::action::list_databases,
-    selection_criteria::ReadPreference,
+    selection_criteria::ReadPreference, db::options::ListDatabasesOptions,
 };
 
 #[test]
@@ -29,7 +29,7 @@ fn build() {
 fn build_with_name_only() {
     let name_only = true;
 
-    let mut list_databases_op = ListDatabases::new(None, name_only, None);
+    let mut list_databases_op = ListDatabases::new(name_only, None);
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -48,7 +48,10 @@ fn build_with_name_only() {
 fn build_with_filter() {
     let filter = doc! {"something" : "something else"};
 
-    let mut list_databases_op = ListDatabases::new(Some(filter.clone()), false, None);
+    let mut list_databases_op = ListDatabases::new(false, Some(ListDatabasesOptions {
+        filter: Some(filter.clone()),
+        ..Default::default()
+    }));
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .unwrap();
@@ -70,7 +73,7 @@ fn build_with_options() {
         ..Default::default()
     };
 
-    let mut list_databases_op = ListDatabases::new(None, false, Some(options));
+    let mut list_databases_op = ListDatabases::new(false, Some(options));
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .unwrap();

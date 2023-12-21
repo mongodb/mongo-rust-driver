@@ -8,6 +8,7 @@ use serde_with::skip_serializing_none;
 use crate::{Client, ClientSession, operation::ListDatabases, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture, db::options::ListDatabasesOptions};
 
 impl Client {
+    /*
     async fn list_databases_common(
         &self,
         filter: impl Into<Option<Document>>,
@@ -44,42 +45,14 @@ impl Client {
         self.list_databases_common(filter, options, Some(session))
             .await
     }
-
-    /*
-    /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub async fn list_database_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<String>> {
-        let op = ListDatabases::new(filter.into(), true, options.into());
-        match self.execute_operation(op, None).await {
-            Ok(databases) => databases
-                .into_iter()
-                .map(|doc| {
-                    let name = doc
-                        .get_str("name")
-                        .map_err(|_| ErrorKind::InvalidResponse {
-                            message: "Expected \"name\" field in server response, but it was not \
-                                      found"
-                                .to_string(),
-                        })?;
-                    Ok(name.to_string())
-                })
-                .collect(),
-            Err(e) => Err(e),
-        }
-    }
     */
 
     /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases_2(
+    pub fn list_databases(
         &self,
-        filter: impl Into<Option<Document>>,
     ) -> ListDatabasesAction {
         ListDatabasesAction {
             client: &self,
-            filter: filter.into(),
             options: Default::default(),
             session: None,
             mode: PhantomData,
@@ -92,7 +65,6 @@ impl Client {
     ) -> ListDatabasesAction<'_, Names> {
         ListDatabasesAction {
             client: &self,
-            filter: None,
             options: Default::default(),
             session: None,
             mode: PhantomData,
@@ -103,7 +75,6 @@ impl Client {
 #[must_use]
 pub struct ListDatabasesAction<'a, M: Mode = Full> {
     client: &'a Client,
-    filter: Option<Document>,
     options: Option<Options>,
     session: Option<&'a mut ClientSession>,
     mode: PhantomData<M>,
@@ -138,17 +109,14 @@ impl<'a, M: Mode> ListDatabasesAction<'a, M> {
         self.options.get_or_insert_with(Options::default)
     }
 
+    #[cfg(test)]
     pub(crate) fn with_options(mut self, value: impl Into<Option<Options>>) -> Self {
-        if let Some(value) = value.into() {
-            *self.options() = value;
-        } else {
-            self.options = None;
-        }
+        self.options = value.into();
         self
     }
 
     pub fn filter(mut self, value: impl Into<Option<Document>>) -> Self {
-        self.filter = value.into();
+        self.options().filter = value.into();
         self
     }
 
@@ -167,6 +135,11 @@ impl<'a, M: Mode> ListDatabasesAction<'a, M> {
         self.options().comment = value.into();
         self
     }
+
+    pub fn session(mut self, value: impl Into<Option<&'a mut ClientSession>>) -> Self {
+        self.session = value.into();
+        self
+    }
 }
 
 impl<'a> IntoFuture for ListDatabasesAction<'a, Full> {
@@ -175,7 +148,7 @@ impl<'a> IntoFuture for ListDatabasesAction<'a, Full> {
 
     fn into_future(self) -> Self::IntoFuture {
         async {
-            let op = ListDatabases::new(self.filter, false, self.options);
+            let op = ListDatabases::new(false, self.options);
             self.client.execute_operation(op, self.session).await.and_then(|dbs| {
                 dbs.into_iter()
                     .map(|db_spec| {
@@ -193,7 +166,7 @@ impl<'a> IntoFuture for ListDatabasesAction<'a, Names> {
 
     fn into_future(self) -> Self::IntoFuture {
         async {
-            let op = ListDatabases::new(self.filter, true, self.options);
+            let op = ListDatabases::new(true, self.options);
             match self.client.execute_operation(op, None).await {
                 Ok(databases) => databases
                     .into_iter()

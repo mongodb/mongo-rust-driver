@@ -292,6 +292,8 @@ pub struct ListCollectionsOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct ListDatabasesOptions {
+    pub filter: Option<Document>,
+
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
     pub authorized_databases: Option<bool>,
