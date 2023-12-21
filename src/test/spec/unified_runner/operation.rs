@@ -44,7 +44,7 @@ use super::{
 use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
-    client::{session::TransactionState, action::list_databases},
+    client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
     db::options::RunCursorCommandOptions,
@@ -74,6 +74,7 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
+    operation::list_databases,
     runtime,
     selection_criteria::ReadPreference,
     serde_util,

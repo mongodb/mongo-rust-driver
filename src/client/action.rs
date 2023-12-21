@@ -2,4 +2,4 @@
 
 pub(crate) mod list_databases;
 
-pub use list_databases::Action as ListDatabases;
+pub use list_databases::ListDatabases;

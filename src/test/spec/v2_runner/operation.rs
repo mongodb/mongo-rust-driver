@@ -5,7 +5,7 @@ use serde::{de::Deserializer, Deserialize};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
-    client::{session::TransactionState, action::list_databases},
+    client::session::TransactionState,
     error::Result,
     options::{
         AggregateOptions,
@@ -34,6 +34,7 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
+    operation::list_databases,
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{assert_matches, log_uncaptured, FailPoint, TestClient},
     ClientSession,

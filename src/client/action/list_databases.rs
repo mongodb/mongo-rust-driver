@@ -2,17 +2,15 @@ use std::{future::IntoFuture, marker::PhantomData};
 
 use bson::{Document, Bson};
 use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 
-use crate::{Client, ClientSession, operation::ListDatabases, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture};
+use crate::{Client, ClientSession, operation::list_databases as op, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
     pub fn list_databases(
         &self,
-    ) -> Action {
-        Action {
+    ) -> ListDatabases {
+        ListDatabases {
             client: &self,
             options: Default::default(),
             session: None,
@@ -23,8 +21,8 @@ impl Client {
     /// Gets the names of the databases present in the cluster the Client is connected to.
     pub fn list_database_names(
         &self,
-    ) -> Action<'_, Names> {
-        Action {
+    ) -> ListDatabases<'_, Names> {
+        ListDatabases {
             client: &self,
             options: Default::default(),
             session: None,
@@ -35,21 +33,13 @@ impl Client {
 
 /// Gets information about each database present in the cluster the Client is connected to.
 #[must_use]
-pub struct Action<'a, M: Mode = Full> {
+pub struct ListDatabases<'a, M: Mode = Full> {
     client: &'a Client,
-    options: Option<Options>,
+    options: Option<op::Options>,
     session: Option<&'a mut ClientSession>,
     mode: PhantomData<M>,
 }
 
-#[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Options {
-    pub(crate) filter: Option<Document>,
-    pub(crate) authorized_databases: Option<bool>,
-    pub(crate) comment: Option<Bson>,
-}
 
 mod private {
     pub trait Sealed {}
@@ -64,13 +54,13 @@ impl Mode for Names {}
 pub struct Full;
 pub struct Names;
 
-impl<'a, M: Mode> Action<'a, M> {
-    fn options(&mut self) -> &mut Options {
-        self.options.get_or_insert_with(Options::default)
+impl<'a, M: Mode> ListDatabases<'a, M> {
+    fn options(&mut self) -> &mut op::Options {
+        self.options.get_or_insert_with(op::Options::default)
     }
 
     #[cfg(test)]
-    pub(crate) fn with_options(mut self, value: impl Into<Option<Options>>) -> Self {
+    pub(crate) fn with_options(mut self, value: impl Into<Option<op::Options>>) -> Self {
         self.options = value.into();
         self
     }
@@ -104,13 +94,13 @@ impl<'a, M: Mode> Action<'a, M> {
     }
 }
 
-impl<'a> IntoFuture for Action<'a, Full> {
+impl<'a> IntoFuture for ListDatabases<'a, Full> {
     type Output = Result<Vec<DatabaseSpecification>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
     fn into_future(self) -> Self::IntoFuture {
         async {
-            let op = ListDatabases::new(false, self.options);
+            let op = op::ListDatabases::new(false, self.options);
             self.client.execute_operation(op, self.session).await.and_then(|dbs| {
                 dbs.into_iter()
                     .map(|db_spec| {
@@ -122,13 +112,13 @@ impl<'a> IntoFuture for Action<'a, Full> {
     }
 }
 
-impl<'a> IntoFuture for Action<'a, Names> {
+impl<'a> IntoFuture for ListDatabases<'a, Names> {
     type Output = Result<Vec<String>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
     fn into_future(self) -> Self::IntoFuture {
         async {
-            let op = ListDatabases::new(true, self.options);
+            let op = op::ListDatabases::new(true, self.options);
             match self.client.execute_operation(op, None).await {
                 Ok(databases) => databases
                     .into_iter()

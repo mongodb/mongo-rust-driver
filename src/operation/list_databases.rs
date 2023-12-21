@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod test;
 
-use bson::RawDocumentBuf;
-use serde::Deserialize;
+use bson::{RawDocumentBuf, Bson};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{doc, Document},
@@ -10,19 +11,27 @@ use crate::{
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
-    client::action::list_databases,
 };
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
     name_only: bool,
-    options: Option<list_databases::Options>,
+    options: Option<Options>,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Options {
+    pub(crate) filter: Option<Document>,
+    pub(crate) authorized_databases: Option<bool>,
+    pub(crate) comment: Option<Bson>,
 }
 
 impl ListDatabases {
     pub fn new(
         name_only: bool,
-        options: Option<list_databases::Options>,
+        options: Option<Options>,
     ) -> Self {
         ListDatabases {
             name_only,
