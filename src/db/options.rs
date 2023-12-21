@@ -284,25 +284,6 @@ pub struct ListCollectionsOptions {
     pub comment: Option<Bson>,
 }
 
-/// Specifies the options to a
-/// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
-#[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(into)))]
-#[non_exhaustive]
-pub struct ListDatabasesOptions {
-    /// Determines which databases to return based on the user's access privileges. This option is
-    /// only supported on server versions 4.0.5+.
-    pub authorized_databases: Option<bool>,
-
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub comment: Option<Bson>,
-}
-
 /// Specifies how change stream pre- and post-images should be supported.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]

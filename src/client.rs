@@ -1,3 +1,4 @@
+pub(crate) mod action;
 pub mod auth;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) mod csfle;
@@ -16,7 +17,7 @@ use std::{
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
-use futures_core::{future::BoxFuture, Future};
+use futures_core::Future;
 use futures_util::{future::join_all, FutureExt};
 
 #[cfg(feature = "tracing-unstable")]
@@ -40,17 +41,15 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::command::{handle_command_event, CommandEvent},
     id_set::IdSet,
-    operation::{AggregateTarget, ListDatabases},
+    operation::AggregateTarget,
     options::{
         ClientOptions,
         DatabaseOptions,
-        ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
         ServerAddress,
         SessionOptions,
     },
-    results::DatabaseSpecification,
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
     ClientSession,
@@ -369,44 +368,8 @@ impl Client {
             .map(|db_name| self.database(db_name))
     }
 
-    async fn list_databases_common(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(op, session).await.and_then(|dbs| {
-            dbs.into_iter()
-                .map(|db_spec| {
-                    bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
-                })
-                .collect()
-        })
-    }
-
-    /// Gets information about each database present in the cluster the Client is connected to.
-    pub async fn list_databases(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        self.list_databases_common(filter, options, None).await
-    }
-
-    /// Gets information about each database present in the cluster the Client is connected to
-    /// using the provided `ClientSession`.
-    pub async fn list_databases_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        self.list_databases_common(filter, options, Some(session))
-            .await
-    }
-
     /// Gets the names of the databases present in the cluster the Client is connected to.
+    /* TODO
     pub async fn list_database_names(
         &self,
         filter: impl Into<Option<Document>>,
@@ -430,6 +393,7 @@ impl Client {
             Err(e) => Err(e),
         }
     }
+    */
 
     /// Starts a new `ClientSession`.
     pub async fn start_session(
@@ -853,3 +817,6 @@ impl AsyncDropToken {
         Self { tx: self.tx.take() }
     }
 }
+
+// TODO: merge this with other BoxFuture defs
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;

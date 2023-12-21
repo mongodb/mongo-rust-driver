@@ -7,9 +7,9 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
+    client::action::list_databases,
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
-    options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
@@ -17,14 +17,14 @@ use crate::{
 pub(crate) struct ListDatabases {
     filter: Option<Document>,
     name_only: bool,
-    options: Option<ListDatabasesOptions>,
+    options: Option<list_databases::Options>,
 }
 
 impl ListDatabases {
     pub fn new(
         filter: Option<Document>,
         name_only: bool,
-        options: Option<ListDatabasesOptions>,
+        options: Option<list_databases::Options>,
     ) -> Self {
         ListDatabases {
             filter,
