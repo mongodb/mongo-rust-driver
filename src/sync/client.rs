@@ -9,11 +9,9 @@ use crate::{
     options::{
         ClientOptions,
         DatabaseOptions,
-        ListDatabasesOptions,
         SelectionCriteria,
         SessionOptions,
     },
-    results::DatabaseSpecification,
     runtime,
     Client as AsyncClient,
 };
@@ -75,7 +73,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Client {
-    async_client: AsyncClient,
+    pub(crate) async_client: AsyncClient,
 }
 
 impl From<AsyncClient> for Client {
@@ -143,30 +141,6 @@ impl Client {
     /// If no default database was specified, `None` will be returned.
     pub fn default_database(&self) -> Option<Database> {
         self.async_client.default_database().map(Database::new)
-    }
-
-    /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        runtime::block_on(
-            self.async_client
-                .list_databases(filter.into(), options.into()),
-        )
-    }
-
-    /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_client
-                .list_database_names(filter.into(), options.into()),
-        )
     }
 
     /// Starts a new `ClientSession`.

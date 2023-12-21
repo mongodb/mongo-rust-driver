@@ -4,6 +4,8 @@ use bson::{Document, Bson};
 use futures_util::FutureExt;
 
 use crate::{Client, ClientSession, operation::list_databases as op, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture};
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+use crate::sync::Client as SyncClient;
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
@@ -28,6 +30,16 @@ impl Client {
             session: None,
             mode: PhantomData,
         }
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl SyncClient {
+    /// Gets information about each database present in the cluster the Client is connected to.
+    pub fn list_databases(
+        &self,
+    ) -> ListDatabases {
+        self.async_client.list_databases()
     }
 }
 
@@ -119,7 +131,7 @@ impl<'a> IntoFuture for ListDatabases<'a, Names> {
     fn into_future(self) -> Self::IntoFuture {
         async {
             let op = op::ListDatabases::new(true, self.options);
-            match self.client.execute_operation(op, None).await {
+            match self.client.execute_operation(op, self.session).await {
                 Ok(databases) => databases
                     .into_iter()
                     .map(|doc| {
@@ -136,5 +148,15 @@ impl<'a> IntoFuture for ListDatabases<'a, Names> {
                 Err(e) => Err(e),
             }
         }.boxed()
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<'a, M: Mode> ListDatabases<'a, M>
+    where Self: IntoFuture
+{
+    /// Synchronously execute this action.
+    pub fn run(self) -> <Self as IntoFuture>::Output {
+        crate::runtime::block_on(self.into_future())
     }
 }
