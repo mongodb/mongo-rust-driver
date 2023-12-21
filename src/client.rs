@@ -1,4 +1,4 @@
-pub(crate) mod action;
+pub mod action;
 pub mod auth;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) mod csfle;

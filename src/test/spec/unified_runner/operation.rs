@@ -44,7 +44,7 @@ use super::{
 use crate::{
     bson::{doc, to_bson, Bson, Document},
     change_stream::options::ChangeStreamOptions,
-    client::session::TransactionState,
+    client::{session::TransactionState, action::list_databases},
     coll::options::Hint,
     collation::Collation,
     db::options::RunCursorCommandOptions,
@@ -67,7 +67,6 @@ use crate::{
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
-        ListDatabasesOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -1173,7 +1172,7 @@ impl TestOperation for FindOne {
 pub(super) struct ListDatabases {
     session: Option<String>,
     #[serde(flatten)]
-    options: ListDatabasesOptions,
+    options: list_databases::Options,
 }
 
 impl TestOperation for ListDatabases {
@@ -1213,7 +1212,7 @@ impl TestOperation for ListDatabases {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabaseNames {
     #[serde(flatten)]
-    options: ListDatabasesOptions,
+    options: list_databases::Options,
 }
 
 impl TestOperation for ListDatabaseNames {

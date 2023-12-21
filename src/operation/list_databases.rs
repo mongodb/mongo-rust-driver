@@ -9,19 +9,20 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
-    selection_criteria::{ReadPreference, SelectionCriteria}, db::options::ListDatabasesOptions,
+    selection_criteria::{ReadPreference, SelectionCriteria},
+    client::action::list_databases,
 };
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
     name_only: bool,
-    options: Option<ListDatabasesOptions>,
+    options: Option<list_databases::Options>,
 }
 
 impl ListDatabases {
     pub fn new(
         name_only: bool,
-        options: Option<ListDatabasesOptions>,
+        options: Option<list_databases::Options>,
     ) -> Self {
         ListDatabases {
             name_only,

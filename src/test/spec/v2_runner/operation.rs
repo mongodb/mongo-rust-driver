@@ -5,7 +5,7 @@ use serde::{de::Deserializer, Deserialize};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
-    client::session::TransactionState,
+    client::{session::TransactionState, action::list_databases},
     error::Result,
     options::{
         AggregateOptions,
@@ -27,7 +27,6 @@ use crate::{
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
-        ListDatabasesOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -1066,7 +1065,7 @@ impl TestOperation for AssertSessionUnpinned {
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabases {
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: Option<list_databases::Options>,
 }
 
 impl TestOperation for ListDatabases {
@@ -1088,7 +1087,7 @@ impl TestOperation for ListDatabases {
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabaseNames {
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: Option<list_databases::Options>,
 }
 
 impl TestOperation for ListDatabaseNames {

@@ -5,53 +5,14 @@ use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::{Client, ClientSession, operation::ListDatabases, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture, db::options::ListDatabasesOptions};
+use crate::{Client, ClientSession, operation::ListDatabases, error::{Result, ErrorKind}, results::DatabaseSpecification, client::BoxFuture};
 
 impl Client {
-    /*
-    async fn list_databases_common(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(op, session).await.and_then(|dbs| {
-            dbs.into_iter()
-                .map(|db_spec| {
-                    bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
-                })
-                .collect()
-        })
-    }
-
-    /// Gets information about each database present in the cluster the Client is connected to.
-    pub async fn list_databases(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        self.list_databases_common(filter, options, None).await
-    }
-
-    /// Gets information about each database present in the cluster the Client is connected to
-    /// using the provided `ClientSession`.
-    pub async fn list_databases_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        self.list_databases_common(filter, options, Some(session))
-            .await
-    }
-    */
-
     /// Gets information about each database present in the cluster the Client is connected to.
     pub fn list_databases(
         &self,
-    ) -> ListDatabasesAction {
-        ListDatabasesAction {
+    ) -> Action {
+        Action {
             client: &self,
             options: Default::default(),
             session: None,
@@ -62,8 +23,8 @@ impl Client {
     /// Gets the names of the databases present in the cluster the Client is connected to.
     pub fn list_database_names(
         &self,
-    ) -> ListDatabasesAction<'_, Names> {
-        ListDatabasesAction {
+    ) -> Action<'_, Names> {
+        Action {
             client: &self,
             options: Default::default(),
             session: None,
@@ -72,24 +33,23 @@ impl Client {
     }
 }
 
+/// Gets information about each database present in the cluster the Client is connected to.
 #[must_use]
-pub struct ListDatabasesAction<'a, M: Mode = Full> {
+pub struct Action<'a, M: Mode = Full> {
     client: &'a Client,
     options: Option<Options>,
     session: Option<&'a mut ClientSession>,
     mode: PhantomData<M>,
 }
 
-/*
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Options {
+    pub(crate) filter: Option<Document>,
     pub(crate) authorized_databases: Option<bool>,
     pub(crate) comment: Option<Bson>,
 }
-*/
-pub(crate) type Options = ListDatabasesOptions;
 
 mod private {
     pub trait Sealed {}
@@ -104,7 +64,7 @@ impl Mode for Names {}
 pub struct Full;
 pub struct Names;
 
-impl<'a, M: Mode> ListDatabasesAction<'a, M> {
+impl<'a, M: Mode> Action<'a, M> {
     fn options(&mut self) -> &mut Options {
         self.options.get_or_insert_with(Options::default)
     }
@@ -115,6 +75,7 @@ impl<'a, M: Mode> ListDatabasesAction<'a, M> {
         self
     }
 
+    /// Filters the query.
     pub fn filter(mut self, value: impl Into<Option<Document>>) -> Self {
         self.options().filter = value.into();
         self
@@ -136,13 +97,14 @@ impl<'a, M: Mode> ListDatabasesAction<'a, M> {
         self
     }
 
+    /// Runs the query using the provided session.
     pub fn session(mut self, value: impl Into<Option<&'a mut ClientSession>>) -> Self {
         self.session = value.into();
         self
     }
 }
 
-impl<'a> IntoFuture for ListDatabasesAction<'a, Full> {
+impl<'a> IntoFuture for Action<'a, Full> {
     type Output = Result<Vec<DatabaseSpecification>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
@@ -160,7 +122,7 @@ impl<'a> IntoFuture for ListDatabasesAction<'a, Full> {
     }
 }
 
-impl<'a> IntoFuture for ListDatabasesAction<'a, Names> {
+impl<'a> IntoFuture for Action<'a, Names> {
     type Output = Result<Vec<String>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 

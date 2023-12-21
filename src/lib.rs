@@ -365,6 +365,8 @@ pub use crate::{
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
 
+pub use client::action;
+
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(
     "`tokio-runtime` and `sync` can't both be enabled; either switch to using `tokio-sync` or set \

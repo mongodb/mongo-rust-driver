@@ -6,7 +6,7 @@ use crate::{
     error::ErrorKind,
     operation::{test::handle_response_test, ListDatabases, Operation},
     client::action::list_databases,
-    selection_criteria::ReadPreference, db::options::ListDatabasesOptions,
+    selection_criteria::ReadPreference,
 };
 
 #[test]
@@ -48,7 +48,7 @@ fn build_with_name_only() {
 fn build_with_filter() {
     let filter = doc! {"something" : "something else"};
 
-    let mut list_databases_op = ListDatabases::new(false, Some(ListDatabasesOptions {
+    let mut list_databases_op = ListDatabases::new(false, Some(list_databases::Options {
         filter: Some(filter.clone()),
         ..Default::default()
     }));
