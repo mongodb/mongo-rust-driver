@@ -5,7 +5,7 @@ use crate::{
     cmap::StreamDescription,
     error::ErrorKind,
     operation::{test::handle_response_test, ListDatabases, Operation},
-    options::ListDatabasesOptions,
+    client::action::list_databases,
     selection_criteria::ReadPreference,
 };
 
@@ -65,9 +65,10 @@ fn build_with_filter() {
 
 #[test]
 fn build_with_options() {
-    let options = ListDatabasesOptions::builder()
-        .authorized_databases(true)
-        .build();
+    let options = list_databases::Options {
+        authorized_databases: Some(true),
+        ..Default::default()
+    };
 
     let mut list_databases_op = ListDatabases::new(None, false, Some(options));
     let list_databases_command = list_databases_op

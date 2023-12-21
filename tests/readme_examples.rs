@@ -25,7 +25,7 @@ async fn _connecting() -> Result<()> {
     let client = Client::with_options(client_options)?;
 
     // List the names of the databases in that deployment.
-    for db_name in client.list_database_names(None, None).await? {
+    for db_name in client.list_database_names().await? {
         println!("{}", db_name);
     }
 

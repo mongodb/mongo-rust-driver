@@ -39,7 +39,7 @@ async fn check_faas_handshake(vars: &[(&'static str, &str)]) -> Result<()> {
     let _tv = TempVars::set(vars);
 
     let client = Client::test_builder().build().await;
-    client.list_database_names(doc! {}, None).await?;
+    client.list_database_names().filter(doc! {}).await?;
 
     Ok(())
 }

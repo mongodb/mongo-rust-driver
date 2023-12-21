@@ -1227,7 +1227,9 @@ impl TestOperation for ListDatabaseNames {
         async move {
             let client = test_runner.get_client(id).await;
             let result = client
-                .list_database_names(self.filter.clone(), self.options.clone())
+                .list_database_names()
+                .filter(self.filter.clone())  // TODO remove this when filter is part of options
+                .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::Array(result).into()))

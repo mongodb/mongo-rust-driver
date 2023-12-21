@@ -368,33 +368,6 @@ impl Client {
             .map(|db_name| self.database(db_name))
     }
 
-    /// Gets the names of the databases present in the cluster the Client is connected to.
-    /* TODO
-    pub async fn list_database_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<String>> {
-        let op = ListDatabases::new(filter.into(), true, options.into());
-        match self.execute_operation(op, None).await {
-            Ok(databases) => databases
-                .into_iter()
-                .map(|doc| {
-                    let name = doc
-                        .get_str("name")
-                        .map_err(|_| ErrorKind::InvalidResponse {
-                            message: "Expected \"name\" field in server response, but it was not \
-                                      found"
-                                .to_string(),
-                        })?;
-                    Ok(name.to_string())
-                })
-                .collect(),
-            Err(e) => Err(e),
-        }
-    }
-    */
-
     /// Starts a new `ClientSession`.
     pub async fn start_session(
         &self,

@@ -1099,7 +1099,9 @@ impl TestOperation for ListDatabaseNames {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = client
-                .list_database_names(self.filter.clone(), self.options.clone())
+                .list_database_names()
+                .filter(self.filter.clone())  // TODO remove
+                .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))
