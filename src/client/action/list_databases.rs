@@ -72,21 +72,21 @@ impl<'a, M: Mode> ListDatabases<'a, M> {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_options(mut self, value: impl Into<Option<op::Options>>) -> Self {
-        self.options = value.into();
+    pub(crate) fn with_options(mut self, value: op::Options) -> Self {
+        self.options = Some(value);
         self
     }
 
     /// Filters the query.
-    pub fn filter(mut self, value: impl Into<Option<Document>>) -> Self {
-        self.options().filter = value.into();
+    pub fn filter(mut self, value: Document) -> Self {
+        self.options().filter = Some(value);
         self
     }
 
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
-    pub fn authorized_databases(mut self, value: impl Into<Option<bool>>) -> Self {
-        self.options().authorized_databases = value.into();
+    pub fn authorized_databases(mut self, value: bool) -> Self {
+        self.options().authorized_databases = Some(value);
         self
     }
 
@@ -94,14 +94,14 @@ impl<'a, M: Mode> ListDatabases<'a, M> {
     /// database profiler, currentOp and logs.
     ///
     /// This option is only available on server versions 4.4+.
-    pub fn comment(mut self, value: impl Into<Option<Bson>>) -> Self {
-        self.options().comment = value.into();
+    pub fn comment(mut self, value: Bson) -> Self {
+        self.options().comment = Some(value);
         self
     }
 
     /// Runs the query using the provided session.
-    pub fn session(mut self, value: impl Into<Option<&'a mut ClientSession>>) -> Self {
-        self.session = value.into();
+    pub fn session(mut self, value: &'a mut ClientSession) -> Self {
+        self.session = Some(value);
         self
     }
 }
