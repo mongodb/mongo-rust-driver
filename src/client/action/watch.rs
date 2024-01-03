@@ -1,10 +1,25 @@
 use std::{future::IntoFuture, time::Duration};
 
-use bson::{Document, Timestamp, Bson};
+use bson::{Bson, Document, Timestamp};
 use futures_util::FutureExt;
 
-use crate::{Client, change_stream::{options::{ChangeStreamOptions, FullDocumentType, FullDocumentBeforeChangeType}, ChangeStream, event::{ChangeStreamEvent, ResumeToken}, session::SessionChangeStream}, ClientSession, error::{Result, ErrorKind}, client::BoxFuture, operation::AggregateTarget, collation::Collation, options::ReadConcern, selection_criteria::SelectionCriteria};
 use super::option_setters;
+use crate::{
+    change_stream::{
+        event::{ChangeStreamEvent, ResumeToken},
+        options::{ChangeStreamOptions, FullDocumentBeforeChangeType, FullDocumentType},
+        session::SessionChangeStream,
+        ChangeStream,
+    },
+    client::BoxFuture,
+    collation::Collation,
+    error::{ErrorKind, Result},
+    operation::AggregateTarget,
+    options::ReadConcern,
+    selection_criteria::SelectionCriteria,
+    Client,
+    ClientSession,
+};
 
 impl Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
@@ -25,10 +40,7 @@ impl Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-    ) -> Watch {
+    pub fn watch(&self, pipeline: impl IntoIterator<Item = Document>) -> Watch {
         Watch {
             client: &self,
             pipeline: pipeline.into_iter().collect(),
@@ -58,10 +70,7 @@ impl crate::sync::Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-    ) -> Watch {
+    pub fn watch(&self, pipeline: impl IntoIterator<Item = Document>) -> Watch {
         self.async_client.watch(pipeline)
     }
 }
@@ -123,7 +132,7 @@ impl<'a, S: Session> Watch<'a, S> {
         start_after: ResumeToken,
 
         /// The maximum amount of time for the server to wait on new documents to satisfy a change
-        /// stream query.        
+        /// stream query.
         max_await_time: Duration,
 
         /// The number of documents to return per batch.
@@ -171,13 +180,20 @@ impl<'a> IntoFuture for Watch<'a, Implicit> {
 
     fn into_future(mut self) -> Self::IntoFuture {
         async {
-            resolve_options!(self.client, self.options, [read_concern, selection_criteria]);
+            resolve_options!(
+                self.client,
+                self.options,
+                [read_concern, selection_criteria]
+            );
             self.options
                 .get_or_insert_with(Default::default)
                 .all_changes_for_cluster = Some(true);
             let target = AggregateTarget::Database("admin".to_string());
-            self.client.execute_watch(self.pipeline, self.options, target, None).await
-        }.boxed()
+            self.client
+                .execute_watch(self.pipeline, self.options, target, None)
+                .await
+        }
+        .boxed()
     }
 }
 
@@ -187,15 +203,31 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
 
     fn into_future(mut self) -> Self::IntoFuture {
         async {
-            resolve_read_concern_with_session!(self.client, self.options, Some(&mut *self.session.0))?;
-            resolve_selection_criteria_with_session!(self.client, self.options, Some(&mut *self.session.0))?;
+            resolve_read_concern_with_session!(
+                self.client,
+                self.options,
+                Some(&mut *self.session.0)
+            )?;
+            resolve_selection_criteria_with_session!(
+                self.client,
+                self.options,
+                Some(&mut *self.session.0)
+            )?;
             self.options
                 .get_or_insert_with(Default::default)
                 .all_changes_for_cluster = Some(true);
             let target = AggregateTarget::Database("admin".to_string());
-            self.client.execute_watch_with_session(self.pipeline, self.options, target, None, self.session.0)
+            self.client
+                .execute_watch_with_session(
+                    self.pipeline,
+                    self.options,
+                    target,
+                    None,
+                    self.session.0,
+                )
                 .await
-        }.boxed()
+        }
+        .boxed()
     }
 }
 

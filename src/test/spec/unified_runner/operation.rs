@@ -2346,7 +2346,8 @@ impl TestOperation for CreateChangeStream {
             let target = entities.get(id).unwrap();
             let stream = match target {
                 Entity::Client(ce) => {
-                    ce.watch(self.pipeline.clone()).with_options(self.options.clone())
+                    ce.watch(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Database(db) => {
