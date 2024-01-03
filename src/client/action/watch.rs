@@ -18,7 +18,7 @@ use crate::{
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,
-    ClientSession,
+    ClientSession, Database,
 };
 
 impl Client {
@@ -43,6 +43,41 @@ impl Client {
     pub fn watch(&self, pipeline: impl IntoIterator<Item = Document>) -> Watch {
         Watch {
             client: &self,
+            target: AggregateTarget::Database("admin".to_string()),
+            cluster: true,
+            pipeline: pipeline.into_iter().collect(),
+            options: None,
+            session: Implicit,
+        }
+    }
+}
+
+impl Database {
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this database. The stream does not observe changes from system
+    /// collections and cannot be started on "config", "local" or "admin" databases.
+    ///
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    pub fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+    ) -> Watch {
+        Watch {
+            client: self.client(),
+            target: AggregateTarget::Database(self.name().to_string()),
+            cluster: false,
             pipeline: pipeline.into_iter().collect(),
             options: None,
             session: Implicit,
@@ -75,6 +110,33 @@ impl crate::sync::Client {
     }
 }
 
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl crate::sync::Database {
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this database. The stream does not observe changes from system
+    /// collections and cannot be started on "config", "local" or "admin" databases.
+    ///
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    pub fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+     ) -> Watch {
+        self.async_database.watch(pipeline)
+    }
+}
+
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Implicit {}
@@ -92,6 +154,8 @@ pub struct Explicit<'a>(&'a mut ClientSession);
 #[must_use]
 pub struct Watch<'a, S: Session = Implicit> {
     client: &'a Client,
+    target: AggregateTarget,
+    cluster: bool,
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
@@ -167,6 +231,8 @@ impl<'a> Watch<'a, Implicit> {
     pub fn with_session<'s>(self, session: &'s mut ClientSession) -> Watch<'a, Explicit<'s>> {
         Watch {
             client: self.client,
+            target: self.target,
+            cluster: self.cluster,
             pipeline: self.pipeline,
             options: self.options,
             session: Explicit(session),
@@ -179,18 +245,19 @@ impl<'a> IntoFuture for Watch<'a, Implicit> {
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
     fn into_future(mut self) -> Self::IntoFuture {
-        async {
+        async move {
             resolve_options!(
                 self.client,
                 self.options,
                 [read_concern, selection_criteria]
             );
-            self.options
-                .get_or_insert_with(Default::default)
-                .all_changes_for_cluster = Some(true);
-            let target = AggregateTarget::Database("admin".to_string());
+            if self.cluster {
+                self.options
+                    .get_or_insert_with(Default::default)
+                    .all_changes_for_cluster = Some(true);
+            }
             self.client
-                .execute_watch(self.pipeline, self.options, target, None)
+                .execute_watch(self.pipeline, self.options, self.target, None)
                 .await
         }
         .boxed()
@@ -202,7 +269,7 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
     fn into_future(mut self) -> Self::IntoFuture {
-        async {
+        async move {
             resolve_read_concern_with_session!(
                 self.client,
                 self.options,
@@ -213,15 +280,16 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
                 self.options,
                 Some(&mut *self.session.0)
             )?;
-            self.options
-                .get_or_insert_with(Default::default)
-                .all_changes_for_cluster = Some(true);
-            let target = AggregateTarget::Database("admin".to_string());
+            if self.cluster {
+                self.options
+                    .get_or_insert_with(Default::default)
+                    .all_changes_for_cluster = Some(true);
+            }
             self.client
                 .execute_watch_with_session(
                     self.pipeline,
                     self.options,
-                    target,
+                    self.target,
                     None,
                     self.session.0,
                 )
