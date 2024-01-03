@@ -4,6 +4,7 @@ use bson::{Document, Timestamp, Bson};
 use futures_util::FutureExt;
 
 use crate::{Client, change_stream::{options::{ChangeStreamOptions, FullDocumentType, FullDocumentBeforeChangeType}, ChangeStream, event::{ChangeStreamEvent, ResumeToken}, session::SessionChangeStream}, ClientSession, error::{Result, ErrorKind}, client::BoxFuture, operation::AggregateTarget, collation::Collation, options::ReadConcern, selection_criteria::SelectionCriteria};
+use super::option_setters;
 
 impl Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
@@ -24,7 +25,7 @@ impl Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub fn watch_2(
+    pub fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
     ) -> Watch {
@@ -57,11 +58,11 @@ impl crate::sync::Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub fn watch_2(
+    pub fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
     ) -> Watch {
-        self.async_client.watch_2(pipeline)
+        self.async_client.watch(pipeline)
     }
 }
 
@@ -85,28 +86,6 @@ pub struct Watch<'a, S: Session = Implicit> {
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
-}
-
-macro_rules! option_setters {
-    (
-        $opt_field:ident: $opt_field_ty:ty;
-        $(
-            $(#[$($attrss:tt)*])*
-            $opt_name:ident: $opt_ty:ty,
-        )+
-    ) => {
-        fn options(&mut self) -> &mut $opt_field_ty {
-            self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
-        }
-
-        $(
-            $(#[$($attrss)*])*
-            pub fn $opt_name(mut self, value: $opt_ty) -> Self {
-                self.options().$opt_name = Some(value);
-                self
-            }
-        )+
-    };
 }
 
 impl<'a, S: Session> Watch<'a, S> {

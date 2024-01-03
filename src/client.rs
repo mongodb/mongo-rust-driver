@@ -29,19 +29,11 @@ use crate::trace::{
     COMMAND_TRACING_EVENT_TARGET,
 };
 use crate::{
-    bson::Document,
-    change_stream::{
-        event::ChangeStreamEvent,
-        options::ChangeStreamOptions,
-        session::SessionChangeStream,
-        ChangeStream,
-    },
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{Error, ErrorKind, Result},
     event::command::{handle_command_event, CommandEvent},
     id_set::IdSet,
-    operation::AggregateTarget,
     options::{
         ClientOptions,
         DatabaseOptions,
@@ -380,57 +372,6 @@ impl Client {
         Ok(ClientSession::new(self.clone(), options, false).await)
     }
 
-    /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
-    /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
-    /// will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub async fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-        options
-            .get_or_insert_with(Default::default)
-            .all_changes_for_cluster = Some(true);
-        let target = AggregateTarget::Database("admin".to_string());
-        self.execute_watch(pipeline, options, target, None).await
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
-    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    pub async fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-        options
-            .get_or_insert_with(Default::default)
-            .all_changes_for_cluster = Some(true);
-        let target = AggregateTarget::Database("admin".to_string());
-        self.execute_watch_with_session(pipeline, options, target, None, session)
-            .await
-    }
-
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
         let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
         let (id_tx, id_rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
@@ -576,7 +517,7 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub(crate) async fn is_session_checked_in(&self, id: &Document) -> bool {
+    pub(crate) async fn is_session_checked_in(&self, id: &bson::Document) -> bool {
         self.inner.session_pool.contains(id).await
     }
 

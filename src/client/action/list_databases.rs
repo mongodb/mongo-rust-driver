@@ -14,6 +14,8 @@ use crate::{
     ClientSession,
 };
 
+use super::option_setters;
+
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
     pub fn list_databases(&self) -> ListDatabases {
@@ -42,6 +44,11 @@ impl SyncClient {
     pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
+
+    /// Gets the names of the databases present in the cluster the Client is connected to.
+    pub fn list_database_names(&self) -> ListDatabases<'_, Names> {
+        self.async_client.list_database_names()
+    }
 }
 
 /// Gets information about each database present in the cluster the Client is connected to.
@@ -67,37 +74,20 @@ pub struct Full;
 pub struct Names;
 
 impl<'a, M: Mode> ListDatabases<'a, M> {
-    fn options(&mut self) -> &mut op::Options {
-        self.options.get_or_insert_with(op::Options::default)
-    }
+    option_setters!(options: op::Options;
+        /// Filters the query.
+        filter: Document,
 
-    #[cfg(test)]
-    pub(crate) fn with_options(mut self, value: op::Options) -> Self {
-        self.options = Some(value);
-        self
-    }
+        /// Determines which databases to return based on the user's access privileges. This option is
+        /// only supported on server versions 4.0.5+.
+        authorized_databases: bool,
 
-    /// Filters the query.
-    pub fn filter(mut self, value: Document) -> Self {
-        self.options().filter = Some(value);
-        self
-    }
-
-    /// Determines which databases to return based on the user's access privileges. This option is
-    /// only supported on server versions 4.0.5+.
-    pub fn authorized_databases(mut self, value: bool) -> Self {
-        self.options().authorized_databases = Some(value);
-        self
-    }
-
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub fn comment(mut self, value: Bson) -> Self {
-        self.options().comment = Some(value);
-        self
-    }
+        /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+        /// database profiler, currentOp and logs.
+        ///
+        /// This option is only available on server versions 4.4+.
+        comment: Bson,
+    );
 
     /// Runs the query using the provided session.
     pub fn session(mut self, value: &'a mut ClientSession) -> Self {

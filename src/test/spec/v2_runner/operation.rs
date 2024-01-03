@@ -1524,7 +1524,7 @@ impl TestOperation for Watch {
         client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            client.watch(None, None).await?;
+            client.watch(None).await?;
             Ok(None)
         }
         .boxed()
