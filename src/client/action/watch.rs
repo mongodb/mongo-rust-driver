@@ -19,6 +19,16 @@ impl Client {
     }
 }
 
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl crate::sync::Client {
+    pub fn watch_2(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+    ) -> Watch {
+        self.async_client.watch_2(pipeline)
+    }
+}
+
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Implicit {}
@@ -88,5 +98,19 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
             self.client.execute_watch_with_session(self.pipeline, self.options, target, None, self.session.0)
                 .await
         }.boxed()
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<'a> Watch<'a, Implicit> {
+    pub fn run(self) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
+        crate::runtime::block_on(self.into_future()).map(crate::sync::ChangeStream::new)
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<'a> Watch<'a, Explicit<'a>> {
+    pub fn run(self) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
+        crate::runtime::block_on(self.into_future()).map(crate::sync::SessionChangeStream::new)
     }
 }
