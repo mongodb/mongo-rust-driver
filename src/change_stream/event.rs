@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 /// [`ChangeStream`](crate::change_stream::ChangeStream).
 ///
 /// When starting a new change stream,
-/// [`crate::options::ChangeStreamOptions::start_after`] and
-/// [`crate::options::ChangeStreamOptions::resume_after`] fields can be specified
+/// [`crate::action::Watch::start_after`] and
+/// [`crate::action::Watch::resume_after`] fields can be specified
 /// with instances of `ResumeToken`.
 ///
 /// See the documentation
@@ -97,7 +97,7 @@ pub struct ChangeStreamEvent<T> {
     /// operation.  For `delete` operations, this field is `None`.
     ///
     /// For `update` operations, this field only appears if you configured the change stream with
-    /// [`full_document`](crate::options::ChangeStreamOptions::full_document) set to
+    /// [`full_document`](crate::action::Watch::full_document) set to
     /// [`UpdateLookup`](crate::options::FullDocumentType::UpdateLookup). This field then
     /// represents the most current majority-committed version of the document modified by the
     /// update operation.
@@ -106,7 +106,7 @@ pub struct ChangeStreamEvent<T> {
     /// Contains the pre-image of the modified or deleted document if the pre-image is available
     /// for the change event and either `Required` or `WhenAvailable` was specified for the
     /// [`full_document_before_change`](
-    /// crate::options::ChangeStreamOptions::full_document_before_change) option when creating the
+    /// crate::action::Watch::full_document_before_change) option when creating the
     /// change stream. If `WhenAvailable` was specified but the pre-image is unavailable, this
     /// will be explicitly set to `None`.
     pub full_document_before_change: Option<T>,

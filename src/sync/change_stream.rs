@@ -22,8 +22,8 @@ use super::ClientSession;
 /// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
 /// a [`ResumeToken`] retrieved from a past event into either the
-/// [`resume_after`](crate::options::ChangeStreamOptions::resume_after) or
-/// [`start_after`](crate::options::ChangeStreamOptions::start_after) (4.2+) options used to create
+/// [`resume_after`](crate::action::Watch::resume_after) or
+/// [`start_after`](crate::action::Watch::start_after) (4.2+) options used to create
 /// the `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
 /// explicitly opt out of resumability.
 ///
