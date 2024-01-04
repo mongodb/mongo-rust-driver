@@ -157,7 +157,6 @@ pub struct Explicit<'a>(&'a mut ClientSession);
 pub struct Watch<'a, S: Session = Implicit> {
     client: &'a Client,
     target: AggregateTarget,
-    cluster: bool,
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
@@ -168,7 +167,6 @@ impl<'a> Watch<'a, Implicit> {
         Self {
             client,
             target,
-            cluster: false,
             pipeline: vec![],
             options: None,
             session: Implicit,
@@ -176,12 +174,13 @@ impl<'a> Watch<'a, Implicit> {
     }
 
     fn new_cluster(client: &'a Client) -> Self {
+        let mut options = ChangeStreamOptions::default();
+        options.all_changes_for_cluster = Some(true);
         Self {
             client,
             target: AggregateTarget::Database("admin".to_string()),
-            cluster: true,
             pipeline: vec![],
-            options: None,
+            options: Some(options),
             session: Implicit,
         }
     }
@@ -219,6 +218,7 @@ impl<'a, S: Session> Watch<'a, S> {
         /// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
         /// field will be populated. By default, the field will be empty for updates.
         full_document: FullDocumentType,
+
         /// Configures how the
         /// [`ChangeStreamEvent::full_document_before_change`](
         /// crate::change_stream::event::ChangeStreamEvent::full_document_before_change) field will be
@@ -277,7 +277,6 @@ impl<'a> Watch<'a, Implicit> {
         Watch {
             client: self.client,
             target: self.target,
-            cluster: self.cluster,
             pipeline: self.pipeline,
             options: self.options,
             session: Explicit(session),
@@ -296,11 +295,6 @@ impl<'a> IntoFuture for Watch<'a, Implicit> {
                 self.options,
                 [read_concern, selection_criteria]
             );
-            if self.cluster {
-                self.options
-                    .get_or_insert_with(Default::default)
-                    .all_changes_for_cluster = Some(true);
-            }
             self.client
                 .execute_watch(self.pipeline, self.options, self.target, None)
                 .await
@@ -325,11 +319,6 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
                 self.options,
                 Some(&mut *self.session.0)
             )?;
-            if self.cluster {
-                self.options
-                    .get_or_insert_with(Default::default)
-                    .all_changes_for_cluster = Some(true);
-            }
             self.client
                 .execute_watch_with_session(
                     self.pipeline,
