@@ -18,7 +18,7 @@ use crate::{
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,
-    ClientSession, Database,
+    ClientSession, Database, Collection,
 };
 
 impl Client {
@@ -85,6 +85,40 @@ impl Database {
     }
 }
 
+impl<T> Collection<T> {
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this collection. A
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
+    /// collections.
+    ///
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    pub fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+    ) -> Watch {
+        Watch {
+            client: self.client(),
+            target: self.namespace().into(),
+            cluster: false,
+            pipeline: pipeline.into_iter().collect(),
+            options: None,
+            session: Implicit,
+        }
+    }
+}
+
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl crate::sync::Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
@@ -134,6 +168,34 @@ impl crate::sync::Database {
         pipeline: impl IntoIterator<Item = Document>,
      ) -> Watch {
         self.async_database.watch(pipeline)
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<T> crate::sync::Collection<T> {
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this collection. A
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
+    /// collections.
+    ///
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    pub fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+    ) -> Watch {
+        self.async_collection.watch(pipeline)
     }
 }
 
