@@ -160,6 +160,7 @@ pub struct Watch<'a, S: Session = Implicit> {
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
+    cluster: bool,
 }
 
 impl<'a> Watch<'a, Implicit> {
@@ -170,18 +171,18 @@ impl<'a> Watch<'a, Implicit> {
             pipeline: vec![],
             options: None,
             session: Implicit,
+            cluster: false,
         }
     }
 
     fn new_cluster(client: &'a Client) -> Self {
-        let mut options = ChangeStreamOptions::default();
-        options.all_changes_for_cluster = Some(true);
         Self {
             client,
             target: AggregateTarget::Database("admin".to_string()),
             pipeline: vec![],
-            options: Some(options),
+            options: None,
             session: Implicit,
+            cluster: true,
         }
     }
 }
@@ -280,6 +281,7 @@ impl<'a> Watch<'a, Implicit> {
             pipeline: self.pipeline,
             options: self.options,
             session: Explicit(session),
+            cluster: self.cluster,
         }
     }
 }
@@ -295,6 +297,11 @@ impl<'a> IntoFuture for Watch<'a, Implicit> {
                 self.options,
                 [read_concern, selection_criteria]
             );
+            if self.cluster {
+                self.options
+                    .get_or_insert_with(Default::default)
+                    .all_changes_for_cluster = Some(true);
+            }
             self.client
                 .execute_watch(self.pipeline, self.options, self.target, None)
                 .await
@@ -319,6 +326,11 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
                 self.options,
                 Some(&mut *self.session.0)
             )?;
+            if self.cluster {
+                self.options
+                    .get_or_insert_with(Default::default)
+                    .all_changes_for_cluster = Some(true);
+            }
             self.client
                 .execute_watch_with_session(
                     self.pipeline,
