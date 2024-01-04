@@ -155,7 +155,7 @@ where
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// let mut change_stream = coll.watch(None, None).await?;
+    /// let mut change_stream = coll.watch().await?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any().await? {

@@ -22,3 +22,5 @@ chmod -R 555 ${CARGO_HOME}/registry/src
 # this invocation mirrors the way docs.rs builds our documentation (see the [package.metadata.docs.rs] section
 # in Cargo.toml).
 cargo +nightly rustdoc $ADDITIONAL_FEATURES -- -D warnings --cfg docsrs
+
+cargo test --doc $ADDITIONAL_FEATURES
