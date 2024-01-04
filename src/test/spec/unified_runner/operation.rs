@@ -2346,16 +2346,21 @@ impl TestOperation for CreateChangeStream {
             let target = entities.get(id).unwrap();
             let stream = match target {
                 Entity::Client(ce) => {
-                    ce.watch(self.pipeline.clone())
+                    ce.watch()
+                        .pipeline(self.pipeline.clone())
                         .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Database(db) => {
-                    db.watch(self.pipeline.clone(), self.options.clone())
+                    db.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Collection(coll) => {
-                    coll.watch(self.pipeline.clone(), self.options.clone())
+                    coll.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 _ => panic!("Invalid entity for createChangeStream"),

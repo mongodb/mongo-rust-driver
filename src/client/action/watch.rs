@@ -40,15 +40,8 @@ impl Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub fn watch(&self, pipeline: impl IntoIterator<Item = Document>) -> Watch {
-        Watch {
-            client: &self,
-            target: AggregateTarget::Database("admin".to_string()),
-            cluster: true,
-            pipeline: pipeline.into_iter().collect(),
-            options: None,
-            session: Implicit,
-        }
+    pub fn watch(&self) -> Watch {
+        Watch::new_cluster(&self)
     }
 }
 
@@ -72,16 +65,8 @@ impl Database {
     /// changed via [`ChangeStream::with_type`].
     pub fn watch(
         &self,
-        pipeline: impl IntoIterator<Item = Document>,
     ) -> Watch {
-        Watch {
-            client: self.client(),
-            target: AggregateTarget::Database(self.name().to_string()),
-            cluster: false,
-            pipeline: pipeline.into_iter().collect(),
-            options: None,
-            session: Implicit,
-        }
+        Watch::new(self.client(), AggregateTarget::Database(self.name().to_string()))
     }
 }
 
@@ -96,26 +81,10 @@ impl<T> Collection<T> {
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    ///
-    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
     pub fn watch(
         &self,
-        pipeline: impl IntoIterator<Item = Document>,
     ) -> Watch {
-        Watch {
-            client: self.client(),
-            target: self.namespace().into(),
-            cluster: false,
-            pipeline: pipeline.into_iter().collect(),
-            options: None,
-            session: Implicit,
-        }
+        Watch::new(self.client(), self.namespace().into())
     }
 }
 
@@ -131,16 +100,8 @@ impl crate::sync::Client {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
-    /// will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub fn watch(&self, pipeline: impl IntoIterator<Item = Document>) -> Watch {
-        self.async_client.watch(pipeline)
+    pub fn watch(&self) -> Watch {
+        self.async_client.watch()
     }
 }
 
@@ -155,19 +116,10 @@ impl crate::sync::Database {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
     pub fn watch(
         &self,
-        pipeline: impl IntoIterator<Item = Document>,
      ) -> Watch {
-        self.async_database.watch(pipeline)
+        self.async_database.watch()
     }
 }
 
@@ -183,19 +135,10 @@ impl<T> crate::sync::Collection<T> {
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    ///
-    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
     pub fn watch(
         &self,
-        pipeline: impl IntoIterator<Item = Document>,
     ) -> Watch {
-        self.async_collection.watch(pipeline)
+        self.async_collection.watch()
     }
 }
 
@@ -223,7 +166,56 @@ pub struct Watch<'a, S: Session = Implicit> {
     session: S,
 }
 
+impl<'a> Watch<'a, Implicit> {
+    fn new(client: &'a Client, target: AggregateTarget) -> Self {
+        Self {
+            client,
+            target,
+            cluster: false,
+            pipeline: vec![],
+            options: None,
+            session: Implicit,
+        }
+    }
+
+    fn new_cluster(client: &'a Client) -> Self {
+        Self {
+            client,
+            target: AggregateTarget::Database("admin".to_string()),
+            cluster: true,
+            pipeline: vec![],
+            options: None,
+            session: Implicit,
+        }
+    }
+}
+
 impl<'a, S: Session> Watch<'a, S> {
+    /// Apply an aggregation pipeline to the change stream.
+    /// 
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    pub fn pipeline(mut self, value: impl IntoIterator<Item = Document>) -> Self {
+        self.pipeline = value.into_iter().collect();
+        self
+    }
+
+    /// Specifies the logical starting point for the new change stream. Note that if a watched
+    /// collection is dropped and recreated or newly renamed, `start_after` should be set instead.
+    /// `resume_after` and `start_after` cannot be set simultaneously.
+    ///
+    /// For more information on resuming a change stream see the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-after)
+    pub fn resume_after(mut self, value: impl Into<Option<ResumeToken>>) -> Self {
+        // Implemented manually to accept `impl Into<Option<ResumeToken>>` so the output of `ChangeStream::resume_token()` can be passed in directly.
+        self.options().resume_after = value.into();
+        self
+    }
+
     option_setters!(options: ChangeStreamOptions;
         /// Configures how the
         /// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
@@ -234,13 +226,6 @@ impl<'a, S: Session> Watch<'a, S> {
         /// crate::change_stream::event::ChangeStreamEvent::full_document_before_change) field will be
         /// populated.  By default, the field will be empty for updates.
         full_document_before_change: FullDocumentBeforeChangeType,
-
-        /// Specifies the logical starting point for the new change stream. Note that if a watched
-        /// collection is dropped and recreated or newly renamed, `start_after` should be set instead.
-        /// `resume_after` and `start_after` cannot be set simultaneously.
-        ///
-        /// For more information on resuming a change stream see the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-after)
-        resume_after: ResumeToken,
 
         /// The change stream will only provide changes that occurred at or after the specified
         /// timestamp. Any command run against the server will return an operation time that can be

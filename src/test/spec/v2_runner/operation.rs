@@ -1489,10 +1489,10 @@ impl TestOperation for Watch {
         async move {
             match session {
                 None => {
-                    collection.watch(None, None).await?;
+                    collection.watch().await?;
                 }
                 Some(s) => {
-                    collection.watch_with_session(None, None, s).await?;
+                    collection.watch().with_session(s).await?;
                 }
             }
             Ok(None)
@@ -1508,10 +1508,10 @@ impl TestOperation for Watch {
         async move {
             match session {
                 None => {
-                    database.watch(None, None).await?;
+                    database.watch().await?;
                 }
                 Some(s) => {
-                    database.watch_with_session(None, None, s).await?;
+                    database.watch().with_session(s).await?;
                 }
             }
             Ok(None)
@@ -1524,7 +1524,7 @@ impl TestOperation for Watch {
         client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            client.watch(None).await?;
+            client.watch().await?;
             Ok(None)
         }
         .boxed()
