@@ -20,7 +20,7 @@ impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
     pub fn list_databases(&self) -> ListDatabases {
         ListDatabases {
-            client: &self,
+            client: self,
             options: Default::default(),
             session: None,
             mode: PhantomData,
@@ -30,7 +30,7 @@ impl Client {
     /// Gets the names of the databases present in the cluster the Client is connected to.
     pub fn list_database_names(&self) -> ListDatabases<'_, Names> {
         ListDatabases {
-            client: &self,
+            client: self,
             options: Default::default(),
             session: None,
             mode: PhantomData,

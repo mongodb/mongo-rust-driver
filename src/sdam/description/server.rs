@@ -18,7 +18,7 @@ const DRIVER_MIN_WIRE_VERSION: i32 = 6;
 const DRIVER_MAX_WIRE_VERSION: i32 = 21;
 
 /// Enum representing the possible types of servers that the driver can connect to.
-#[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq, Serialize, Default)]
 #[non_exhaustive]
 pub enum ServerType {
     /// A single, non-replica set mongod.
@@ -53,6 +53,7 @@ pub enum ServerType {
 
     /// A server that the driver hasn't yet communicated with or can't connect to.
     #[serde(alias = "PossiblePrimary")]
+    #[default]
     Unknown,
 }
 
@@ -74,12 +75,6 @@ impl ServerType {
 
     pub(crate) fn is_available(self) -> bool {
         !matches!(self, ServerType::Unknown)
-    }
-}
-
-impl Default for ServerType {
-    fn default() -> Self {
-        ServerType::Unknown
     }
 }
 
