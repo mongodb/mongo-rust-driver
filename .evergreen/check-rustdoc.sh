@@ -13,8 +13,6 @@ source ./.evergreen/env.sh
 
 source ./.evergreen/feature-combinations.sh
 
-cargo test --doc $ADDITIONAL_FEATURES
-
 # build with all available features to ensure all optional dependencies are brought in too.
 cargo +nightly build $ADDITIONAL_FEATURES
 cargo clean

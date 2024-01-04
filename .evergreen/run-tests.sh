@@ -29,4 +29,8 @@ set +o errexit
 
 cargo_test "" results.xml
 
+# cargo-nextest doesn't support doc tests
+RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)
+((CARGO_RESULT = ${CARGO_RESULT} || $?))
+
 exit $CARGO_RESULT
