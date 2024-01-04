@@ -414,10 +414,7 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
     assert_eq!(stream.resume_token().as_ref(), Some(&expected_id));
 
     // Case: empty batch, `resume_after` specified
-    let mut stream = coll
-        .watch()
-        .resume_after(expected_id.clone())
-        .await?;
+    let mut stream = coll.watch().resume_after(expected_id.clone()).await?;
     assert_eq!(stream.next_if_any().await?, None);
     assert_eq!(stream.resume_token(), Some(expected_id));
 
@@ -493,17 +490,11 @@ async fn aggregate_batch() -> Result<()> {
     coll.insert_one(doc! {}, None).await?;
 
     // Case: `start_after` is given
-    let stream = coll
-        .watch()
-        .start_after(token.clone())
-        .await?;
+    let stream = coll.watch().start_after(token.clone()).await?;
     assert_eq!(stream.resume_token().as_ref(), Some(&token));
 
     // Case: `resume_after` is given
-    let stream = coll
-        .watch()
-        .resume_after(token.clone())
-        .await?;
+    let stream = coll.watch().resume_after(token.clone()).await?;
     assert_eq!(stream.resume_token().as_ref(), Some(&token));
 
     Ok(())
@@ -535,10 +526,7 @@ async fn resume_uses_start_after() -> Result<()> {
     stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
-    let mut stream = coll
-        .watch()
-        .start_after(token.clone())
-        .await?;
+    let mut stream = coll.watch().start_after(token.clone()).await?;
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}, None).await?;
@@ -595,10 +583,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
-    let mut stream = coll
-        .watch()
-        .start_after(token.clone())
-        .await?;
+    let mut stream = coll.watch().start_after(token.clone()).await?;
 
     // Create an event and read it.
     coll.insert_one(doc! {}, None).await?;

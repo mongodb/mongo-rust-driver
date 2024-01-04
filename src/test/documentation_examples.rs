@@ -1800,7 +1800,8 @@ async fn change_streams_examples() -> Result<()> {
         {
             // Start Changestream Example 2
             use futures::stream::TryStreamExt;
-            let mut stream = inventory.watch()
+            let mut stream = inventory
+                .watch()
                 .full_document(FullDocumentType::UpdateLookup)
                 .await?;
             let next = stream.try_next().await?;
@@ -1812,9 +1813,7 @@ async fn change_streams_examples() -> Result<()> {
             // Start Changestream Example 3
             use futures::stream::TryStreamExt;
             let resume_token = stream.resume_token();
-            let mut stream = inventory.watch()
-                .resume_after(resume_token)
-                .await?;
+            let mut stream = inventory.watch().resume_after(resume_token).await?;
             stream.try_next().await?;
             // End Changestream Example 3
         }

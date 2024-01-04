@@ -14,14 +14,7 @@ use crate::{
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{
-        Aggregate,
-        Create,
-        DropDatabase,
-        ListCollections,
-        RunCommand,
-        RunCursorCommand,
-    },
+    operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand, RunCursorCommand},
     options::{
         AggregateOptions,
         CollectionOptions,

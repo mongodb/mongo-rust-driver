@@ -18,7 +18,9 @@ use crate::{
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,
-    ClientSession, Database, Collection,
+    ClientSession,
+    Collection,
+    Database,
 };
 
 impl Client {
@@ -63,10 +65,11 @@ impl Database {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-    ) -> Watch {
-        Watch::new(self.client(), AggregateTarget::Database(self.name().to_string()))
+    pub fn watch(&self) -> Watch {
+        Watch::new(
+            self.client(),
+            AggregateTarget::Database(self.name().to_string()),
+        )
     }
 }
 
@@ -81,9 +84,7 @@ impl<T> Collection<T> {
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    pub fn watch(
-        &self,
-    ) -> Watch {
+    pub fn watch(&self) -> Watch {
         Watch::new(self.client(), self.namespace().into())
     }
 }
@@ -116,9 +117,7 @@ impl crate::sync::Database {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    pub fn watch(
-        &self,
-     ) -> Watch {
+    pub fn watch(&self) -> Watch {
         self.async_database.watch()
     }
 }
@@ -135,9 +134,7 @@ impl<T> crate::sync::Collection<T> {
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    pub fn watch(
-        &self,
-    ) -> Watch {
+    pub fn watch(&self) -> Watch {
         self.async_collection.watch()
     }
 }
@@ -192,7 +189,7 @@ impl<'a> Watch<'a, Implicit> {
 
 impl<'a, S: Session> Watch<'a, S> {
     /// Apply an aggregation pipeline to the change stream.
-    /// 
+    ///
     /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
     /// fields will cause an error. The driver requires these fields to support resumability. For
     /// more information on resumability, see the documentation for
@@ -211,7 +208,8 @@ impl<'a, S: Session> Watch<'a, S> {
     ///
     /// For more information on resuming a change stream see the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-after)
     pub fn resume_after(mut self, value: impl Into<Option<ResumeToken>>) -> Self {
-        // Implemented manually to accept `impl Into<Option<ResumeToken>>` so the output of `ChangeStream::resume_token()` can be passed in directly.
+        // Implemented manually to accept `impl Into<Option<ResumeToken>>` so the output of
+        // `ChangeStream::resume_token()` can be passed in directly.
         self.options().resume_after = value.into();
         self
     }

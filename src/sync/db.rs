@@ -1,12 +1,6 @@
 use std::fmt::Debug;
 
-use super::{
-    gridfs::GridFsBucket,
-    ClientSession,
-    Collection,
-    Cursor,
-    SessionCursor,
-};
+use super::{gridfs::GridFsBucket, ClientSession, Collection, Cursor, SessionCursor};
 use crate::{
     bson::Document,
     error::Result,
