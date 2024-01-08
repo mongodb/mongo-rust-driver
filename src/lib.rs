@@ -367,6 +367,9 @@ pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam:
 
 pub use client::action;
 
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+
+
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(
     "`tokio-runtime` and `sync` can't both be enabled; either switch to using `tokio-sync` or set \

@@ -33,7 +33,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{Error, ErrorKind, Result},
-    event::command::{handle_command_event, CommandEvent},
+    event::command::CommandEvent,
     id_set::IdSet,
     options::{
         ClientOptions,
@@ -141,8 +141,6 @@ struct ClientInner {
     shutdown: Shutdown,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
-    broadcast: self::event::Broadcast,
-    
 }
 
 #[derive(Debug)]
@@ -177,7 +175,6 @@ impl Client {
             },
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
-            broadcast: Default::default(),
         });
         Ok(Self { inner })
     }
@@ -274,9 +271,8 @@ impl Client {
         } else {
             None
         };
-        let apm_event_handler = self.inner.options.command_event_handler.as_ref();
         let test_channel = self.test_command_event_channel();
-        let should_send = apm_event_handler.is_some() || test_channel.is_some() || self.inner.broadcast.command_is_receiving();
+        let should_send = test_channel.is_some() || self.options().command_event_handler.is_some();
         #[cfg(feature = "tracing-unstable")]
         let should_send = should_send || tracing_emitter.is_some();
         if !should_send {
@@ -289,14 +285,13 @@ impl Client {
             let _ = tx.send(msg).await;
             ack.wait_for_acknowledgment().await;
         }
-        if let Some(handler) = apm_event_handler {
-            handle_command_event(handler.as_ref(), event.clone());
-        }
         #[cfg(feature = "tracing-unstable")]
         if let Some(ref tracing_emitter) = tracing_emitter {
-            handle_command_event(tracing_emitter, event.clone());
+            tracing_emitter.handle(event.clone());
         }
-        self.inner.broadcast.send_command(event);
+        if let Some(handler) = &self.options().command_event_handler {
+            handler.handle(event).await;
+        }
     }
 
     /// Gets the default selection criteria the `Client` uses for operations..
@@ -679,7 +674,6 @@ impl Client {
         .ok()
     }
 
-    #[cfg(test)]
     pub(crate) fn options(&self) -> &ClientOptions {
         &self.inner.options
     }

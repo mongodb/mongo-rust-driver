@@ -32,7 +32,7 @@ use crate::{
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
-    event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
+    event::{cmap::CmapEventHandler, sdam::SdamEventHandler},
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
@@ -418,7 +418,7 @@ pub struct ClientOptions {
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
     #[serde(skip)]
-    pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
+    pub command_event_handler: Option<super::event::EventHandler<crate::event::command::CommandEvent>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.
