@@ -305,7 +305,7 @@ async fn cluster_time_in_commands() {
     let handler = Arc::new(EventHandler::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
-    options.command_event_handler = Some(handler.clone());
+    options.command_event_handler = Some(handler.clone().into());
     options.sdam_event_handler = Some(handler.clone());
 
     // Ensure we only connect to one server so the monitor checks from other servers

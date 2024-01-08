@@ -93,6 +93,61 @@ pub struct CommandFailedEvent {
     pub service_id: Option<ObjectId>,
 }
 
+/// Usage of this trait is deprecated.  Applications should use the simpler EventHandler API.
+///
+/// Applications can implement this trait to specify custom logic to run on each command event sent
+/// by the driver.
+///
+/// ```rust
+/// # use std::sync::Arc;
+/// #
+/// # use mongodb::{
+/// #     error::Result,
+/// #     event::command::{
+/// #         CommandEventHandler,
+/// #         CommandFailedEvent
+/// #     },
+/// #     options::ClientOptions,
+/// # };
+/// # #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+/// # use mongodb::sync::Client;
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
+/// # use mongodb::Client;
+/// #
+/// struct FailedCommandLogger;
+///
+/// impl CommandEventHandler for FailedCommandLogger {
+///     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
+///         eprintln!("Failed command: {:?}", event);
+///     }
+/// }
+///
+/// # fn do_stuff() -> Result<()> {
+/// let handler: Arc<dyn CommandEventHandler> = Arc::new(FailedCommandLogger);
+/// let options = ClientOptions::builder()
+///                   .command_event_handler(handler)
+///                   .build();
+/// let client = Client::with_options(options)?;
+///
+/// // Do things with the client, and failed command events will be logged to stderr.
+/// # Ok(())
+/// # }
+/// ```
+#[deprecated]
+pub trait CommandEventHandler: Send + Sync {
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command is initiated.
+    fn handle_command_started_event(&self, _event: CommandStartedEvent) {}
+
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command successfully completes.
+    fn handle_command_succeeded_event(&self, _event: CommandSucceededEvent) {}
+
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command fails to complete successfully.
+    fn handle_command_failed_event(&self, _event: CommandFailedEvent) {}
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[allow(missing_docs)]
 #[serde(untagged)]

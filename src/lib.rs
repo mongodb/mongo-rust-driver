@@ -367,6 +367,7 @@ pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam:
 
 pub use client::action;
 
+/// A boxed future.
 pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 

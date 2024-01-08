@@ -14,7 +14,7 @@ use crate::{
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::{CommandEvent, CommandEventHandler},
+        command::CommandEvent,
     },
     options::{ClientOptions, FindOptions, InsertManyOptions},
     runtime,
@@ -401,7 +401,7 @@ async fn retry_write_pool_cleared() {
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
-    client_options.command_event_handler = Some(handler.clone() as Arc<dyn CommandEventHandler>);
+    client_options.command_event_handler = Some(handler.clone().into());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);

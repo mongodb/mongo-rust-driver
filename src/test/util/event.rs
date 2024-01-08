@@ -32,7 +32,6 @@ use crate::{
         },
         command::{
             CommandEvent,
-            CommandEventHandler,
             CommandFailedEvent,
             CommandStartedEvent,
             CommandSucceededEvent,
@@ -448,7 +447,8 @@ impl SdamEventHandler for EventHandler {
     }
 }
 
-impl CommandEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::command::CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
         let event = CommandEvent::Started(event);
         self.handle(event.clone());

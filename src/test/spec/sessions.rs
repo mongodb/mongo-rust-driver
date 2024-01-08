@@ -10,7 +10,7 @@ use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
     error::{ErrorKind, Result},
-    event::command::{CommandEvent, CommandEventHandler, CommandStartedEvent},
+    event::command::{CommandEvent, CommandStartedEvent},
     options::SessionOptions,
     runtime::process::Process,
     test::{
@@ -92,7 +92,8 @@ async fn implicit_session_after_connection() {
         lsids: Mutex<Vec<Document>>,
     }
 
-    impl CommandEventHandler for EventHandler {
+    #[allow(deprecated)]
+    impl crate::event::command::CommandEventHandler for EventHandler {
         fn handle_command_started_event(&self, event: CommandStartedEvent) {
             self.lsids
                 .lock()
@@ -113,7 +114,7 @@ async fn implicit_session_after_connection() {
             options.max_pool_size = Some(1);
             options.retry_writes = Some(true);
             options.hosts.drain(1..);
-            options.command_event_handler = Some(event_handler.clone());
+            options.command_event_handler = Some(event_handler.clone().into());
             Client::with_options(options).unwrap()
         };
 
