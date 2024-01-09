@@ -30,12 +30,7 @@ use crate::{
             PoolCreatedEvent,
             PoolReadyEvent,
         },
-        command::{
-            CommandEvent,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
-        },
+        command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::{
             SdamEventHandler,
             ServerClosedEvent,

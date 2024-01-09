@@ -20,7 +20,8 @@ use crate::{
     options::{SessionOptions, TransactionOptions},
     sdam::{ServerInfo, TransactionSupportStatus},
     selection_criteria::SelectionCriteria,
-    Client, BoxFuture,
+    BoxFuture,
+    Client,
 };
 pub use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;

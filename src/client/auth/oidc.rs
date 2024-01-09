@@ -16,7 +16,8 @@ use crate::{
         options::ServerApi,
     },
     cmap::Connection,
-    error::{Error, Result}, BoxFuture,
+    error::{Error, Result},
+    BoxFuture,
 };
 
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};

@@ -26,7 +26,9 @@ impl<T> From<tokio::sync::mpsc::Sender<T>> for EventHandler<T> {
 }
 
 #[allow(deprecated)]
-impl<T: crate::event::command::CommandEventHandler + 'static> From<Arc<T>> for EventHandler<CommandEvent> {
+impl<T: crate::event::command::CommandEventHandler + 'static> From<Arc<T>>
+    for EventHandler<CommandEvent>
+{
     fn from(value: Arc<T>) -> Self {
         Self::Legacy(LegacyEventHandler(Arc::new(move |ev| match ev {
             CommandEvent::Started(e) => value.handle_command_started_event(e),

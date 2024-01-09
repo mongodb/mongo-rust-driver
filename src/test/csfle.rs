@@ -32,11 +32,7 @@ use tokio::net::TcpListener;
 use crate::{
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
     error::{ErrorKind, WriteError, WriteFailure},
-    event::command::{
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
-    },
+    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{
         CollectionOptions,
         CreateCollectionOptions,
