@@ -92,7 +92,3 @@ impl<T: Send + Sync + 'static> EventHandler<T> {
         }
     }
 }
-
-/// A container for a legacy `*EventHandler` trait impl.
-#[derive(Clone)]
-pub struct LegacyEventHandler<T>(Arc<dyn Fn(T) + Send + Sync>);
