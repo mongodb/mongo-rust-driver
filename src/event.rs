@@ -11,7 +11,9 @@ use futures_core::future::BoxFuture;
 use crate::event::command::CommandEvent;
 
 /// A destination for events.  Allows implicit conversion via [`From`] for concrete types for
-/// convenience with [`crate::options::ClientOptions`] construction: ```rust
+/// convenience with [`crate::options::ClientOptions`] construction:
+///
+/// ```rust
 /// # use mongodb::options::ClientOptions;
 /// # fn example() {
 /// let (tx, rx) = tokio::sync::mpsc::channel(100);
@@ -20,7 +22,9 @@ use crate::event::command::CommandEvent;
 ///                 .build();
 /// # }
 /// ```
+///
 /// or explicit construction for `Fn` traits:
+///
 /// ```rust
 /// # use mongodb::options::ClientOptions;
 /// # use mongodb::event::EventHandler;
@@ -29,6 +33,7 @@ use crate::event::command::CommandEvent;
 ///                 .command_event_handler(EventHandler::callback(|ev| println!("{:?}", ev)))
 ///                 .build();
 /// # }
+/// ```
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum EventHandler<T> {
