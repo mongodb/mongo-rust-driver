@@ -369,9 +369,7 @@ pub trait CmapEventHandler: Send + Sync {
 }
 
 #[derive(Clone, Debug, PartialEq, From)]
-#[non_exhaustive]
-#[allow(missing_docs)]
-pub enum CmapEvent {
+pub(crate) enum CmapEvent {
     PoolCreated(PoolCreatedEvent),
     PoolReady(PoolReadyEvent),
     PoolCleared(PoolClearedEvent),

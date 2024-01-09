@@ -416,10 +416,10 @@ pub struct ClientOptions {
     ///
     /// Note that monitoring command events may incur a performance penalty.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub command_event_handler:
-        Option<super::event::EventHandler<crate::event::command::CommandEvent>>,
+        Option<crate::event::EventHandler<crate::event::command::CommandEvent>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.

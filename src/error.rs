@@ -467,8 +467,7 @@ impl Error {
             | ErrorKind::Authentication { .. }
             | ErrorKind::Custom(_)
             | ErrorKind::Shutdown
-            | ErrorKind::GridFs(_)
-            | ErrorKind::EventLagged(_) => {}
+            | ErrorKind::GridFs(_) => {}
             #[cfg(feature = "in-use-encryption-unstable")]
             ErrorKind::Encryption(_) => {}
         }
@@ -631,11 +630,6 @@ pub enum ErrorKind {
     /// A method was called on a client that was shut down.
     #[error("Client has been shut down")]
     Shutdown,
-
-    /// Event receivers have lagged behind event production and the given number of events were
-    /// dropped.
-    #[error("Event receiver lag caused {0} missed events")]
-    EventLagged(u64),
 }
 
 impl ErrorKind {

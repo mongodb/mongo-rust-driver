@@ -30,8 +30,22 @@ exclude = [
 # list in the [package.metadata.docs.rs] section below.
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/macros", "tokio/net", "tokio/process", "tokio/rt", "tokio/time", "serde_bytes"]
-async-std-runtime = ["async-executor", "async-std", "async-std/attributes", "async-std/unstable", "async-std-resolver", "tokio-util/compat"]
+tokio-runtime = [
+    "tokio/macros",
+    "tokio/net",
+    "tokio/process",
+    "tokio/rt",
+    "tokio/time",
+    "serde_bytes",
+]
+async-std-runtime = [
+    "async-executor",
+    "async-std",
+    "async-std/attributes",
+    "async-std/unstable",
+    "async-std-resolver",
+    "tokio-util/compat",
+]
 sync = ["async-std-runtime"]
 tokio-sync = ["tokio-runtime"]
 openssl-tls = ["openssl", "openssl-probe", "tokio-openssl"]

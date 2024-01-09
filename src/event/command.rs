@@ -123,7 +123,7 @@ pub struct CommandFailedEvent {
 /// }
 ///
 /// # fn do_stuff() -> Result<()> {
-/// let handler: Arc<dyn CommandEventHandler> = Arc::new(FailedCommandLogger);
+/// let handler = Arc::new(FailedCommandLogger);
 /// let options = ClientOptions::builder()
 ///                   .command_event_handler(handler)
 ///                   .build();

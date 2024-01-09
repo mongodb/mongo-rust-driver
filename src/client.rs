@@ -2,7 +2,6 @@ pub mod action;
 pub mod auth;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) mod csfle;
-mod event;
 mod executor;
 pub mod options;
 pub mod session;
@@ -290,7 +289,7 @@ impl Client {
             tracing_emitter.handle(event.clone());
         }
         if let Some(handler) = &self.options().command_event_handler {
-            handler.handle(event).await;
+            handler.handle(event);
         }
     }
 
