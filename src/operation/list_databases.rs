@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::{Bson, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -31,14 +28,6 @@ pub(crate) struct Options {
 impl ListDatabases {
     pub fn new(name_only: bool, options: Option<Options>) -> Self {
         ListDatabases { name_only, options }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        ListDatabases {
-            name_only: false,
-            options: None,
-        }
     }
 }
 

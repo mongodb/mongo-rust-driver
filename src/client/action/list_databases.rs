@@ -18,6 +18,8 @@ use super::option_setters;
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
+    ///
+    /// `await` will return `Result<Vec<`[`DatabaseSpecification`]`>>`.
     pub fn list_databases(&self) -> ListDatabases {
         ListDatabases {
             client: self,
@@ -28,7 +30,9 @@ impl Client {
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(&self) -> ListDatabases<'_, Names> {
+    ///
+    /// `await` will return `Result<Vec<String>>`.
+    pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         ListDatabases {
             client: self,
             options: Default::default(),
@@ -41,39 +45,35 @@ impl Client {
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl SyncClient {
     /// Gets information about each database present in the cluster the Client is connected to.
+    ///
+    /// [run](ListDatabases::run) will return `Result<Vec<`[`DatabaseSpecification`]`>>`.
     pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(&self) -> ListDatabases<'_, Names> {
+    ///
+    /// [run](ListDatabases::run) will return `Result<Vec<String>>`.
+    pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         self.async_client.list_database_names()
     }
 }
 
-/// Gets information about each database present in the cluster the Client is connected to.
+/// Gets information about each database present in the cluster the Client is connected to.  Create
+/// by calling [`Client::list_databases`] or [`Client::list_database_names`] and execute with
+/// `await` (or [run](ListDatabases::run) if using the sync client).
 #[must_use]
-pub struct ListDatabases<'a, M: Mode = Full> {
+pub struct ListDatabases<'a, M = ListSpecifications> {
     client: &'a Client,
     options: Option<op::Options>,
     session: Option<&'a mut ClientSession>,
     mode: PhantomData<M>,
 }
 
-mod private {
-    pub trait Sealed {}
-    impl Sealed for super::Full {}
-    impl Sealed for super::Names {}
-}
+pub struct ListSpecifications;
+pub struct ListNames;
 
-pub trait Mode: private::Sealed {}
-impl Mode for Full {}
-impl Mode for Names {}
-
-pub struct Full;
-pub struct Names;
-
-impl<'a, M: Mode> ListDatabases<'a, M> {
+impl<'a, M> ListDatabases<'a, M> {
     option_setters!(options: op::Options;
         /// Filters the query.
         filter: Document,
@@ -96,7 +96,7 @@ impl<'a, M: Mode> ListDatabases<'a, M> {
     }
 }
 
-impl<'a> IntoFuture for ListDatabases<'a, Full> {
+impl<'a> IntoFuture for ListDatabases<'a, ListSpecifications> {
     type Output = Result<Vec<DatabaseSpecification>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
@@ -118,7 +118,7 @@ impl<'a> IntoFuture for ListDatabases<'a, Full> {
     }
 }
 
-impl<'a> IntoFuture for ListDatabases<'a, Names> {
+impl<'a> IntoFuture for ListDatabases<'a, ListNames> {
     type Output = Result<Vec<String>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
@@ -147,7 +147,7 @@ impl<'a> IntoFuture for ListDatabases<'a, Names> {
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a, M: Mode> ListDatabases<'a, M>
+impl<'a, M> ListDatabases<'a, M>
 where
     Self: IntoFuture,
 {

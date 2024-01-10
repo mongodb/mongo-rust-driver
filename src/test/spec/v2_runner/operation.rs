@@ -1492,7 +1492,7 @@ impl TestOperation for Watch {
                     collection.watch().await?;
                 }
                 Some(s) => {
-                    collection.watch().with_session(s).await?;
+                    collection.watch().session(s).await?;
                 }
             }
             Ok(None)
@@ -1511,7 +1511,7 @@ impl TestOperation for Watch {
                     database.watch().await?;
                 }
                 Some(s) => {
-                    database.watch().with_session(s).await?;
+                    database.watch().session(s).await?;
                 }
             }
             Ok(None)

@@ -42,6 +42,10 @@ impl Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
+    ///
+    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
+    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// [`ClientSession`] has been provided.
     pub fn watch(&self) -> Watch {
         Watch::new_cluster(self)
     }
@@ -61,10 +65,14 @@ impl Database {
     /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
     /// fields will cause an error. The driver requires these fields to support resumability. For
     /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html).
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
+    ///
+    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
+    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// [`ClientSession`] has been provided.
     pub fn watch(&self) -> Watch {
         Watch::new(
             self.client(),
@@ -84,6 +92,10 @@ impl<T> Collection<T> {
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
+    ///
+    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
+    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// [`ClientSession`] has been provided.
     pub fn watch(&self) -> Watch {
         Watch::new(self.client(), self.namespace().into())
     }
@@ -139,22 +151,14 @@ impl<T> crate::sync::Collection<T> {
     }
 }
 
-mod private {
-    pub trait Sealed {}
-    impl Sealed for super::Implicit {}
-    impl<'a> Sealed for super::Explicit<'a> {}
-}
+pub struct ImplicitSession;
+pub struct ExplicitSession<'a>(&'a mut ClientSession);
 
-pub trait Session: private::Sealed {}
-impl Session for Implicit {}
-impl<'a> Session for Explicit<'a> {}
-
-pub struct Implicit;
-pub struct Explicit<'a>(&'a mut ClientSession);
-
-/// Starts a new [`ChangeStream`] that receives events for all changes in the cluster.
+/// Starts a new [`ChangeStream`] that receives events for all changes in a given scope.  Create by
+/// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`] and execute with
+/// `await` (or [run](Watch::run) if using the sync client).
 #[must_use]
-pub struct Watch<'a, S: Session = Implicit> {
+pub struct Watch<'a, S = ImplicitSession> {
     client: &'a Client,
     target: AggregateTarget,
     pipeline: Vec<Document>,
@@ -163,14 +167,14 @@ pub struct Watch<'a, S: Session = Implicit> {
     cluster: bool,
 }
 
-impl<'a> Watch<'a, Implicit> {
+impl<'a> Watch<'a, ImplicitSession> {
     fn new(client: &'a Client, target: AggregateTarget) -> Self {
         Self {
             client,
             target,
             pipeline: vec![],
             options: None,
-            session: Implicit,
+            session: ImplicitSession,
             cluster: false,
         }
     }
@@ -181,13 +185,13 @@ impl<'a> Watch<'a, Implicit> {
             target: AggregateTarget::Database("admin".to_string()),
             pipeline: vec![],
             options: None,
-            session: Implicit,
+            session: ImplicitSession,
             cluster: true,
         }
     }
 }
 
-impl<'a, S: Session> Watch<'a, S> {
+impl<'a, S> Watch<'a, S> {
     /// Apply an aggregation pipeline to the change stream.
     ///
     /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
@@ -272,21 +276,21 @@ impl<'a, S: Session> Watch<'a, S> {
     );
 }
 
-impl<'a> Watch<'a, Implicit> {
+impl<'a> Watch<'a, ImplicitSession> {
     /// Use the provided ['ClientSession'].
-    pub fn with_session<'s>(self, session: &'s mut ClientSession) -> Watch<'a, Explicit<'s>> {
+    pub fn session<'s>(self, session: &'s mut ClientSession) -> Watch<'a, ExplicitSession<'s>> {
         Watch {
             client: self.client,
             target: self.target,
             pipeline: self.pipeline,
             options: self.options,
-            session: Explicit(session),
+            session: ExplicitSession(session),
             cluster: self.cluster,
         }
     }
 }
 
-impl<'a> IntoFuture for Watch<'a, Implicit> {
+impl<'a> IntoFuture for Watch<'a, ImplicitSession> {
     type Output = Result<ChangeStream<ChangeStreamEvent<Document>>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
@@ -310,7 +314,7 @@ impl<'a> IntoFuture for Watch<'a, Implicit> {
     }
 }
 
-impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
+impl<'a> IntoFuture for Watch<'a, ExplicitSession<'a>> {
     type Output = Result<SessionChangeStream<ChangeStreamEvent<Document>>>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
@@ -346,7 +350,7 @@ impl<'a> IntoFuture for Watch<'a, Explicit<'a>> {
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> Watch<'a, Implicit> {
+impl<'a> Watch<'a, ImplicitSession> {
     /// Synchronously execute this action.
     pub fn run(self) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
         crate::runtime::block_on(self.into_future()).map(crate::sync::ChangeStream::new)
@@ -354,7 +358,7 @@ impl<'a> Watch<'a, Implicit> {
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> Watch<'a, Explicit<'a>> {
+impl<'a> Watch<'a, ExplicitSession<'a>> {
     /// Synchronously execute this action.
     pub fn run(self) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
         crate::runtime::block_on(self.into_future()).map(crate::sync::SessionChangeStream::new)
