@@ -9,7 +9,7 @@ use crate::{
     error::{CommandError, Error, ErrorKind},
     event::cmap::CmapEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
-    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
+    options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
@@ -193,7 +193,7 @@ async fn list_databases() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_databases(None, None).await.unwrap();
+    let prev_dbs = client.list_databases().await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|doc| doc.name.as_str() == name));
@@ -206,7 +206,7 @@ async fn list_databases() {
             .unwrap();
     }
 
-    let new_dbs = client.list_databases(None, None).await.unwrap();
+    let new_dbs = client.list_databases().await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|db_spec| expected_dbs.contains(&db_spec.name))
@@ -239,7 +239,7 @@ async fn list_database_names() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_database_names(None, None).await.unwrap();
+    let prev_dbs = client.list_database_names().await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|db_name| db_name == name));
@@ -252,7 +252,7 @@ async fn list_database_names() {
             .unwrap();
     }
 
-    let new_dbs = client.list_database_names(None, None).await.unwrap();
+    let new_dbs = client.list_database_names().await.unwrap();
 
     for name in expected_dbs {
         assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
@@ -301,10 +301,11 @@ async fn list_authorized_databases() {
         options.credential = Some(credential);
         let client = Client::with_options(options).unwrap();
 
-        let options = ListDatabasesOptions::builder()
+        let result = client
+            .list_database_names()
             .authorized_databases(true)
-            .build();
-        let result = client.list_database_names(None, options).await.unwrap();
+            .await
+            .unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(0).unwrap(), name);
@@ -322,7 +323,7 @@ fn is_auth_error(error: Error) -> bool {
 /// Performs an operation that requires authentication and verifies that it either succeeded or
 /// failed with an authentication error according to the `should_succeed` parameter.
 async fn auth_test(client: Client, should_succeed: bool) {
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     if should_succeed {
         result.expect("operation should have succeeded");
     } else {
@@ -987,5 +988,5 @@ async fn warm_connection_pool() {
 
     client.warm_connection_pool().await;
     // Validate that a command executes.
-    client.list_database_names(None, None).await.unwrap();
+    client.list_database_names().await.unwrap();
 }

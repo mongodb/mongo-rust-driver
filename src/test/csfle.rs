@@ -1346,7 +1346,7 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     // Test: attempting to connect fails.
     let client =
         Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
@@ -1423,7 +1423,7 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
     // Test: attempting to connect fails.
     let client =
         Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())

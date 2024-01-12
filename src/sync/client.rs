@@ -1,19 +1,10 @@
 pub mod session;
 
-use super::{ChangeStream, ClientSession, Database, SessionChangeStream};
+use super::{ClientSession, Database};
 use crate::{
-    bson::Document,
-    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     concern::{ReadConcern, WriteConcern},
     error::Result,
-    options::{
-        ClientOptions,
-        DatabaseOptions,
-        ListDatabasesOptions,
-        SelectionCriteria,
-        SessionOptions,
-    },
-    results::DatabaseSpecification,
+    options::{ClientOptions, DatabaseOptions, SelectionCriteria, SessionOptions},
     runtime,
     Client as AsyncClient,
 };
@@ -75,7 +66,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Client {
-    async_client: AsyncClient,
+    pub(crate) async_client: AsyncClient,
 }
 
 impl From<AsyncClient> for Client {
@@ -145,75 +136,9 @@ impl Client {
         self.async_client.default_database().map(Database::new)
     }
 
-    /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        runtime::block_on(
-            self.async_client
-                .list_databases(filter.into(), options.into()),
-        )
-    }
-
-    /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_client
-                .list_database_names(filter.into(), options.into()),
-        )
-    }
-
     /// Starts a new `ClientSession`.
     pub fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
         runtime::block_on(self.async_client.start_session(options)).map(Into::into)
-    }
-
-    /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
-    /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
-    /// will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_client.watch(pipeline, options)).map(ChangeStream::new)
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
-    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    pub fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_client.watch_with_session(
-            pipeline,
-            options,
-            &mut session.async_client_session,
-        ))
-        .map(SessionChangeStream::new)
     }
 
     /// Shut down this `Client`, terminating background thread workers and closing connections.

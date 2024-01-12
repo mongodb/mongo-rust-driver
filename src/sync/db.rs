@@ -1,17 +1,8 @@
 use std::fmt::Debug;
 
-use super::{
-    gridfs::GridFsBucket,
-    ChangeStream,
-    ClientSession,
-    Collection,
-    Cursor,
-    SessionChangeStream,
-    SessionCursor,
-};
+use super::{gridfs::GridFsBucket, ClientSession, Collection, Cursor, SessionCursor};
 use crate::{
     bson::Document,
-    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     error::Result,
     options::{
         AggregateOptions,
@@ -63,7 +54,7 @@ use crate::{
 /// ```
 #[derive(Debug, Clone)]
 pub struct Database {
-    async_database: AsyncDatabase,
+    pub(crate) async_database: AsyncDatabase,
 }
 
 impl Database {
@@ -283,47 +274,6 @@ impl Database {
             &mut session.async_client_session,
         ))
         .map(SessionCursor::new)
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in this database. The stream does not observe changes from system
-    /// collections and cannot be started on "config", "local" or "admin" databases.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_database.watch(pipeline, options)).map(ChangeStream::new)
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
-    /// using the provided [`ClientSession`].  See [`Database::watch`] for more information.
-    pub fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_database.watch_with_session(
-            pipeline,
-            options,
-            &mut session.async_client_session,
-        ))
-        .map(SessionChangeStream::new)
     }
 
     /// Creates a new [`GridFsBucket`] in the database with the given options.

@@ -5,7 +5,7 @@ use semver::VersionReq;
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, OperationType},
-        options::{ChangeStreamOptions, FullDocumentBeforeChangeType},
+        options::FullDocumentBeforeChangeType,
         ChangeStream,
     },
     coll::options::CollectionOptions,
@@ -56,7 +56,7 @@ async fn init_stream(
             .build(),
     );
     coll.drop(None).await?;
-    let stream = coll.watch(None, None).await?;
+    let stream = coll.watch().await?;
     Ok(Some((client, coll, stream)))
 }
 
@@ -139,7 +139,8 @@ async fn errors_on_missing_token() -> Result<()> {
         None => return Ok(()),
     };
     let mut stream = coll
-        .watch(vec![doc! { "$project": { "_id": 0 } }], None)
+        .watch()
+        .pipeline(vec![doc! { "$project": { "_id": 0 } }])
         .await?;
     coll.insert_one(doc! {}, None).await?;
     assert!(stream.next().await.transpose().is_err());
@@ -208,7 +209,7 @@ async fn does_not_resume_aggregate() -> Result<()> {
     .enable(&client, None)
     .await?;
 
-    assert!(coll.watch(None, None).await.is_err());
+    assert!(coll.watch().await.is_err());
 
     Ok(())
 }
@@ -413,14 +414,7 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
     assert_eq!(stream.resume_token().as_ref(), Some(&expected_id));
 
     // Case: empty batch, `resume_after` specified
-    let mut stream = coll
-        .watch(
-            None,
-            ChangeStreamOptions::builder()
-                .resume_after(Some(expected_id.clone()))
-                .build(),
-        )
-        .await?;
+    let mut stream = coll.watch().resume_after(expected_id.clone()).await?;
     assert_eq!(stream.next_if_any().await?, None);
     assert_eq!(stream.resume_token(), Some(expected_id));
 
@@ -496,25 +490,11 @@ async fn aggregate_batch() -> Result<()> {
     coll.insert_one(doc! {}, None).await?;
 
     // Case: `start_after` is given
-    let stream = coll
-        .watch(
-            None,
-            ChangeStreamOptions::builder()
-                .start_after(Some(token.clone()))
-                .build(),
-        )
-        .await?;
+    let stream = coll.watch().start_after(token.clone()).await?;
     assert_eq!(stream.resume_token().as_ref(), Some(&token));
 
     // Case: `resume_after` is given
-    let stream = coll
-        .watch(
-            None,
-            ChangeStreamOptions::builder()
-                .resume_after(Some(token.clone()))
-                .build(),
-        )
-        .await?;
+    let stream = coll.watch().resume_after(token.clone()).await?;
     assert_eq!(stream.resume_token().as_ref(), Some(&token));
 
     Ok(())
@@ -546,14 +526,7 @@ async fn resume_uses_start_after() -> Result<()> {
     stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
-    let mut stream = coll
-        .watch(
-            None,
-            ChangeStreamOptions::builder()
-                .start_after(Some(token.clone()))
-                .build(),
-        )
-        .await?;
+    let mut stream = coll.watch().start_after(token.clone()).await?;
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}, None).await?;
@@ -610,14 +583,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
-    let mut stream = coll
-        .watch(
-            None,
-            ChangeStreamOptions::builder()
-                .start_after(Some(token.clone()))
-                .build(),
-        )
-        .await?;
+    let mut stream = coll.watch().start_after(token.clone()).await?;
 
     // Create an event and read it.
     coll.insert_one(doc! {}, None).await?;
@@ -718,12 +684,9 @@ async fn split_large_event() -> Result<()> {
     coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None)
         .await?;
     let stream = coll
-        .watch(
-            [doc! { "$changeStreamSplitLargeEvent": {} }],
-            ChangeStreamOptions::builder()
-                .full_document_before_change(Some(FullDocumentBeforeChangeType::Required))
-                .build(),
-        )
+        .watch()
+        .pipeline([doc! { "$changeStreamSplitLargeEvent": {} }])
+        .full_document_before_change(FullDocumentBeforeChangeType::Required)
         .await?
         .with_type::<Document>();
     coll.update_one(

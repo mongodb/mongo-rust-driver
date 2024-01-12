@@ -17,12 +17,6 @@ use self::options::*;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    change_stream::{
-        event::ChangeStreamEvent,
-        options::ChangeStreamOptions,
-        session::SessionChangeStream,
-        ChangeStream,
-    },
     client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
@@ -898,60 +892,6 @@ impl<T> Collection<T> {
             )
             .await?;
         Ok(())
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in this collection. A
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
-    /// collections.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read concern. Anything else
-    /// will cause a server error.
-    ///
-    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub async fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-        let target = self.namespace().into();
-        self.client()
-            .execute_watch(pipeline, options, target, None)
-            .await
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
-    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    pub async fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-        let target = self.namespace().into();
-        self.client()
-            .execute_watch_with_session(pipeline, options, target, None, session)
-            .await
     }
 
     /// Finds the documents in the collection matching `filter`.

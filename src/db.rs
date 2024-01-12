@@ -8,27 +8,13 @@ use futures_util::stream::TryStreamExt;
 
 use crate::{
     bson::{Bson, Document},
-    change_stream::{
-        event::ChangeStreamEvent,
-        options::ChangeStreamOptions,
-        session::SessionChangeStream,
-        ChangeStream,
-    },
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{
-        Aggregate,
-        AggregateTarget,
-        Create,
-        DropDatabase,
-        ListCollections,
-        RunCommand,
-        RunCursorCommand,
-    },
+    operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand, RunCursorCommand},
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -598,53 +584,6 @@ impl Database {
         let client = self.client();
         client
             .execute_session_cursor_operation(aggregate, session)
-            .await
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in this database. The stream does not observe changes from system
-    /// collections and cannot be started on "config", "local" or "admin" databases.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub async fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-        let target = AggregateTarget::Database(self.name().to_string());
-        self.client()
-            .execute_watch(pipeline, options, target, None)
-            .await
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
-    /// using the provided [`ClientSession`].  See [`Database::watch`] for more information.
-    pub async fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-        let target = AggregateTarget::Database(self.name().to_string());
-        self.client()
-            .execute_watch_with_session(pipeline, options, target, None, session)
             .await
     }
 

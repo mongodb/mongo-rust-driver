@@ -71,7 +71,8 @@ fn client() {
         .expect("insert should succeed");
 
     let db_names = client
-        .list_database_names(None, None)
+        .list_database_names()
+        .run()
         .expect("list_database_names should succeed");
     assert!(db_names.contains(&function_name!().to_string()));
 }

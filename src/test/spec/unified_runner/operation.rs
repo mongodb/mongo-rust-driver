@@ -50,6 +50,7 @@ use crate::{
     db::options::RunCursorCommandOptions,
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
+    operation::list_databases,
     options::{
         AggregateOptions,
         CountOptions,
@@ -67,7 +68,6 @@ use crate::{
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
-        ListDatabasesOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -1171,10 +1171,9 @@ impl TestOperation for FindOne {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabases {
-    filter: Option<Document>,
     session: Option<String>,
     #[serde(flatten)]
-    options: ListDatabasesOptions,
+    options: list_databases::Options,
 }
 
 impl TestOperation for ListDatabases {
@@ -1188,19 +1187,19 @@ impl TestOperation for ListDatabases {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
+                        let session: &mut crate::ClientSession = &mut *session;
                         client
-                            .list_databases_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
+                            .list_databases()
+                            .with_options(self.options.clone())
+                            .session(session)
                             .await
                     })
                     .await?
                 }
                 None => {
                     client
-                        .list_databases(self.filter.clone(), self.options.clone())
+                        .list_databases()
+                        .with_options(self.options.clone())
                         .await?
                 }
             };
@@ -1213,9 +1212,8 @@ impl TestOperation for ListDatabases {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabaseNames {
-    filter: Option<Document>,
     #[serde(flatten)]
-    options: ListDatabasesOptions,
+    options: list_databases::Options,
 }
 
 impl TestOperation for ListDatabaseNames {
@@ -1227,7 +1225,8 @@ impl TestOperation for ListDatabaseNames {
         async move {
             let client = test_runner.get_client(id).await;
             let result = client
-                .list_database_names(self.filter.clone(), self.options.clone())
+                .list_database_names()
+                .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::Array(result).into()))
@@ -2347,15 +2346,21 @@ impl TestOperation for CreateChangeStream {
             let target = entities.get(id).unwrap();
             let stream = match target {
                 Entity::Client(ce) => {
-                    ce.watch(self.pipeline.clone(), self.options.clone())
+                    ce.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Database(db) => {
-                    db.watch(self.pipeline.clone(), self.options.clone())
+                    db.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Collection(coll) => {
-                    coll.watch(self.pipeline.clone(), self.options.clone())
+                    coll.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 _ => panic!("Invalid entity for createChangeStream"),

@@ -1,45 +1,33 @@
-#[cfg(test)]
-mod test;
-
-use bson::RawDocumentBuf;
-use serde::Deserialize;
+use bson::{Bson, RawDocumentBuf};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
-    options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
-    filter: Option<Document>,
     name_only: bool,
-    options: Option<ListDatabasesOptions>,
+    options: Option<Options>,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Options {
+    pub(crate) filter: Option<Document>,
+    pub(crate) authorized_databases: Option<bool>,
+    pub(crate) comment: Option<Bson>,
 }
 
 impl ListDatabases {
-    pub fn new(
-        filter: Option<Document>,
-        name_only: bool,
-        options: Option<ListDatabasesOptions>,
-    ) -> Self {
-        ListDatabases {
-            filter,
-            name_only,
-            options,
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        ListDatabases {
-            filter: None,
-            name_only: false,
-            options: None,
-        }
+    pub fn new(name_only: bool, options: Option<Options>) -> Self {
+        ListDatabases { name_only, options }
     }
 }
 
@@ -54,10 +42,6 @@ impl OperationWithDefaults for ListDatabases {
             Self::NAME: 1,
             "nameOnly": self.name_only
         };
-
-        if let Some(ref filter) = self.filter {
-            body.insert("filter", filter.clone());
-        }
 
         append_options(&mut body, self.options.as_ref())?;
 

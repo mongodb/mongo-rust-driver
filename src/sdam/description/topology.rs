@@ -25,7 +25,9 @@ use crate::{
 use self::server_selection::IDLE_WRITE_PERIOD;
 
 /// The possible types for a topology.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, derive_more::Display)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, Default, derive_more::Display,
+)]
 #[non_exhaustive]
 pub enum TopologyType {
     /// A single mongod server.
@@ -44,6 +46,7 @@ pub enum TopologyType {
     LoadBalanced,
 
     /// A topology whose type is not known.
+    #[default]
     Unknown,
 }
 
@@ -58,12 +61,6 @@ impl TopologyType {
             Self::LoadBalanced => "LoadBalanced",
             Self::Unknown => "Unknown",
         }
-    }
-}
-
-impl Default for TopologyType {
-    fn default() -> Self {
-        TopologyType::Unknown
     }
 }
 

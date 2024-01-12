@@ -33,5 +33,5 @@ tokio::time::timeout(Duration::from_secs(5), handle).await???;
 
 ## Minimum supported Rust version (MSRV)
 
-The MSRV for this crate is currently 1.61.0. This will rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.64.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.

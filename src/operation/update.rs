@@ -87,7 +87,7 @@ impl Update<'_> {
             ns,
             filter,
             update: update.into(),
-            multi: multi.then(|| true),
+            multi: multi.then_some(true),
             options,
             human_readable_serialization,
         }
@@ -107,7 +107,7 @@ impl<'a, T: Serialize> Update<'a, T> {
             ns,
             filter,
             update: update.into(),
-            multi: multi.then(|| true),
+            multi: multi.then_some(true),
             options,
             human_readable_serialization,
         }

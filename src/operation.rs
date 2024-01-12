@@ -15,7 +15,7 @@ mod find_and_modify;
 mod get_more;
 mod insert;
 mod list_collections;
-mod list_databases;
+pub(crate) mod list_databases;
 mod list_indexes;
 mod raw_output;
 mod run_command;
@@ -68,7 +68,6 @@ pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
 pub(crate) use list_collections::ListCollections;
-pub(crate) use list_databases::ListDatabases;
 pub(crate) use list_indexes::ListIndexes;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use raw_output::RawOutput;

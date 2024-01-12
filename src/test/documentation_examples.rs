@@ -1756,7 +1756,7 @@ async fn index_examples() -> Result<()> {
 }
 
 async fn change_streams_examples() -> Result<()> {
-    use crate::{change_stream::options::FullDocumentType, options::ChangeStreamOptions, runtime};
+    use crate::{change_stream::options::FullDocumentType, runtime};
     use std::time::Duration;
 
     let client = TestClient::new().await;
@@ -1791,7 +1791,8 @@ async fn change_streams_examples() -> Result<()> {
         {
             // Start Changestream Example 1
             use futures::stream::TryStreamExt;
-            let mut stream = inventory.watch(None, None).await?;
+
+            let mut stream = inventory.watch().await?;
             let next = stream.try_next().await?;
             // End Changestream Example 1
         }
@@ -1799,23 +1800,20 @@ async fn change_streams_examples() -> Result<()> {
         {
             // Start Changestream Example 2
             use futures::stream::TryStreamExt;
-            let options = ChangeStreamOptions::builder()
-                .full_document(Some(FullDocumentType::UpdateLookup))
-                .build();
-            let mut stream = inventory.watch(None, options).await?;
+            let mut stream = inventory
+                .watch()
+                .full_document(FullDocumentType::UpdateLookup)
+                .await?;
             let next = stream.try_next().await?;
             // End Changestream Example 2
         }
 
         {
-            let stream = inventory.watch(None, None).await?;
+            let stream = inventory.watch().await?;
             // Start Changestream Example 3
             use futures::stream::TryStreamExt;
             let resume_token = stream.resume_token();
-            let options = ChangeStreamOptions::builder()
-                .resume_after(resume_token)
-                .build();
-            let mut stream = inventory.watch(None, options).await?;
+            let mut stream = inventory.watch().resume_after(resume_token).await?;
             stream.try_next().await?;
             // End Changestream Example 3
         }

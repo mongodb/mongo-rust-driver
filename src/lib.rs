@@ -8,7 +8,7 @@
 //! # Installation
 //!
 //! ## Requirements
-//! - Rust 1.61+
+//! - Rust 1.64+
 //! - MongoDB 3.6+
 //!
 //! ## Importing
@@ -86,7 +86,7 @@
 //! let client = Client::with_options(client_options)?;
 //!
 //! // List the names of the databases in that deployment.
-//! for db_name in client.list_database_names(None, None).await? {
+//! for db_name in client.list_database_names().await? {
 //!     println!("{}", db_name);
 //! }
 //! # Ok(()) }
@@ -289,7 +289,7 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.61.0. This will be rarely be increased, and if it ever is,
+//! The MSRV for this crate is currently 1.64.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
@@ -364,6 +364,8 @@ pub use crate::{
 };
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
+
+pub use client::action;
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(

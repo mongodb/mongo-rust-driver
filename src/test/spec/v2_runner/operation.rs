@@ -7,6 +7,7 @@ use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
     error::Result,
+    operation::list_databases,
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -27,7 +28,6 @@ use crate::{
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
-        ListDatabasesOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -1065,9 +1065,8 @@ impl TestOperation for AssertSessionUnpinned {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabases {
-    filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: Option<list_databases::Options>,
 }
 
 impl TestOperation for ListDatabases {
@@ -1077,7 +1076,8 @@ impl TestOperation for ListDatabases {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = client
-                .list_databases(self.filter.clone(), self.options.clone())
+                .list_databases()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(bson::to_bson(&result)?))
         }
@@ -1087,9 +1087,8 @@ impl TestOperation for ListDatabases {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabaseNames {
-    filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: Option<list_databases::Options>,
 }
 
 impl TestOperation for ListDatabaseNames {
@@ -1099,7 +1098,8 @@ impl TestOperation for ListDatabaseNames {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = client
-                .list_database_names(self.filter.clone(), self.options.clone())
+                .list_database_names()
+                .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))
@@ -1489,10 +1489,10 @@ impl TestOperation for Watch {
         async move {
             match session {
                 None => {
-                    collection.watch(None, None).await?;
+                    collection.watch().await?;
                 }
                 Some(s) => {
-                    collection.watch_with_session(None, None, s).await?;
+                    collection.watch().session(s).await?;
                 }
             }
             Ok(None)
@@ -1508,10 +1508,10 @@ impl TestOperation for Watch {
         async move {
             match session {
                 None => {
-                    database.watch(None, None).await?;
+                    database.watch().await?;
                 }
                 Some(s) => {
-                    database.watch_with_session(None, None, s).await?;
+                    database.watch().session(s).await?;
                 }
             }
             Ok(None)
@@ -1524,7 +1524,7 @@ impl TestOperation for Watch {
         client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            client.watch(None, None).await?;
+            client.watch().await?;
             Ok(None)
         }
         .boxed()

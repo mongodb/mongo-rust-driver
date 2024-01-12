@@ -41,8 +41,8 @@ use crate::{
 /// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
 /// a [`ResumeToken`] retrieved from a past event into either the
-/// [`resume_after`](ChangeStreamOptions::resume_after) or
-/// [`start_after`](ChangeStreamOptions::start_after) (4.2+) options used to create the
+/// [`resume_after`](crate::action::Watch::resume_after) or
+/// [`start_after`](crate::action::Watch::start_after) (4.2+) options used to create the
 /// `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
 /// explicitly opt out of resumability.
 ///
@@ -63,7 +63,7 @@ use crate::{
 /// # async fn func() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// let mut change_stream = coll.watch(None, None).await?;
+/// let mut change_stream = coll.watch().await?;
 /// let coll_ref = coll.clone();
 /// task::spawn(async move {
 ///     coll_ref.insert_one(doc! { "x": 1 }, None).await;
@@ -155,7 +155,7 @@ where
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// let mut change_stream = coll.watch(None, None).await?;
+    /// let mut change_stream = coll.watch().await?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any().await? {
