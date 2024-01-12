@@ -1,6 +1,12 @@
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
-use crate::Namespace;
+use crate::{
+    event::command::CommandEvent,
+    test::{Event, EventHandler},
+    Client,
+    Namespace,
+};
+use bson::{rawdoc, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use semver::VersionReq;
@@ -1279,4 +1285,97 @@ async fn configure_human_readable_serialization() {
         .find_one(doc! { "id": 1 }, None)
         .await
         .unwrap();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn insert_many_document_sequences() {
+    if cfg!(feature = "in-use-encryption-unstable") {
+        log_uncaptured(
+            "skipping insert_many_document_sequences: auto-encryption does not support document \
+             sequences",
+        );
+        return;
+    }
+
+    let handler = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(handler.clone())
+        .build()
+        .await;
+    let mut subscriber = handler.subscribe();
+
+    let max_object_size = client.server_info.max_bson_object_size;
+    let max_message_size = client.server_info.max_message_size_bytes;
+
+    let collection = client
+        .database("insert_many_document_sequences")
+        .collection::<RawDocumentBuf>("insert_many_document_sequences");
+    collection.drop(None).await.unwrap();
+
+    // A payload with > max_bson_object_size bytes but < max_message_size bytes should require only
+    // one round trip.
+    let docs = vec![
+        rawdoc! { "s": "a".repeat((max_object_size / 2) as usize) },
+        rawdoc! { "s": "b".repeat((max_object_size / 2) as usize) },
+    ];
+    collection.insert_many(docs, None).await.unwrap();
+
+    let event = subscriber
+        .filter_map_event(Duration::from_millis(500), |e| match e {
+            Event::Command(command_event) => match command_event {
+                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
+                    Some(started)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .await
+        .expect("did not observe command started event for insert");
+    let insert_documents = event.command.get_array("documents").unwrap();
+    assert_eq!(insert_documents.len(), 2);
+
+    // Build up a list of documents that exceeds max_message_size
+    let mut docs = Vec::new();
+    let mut size = 0;
+    while size <= max_message_size {
+        // Leave some room for key/metadata bytes in document
+        let string_length = max_object_size - 50;
+        let doc = rawdoc! { "s": "a".repeat(string_length as usize) };
+        size += doc.as_bytes().len() as i32;
+        docs.push(doc);
+    }
+    let total_docs = docs.len();
+    collection.insert_many(docs, None).await.unwrap();
+
+    let first_event = subscriber
+        .filter_map_event(Duration::from_millis(500), |e| match e {
+            Event::Command(command_event) => match command_event {
+                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
+                    Some(started)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .await
+        .expect("did not observe command started event for insert");
+    let first_batch_len = first_event.command.get_array("documents").unwrap().len();
+    assert!(first_batch_len < total_docs);
+
+    let second_event = subscriber
+        .filter_map_event(Duration::from_millis(500), |e| match e {
+            Event::Command(command_event) => match command_event {
+                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
+                    Some(started)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .await
+        .expect("did not observe command started event for insert");
+    let second_batch_len = second_event.command.get_array("documents").unwrap().len();
+    assert_eq!(first_batch_len + second_batch_len, total_docs);
 }

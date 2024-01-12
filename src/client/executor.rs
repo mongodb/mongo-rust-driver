@@ -23,10 +23,12 @@ use crate::{
         WatchArgs,
     },
     cmap::{
-        conn::PinnedConnectionHandle,
+        conn::{
+            wire::{next_request_id, Message},
+            PinnedConnectionHandle,
+        },
         Connection,
         ConnectionPool,
-        RawCommand,
         RawCommandResponse,
     },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
@@ -573,51 +575,43 @@ impl Client {
 
         let connection_info = connection.info();
         let service_id = connection.service_id();
-        let request_id = crate::cmap::conn::next_request_id();
+        let request_id = next_request_id();
 
         if let Some(ref server_api) = self.inner.options.server_api {
             cmd.set_server_api(server_api);
         }
 
         let should_redact = cmd.should_redact();
+        let should_compress = cmd.should_compress();
 
         let cmd_name = cmd.name.clone();
         let target_db = cmd.target_db.clone();
 
-        let serialized = op.serialize_command(cmd)?;
+        #[allow(unused_mut)]
+        let mut message = Message::from_command(cmd, Some(request_id))?;
         #[cfg(feature = "in-use-encryption-unstable")]
-        let serialized = {
+        {
             let guard = self.inner.csfle.read().await;
             if let Some(ref csfle) = *guard {
                 if csfle.opts().bypass_auto_encryption != Some(true) {
-                    self.auto_encrypt(csfle, RawDocument::from_bytes(&serialized)?, &target_db)
-                        .await?
-                        .into_bytes()
-                } else {
-                    serialized
+                    let encrypted_payload = self
+                        .auto_encrypt(csfle, &message.document_payload, &target_db)
+                        .await?;
+                    message.document_payload = encrypted_payload;
                 }
-            } else {
-                serialized
             }
-        };
-        let raw_cmd = RawCommand {
-            name: cmd_name.clone(),
-            target_db,
-            exhaust_allowed: false,
-            bytes: serialized,
-        };
+        }
 
         self.emit_command_event(|| {
             let command_body = if should_redact {
                 Document::new()
             } else {
-                Document::from_reader(raw_cmd.bytes.as_slice())
-                    .unwrap_or_else(|e| doc! { "serialization error": e.to_string() })
+                message.get_command_document()
             };
             CommandEvent::Started(CommandStartedEvent {
                 command: command_body,
-                db: raw_cmd.target_db.clone(),
-                command_name: raw_cmd.name.clone(),
+                db: target_db.clone(),
+                command_name: cmd_name.clone(),
                 request_id,
                 connection: connection_info.clone(),
                 service_id,
@@ -626,7 +620,7 @@ impl Client {
         .await;
 
         let start_time = Instant::now();
-        let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
+        let command_result = match connection.send_message(message, should_compress).await {
             Ok(response) => {
                 async fn handle_response<T: Operation>(
                     client: &Client,

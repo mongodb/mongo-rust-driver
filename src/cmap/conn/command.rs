@@ -1,11 +1,10 @@
 use bson::{RawDocument, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::wire::Message;
+use super::wire::{message::DocumentSequence, Message};
 use crate::{
-    bson::{rawdoc, Document},
-    bson_util::extend_raw_document_buf,
-    client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
+    bson::Document,
+    client::{options::ServerApi, ClusterTime},
     error::{Error, ErrorKind, Result},
     hello::{HelloCommandResponse, HelloReply},
     operation::{CommandErrorBody, CommandResponse},
@@ -14,36 +13,25 @@ use crate::{
     ClientSession,
 };
 
-/// A command that has been serialized to BSON.
-#[derive(Debug)]
-pub(crate) struct RawCommand {
-    pub(crate) name: String,
-    pub(crate) target_db: String,
-    /// Whether or not the server may respond to this command multiple times via the moreToComeBit.
-    pub(crate) exhaust_allowed: bool,
-    pub(crate) bytes: Vec<u8>,
-}
-
-impl RawCommand {
-    pub(crate) fn should_compress(&self) -> bool {
-        let name = self.name.to_lowercase();
-        !REDACTED_COMMANDS.contains(name.as_str()) && !HELLO_COMMAND_NAMES.contains(name.as_str())
-    }
-}
-
 /// Driver-side model of a database command.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Command<T = Document> {
+pub(crate) struct Command<T = Document>
+where
+    T: Serialize,
+{
     #[serde(skip)]
     pub(crate) name: String,
 
     #[serde(skip)]
     pub(crate) exhaust_allowed: bool,
 
-    #[serde(flatten)]
+    #[serde(skip)]
     pub(crate) body: T,
+
+    #[serde(skip)]
+    pub(crate) document_sequences: Option<Vec<DocumentSequence>>,
 
     #[serde(rename = "$db")]
     pub(crate) target_db: String,
@@ -70,13 +58,17 @@ pub(crate) struct Command<T = Document> {
     recovery_token: Option<Document>,
 }
 
-impl<T> Command<T> {
-    pub(crate) fn new(name: String, target_db: String, body: T) -> Self {
+impl<T> Command<T>
+where
+    T: Serialize,
+{
+    pub(crate) fn new(name: impl ToString, target_db: impl ToString, body: T) -> Self {
         Self {
-            name,
-            target_db,
+            name: name.to_string(),
+            target_db: target_db.to_string(),
             exhaust_allowed: false,
             body,
+            document_sequences: None,
             lsid: None,
             cluster_time: None,
             server_api: None,
@@ -100,6 +92,7 @@ impl<T> Command<T> {
             target_db,
             exhaust_allowed: false,
             body,
+            document_sequences: None,
             lsid: None,
             cluster_time: None,
             server_api: None,
@@ -110,6 +103,18 @@ impl<T> Command<T> {
             read_concern: read_concern.map(Into::into),
             recovery_token: None,
         }
+    }
+
+    pub(crate) fn add_document_sequence(
+        &mut self,
+        identifier: impl ToString,
+        documents: Vec<RawDocumentBuf>,
+    ) {
+        let sequences = self.document_sequences.get_or_insert_with(Default::default);
+        sequences.push(DocumentSequence {
+            identifier: identifier.to_string(),
+            documents,
+        });
     }
 
     pub(crate) fn set_session(&mut self, session: &ClientSession) {
@@ -178,19 +183,6 @@ impl<T> Command<T> {
     }
 }
 
-impl Command<RawDocumentBuf> {
-    pub(crate) fn into_bson_bytes(mut self) -> Result<Vec<u8>> {
-        let mut command = self.body;
-
-        // Clear the body of the command to avoid re-serializing.
-        self.body = rawdoc! {};
-        let rest_of_command = bson::to_raw_document_buf(&self)?;
-
-        extend_raw_document_buf(&mut command, rest_of_command)?;
-        Ok(command.into_bytes())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub(crate) struct RawCommandResponse {
     pub(crate) source: ServerAddress,
@@ -220,9 +212,8 @@ impl RawCommandResponse {
         )
     }
 
-    pub(crate) fn new(source: ServerAddress, message: Message) -> Result<Self> {
-        let raw = message.single_document_response()?;
-        Ok(Self::new_raw(source, RawDocumentBuf::from_bytes(raw)?))
+    pub(crate) fn new(source: ServerAddress, message: Message) -> Self {
+        Self::new_raw(source, message.document_payload)
     }
 
     pub(crate) fn new_raw(source: ServerAddress, raw: RawDocumentBuf) -> Self {
