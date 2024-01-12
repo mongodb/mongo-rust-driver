@@ -22,6 +22,7 @@ if [ "$COMPRESSION" = true ]; then
 fi
 
 export SESSION_TEST_REQUIRE_MONGOCRYPTD=true
+export INDEX_MANAGEMENT_TEST_UNIFIED=1
 
 echo "cargo test options: $(cargo_test_options)"
 
