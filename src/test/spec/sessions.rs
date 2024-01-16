@@ -43,12 +43,8 @@ async fn run_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
-    let options = SessionOptions::builder()
-        .snapshot(true)
-        .causal_consistency(true)
-        .build();
     let client = TestClient::new().await;
-    assert!(client.start_session(options).await.is_err());
+    assert!(client.start_session().snapshot(true).causal_consistency(true).await.is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
