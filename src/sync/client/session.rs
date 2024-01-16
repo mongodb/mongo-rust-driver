@@ -3,7 +3,7 @@ use crate::{
     bson::Document,
     client::session::ClusterTime,
     error::Result,
-    options::{SessionOptions, TransactionOptions},
+    options::TransactionOptions,
     runtime,
     ClientSession as AsyncClientSession,
 };
@@ -41,11 +41,6 @@ impl ClientSession {
     /// This will be `None` if this session has not been used in an operation yet.
     pub fn cluster_time(&self) -> Option<&ClusterTime> {
         self.async_client_session.cluster_time()
-    }
-
-    /// The options used to create this session.
-    pub fn options(&self) -> Option<&SessionOptions> {
-        self.async_client_session.options()
     }
 
     /// Set the cluster time to the provided one if it is greater than this session's highest seen

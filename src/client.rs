@@ -40,7 +40,6 @@ use crate::{
         ReadPreference,
         SelectionCriteria,
         ServerAddress,
-        SessionOptions,
     },
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
@@ -339,18 +338,6 @@ impl Client {
             .default_database
             .as_ref()
             .map(|db_name| self.database(db_name))
-    }
-
-    /// Starts a new `ClientSession`.
-    pub async fn start_session(
-        &self,
-        options: impl Into<Option<SessionOptions>>,
-    ) -> Result<ClientSession> {
-        let options = options.into();
-        if let Some(ref options) = options {
-            options.validate()?;
-        }
-        Ok(ClientSession::new(self.clone(), options, false).await)
     }
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {

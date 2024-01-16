@@ -255,7 +255,7 @@ impl ClientSession {
     }
 
     /// The options used to create this session.
-    pub fn options(&self) -> Option<&SessionOptions> {
+    pub(crate) fn options(&self) -> Option<&SessionOptions> {
         self.options.as_ref()
     }
 

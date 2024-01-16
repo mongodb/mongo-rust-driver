@@ -1,10 +1,10 @@
 pub mod session;
 
-use super::{ClientSession, Database};
+use super::Database;
 use crate::{
     concern::{ReadConcern, WriteConcern},
     error::Result,
-    options::{ClientOptions, DatabaseOptions, SelectionCriteria, SessionOptions},
+    options::{ClientOptions, DatabaseOptions, SelectionCriteria},
     runtime,
     Client as AsyncClient,
 };
@@ -134,11 +134,6 @@ impl Client {
     /// If no default database was specified, `None` will be returned.
     pub fn default_database(&self) -> Option<Database> {
         self.async_client.default_database().map(Database::new)
-    }
-
-    /// Starts a new `ClientSession`.
-    pub fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
-        runtime::block_on(self.async_client.start_session(options)).map(Into::into)
     }
 
     /// Shut down this `Client`, terminating background thread workers and closing connections.

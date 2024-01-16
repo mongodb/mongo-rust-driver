@@ -1,9 +1,11 @@
 //! Action builder types.
 
 pub(crate) mod list_databases;
+pub(crate) mod session;
 pub(crate) mod watch;
 
 pub use list_databases::ListDatabases;
+pub use session::StartSession;
 pub use watch::Watch;
 
 macro_rules! option_setters {
