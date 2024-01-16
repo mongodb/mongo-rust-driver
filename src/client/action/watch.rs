@@ -278,13 +278,13 @@ impl<'a, S> Watch<'a, S> {
 
 impl<'a> Watch<'a, ImplicitSession> {
     /// Use the provided ['ClientSession'].
-    pub fn session<'s>(self, session: &'s mut ClientSession) -> Watch<'a, ExplicitSession<'s>> {
+    pub fn session<'s>(self, session: impl Into<&'s mut ClientSession>) -> Watch<'a, ExplicitSession<'s>> {
         Watch {
             client: self.client,
             target: self.target,
             pipeline: self.pipeline,
             options: self.options,
-            session: ExplicitSession(session),
+            session: ExplicitSession(session.into()),
             cluster: self.cluster,
         }
     }

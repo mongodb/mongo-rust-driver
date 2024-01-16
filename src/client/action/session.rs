@@ -2,32 +2,42 @@ use std::future::IntoFuture;
 
 use futures_util::FutureExt;
 
-use crate::ClientSession;
-use crate::error::Result;
-use crate::{Client, client::{options::{SessionOptions, TransactionOptions}, BoxFuture}};
+use crate::{
+    client::{
+        options::{SessionOptions, TransactionOptions},
+        BoxFuture,
+    },
+    error::Result,
+    Client,
+    ClientSession,
+};
 
 use super::option_setters;
 
 impl Client {
     /// Starts a new [`ClientSession`].
-    /// 
+    ///
     /// `await` will return `Result<`[`ClientSession`]`>`.
     pub fn start_session(&self) -> StartSession {
-        StartSession { client: self, options: None }
+        StartSession {
+            client: self,
+            options: None,
+        }
     }
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl crate::sync::Client {
     /// Starts a new [`ClientSession`].
-    /// 
+    ///
     /// [run](StartSession::run) will return `Result<`[`ClientSession`]`>`.
     pub fn start_session(&self) -> StartSession {
         self.async_client.start_session()
     }
 }
 
-/// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`] and execute with `await` (or [run](StartSession::run) if using the sync client).
+/// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`] and execute with
+/// `await` (or [run](StartSession::run) if using the sync client).
 #[must_use]
 pub struct StartSession<'a> {
     client: &'a Client,
@@ -48,7 +58,7 @@ impl<'a> StartSession<'a> {
         /// If true, all operations performed in the context of this session
         /// will be [causally consistent](https://www.mongodb.com/docs/manual/core/causal-consistency-read-write-concerns/).
         ///
-        /// Defaults to true if [`SessionOptions::snapshot`] is unspecified.
+        /// Defaults to true if [`snapshot`](StartSession::snapshot) is unspecified.
         causal_consistency: bool,
 
         /// If true, all read operations performed using this client session will share the same
@@ -66,8 +76,9 @@ impl<'a> IntoFuture for StartSession<'a> {
             if let Some(options) = &self.options {
                 options.validate()?;
             }
-            Ok(ClientSession::new(self.client.clone(), self.options, false).await)    
-        }.boxed()
+            Ok(ClientSession::new(self.client.clone(), self.options, false).await)
+        }
+        .boxed()
     }
 }
 

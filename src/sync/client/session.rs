@@ -26,6 +26,12 @@ impl From<AsyncClientSession> for ClientSession {
     }
 }
 
+impl<'a> From<&'a mut ClientSession> for &'a mut AsyncClientSession {
+    fn from(value: &'a mut ClientSession) -> &'a mut AsyncClientSession {
+        &mut value.async_client_session
+    }
+}
+
 impl ClientSession {
     /// The client used to create this session.
     pub fn client(&self) -> Client {
@@ -60,7 +66,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)?;
     /// session.commit_transaction()?;
@@ -82,7 +88,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)?;
     /// session.commit_transaction()?;
@@ -107,7 +113,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
     /// match execute_transaction(coll, &mut session) {
     ///     Ok(_) => session.commit_transaction()?,

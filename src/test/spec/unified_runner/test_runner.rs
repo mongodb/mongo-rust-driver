@@ -539,7 +539,8 @@ impl TestRunner {
                     let id = session.id.clone();
                     let client = self.get_client(&session.client).await;
                     let client_session = client
-                        .start_session().with_options(session.session_options.clone())
+                        .start_session()
+                        .with_options(session.session_options.clone())
                         .await
                         .unwrap();
                     (id, Entity::Session(SessionEntity::new(client_session)))

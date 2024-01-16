@@ -7,10 +7,7 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::{
-        atomic::AtomicBool,
-        Mutex as SyncMutex,
-    },
+    sync::{atomic::AtomicBool, Mutex as SyncMutex},
     time::{Duration, Instant},
 };
 
@@ -34,13 +31,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
     id_set::IdSet,
-    options::{
-        ClientOptions,
-        DatabaseOptions,
-        ReadPreference,
-        SelectionCriteria,
-        ServerAddress,
-    },
+    options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
     BoxFuture,

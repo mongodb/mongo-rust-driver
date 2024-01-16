@@ -58,8 +58,8 @@ async fn explicit_session_created_on_same_client() {
     let client0 = TestClient::new().await;
     let client1 = TestClient::new().await;
 
-    let mut session0 = client0.start_session(None).await.unwrap();
-    let mut session1 = client1.start_session(None).await.unwrap();
+    let mut session0 = client0.start_session().await.unwrap();
+    let mut session1 = client1.start_session().await.unwrap();
 
     let db = client0.database(function_name!());
     let err = db
@@ -279,7 +279,7 @@ async fn sessions_not_supported_explicit_session_error() {
         return;
     };
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let coll = client.database(name).collection(name);
 
     let error = coll

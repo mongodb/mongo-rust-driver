@@ -66,7 +66,7 @@ lazy_static! {
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-/// let mut session = client.start_session(None).await?;
+/// let mut session = client.start_session().await?;
 /// let options = TransactionOptions::builder()
 ///     .read_concern(ReadConcern::majority())
 ///     .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
@@ -355,7 +355,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
     /// session.commit_transaction().await?;
@@ -456,7 +456,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
     /// session.commit_transaction().await?;
@@ -516,7 +516,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
     /// match execute_transaction(&coll, &mut session).await {
     ///     Ok(_) => session.commit_transaction().await?,
@@ -600,7 +600,7 @@ impl ClientSession {
     /// # use futures::FutureExt;
     /// # async fn wrapper() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// let coll = client.database("mydb").collection::<Document>("mycoll");
     /// let my_data = "my data".to_string();
     /// // This works:

@@ -1885,7 +1885,7 @@ async fn convenient_transaction_examples() -> Result<()> {
     }
 
     // Step 2: Start a client session.
-    let mut session = client.start_session(None).await?;
+    let mut session = client.start_session().await?;
 
     // Step 3: Use with_transaction to start a transaction, execute the callback, and commit (or
     // abort on error).

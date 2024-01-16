@@ -90,8 +90,8 @@ impl<'a, M> ListDatabases<'a, M> {
     );
 
     /// Runs the query using the provided session.
-    pub fn session(mut self, value: &'a mut ClientSession) -> Self {
-        self.session = Some(value);
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
+        self.session = Some(value.into());
         self
     }
 }
