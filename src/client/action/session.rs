@@ -28,6 +28,7 @@ impl crate::sync::Client {
 }
 
 /// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`] and execute with `await` (or [run](StartSession::run) if using the sync client).
+#[must_use]
 pub struct StartSession<'a> {
     client: &'a Client,
     options: Option<SessionOptions>,
