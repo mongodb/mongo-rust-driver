@@ -161,7 +161,7 @@ async fn snapshot_read_concern() {
         .collection::<Document>(function_name!());
 
     if client.supports_transactions() {
-        let mut session = client.start_session(None).await.unwrap();
+        let mut session = client.start_session().await.unwrap();
         let options = TransactionOptions::builder()
             .read_concern(ReadConcern::snapshot())
             .build();

@@ -2,7 +2,6 @@ use bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
 
 use crate::{
-    client::options::SessionOptions,
     coll::options::CollectionOptions,
     error::Result,
     event::command::CommandEvent,
@@ -154,7 +153,7 @@ async fn new_session_operation_time_null() {
         return;
     }
 
-    let session = client.start_session(None).await.unwrap();
+    let session = client.start_session().await.unwrap();
     assert!(session.operation_time().is_none());
 }
 
@@ -173,9 +172,8 @@ async fn first_read_no_after_cluser_time() {
 
     for op in all_session_ops().filter(|o| o.is_read) {
         let mut session = client
-            .start_session(Some(
-                SessionOptions::builder().causal_consistency(true).build(),
-            ))
+            .start_session()
+            .causal_consistency(true)
             .await
             .unwrap();
         assert!(session.operation_time().is_none());
@@ -208,9 +206,8 @@ async fn first_op_update_op_time() {
 
     for op in all_session_ops() {
         let mut session = client
-            .start_session(Some(
-                SessionOptions::builder().causal_consistency(true).build(),
-            ))
+            .start_session()
+            .causal_consistency(true)
             .await
             .unwrap();
         assert!(session.operation_time().is_none());
@@ -262,7 +259,7 @@ async fn read_includes_after_cluster_time() {
 
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
-        let mut session = client.start_session(None).await.unwrap();
+        let mut session = client.start_session().await.unwrap();
         coll.find_one_with_session(None, None, &mut session)
             .await
             .unwrap();
@@ -305,8 +302,7 @@ async fn find_after_write_includes_after_cluster_time() {
         .await;
 
     for op in all_session_ops().filter(|o| !o.is_read) {
-        let session_options = SessionOptions::builder().causal_consistency(true).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client.start_session().causal_consistency(true).await.unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         coll.find_one_with_session(None, None, &mut session)
@@ -347,8 +343,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
-        let session_options = SessionOptions::builder().causal_consistency(false).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client.start_session().causal_consistency(false).await.unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
@@ -380,8 +375,7 @@ async fn omit_after_cluster_time_standalone() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
-        let session_options = SessionOptions::builder().causal_consistency(true).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client.start_session().causal_consistency(true).await.unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
@@ -415,8 +409,7 @@ async fn omit_default_read_concern_level() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
-        let session_options = SessionOptions::builder().causal_consistency(true).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client.start_session().causal_consistency(true).await.unwrap();
         coll.find_one_with_session(None, None, &mut session)
             .await
             .unwrap();
@@ -447,8 +440,7 @@ async fn test_causal_consistency_read_concern_merge() {
         return;
     }
 
-    let session_options = SessionOptions::builder().causal_consistency(true).build();
-    let mut session = client.start_session(Some(session_options)).await.unwrap();
+    let mut session = client.start_session().causal_consistency(true).await.unwrap();
 
     let coll_options = CollectionOptions::builder()
         .read_concern(ReadConcern::majority())

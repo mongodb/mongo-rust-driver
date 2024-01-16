@@ -237,13 +237,13 @@ impl TestContext {
             Some(ref options) => options.get("session0").cloned(),
             None => None,
         };
-        let session0 = Some(client.start_session(options).await.unwrap());
+        let session0 = Some(client.start_session().with_options(options).await.unwrap());
 
         let options = match test.session_options {
             Some(ref options) => options.get("session1").cloned(),
             None => None,
         };
-        let session1 = Some(client.start_session(options).await.unwrap());
+        let session1 = Some(client.start_session().with_options(options).await.unwrap());
 
         Self {
             description: test.description.clone(),

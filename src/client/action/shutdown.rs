@@ -116,6 +116,7 @@ impl crate::sync::Client {
 }
 
 /// Shut down this `Client`, terminating background thread workers and closing connections.
+#[must_use]
 pub struct Shutdown {
     client: Client,
     immediate: bool,
@@ -123,7 +124,7 @@ pub struct Shutdown {
 
 impl Shutdown {
     /// If `true`, execution will not wait for pending resources to be cleaned up,
-    /// which may cause both client-side errors and server-side resource leaks.
+    /// which may cause both client-side errors and server-side resource leaks.  Defaults to `false`.
     pub fn immediate(mut self, value: bool) -> Self {
         self.immediate = value;
         self

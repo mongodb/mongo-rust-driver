@@ -214,8 +214,8 @@ async fn pool_is_lifo() {
         return;
     }
 
-    let a = client.start_session(None).await.unwrap();
-    let b = client.start_session(None).await.unwrap();
+    let a = client.start_session().await.unwrap();
+    let b = client.start_session().await.unwrap();
 
     let a_id = a.id().clone();
     let b_id = b.id().clone();
@@ -228,10 +228,10 @@ async fn pool_is_lifo() {
     drop(b);
     runtime::delay_for(Duration::from_millis(250)).await;
 
-    let s1 = client.start_session(None).await.unwrap();
+    let s1 = client.start_session().await.unwrap();
     assert_eq!(s1.id(), &b_id);
 
-    let s2 = client.start_session(None).await.unwrap();
+    let s2 = client.start_session().await.unwrap();
     assert_eq!(s2.id(), &a_id);
 }
 

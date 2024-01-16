@@ -1030,7 +1030,7 @@ async fn cursor_batch_size() {
         log_uncaptured("skipping cursor_batch_size due to standalone topology");
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
         .find_with_session(doc! {}, opts.clone(), &mut session)
         .await
