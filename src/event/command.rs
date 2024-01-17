@@ -93,7 +93,8 @@ pub struct CommandFailedEvent {
     pub service_id: Option<ObjectId>,
 }
 
-/// Usage of this trait is deprecated.  Applications should use the simpler [`EventHandler`](crate::event::EventHandler) API.
+/// Usage of this trait is deprecated.  Applications should use the simpler
+/// [`EventHandler`](crate::event::EventHandler) API.
 ///
 /// Applications can implement this trait to specify custom logic to run on each command event sent
 /// by the driver.

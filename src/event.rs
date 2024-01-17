@@ -16,7 +16,7 @@ use crate::event::command::CommandEvent;
 /// ```rust
 /// # use mongodb::options::ClientOptions;
 /// # fn example() {
-/// let (tx, rx) = tokio::sync::mpsc::channel(100);
+/// let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 /// tokio::spawn(async move {
 ///     while let Some(ev) = rx.recv().await {
 ///         println!("{:?}", ev);
