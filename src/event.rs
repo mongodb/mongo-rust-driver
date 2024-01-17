@@ -17,6 +17,11 @@ use crate::event::command::CommandEvent;
 /// # use mongodb::options::ClientOptions;
 /// # fn example() {
 /// let (tx, rx) = tokio::sync::mpsc::channel(100);
+/// tokio::spawn(async move {
+///     while let Some(ev) = rx.recv().await {
+///         println!("{:?}", ev);
+///     }
+/// });
 /// let options = ClientOptions::builder()
 ///                 .command_event_handler(tx)
 ///                 .build();

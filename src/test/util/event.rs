@@ -184,6 +184,17 @@ impl EventHandler {
         }
     }
 
+    pub(crate) fn receive_command(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CommandEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<CommandEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                self.handle(ev.clone());
+                add_event_to_queue(&self.command_events, ev);
+            }
+        });
+        tx
+    }
+
     fn handle(&self, event: impl Into<Event>) {
         // this only errors if no receivers are listening which isn't a concern here.
         let _: std::result::Result<usize, SendError<Event>> =
