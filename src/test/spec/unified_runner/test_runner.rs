@@ -244,6 +244,8 @@ impl TestRunner {
             }
 
             if let Some(ref events) = test_case.expect_events {
+                // Hack: make sure in-flight events are recorded.
+                runtime::delay_for(Duration::from_millis(500)).await;
                 for expected in events {
                     let entities = self.entities.read().await;
                     let entity = entities.get(&expected.client).unwrap();
