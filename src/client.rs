@@ -44,6 +44,7 @@ use crate::{
     },
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
+    BoxFuture,
     ClientSession,
 };
 
@@ -710,6 +711,3 @@ impl AsyncDropToken {
         Self { tx: self.tx.take() }
     }
 }
-
-// TODO: merge this with other BoxFuture defs
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
