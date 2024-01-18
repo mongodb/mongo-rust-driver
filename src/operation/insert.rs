@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use std::{cmp::min, collections::HashMap, convert::TryInto};
+use std::{collections::HashMap, convert::TryInto};
 
 use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocumentBuf};
 use serde::Serialize;
@@ -35,15 +35,6 @@ impl<'a, T> Insert<'a, T> {
         ns: Namespace,
         documents: Vec<&'a T>,
         options: Option<InsertManyOptions>,
-        human_readable_serialization: bool,
-    ) -> Self {
-        Self::new_encrypted(ns, documents, options, false, human_readable_serialization)
-    }
-
-    pub(crate) fn new_encrypted(
-        ns: Namespace,
-        documents: Vec<&'a T>,
-        options: Option<InsertManyOptions>,
         encrypted: bool,
         human_readable_serialization: bool,
     ) -> Self {
@@ -73,14 +64,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         let mut docs = Vec::new();
         let mut size = 0;
 
-        let max_doc_size = if self.encrypted {
-            min(
-                MAX_ENCRYPTED_WRITE_SIZE,
-                description.max_bson_object_size as u64,
-            )
-        } else {
-            description.max_bson_object_size as u64
-        };
+        let max_doc_size = description.max_bson_object_size as u64;
         let max_doc_sequence_size =
             description.max_message_size_bytes as u64 - COMMAND_OVERHEAD_SIZE;
 
@@ -128,7 +112,10 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
                 .into());
             }
 
-            if self.encrypted {
+            // From the spec: Drivers MUST not reduce the size limits for a single write before
+            // automatic encryption. I.e. if a single document has size larger than 2MiB (but less
+            // than `maxBsonObjectSize`) proceed with automatic encryption.
+            if self.encrypted && i != 0 {
                 let doc_entry_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len());
                 if size + doc_entry_size >= MAX_ENCRYPTED_WRITE_SIZE {
                     break;

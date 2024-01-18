@@ -55,7 +55,7 @@ impl Message {
 
         Ok(Self {
             document_payload,
-            document_sequences: command.document_sequences.unwrap_or_default(),
+            document_sequences: command.document_sequences,
             response_to: 0,
             flags,
             checksum: None,

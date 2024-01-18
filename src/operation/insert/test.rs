@@ -40,6 +40,7 @@ fn fixtures(opts: Option<InsertManyOptions>) -> TestFixtures {
         DOCUMENTS.iter().collect(),
         Some(options.clone()),
         false,
+        false,
     );
 
     TestFixtures {

@@ -31,7 +31,7 @@ where
     pub(crate) body: T,
 
     #[serde(skip)]
-    pub(crate) document_sequences: Option<Vec<DocumentSequence>>,
+    pub(crate) document_sequences: Vec<DocumentSequence>,
 
     #[serde(rename = "$db")]
     pub(crate) target_db: String,
@@ -68,7 +68,7 @@ where
             target_db: target_db.to_string(),
             exhaust_allowed: false,
             body,
-            document_sequences: None,
+            document_sequences: Vec::new(),
             lsid: None,
             cluster_time: None,
             server_api: None,
@@ -92,7 +92,7 @@ where
             target_db,
             exhaust_allowed: false,
             body,
-            document_sequences: None,
+            document_sequences: Vec::new(),
             lsid: None,
             cluster_time: None,
             server_api: None,
@@ -110,8 +110,7 @@ where
         identifier: impl ToString,
         documents: Vec<RawDocumentBuf>,
     ) {
-        let sequences = self.document_sequences.get_or_insert_with(Default::default);
-        sequences.push(DocumentSequence {
+        self.document_sequences.push(DocumentSequence {
             identifier: identifier.to_string(),
             documents,
         });

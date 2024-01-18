@@ -1314,7 +1314,7 @@ async fn insert_many_document_sequences() {
     collection.drop(None).await.unwrap();
 
     // A payload with > max_bson_object_size bytes but < max_message_size bytes should require only
-    // one round trip.
+    // one round trip
     let docs = vec![
         rawdoc! { "s": "a".repeat((max_object_size / 2) as usize) },
         rawdoc! { "s": "b".repeat((max_object_size / 2) as usize) },
@@ -1341,7 +1341,7 @@ async fn insert_many_document_sequences() {
     let mut size = 0;
     while size <= max_message_size {
         // Leave some room for key/metadata bytes in document
-        let string_length = max_object_size - 50;
+        let string_length = max_object_size - 500;
         let doc = rawdoc! { "s": "a".repeat(string_length as usize) };
         size += doc.as_bytes().len() as i32;
         docs.push(doc);
