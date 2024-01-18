@@ -308,7 +308,7 @@ async fn list_authorized_databases() {
             .unwrap();
 
         assert_eq!(result.len(), 1);
-        assert_eq!(result.get(0).unwrap(), name);
+        assert_eq!(result.first().unwrap(), name);
     }
 
     for name in dbs {

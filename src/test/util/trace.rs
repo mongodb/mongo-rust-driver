@@ -194,13 +194,13 @@ pub(crate) fn max_verbosity_levels_for_test_case(
             o.test_file_entities()
                 .unwrap()
                 .iter()
-                .for_each(|e| update_merged_levels(e))
+                .for_each(&mut update_merged_levels)
         });
 
     // test-file level entities. these might not all actually be used by this particular
     // test case but we include them for simplicity.
     if let Some(ref entities) = entities {
-        entities.iter().for_each(|e| update_merged_levels(e));
+        entities.iter().for_each(update_merged_levels);
     };
 
     merged_levels

@@ -626,19 +626,11 @@ impl MonitorRequestReceiver {
             };
             tokio::pin!(wait_for_check_request);
 
-            loop {
-                tokio::select! {
-                    _ = self.individual_check_request_receiver.changed() => {
-                        break;
-                    }
-                    _ = &mut wait_for_check_request => {
-                        break;
-                    }
-                    _ = self.handle_listener.wait_for_all_handle_drops() => {
-                        // Don't continue waiting after server has been removed from the topology.
-                        break;
-                    }
-                }
+            tokio::select! {
+                _ = self.individual_check_request_receiver.changed() => (),
+                _ = &mut wait_for_check_request => (),
+                // Don't continue waiting after server has been removed from the topology.
+                _ = self.handle_listener.wait_for_all_handle_drops() => (),
             }
         })
         .await;

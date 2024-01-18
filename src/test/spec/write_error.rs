@@ -43,7 +43,7 @@ async fn details() {
             .reply
             .get_array("writeErrors")
             .unwrap()
-            .get(0)
+            .first()
             .unwrap()
             .as_document()
             .unwrap()
