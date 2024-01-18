@@ -528,7 +528,7 @@ pub(crate) fn log_uncaptured<S: AsRef<str>>(text: S) {
     let mut sinks = vec![&mut stderr as &mut dyn Write];
     let mut other;
     let other_path = std::env::var("LOG_UNCAPTURED").unwrap_or("/dev/tty".to_string());
-    if let Ok(f) = std::fs::OpenOptions::new().append(true).open(&other_path) {
+    if let Ok(f) = std::fs::OpenOptions::new().append(true).open(other_path) {
         other = f;
         sinks.push(&mut other);
     }
