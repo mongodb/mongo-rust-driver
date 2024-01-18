@@ -98,11 +98,11 @@ async fn run_test(mut test_file: TestFile) {
     };
 
     if let Some(true) = test_file.error {
-        assert!(matches!(result, Err(_)), "{}", test_file.comment.unwrap());
+        assert!(result.is_err(), "{}", test_file.comment.unwrap());
         return;
     }
 
-    assert!(matches!(result, Ok(_)), "non-Ok result: {:?}", result);
+    assert!(result.is_ok(), "non-Ok result: {:?}", result);
 
     let options = result.unwrap();
 
