@@ -171,7 +171,7 @@ impl Outcome {
         let coll_opts = CollectionOptions::default();
         #[cfg(feature = "in-use-encryption-unstable")]
         let coll_opts = CollectionOptions::builder()
-            .read_concern(crate::options::ReadConcern::LOCAL)
+            .read_concern(crate::options::ReadConcern::local())
             .build();
         let coll = client
             .database(db_name)

@@ -17,7 +17,7 @@ pub(crate) async fn populate_key_vault(client: &Client, kv_data: Option<&Vec<Doc
             .collection_with_options::<Document>(
                 "datakeys",
                 CollectionOptions::builder()
-                    .write_concern(WriteConcern::MAJORITY)
+                    .write_concern(WriteConcern::majority())
                     .build(),
             );
         datakeys.drop(None).await.unwrap();

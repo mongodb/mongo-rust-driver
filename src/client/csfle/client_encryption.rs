@@ -85,8 +85,8 @@ impl ClientEncryption {
             .collection_with_options(
                 &key_vault_namespace.coll,
                 CollectionOptions::builder()
-                    .write_concern(WriteConcern::MAJORITY)
-                    .read_concern(ReadConcern::MAJORITY)
+                    .write_concern(WriteConcern::majority())
+                    .read_concern(ReadConcern::majority())
                     .build(),
             );
         Ok(ClientEncryption {
