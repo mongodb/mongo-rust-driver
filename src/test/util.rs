@@ -141,7 +141,7 @@ impl TestClientBuilder {
         };
 
         if let Some(handler) = self.handler {
-            options.command_event_handler = Some(handler.clone());
+            options.command_event_handler = Some(handler.clone().into());
             options.cmap_event_handler = Some(handler.clone());
             options.sdam_event_handler = Some(handler);
         }

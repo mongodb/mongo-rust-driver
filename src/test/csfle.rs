@@ -32,12 +32,7 @@ use tokio::net::TcpListener;
 use crate::{
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
     error::{ErrorKind, WriteError, WriteFailure},
-    event::command::{
-        CommandEventHandler,
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
-    },
+    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{
         CollectionOptions,
         CreateCollectionOptions,
@@ -568,7 +563,7 @@ async fn bson_size_limits() -> Result<()> {
     let mut opts = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
     let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.clone());
+    opts.command_event_handler = Some(handler.clone().into());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
             .extra_options(EXTRA_OPTIONS.clone())
@@ -1627,7 +1622,7 @@ impl DeadlockTestCase {
         let mut encrypted_events = event_handler.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.clone());
+        opts.command_event_handler = Some(event_handler.clone().into());
         opts.sdam_event_handler = Some(event_handler.clone());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
@@ -2701,7 +2696,7 @@ impl DecryptionEventsTestdata {
         let ev_handler = DecryptionEventsHandler::new();
         let mut opts = get_client_options().await.clone();
         opts.retry_reads = Some(false);
-        opts.command_event_handler = Some(ev_handler.clone());
+        opts.command_event_handler = Some(ev_handler.clone().into());
         let encrypted_client =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .extra_options(EXTRA_OPTIONS.clone())
@@ -2737,7 +2732,8 @@ impl DecryptionEventsHandler {
     }
 }
 
-impl CommandEventHandler for DecryptionEventsHandler {
+#[allow(deprecated)]
+impl crate::event::command::CommandEventHandler for DecryptionEventsHandler {
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
         if event.command_name == "aggregate" {
             *self.succeeded.lock().unwrap() = Some(event);

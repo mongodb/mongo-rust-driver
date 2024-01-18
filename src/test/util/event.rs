@@ -30,13 +30,7 @@ use crate::{
             PoolCreatedEvent,
             PoolReadyEvent,
         },
-        command::{
-            CommandEvent,
-            CommandEventHandler,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
-        },
+        command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::{
             SdamEventHandler,
             ServerClosedEvent,
@@ -188,6 +182,17 @@ impl EventHandler {
             event_broadcaster,
             connections_checked_out: Arc::new(Mutex::new(0)),
         }
+    }
+
+    pub(crate) fn receive_command(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CommandEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<CommandEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                self.handle(ev.clone());
+                add_event_to_queue(&self.command_events, ev);
+            }
+        });
+        tx
     }
 
     fn handle(&self, event: impl Into<Event>) {
@@ -448,7 +453,8 @@ impl SdamEventHandler for EventHandler {
     }
 }
 
-impl CommandEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::command::CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
         let event = CommandEvent::Started(event);
         self.handle(event.clone());

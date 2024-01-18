@@ -20,6 +20,7 @@ use crate::{
     options::{SessionOptions, TransactionOptions},
     sdam::{ServerInfo, TransactionSupportStatus},
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     Client,
 };
 pub use cluster_time::ClusterTime;
@@ -690,8 +691,6 @@ impl ClientSession {
             .and_then(|options| options.default_transaction_options.as_ref())
     }
 }
-
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 struct DroppedClientSession {
     cluster_time: Option<ClusterTime>,

@@ -32,7 +32,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{Error, ErrorKind, Result},
-    event::command::{handle_command_event, CommandEvent},
+    event::command::CommandEvent,
     id_set::IdSet,
     options::{
         ClientOptions,
@@ -44,6 +44,7 @@ use crate::{
     },
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
+    BoxFuture,
     ClientSession,
 };
 
@@ -257,27 +258,8 @@ impl Client {
         }
     }
 
-    #[cfg(not(feature = "tracing-unstable"))]
     pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
-        let handler = self.inner.options.command_event_handler.as_ref();
-        let test_channel = self.test_command_event_channel();
-        if handler.is_none() && test_channel.is_none() {
-            return;
-        }
-
-        let event = generate_event();
-        if let Some(tx) = test_channel {
-            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
-            let _ = tx.send(msg).await;
-            ack.wait_for_acknowledgment().await;
-        }
-        if let Some(handler) = handler {
-            handle_command_event(handler.as_ref(), event);
-        }
-    }
-
-    #[cfg(feature = "tracing-unstable")]
-    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        #[cfg(feature = "tracing-unstable")]
         let tracing_emitter = if trace_or_log_enabled!(
             target: COMMAND_TRACING_EVENT_TARGET,
             TracingOrLogLevel::Debug
@@ -289,9 +271,11 @@ impl Client {
         } else {
             None
         };
-        let apm_event_handler = self.inner.options.command_event_handler.as_ref();
         let test_channel = self.test_command_event_channel();
-        if !(tracing_emitter.is_some() || apm_event_handler.is_some() || test_channel.is_some()) {
+        let should_send = test_channel.is_some() || self.options().command_event_handler.is_some();
+        #[cfg(feature = "tracing-unstable")]
+        let should_send = should_send || tracing_emitter.is_some();
+        if !should_send {
             return;
         }
 
@@ -301,15 +285,12 @@ impl Client {
             let _ = tx.send(msg).await;
             ack.wait_for_acknowledgment().await;
         }
-        if let (Some(event_handler), Some(ref tracing_emitter)) =
-            (apm_event_handler, &tracing_emitter)
-        {
-            handle_command_event(event_handler.as_ref(), event.clone());
-            handle_command_event(tracing_emitter, event);
-        } else if let Some(event_handler) = apm_event_handler {
-            handle_command_event(event_handler.as_ref(), event);
-        } else if let Some(ref tracing_emitter) = tracing_emitter {
-            handle_command_event(tracing_emitter, event);
+        #[cfg(feature = "tracing-unstable")]
+        if let Some(ref tracing_emitter) = tracing_emitter {
+            tracing_emitter.handle(event.clone());
+        }
+        if let Some(handler) = &self.options().command_event_handler {
+            handler.handle(event);
         }
     }
 
@@ -693,7 +674,6 @@ impl Client {
         .ok()
     }
 
-    #[cfg(test)]
     pub(crate) fn options(&self) -> &ClientOptions {
         &self.inner.options
     }
@@ -731,6 +711,3 @@ impl AsyncDropToken {
         Self { tx: self.tx.take() }
     }
 }
-
-// TODO: merge this with other BoxFuture defs
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;

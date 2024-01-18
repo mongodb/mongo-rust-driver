@@ -17,6 +17,7 @@ use crate::{
     },
     cmap::Connection,
     error::{Error, Result},
+    BoxFuture,
 };
 
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
@@ -26,8 +27,6 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 pub struct Callbacks {
     inner: Arc<CallbacksInner>,
 }
-
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 impl Callbacks {
     /// Create a new instance with a token request callback.
