@@ -81,8 +81,8 @@ impl ReadConcern {
     /// Creates a read concern with a custom read concern level. This is present to provide forwards
     /// compatibility with any future read concerns which may be added to new versions of
     /// MongoDB.
-    pub fn custom(level: &str) -> Self {
-        ReadConcernLevel::from_str(level).into()
+    pub fn custom(level: impl AsRef<str>) -> Self {
+        ReadConcernLevel::from_str(level.as_ref()).into()
     }
 
     #[cfg(test)]
@@ -306,8 +306,8 @@ impl WriteConcern {
     }
 
     /// A `WriteConcern` with a custom acknowledgment.
-    pub fn custom(s: &str) -> Self {
-        Acknowledgment::from(s).into()
+    pub fn custom(s: impl AsRef<str>) -> Self {
+        Acknowledgment::from(s.as_ref()).into()
     }
 
     pub(crate) fn is_acknowledged(&self) -> bool {
