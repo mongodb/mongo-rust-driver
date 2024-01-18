@@ -294,7 +294,7 @@ async fn main() -> Result<()> {
     db.create_collection(
         &encrypted_namespace.coll,
         CreateCollectionOptions::builder()
-            .write_concern(WriteConcern::MAJORITY)
+            .write_concern(WriteConcern::majority())
             .validator(doc! { "$jsonSchema": schema })
             .build(),
     ).await?;

@@ -29,29 +29,6 @@ pub struct ReadConcern {
     pub level: ReadConcernLevel,
 }
 
-impl ReadConcern {
-    /// A `ReadConcern` with level `ReadConcernLevel::Local`.
-    pub const LOCAL: ReadConcern = ReadConcern {
-        level: ReadConcernLevel::Local,
-    };
-    /// A `ReadConcern` with level `ReadConcernLevel::Majority`.
-    pub const MAJORITY: ReadConcern = ReadConcern {
-        level: ReadConcernLevel::Majority,
-    };
-    /// A `ReadConcern` with level `ReadConcernLevel::Linearizable`.
-    pub const LINEARIZABLE: ReadConcern = ReadConcern {
-        level: ReadConcernLevel::Linearizable,
-    };
-    /// A `ReadConcern` with level `ReadConcernLevel::Available`.
-    pub const AVAILABLE: ReadConcern = ReadConcern {
-        level: ReadConcernLevel::Available,
-    };
-    /// A `ReadConcern` with level `ReadConcernLevel::Snapshot`.
-    pub const SNAPSHOT: ReadConcern = ReadConcern {
-        level: ReadConcernLevel::Snapshot,
-    };
-}
-
 /// An internal-only read concern type that allows the omission of a "level" as well as
 /// specification of "atClusterTime" and "afterClusterTime".
 #[skip_serializing_none]
@@ -104,8 +81,8 @@ impl ReadConcern {
     /// Creates a read concern with a custom read concern level. This is present to provide forwards
     /// compatibility with any future read concerns which may be added to new versions of
     /// MongoDB.
-    pub fn custom(level: String) -> Self {
-        ReadConcernLevel::from_str(level.as_str()).into()
+    pub fn custom(level: impl AsRef<str>) -> Self {
+        ReadConcernLevel::from_str(level.as_ref()).into()
     }
 
     #[cfg(test)]
@@ -242,20 +219,6 @@ pub struct WriteConcern {
     pub journal: Option<bool>,
 }
 
-impl WriteConcern {
-    // Can't use `Default::default()` in const contexts yet :(
-    const DEFAULT: WriteConcern = WriteConcern {
-        w: None,
-        w_timeout: None,
-        journal: None,
-    };
-    /// A `WriteConcern` requesting `Acknowledgment::Majority`.
-    pub const MAJORITY: WriteConcern = WriteConcern {
-        w: Some(Acknowledgment::Majority),
-        ..WriteConcern::DEFAULT
-    };
-}
-
 /// The type of the `w` field in a [`WriteConcern`](struct.WriteConcern.html).
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -311,6 +274,16 @@ impl From<u32> for Acknowledgment {
     }
 }
 
+impl From<&str> for Acknowledgment {
+    fn from(s: &str) -> Self {
+        if s == "majority" {
+            Acknowledgment::Majority
+        } else {
+            Acknowledgment::Custom(s.to_string())
+        }
+    }
+}
+
 impl From<String> for Acknowledgment {
     fn from(s: String) -> Self {
         if s == "majority" {
@@ -322,6 +295,21 @@ impl From<String> for Acknowledgment {
 }
 
 impl WriteConcern {
+    /// A 'WriteConcern' requesting [`Acknowledgment::Nodes`].
+    pub fn nodes(v: u32) -> Self {
+        Acknowledgment::Nodes(v).into()
+    }
+
+    /// A `WriteConcern` requesting [`Acknowledgment::Majority`].
+    pub fn majority() -> Self {
+        Acknowledgment::Majority.into()
+    }
+
+    /// A `WriteConcern` with a custom acknowledgment.
+    pub fn custom(s: impl AsRef<str>) -> Self {
+        Acknowledgment::from(s.as_ref()).into()
+    }
+
     pub(crate) fn is_acknowledged(&self) -> bool {
         self.w != Some(Acknowledgment::Nodes(0)) || self.journal == Some(true)
     }
@@ -379,5 +367,15 @@ impl WriteConcern {
         });
 
         state.serialize(serializer)
+    }
+}
+
+impl From<Acknowledgment> for WriteConcern {
+    fn from(w: Acknowledgment) -> Self {
+        WriteConcern {
+            w: Some(w),
+            w_timeout: None,
+            journal: None,
+        }
     }
 }

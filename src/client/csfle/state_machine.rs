@@ -167,7 +167,7 @@ impl CryptExecutor {
                         .find(
                             filter,
                             FindOptions::builder()
-                                .read_concern(ReadConcern::MAJORITY)
+                                .read_concern(ReadConcern::majority())
                                 .build(),
                         )
                         .await?;

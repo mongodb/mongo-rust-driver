@@ -73,8 +73,8 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
         .collection_with_options::<Document>(
             "datakeys",
             CollectionOptions::builder()
-                .read_concern(ReadConcern::MAJORITY)
-                .write_concern(WriteConcern::MAJORITY)
+                .read_concern(ReadConcern::majority())
+                .write_concern(WriteConcern::majority())
                 .build(),
         );
     datakeys.drop(None).await?;
@@ -1588,7 +1588,7 @@ impl DeadlockTestCase {
             .insert_one(
                 load_testdata("external/external-key.json")?,
                 InsertOneOptions::builder()
-                    .write_concern(WriteConcern::MAJORITY)
+                    .write_concern(WriteConcern::majority())
                     .build(),
             )
             .await?;
@@ -2357,7 +2357,7 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
         .insert_one(
             key1_document,
             InsertOneOptions::builder()
-                .write_concern(WriteConcern::MAJORITY)
+                .write_concern(WriteConcern::majority())
                 .build(),
         )
         .await?;
@@ -2504,7 +2504,7 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
                 ),
             },
             CreateIndexOptions::builder()
-                .write_concern(WriteConcern::MAJORITY)
+                .write_concern(WriteConcern::majority())
                 .build(),
         )
         .await?;
@@ -3260,7 +3260,7 @@ async fn range_explicit_encryption_test(
         .insert_one(
             key1_document,
             InsertOneOptions::builder()
-                .write_concern(WriteConcern::MAJORITY)
+                .write_concern(WriteConcern::majority())
                 .build(),
         )
         .await?;

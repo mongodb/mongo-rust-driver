@@ -142,7 +142,7 @@ impl TestContext {
         // Reset the test collection as needed
         #[allow(unused_mut)]
         let mut options = DropCollectionOptions::builder()
-            .write_concern(WriteConcern::MAJORITY)
+            .write_concern(WriteConcern::majority())
             .build();
         #[cfg(feature = "in-use-encryption-unstable")]
         if let Some(enc_fields) = &test_file.encrypted_fields {
@@ -158,7 +158,7 @@ impl TestContext {
 
         #[allow(unused_mut)]
         let mut options = CreateCollectionOptions::builder()
-            .write_concern(WriteConcern::MAJORITY)
+            .write_concern(WriteConcern::majority())
             .build();
         #[cfg(feature = "in-use-encryption-unstable")]
         {
@@ -181,7 +181,7 @@ impl TestContext {
                 TestData::Single(data) => {
                     if !data.is_empty() {
                         let options = InsertManyOptions::builder()
-                            .write_concern(WriteConcern::MAJORITY)
+                            .write_concern(WriteConcern::majority())
                             .build();
                         coll.insert_many(data.clone(), options).await.unwrap();
                     }

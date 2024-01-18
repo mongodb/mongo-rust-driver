@@ -1307,7 +1307,7 @@ impl TestOperation for AssertCollectionExists {
                 .database_with_options(
                     &self.database,
                     DatabaseOptions::builder()
-                        .read_concern(ReadConcern::MAJORITY)
+                        .read_concern(ReadConcern::majority())
                         .build(),
                 )
                 .list_collection_names(None)
