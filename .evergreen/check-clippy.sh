@@ -6,7 +6,7 @@ source ./.evergreen/env.sh
 source ./.evergreen/feature-combinations.sh
 
 # Pin clippy to the latest version. This should be updated when new versions of Rust are released.
-CLIPPY_VERSION=1.71.0
+CLIPPY_VERSION=1.75.0
 
 rustup install $CLIPPY_VERSION
 
