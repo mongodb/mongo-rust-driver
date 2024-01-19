@@ -78,9 +78,7 @@ impl<T: crate::event::command::CommandEventHandler + 'static> From<Arc<T>>
 }
 
 #[allow(deprecated)]
-impl<T: crate::event::cmap::CmapEventHandler + 'static> From<Arc<T>>
-    for EventHandler<CmapEvent>
-{
+impl<T: crate::event::cmap::CmapEventHandler + 'static> From<Arc<T>> for EventHandler<CmapEvent> {
     fn from(value: Arc<T>) -> Self {
         use CmapEvent::*;
         Self::callback(move |ev| match ev {
@@ -100,9 +98,7 @@ impl<T: crate::event::cmap::CmapEventHandler + 'static> From<Arc<T>>
 }
 
 #[allow(deprecated)]
-impl<T: crate::event::sdam::SdamEventHandler + 'static> From<Arc<T>>
-    for EventHandler<SdamEvent>
-{
+impl<T: crate::event::sdam::SdamEventHandler + 'static> From<Arc<T>> for EventHandler<SdamEvent> {
     fn from(value: Arc<T>) -> Self {
         use SdamEvent::*;
         Self::callback(move |ev| match ev {

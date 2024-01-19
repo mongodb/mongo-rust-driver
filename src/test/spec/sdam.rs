@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use bson::{doc, Document};
 
 use crate::{
+    event::sdam::SdamEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
@@ -16,7 +17,7 @@ use crate::{
         FailPointMode,
         TestClient,
     },
-    Client, event::sdam::SdamEvent,
+    Client,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]

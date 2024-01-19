@@ -2,7 +2,8 @@ use crate::{
     bson::Document,
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
-        command::CommandEvent, sdam::SdamEvent,
+        command::CommandEvent,
+        sdam::SdamEvent,
     },
     test::Event,
     ServerType,

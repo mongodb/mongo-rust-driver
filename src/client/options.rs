@@ -415,8 +415,7 @@ pub struct ClientOptions {
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default, setter(strip_option))]
     #[serde(skip)]
-    pub command_event_handler:
-        Option<EventHandler<crate::event::command::CommandEvent>>,
+    pub command_event_handler: Option<EventHandler<crate::event::command::CommandEvent>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.

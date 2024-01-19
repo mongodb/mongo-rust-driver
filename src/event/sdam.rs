@@ -206,6 +206,7 @@ pub enum SdamEvent {
 /// by the driver.
 ///
 /// ```rust
+/// # #![allow(deprecated)]
 /// # use std::sync::Arc;
 /// #
 /// # use mongodb::{
@@ -230,7 +231,7 @@ pub enum SdamEvent {
 /// }
 ///
 /// # fn do_stuff() -> Result<()> {
-/// let handler: Arc<dyn SdamEventHandler> = Arc::new(FailedHeartbeatLogger);
+/// let handler = Arc::new(FailedHeartbeatLogger);
 /// let options = ClientOptions::builder()
 ///                   .sdam_event_handler(handler)
 ///                   .build();

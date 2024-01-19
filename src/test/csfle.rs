@@ -32,7 +32,10 @@ use tokio::net::TcpListener;
 use crate::{
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
     error::{ErrorKind, WriteError, WriteFailure},
-    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+    event::{
+        command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+        sdam::SdamEvent,
+    },
     options::{
         CollectionOptions,
         CreateCollectionOptions,
@@ -47,7 +50,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{Event, EventHandler, SdamEvent},
+    test::{Event, EventHandler},
     Client,
     Collection,
     IndexModel,
@@ -1623,7 +1626,7 @@ impl DeadlockTestCase {
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
         opts.command_event_handler = Some(event_handler.clone().into());
-        opts.sdam_event_handler = Some(event_handler.clone());
+        opts.sdam_event_handler = Some(event_handler.clone().into());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)

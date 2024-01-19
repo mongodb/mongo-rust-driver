@@ -1,11 +1,7 @@
 use bson::oid::ObjectId;
 
 use crate::{
-    event::cmap::{
-        ConnectionCheckoutFailedReason,
-        ConnectionClosedReason,
-        CmapEvent,
-    },
+    event::cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
     trace::{TracingRepresentation, CONNECTION_TRACING_EVENT_TARGET},
 };
 
@@ -52,7 +48,7 @@ impl ConnectionTracingEventEmitter {
                     serverPort = event.address.port_tracing_representation(),
                     serviceId = event.service_id.map(|id| id.tracing_representation()),
                     "Connection pool cleared",
-                );        
+                );
             }
             PoolClosed(event) => {
                 tracing::debug!(
@@ -61,7 +57,7 @@ impl ConnectionTracingEventEmitter {
                     serverHost = event.address.host().as_ref(),
                     serverPort = event.address.port_tracing_representation(),
                     "Connection pool closed",
-                );        
+                );
             }
             ConnectionCreated(event) => {
                 tracing::debug!(
@@ -71,7 +67,7 @@ impl ConnectionTracingEventEmitter {
                     serverPort = event.address.port_tracing_representation(),
                     driverConnectionId = event.connection_id,
                     "Connection created",
-                );        
+                );
             }
             ConnectionReady(event) => {
                 tracing::debug!(
@@ -82,7 +78,7 @@ impl ConnectionTracingEventEmitter {
                     driverConnectionId = event.connection_id,
                     durationMS = event.duration.as_millis(),
                     "Connection ready",
-                );        
+                );
             }
             ConnectionClosed(event) => {
                 tracing::debug!(
@@ -94,7 +90,7 @@ impl ConnectionTracingEventEmitter {
                     reason = event.reason.tracing_representation(),
                     error = event.error.map(|e| e.tracing_representation()),
                     "Connection closed",
-                );        
+                );
             }
             ConnectionCheckoutStarted(event) => {
                 tracing::debug!(
@@ -103,7 +99,7 @@ impl ConnectionTracingEventEmitter {
                     serverHost = event.address.host().as_ref(),
                     serverPort = event.address.port_tracing_representation(),
                     "Connection checkout started",
-                );        
+                );
             }
             ConnectionCheckoutFailed(event) => {
                 tracing::debug!(
@@ -115,7 +111,7 @@ impl ConnectionTracingEventEmitter {
                     error = event.error.map(|e| e.tracing_representation()),
                     durationMS = event.duration.as_millis(),
                     "Connection checkout failed",
-                );        
+                );
             }
             ConnectionCheckedOut(event) => {
                 tracing::debug!(
@@ -126,7 +122,7 @@ impl ConnectionTracingEventEmitter {
                     driverConnectionId = event.connection_id,
                     durationMS = event.duration.as_millis(),
                     "Connection checked out",
-                );        
+                );
             }
             ConnectionCheckedIn(event) => {
                 tracing::debug!(
@@ -137,7 +133,6 @@ impl ConnectionTracingEventEmitter {
                     driverConnectionId = event.connection_id,
                     "Connection checked in",
                 );
-        
             }
         }
     }

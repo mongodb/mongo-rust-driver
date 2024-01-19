@@ -9,7 +9,10 @@ use serde::Deserialize;
 
 use crate::{
     client::auth::Credential,
-    event::{cmap::{ConnectionPoolOptions as EventOptions, CmapEvent}, EventHandler},
+    event::{
+        cmap::{CmapEvent, ConnectionPoolOptions as EventOptions},
+        EventHandler,
+    },
     options::ClientOptions,
     serde_util,
 };

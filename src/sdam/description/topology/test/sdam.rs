@@ -10,6 +10,7 @@ use crate::{
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
+    event::sdam::SdamEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
@@ -34,7 +35,7 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-    }, event::sdam::SdamEvent,
+    },
 };
 
 #[derive(Debug, Deserialize)]

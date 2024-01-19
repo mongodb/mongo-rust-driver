@@ -283,13 +283,13 @@ fn default_connection_id() -> u32 {
     42
 }
 
-/// Usage of this trait is deprecated.  Applications should use the
-/// [`EventHandler`](crate::event::EventHandler) API.
+/// Usage of this trait is deprecated.  Applications should use the [`EventHandler`] API.
 ///
 /// Applications can implement this trait to specify custom logic to run on each CMAP event sent
 /// by the driver.
 ///
 /// ```rust
+/// # #![allow(deprecated)]
 /// # use std::sync::Arc;
 /// #
 /// # use mongodb::{
@@ -314,7 +314,7 @@ fn default_connection_id() -> u32 {
 /// }
 ///
 /// # fn do_stuff() -> Result<()> {
-/// let handler: Arc<dyn CmapEventHandler> = Arc::new(FailedCheckoutLogger);
+/// let handler = Arc::new(FailedCheckoutLogger);
 /// let options = ClientOptions::builder()
 ///                   .cmap_event_handler(handler)
 ///                   .build();

@@ -3,12 +3,13 @@ use serde::Deserialize;
 use crate::{
     client::options::ServerAddress,
     event::sdam::{
+        SdamEvent,
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
         ServerOpeningEvent,
         TopologyClosedEvent,
         TopologyDescriptionChangedEvent,
-        TopologyOpeningEvent, SdamEvent,
+        TopologyOpeningEvent,
     },
     sdam::{ServerDescription, ServerType, TopologyDescription},
 };

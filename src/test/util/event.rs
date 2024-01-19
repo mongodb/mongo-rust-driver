@@ -30,6 +30,7 @@ use crate::{
         },
         command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::{
+            SdamEvent,
             ServerClosedEvent,
             ServerDescriptionChangedEvent,
             ServerHeartbeatFailedEvent,
@@ -38,7 +39,7 @@ use crate::{
             ServerOpeningEvent,
             TopologyClosedEvent,
             TopologyDescriptionChangedEvent,
-            TopologyOpeningEvent, SdamEvent,
+            TopologyOpeningEvent,
         },
     },
     options::ClientOptions,
@@ -183,8 +184,12 @@ impl EventHandler {
         crate::runtime::spawn(async move {
             while let Some(ev) = rx.recv().await {
                 match &ev {
-                    CmapEvent::ConnectionCheckedOut(_) => *self.connections_checked_out.lock().unwrap() += 1,
-                    CmapEvent::ConnectionCheckedIn(_) => *self.connections_checked_out.lock().unwrap() -= 1,
+                    CmapEvent::ConnectionCheckedOut(_) => {
+                        *self.connections_checked_out.lock().unwrap() += 1
+                    }
+                    CmapEvent::ConnectionCheckedIn(_) => {
+                        *self.connections_checked_out.lock().unwrap() -= 1
+                    }
                     _ => (),
                 }
                 self.handle(ev.clone());

@@ -9,20 +9,14 @@ use crate::{
     bson::{doc, Bson},
     coll::options::{CountOptions, InsertManyOptions},
     error::Result,
+    event::sdam::SdamEvent,
     options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
     runtime,
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{
-        get_client_options,
-        log_uncaptured,
-        Event,
-        EventClient,
-        EventHandler,
-        TestClient,
-    },
+    test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
     Client,
-    Collection, event::sdam::SdamEvent,
+    Collection,
 };
 
 /// Macro defining a closure that returns a future populated by an operation on the
