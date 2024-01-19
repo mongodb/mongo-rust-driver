@@ -7,7 +7,6 @@ use std::{
 };
 
 use derive_more::From;
-use serde::Serialize;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::error::SendError;
 
@@ -31,7 +30,6 @@ use crate::{
         },
         command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::{
-            SdamEventHandler,
             ServerClosedEvent,
             ServerDescriptionChangedEvent,
             ServerHeartbeatFailedEvent,
@@ -40,7 +38,7 @@ use crate::{
             ServerOpeningEvent,
             TopologyClosedEvent,
             TopologyDescriptionChangedEvent,
-            TopologyOpeningEvent,
+            TopologyOpeningEvent, SdamEvent,
         },
     },
     options::ClientOptions,
@@ -90,20 +88,6 @@ impl Event {
             _ => None,
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(untagged)]
-pub(crate) enum SdamEvent {
-    ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
-    ServerOpening(ServerOpeningEvent),
-    ServerClosed(ServerClosedEvent),
-    TopologyDescriptionChanged(Box<TopologyDescriptionChangedEvent>),
-    TopologyOpening(TopologyOpeningEvent),
-    TopologyClosed(TopologyClosedEvent),
-    ServerHeartbeatStarted(ServerHeartbeatStartedEvent),
-    ServerHeartbeatSucceeded(ServerHeartbeatSucceededEvent),
-    ServerHeartbeatFailed(ServerHeartbeatFailedEvent),
 }
 
 impl SdamEvent {
@@ -205,6 +189,17 @@ impl EventHandler {
                 }
                 self.handle(ev.clone());
                 add_event_to_queue(&self.cmap_events, ev);
+            }
+        });
+        tx
+    }
+
+    pub(crate) fn sdam_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<SdamEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<SdamEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                self.handle(ev.clone());
+                add_event_to_queue(&self.sdam_events, ev);
             }
         });
         tx
@@ -413,7 +408,8 @@ impl crate::event::cmap::CmapEventHandler for EventHandler {
     }
 }
 
-impl SdamEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::sdam::SdamEventHandler for EventHandler {
     fn handle_server_description_changed_event(&self, event: ServerDescriptionChangedEvent) {
         let event = SdamEvent::ServerDescriptionChanged(Box::new(event));
         self.handle(event.clone());

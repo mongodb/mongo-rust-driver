@@ -36,7 +36,6 @@ pub(crate) use self::{
         FailPointMode,
         MatchErrExt,
         Matchable,
-        SdamEvent,
         TestClient,
     },
 };

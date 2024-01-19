@@ -10,7 +10,7 @@ use futures_core::future::BoxFuture;
 
 use crate::event::command::CommandEvent;
 
-use self::cmap::CmapEvent;
+use self::{cmap::CmapEvent, sdam::SdamEvent};
 
 /// A destination for events.  Allows implicit conversion via [`From`] for concrete types for
 /// convenience with [`crate::options::ClientOptions`] construction:
@@ -95,6 +95,26 @@ impl<T: crate::event::cmap::CmapEventHandler + 'static> From<Arc<T>>
             ConnectionCheckoutFailed(ev) => value.handle_connection_checkout_failed_event(ev),
             ConnectionCheckedOut(ev) => value.handle_connection_checked_out_event(ev),
             ConnectionCheckedIn(ev) => value.handle_connection_checked_in_event(ev),
+        })
+    }
+}
+
+#[allow(deprecated)]
+impl<T: crate::event::sdam::SdamEventHandler + 'static> From<Arc<T>>
+    for EventHandler<SdamEvent>
+{
+    fn from(value: Arc<T>) -> Self {
+        use SdamEvent::*;
+        Self::callback(move |ev| match ev {
+            ServerDescriptionChanged(ev) => value.handle_server_description_changed_event(*ev),
+            ServerOpening(ev) => value.handle_server_opening_event(ev),
+            ServerClosed(ev) => value.handle_server_closed_event(ev),
+            TopologyDescriptionChanged(ev) => value.handle_topology_description_changed_event(*ev),
+            TopologyOpening(ev) => value.handle_topology_opening_event(ev),
+            TopologyClosed(ev) => value.handle_topology_closed_event(ev),
+            ServerHeartbeatStarted(ev) => value.handle_server_heartbeat_started_event(ev),
+            ServerHeartbeatSucceeded(ev) => value.handle_server_heartbeat_succeeded_event(ev),
+            ServerHeartbeatFailed(ev) => value.handle_server_heartbeat_failed_event(ev),
         })
     }
 }

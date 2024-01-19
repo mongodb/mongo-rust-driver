@@ -19,11 +19,10 @@ use crate::{
         Event,
         EventClient,
         EventHandler,
-        SdamEvent,
         TestClient,
     },
     Client,
-    Collection,
+    Collection, event::sdam::SdamEvent,
 };
 
 /// Macro defining a closure that returns a future populated by an operation on the
@@ -306,7 +305,7 @@ async fn cluster_time_in_commands() {
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
     options.command_event_handler = Some(handler.clone().into());
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
 
     // Ensure we only connect to one server so the monitor checks from other servers
     // don't affect the TopologyDescription's clusterTime value between commands.

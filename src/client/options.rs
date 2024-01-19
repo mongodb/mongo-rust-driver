@@ -12,7 +12,6 @@ use std::{
     hash::{Hash, Hasher},
     path::PathBuf,
     str::FromStr,
-    sync::Arc,
     time::Duration,
 };
 
@@ -32,7 +31,7 @@ use crate::{
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
-    event::{sdam::SdamEventHandler, EventHandler},
+    event::EventHandler,
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
@@ -406,7 +405,7 @@ pub struct ClientOptions {
 
     /// The handler that should process all Connection Monitoring and Pooling events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub cmap_event_handler: Option<EventHandler<crate::event::cmap::CmapEvent>>,
 
@@ -518,12 +517,11 @@ pub struct ClientOptions {
     #[builder(default)]
     pub retry_writes: Option<bool>,
 
-    /// The handler that should process all Server Discovery and Monitoring events. See the
-    /// [`SdamEventHandler`] type documentation for more details.
+    /// The handler that should process all Server Discovery and Monitoring events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
-    pub sdam_event_handler: Option<Arc<dyn SdamEventHandler>>,
+    pub sdam_event_handler: Option<EventHandler<crate::event::sdam::SdamEvent>>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.

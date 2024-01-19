@@ -183,8 +183,11 @@ pub struct ServerHeartbeatFailedEvent {
     pub server_connection_id: Option<i64>,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum SdamEvent {
+#[derive(Clone, Debug, Serialize)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+#[serde(untagged)]
+pub enum SdamEvent {
     ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
     ServerOpening(ServerOpeningEvent),
     ServerClosed(ServerClosedEvent),
@@ -196,6 +199,9 @@ pub(crate) enum SdamEvent {
     ServerHeartbeatFailed(ServerHeartbeatFailedEvent),
 }
 
+/// Usage of this trait is deprecated.  Applications should use the
+/// [`EventHandler`](crate::event::EventHandler) API.
+///
 /// Applications can implement this trait to specify custom logic to run on each SDAM event sent
 /// by the driver.
 ///
@@ -234,6 +240,7 @@ pub(crate) enum SdamEvent {
 /// # Ok(())
 /// # }
 /// ```
+#[deprecated = "use the EventHandler API"]
 pub trait SdamEventHandler: Send + Sync {
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler when
     /// a server description changes.
@@ -271,24 +278,4 @@ pub trait SdamEventHandler: Send + Sync {
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler when
     /// a server heartbeat fails.
     fn handle_server_heartbeat_failed_event(&self, _event: ServerHeartbeatFailedEvent) {}
-}
-
-pub(crate) fn handle_sdam_event(handler: &dyn SdamEventHandler, event: SdamEvent) {
-    match event {
-        SdamEvent::ServerClosed(event) => handler.handle_server_closed_event(event),
-        SdamEvent::ServerDescriptionChanged(e) => {
-            handler.handle_server_description_changed_event(*e)
-        }
-        SdamEvent::ServerOpening(e) => handler.handle_server_opening_event(e),
-        SdamEvent::TopologyDescriptionChanged(e) => {
-            handler.handle_topology_description_changed_event(*e)
-        }
-        SdamEvent::TopologyOpening(e) => handler.handle_topology_opening_event(e),
-        SdamEvent::TopologyClosed(e) => handler.handle_topology_closed_event(e),
-        SdamEvent::ServerHeartbeatStarted(e) => handler.handle_server_heartbeat_started_event(e),
-        SdamEvent::ServerHeartbeatSucceeded(e) => {
-            handler.handle_server_heartbeat_succeeded_event(e)
-        }
-        SdamEvent::ServerHeartbeatFailed(e) => handler.handle_server_heartbeat_failed_event(e),
-    }
 }

@@ -14,10 +14,9 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         TestClient,
     },
-    Client,
+    Client, event::sdam::SdamEvent,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -57,7 +56,7 @@ async fn streaming_min_heartbeat_frequency() {
     let handler = Arc::new(EventHandler::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
 
     let hosts = options.hosts.clone();
 
@@ -108,7 +107,7 @@ async fn heartbeat_frequency_is_respected() {
     let handler = Arc::new(EventHandler::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(1000));
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
 
     let hosts = options.hosts.clone();
 
@@ -174,7 +173,7 @@ async fn rtt_is_updated() {
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
     options.app_name = Some(app_name.to_string());
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
 

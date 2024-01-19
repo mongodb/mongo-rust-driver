@@ -2,9 +2,9 @@ use crate::{
     bson::Document,
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
-        command::CommandEvent,
+        command::CommandEvent, sdam::SdamEvent,
     },
-    test::{Event, SdamEvent},
+    test::Event,
     ServerType,
 };
 use serde::Deserialize;

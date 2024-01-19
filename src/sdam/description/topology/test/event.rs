@@ -8,10 +8,9 @@ use crate::{
         ServerOpeningEvent,
         TopologyClosedEvent,
         TopologyDescriptionChangedEvent,
-        TopologyOpeningEvent,
+        TopologyOpeningEvent, SdamEvent,
     },
     sdam::{ServerDescription, ServerType, TopologyDescription},
-    test::SdamEvent,
 };
 
 #[derive(Debug, Deserialize)]

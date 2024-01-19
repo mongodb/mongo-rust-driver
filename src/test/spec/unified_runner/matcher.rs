@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use crate::{
     bson::{doc, spec::ElementType, Bson, Document},
     bson_util::get_int,
-    event::{cmap::CmapEvent, command::CommandEvent, sdam::ServerDescription},
-    test::{Event, SdamEvent},
+    event::{cmap::CmapEvent, command::CommandEvent, sdam::{ServerDescription, SdamEvent}},
+    test::Event,
 };
 
 use super::{
