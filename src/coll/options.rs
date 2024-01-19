@@ -10,7 +10,7 @@ use crate::{
     error::Result,
     options::Collation,
     selection_criteria::SelectionCriteria,
-    serde_util,
+    serde_util::{self, write_concern_is_empty},
 };
 
 // Generated code for `Deserialize` or `TypedBuilder` causes a deprecation warning; annotating the
@@ -151,7 +151,7 @@ pub struct InsertManyOptions {
     pub ordered: Option<bool>,
 
     /// The write concern for the operation.
-    #[serde(skip_deserializing)]
+    #[serde(skip_deserializing, skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the

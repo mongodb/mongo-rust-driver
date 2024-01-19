@@ -1171,7 +1171,7 @@ where
 
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert = Insert::new_encrypted(
+            let insert = Insert::new(
                 self.namespace(),
                 docs,
                 options.clone(),
@@ -1300,10 +1300,16 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
+        #[cfg(feature = "in-use-encryption-unstable")]
+        let encrypted = self.client().auto_encryption_opts().await.is_some();
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
+        let encrypted = false;
+
         let insert = Insert::new(
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
+            encrypted,
             self.inner.human_readable_serialization,
         );
         self.client()

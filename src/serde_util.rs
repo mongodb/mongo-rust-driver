@@ -7,6 +7,7 @@ use crate::{
     bson::{doc, Bson, Document, RawDocumentBuf},
     bson_util::get_u64,
     error::{Error, Result},
+    options::WriteConcern,
 };
 
 pub(crate) mod duration_option_as_int_seconds {
@@ -165,6 +166,12 @@ pub(crate) fn to_raw_document_buf_with_options<T: Serialize>(
         bson::to_raw_document_buf(doc)?
     };
     Ok(raw_doc)
+}
+
+pub(crate) fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
+    write_concern
+        .as_ref()
+        .map_or(true, |write_concern| write_concern.is_empty())
 }
 
 #[cfg(test)]

@@ -201,7 +201,7 @@ impl TopologyDescription {
         self.servers.get(address)
     }
 
-    pub(crate) fn update_command_with_read_pref<T>(
+    pub(crate) fn update_command_with_read_pref<T: Serialize>(
         &self,
         address: &ServerAddress,
         command: &mut Command<T>,
@@ -249,7 +249,7 @@ impl TopologyDescription {
         }
     }
 
-    fn update_command_read_pref_for_mongos<T>(
+    fn update_command_read_pref_for_mongos<T: Serialize>(
         &self,
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,

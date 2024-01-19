@@ -182,10 +182,6 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
         ))
     }
 
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        cmd.into_bson_bytes()
-    }
-
     fn handle_response(
         &self,
         raw_response: RawCommandResponse,
