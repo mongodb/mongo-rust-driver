@@ -2,7 +2,7 @@ use std::future::IntoFuture;
 
 use futures_util::FutureExt;
 
-use crate::{Client, client::BoxFuture};
+use crate::{client::BoxFuture, Client};
 
 impl Client {
     /// Add connections to the connection pool up to `min_pool_size`.  This is normally not needed -
@@ -18,7 +18,7 @@ impl Client {
     ///
     /// `await` will return `()`.
     pub fn warm_connection_pool(&self) -> WarmConnectionPool {
-        todo!()
+        WarmConnectionPool { client: self }
     }
 }
 
@@ -57,12 +57,19 @@ impl<'a> IntoFuture for WarmConnectionPool<'a> {
 
     fn into_future(self) -> Self::IntoFuture {
         async {
-            if !self.client.inner.options.min_pool_size.map_or(false, |s| s > 0) {
+            if !self
+                .client
+                .inner
+                .options
+                .min_pool_size
+                .map_or(false, |s| s > 0)
+            {
                 // No-op when min_pool_size is zero.
                 return;
             }
             self.client.inner.topology.warm_pool().await;
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
