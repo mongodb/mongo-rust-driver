@@ -1,11 +1,13 @@
 //! Action builder types.
 
 pub(crate) mod list_databases;
+pub(crate) mod perf;
 pub(crate) mod session;
 pub(crate) mod shutdown;
 pub(crate) mod watch;
 
 pub use list_databases::ListDatabases;
+pub use perf::WarmConnectionPool;
 pub use session::StartSession;
 pub use shutdown::Shutdown;
 pub use watch::Watch;

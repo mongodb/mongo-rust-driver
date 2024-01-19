@@ -366,24 +366,6 @@ impl Client {
         }
     }
 
-    /// Add connections to the connection pool up to `min_pool_size`.  This is normally not needed -
-    /// the connection pool will be filled in the background, and new connections created as needed
-    /// up to `max_pool_size`.  However, it can sometimes be preferable to pay the (larger) cost of
-    /// creating new connections up-front so that individual operations execute as quickly as
-    /// possible.
-    ///
-    /// Note that topology changes require rebuilding the connection pool, so this method cannot
-    /// guarantee that the pool will always be filled for the lifetime of the `Client`.
-    ///
-    /// Does nothing if `min_pool_size` is unset or zero.
-    pub async fn warm_connection_pool(&self) {
-        if !self.inner.options.min_pool_size.map_or(false, |s| s > 0) {
-            // No-op when min_pool_size is zero.
-            return;
-        }
-        self.inner.topology.warm_pool().await;
-    }
-
     /// Check in a server session to the server session pool. The session will be discarded if it is
     /// expired or dirty.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {

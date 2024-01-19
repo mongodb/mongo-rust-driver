@@ -124,7 +124,9 @@ impl crate::sync::Client {
     }
 }
 
-/// Shut down this `Client`, terminating background thread workers and closing connections.
+/// Shut down this `Client`, terminating background thread workers and closing connections.  Create
+/// by calling [`Client::shutdown`] and execute with `await` (or [`run`](Shutdown::run) if using the
+/// sync client).
 #[must_use]
 pub struct Shutdown {
     client: Client,
