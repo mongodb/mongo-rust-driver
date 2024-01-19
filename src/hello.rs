@@ -57,7 +57,7 @@ pub(crate) fn hello_command(
         command.insert("maxAwaitTimeMS", opts.max_await_time.as_millis() as i64);
     }
 
-    let mut command = Command::new(command_name.into(), "admin".into(), command);
+    let mut command = Command::new(command_name, "admin", command);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }

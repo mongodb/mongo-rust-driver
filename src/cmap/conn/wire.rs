@@ -1,5 +1,5 @@
 mod header;
-mod message;
+pub(crate) mod message;
 mod util;
 
 pub(crate) use self::{

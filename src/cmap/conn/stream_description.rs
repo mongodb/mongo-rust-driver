@@ -99,7 +99,7 @@ impl StreamDescription {
             max_bson_object_size: 16 * 1024 * 1024,
             max_write_batch_size: 100_000,
             hello_ok: false,
-            max_message_size_bytes: Default::default(),
+            max_message_size_bytes: 48_000_000,
             service_id: None,
         }
     }

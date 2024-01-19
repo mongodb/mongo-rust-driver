@@ -42,7 +42,7 @@ impl SaslStart {
             body.insert("options", doc! { "skipEmptyExchange": true });
         }
 
-        let mut command = Command::new("saslStart".into(), self.source, body);
+        let mut command = Command::new("saslStart", self.source, body);
         if let Some(server_api) = self.server_api {
             command.set_server_api(&server_api);
         }
@@ -81,7 +81,7 @@ impl SaslContinue {
             "payload": Binary { subtype: BinarySubtype::Generic, bytes: self.payload },
         };
 
-        let mut command = Command::new("saslContinue".into(), self.source, body);
+        let mut command = Command::new("saslContinue", self.source, body);
         if let Some(server_api) = self.server_api {
             command.set_server_api(&server_api);
         }
