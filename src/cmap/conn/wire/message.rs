@@ -44,9 +44,7 @@ impl Message {
         command: Command<T>,
         request_id: Option<i32>,
     ) -> Result<Self> {
-        let mut document_payload = bson::to_raw_document_buf(&command.body)?;
-        let command_fields = bson::to_raw_document_buf(&command)?;
-        bson_util::extend_raw_document_buf(&mut document_payload, command_fields)?;
+        let document_payload = bson::to_raw_document_buf(&command)?;
 
         let mut flags = MessageFlags::empty();
         if command.exhaust_allowed {

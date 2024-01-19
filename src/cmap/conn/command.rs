@@ -27,7 +27,7 @@ where
     #[serde(skip)]
     pub(crate) exhaust_allowed: bool,
 
-    #[serde(skip)]
+    #[serde(flatten)]
     pub(crate) body: T,
 
     #[serde(skip)]

@@ -575,7 +575,6 @@ async fn bson_size_limits() -> Result<()> {
             .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
             .build()
             .await?;
-
     let coll = client_encrypted
         .database("db")
         .collection::<Document>("coll");
