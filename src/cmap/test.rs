@@ -7,7 +7,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::sync::{Mutex, RwLock};
 
 use self::{
-    event::EventHandler,
+    event::TestEventHandler,
     file::{Operation, TestFile, ThreadedOperation},
 };
 
@@ -70,7 +70,7 @@ struct Executor {
 
 #[derive(Debug)]
 struct State {
-    handler: Arc<EventHandler>,
+    handler: Arc<TestEventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
     unlabeled_connections: Mutex<Vec<Connection>>,
     threads: RwLock<HashMap<String, CmapThread>>,
@@ -126,11 +126,11 @@ impl CmapThread {
 
 impl Executor {
     async fn new(test_file: TestFile) -> Self {
-        let handler = Arc::new(EventHandler::new());
+        let handler = Arc::new(TestEventHandler::new());
         let error = test_file.error;
 
         let mut pool_options = test_file.pool_options.unwrap_or_default();
-        pool_options.cmap_event_handler = Some(handler.clone());
+        pool_options.cmap_event_handler = Some(handler.clone().into());
 
         let state = State {
             handler,

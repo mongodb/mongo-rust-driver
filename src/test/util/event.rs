@@ -17,7 +17,6 @@ use crate::{
     event::{
         cmap::{
             CmapEvent,
-            CmapEventHandler,
             ConnectionCheckedInEvent,
             ConnectionCheckedOutEvent,
             ConnectionCheckoutFailedEvent,
@@ -184,12 +183,28 @@ impl EventHandler {
         }
     }
 
-    pub(crate) fn receive_command(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CommandEvent> {
+    pub(crate) fn command_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CommandEvent> {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<CommandEvent>(100);
         crate::runtime::spawn(async move {
             while let Some(ev) = rx.recv().await {
                 self.handle(ev.clone());
                 add_event_to_queue(&self.command_events, ev);
+            }
+        });
+        tx
+    }
+
+    pub(crate) fn cmap_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CmapEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<CmapEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                match &ev {
+                    CmapEvent::ConnectionCheckedOut(_) => *self.connections_checked_out.lock().unwrap() += 1,
+                    CmapEvent::ConnectionCheckedIn(_) => *self.connections_checked_out.lock().unwrap() -= 1,
+                    _ => (),
+                }
+                self.handle(ev.clone());
+                add_event_to_queue(&self.cmap_events, ev);
             }
         });
         tx
@@ -327,7 +342,8 @@ impl EventHandler {
     }
 }
 
-impl CmapEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::cmap::CmapEventHandler for EventHandler {
     fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
         *self.connections_checked_out.lock().unwrap() += 1;
         let event = CmapEvent::ConnectionCheckedOut(event);

@@ -32,7 +32,7 @@ use crate::{
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
-    event::{cmap::CmapEventHandler, sdam::SdamEventHandler},
+    event::{sdam::SdamEventHandler, EventHandler},
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
@@ -404,22 +404,20 @@ pub struct ClientOptions {
     #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
 
-    /// The handler that should process all Connection Monitoring and Pooling events. See the
-    /// CmapEventHandler type documentation for more details.
+    /// The handler that should process all Connection Monitoring and Pooling events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
     #[serde(skip)]
-    pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
+    pub cmap_event_handler: Option<EventHandler<crate::event::cmap::CmapEvent>>,
 
-    /// The handler that should process all command-related events. See the CommandEventHandler
-    /// type documentation for more details.
+    /// The handler that should process all command-related events.
     ///
     /// Note that monitoring command events may incur a performance penalty.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub command_event_handler:
-        Option<crate::event::EventHandler<crate::event::command::CommandEvent>>,
+        Option<EventHandler<crate::event::command::CommandEvent>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.

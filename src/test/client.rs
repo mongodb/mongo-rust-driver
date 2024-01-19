@@ -722,7 +722,7 @@ async fn retry_commit_txn_check_out() {
 
     let mut options = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
-    options.cmap_event_handler = Some(handler.clone());
+    options.cmap_event_handler = Some(handler.clone().into());
     options.sdam_event_handler = Some(handler.clone());
     options.heartbeat_freq = Some(Duration::from_secs(120));
     options.app_name = Some("retry_commit_txn_check_out".to_string());

@@ -465,8 +465,8 @@ impl TestRunner {
                             });
                     update_options_for_testing(&mut options);
                     let handler = Arc::new(EventHandler::new());
-                    options.command_event_handler = Some(handler.clone().receive_command().into());
-                    options.cmap_event_handler = Some(handler.clone());
+                    options.command_event_handler = Some(handler.clone().command_sender().into());
+                    options.cmap_event_handler = Some(handler.clone().cmap_sender().into());
                     options.sdam_event_handler = Some(handler.clone());
 
                     options.server_api = server_api;

@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{event::EventHandler, EVENT_TIMEOUT};
+use super::{event::TestEventHandler, EVENT_TIMEOUT};
 use crate::{
     bson::{doc, Document},
     cmap::{
@@ -9,7 +9,7 @@ use crate::{
         Command,
         ConnectionPool,
     },
-    event::cmap::{CmapEvent, CmapEventHandler, ConnectionClosedReason},
+    event::cmap::{CmapEvent, ConnectionClosedReason},
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
@@ -114,11 +114,11 @@ async fn concurrent_connections() {
         .await
         .expect("failpoint should succeed");
 
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(TestEventHandler::new());
     let client_options = get_client_options().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.cmap_event_handler =
-        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
+        Some(handler.clone().into());
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
@@ -203,13 +203,13 @@ async fn connection_error_during_establishment() {
     );
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(TestEventHandler::new());
     let mut subscriber = handler.subscribe();
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
     options.cmap_event_handler =
-        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
+        Some(handler.clone().into());
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
@@ -238,8 +238,8 @@ async fn connection_error_during_establishment() {
 
 async fn connection_error_during_operation() {
     let mut options = get_client_options().await.clone();
-    let handler = Arc::new(EventHandler::new());
-    options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    let handler = Arc::new(TestEventHandler::new());
+    options.cmap_event_handler = Some(handler.clone().into());
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 

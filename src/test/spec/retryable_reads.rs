@@ -5,7 +5,7 @@ use bson::doc;
 use crate::{
     error::Result,
     event::{
-        cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
+        cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
     runtime,
@@ -78,7 +78,7 @@ async fn retry_read_pool_cleared() {
     let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    client_options.cmap_event_handler = Some(handler.clone().into());
     client_options.command_event_handler = Some(handler.clone().into());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {

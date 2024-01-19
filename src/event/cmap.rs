@@ -1,7 +1,7 @@
 //! Contains the events and functionality for monitoring behavior of the connection pooling of a
 //! `Client`.
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +16,8 @@ use crate::trace::{
     TracingOrLogLevel,
     CONNECTION_TRACING_EVENT_TARGET,
 };
+
+use super::EventHandler;
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
@@ -281,6 +283,9 @@ fn default_connection_id() -> u32 {
     42
 }
 
+/// Usage of this trait is deprecated.  Applications should use the
+/// [`EventHandler`](crate::event::EventHandler) API.
+///
 /// Applications can implement this trait to specify custom logic to run on each CMAP event sent
 /// by the driver.
 ///
@@ -319,6 +324,7 @@ fn default_connection_id() -> u32 {
 /// # Ok(())
 /// # }
 /// ```
+#[deprecated = "use the EventHandler API"]
 pub trait CmapEventHandler: Send + Sync {
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection pool is created.
@@ -369,7 +375,9 @@ pub trait CmapEventHandler: Send + Sync {
 }
 
 #[derive(Clone, Debug, PartialEq, From)]
-pub(crate) enum CmapEvent {
+#[non_exhaustive]
+#[allow(missing_docs)]
+pub enum CmapEvent {
     PoolCreated(PoolCreatedEvent),
     PoolReady(PoolReadyEvent),
     PoolCleared(PoolClearedEvent),
@@ -385,7 +393,7 @@ pub(crate) enum CmapEvent {
 
 #[derive(Clone)]
 pub(crate) struct CmapEventEmitter {
-    user_handler: Option<Arc<dyn CmapEventHandler>>,
+    user_handler: Option<EventHandler<CmapEvent>>,
 
     #[cfg(feature = "tracing-unstable")]
     tracing_emitter: ConnectionTracingEventEmitter,
@@ -395,7 +403,7 @@ impl CmapEventEmitter {
     // the topology ID is only used when the tracing feature is on.
     #[allow(unused_variables)]
     pub(crate) fn new(
-        user_handler: Option<Arc<dyn CmapEventHandler>>,
+        user_handler: Option<EventHandler<CmapEvent>>,
         topology_id: ObjectId,
     ) -> CmapEventEmitter {
         Self {
@@ -408,7 +416,7 @@ impl CmapEventEmitter {
     #[cfg(not(feature = "tracing-unstable"))]
     pub(crate) fn emit_event(&self, generate_event: impl FnOnce() -> CmapEvent) {
         if let Some(ref handler) = self.user_handler {
-            handle_cmap_event(handler.as_ref(), generate_event());
+            handler.handle(generate_event());
         }
     }
 
@@ -429,39 +437,17 @@ impl CmapEventEmitter {
             (None, None) => {}
             (None, Some(tracing_emitter)) => {
                 let event = generate_event();
-                handle_cmap_event(tracing_emitter, event);
+                tracing_emitter.handle(event);
             }
             (Some(user_handler), None) => {
                 let event = generate_event();
-                handle_cmap_event(user_handler.as_ref(), event);
+                user_handler.handle(event);
             }
             (Some(user_handler), Some(tracing_emitter)) => {
                 let event = generate_event();
-                handle_cmap_event(user_handler.as_ref(), event.clone());
-                handle_cmap_event(tracing_emitter, event);
+                user_handler.handle(event.clone());
+                tracing_emitter.handle(event);
             }
         };
-    }
-}
-
-fn handle_cmap_event(handler: &dyn CmapEventHandler, event: CmapEvent) {
-    match event {
-        CmapEvent::PoolCreated(event) => handler.handle_pool_created_event(event),
-        CmapEvent::PoolReady(event) => handler.handle_pool_ready_event(event),
-        CmapEvent::PoolCleared(event) => handler.handle_pool_cleared_event(event),
-        CmapEvent::PoolClosed(event) => handler.handle_pool_closed_event(event),
-        CmapEvent::ConnectionCreated(event) => handler.handle_connection_created_event(event),
-        CmapEvent::ConnectionReady(event) => handler.handle_connection_ready_event(event),
-        CmapEvent::ConnectionClosed(event) => handler.handle_connection_closed_event(event),
-        CmapEvent::ConnectionCheckoutStarted(event) => {
-            handler.handle_connection_checkout_started_event(event)
-        }
-        CmapEvent::ConnectionCheckoutFailed(event) => {
-            handler.handle_connection_checkout_failed_event(event)
-        }
-        CmapEvent::ConnectionCheckedOut(event) => {
-            handler.handle_connection_checked_out_event(event)
-        }
-        CmapEvent::ConnectionCheckedIn(event) => handler.handle_connection_checked_in_event(event),
     }
 }

@@ -93,7 +93,7 @@ pub struct CommandFailedEvent {
     pub service_id: Option<ObjectId>,
 }
 
-/// Usage of this trait is deprecated.  Applications should use the simpler
+/// Usage of this trait is deprecated.  Applications should use the
 /// [`EventHandler`](crate::event::EventHandler) API.
 ///
 /// Applications can implement this trait to specify custom logic to run on each command event sent
@@ -134,7 +134,7 @@ pub struct CommandFailedEvent {
 /// # Ok(())
 /// # }
 /// ```
-#[deprecated]
+#[deprecated = "use the EventHandler API"]
 pub trait CommandEventHandler: Send + Sync {
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a database command is initiated.

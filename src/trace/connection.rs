@@ -2,20 +2,9 @@ use bson::oid::ObjectId;
 
 use crate::{
     event::cmap::{
-        CmapEventHandler,
-        ConnectionCheckedInEvent,
-        ConnectionCheckedOutEvent,
-        ConnectionCheckoutFailedEvent,
         ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent,
-        ConnectionClosedEvent,
         ConnectionClosedReason,
-        ConnectionCreatedEvent,
-        ConnectionReadyEvent,
-        PoolClearedEvent,
-        PoolClosedEvent,
-        PoolCreatedEvent,
-        PoolReadyEvent,
+        CmapEvent,
     },
     trace::{TracingRepresentation, CONNECTION_TRACING_EVENT_TARGET},
 };
@@ -29,134 +18,128 @@ impl ConnectionTracingEventEmitter {
     pub(crate) fn new(topology_id: ObjectId) -> ConnectionTracingEventEmitter {
         Self { topology_id }
     }
-}
 
-impl CmapEventHandler for ConnectionTracingEventEmitter {
-    fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
-        let options_ref = event.options.as_ref();
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            maxIdleTimeMS = options_ref.and_then(|o| o.max_idle_time.map(|m| m.as_millis())),
-            maxPoolSize = options_ref.and_then(|o| o.max_pool_size),
-            minPoolSize = options_ref.and_then(|o| o.min_pool_size),
-            "Connection pool created",
-        );
-    }
-
-    fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            "Connection pool ready",
-        );
-    }
-
-    fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            serviceId = event.service_id.map(|id| id.tracing_representation()),
-            "Connection pool cleared",
-        );
-    }
-
-    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            "Connection pool closed",
-        );
-    }
-
-    fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            driverConnectionId = event.connection_id,
-            "Connection created",
-        );
-    }
-
-    fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            driverConnectionId = event.connection_id,
-            durationMS = event.duration.as_millis(),
-            "Connection ready",
-        );
-    }
-
-    fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            driverConnectionId = event.connection_id,
-            reason = event.reason.tracing_representation(),
-            error = event.error.map(|e| e.tracing_representation()),
-            "Connection closed",
-        );
-    }
-
-    fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            "Connection checkout started",
-        );
-    }
-
-    fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            reason = event.reason.tracing_representation(),
-            error = event.error.map(|e| e.tracing_representation()),
-            durationMS = event.duration.as_millis(),
-            "Connection checkout failed",
-        );
-    }
-
-    fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            driverConnectionId = event.connection_id,
-            durationMS = event.duration.as_millis(),
-            "Connection checked out",
-        );
-    }
-
-    fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
-        tracing::debug!(
-            target: CONNECTION_TRACING_EVENT_TARGET,
-            topologyId = self.topology_id.tracing_representation(),
-            serverHost = event.address.host().as_ref(),
-            serverPort = event.address.port_tracing_representation(),
-            driverConnectionId = event.connection_id,
-            "Connection checked in",
-        );
+    pub(crate) fn handle(&self, event: CmapEvent) {
+        use CmapEvent::*;
+        match event {
+            PoolCreated(event) => {
+                let options_ref = event.options.as_ref();
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    maxIdleTimeMS = options_ref.and_then(|o| o.max_idle_time.map(|m| m.as_millis())),
+                    maxPoolSize = options_ref.and_then(|o| o.max_pool_size),
+                    minPoolSize = options_ref.and_then(|o| o.min_pool_size),
+                    "Connection pool created",
+                );
+            }
+            PoolReady(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    "Connection pool ready",
+                );
+            }
+            PoolCleared(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    serviceId = event.service_id.map(|id| id.tracing_representation()),
+                    "Connection pool cleared",
+                );        
+            }
+            PoolClosed(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    "Connection pool closed",
+                );        
+            }
+            ConnectionCreated(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    driverConnectionId = event.connection_id,
+                    "Connection created",
+                );        
+            }
+            ConnectionReady(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    driverConnectionId = event.connection_id,
+                    durationMS = event.duration.as_millis(),
+                    "Connection ready",
+                );        
+            }
+            ConnectionClosed(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    driverConnectionId = event.connection_id,
+                    reason = event.reason.tracing_representation(),
+                    error = event.error.map(|e| e.tracing_representation()),
+                    "Connection closed",
+                );        
+            }
+            ConnectionCheckoutStarted(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    "Connection checkout started",
+                );        
+            }
+            ConnectionCheckoutFailed(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    reason = event.reason.tracing_representation(),
+                    error = event.error.map(|e| e.tracing_representation()),
+                    durationMS = event.duration.as_millis(),
+                    "Connection checkout failed",
+                );        
+            }
+            ConnectionCheckedOut(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    driverConnectionId = event.connection_id,
+                    durationMS = event.duration.as_millis(),
+                    "Connection checked out",
+                );        
+            }
+            ConnectionCheckedIn(event) => {
+                tracing::debug!(
+                    target: CONNECTION_TRACING_EVENT_TARGET,
+                    topologyId = self.topology_id.tracing_representation(),
+                    serverHost = event.address.host().as_ref(),
+                    serverPort = event.address.port_tracing_representation(),
+                    driverConnectionId = event.connection_id,
+                    "Connection checked in",
+                );
+        
+            }
+        }
     }
 }
 

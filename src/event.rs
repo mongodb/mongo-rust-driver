@@ -10,6 +10,8 @@ use futures_core::future::BoxFuture;
 
 use crate::event::command::CommandEvent;
 
+use self::cmap::CmapEvent;
+
 /// A destination for events.  Allows implicit conversion via [`From`] for concrete types for
 /// convenience with [`crate::options::ClientOptions`] construction:
 ///
@@ -71,6 +73,28 @@ impl<T: crate::event::command::CommandEventHandler + 'static> From<Arc<T>>
             CommandEvent::Started(e) => value.handle_command_started_event(e),
             CommandEvent::Succeeded(e) => value.handle_command_succeeded_event(e),
             CommandEvent::Failed(e) => value.handle_command_failed_event(e),
+        })
+    }
+}
+
+#[allow(deprecated)]
+impl<T: crate::event::cmap::CmapEventHandler + 'static> From<Arc<T>>
+    for EventHandler<CmapEvent>
+{
+    fn from(value: Arc<T>) -> Self {
+        use CmapEvent::*;
+        Self::callback(move |ev| match ev {
+            PoolCreated(ev) => value.handle_pool_created_event(ev),
+            PoolReady(ev) => value.handle_pool_ready_event(ev),
+            PoolCleared(ev) => value.handle_pool_cleared_event(ev),
+            PoolClosed(ev) => value.handle_pool_closed_event(ev),
+            ConnectionCreated(ev) => value.handle_connection_created_event(ev),
+            ConnectionReady(ev) => value.handle_connection_ready_event(ev),
+            ConnectionClosed(ev) => value.handle_connection_closed_event(ev),
+            ConnectionCheckoutStarted(ev) => value.handle_connection_checkout_started_event(ev),
+            ConnectionCheckoutFailed(ev) => value.handle_connection_checkout_failed_event(ev),
+            ConnectionCheckedOut(ev) => value.handle_connection_checked_out_event(ev),
+            ConnectionCheckedIn(ev) => value.handle_connection_checked_in_event(ev),
         })
     }
 }
