@@ -131,6 +131,7 @@ trust-dns-resolver = "0.21.2"
 typed-builder = "0.10.0"
 webpki-roots = "0.25.2"
 zstd = { version = "0.11.2", optional = true }
+paste = "1.0.14"
 
 [dependencies.async-std]
 version = "1.9.0"

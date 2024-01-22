@@ -6,7 +6,7 @@ use crate::BoxFuture;
 use crate::{db::options::DropDatabaseOptions, options::WriteConcern, ClientSession, Database};
 use crate::error::Result;
 
-use super::option_setters;
+use super::{action_future, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
@@ -36,27 +36,10 @@ impl<'a> DropDatabase<'a> {
     }
 }
 
-impl<'a> IntoFuture for DropDatabase<'a> {
-    type Output = Result<()>;
-    type IntoFuture = DropDatabaseFuture<'a>;
-
-    fn into_future(mut self) -> Self::IntoFuture {
-        DropDatabaseFuture(async move {
-            resolve_options!(self.db, self.options, [write_concern]);
-            let op = crate::operation::DropDatabase::new(self.db.name().to_string(), self.options);
-            self.db.client()
-                .execute_operation(op, self.session)
-                .await
-        }.boxed())
-    }
-}
-
-pub struct DropDatabaseFuture<'a>(BoxFuture<'a, Result<()>>);
-
-impl<'a> std::future::Future for DropDatabaseFuture<'a> {
-    type Output = Result<()>;
-
-    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-        self.0.as_mut().poll(cx)
-    }
-}
+action_future!(DropDatabase(self) -> Result<()> {
+    resolve_options!(self.db, self.options, [write_concern]);
+    let op = crate::operation::DropDatabase::new(self.db.name().to_string(), self.options);
+    self.db.client()
+        .execute_operation(op, self.session)
+        .await
+});

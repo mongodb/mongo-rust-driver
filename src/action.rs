@@ -42,3 +42,34 @@ macro_rules! option_setters {
     };
 }
 use option_setters;
+
+macro_rules! action_future {
+    ($act_name:ident ( $self:ident ) -> $f_ty:ident ( $out:ty ) $code:block) => {
+        impl<'a> std::future::IntoFuture for $act_name<'a> {
+            type Output = $out;
+            type IntoFuture = $f_ty<'a>;
+
+            fn into_future(mut $self) -> Self::IntoFuture {
+                $f_ty(async move {
+                    $code
+                }.boxed())
+            }
+        }
+
+        pub struct $f_ty<'a>(crate::BoxFuture<'a, $out>);
+
+        impl<'a> std::future::Future for $f_ty<'a> {
+            type Output = $out;
+
+            fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+                self.0.as_mut().poll(cx)
+            }
+        }
+    };
+    ($act_name:ident ( $self:ident ) -> $out:ty $code:block) => {
+        paste::paste! {
+            action_future!($act_name($self) -> [<$act_name Future>]($out) $code);
+        }
+    };
+}
+use action_future;
