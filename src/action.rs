@@ -1,4 +1,6 @@
 //! Action builder types.
+
+mod drop;
 mod list_databases;
 mod perf;
 mod session;
@@ -24,6 +26,7 @@ macro_rules! option_setters {
         }
 
         #[cfg(test)]
+        #[allow(dead_code)]
         pub(crate) fn with_options(mut self, value: impl Into<Option<$opt_field_ty>>) -> Self {
             self.options = value.into();
             self
@@ -38,4 +41,4 @@ macro_rules! option_setters {
         )+
     };
 }
-pub(crate) use option_setters;
+use option_setters;
