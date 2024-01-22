@@ -1,16 +1,11 @@
-use std::future::IntoFuture;
-
-use futures_util::FutureExt;
-
 use crate::{
-    BoxFuture,
     client::options::{SessionOptions, TransactionOptions},
     error::Result,
     Client,
     ClientSession,
 };
 
-use super::option_setters;
+use super::{action_execute, option_setters};
 
 impl Client {
     /// Starts a new [`ClientSession`].
@@ -65,18 +60,14 @@ impl<'a> StartSession<'a> {
     );
 }
 
-impl<'a> IntoFuture for StartSession<'a> {
-    type Output = Result<ClientSession>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_execute! {
+    StartSession<'a> => StartSessionFuture;
 
-    fn into_future(self) -> Self::IntoFuture {
-        async {
-            if let Some(options) = &self.options {
-                options.validate()?;
-            }
-            Ok(ClientSession::new(self.client.clone(), self.options, false).await)
+    async fn(self) -> Result<ClientSession> {
+        if let Some(options) = &self.options {
+            options.validate()?;
         }
-        .boxed()
+        Ok(ClientSession::new(self.client.clone(), self.options, false).await)
     }
 }
 

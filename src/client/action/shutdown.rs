@@ -36,3 +36,14 @@ impl IntoFuture for crate::action::Shutdown {
         .boxed()
     }
 }
+
+/// Opaque future type for action execution.
+pub struct ShutdownFuture(BoxFuture<'static, ()>);
+
+impl std::future::Future for ShutdownFuture {
+    type Output = ();
+
+    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        self.0.as_mut().poll(cx)
+    }
+}

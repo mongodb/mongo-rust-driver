@@ -1,9 +1,8 @@
-use std::{future::IntoFuture, time::Duration};
+use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
-use futures_util::FutureExt;
 
-use super::option_setters;
+use super::{action_execute, option_setters};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -11,7 +10,6 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
-    BoxFuture,
     collation::Collation,
     error::{ErrorKind, Result},
     operation::AggregateTarget,
@@ -293,62 +291,54 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-impl<'a> IntoFuture for Watch<'a, ImplicitSession> {
-    type Output = Result<ChangeStream<ChangeStreamEvent<Document>>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_execute! {
+    Watch<'a, ImplicitSession> => WatchImplicitSessionFuture;
 
-    fn into_future(mut self) -> Self::IntoFuture {
-        async move {
-            resolve_options!(
-                self.client,
-                self.options,
-                [read_concern, selection_criteria]
-            );
-            if self.cluster {
-                self.options
-                    .get_or_insert_with(Default::default)
-                    .all_changes_for_cluster = Some(true);
-            }
-            self.client
-                .execute_watch(self.pipeline, self.options, self.target, None)
-                .await
+    async fn(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        resolve_options!(
+            self.client,
+            self.options,
+            [read_concern, selection_criteria]
+        );
+        if self.cluster {
+            self.options
+                .get_or_insert_with(Default::default)
+                .all_changes_for_cluster = Some(true);
         }
-        .boxed()
+        self.client
+            .execute_watch(self.pipeline, self.options, self.target, None)
+            .await
     }
 }
 
-impl<'a> IntoFuture for Watch<'a, ExplicitSession<'a>> {
-    type Output = Result<SessionChangeStream<ChangeStreamEvent<Document>>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_execute! {
+    Watch<'a, ExplicitSession<'a>> => WatchExplicitSessionFuture;
 
-    fn into_future(mut self) -> Self::IntoFuture {
-        async move {
-            resolve_read_concern_with_session!(
-                self.client,
-                self.options,
-                Some(&mut *self.session.0)
-            )?;
-            resolve_selection_criteria_with_session!(
-                self.client,
-                self.options,
-                Some(&mut *self.session.0)
-            )?;
-            if self.cluster {
-                self.options
-                    .get_or_insert_with(Default::default)
-                    .all_changes_for_cluster = Some(true);
-            }
-            self.client
-                .execute_watch_with_session(
-                    self.pipeline,
-                    self.options,
-                    self.target,
-                    None,
-                    self.session.0,
-                )
-                .await
+    async fn(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+        resolve_read_concern_with_session!(
+            self.client,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
+        resolve_selection_criteria_with_session!(
+            self.client,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
+        if self.cluster {
+            self.options
+                .get_or_insert_with(Default::default)
+                .all_changes_for_cluster = Some(true);
         }
-        .boxed()
+        self.client
+            .execute_watch_with_session(
+                self.pipeline,
+                self.options,
+                self.target,
+                None,
+                self.session.0,
+            )
+            .await
     }
 }
 

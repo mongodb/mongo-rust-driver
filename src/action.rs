@@ -7,11 +7,12 @@ mod session;
 mod shutdown;
 mod watch;
 
-pub use list_databases::ListDatabases;
-pub use perf::WarmConnectionPool;
-pub use session::StartSession;
-pub use shutdown::Shutdown;
-pub use watch::Watch;
+pub use drop::{DropDatabase, DropDatabaseFuture};
+pub use list_databases::{ListDatabases, ListSpecificationsFuture};
+pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
+pub use session::{StartSession, StartSessionFuture};
+pub use shutdown::{Shutdown, ShutdownFuture};
+pub use watch::{Watch, WatchImplicitSessionFuture, WatchExplicitSessionFuture};
 
 macro_rules! option_setters {
     (
@@ -43,19 +44,20 @@ macro_rules! option_setters {
 }
 use option_setters;
 
-macro_rules! action_future {
-    ($act_name:ident ( $self:ident ) -> $f_ty:ident ( $out:ty ) $code:block) => {
-        impl<'a> std::future::IntoFuture for $act_name<'a> {
+macro_rules! action_execute_inner {
+    (
+        $action:ty => $f_ty:ident;
+        $into_future:item;
+        $out:ty
+    ) => {
+        impl<'a> std::future::IntoFuture for $action {
             type Output = $out;
             type IntoFuture = $f_ty<'a>;
 
-            fn into_future(mut $self) -> Self::IntoFuture {
-                $f_ty(async move {
-                    $code
-                }.boxed())
-            }
+            $into_future
         }
 
+        /// Opaque future type for action execution.
         pub struct $f_ty<'a>(crate::BoxFuture<'a, $out>);
 
         impl<'a> std::future::Future for $f_ty<'a> {
@@ -65,11 +67,38 @@ macro_rules! action_future {
                 self.0.as_mut().poll(cx)
             }
         }
-    };
-    ($act_name:ident ( $self:ident ) -> $out:ty $code:block) => {
-        paste::paste! {
-            action_future!($act_name($self) -> [<$act_name Future>]($out) $code);
-        }
-    };
+    }
 }
-use action_future;
+pub(crate) use action_execute_inner;
+
+macro_rules! action_execute {
+    (
+        $action:ty => $f_ty:ident;
+        async fn($self:ident) -> $out:ty $code:block
+    ) => {
+        $crate::action::action_execute_inner!(
+            $action => $f_ty;
+            fn into_future($self) -> Self::IntoFuture {
+                $f_ty(Box::pin(async move {
+                    $code
+                }))
+            };
+            $out
+        );
+    };
+    (
+        $action:ty => $f_ty:ident;
+        async fn(mut $self:ident) -> $out:ty $code:block
+    ) => {
+        $crate::action::action_execute_inner!(
+            $action => $f_ty;
+            fn into_future(mut $self) -> Self::IntoFuture {
+                $f_ty(Box::pin(async move {
+                    $code
+                }))
+            };
+            $out
+        );
+    }
+}
+pub(crate) use action_execute;

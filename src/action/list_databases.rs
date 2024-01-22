@@ -1,12 +1,10 @@
-use std::{future::IntoFuture, marker::PhantomData};
+use std:: marker::PhantomData;
 
 use bson::{Bson, Document};
-use futures_util::FutureExt;
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::sync::Client as SyncClient;
 use crate::{
-    BoxFuture,
     error::{ErrorKind, Result},
     operation::list_databases as op,
     results::DatabaseSpecification,
@@ -14,7 +12,7 @@ use crate::{
     ClientSession,
 };
 
-use super::option_setters;
+use super::{action_execute, option_setters};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
@@ -96,13 +94,11 @@ impl<'a, M> ListDatabases<'a, M> {
     }
 }
 
-impl<'a> IntoFuture for ListDatabases<'a, ListSpecifications> {
-    type Output = Result<Vec<DatabaseSpecification>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        async {
-            let op = op::ListDatabases::new(false, self.options);
+action_execute! {
+    ListDatabases<'a, ListSpecifications> => ListSpecificationsFuture;
+    
+    async fn(self) -> Result<Vec<DatabaseSpecification>> {
+        let op = op::ListDatabases::new(false, self.options);
             self.client
                 .execute_operation(op, self.session)
                 .await
@@ -113,36 +109,30 @@ impl<'a> IntoFuture for ListDatabases<'a, ListSpecifications> {
                         })
                         .collect()
                 })
-        }
-        .boxed()
     }
 }
 
-impl<'a> IntoFuture for ListDatabases<'a, ListNames> {
-    type Output = Result<Vec<String>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        async {
-            let op = op::ListDatabases::new(true, self.options);
-            match self.client.execute_operation(op, self.session).await {
-                Ok(databases) => databases
-                    .into_iter()
-                    .map(|doc| {
-                        let name = doc
-                            .get_str("name")
-                            .map_err(|_| ErrorKind::InvalidResponse {
-                                message: "Expected \"name\" field in server response, but it was \
-                                          not found"
-                                    .to_string(),
-                            })?;
-                        Ok(name.to_string())
-                    })
-                    .collect(),
-                Err(e) => Err(e),
-            }
+action_execute! {
+    ListDatabases<'a, ListNames> => ListNamesFuture;
+    
+    async fn(self) -> Result<Vec<String>> {
+        let op = op::ListDatabases::new(true, self.options);
+        match self.client.execute_operation(op, self.session).await {
+            Ok(databases) => databases
+                .into_iter()
+                .map(|doc| {
+                    let name = doc
+                        .get_str("name")
+                        .map_err(|_| ErrorKind::InvalidResponse {
+                            message: "Expected \"name\" field in server response, but it was \
+                                        not found"
+                                .to_string(),
+                        })?;
+                    Ok(name.to_string())
+                })
+                .collect(),
+            Err(e) => Err(e),
         }
-        .boxed()
     }
 }
 

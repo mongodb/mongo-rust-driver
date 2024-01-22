@@ -1,12 +1,7 @@
-use std::future::IntoFuture;
-
-use futures_util::FutureExt;
-
-use crate::BoxFuture;
 use crate::{db::options::DropDatabaseOptions, options::WriteConcern, ClientSession, Database};
 use crate::error::Result;
 
-use super::{action_future, option_setters};
+use super::{action_execute, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
@@ -36,10 +31,14 @@ impl<'a> DropDatabase<'a> {
     }
 }
 
-action_future!(DropDatabase(self) -> Result<()> {
-    resolve_options!(self.db, self.options, [write_concern]);
-    let op = crate::operation::DropDatabase::new(self.db.name().to_string(), self.options);
-    self.db.client()
-        .execute_operation(op, self.session)
-        .await
-});
+action_execute! {
+    DropDatabase<'a> => DropDatabaseFuture;
+
+    async fn(mut self) -> Result<()> {
+        resolve_options!(self.db, self.options, [write_concern]);
+        let op = crate::operation::DropDatabase::new(self.db.name().to_string(), self.options);
+        self.db.client()
+            .execute_operation(op, self.session)
+            .await
+    }
+}

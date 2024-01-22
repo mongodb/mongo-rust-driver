@@ -1,2 +1,2 @@
-mod perf;
-mod shutdown;
+pub(crate) mod perf;
+pub(crate) mod shutdown;
