@@ -728,7 +728,7 @@ async fn retry_commit_txn_check_out() {
     options.app_name = Some("retry_commit_txn_check_out".to_string());
     let client = Client::with_options(options).unwrap();
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();
     // transition transaction to "in progress" so that the commit
     // actually executes an operation.
@@ -856,7 +856,7 @@ async fn manual_shutdown_with_resources() {
             .await
             .unwrap();
         // Similarly, sessions need an in-progress transaction to have cleanup.
-        let mut session = client.start_session(None).await.unwrap();
+        let mut session = client.start_session().await.unwrap();
         if session.start_transaction(None).await.is_err() {
             // Transaction start can transiently fail; if so, just bail out of the test.
             log_uncaptured("Skipping manual_shutdown_with_resources: transaction start failed");
@@ -892,7 +892,7 @@ async fn manual_shutdown_with_resources() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn manual_shutdown_immediate_with_nothing() {
     let client = Client::test_builder().build().await.into_client();
-    client.shutdown_immediate().await;
+    client.shutdown().immediate(true).await;
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
@@ -922,14 +922,14 @@ async fn manual_shutdown_immediate_with_resources() {
         .await
         .unwrap();
     // Similarly, sessions need an in-progress transaction to have cleanup.
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();
     coll.insert_one_with_session(doc! {}, None, &mut session)
         .await
         .unwrap();
     let _stream = bucket.open_upload_stream("test", None);
 
-    client.into_client().shutdown_immediate().await;
+    client.into_client().shutdown().immediate(true).await;
 
     assert!(events
         .get_command_started_events(&["killCursors"])

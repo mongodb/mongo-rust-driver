@@ -186,7 +186,7 @@ where
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
-/// # let mut session = client.start_session(None)?;
+/// # let mut session = client.start_session().run()?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find_with_session(None, None, &mut session)?;
 /// #
@@ -224,7 +224,7 @@ impl<T> SessionCursor<T> {
     /// # use mongodb::{sync::Client, bson::Document, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
     /// while cursor.advance(&mut session)? {
@@ -248,7 +248,7 @@ impl<T> SessionCursor<T> {
     /// # use mongodb::{sync::Client, bson::Document, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
     /// while cursor.advance(&mut session)? {
@@ -272,7 +272,7 @@ impl<T> SessionCursor<T> {
     /// # use mongodb::{sync::Client, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// # let db = client.database("foo");
     /// use serde::Deserialize;
     ///
@@ -326,7 +326,7 @@ where
     /// # let client = Client::with_uri_str("foo")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session)?;
     /// while let Some(doc) = cursor.next(&mut session).transpose()? {
     ///     other_coll.insert_one_with_session(doc, None, &mut session)?;

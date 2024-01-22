@@ -254,7 +254,8 @@ fn transactions() {
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let mut session = client
-        .start_session(None)
+        .start_session()
+        .run()
         .expect("session creation should succeed");
     let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
 
@@ -385,7 +386,7 @@ fn borrowed_deserialization() {
         i += 1;
     }
 
-    let mut session = client.start_session(None).unwrap();
+    let mut session = client.start_session().run().unwrap();
     let mut cursor = coll.find_with_session(None, options, &mut session).unwrap();
 
     let mut i = 0;

@@ -7,10 +7,7 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex as SyncMutex,
-    },
+    sync::{atomic::AtomicBool, Mutex as SyncMutex},
     time::{Duration, Instant},
 };
 
@@ -18,7 +15,7 @@ use std::{
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
 use futures_core::Future;
-use futures_util::{future::join_all, FutureExt};
+use futures_util::FutureExt;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -34,14 +31,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
     id_set::IdSet,
-    options::{
-        ClientOptions,
-        DatabaseOptions,
-        ReadPreference,
-        SelectionCriteria,
-        ServerAddress,
-        SessionOptions,
-    },
+    options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
     BoxFuture,
@@ -341,18 +331,6 @@ impl Client {
             .map(|db_name| self.database(db_name))
     }
 
-    /// Starts a new `ClientSession`.
-    pub async fn start_session(
-        &self,
-        options: impl Into<Option<SessionOptions>>,
-    ) -> Result<ClientSession> {
-        let options = options.into();
-        if let Some(ref options) = options {
-            options.validate()?;
-        }
-        Ok(ClientSession::new(self.clone(), options, false).await)
-    }
-
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
         let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
         let (id_tx, id_rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
@@ -386,103 +364,6 @@ impl Client {
         AsyncDropToken {
             tx: Some(cleanup_tx),
         }
-    }
-
-    /// Shut down this `Client`, terminating background thread workers and closing connections.
-    /// This will wait for any live handles to server-side resources (see below) to be
-    /// dropped and any associated server-side operations to finish.
-    ///
-    /// IMPORTANT: Any live resource handles that are not dropped will cause this method to wait
-    /// indefinitely.  It's strongly recommended to structure your usage to avoid this, e.g. by
-    /// only using those types in shorter-lived scopes than the `Client`.  If this is not possible,
-    /// see [`shutdown_immediate`](Client::shutdown_immediate).  For example:
-    ///
-    /// ```rust
-    /// # use mongodb::{Client, GridFsBucket, error::Result};
-    /// async fn upload_data(bucket: &GridFsBucket) {
-    ///   let stream = bucket.open_upload_stream("test", None);
-    ///    // .. write to the stream ..
-    /// }
-    ///
-    /// # async fn run() -> Result<()> {
-    /// let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// let bucket = client.database("test").gridfs_bucket(None);
-    /// upload_data(&bucket).await;
-    /// client.shutdown().await;
-    /// // Background cleanup work from `upload_data` is guaranteed to have run.
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// If the handle is used in the same scope as `shutdown`, explicit `drop` may be needed:
-    ///
-    /// ```rust
-    /// # use mongodb::{Client, error::Result};
-    /// # async fn run() -> Result<()> {
-    /// let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// let bucket = client.database("test").gridfs_bucket(None);
-    /// let stream = bucket.open_upload_stream("test", None);
-    /// // .. write to the stream ..
-    /// drop(stream);
-    /// client.shutdown().await;
-    /// // Background cleanup work for `stream` is guaranteed to have run.
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// Calling any methods on  clones of this `Client` or derived handles after this will return
-    /// errors.
-    ///
-    /// Handles to server-side resources are `Cursor`, `SessionCursor`, `Session`, or
-    /// `GridFsUploadStream`.
-    pub async fn shutdown(self) {
-        // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
-        // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
-        // causing the lock to be held for the duration of the join, which deadlocks.
-        let pending = self.inner.shutdown.pending_drops.lock().unwrap().extract();
-        join_all(pending).await;
-        self.shutdown_immediate().await;
-    }
-
-    /// Shut down this `Client`, terminating background thread workers and closing connections.
-    /// This does *not* wait for other pending resources to be cleaned up, which may cause both
-    /// client-side errors and server-side resource leaks. Calling any methods on clones of this
-    /// `Client` or derived handles after this will return errors.
-    ///
-    /// ```rust
-    /// # use mongodb::{Client, error::Result};
-    /// # async fn run() -> Result<()> {
-    /// let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// let bucket = client.database("test").gridfs_bucket(None);
-    /// let stream = bucket.open_upload_stream("test", None);
-    /// // .. write to the stream ..
-    /// client.shutdown_immediate().await;
-    /// // Background cleanup work for `stream` may or may not have run.
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn shutdown_immediate(self) {
-        self.inner.topology.shutdown().await;
-        // This has to happen last to allow pending cleanup to execute commands.
-        self.inner.shutdown.executed.store(true, Ordering::SeqCst);
-    }
-
-    /// Add connections to the connection pool up to `min_pool_size`.  This is normally not needed -
-    /// the connection pool will be filled in the background, and new connections created as needed
-    /// up to `max_pool_size`.  However, it can sometimes be preferable to pay the (larger) cost of
-    /// creating new connections up-front so that individual operations execute as quickly as
-    /// possible.
-    ///
-    /// Note that topology changes require rebuilding the connection pool, so this method cannot
-    /// guarantee that the pool will always be filled for the lifetime of the `Client`.
-    ///
-    /// Does nothing if `min_pool_size` is unset or zero.
-    pub async fn warm_connection_pool(&self) {
-        if !self.inner.options.min_pool_size.map_or(false, |s| s > 0) {
-            // No-op when min_pool_size is zero.
-            return;
-        }
-        self.inner.topology.warm_pool().await;
     }
 
     /// Check in a server session to the server session pool. The session will be discarded if it is

@@ -65,7 +65,7 @@ async fn deserialize_recovery_token() {
         return;
     }
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
 
     // Insert a document with schema A.
     client
@@ -105,7 +105,7 @@ async fn convenient_api_custom_error() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let coll = client
         .database("test_convenient")
         .collection::<Document>("test_convenient");
@@ -140,7 +140,7 @@ async fn convenient_api_returned_value() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let coll = client
         .database("test_convenient")
         .collection::<Document>("test_convenient");
@@ -171,7 +171,7 @@ async fn convenient_api_retry_timeout_callback() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client
         .database("test_convenient")
@@ -217,7 +217,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         );
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client
         .database("test_convenient")
@@ -272,7 +272,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
         );
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client
         .database("test_convenient")

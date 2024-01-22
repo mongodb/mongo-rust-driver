@@ -11,7 +11,6 @@ use crate::{
     client::options::ClientOptions,
     error::{ErrorKind, Result},
     event::command::{CommandEvent, CommandStartedEvent},
-    options::SessionOptions,
     runtime::process::Process,
     test::{
         get_client_options,
@@ -43,12 +42,13 @@ async fn run_unified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
-    let options = SessionOptions::builder()
+    let client = TestClient::new().await;
+    assert!(client
+        .start_session()
         .snapshot(true)
         .causal_consistency(true)
-        .build();
-    let client = TestClient::new().await;
-    assert!(client.start_session(options).await.is_err());
+        .await
+        .is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -58,8 +58,8 @@ async fn explicit_session_created_on_same_client() {
     let client0 = TestClient::new().await;
     let client1 = TestClient::new().await;
 
-    let mut session0 = client0.start_session(None).await.unwrap();
-    let mut session1 = client1.start_session(None).await.unwrap();
+    let mut session0 = client0.start_session().await.unwrap();
+    let mut session1 = client1.start_session().await.unwrap();
 
     let db = client0.database(function_name!());
     let err = db
@@ -279,7 +279,7 @@ async fn sessions_not_supported_explicit_session_error() {
         return;
     };
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let coll = client.database(name).collection(name);
 
     let error = coll

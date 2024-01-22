@@ -36,7 +36,7 @@ use super::ClientSession;
 /// # fn func() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
-/// let mut change_stream = coll.watch(None, None)?;
+/// let mut change_stream = coll.watch().run()?;
 /// coll.insert_one(doc! { "x": 1 }, None)?;
 /// for event in change_stream {
 ///     let event = event?;
@@ -99,7 +99,7 @@ where
     /// # fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// let mut change_stream = coll.watch(None, None)?;
+    /// let mut change_stream = coll.watch().run()?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any()? {
@@ -135,10 +135,10 @@ where
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
-/// # let mut session = client.start_session(None)?;
+/// # let mut session = client.start_session().run()?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// #
-/// let mut cs = coll.watch_with_session(None, None, &mut session)?;
+/// let mut cs = coll.watch().session(&mut session).run()?;
 /// while let Some(event) = cs.next(&mut session)? {
 ///     println!("{:?}", event)
 /// }
@@ -189,8 +189,8 @@ where
     /// # let client = Client::with_uri_str("foo")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
-    /// # let mut session = client.start_session(None)?;
-    /// let mut cs = coll.watch_with_session(None, None, &mut session)?;
+    /// # let mut session = client.start_session().run()?;
+    /// let mut cs = coll.watch().session(&mut session).run()?;
     /// while let Some(event) = cs.next(&mut session)? {
     ///     let id = bson::to_bson(&event.id)?;
     ///     other_coll.insert_one_with_session(doc! { "id": id }, None, &mut session)?;
@@ -220,8 +220,8 @@ where
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// # let mut session = client.start_session(None)?;
-    /// let mut change_stream = coll.watch_with_session(None, None, &mut session)?;
+    /// # let mut session = client.start_session().run()?;
+    /// let mut change_stream = coll.watch().session(&mut session).run()?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any(&mut session)? {

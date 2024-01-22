@@ -89,7 +89,7 @@ async fn tailable_cursor() {
 #[function_name::named]
 async fn session_cursor_next() {
     let client = TestClient::new().await;
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
 
     let coll = client
         .create_fresh_collection(function_name!(), function_name!(), None)
@@ -215,7 +215,7 @@ async fn borrowed_deserialization() {
         i += 1;
     }
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
         .find_with_session(None, options.clone(), &mut session)
         .await
@@ -234,7 +234,7 @@ async fn borrowed_deserialization() {
 async fn session_cursor_with_type() {
     let client = TestClient::new().await;
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let coll = client.database("db").collection("coll");
     coll.drop_with_session(None, &mut session).await.unwrap();
 

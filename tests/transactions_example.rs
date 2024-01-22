@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     let uri = std::env::var("MONGODB_URI").expect("MONGODB_URI must be set");
     let client = Client::with_uri_str(uri).await?;
 
-    let mut session = client.start_session(None).await?;
+    let mut session = client.start_session().await?;
     run_transaction_with_retry(&mut session).await
 }
 

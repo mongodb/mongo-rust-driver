@@ -23,7 +23,7 @@ use super::{
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-/// # let mut session = client.start_session(None).await?;
+/// # let mut session = client.start_session().await?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// #
 /// let mut cs = coll.watch().session(&mut session).await?;
@@ -81,7 +81,7 @@ where
     /// # let client = Client::with_uri_str("foo").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// let mut cs = coll.watch().session(&mut session).await?;
     /// while let Some(event) = cs.next(&mut session).await? {
     ///     let id = bson::to_bson(&event.id)?;
@@ -119,7 +119,7 @@ where
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// let mut change_stream = coll.watch().session(&mut session).await?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
