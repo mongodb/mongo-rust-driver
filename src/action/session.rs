@@ -3,10 +3,8 @@ use std::future::IntoFuture;
 use futures_util::FutureExt;
 
 use crate::{
-    client::{
-        options::{SessionOptions, TransactionOptions},
-        BoxFuture,
-    },
+    BoxFuture,
+    client::options::{SessionOptions, TransactionOptions},
     error::Result,
     Client,
     ClientSession,

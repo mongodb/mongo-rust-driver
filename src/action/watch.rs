@@ -11,7 +11,7 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
-    client::BoxFuture,
+    BoxFuture,
     collation::Collation,
     error::{ErrorKind, Result},
     operation::AggregateTarget,

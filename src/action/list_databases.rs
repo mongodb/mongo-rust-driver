@@ -6,7 +6,7 @@ use futures_util::FutureExt;
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::sync::Client as SyncClient;
 use crate::{
-    client::BoxFuture,
+    BoxFuture,
     error::{ErrorKind, Result},
     operation::list_databases as op,
     results::DatabaseSpecification,
