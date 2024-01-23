@@ -1507,7 +1507,7 @@ async fn stable_api_examples() -> GenericResult<()> {
 async fn aggregation_examples() -> GenericResult<()> {
     let client = TestClient::new().await;
     let db = client.database("aggregation_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     aggregation_data::populate(&db).await?;
 
     // Each example is within its own scope to allow the example to include
@@ -1649,7 +1649,7 @@ async fn aggregation_examples() -> GenericResult<()> {
 async fn run_command_examples() -> Result<()> {
     let client = TestClient::new().await;
     let db = client.database("run_command_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     db.collection::<Document>("restaurants")
         .insert_one(
             doc! {
@@ -1681,7 +1681,7 @@ async fn run_command_examples() -> Result<()> {
 async fn index_examples() -> Result<()> {
     let client = TestClient::new().await;
     let db = client.database("index_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     db.collection::<Document>("records")
         .insert_many(
             vec![
@@ -1765,7 +1765,7 @@ async fn change_streams_examples() -> Result<()> {
         return Ok(());
     }
     let db = client.database("change_streams_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     let inventory = db.collection::<Document>("inventory");
     // Populate an item so the collection exists for the change stream to watch.
     inventory.insert_one(doc! {}, None).await?;
