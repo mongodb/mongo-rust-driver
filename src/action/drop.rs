@@ -5,6 +5,8 @@ use super::{action_execute, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
+    /// 
+    /// `await` will return `Result<()>`.
     pub fn drop_2(&self) -> DropDatabase {
         DropDatabase { db: self, options: None, session: None }
     }
