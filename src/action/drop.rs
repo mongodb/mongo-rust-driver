@@ -1,7 +1,7 @@
 use crate::{db::options::DropDatabaseOptions, options::WriteConcern, ClientSession, Database};
 use crate::error::Result;
 
-use super::{action_execute_norun, option_setters};
+use super::{action_execute, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
@@ -33,7 +33,7 @@ impl<'a> DropDatabase<'a> {
     }
 }
 
-action_execute_norun! {
+action_execute! {
     DropDatabase<'a> => DropDatabaseFuture;
 
     async fn(mut self) -> Result<()> {

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_execute_norun, option_setters};
+use super::{action_execute, option_setters};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -291,7 +291,7 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-action_execute_norun! {
+action_execute! {
     Watch<'a, ImplicitSession> => WatchImplicitSessionFuture;
 
     async fn(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
@@ -309,9 +309,13 @@ action_execute_norun! {
             .execute_watch(self.pipeline, self.options, self.target, None)
             .await
     }
+
+    fn sync_wrap(out) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
+        out.map(crate::sync::ChangeStream::new)
+    }
 }
 
-action_execute_norun! {
+action_execute! {
     Watch<'a, ExplicitSession<'a>> => WatchExplicitSessionFuture;
 
     async fn(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
@@ -340,20 +344,8 @@ action_execute_norun! {
             )
             .await
     }
-}
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> Watch<'a, ImplicitSession> {
-    /// Synchronously execute this action.
-    pub fn run(self) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
-        crate::runtime::block_on(std::future::IntoFuture::into_future(self)).map(crate::sync::ChangeStream::new)
-    }
-}
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> Watch<'a, ExplicitSession<'a>> {
-    /// Synchronously execute this action.
-    pub fn run(self) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
-        crate::runtime::block_on(std::future::IntoFuture::into_future(self)).map(crate::sync::SessionChangeStream::new)
+    fn sync_wrap(out) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
+        out.map(crate::sync::SessionChangeStream::new)
     }
 }

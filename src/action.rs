@@ -44,6 +44,12 @@ macro_rules! option_setters {
 }
 use option_setters;
 
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+pub(crate) trait SyncRun: std::future::IntoFuture {
+    type SyncOutput;
+    fn wrap(out: Self::Output) -> Self::SyncOutput;
+}
+
 /// Generates:
 /// * an `IntoFuture` executing the given method body
 /// * an opaque wrapper type for the future in case we want to do something more fancy than BoxFuture.
@@ -60,12 +66,29 @@ macro_rules! action_execute {
         }
 
         #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl<'a> $action
-            where Self: std::future::IntoFuture
-        {
+        impl<'a> $action {
             /// Synchronously execute this action.
-            pub fn run(self) -> <Self as std::future::IntoFuture>::Output {
+            pub fn run(self) -> $out {
                 crate::runtime::block_on(std::future::IntoFuture::into_future(self))
+            }
+        }
+    };
+    (
+        $action:ty => $f_ty:ident;
+        async fn($($args:ident)+) -> $out:ty $code:block
+        fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
+    ) => {
+        crate::action::action_execute_norun! {
+            $action => $f_ty;
+            async fn($($args)+) -> $out $code
+        }
+
+        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+        impl<'a> $action {
+            /// Synchronously execute this action.
+            pub fn run(self) -> $sync_out {
+                let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
+                return $wrap_code
             }
         }
     }
