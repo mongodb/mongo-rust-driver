@@ -52,19 +52,19 @@ use option_setters;
 macro_rules! action_impl {
     // Generate with no sync type conversion
     (
-        impl Action<$lt:lifetime> for $action:ty {
+        impl Action$(<$lt:lifetime>)? for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
         }
     ) => {
         crate::action::action_impl_inner! {
             $action => $f_ty;
-            $lt;
+            $($lt)?;
             async fn($($args)+) -> $out $code
         }
 
         #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl<$lt> $action {
+        impl$(<$lt>)? $action {
             /// Synchronously execute this action.
             pub fn run(self) -> $out {
                 crate::runtime::block_on(std::future::IntoFuture::into_future(self))
@@ -73,7 +73,7 @@ macro_rules! action_impl {
     };
     // Generate with a sync type conversion
     (
-        impl Action<$lt:lifetime> for $action:ty {
+        impl Action$(<$lt:lifetime>)? for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
             fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
@@ -81,12 +81,12 @@ macro_rules! action_impl {
     ) => {
         crate::action::action_impl_inner! {
             $action => $f_ty;
-            $lt;
+            $($lt)?;
             async fn($($args)+) -> $out $code
         }
 
         #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl<$lt> $action {
+        impl$(<$lt>)? $action {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {
                 let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
@@ -100,12 +100,12 @@ pub(crate) use action_impl;
 macro_rules! action_impl_inner {
     (
         $action:ty => $f_ty:ident;
-        $lt:lifetime;
+        $($lt:lifetime)?;
         async fn($($args:ident)+) -> $out:ty $code:block
     ) => {
-        impl<$lt> std::future::IntoFuture for $action {
+        impl$(<$lt>)? std::future::IntoFuture for $action {
             type Output = $out;
-            type IntoFuture = $f_ty<$lt>;
+            type IntoFuture = $f_ty$(<$lt>)?;
 
             fn into_future($($args)+) -> Self::IntoFuture {
                 $f_ty(Box::pin(async move {
@@ -114,10 +114,9 @@ macro_rules! action_impl_inner {
             }
         }
 
-        /// Opaque future type for action execution.
-        pub struct $f_ty<$lt>(crate::BoxFuture<$lt, $out>);
+        crate::action::action_impl_future_wrapper!($($lt)?, $f_ty, $out);
 
-        impl<$lt> std::future::Future for $f_ty<$lt> {
+        impl$(<$lt>)? std::future::Future for $f_ty$(<$lt>)? {
             type Output = $out;
 
             fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
@@ -127,3 +126,15 @@ macro_rules! action_impl_inner {
     }
 }
 pub(crate) use action_impl_inner;
+
+macro_rules! action_impl_future_wrapper {
+    (, $f_ty:ident, $out:ty) => {
+        /// Opaque future type for action execution.
+        pub struct $f_ty(crate::BoxFuture<'static, $out>);
+    };
+    ($lt:lifetime, $f_ty:ident, $out:ty) => {
+        /// Opaque future type for action execution.
+        pub struct $f_ty<$lt>(crate::BoxFuture<$lt, $out>);
+    };
+}
+pub(crate) use action_impl_future_wrapper;

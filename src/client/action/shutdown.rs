@@ -1,16 +1,14 @@
-use std::{future::IntoFuture, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
-use futures_util::{future::join_all, FutureExt};
+use futures_util::future::join_all;
 
-use crate::BoxFuture;
+use crate::action::action_impl;
 
-impl IntoFuture for crate::action::Shutdown {
-    type Output = ();
+action_impl! {
+    impl Action for crate::action::Shutdown {
+        type Future = ShutdownFuture;
 
-    type IntoFuture = BoxFuture<'static, ()>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        async move {
+        async fn execute(self) -> () {
             if !self.immediate {
                 // Subtle bug: if this is inlined into the `join_all(..)` call, Rust will extend the
                 // lifetime of the temporary unnamed `MutexLock` until the end of the *statement*,
@@ -33,20 +31,5 @@ impl IntoFuture for crate::action::Shutdown {
                 .executed
                 .store(true, Ordering::SeqCst);
         }
-        .boxed()
-    }
-}
-
-/// Opaque future type for action execution.
-pub struct ShutdownFuture(BoxFuture<'static, ()>);
-
-impl std::future::Future for ShutdownFuture {
-    type Output = ();
-
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        self.0.as_mut().poll(cx)
     }
 }

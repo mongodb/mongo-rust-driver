@@ -142,11 +142,3 @@ impl Shutdown {
 }
 
 // IntoFuture impl in src/client/action/shutdown.rs
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl Shutdown {
-    /// Synchronously execute this action.
-    pub fn run(self) {
-        crate::runtime::block_on(std::future::IntoFuture::into_future(self))
-    }
-}
