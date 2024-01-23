@@ -39,7 +39,7 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 async fn list_collections() {
     let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
 
     let colls: Result<Vec<_>> = db
         .list_collections(None, None)
@@ -78,7 +78,7 @@ async fn list_collections() {
 async fn list_collections_filter() {
     let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
 
     let colls: Result<Vec<_>> = db
         .list_collections(None, None)
@@ -119,7 +119,7 @@ async fn list_collections_filter() {
 async fn list_collection_names() {
     let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
 
     assert!(db.list_collection_names(None).await.unwrap().is_empty());
 
@@ -148,7 +148,7 @@ async fn list_collection_names() {
 async fn collection_management() {
     let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
 
     assert!(db.list_collection_names(None).await.unwrap().is_empty());
 
@@ -339,7 +339,7 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
         .index_option_defaults(defaults.clone())
         .build();
     db.create_collection(name, options).await.unwrap();
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
 
     let events = client.get_command_started_events(&["create"]);
     assert_eq!(events.len(), 1);

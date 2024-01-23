@@ -175,7 +175,7 @@ async fn run_legacy() {
                 .unwrap();
             assert_eq!(test_case.outcome.collection.data, actual_data);
 
-            client.database(&db_name).drop(None).await.unwrap();
+            client.database(&db_name).drop().await.unwrap();
         }
     }
 

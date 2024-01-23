@@ -247,16 +247,6 @@ pub enum TimeseriesGranularity {
     Hours,
 }
 
-/// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(into)))]
-#[non_exhaustive]
-pub struct DropDatabaseOptions {
-    /// The write concern for the operation.
-    pub write_concern: Option<WriteConcern>,
-}
-
 /// Specifies the options to a
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
 #[skip_serializing_none]

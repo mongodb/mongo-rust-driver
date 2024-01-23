@@ -18,7 +18,7 @@ async fn list_collections_timeseries() -> Result<()> {
         return Ok(());
     }
     let db = client.database("list_collections_timeseries");
-    db.drop(None).await?;
+    db.drop().await?;
     db.create_collection(
         "test",
         CreateCollectionOptions::builder()

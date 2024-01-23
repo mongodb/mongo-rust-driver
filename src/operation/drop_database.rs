@@ -1,7 +1,5 @@
-#[cfg(test)]
-mod test;
-
 use bson::Document;
+use serde::Serialize;
 
 use crate::{
     bson::doc,
@@ -13,7 +11,7 @@ use crate::{
         OperationWithDefaults,
         WriteConcernOnlyBody,
     },
-    options::{DropDatabaseOptions, WriteConcern},
+    options::WriteConcern,
 };
 
 #[derive(Debug)]
@@ -22,12 +20,14 @@ pub(crate) struct DropDatabase {
     options: Option<DropDatabaseOptions>,
 }
 
-impl DropDatabase {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(String::new(), None)
-    }
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DropDatabaseOptions {
+    /// The write concern for the operation.
+    pub(crate) write_concern: Option<WriteConcern>,
+}
 
+impl DropDatabase {
     pub(crate) fn new(target_db: String, options: Option<DropDatabaseOptions>) -> Self {
         Self { target_db, options }
     }

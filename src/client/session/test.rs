@@ -182,7 +182,7 @@ macro_rules! for_each_op {
             db_op!($test_name, db, db.create_collection("sessionopcoll", None)),
         )
         .await;
-        $test_func("dropDatabase", db_op!($test_name, db, db.drop(None))).await;
+        $test_func("dropDatabase", db_op!($test_name, db, db.drop())).await;
 
         // client operations
         $test_func("listDatabases", client_op!(client, client.list_databases())).await;

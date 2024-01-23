@@ -189,7 +189,7 @@ async fn list_databases() {
     let client = TestClient::new().await;
 
     for name in expected_dbs {
-        client.database(name).drop(None).await.unwrap();
+        client.database(name).drop().await.unwrap();
     }
 
     let prev_dbs = client.list_databases().await.unwrap();
@@ -235,7 +235,7 @@ async fn list_database_names() {
     ];
 
     for name in expected_dbs {
-        client.database(name).drop(None).await.unwrap();
+        client.database(name).drop().await.unwrap();
     }
 
     let prev_dbs = client.list_database_names().await.unwrap();
@@ -311,7 +311,7 @@ async fn list_authorized_databases() {
     }
 
     for name in dbs {
-        client.database(name).drop(None).await.unwrap();
+        client.database(name).drop().await.unwrap();
     }
 }
 
@@ -843,7 +843,7 @@ async fn manual_shutdown_with_resources() {
         return;
     }
     let db = client.database("shutdown_test");
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
     coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
     let bucket = db.gridfs_bucket(None);
@@ -908,7 +908,7 @@ async fn manual_shutdown_immediate_with_resources() {
         return;
     }
     let db = client.database("shutdown_test");
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
     coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
     let bucket = db.gridfs_bucket(None);

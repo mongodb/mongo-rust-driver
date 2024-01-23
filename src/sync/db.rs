@@ -8,7 +8,6 @@ use crate::{
         AggregateOptions,
         CollectionOptions,
         CreateCollectionOptions,
-        DropDatabaseOptions,
         GridFsBucketOptions,
         ListCollectionsOptions,
         ReadConcern,
@@ -104,24 +103,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.async_database.collection_with_options(name, options))
-    }
-
-    /// Drops the database, deleting all data, collections, users, and indexes stored in it.
-    pub fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
-        runtime::block_on(self.async_database.drop(options.into()))
-    }
-
-    /// Drops the database, deleting all data, collections, users, and indexes stored in it using
-    /// the provided `ClientSession`.
-    pub fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropDatabaseOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_database
-                .drop_with_session(options.into(), &mut session.async_client_session),
-        )
     }
 
     /// Gets information about each of the collections in the database. The cursor will yield a
