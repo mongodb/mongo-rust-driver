@@ -44,17 +44,21 @@ macro_rules! option_setters {
 }
 use option_setters;
 
-macro_rules! action_execute_inner {
+/// Generates an `IntoFuture` executing the given method body and an opaque wrapper type for the future in case we want to do something more fancy than BoxFuture.
+macro_rules! action_execute {
     (
         $action:ty => $f_ty:ident;
-        $into_future:item;
-        $out:ty
+        async fn($($args:ident)+) -> $out:ty $code:block
     ) => {
         impl<'a> std::future::IntoFuture for $action {
             type Output = $out;
             type IntoFuture = $f_ty<'a>;
 
-            $into_future
+            fn into_future($($args)+) -> Self::IntoFuture {
+                $f_ty(Box::pin(async move {
+                    $code
+                }))
+            }
         }
 
         /// Opaque future type for action execution.
@@ -67,38 +71,6 @@ macro_rules! action_execute_inner {
                 self.0.as_mut().poll(cx)
             }
         }
-    }
-}
-pub(crate) use action_execute_inner;
-
-macro_rules! action_execute {
-    (
-        $action:ty => $f_ty:ident;
-        async fn($self:ident) -> $out:ty $code:block
-    ) => {
-        $crate::action::action_execute_inner!(
-            $action => $f_ty;
-            fn into_future($self) -> Self::IntoFuture {
-                $f_ty(Box::pin(async move {
-                    $code
-                }))
-            };
-            $out
-        );
-    };
-    (
-        $action:ty => $f_ty:ident;
-        async fn(mut $self:ident) -> $out:ty $code:block
-    ) => {
-        $crate::action::action_execute_inner!(
-            $action => $f_ty;
-            fn into_future(mut $self) -> Self::IntoFuture {
-                $f_ty(Box::pin(async move {
-                    $code
-                }))
-            };
-            $out
-        );
     }
 }
 pub(crate) use action_execute;
