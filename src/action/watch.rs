@@ -292,62 +292,64 @@ impl<'a> Watch<'a, ImplicitSession> {
 }
 
 action_impl! {
-    type Action = Watch<'a, ImplicitSession>;
-    type Future = WatchImplicitSessionFuture;
+    impl Action<'a> for Watch<'a, ImplicitSession> {
+        type Future = WatchImplicitSessionFuture;
 
-    async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        resolve_options!(
-            self.client,
-            self.options,
-            [read_concern, selection_criteria]
-        );
-        if self.cluster {
-            self.options
-                .get_or_insert_with(Default::default)
-                .all_changes_for_cluster = Some(true);
+        async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+            resolve_options!(
+                self.client,
+                self.options,
+                [read_concern, selection_criteria]
+            );
+            if self.cluster {
+                self.options
+                    .get_or_insert_with(Default::default)
+                    .all_changes_for_cluster = Some(true);
+            }
+            self.client
+                .execute_watch(self.pipeline, self.options, self.target, None)
+                .await
         }
-        self.client
-            .execute_watch(self.pipeline, self.options, self.target, None)
-            .await
-    }
 
-    fn sync_wrap(out) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
-        out.map(crate::sync::ChangeStream::new)
+        fn sync_wrap(out) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
+            out.map(crate::sync::ChangeStream::new)
+        }
     }
 }
 
 action_impl! {
-    type Action = Watch<'a, ExplicitSession<'a>>;
-    type Future = WatchExplicitSessionFuture;
+    impl Action<'a> for Watch<'a, ExplicitSession<'a>> {
+        type Future = WatchExplicitSessionFuture;
 
-    async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        resolve_read_concern_with_session!(
-            self.client,
-            self.options,
-            Some(&mut *self.session.0)
-        )?;
-        resolve_selection_criteria_with_session!(
-            self.client,
-            self.options,
-            Some(&mut *self.session.0)
-        )?;
-        if self.cluster {
-            self.options
-                .get_or_insert_with(Default::default)
-                .all_changes_for_cluster = Some(true);
-        }
-        self.client
-            .execute_watch_with_session(
-                self.pipeline,
+        async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+            resolve_read_concern_with_session!(
+                self.client,
                 self.options,
-                self.target,
-                None,
-                self.session.0,
-            )
-            .await
-    }
+                Some(&mut *self.session.0)
+            )?;
+            resolve_selection_criteria_with_session!(
+                self.client,
+                self.options,
+                Some(&mut *self.session.0)
+            )?;
+            if self.cluster {
+                self.options
+                    .get_or_insert_with(Default::default)
+                    .all_changes_for_cluster = Some(true);
+            }
+            self.client
+                .execute_watch_with_session(
+                    self.pipeline,
+                    self.options,
+                    self.target,
+                    None,
+                    self.session.0,
+                )
+                .await
+        }
 
-    fn sync_wrap(out) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
-        out.map(crate::sync::SessionChangeStream::new)
+        fn sync_wrap(out) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
+            out.map(crate::sync::SessionChangeStream::new)
+        }
     }
 }

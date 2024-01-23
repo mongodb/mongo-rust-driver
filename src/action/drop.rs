@@ -55,14 +55,15 @@ impl<'a> DropDatabase<'a> {
 }
 
 action_impl! {
-    type Action = DropDatabase<'a>;
-    type Future = DropDatabaseFuture;
+    impl Action<'a> for DropDatabase<'a> {
+        type Future = DropDatabaseFuture;
 
-    async fn execute(mut self) -> Result<()> {
-        resolve_options!(self.db, self.options, [write_concern]);
-        let op = op::DropDatabase::new(self.db.name().to_string(), self.options);
-        self.db.client()
-            .execute_operation(op, self.session)
-            .await
+        async fn execute(mut self) -> Result<()> {
+            resolve_options!(self.db, self.options, [write_concern]);
+            let op = op::DropDatabase::new(self.db.name().to_string(), self.options);
+            self.db.client()
+                .execute_operation(op, self.session)
+                .await
+        }
     }
 }
