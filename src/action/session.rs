@@ -5,7 +5,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_execute, option_setters};
+use super::{action_impl, option_setters};
 
 impl Client {
     /// Starts a new [`ClientSession`].
@@ -60,10 +60,11 @@ impl<'a> StartSession<'a> {
     );
 }
 
-action_execute! {
-    StartSession<'a> => StartSessionFuture;
+action_impl! {
+    type Action = StartSession<'a>;
+    type Future = StartSessionFuture;
 
-    async fn(self) -> Result<ClientSession> {
+    async fn execute(self) -> Result<ClientSession> {
         if let Some(options) = &self.options {
             options.validate()?;
         }

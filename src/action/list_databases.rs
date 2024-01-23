@@ -12,7 +12,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_execute, option_setters};
+use super::{action_impl, option_setters};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
@@ -94,10 +94,11 @@ impl<'a, M> ListDatabases<'a, M> {
     }
 }
 
-action_execute! {
-    ListDatabases<'a, ListSpecifications> => ListSpecificationsFuture;
+action_impl! {
+    type Action = ListDatabases<'a, ListSpecifications>;
+    type Future = ListSpecificationsFuture;
 
-    async fn(self) -> Result<Vec<DatabaseSpecification>> {
+    async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
         let op = op::ListDatabases::new(false, self.options);
             self.client
                 .execute_operation(op, self.session)
@@ -112,10 +113,11 @@ action_execute! {
     }
 }
 
-action_execute! {
-    ListDatabases<'a, ListNames> => ListNamesFuture;
+action_impl! {
+    type Action = ListDatabases<'a, ListNames>;
+    type Future = ListNamesFuture;
 
-    async fn(self) -> Result<Vec<String>> {
+    async fn execute(self) -> Result<Vec<String>> {
         let op = op::ListDatabases::new(true, self.options);
         match self.client.execute_operation(op, self.session).await {
             Ok(databases) => databases

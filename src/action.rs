@@ -51,13 +51,14 @@ use option_setters;
 /// * a `run` method for sync execution, optionally with a wrapper function
 ///
 /// The action type is assumed to have a 'a lifetype parameter.
-macro_rules! action_execute {
+macro_rules! action_impl {
     // Generate with no sync type conversion
     (
-        $action:ty => $f_ty:ident;
-        async fn($($args:ident)+) -> $out:ty $code:block
+        type Action = $action:ty;
+        type Future = $f_ty:ident;
+        async fn execute($($args:ident)+) -> $out:ty $code:block
     ) => {
-        crate::action::action_execute_norun! {
+        crate::action::action_impl_inner! {
             $action => $f_ty;
             async fn($($args)+) -> $out $code
         }
@@ -72,11 +73,12 @@ macro_rules! action_execute {
     };
     // Generate with a sync type conversion
     (
-        $action:ty => $f_ty:ident;
-        async fn($($args:ident)+) -> $out:ty $code:block
+        type Action = $action:ty;
+        type Future = $f_ty:ident;
+        async fn execute($($args:ident)+) -> $out:ty $code:block
         fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
     ) => {
-        crate::action::action_execute_norun! {
+        crate::action::action_impl_inner! {
             $action => $f_ty;
             async fn($($args)+) -> $out $code
         }
@@ -91,9 +93,9 @@ macro_rules! action_execute {
         }
     }
 }
-pub(crate) use action_execute;
+pub(crate) use action_impl;
 
-macro_rules! action_execute_norun {
+macro_rules! action_impl_inner {
     (
         $action:ty => $f_ty:ident;
         async fn($($args:ident)+) -> $out:ty $code:block
@@ -121,4 +123,4 @@ macro_rules! action_execute_norun {
         }
     }
 }
-pub(crate) use action_execute_norun;
+pub(crate) use action_impl_inner;

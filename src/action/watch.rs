@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_execute, option_setters};
+use super::{action_impl, option_setters};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -291,10 +291,11 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-action_execute! {
-    Watch<'a, ImplicitSession> => WatchImplicitSessionFuture;
+action_impl! {
+    type Action = Watch<'a, ImplicitSession>;
+    type Future = WatchImplicitSessionFuture;
 
-    async fn(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+    async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
         resolve_options!(
             self.client,
             self.options,
@@ -315,10 +316,11 @@ action_execute! {
     }
 }
 
-action_execute! {
-    Watch<'a, ExplicitSession<'a>> => WatchExplicitSessionFuture;
+action_impl! {
+    type Action = Watch<'a, ExplicitSession<'a>>;
+    type Future = WatchExplicitSessionFuture;
 
-    async fn(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+    async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
         resolve_read_concern_with_session!(
             self.client,
             self.options,

@@ -6,7 +6,7 @@ use crate::{
     Database,
 };
 
-use super::{action_execute, option_setters};
+use super::{action_impl, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
@@ -54,10 +54,11 @@ impl<'a> DropDatabase<'a> {
     }
 }
 
-action_execute! {
-    DropDatabase<'a> => DropDatabaseFuture;
+action_impl! {
+    type Action = DropDatabase<'a>;
+    type Future = DropDatabaseFuture;
 
-    async fn(mut self) -> Result<()> {
+    async fn execute(mut self) -> Result<()> {
         resolve_options!(self.db, self.options, [write_concern]);
         let op = op::DropDatabase::new(self.db.name().to_string(), self.options);
         self.db.client()

@@ -1,9 +1,10 @@
-use crate::action::action_execute;
+use crate::action::action_impl;
 
-action_execute! {
-    crate::action::WarmConnectionPool<'a> => WarmConnectionPoolFuture;
+action_impl! {
+    type Action = crate::action::WarmConnectionPool<'a>;
+    type Future = WarmConnectionPoolFuture;
 
-    async fn(self) -> () {
+    async fn execute(self) -> () {
         if !self
             .client
             .inner
