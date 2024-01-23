@@ -5,7 +5,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_execute, option_setters};
+use super::{action_execute_norun, option_setters};
 
 impl Client {
     /// Starts a new [`ClientSession`].
@@ -60,7 +60,7 @@ impl<'a> StartSession<'a> {
     );
 }
 
-action_execute! {
+action_execute_norun! {
     StartSession<'a> => StartSessionFuture;
 
     async fn(self) -> Result<ClientSession> {
@@ -68,5 +68,13 @@ action_execute! {
             options.validate()?;
         }
         Ok(ClientSession::new(self.client.clone(), self.options, false).await)
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<'a> StartSession<'a> {
+    /// Synchronously execute this action.
+    pub fn run(self) -> Result<crate::sync::ClientSession> {
+        crate::runtime::block_on(std::future::IntoFuture::into_future(self)).map(Into::into)
     }
 }
