@@ -44,19 +44,15 @@ macro_rules! option_setters {
 }
 use option_setters;
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-pub(crate) trait SyncRun: std::future::IntoFuture {
-    type SyncOutput;
-    fn wrap(out: Self::Output) -> Self::SyncOutput;
-}
-
 /// Generates:
 /// * an `IntoFuture` executing the given method body
 /// * an opaque wrapper type for the future in case we want to do something more fancy than
 ///   BoxFuture.
+/// * a `run` method for sync execution, optionally with a wrapper function
 ///
 /// The action type is assumed to have a 'a lifetype parameter.
 macro_rules! action_execute {
+    // Generate with no sync type conversion
     (
         $action:ty => $f_ty:ident;
         async fn($($args:ident)+) -> $out:ty $code:block
@@ -74,6 +70,7 @@ macro_rules! action_execute {
             }
         }
     };
+    // Generate with a sync type conversion
     (
         $action:ty => $f_ty:ident;
         async fn($($args:ident)+) -> $out:ty $code:block
@@ -96,7 +93,6 @@ macro_rules! action_execute {
 }
 pub(crate) use action_execute;
 
-/// As `action_execute`, but without the sync `run` method.
 macro_rules! action_execute_norun {
     (
         $action:ty => $f_ty:ident;
