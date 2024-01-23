@@ -524,7 +524,7 @@ async fn main() -> Result<()> {
     .build()
     .await?;
     let db = encrypted_client.database("test");
-    db.drop(None).await?;
+    db.drop().await?;
 
     // Create the collection with encrypted fields.
     db.create_collection(
