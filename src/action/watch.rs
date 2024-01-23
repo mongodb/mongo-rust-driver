@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_execute, option_setters};
+use super::{action_execute_norun, option_setters};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -291,7 +291,7 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-action_execute! {
+action_execute_norun! {
     Watch<'a, ImplicitSession> => WatchImplicitSessionFuture;
 
     async fn(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
@@ -311,7 +311,7 @@ action_execute! {
     }
 }
 
-action_execute! {
+action_execute_norun! {
     Watch<'a, ExplicitSession<'a>> => WatchExplicitSessionFuture;
 
     async fn(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
@@ -346,7 +346,7 @@ action_execute! {
 impl<'a> Watch<'a, ImplicitSession> {
     /// Synchronously execute this action.
     pub fn run(self) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
-        crate::runtime::block_on(self.into_future()).map(crate::sync::ChangeStream::new)
+        crate::runtime::block_on(std::future::IntoFuture::into_future(self)).map(crate::sync::ChangeStream::new)
     }
 }
 
@@ -354,6 +354,6 @@ impl<'a> Watch<'a, ImplicitSession> {
 impl<'a> Watch<'a, ExplicitSession<'a>> {
     /// Synchronously execute this action.
     pub fn run(self) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
-        crate::runtime::block_on(self.into_future()).map(crate::sync::SessionChangeStream::new)
+        crate::runtime::block_on(std::future::IntoFuture::into_future(self)).map(crate::sync::SessionChangeStream::new)
     }
 }

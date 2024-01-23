@@ -147,6 +147,6 @@ impl Shutdown {
 impl Shutdown {
     /// Synchronously execute this action.
     pub fn run(self) {
-        crate::runtime::block_on(self.into_future())
+        crate::runtime::block_on(std::future::IntoFuture::into_future(self))
     }
 }

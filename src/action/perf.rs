@@ -49,11 +49,3 @@ pub struct WarmConnectionPool<'a> {
 }
 
 // IntoFuture impl in src/client/action/perf.rs
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> WarmConnectionPool<'a> {
-    /// Synchronously execute this action.
-    pub fn run(self) {
-        crate::runtime::block_on(self.into_future())
-    }
-}

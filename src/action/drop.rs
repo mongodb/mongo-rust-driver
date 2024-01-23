@@ -1,7 +1,7 @@
 use crate::{db::options::DropDatabaseOptions, options::WriteConcern, ClientSession, Database};
 use crate::error::Result;
 
-use super::{action_execute, option_setters};
+use super::{action_execute_norun, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
@@ -9,6 +9,8 @@ impl Database {
         DropDatabase { db: self, options: None, session: None }
     }
 }
+
+//#[cfg(any(feature = "sync", feature = "tokio-sync"))]
 
 /// Drops the database, deleting all data, collections, and indexes stored in it.  Create by calling [`Database::drop`] and execute with `await` (or [`run`](DropDatabase::run) if using the sync client).
 #[must_use]
@@ -31,7 +33,7 @@ impl<'a> DropDatabase<'a> {
     }
 }
 
-action_execute! {
+action_execute_norun! {
     DropDatabase<'a> => DropDatabaseFuture;
 
     async fn(mut self) -> Result<()> {
@@ -42,3 +44,5 @@ action_execute! {
             .await
     }
 }
+
+// TODO: sync entry point, remove old impl, update callers, hide options

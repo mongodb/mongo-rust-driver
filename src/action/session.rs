@@ -70,11 +70,3 @@ action_execute! {
         Ok(ClientSession::new(self.client.clone(), self.options, false).await)
     }
 }
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> StartSession<'a> {
-    /// Synchronously execute this action.
-    pub fn run(self) -> Result<crate::sync::ClientSession> {
-        crate::runtime::block_on(self.into_future()).map(Into::into)
-    }
-}

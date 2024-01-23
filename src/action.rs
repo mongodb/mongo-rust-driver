@@ -44,8 +44,36 @@ macro_rules! option_setters {
 }
 use option_setters;
 
-/// Generates an `IntoFuture` executing the given method body and an opaque wrapper type for the future in case we want to do something more fancy than BoxFuture.
+/// Generates:
+/// * an `IntoFuture` executing the given method body
+/// * an opaque wrapper type for the future in case we want to do something more fancy than BoxFuture.
+/// 
+/// The action type is assumed to have a 'a lifetype parameter.
 macro_rules! action_execute {
+    (
+        $action:ty => $f_ty:ident;
+        async fn($($args:ident)+) -> $out:ty $code:block
+    ) => {
+        crate::action::action_execute_norun! {
+            $action => $f_ty;
+            async fn($($args)+) -> $out $code
+        }
+
+        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+        impl<'a> $action
+            where Self: std::future::IntoFuture
+        {
+            /// Synchronously execute this action.
+            pub fn run(self) -> <Self as std::future::IntoFuture>::Output {
+                crate::runtime::block_on(std::future::IntoFuture::into_future(self))
+            }
+        }
+    }
+}
+pub(crate) use action_execute;
+
+/// As `action_execute`, but without the sync `run` method.
+macro_rules! action_execute_norun {
     (
         $action:ty => $f_ty:ident;
         async fn($($args:ident)+) -> $out:ty $code:block
@@ -73,4 +101,4 @@ macro_rules! action_execute {
         }
     }
 }
-pub(crate) use action_execute;
+pub(crate) use action_execute_norun;

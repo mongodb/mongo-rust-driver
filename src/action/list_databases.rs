@@ -12,7 +12,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_execute, option_setters};
+use super::{action_execute_norun, option_setters};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
@@ -94,7 +94,7 @@ impl<'a, M> ListDatabases<'a, M> {
     }
 }
 
-action_execute! {
+action_execute_norun! {
     ListDatabases<'a, ListSpecifications> => ListSpecificationsFuture;
     
     async fn(self) -> Result<Vec<DatabaseSpecification>> {
@@ -112,7 +112,7 @@ action_execute! {
     }
 }
 
-action_execute! {
+action_execute_norun! {
     ListDatabases<'a, ListNames> => ListNamesFuture;
     
     async fn(self) -> Result<Vec<String>> {
@@ -139,10 +139,10 @@ action_execute! {
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl<'a, M> ListDatabases<'a, M>
 where
-    Self: IntoFuture,
+    Self: std::future::IntoFuture,
 {
     /// Synchronously execute this action.
-    pub fn run(self) -> <Self as IntoFuture>::Output {
-        crate::runtime::block_on(self.into_future())
+    pub fn run(self) -> <Self as std::future::IntoFuture>::Output {
+        crate::runtime::block_on(std::future::IntoFuture::into_future(self))
     }
 }
