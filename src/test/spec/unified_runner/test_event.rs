@@ -3,8 +3,9 @@ use crate::{
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
         command::CommandEvent,
+        sdam::SdamEvent,
     },
-    test::{Event, SdamEvent},
+    test::Event,
     ServerType,
 };
 use serde::Deserialize;

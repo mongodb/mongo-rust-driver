@@ -10,6 +10,7 @@ use crate::{
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
+    event::sdam::SdamEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
@@ -33,7 +34,6 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         TestClient,
     },
 };
@@ -275,7 +275,7 @@ async fn run_test(test_file: TestFile) {
         .expect(test_description);
 
     let handler = Arc::new(EventHandler::new());
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_subscriber = handler.subscribe();

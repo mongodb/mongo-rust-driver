@@ -10,6 +10,8 @@ use futures_core::future::BoxFuture;
 
 use crate::event::command::CommandEvent;
 
+use self::{cmap::CmapEvent, sdam::SdamEvent};
+
 /// A destination for events.  Allows implicit conversion via [`From`] for concrete types for
 /// convenience with [`crate::options::ClientOptions`] construction:
 ///
@@ -71,6 +73,44 @@ impl<T: crate::event::command::CommandEventHandler + 'static> From<Arc<T>>
             CommandEvent::Started(e) => value.handle_command_started_event(e),
             CommandEvent::Succeeded(e) => value.handle_command_succeeded_event(e),
             CommandEvent::Failed(e) => value.handle_command_failed_event(e),
+        })
+    }
+}
+
+#[allow(deprecated)]
+impl<T: crate::event::cmap::CmapEventHandler + 'static> From<Arc<T>> for EventHandler<CmapEvent> {
+    fn from(value: Arc<T>) -> Self {
+        use CmapEvent::*;
+        Self::callback(move |ev| match ev {
+            PoolCreated(ev) => value.handle_pool_created_event(ev),
+            PoolReady(ev) => value.handle_pool_ready_event(ev),
+            PoolCleared(ev) => value.handle_pool_cleared_event(ev),
+            PoolClosed(ev) => value.handle_pool_closed_event(ev),
+            ConnectionCreated(ev) => value.handle_connection_created_event(ev),
+            ConnectionReady(ev) => value.handle_connection_ready_event(ev),
+            ConnectionClosed(ev) => value.handle_connection_closed_event(ev),
+            ConnectionCheckoutStarted(ev) => value.handle_connection_checkout_started_event(ev),
+            ConnectionCheckoutFailed(ev) => value.handle_connection_checkout_failed_event(ev),
+            ConnectionCheckedOut(ev) => value.handle_connection_checked_out_event(ev),
+            ConnectionCheckedIn(ev) => value.handle_connection_checked_in_event(ev),
+        })
+    }
+}
+
+#[allow(deprecated)]
+impl<T: crate::event::sdam::SdamEventHandler + 'static> From<Arc<T>> for EventHandler<SdamEvent> {
+    fn from(value: Arc<T>) -> Self {
+        use SdamEvent::*;
+        Self::callback(move |ev| match ev {
+            ServerDescriptionChanged(ev) => value.handle_server_description_changed_event(*ev),
+            ServerOpening(ev) => value.handle_server_opening_event(ev),
+            ServerClosed(ev) => value.handle_server_closed_event(ev),
+            TopologyDescriptionChanged(ev) => value.handle_topology_description_changed_event(*ev),
+            TopologyOpening(ev) => value.handle_topology_opening_event(ev),
+            TopologyClosed(ev) => value.handle_topology_closed_event(ev),
+            ServerHeartbeatStarted(ev) => value.handle_server_heartbeat_started_event(ev),
+            ServerHeartbeatSucceeded(ev) => value.handle_server_heartbeat_succeeded_event(ev),
+            ServerHeartbeatFailed(ev) => value.handle_server_heartbeat_failed_event(ev),
         })
     }
 }

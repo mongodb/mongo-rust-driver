@@ -7,7 +7,7 @@ use crate::{
     bson::{doc, Bson},
     coll::options::FindOptions,
     error::{CommandError, Error, ErrorKind},
-    event::cmap::CmapEvent,
+    event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
     options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
     runtime,
@@ -21,7 +21,6 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         SERVER_API,
     },
     Client,
@@ -722,8 +721,8 @@ async fn retry_commit_txn_check_out() {
 
     let mut options = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
-    options.cmap_event_handler = Some(handler.clone());
-    options.sdam_event_handler = Some(handler.clone());
+    options.cmap_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.heartbeat_freq = Some(Duration::from_secs(120));
     options.app_name = Some("retry_commit_txn_check_out".to_string());
     let client = Client::with_options(options).unwrap();

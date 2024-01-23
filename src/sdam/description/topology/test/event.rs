@@ -3,6 +3,7 @@ use serde::Deserialize;
 use crate::{
     client::options::ServerAddress,
     event::sdam::{
+        SdamEvent,
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
         ServerOpeningEvent,
@@ -11,7 +12,6 @@ use crate::{
         TopologyOpeningEvent,
     },
     sdam::{ServerDescription, ServerType, TopologyDescription},
-    test::SdamEvent,
 };
 
 #[derive(Debug, Deserialize)]

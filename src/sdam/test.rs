@@ -11,7 +11,7 @@ use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
     error::{Error, ErrorKind},
-    event::{cmap::CmapEvent, sdam::SdamEventHandler},
+    event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     sdam::{ServerDescription, Topology},
     test::{
@@ -23,7 +23,6 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         TestClient,
     },
     Client,
@@ -201,7 +200,7 @@ async fn hello_ok_true() {
     let mut subscriber = handler.subscribe();
 
     let mut options = setup_client_options.clone();
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.direct_connection = Some(true);
     options.heartbeat_freq = Some(Duration::from_millis(500));
     let _client = Client::with_options(options).expect("client creation should succeed");
@@ -277,7 +276,7 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
             ServerAddress::parse("localhost:49154")?,
         ])
         .heartbeat_freq(Duration::from_millis(50))
-        .sdam_event_handler(handler.clone() as Arc<dyn SdamEventHandler>)
+        .sdam_event_handler(handler.clone())
         .repl_set_name("foo".to_string())
         .build();
 

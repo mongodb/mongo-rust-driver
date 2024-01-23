@@ -6,7 +6,7 @@ mod subscriber;
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventClient, EventHandler, SdamEvent},
+    event::{Event, EventClient, EventHandler},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
     subscriber::EventSubscriber,
@@ -142,8 +142,8 @@ impl TestClientBuilder {
 
         if let Some(handler) = self.handler {
             options.command_event_handler = Some(handler.clone().into());
-            options.cmap_event_handler = Some(handler.clone());
-            options.sdam_event_handler = Some(handler);
+            options.cmap_event_handler = Some(handler.clone().into());
+            options.sdam_event_handler = Some(handler.clone().into());
         }
 
         if let Some(freq) = self.min_heartbeat_freq {

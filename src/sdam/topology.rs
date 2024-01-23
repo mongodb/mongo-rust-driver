@@ -27,7 +27,6 @@ use crate::{
     },
     error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
-        handle_sdam_event,
         SdamEvent,
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
@@ -87,12 +86,12 @@ impl Topology {
 
                         if let Some(ref user_handler) = user_handler {
                             #[cfg(feature = "tracing-unstable")]
-                            handle_sdam_event(user_handler.as_ref(), event.clone());
+                            user_handler.handle(event.clone());
                             #[cfg(not(feature = "tracing-unstable"))]
-                            handle_sdam_event(user_handler.as_ref(), event);
+                            user_handler.handle(event);
                         }
                         #[cfg(feature = "tracing-unstable")]
-                        handle_sdam_event(&tracing_emitter, event);
+                        tracing_emitter.handle(event);
 
                         ack.acknowledge(());
                     }
