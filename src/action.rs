@@ -12,7 +12,7 @@ pub use list_databases::{ListDatabases, ListSpecificationsFuture};
 pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
 pub use session::{StartSession, StartSessionFuture};
 pub use shutdown::{Shutdown, ShutdownFuture};
-pub use watch::{Watch, WatchImplicitSessionFuture, WatchExplicitSessionFuture};
+pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture};
 
 macro_rules! option_setters {
     (
@@ -52,8 +52,9 @@ pub(crate) trait SyncRun: std::future::IntoFuture {
 
 /// Generates:
 /// * an `IntoFuture` executing the given method body
-/// * an opaque wrapper type for the future in case we want to do something more fancy than BoxFuture.
-/// 
+/// * an opaque wrapper type for the future in case we want to do something more fancy than
+///   BoxFuture.
+///
 /// The action type is assumed to have a 'a lifetype parameter.
 macro_rules! action_execute {
     (

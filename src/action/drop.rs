@@ -1,29 +1,39 @@
-use crate::operation::drop_database as op;
-use crate::{options::WriteConcern, ClientSession, Database};
-use crate::error::Result;
+use crate::{
+    error::Result,
+    operation::drop_database as op,
+    options::WriteConcern,
+    ClientSession,
+    Database,
+};
 
 use super::{action_execute, option_setters};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
-    /// 
+    ///
     /// `await` will return `Result<()>`.
     pub fn drop(&self) -> DropDatabase {
-        DropDatabase { db: self, options: None, session: None }
+        DropDatabase {
+            db: self,
+            options: None,
+            session: None,
+        }
     }
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl crate::sync::Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
-    /// 
+    ///
     /// [`run`](DropDatabase::run) will return `Result<()>`.
     pub fn drop(&self) -> DropDatabase {
         self.async_database.drop()
     }
 }
 
-/// Drops the database, deleting all data, collections, and indexes stored in it.  Create by calling [`Database::drop`] and execute with `await` (or [`run`](DropDatabase::run) if using the sync client).
+/// Drops the database, deleting all data, collections, and indexes stored in it.  Create by calling
+/// [`Database::drop`] and execute with `await` (or [`run`](DropDatabase::run) if using the sync
+/// client).
 #[must_use]
 pub struct DropDatabase<'a> {
     db: &'a Database,

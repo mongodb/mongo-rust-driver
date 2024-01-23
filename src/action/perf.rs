@@ -1,5 +1,5 @@
-use crate::Client;
 pub use crate::client::action::perf::WarmConnectionPoolFuture;
+use crate::Client;
 
 impl Client {
     /// Add connections to the connection pool up to `min_pool_size`.  This is normally not needed -

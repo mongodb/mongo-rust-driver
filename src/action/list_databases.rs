@@ -1,4 +1,4 @@
-use std:: marker::PhantomData;
+use std::marker::PhantomData;
 
 use bson::{Bson, Document};
 
@@ -96,7 +96,7 @@ impl<'a, M> ListDatabases<'a, M> {
 
 action_execute! {
     ListDatabases<'a, ListSpecifications> => ListSpecificationsFuture;
-    
+
     async fn(self) -> Result<Vec<DatabaseSpecification>> {
         let op = op::ListDatabases::new(false, self.options);
             self.client
@@ -114,7 +114,7 @@ action_execute! {
 
 action_execute! {
     ListDatabases<'a, ListNames> => ListNamesFuture;
-    
+
     async fn(self) -> Result<Vec<String>> {
         let op = op::ListDatabases::new(true, self.options);
         match self.client.execute_operation(op, self.session).await {
