@@ -5,7 +5,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::Document,
-    options::{FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
+    options::{FindOneOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
 };
 
 /// Contains the options for creating a [`GridFsBucket`](crate::gridfs::GridFsBucket).
@@ -96,6 +96,34 @@ impl From<GridFsFindOptions> for FindOptions {
             allow_disk_use: options.allow_disk_use,
             batch_size: options.batch_size,
             limit: options.limit,
+            max_time: options.max_time,
+            skip: options.skip,
+            sort: options.sort,
+            ..Default::default()
+        }
+    }
+}
+
+/// Contains the options for finding a single
+/// [`FilesCollectionDocument`](crate::gridfs::FilesCollectionDocument) in a
+/// [`GridFsBucket`](crate::gridfs::GridFsBucket).
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct GridFsFindOneOptions {
+    /// The maximum amount of time to allow the query to run.
+    pub max_time: Option<Duration>,
+
+    /// The number of documents to skip before returning.
+    pub skip: Option<u64>,
+
+    /// The order by which to sort results. Defaults to not sorting.
+    pub sort: Option<Document>,
+}
+
+impl From<GridFsFindOneOptions> for FindOneOptions {
+    fn from(options: GridFsFindOneOptions) -> Self {
+        Self {
             max_time: options.max_time,
             skip: options.skip,
             sort: options.sort,

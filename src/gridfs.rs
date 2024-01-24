@@ -13,7 +13,14 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     cursor::Cursor,
     error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    options::{CollectionOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
+    options::{
+        CollectionOptions,
+        FindOneOptions,
+        FindOptions,
+        ReadConcern,
+        SelectionCriteria,
+        WriteConcern,
+    },
     Collection,
     Database,
 };
@@ -221,7 +228,7 @@ impl GridFsBucket {
         Ok(())
     }
 
-    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
+    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that matches the given
     /// filter.
     pub async fn find(
         &self,
@@ -230,6 +237,17 @@ impl GridFsBucket {
     ) -> Result<Cursor<FilesCollectionDocument>> {
         let find_options = options.into().map(FindOptions::from);
         self.files().find(filter, find_options).await
+    }
+
+    /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
+    /// given filter.
+    pub async fn find_one(
+        &self,
+        filter: Document,
+        options: impl Into<Option<GridFsFindOneOptions>>,
+    ) -> Result<Option<FilesCollectionDocument>> {
+        let find_options = options.into().map(FindOneOptions::from);
+        self.files().find_one(filter, find_options).await
     }
 
     /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
