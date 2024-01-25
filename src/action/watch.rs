@@ -1,9 +1,8 @@
-use std::{future::IntoFuture, time::Duration};
+use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
-use futures_util::FutureExt;
 
-use super::option_setters;
+use super::{action_impl, option_setters};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -11,7 +10,6 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
-    client::BoxFuture,
     collation::Collation,
     error::{ErrorKind, Result},
     operation::AggregateTarget,
@@ -293,12 +291,11 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-impl<'a> IntoFuture for Watch<'a, ImplicitSession> {
-    type Output = Result<ChangeStream<ChangeStreamEvent<Document>>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_impl! {
+    impl Action<'a> for Watch<'a, ImplicitSession> {
+        type Future = WatchImplicitSessionFuture;
 
-    fn into_future(mut self) -> Self::IntoFuture {
-        async move {
+        async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
             resolve_options!(
                 self.client,
                 self.options,
@@ -313,16 +310,18 @@ impl<'a> IntoFuture for Watch<'a, ImplicitSession> {
                 .execute_watch(self.pipeline, self.options, self.target, None)
                 .await
         }
-        .boxed()
+
+        fn sync_wrap(out) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
+            out.map(crate::sync::ChangeStream::new)
+        }
     }
 }
 
-impl<'a> IntoFuture for Watch<'a, ExplicitSession<'a>> {
-    type Output = Result<SessionChangeStream<ChangeStreamEvent<Document>>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_impl! {
+    impl Action<'a> for Watch<'a, ExplicitSession<'a>> {
+        type Future = WatchExplicitSessionFuture;
 
-    fn into_future(mut self) -> Self::IntoFuture {
-        async move {
+        async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
             resolve_read_concern_with_session!(
                 self.client,
                 self.options,
@@ -348,22 +347,9 @@ impl<'a> IntoFuture for Watch<'a, ExplicitSession<'a>> {
                 )
                 .await
         }
-        .boxed()
-    }
-}
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> Watch<'a, ImplicitSession> {
-    /// Synchronously execute this action.
-    pub fn run(self) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
-        crate::runtime::block_on(self.into_future()).map(crate::sync::ChangeStream::new)
-    }
-}
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> Watch<'a, ExplicitSession<'a>> {
-    /// Synchronously execute this action.
-    pub fn run(self) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
-        crate::runtime::block_on(self.into_future()).map(crate::sync::SessionChangeStream::new)
+        fn sync_wrap(out) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
+            out.map(crate::sync::SessionChangeStream::new)
+        }
     }
 }

@@ -1,12 +1,10 @@
-use std::{future::IntoFuture, marker::PhantomData};
+use std::marker::PhantomData;
 
 use bson::{Bson, Document};
-use futures_util::FutureExt;
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::sync::Client as SyncClient;
 use crate::{
-    client::BoxFuture,
     error::{ErrorKind, Result},
     operation::list_databases as op,
     results::DatabaseSpecification,
@@ -14,7 +12,7 @@ use crate::{
     ClientSession,
 };
 
-use super::option_setters;
+use super::{action_impl, option_setters};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
@@ -96,34 +94,31 @@ impl<'a, M> ListDatabases<'a, M> {
     }
 }
 
-impl<'a> IntoFuture for ListDatabases<'a, ListSpecifications> {
-    type Output = Result<Vec<DatabaseSpecification>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_impl! {
+    impl Action<'a> for ListDatabases<'a, ListSpecifications> {
+        type Future = ListSpecificationsFuture;
 
-    fn into_future(self) -> Self::IntoFuture {
-        async {
+        async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
             let op = op::ListDatabases::new(false, self.options);
-            self.client
-                .execute_operation(op, self.session)
-                .await
-                .and_then(|dbs| {
-                    dbs.into_iter()
-                        .map(|db_spec| {
-                            bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
-                        })
-                        .collect()
-                })
+                self.client
+                    .execute_operation(op, self.session)
+                    .await
+                    .and_then(|dbs| {
+                        dbs.into_iter()
+                            .map(|db_spec| {
+                                bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
+                            })
+                            .collect()
+                    })
         }
-        .boxed()
     }
 }
 
-impl<'a> IntoFuture for ListDatabases<'a, ListNames> {
-    type Output = Result<Vec<String>>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_impl! {
+    impl Action<'a> for ListDatabases<'a, ListNames> {
+        type Future = ListNamesFuture;
 
-    fn into_future(self) -> Self::IntoFuture {
-        async {
+        async fn execute(self) -> Result<Vec<String>> {
             let op = op::ListDatabases::new(true, self.options);
             match self.client.execute_operation(op, self.session).await {
                 Ok(databases) => databases
@@ -133,7 +128,7 @@ impl<'a> IntoFuture for ListDatabases<'a, ListNames> {
                             .get_str("name")
                             .map_err(|_| ErrorKind::InvalidResponse {
                                 message: "Expected \"name\" field in server response, but it was \
-                                          not found"
+                                            not found"
                                     .to_string(),
                             })?;
                         Ok(name.to_string())
@@ -142,17 +137,5 @@ impl<'a> IntoFuture for ListDatabases<'a, ListNames> {
                 Err(e) => Err(e),
             }
         }
-        .boxed()
-    }
-}
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a, M> ListDatabases<'a, M>
-where
-    Self: IntoFuture,
-{
-    /// Synchronously execute this action.
-    pub fn run(self) -> <Self as IntoFuture>::Output {
-        crate::runtime::block_on(self.into_future())
     }
 }

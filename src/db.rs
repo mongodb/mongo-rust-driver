@@ -14,13 +14,12 @@ use crate::{
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand, RunCursorCommand},
+    operation::{Aggregate, Create, ListCollections, RunCommand, RunCursorCommand},
     options::{
         AggregateOptions,
         CollectionOptions,
         CreateCollectionOptions,
         DatabaseOptions,
-        DropDatabaseOptions,
         ListCollectionsOptions,
         RunCursorCommandOptions,
     },
@@ -163,35 +162,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.clone(), name, Some(options))
-    }
-
-    async fn drop_common(
-        &self,
-        options: impl Into<Option<DropDatabaseOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
-
-        let drop_database = DropDatabase::new(self.name().to_string(), options);
-        self.client()
-            .execute_operation(drop_database, session)
-            .await
-    }
-
-    /// Drops the database, deleting all data, collections, and indexes stored in it.
-    pub async fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
-        self.drop_common(options, None).await
-    }
-
-    /// Drops the database, deleting all data, collections, and indexes stored in it using the
-    /// provided `ClientSession`.
-    pub async fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropDatabaseOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_common(options, session).await
     }
 
     /// Gets information about each of the collections in the database. The cursor will yield a

@@ -318,6 +318,7 @@ pub use ::bson;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use ::mongocrypt;
 
+pub mod action;
 mod bson_util;
 pub mod change_stream;
 mod client;
@@ -363,7 +364,7 @@ pub use crate::{
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
 
-pub use {client::action, client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
 
 /// A boxed future.
 pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;

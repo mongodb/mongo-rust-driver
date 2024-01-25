@@ -18,7 +18,7 @@ async fn details() {
     }
 
     let db = client.database("write_error_details");
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
     db.create_collection(
         "test",
         CreateCollectionOptions::builder()

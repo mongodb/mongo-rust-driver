@@ -1,18 +1,11 @@
-use std::future::IntoFuture;
-
-use futures_util::FutureExt;
-
 use crate::{
-    client::{
-        options::{SessionOptions, TransactionOptions},
-        BoxFuture,
-    },
+    client::options::{SessionOptions, TransactionOptions},
     error::Result,
     Client,
     ClientSession,
 };
 
-use super::option_setters;
+use super::{action_impl, option_setters};
 
 impl Client {
     /// Starts a new [`ClientSession`].
@@ -67,25 +60,19 @@ impl<'a> StartSession<'a> {
     );
 }
 
-impl<'a> IntoFuture for StartSession<'a> {
-    type Output = Result<ClientSession>;
-    type IntoFuture = BoxFuture<'a, Self::Output>;
+action_impl! {
+    impl Action<'a> for StartSession<'a> {
+        type Future = StartSessionFuture;
 
-    fn into_future(self) -> Self::IntoFuture {
-        async {
+        async fn execute(self) -> Result<ClientSession> {
             if let Some(options) = &self.options {
                 options.validate()?;
             }
             Ok(ClientSession::new(self.client.clone(), self.options, false).await)
         }
-        .boxed()
-    }
-}
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<'a> StartSession<'a> {
-    /// Synchronously execute this action.
-    pub fn run(self) -> Result<crate::sync::ClientSession> {
-        crate::runtime::block_on(self.into_future()).map(Into::into)
+        fn sync_wrap(out) -> Result<crate::sync::ClientSession> {
+            out.map(Into::into)
+        }
     }
 }

@@ -405,7 +405,7 @@ fn mixed_sync_and_async() -> Result<()> {
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
     let async_client = runtime::block_on(async { AsyncTestClient::new().await });
     let sync_db = sync_client.database(DB_NAME);
-    sync_db.drop(None)?;
+    sync_db.drop().run()?;
     sync_db
         .collection::<Document>(COLL_NAME)
         .insert_one(doc! { "a": 1 }, None)?;

@@ -3038,7 +3038,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         return Ok(());
     }
     let db = client.database("test_auto_encryption_keys");
-    db.drop(None).await?;
+    db.drop().await?;
     let ce = ClientEncryption::new(
         client.into_client(),
         KV_NAMESPACE.clone(),
@@ -3549,7 +3549,7 @@ async fn fle2_example() -> Result<()> {
         .collection::<Document>("datakeys")
         .drop(None)
         .await?;
-    test_client.database("docsExamples").drop(None).await?;
+    test_client.database("docsExamples").drop().await?;
 
     // Create two data keys.
     let ce = ClientEncryption::new(
