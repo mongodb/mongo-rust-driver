@@ -5,8 +5,8 @@ use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 use crate::{
     bson::{doc, Bson, Document},
     error::{Error, ErrorKind, GridFsErrorKind},
-    gridfs::{GridFsBucket, GridFsUploadStream},
-    options::{GridFsBucketOptions, GridFsUploadOptions},
+    gridfs::{GridFsBucket, GridFsFindOneOptions, GridFsUploadStream},
+    options::{FindOneOptions, GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
         get_client_options,
@@ -120,7 +120,6 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
     assert_eq!(data, &uploaded);
 
     let file = bucket
-        .files()
         .find_one(doc! { "_id": upload_stream.id() }, None)
         .await
         .unwrap()
@@ -331,4 +330,49 @@ async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
         .await
         .unwrap()
         .is_none());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn test_gridfs_bucket_find_one() {
+    let data = &[1, 2, 3, 4];
+    let client = TestClient::new().await;
+
+    let options = GridFsBucketOptions::default();
+    let bucket = client.database("gridfs_find_one").gridfs_bucket(options);
+
+    let filename = String::from("somefile");
+    let mut upload_stream = bucket.open_upload_stream(&filename, None);
+    upload_stream.write_all(data).await.unwrap();
+    upload_stream.close().await.unwrap();
+
+    let found = bucket
+        .find_one(doc! { "_id": upload_stream.id() }, None)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(&found.id, upload_stream.id());
+    assert_eq!(found.length, 4);
+    assert_eq!(found.filename, Some(filename));
+}
+
+#[test]
+fn test_gridfs_find_one_options_from() {
+    let default_options = GridFsFindOneOptions::default();
+    let find_one_options = FindOneOptions::from(default_options);
+    assert_eq!(find_one_options.max_time, None);
+    assert_eq!(find_one_options.skip, None);
+    assert_eq!(find_one_options.sort, None);
+
+    let options = GridFsFindOneOptions::builder()
+        .sort(doc! { "foo": -1 })
+        .skip(1)
+        .max_time(Duration::from_millis(42))
+        .build();
+
+    let find_one_options = FindOneOptions::from(options);
+    assert_eq!(find_one_options.max_time, Some(Duration::from_millis(42)));
+    assert_eq!(find_one_options.skip, Some(1));
+    assert_eq!(find_one_options.sort, Some(doc! {"foo": -1}));
 }
