@@ -357,9 +357,8 @@ async fn test_gridfs_bucket_find_one() {
     assert_eq!(found.filename, Some(filename));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn test_gridfs_find_one_options_from() {
+#[test]
+fn test_gridfs_find_one_options_from() {
     let default_options = GridFsFindOneOptions::default();
     let find_one_options = FindOneOptions::from(default_options);
     assert_eq!(find_one_options.max_time, None);
