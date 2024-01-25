@@ -228,7 +228,7 @@ impl GridFsBucket {
         Ok(())
     }
 
-    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that matches the given
+    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
     /// filter.
     pub async fn find(
         &self,
