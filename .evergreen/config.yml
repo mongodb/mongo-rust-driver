@@ -257,7 +257,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
-    # patchable: false
+    patchable: false
     run_on:
       - ubuntu2004-small
     expansions:
@@ -1356,9 +1356,6 @@ functions:
           ECS_SRC_DIR=$AUTH_AWS_DIR/src
 
           mkdir -p $ECS_SRC_DIR/.evergreen
-
-          # fix issue with `TestData` in SERVER-46340
-          sed -i '1s+^+TestData = {};\n+' $AUTH_AWS_DIR/lib/ecs_hosted_test.js
 
           # compile mini test project
           cd $PROJECT_DIRECTORY/.evergreen/aws-ecs-test
