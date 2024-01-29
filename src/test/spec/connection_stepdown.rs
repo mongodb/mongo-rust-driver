@@ -8,7 +8,6 @@ use crate::{
     options::{
         Acknowledgment,
         ClientOptions,
-        CreateCollectionOptions,
         DropCollectionOptions,
         FindOptions,
         InsertManyOptions,
@@ -54,16 +53,11 @@ async fn run_test<F: Future>(
         ))
         .await;
 
-    db.create_collection(
-        &name,
-        Some(
-            CreateCollectionOptions::builder()
-                .write_concern(wc_majority)
-                .build(),
-        ),
-    )
-    .await
-    .unwrap();
+    db
+        .create_collection(&name)
+        .write_concern(wc_majority)
+        .await
+        .unwrap();
 
     test(client, db, coll).await;
 }

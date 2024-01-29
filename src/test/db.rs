@@ -3,29 +3,22 @@ use std::cmp::Ord;
 use futures::stream::TryStreamExt;
 
 use crate::{
-    bson::{doc, Document},
-    error::Result,
-    options::{
+    bson::{doc, Document}, error::Result, options::{
         AggregateOptions,
         Collation,
         CreateCollectionOptions,
         IndexOptionDefaults,
         ValidationAction,
         ValidationLevel,
-    },
-    results::{CollectionSpecification, CollectionType},
-    test::util::{EventClient, TestClient},
-    Database,
+    }, results::{CollectionSpecification, CollectionType}, test::util::{EventClient, TestClient}, Database, OptionalUpdate
 };
 
 use super::log_uncaptured;
 
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
-    let mut builder = db.list_collections();
-    if let Some(filter) = filter {
-        builder = builder.filter(filter);
-    }
-    let mut colls: Vec<CollectionSpecification> = builder
+let mut colls: Vec<CollectionSpecification> = db
+        .list_collections()
+        .update_with(filter, |b, f| b.filter(f))
         .await
         .unwrap()
         .try_collect()
@@ -155,7 +148,7 @@ async fn collection_management() {
 
     assert!(db.list_collection_names().await.unwrap().is_empty());
 
-    db.create_collection(&format!("{}{}", function_name!(), 1), None)
+    db.create_collection(&format!("{}{}", function_name!(), 1))
         .await
         .unwrap();
 
@@ -176,7 +169,7 @@ async fn collection_management() {
         )
         .build();
 
-    db.create_collection(&format!("{}{}", function_name!(), 2), options.clone())
+    db.create_collection(&format!("{}{}", function_name!(), 2)).with_options(options.clone())
         .await
         .unwrap();
 
@@ -184,7 +177,7 @@ async fn collection_management() {
         .view_on(format!("{}{}", function_name!(), 2))
         .pipeline(vec![doc! { "$match": {} }])
         .build();
-    db.create_collection(&format!("{}{}", function_name!(), 3), view_options.clone())
+    db.create_collection(&format!("{}{}", function_name!(), 3)).with_options(view_options.clone())
         .await
         .unwrap();
 
@@ -338,10 +331,10 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
     let client = EventClient::new().await;
     let db = client.database(name);
 
-    let options = CreateCollectionOptions::builder()
-        .index_option_defaults(defaults.clone())
-        .build();
-    db.create_collection(name, options).await.unwrap();
+    db.create_collection(name)
+        .update_with(defaults.clone(), |b, d| b.index_option_defaults(d))
+        .await
+        .unwrap();
     db.drop().await.unwrap();
 
     let events = client.get_command_started_events(&["create"]);

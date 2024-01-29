@@ -276,7 +276,7 @@ async fn list_authorized_databases() {
     for name in dbs {
         client
             .database(name)
-            .create_collection("coll", None)
+            .create_collection("coll")
             .await
             .unwrap();
         client

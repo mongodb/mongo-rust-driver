@@ -32,13 +32,7 @@ use crate::{
         TransactionOptions,
         UpdateModifications,
         UpdateOptions,
-    },
-    selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{assert_matches, log_uncaptured, FailPoint, TestClient},
-    ClientSession,
-    Collection,
-    Database,
-    IndexModel,
+    }, selection_criteria::{ReadPreference, SelectionCriteria}, test::{assert_matches, log_uncaptured, FailPoint, TestClient}, ClientSession, Collection, Database, IndexModel, OptionalUpdate
 };
 
 use super::{OpRunner, OpSessions};
@@ -833,10 +827,9 @@ impl TestOperation for ListCollectionNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let mut builder = database.list_collection_names();
-            if let Some(filter) = &self.filter {
-                builder = builder.filter(filter.clone());
-            }
+            let builder = database
+                .list_collection_names()
+                .update_with(self.filter.clone(), |b, f| b.filter(f));
             let result = match session {
                 Some(session) => {
                     builder.session(session).await?
@@ -1266,22 +1259,11 @@ impl TestOperation for CreateCollection {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    database
-                        .create_collection_with_session(
-                            &self.collection,
-                            self.options.clone(),
-                            session,
-                        )
-                        .await
-                }
-                None => {
-                    database
-                        .create_collection(&self.collection, self.options.clone())
-                        .await
-                }
-            };
+            let result = database
+                .create_collection(&self.collection)
+                .with_options(self.options.clone())
+                .update_with(session, |b, s| b.session(s))
+                .await;
             result.map(|_| None)
         }
         .boxed()

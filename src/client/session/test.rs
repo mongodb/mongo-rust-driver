@@ -179,7 +179,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "create",
-            db_op!($test_name, db, db.create_collection("sessionopcoll", None)),
+            db_op!($test_name, db, db.create_collection("sessionopcoll")),
         )
         .await;
         $test_func("dropDatabase", db_op!($test_name, db, db.drop())).await;

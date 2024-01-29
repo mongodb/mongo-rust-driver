@@ -9,7 +9,7 @@ use crate::{
         ChangeStream,
     },
     coll::options::CollectionOptions,
-    db::options::{ChangeStreamPreAndPostImages, CreateCollectionOptions},
+    db::options::ChangeStreamPreAndPostImages,
     event::command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{Acknowledgment, WriteConcern},
     test::{FailCommandOptions, FailPoint, FailPointMode},
@@ -638,13 +638,9 @@ async fn create_coll_pre_post() -> Result<()> {
 
     let db = client.database("create_coll_pre_post");
     db.collection::<Document>("test").drop(None).await?;
-    db.create_collection(
-        "test",
-        CreateCollectionOptions::builder()
-            .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
-            .build(),
-    )
-    .await?;
+    db.create_collection("test")
+        .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
+        .await?;
 
     Ok(())
 }
@@ -672,13 +668,9 @@ async fn split_large_event() -> Result<()> {
     db.collection::<Document>("split_large_event")
         .drop(None)
         .await?;
-    db.create_collection(
-        "split_large_event",
-        CreateCollectionOptions::builder()
-            .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
-            .build(),
-    )
-    .await?;
+    db.create_collection("split_large_event")
+        .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
+        .await?;
 
     let coll = db.collection::<Document>("split_large_event");
     coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None)

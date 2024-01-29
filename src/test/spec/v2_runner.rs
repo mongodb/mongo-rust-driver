@@ -171,7 +171,7 @@ impl TestContext {
         }
         internal_client
             .database(&db_name)
-            .create_collection(&coll_name, options)
+            .create_collection(&coll_name).with_options(options)
             .await
             .unwrap();
 

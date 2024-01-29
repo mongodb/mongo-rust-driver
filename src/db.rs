@@ -15,7 +15,6 @@ use crate::{
     options::{
         AggregateOptions,
         CollectionOptions,
-        CreateCollectionOptions,
         DatabaseOptions,
         RunCursorCommandOptions,
     },
@@ -23,7 +22,6 @@ use crate::{
     Client,
     ClientSession,
     Collection,
-    Namespace,
     SessionCursor,
 };
 

@@ -2,7 +2,7 @@ use bson::doc;
 use futures::TryStreamExt;
 
 use crate::{
-    db::options::{CreateCollectionOptions, TimeseriesOptions},
+    db::options::TimeseriesOptions,
     test::log_uncaptured,
     Client,
 };
@@ -19,19 +19,15 @@ async fn list_collections_timeseries() -> Result<()> {
     }
     let db = client.database("list_collections_timeseries");
     db.drop().await?;
-    db.create_collection(
-        "test",
-        CreateCollectionOptions::builder()
-            .timeseries(
-                TimeseriesOptions::builder()
-                    .time_field("timestamp".to_string())
-                    .meta_field(None)
-                    .granularity(None)
-                    .build(),
-            )
-            .build(),
-    )
-    .await?;
+    db.create_collection("test")
+        .timeseries(
+            TimeseriesOptions::builder()
+                .time_field("timestamp".to_string())
+                .meta_field(None)
+                .granularity(None)
+                .build(),
+        )
+        .await?;
     let results: Vec<_> = db
         .list_collections()
         .filter(doc! { "name": "test" })

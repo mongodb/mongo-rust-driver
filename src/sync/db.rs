@@ -7,7 +7,6 @@ use crate::{
     options::{
         AggregateOptions,
         CollectionOptions,
-        CreateCollectionOptions,
         GridFsBucketOptions,
         ReadConcern,
         SelectionCriteria,

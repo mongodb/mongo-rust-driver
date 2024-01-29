@@ -17,7 +17,7 @@ use crate::{
     client::AsyncDropToken,
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
-    options::{CreateCollectionOptions, FindOneOptions, ReadPreference, SelectionCriteria},
+    options::{FindOneOptions, ReadPreference, SelectionCriteria},
     Collection,
 };
 
@@ -175,11 +175,12 @@ impl GridFsBucket {
 
     async fn create_index<T>(&self, coll: &Collection<T>, keys: Document) -> Result<()> {
         // listIndexes returns an error if the collection has not yet been created.
-        let options = CreateCollectionOptions::builder()
-            .write_concern(self.write_concern().cloned())
-            .build();
+        let mut builder = self.inner.db.create_collection(coll.name());
+        if let Some(concern) = self.write_concern().cloned() {
+            builder = builder.write_concern(concern);
+        }
         // Ignore NamespaceExists errors if the collection has already been created.
-        if let Err(error) = self.inner.db.create_collection(coll.name(), options).await {
+        if let Err(error) = builder.await {
             if error.sdam_code() != Some(48) {
                 return Err(error);
             }

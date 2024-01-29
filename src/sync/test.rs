@@ -262,7 +262,8 @@ fn transactions() {
 
     client
         .database(function_name!())
-        .create_collection(function_name!(), None)
+        .create_collection(function_name!())
+        .run()
         .expect("create collection should succeed");
 
     session

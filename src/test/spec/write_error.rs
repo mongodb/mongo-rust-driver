@@ -1,7 +1,6 @@
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, WriteFailure},
-    options::CreateCollectionOptions,
     test::{log_uncaptured, EventClient},
     Collection,
 };
@@ -19,16 +18,12 @@ async fn details() {
 
     let db = client.database("write_error_details");
     db.drop().await.unwrap();
-    db.create_collection(
-        "test",
-        CreateCollectionOptions::builder()
-            .validator(doc! {
-                "x": { "$type": "string" }
-            })
-            .build(),
-    )
-    .await
-    .unwrap();
+    db.create_collection("test")
+        .validator(doc! {
+            "x": { "$type": "string" }
+        })
+        .await
+        .unwrap();
     let coll: Collection<Document> = db.collection("test");
     let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
     let write_err = match *err.kind {

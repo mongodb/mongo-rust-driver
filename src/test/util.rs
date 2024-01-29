@@ -315,7 +315,7 @@ impl TestClient {
     ) -> Collection<Document> {
         self.drop_collection(db_name, coll_name).await;
         self.database(db_name)
-            .create_collection(coll_name, options)
+            .create_collection(coll_name).with_options(options)
             .await
             .unwrap();
 

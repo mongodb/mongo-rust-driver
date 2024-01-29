@@ -6,7 +6,6 @@ use crate::{
     options::{
         Acknowledgment,
         AggregateOptions,
-        CreateCollectionOptions,
         DeleteOptions,
         DropCollectionOptions,
         FindOneAndDeleteOptions,
@@ -854,33 +853,23 @@ async fn command_contains_write_concern_create_collection() {
     let coll: Collection<Document> = db.collection(function_name!());
 
     coll.drop(None).await.unwrap();
-    db.create_collection(
-        function_name!(),
-        CreateCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    db.create_collection(function_name!())
+        .write_concern(WriteConcern::builder()
+            .w(Acknowledgment::Nodes(1))
+            .journal(true)
+            .build()
+        )
+        .await
+        .unwrap();
     coll.drop(None).await.unwrap();
-    db.create_collection(
-        function_name!(),
-        CreateCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    db.create_collection(function_name!())
+        .write_concern(WriteConcern::builder()
+            .w(Acknowledgment::Nodes(1))
+            .journal(false)
+            .build()
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "create"),

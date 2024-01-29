@@ -369,6 +369,19 @@ pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam:
 /// A boxed future.
 pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
+pub(crate) trait OptionalUpdate: Sized {
+    fn update_with<T>(self, value: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self;
+}
+
+impl<T: Sized> OptionalUpdate for T {
+    fn update_with<V>(self, value: Option<V>, f: impl FnOnce(Self, V) -> Self) -> Self {
+        if let Some(value) = value {
+            f(self, value)
+        } else {
+            self
+        }
+    }
+}
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(

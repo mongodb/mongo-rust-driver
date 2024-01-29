@@ -72,16 +72,7 @@ use crate::{
         SelectionCriteria,
         UpdateModifications,
         UpdateOptions,
-    },
-    runtime,
-    selection_criteria::ReadPreference,
-    serde_util,
-    test::FailPoint,
-    Collection,
-    Database,
-    IndexModel,
-    ServerType,
-    TopologyType,
+    }, runtime, selection_criteria::ReadPreference, serde_util, test::FailPoint, Collection, Database, IndexModel, OptionalUpdate, ServerType, TopologyType
 };
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
@@ -1292,11 +1283,9 @@ impl TestOperation for ListCollectionNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let db = test_runner.get_database(id).await;
-            let mut builder = db.list_collection_names();
-            if let Some(filter) = &self.filter {
-                builder = builder.filter(filter.clone());
-            }
-            let result = builder.await?;
+            let result = db.list_collection_names()
+                .update_with(self.filter.clone(), |b, f| b.filter(f))
+                .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::from(result).into()))
         }
@@ -1567,17 +1556,15 @@ impl TestOperation for CreateCollection {
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
                     database
-                        .create_collection_with_session(
-                            &self.collection,
-                            self.options.clone(),
-                            session,
-                        )
+                        .create_collection(&self.collection)
+                        .with_options(self.options.clone())
+                        .session(session.deref_mut())
                         .await
                 })
                 .await?;
             } else {
                 database
-                    .create_collection(&self.collection, self.options.clone())
+                    .create_collection(&self.collection).with_options(self.options.clone())
                     .await?;
             }
             Ok(Some(Entity::Collection(
