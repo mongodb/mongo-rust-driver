@@ -9,6 +9,7 @@ mod session;
 mod shutdown;
 mod watch;
 
+pub use create_collection::CreateCollection;
 pub use drop::DropDatabase;
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;

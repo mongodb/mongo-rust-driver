@@ -47,4 +47,4 @@ pub struct WarmConnectionPool<'a> {
     pub(crate) client: &'a Client,
 }
 
-// IntoFuture impl in src/client/action/perf.rs
+// Action impl in src/client/action/perf.rs

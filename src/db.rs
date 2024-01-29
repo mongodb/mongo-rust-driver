@@ -3,9 +3,6 @@ pub mod options;
 
 use std::{fmt::Debug, sync::Arc};
 
-#[cfg(feature = "in-use-encryption-unstable")]
-use bson::doc;
-
 use crate::{
     bson::Document,
     client::session::TransactionState,
@@ -14,7 +11,7 @@ use crate::{
     cursor::Cursor,
     error::{ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{Aggregate, Create, RunCommand, RunCursorCommand},
+    operation::{Aggregate, RunCommand, RunCursorCommand},
     options::{
         AggregateOptions,
         CollectionOptions,

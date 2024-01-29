@@ -1,6 +1,16 @@
 use bson::{doc, Document};
 
-use crate::{db::options::CreateCollectionOptions, error::Result, operation::Create, ClientSession, Database, Namespace};
+use crate::{action::{action_impl, CreateCollection}, db::options::CreateCollectionOptions, error::Result, operation::Create, ClientSession, Database, Namespace};
+
+action_impl! {
+    impl Action<'a> for CreateCollection<'a> {
+        type Future = CreateCollectionFuture;
+
+        async fn execute(self) -> Result<()> {
+            Ok(())
+        }
+    }
+}
 
 impl Database {
     #[allow(clippy::needless_option_as_deref)]
