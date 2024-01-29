@@ -1,5 +1,6 @@
 //! Action builder types.
 
+mod create_collection;
 mod drop;
 mod list_collections;
 mod list_databases;
