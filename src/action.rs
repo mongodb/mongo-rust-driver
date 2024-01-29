@@ -8,12 +8,13 @@ mod session;
 mod shutdown;
 mod watch;
 
-pub use drop::{DropDatabase, DropDatabaseFuture};
-pub use list_databases::{ListDatabases, ListDatabaseSpecificationsFuture, ListDatabaseNamesFuture};
-pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
-pub use session::{StartSession, StartSessionFuture};
-pub use shutdown::{Shutdown, ShutdownFuture};
-pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture};
+pub use drop::DropDatabase;
+pub use list_collections::ListCollections;
+pub use list_databases::ListDatabases;
+pub use perf::WarmConnectionPool;
+pub use session::StartSession;
+pub use shutdown::Shutdown;
+pub use watch::Watch;
 
 #[allow(missing_docs)]
 pub struct ListSpecifications;

@@ -85,7 +85,7 @@ impl<'a, M> ListDatabases<'a, M> {
 
 action_impl! {
     impl Action<'a> for ListDatabases<'a, ListSpecifications> {
-        type Future = ListDatabaseSpecificationsFuture;
+        type Future = ListDatabasesFuture;
 
         async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
             let op = op::ListDatabases::new(false, self.options);

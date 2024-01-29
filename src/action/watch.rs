@@ -246,7 +246,7 @@ impl<'a> Watch<'a, ImplicitSession> {
 
 action_impl! {
     impl Action<'a> for Watch<'a, ImplicitSession> {
-        type Future = WatchImplicitSessionFuture;
+        type Future = WatchFuture;
 
         async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
             resolve_options!(
@@ -272,7 +272,7 @@ action_impl! {
 
 action_impl! {
     impl Action<'a> for Watch<'a, ExplicitSession<'a>> {
-        type Future = WatchExplicitSessionFuture;
+        type Future = WatchSessionFuture;
 
         async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
             resolve_read_concern_with_session!(
