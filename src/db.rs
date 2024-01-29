@@ -159,32 +159,6 @@ impl Database {
         Collection::new(self.clone(), name, Some(options))
     }
 
-    /// Creates a new collection in the database with the given `name` and `options`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub async fn create_collection(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-    ) -> Result<()> {
-        self.create_collection_common(name, options, None).await
-    }
-
-    /// Creates a new collection in the database with the given `name` and `options` using the
-    /// provided `ClientSession`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub async fn create_collection_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.create_collection_common(name, options, session).await
-    }
-
     pub(crate) async fn run_command_common(
         &self,
         command: Document,

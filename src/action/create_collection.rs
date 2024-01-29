@@ -11,7 +11,7 @@ impl Database {
     /// not needed if no special options are required.
     /// 
     /// `await` will return `Result<()>`.
-    pub fn create_collection_2(
+    pub fn create_collection(
         &self,
         name: impl AsRef<str>,
     ) -> CreateCollection {
@@ -32,20 +32,20 @@ impl crate::sync::Database {
     /// not needed if no special options are required.
     /// 
     /// [`run`](CreateCollection::run) will return `Result<()>`.
-    pub fn create_collection_2(
+    pub fn create_collection(
         &self,
         name: impl AsRef<str>,
     ) -> CreateCollection {
-        self.async_database.create_collection_2(name)
+        self.async_database.create_collection(name)
     }
 }
 
 /// Creates a new collection.  Create by calling [`Database::create_collection`] and execute with `await` (or [`run`](CreateCollection::run) if using the sync client).
 pub struct CreateCollection<'a> {
-    db: &'a Database,
-    name: String,
-    options: Option<CreateCollectionOptions>,
-    session: Option<&'a mut ClientSession>,
+    pub(crate) db: &'a Database,
+    pub(crate) name: String,
+    pub(crate) options: Option<CreateCollectionOptions>,
+    pub(crate) session: Option<&'a mut ClientSession>,
 }
 
 impl<'a> CreateCollection<'a> {

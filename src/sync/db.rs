@@ -103,39 +103,6 @@ impl Database {
         Collection::new(self.async_database.collection_with_options(name, options))
     }
 
-    /// Creates a new collection in the database with the given `name` and `options`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub fn create_collection(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_database
-                .create_collection(name.as_ref(), options.into()),
-        )
-    }
-
-    /// Creates a new collection in the database with the given `name` and `options` using the
-    /// provided `ClientSession`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub fn create_collection_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(self.async_database.create_collection_with_session(
-            name.as_ref(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
     /// Runs a database-level command.
     ///
     /// Note that no inspection is done on `doc`, so the command will not use the database's default

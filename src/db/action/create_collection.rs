@@ -6,62 +6,50 @@ action_impl! {
     impl Action<'a> for CreateCollection<'a> {
         type Future = CreateCollectionFuture;
 
-        async fn execute(self) -> Result<()> {
+        async fn execute(mut self) -> Result<()> {
+            resolve_options!(self.db, self.options, [write_concern]);
+
+            let ns = Namespace {
+                db: self.db.name().to_string(),
+                coll: self.name,
+            };
+
+            #[cfg(feature = "in-use-encryption-unstable")]
+            let has_encrypted_fields = {
+                self.db.resolve_encrypted_fields(&ns, &mut self.options).await;
+                self.db.create_aux_collections(&ns, &self.options, self.session.as_deref_mut())
+                    .await?;
+                self.options
+                    .as_ref()
+                    .and_then(|o| o.encrypted_fields.as_ref())
+                    .is_some()
+            };
+
+            let create = Create::new(ns.clone(), self.options);
+            self.db.client()
+                .execute_operation(create, self.session.as_deref_mut())
+                .await?;
+
+            #[cfg(feature = "in-use-encryption-unstable")]
+            if has_encrypted_fields {
+                let coll = self.db.collection::<Document>(&ns.coll);
+                coll.create_index_common(
+                    crate::IndexModel {
+                        keys: doc! {"__safeContent__": 1},
+                        options: None,
+                    },
+                    None,
+                    self.session.as_deref_mut(),
+                )
+                .await?;
+            }
+
             Ok(())
         }
     }
 }
 
 impl Database {
-    #[allow(clippy::needless_option_as_deref)]
-    pub(crate) async fn create_collection_common(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let mut options: Option<CreateCollectionOptions> = options.into();
-        resolve_options!(self, options, [write_concern]);
-        let mut session = session.into();
-
-        let ns = Namespace {
-            db: self.name().to_string(),
-            coll: name.as_ref().to_string(),
-        };
-
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let has_encrypted_fields = {
-            self.resolve_encrypted_fields(&ns, &mut options).await;
-            self.create_aux_collections(&ns, &options, session.as_deref_mut())
-                .await?;
-            options
-                .as_ref()
-                .and_then(|o| o.encrypted_fields.as_ref())
-                .is_some()
-        };
-
-        let create = Create::new(ns.clone(), options);
-        self.client()
-            .execute_operation(create, session.as_deref_mut())
-            .await?;
-
-        #[cfg(feature = "in-use-encryption-unstable")]
-        if has_encrypted_fields {
-            let coll = self.collection::<Document>(&ns.coll);
-            coll.create_index_common(
-                crate::IndexModel {
-                    keys: doc! {"__safeContent__": 1},
-                    options: None,
-                },
-                None,
-                session.as_deref_mut(),
-            )
-            .await?;
-        }
-
-        Ok(())
-    }
-
     #[cfg(feature = "in-use-encryption-unstable")]
     async fn resolve_encrypted_fields(
         &self,
