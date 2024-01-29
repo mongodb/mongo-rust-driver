@@ -114,7 +114,7 @@ impl CryptExecutor {
                     let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
-                    let mut cursor = db.list_collections(filter, None).await?;
+                    let mut cursor = db.list_collections().filter(filter).await?;
                     if cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;
                     }

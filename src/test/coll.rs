@@ -242,7 +242,7 @@ async fn aggregate_out() {
 
     coll.aggregate(pipeline.clone(), None).await.unwrap();
     assert!(db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .unwrap()
         .into_iter()
@@ -254,7 +254,7 @@ async fn aggregate_out() {
         .await
         .unwrap();
     assert!(db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .unwrap()
         .into_iter()

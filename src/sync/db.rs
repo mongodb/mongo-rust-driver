@@ -13,7 +13,6 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    results::CollectionSpecification,
     runtime,
     Database as AsyncDatabase,
 };

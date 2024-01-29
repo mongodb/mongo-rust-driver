@@ -85,7 +85,7 @@ impl<'a, M> ListCollections<'a, M> {
 
 impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     /// Runs the query using the provided session.
-    pub fn session<'s>(mut self, value: impl Into<&'a mut ClientSession>) -> ListCollections<'a, M, ExplicitSession<'s>> {
+    pub fn session<'s>(self, value: impl Into<&'s mut ClientSession>) -> ListCollections<'a, M, ExplicitSession<'s>> {
         ListCollections {
             db: self.db,
             options: self.options,

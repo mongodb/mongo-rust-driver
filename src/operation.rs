@@ -66,7 +66,6 @@ pub(crate) use find::Find;
 pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
-pub(crate) use list_collections::ListCollections;
 pub(crate) use list_indexes::ListIndexes;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use raw_output::RawOutput;

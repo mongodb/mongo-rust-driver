@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::Bson;
 use serde::{Deserialize, Serialize};
 
@@ -46,11 +43,6 @@ pub(crate) struct ListCollectionsOptions {
 }
 
 impl ListCollections {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(String::new(), None, false)
-    }
-
     pub(crate) fn new(
         db: String,
         name_only: bool,
@@ -76,7 +68,7 @@ impl OperationWithDefaults for ListCollections {
         };
 
         let mut name_only = self.name_only;
-        if let Some(ref filter) = self.options.as_ref().and_then(|o| o.filter) {
+        if let Some(filter) = self.options.as_ref().and_then(|o| o.filter.as_ref()) {
             if name_only && filter.keys().any(|k| k != "name") {
                 name_only = false;
             }

@@ -4,17 +4,16 @@ use std::{fmt::Debug, sync::Arc};
 
 #[cfg(feature = "in-use-encryption-unstable")]
 use bson::doc;
-use futures_util::stream::TryStreamExt;
 
 use crate::{
-    bson::{Bson, Document},
+    bson::Document,
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{Aggregate, Create, ListCollections, RunCommand, RunCursorCommand},
+    operation::{Aggregate, Create, RunCommand, RunCursorCommand},
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -22,7 +21,6 @@ use crate::{
         DatabaseOptions,
         RunCursorCommandOptions,
     },
-    results::CollectionSpecification,
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,

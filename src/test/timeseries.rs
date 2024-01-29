@@ -33,7 +33,8 @@ async fn list_collections_timeseries() -> Result<()> {
     )
     .await?;
     let results: Vec<_> = db
-        .list_collections(doc! { "name": "test" }, None)
+        .list_collections()
+        .filter(doc! { "name": "test" })
         .await?
         .try_collect()
         .await?;

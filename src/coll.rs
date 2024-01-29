@@ -289,14 +289,14 @@ impl<T> Collection<T> {
                     let mut cursor = self
                         .inner
                         .db
-                        .list_collections_with_session(filter, None, s)
+                        .list_collections().filter(filter).session(&mut *s)
                         .await?;
                     cursor.stream(s).try_collect().await?
                 }
                 None => {
                     self.inner
                         .db
-                        .list_collections(filter, None)
+                        .list_collections().filter(filter)
                         .await?
                         .try_collect()
                         .await?

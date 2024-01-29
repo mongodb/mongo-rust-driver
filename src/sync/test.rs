@@ -118,7 +118,8 @@ fn database() {
         .expect("insert should succeed");
 
     let coll_names = db
-        .list_collection_names(None)
+        .list_collection_names()
+        .run()
         .expect("list_database_names should succeed");
     assert!(coll_names.contains(&function_name!().to_string()));
 

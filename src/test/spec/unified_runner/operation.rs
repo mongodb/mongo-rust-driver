@@ -9,7 +9,7 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -66,7 +66,6 @@ use crate::{
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListCollectionsOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -1237,7 +1236,6 @@ impl TestOperation for ListDatabaseNames {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListCollections {
-    filter: Option<Document>,
     session: Option<String>,
     #[serde(flatten)]
     options: ListCollectionsOptions,
@@ -1255,11 +1253,9 @@ impl TestOperation for ListCollections {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
                         let mut cursor = db
-                            .list_collections_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
+                            .list_collections()
+                            .with_options(self.options.clone())
+                            .session(session.deref_mut())
                             .await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
@@ -1267,7 +1263,7 @@ impl TestOperation for ListCollections {
                 }
                 None => {
                     let cursor = db
-                        .list_collections(self.filter.clone(), self.options.clone())
+                        .list_collections().with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -1296,7 +1292,11 @@ impl TestOperation for ListCollectionNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let db = test_runner.get_database(id).await;
-            let result = db.list_collection_names(self.filter.clone()).await?;
+            let mut builder = db.list_collection_names();
+            if let Some(filter) = &self.filter {
+                builder = builder.filter(filter.clone());
+            }
+            let result = builder.await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::from(result).into()))
         }
@@ -1518,7 +1518,7 @@ impl TestOperation for AssertCollectionExists {
     ) -> BoxFuture<'a, ()> {
         async move {
             let db = test_runner.internal_client.database(&self.database_name);
-            let names = db.list_collection_names(None).await.unwrap();
+            let names = db.list_collection_names().await.unwrap();
             assert!(names.contains(&self.collection_name));
         }
         .boxed()
@@ -1539,7 +1539,7 @@ impl TestOperation for AssertCollectionNotExists {
     ) -> BoxFuture<'a, ()> {
         async move {
             let db = test_runner.internal_client.database(&self.database_name);
-            let names = db.list_collection_names(None).await.unwrap();
+            let names = db.list_collection_names().await.unwrap();
             assert!(!names.contains(&self.collection_name));
         }
         .boxed()

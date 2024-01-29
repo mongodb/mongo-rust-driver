@@ -169,7 +169,7 @@ macro_rules! for_each_op {
         // db operations
         $test_func(
             "listCollections",
-            db_op!($test_name, db, db.list_collections(None, None)),
+            db_op!($test_name, db, db.list_collections()),
         )
         .await;
         $test_func(

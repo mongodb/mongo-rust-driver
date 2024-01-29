@@ -26,7 +26,6 @@ use crate::{
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListCollectionsOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -789,7 +788,6 @@ impl TestOperation for FindOne {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListCollections {
-    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<ListCollectionsOptions>,
 }
@@ -804,17 +802,15 @@ impl TestOperation for ListCollections {
             let result = match session {
                 Some(session) => {
                     let mut cursor = database
-                        .list_collections_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
+                        .list_collections()
+                        .with_options(self.options.clone())
+                        .session(&mut *session)
                         .await?;
                     cursor.stream(session).try_collect::<Vec<_>>().await?
                 }
                 None => {
                     let cursor = database
-                        .list_collections(self.filter.clone(), self.options.clone())
+                        .list_collections().with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -837,13 +833,15 @@ impl TestOperation for ListCollectionNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let mut builder = database.list_collection_names();
+            if let Some(filter) = &self.filter {
+                builder = builder.filter(filter.clone());
+            }
             let result = match session {
                 Some(session) => {
-                    database
-                        .list_collection_names_with_session(self.filter.clone(), session)
-                        .await?
+                    builder.session(session).await?
                 }
-                None => database.list_collection_names(self.filter.clone()).await?,
+                None => builder.await?,
             };
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))
@@ -1309,7 +1307,7 @@ impl TestOperation for AssertCollectionExists {
                         .read_concern(ReadConcern::majority())
                         .build(),
                 )
-                .list_collection_names(None)
+                .list_collection_names()
                 .await
                 .unwrap();
             assert!(
@@ -1339,7 +1337,7 @@ impl TestOperation for AssertCollectionNotExists {
         async move {
             let collections = client
                 .database(&self.database)
-                .list_collection_names(None)
+                .list_collection_names()
                 .await
                 .unwrap();
             assert!(!collections.contains(&self.collection));

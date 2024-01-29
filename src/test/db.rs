@@ -21,8 +21,11 @@ use crate::{
 use super::log_uncaptured;
 
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
-    let mut colls: Vec<CollectionSpecification> = db
-        .list_collections(filter, None)
+    let mut builder = db.list_collections();
+    if let Some(filter) = filter {
+        builder = builder.filter(filter);
+    }
+    let mut colls: Vec<CollectionSpecification> = builder
         .await
         .unwrap()
         .try_collect()
@@ -42,7 +45,7 @@ async fn list_collections() {
     db.drop().await.unwrap();
 
     let colls: Result<Vec<_>> = db
-        .list_collections(None, None)
+        .list_collections()
         .await
         .unwrap()
         .try_collect()
@@ -81,7 +84,7 @@ async fn list_collections_filter() {
     db.drop().await.unwrap();
 
     let colls: Result<Vec<_>> = db
-        .list_collections(None, None)
+        .list_collections()
         .await
         .unwrap()
         .try_collect()
@@ -121,7 +124,7 @@ async fn list_collection_names() {
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
-    assert!(db.list_collection_names(None).await.unwrap().is_empty());
+    assert!(db.list_collection_names().await.unwrap().is_empty());
 
     let expected_colls = &[
         format!("{}1", function_name!()),
@@ -136,7 +139,7 @@ async fn list_collection_names() {
             .unwrap();
     }
 
-    let mut actual_colls = db.list_collection_names(None).await.unwrap();
+    let mut actual_colls = db.list_collection_names().await.unwrap();
     actual_colls.sort();
 
     assert_eq!(&actual_colls, expected_colls);
@@ -150,7 +153,7 @@ async fn collection_management() {
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
-    assert!(db.list_collection_names(None).await.unwrap().is_empty());
+    assert!(db.list_collection_names().await.unwrap().is_empty());
 
     db.create_collection(&format!("{}{}", function_name!(), 1), None)
         .await
