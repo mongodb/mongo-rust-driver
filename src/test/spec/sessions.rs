@@ -63,7 +63,7 @@ async fn explicit_session_created_on_same_client() {
 
     let db = client0.database(function_name!());
     let err = db
-        .list_collections_with_session(None, None, &mut session1)
+        .list_collections().session(&mut session1)
         .await
         .unwrap_err();
     match *err.kind {
