@@ -14,7 +14,7 @@ mod find;
 mod find_and_modify;
 mod get_more;
 mod insert;
-mod list_collections;
+pub(crate) mod list_collections;
 pub(crate) mod list_databases;
 mod list_indexes;
 mod raw_output;

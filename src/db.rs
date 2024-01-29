@@ -20,7 +20,6 @@ use crate::{
         CollectionOptions,
         CreateCollectionOptions,
         DatabaseOptions,
-        ListCollectionsOptions,
         RunCursorCommandOptions,
     },
     results::CollectionSpecification,
@@ -162,95 +161,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.clone(), name, Some(options))
-    }
-
-    /// Gets information about each of the collections in the database. The cursor will yield a
-    /// document pertaining to each collection in the database.
-    pub async fn list_collections(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor<CollectionSpecification>> {
-        let list_collections = ListCollections::new(
-            self.name().to_string(),
-            filter.into(),
-            false,
-            options.into(),
-        );
-        self.client()
-            .execute_cursor_operation(list_collections)
-            .await
-    }
-
-    /// Gets information about each of the collections in the database using the provided
-    /// `ClientSession`. The cursor will yield a document pertaining to each collection in the
-    /// database.
-    pub async fn list_collections_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListCollectionsOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<CollectionSpecification>> {
-        let list_collections = ListCollections::new(
-            self.name().to_string(),
-            filter.into(),
-            false,
-            options.into(),
-        );
-        self.client()
-            .execute_session_cursor_operation(list_collections, session)
-            .await
-    }
-
-    async fn list_collection_names_common(
-        &self,
-        cursor: impl TryStreamExt<Ok = Document, Error = Error>,
-    ) -> Result<Vec<String>> {
-        cursor
-            .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
-                Some(name) => futures_util::future::ok(name.into()),
-                None => futures_util::future::err(
-                    ErrorKind::InvalidResponse {
-                        message: "Expected name field in server response, but there was none."
-                            .to_string(),
-                    }
-                    .into(),
-                ),
-            })
-            .try_collect()
-            .await
-    }
-
-    /// Gets the names of the collections in the database.
-    pub async fn list_collection_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-    ) -> Result<Vec<String>> {
-        let list_collections =
-            ListCollections::new(self.name().to_string(), filter.into(), true, None);
-        let cursor: Cursor<Document> = self
-            .client()
-            .execute_cursor_operation(list_collections)
-            .await?;
-
-        self.list_collection_names_common(cursor).await
-    }
-
-    /// Gets the names of the collections in the database using the provided `ClientSession`.
-    pub async fn list_collection_names_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        let list_collections =
-            ListCollections::new(self.name().to_string(), filter.into(), true, None);
-        let mut cursor: SessionCursor<Document> = self
-            .client()
-            .execute_session_cursor_operation(list_collections, &mut *session)
-            .await?;
-
-        self.list_collection_names_common(cursor.stream(session))
-            .await
     }
 
     #[allow(clippy::needless_option_as_deref)]

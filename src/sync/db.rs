@@ -9,7 +9,6 @@ use crate::{
         CollectionOptions,
         CreateCollectionOptions,
         GridFsBucketOptions,
-        ListCollectionsOptions,
         ReadConcern,
         SelectionCriteria,
         WriteConcern,
@@ -103,59 +102,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.async_database.collection_with_options(name, options))
-    }
-
-    /// Gets information about each of the collections in the database. The cursor will yield a
-    /// document pertaining to each collection in the database.
-    pub fn list_collections(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor<CollectionSpecification>> {
-        runtime::block_on(
-            self.async_database
-                .list_collections(filter.into(), options.into()),
-        )
-        .map(Cursor::new)
-    }
-
-    /// Gets information about each of the collections in the database using the provided
-    /// `ClientSession`. The cursor will yield a document pertaining to each collection in the
-    /// database.
-    pub fn list_collections_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListCollectionsOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<CollectionSpecification>> {
-        runtime::block_on(self.async_database.list_collections_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
-    }
-
-    /// Gets the names of the collections in the database.
-    pub fn list_collection_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(self.async_database.list_collection_names(filter.into()))
-    }
-
-    /// Gets the names of the collections in the database using the provided `ClientSession`.
-    pub fn list_collection_names_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_database.list_collection_names_with_session(
-                filter.into(),
-                &mut session.async_client_session,
-            ),
-        )
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.

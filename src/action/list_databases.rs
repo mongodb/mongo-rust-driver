@@ -13,7 +13,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, option_setters};
+use super::{action_impl, option_setters, ListNames, ListSpecifications};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
@@ -69,9 +69,6 @@ pub struct ListDatabases<'a, M = ListSpecifications> {
     mode: PhantomData<M>,
 }
 
-pub struct ListSpecifications;
-pub struct ListNames;
-
 impl<'a, M> ListDatabases<'a, M> {
     option_setters!(options: ListDatabasesOptions;
         filter: Document,
@@ -88,7 +85,7 @@ impl<'a, M> ListDatabases<'a, M> {
 
 action_impl! {
     impl Action<'a> for ListDatabases<'a, ListSpecifications> {
-        type Future = ListSpecificationsFuture;
+        type Future = ListDatabaseSpecificationsFuture;
 
         async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
             let op = op::ListDatabases::new(false, self.options);
@@ -108,7 +105,7 @@ action_impl! {
 
 action_impl! {
     impl Action<'a> for ListDatabases<'a, ListNames> {
-        type Future = ListNamesFuture;
+        type Future = ListDatabaseNamesFuture;
 
         async fn execute(self) -> Result<Vec<String>> {
             let op = op::ListDatabases::new(true, self.options);

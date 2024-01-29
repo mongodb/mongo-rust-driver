@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_impl, option_setters};
+use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -148,9 +148,6 @@ impl<T> crate::sync::Collection<T> {
         self.async_collection.watch()
     }
 }
-
-pub struct ImplicitSession;
-pub struct ExplicitSession<'a>(&'a mut ClientSession);
 
 /// Starts a new [`ChangeStream`] that receives events for all changes in a given scope.  Create by
 /// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`] and execute with

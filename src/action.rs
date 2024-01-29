@@ -1,6 +1,7 @@
 //! Action builder types.
 
 mod drop;
+mod list_collections;
 mod list_databases;
 mod perf;
 mod session;
@@ -8,11 +9,21 @@ mod shutdown;
 mod watch;
 
 pub use drop::{DropDatabase, DropDatabaseFuture};
-pub use list_databases::{ListDatabases, ListSpecificationsFuture};
+pub use list_databases::{ListDatabases, ListDatabaseSpecificationsFuture, ListDatabaseNamesFuture};
 pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
 pub use session::{StartSession, StartSessionFuture};
 pub use shutdown::{Shutdown, ShutdownFuture};
 pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture};
+
+#[allow(missing_docs)]
+pub struct ListSpecifications;
+#[allow(missing_docs)]
+pub struct ListNames;
+
+#[allow(missing_docs)]
+pub struct ImplicitSession;
+#[allow(missing_docs)]
+pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
 
 macro_rules! option_setters {
     (
@@ -53,17 +64,11 @@ macro_rules! action_impl {
             async fn execute($($args:ident)+) -> $out:ty $code:block
         }
     ) => {
-        crate::action::action_impl_inner! {
-            $action => $f_ty;
-            $($lt)?;
-            async fn($($args)+) -> $out $code
-        }
-
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl$(<$lt>)? $action {
-            /// Synchronously execute this action.
-            pub fn run(self) -> $out {
-                crate::runtime::block_on(std::future::IntoFuture::into_future(self))
+        crate::action::action_impl! {
+            impl Action$(<$lt>)? for $action {
+                type Future = $f_ty;
+                async fn execute($($args)+) -> $out $code
+                fn sync_wrap(out) -> $out { out }
             }
         }
     };
@@ -74,30 +79,6 @@ macro_rules! action_impl {
             async fn execute($($args:ident)+) -> $out:ty $code:block
             fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
         }
-    ) => {
-        crate::action::action_impl_inner! {
-            $action => $f_ty;
-            $($lt)?;
-            async fn($($args)+) -> $out $code
-        }
-
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl$(<$lt>)? $action {
-            /// Synchronously execute this action.
-            pub fn run(self) -> $sync_out {
-                let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
-                return $wrap_code
-            }
-        }
-    }
-}
-pub(crate) use action_impl;
-
-macro_rules! action_impl_inner {
-    (
-        $action:ty => $f_ty:ident;
-        $($lt:lifetime)?;
-        async fn($($args:ident)+) -> $out:ty $code:block
     ) => {
         impl$(<$lt>)? std::future::IntoFuture for $action {
             type Output = $out;
@@ -119,9 +100,18 @@ macro_rules! action_impl_inner {
                 self.0.as_mut().poll(cx)
             }
         }
+
+        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+        impl$(<$lt>)? $action {
+            /// Synchronously execute this action.
+            pub fn run(self) -> $sync_out {
+                let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
+                return $wrap_code
+            }
+        }
     }
 }
-pub(crate) use action_impl_inner;
+pub(crate) use action_impl;
 
 macro_rules! action_impl_future_wrapper {
     (, $f_ty:ident, $out:ty) => {
