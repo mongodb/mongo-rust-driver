@@ -4,14 +4,27 @@ use bson::{Bson, Document};
 use futures_util::TryStreamExt;
 
 use crate::{
-    error::{Error, ErrorKind, Result}, operation::list_collections as op, results::CollectionSpecification, ClientSession, Cursor, Database, SessionCursor
+    error::{Error, ErrorKind, Result},
+    operation::list_collections as op,
+    results::CollectionSpecification,
+    ClientSession,
+    Cursor,
+    Database,
+    SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession, ListNames, ListSpecifications};
+use super::{
+    action_impl,
+    option_setters,
+    ExplicitSession,
+    ImplicitSession,
+    ListNames,
+    ListSpecifications,
+};
 
 impl Database {
     /// Gets information about each of the collections in the database.
-    /// 
+    ///
     /// `await` will return `Result<`[`Cursor`]`<`[`CollectionSpecification`]`>>`.
     pub fn list_collections(&self) -> ListCollections {
         ListCollections {
@@ -23,7 +36,7 @@ impl Database {
     }
 
     /// Gets the names of the collections in the database.
-    /// 
+    ///
     /// `await` will return `Result<Vec<String>>`.
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         ListCollections {
@@ -38,14 +51,15 @@ impl Database {
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 impl crate::sync::Database {
     /// Gets information about each of the collections in the database.
-    /// 
-    /// [`run`](ListCollections::run) will return `Result<`[`Cursor`]`<`[`CollectionSpecification`]`>>`.
+    ///
+    /// [`run`](ListCollections::run) will return
+    /// `Result<`[`Cursor`]`<`[`CollectionSpecification`]`>>`.
     pub fn list_collections(&self) -> ListCollections {
         self.async_database.list_collections()
     }
 
     /// Gets the names of the collections in the database.
-    /// 
+    ///
     /// [`run`](ListCollections::run) will return `Result<Vec<String>>`.
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         self.async_database.list_collection_names()
@@ -85,7 +99,10 @@ impl<'a, M> ListCollections<'a, M> {
 
 impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     /// Runs the query using the provided session.
-    pub fn session<'s>(self, value: impl Into<&'s mut ClientSession>) -> ListCollections<'a, M, ExplicitSession<'s>> {
+    pub fn session<'s>(
+        self,
+        value: impl Into<&'s mut ClientSession>,
+    ) -> ListCollections<'a, M, ExplicitSession<'s>> {
         ListCollections {
             db: self.db,
             options: self.options,

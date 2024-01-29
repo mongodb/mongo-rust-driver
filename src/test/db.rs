@@ -3,20 +3,26 @@ use std::cmp::Ord;
 use futures::stream::TryStreamExt;
 
 use crate::{
-    bson::{doc, Document}, error::Result, options::{
+    bson::{doc, Document},
+    error::Result,
+    options::{
         AggregateOptions,
         Collation,
         CreateCollectionOptions,
         IndexOptionDefaults,
         ValidationAction,
         ValidationLevel,
-    }, results::{CollectionSpecification, CollectionType}, test::util::{EventClient, TestClient}, Database, OptionalUpdate
+    },
+    results::{CollectionSpecification, CollectionType},
+    test::util::{EventClient, TestClient},
+    Database,
+    OptionalUpdate,
 };
 
 use super::log_uncaptured;
 
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
-let mut colls: Vec<CollectionSpecification> = db
+    let mut colls: Vec<CollectionSpecification> = db
         .list_collections()
         .update_with(filter, |b, f| b.filter(f))
         .await
@@ -37,12 +43,7 @@ async fn list_collections() {
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
-    let colls: Result<Vec<_>> = db
-        .list_collections()
-        .await
-        .unwrap()
-        .try_collect()
-        .await;
+    let colls: Result<Vec<_>> = db.list_collections().await.unwrap().try_collect().await;
     assert_eq!(colls.unwrap().len(), 0);
 
     let coll_names = &[
@@ -76,12 +77,7 @@ async fn list_collections_filter() {
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
-    let colls: Result<Vec<_>> = db
-        .list_collections()
-        .await
-        .unwrap()
-        .try_collect()
-        .await;
+    let colls: Result<Vec<_>> = db.list_collections().await.unwrap().try_collect().await;
     assert_eq!(colls.unwrap().len(), 0);
 
     let coll_names = &["bar", "baz", "foo"];
@@ -169,7 +165,8 @@ async fn collection_management() {
         )
         .build();
 
-    db.create_collection(&format!("{}{}", function_name!(), 2)).with_options(options.clone())
+    db.create_collection(&format!("{}{}", function_name!(), 2))
+        .with_options(options.clone())
         .await
         .unwrap();
 
@@ -177,7 +174,8 @@ async fn collection_management() {
         .view_on(format!("{}{}", function_name!(), 2))
         .pipeline(vec![doc! { "$match": {} }])
         .build();
-    db.create_collection(&format!("{}{}", function_name!(), 3)).with_options(view_options.clone())
+    db.create_collection(&format!("{}{}", function_name!(), 3))
+        .with_options(view_options.clone())
         .await
         .unwrap();
 

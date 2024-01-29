@@ -1,11 +1,7 @@
 use bson::doc;
 use futures::TryStreamExt;
 
-use crate::{
-    db::options::TimeseriesOptions,
-    test::log_uncaptured,
-    Client,
-};
+use crate::{db::options::TimeseriesOptions, test::log_uncaptured, Client};
 
 type Result<T> = anyhow::Result<T>;
 

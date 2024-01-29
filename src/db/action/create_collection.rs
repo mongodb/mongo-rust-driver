@@ -1,6 +1,14 @@
 use bson::{doc, Document};
 
-use crate::{action::{action_impl, CreateCollection}, db::options::CreateCollectionOptions, error::Result, operation::Create, ClientSession, Database, Namespace};
+use crate::{
+    action::{action_impl, CreateCollection},
+    db::options::CreateCollectionOptions,
+    error::Result,
+    operation::Create,
+    ClientSession,
+    Database,
+    Namespace,
+};
 
 action_impl! {
     impl Action<'a> for CreateCollection<'a> {

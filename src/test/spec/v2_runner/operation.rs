@@ -32,7 +32,14 @@ use crate::{
         TransactionOptions,
         UpdateModifications,
         UpdateOptions,
-    }, selection_criteria::{ReadPreference, SelectionCriteria}, test::{assert_matches, log_uncaptured, FailPoint, TestClient}, ClientSession, Collection, Database, IndexModel, OptionalUpdate
+    },
+    selection_criteria::{ReadPreference, SelectionCriteria},
+    test::{assert_matches, log_uncaptured, FailPoint, TestClient},
+    ClientSession,
+    Collection,
+    Database,
+    IndexModel,
+    OptionalUpdate,
 };
 
 use super::{OpRunner, OpSessions};
@@ -804,7 +811,8 @@ impl TestOperation for ListCollections {
                 }
                 None => {
                     let cursor = database
-                        .list_collections().with_options(self.options.clone())
+                        .list_collections()
+                        .with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -831,9 +839,7 @@ impl TestOperation for ListCollectionNames {
                 .list_collection_names()
                 .update_with(self.filter.clone(), |b, f| b.filter(f));
             let result = match session {
-                Some(session) => {
-                    builder.session(session).await?
-                }
+                Some(session) => builder.session(session).await?,
                 None => builder.await?,
             };
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();

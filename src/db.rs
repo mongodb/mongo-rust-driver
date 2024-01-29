@@ -12,12 +12,7 @@ use crate::{
     error::{ErrorKind, Result},
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
     operation::{Aggregate, RunCommand, RunCursorCommand},
-    options::{
-        AggregateOptions,
-        CollectionOptions,
-        DatabaseOptions,
-        RunCursorCommandOptions,
-    },
+    options::{AggregateOptions, CollectionOptions, DatabaseOptions, RunCursorCommandOptions},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,

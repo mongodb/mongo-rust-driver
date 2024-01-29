@@ -9,12 +9,9 @@ impl Database {
     ///
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
-    /// 
+    ///
     /// `await` will return `Result<()>`.
-    pub fn create_collection(
-        &self,
-        name: impl AsRef<str>,
-    ) -> CreateCollection {
+    pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
         CreateCollection {
             db: self,
             name: name.as_ref().to_owned(),
@@ -30,17 +27,15 @@ impl crate::sync::Database {
     ///
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
-    /// 
+    ///
     /// [`run`](CreateCollection::run) will return `Result<()>`.
-    pub fn create_collection(
-        &self,
-        name: impl AsRef<str>,
-    ) -> CreateCollection {
+    pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
         self.async_database.create_collection(name)
     }
 }
 
-/// Creates a new collection.  Create by calling [`Database::create_collection`] and execute with `await` (or [`run`](CreateCollection::run) if using the sync client).
+/// Creates a new collection.  Create by calling [`Database::create_collection`] and execute with
+/// `await` (or [`run`](CreateCollection::run) if using the sync client).
 pub struct CreateCollection<'a> {
     pub(crate) db: &'a Database,
     pub(crate) name: String,
@@ -89,10 +84,10 @@ impl<'a> CreateCollection<'a> {
         /// determine the contents of the view.
         pipeline: Vec<Document>,
 
-        /// The default collation for the collection or view.   
+        /// The default collation for the collection or view.
         collation: crate::collation::Collation,
 
-        /// The write concern for the operation.   
+        /// The write concern for the operation.
         write_concern: crate::options::WriteConcern,
 
         /// The default configuration for indexes created on this collection, including the _id index.

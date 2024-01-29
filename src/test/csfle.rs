@@ -30,10 +30,13 @@ use mongocrypt::ctx::{Algorithm, KmsProvider};
 use tokio::net::TcpListener;
 
 use crate::{
-    client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions}, error::{ErrorKind, WriteError, WriteFailure}, event::{
+    client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
+    error::{ErrorKind, WriteError, WriteFailure},
+    event::{
         command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
-    }, options::{
+    },
+    options::{
         CollectionOptions,
         CreateCollectionOptions,
         CreateIndexOptions,
@@ -45,7 +48,14 @@ use crate::{
         ReadConcern,
         TlsOptions,
         WriteConcern,
-    }, runtime, test::{Event, EventHandler}, Client, Collection, IndexModel, Namespace, OptionalUpdate
+    },
+    runtime,
+    test::{Event, EventHandler},
+    Client,
+    Collection,
+    IndexModel,
+    Namespace,
+    OptionalUpdate,
 };
 
 use super::{

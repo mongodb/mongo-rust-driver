@@ -72,7 +72,17 @@ use crate::{
         SelectionCriteria,
         UpdateModifications,
         UpdateOptions,
-    }, runtime, selection_criteria::ReadPreference, serde_util, test::FailPoint, Collection, Database, IndexModel, OptionalUpdate, ServerType, TopologyType
+    },
+    runtime,
+    selection_criteria::ReadPreference,
+    serde_util,
+    test::FailPoint,
+    Collection,
+    Database,
+    IndexModel,
+    OptionalUpdate,
+    ServerType,
+    TopologyType,
 };
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
@@ -1254,7 +1264,8 @@ impl TestOperation for ListCollections {
                 }
                 None => {
                     let cursor = db
-                        .list_collections().with_options(self.options.clone())
+                        .list_collections()
+                        .with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -1283,7 +1294,8 @@ impl TestOperation for ListCollectionNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let db = test_runner.get_database(id).await;
-            let result = db.list_collection_names()
+            let result = db
+                .list_collection_names()
                 .update_with(self.filter.clone(), |b, f| b.filter(f))
                 .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
@@ -1564,7 +1576,8 @@ impl TestOperation for CreateCollection {
                 .await?;
             } else {
                 database
-                    .create_collection(&self.collection).with_options(self.options.clone())
+                    .create_collection(&self.collection)
+                    .with_options(self.options.clone())
                     .await?;
             }
             Ok(Some(Entity::Collection(

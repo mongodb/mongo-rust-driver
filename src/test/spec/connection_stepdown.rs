@@ -53,8 +53,7 @@ async fn run_test<F: Future>(
         ))
         .await;
 
-    db
-        .create_collection(&name)
+    db.create_collection(&name)
         .write_concern(wc_majority)
         .await
         .unwrap();

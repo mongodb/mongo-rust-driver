@@ -854,19 +854,21 @@ async fn command_contains_write_concern_create_collection() {
 
     coll.drop(None).await.unwrap();
     db.create_collection(function_name!())
-        .write_concern(WriteConcern::builder()
-            .w(Acknowledgment::Nodes(1))
-            .journal(true)
-            .build()
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
         )
         .await
         .unwrap();
     coll.drop(None).await.unwrap();
     db.create_collection(function_name!())
-        .write_concern(WriteConcern::builder()
-            .w(Acknowledgment::Nodes(1))
-            .journal(false)
-            .build()
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
         )
         .await
         .unwrap();
