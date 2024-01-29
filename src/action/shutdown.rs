@@ -1,7 +1,5 @@
 use crate::Client;
 
-pub use crate::client::action::shutdown::ShutdownFuture;
-
 impl Client {
     /// Shut down this `Client`, terminating background thread workers and closing connections.
     /// Using this method is not required under most circumstances (resources will be cleaned up in

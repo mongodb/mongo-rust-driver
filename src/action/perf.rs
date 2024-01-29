@@ -1,4 +1,3 @@
-pub use crate::client::action::perf::WarmConnectionPoolFuture;
 use crate::Client;
 
 impl Client {
