@@ -43,14 +43,13 @@ use super::{
 
 use crate::{
     bson::{doc, to_bson, Bson, Document},
-    change_stream::options::ChangeStreamOptions,
+    action::ChangeStreamOptions,
     client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
     db::options::RunCursorCommandOptions,
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
-    operation::list_databases,
     options::{
         AggregateOptions,
         CountOptions,
@@ -1173,7 +1172,7 @@ impl TestOperation for FindOne {
 pub(super) struct ListDatabases {
     session: Option<String>,
     #[serde(flatten)]
-    options: list_databases::Options,
+    options: crate::action::ListDatabasesOptions,
 }
 
 impl TestOperation for ListDatabases {
@@ -1213,7 +1212,7 @@ impl TestOperation for ListDatabases {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabaseNames {
     #[serde(flatten)]
-    options: list_databases::Options,
+    options: crate::action::ListDatabasesOptions,
 }
 
 impl TestOperation for ListDatabaseNames {

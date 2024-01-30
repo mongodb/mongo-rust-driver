@@ -1,32 +1,18 @@
-use bson::{Bson, RawDocumentBuf};
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
+use bson::RawDocumentBuf;
+use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
-    cmap::{Command, RawCommandResponse, StreamDescription},
-    error::Result,
-    operation::{append_options, OperationWithDefaults, Retryability},
-    selection_criteria::{ReadPreference, SelectionCriteria},
+    action::ListDatabasesOptions, bson::{doc, Document}, cmap::{Command, RawCommandResponse, StreamDescription}, error::Result, operation::{append_options, OperationWithDefaults, Retryability}, selection_criteria::{ReadPreference, SelectionCriteria}
 };
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
     name_only: bool,
-    options: Option<Options>,
-}
-
-#[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Options {
-    pub(crate) filter: Option<Document>,
-    pub(crate) authorized_databases: Option<bool>,
-    pub(crate) comment: Option<Bson>,
+    options: Option<ListDatabasesOptions>,
 }
 
 impl ListDatabases {
-    pub fn new(name_only: bool, options: Option<Options>) -> Self {
+    pub fn new(name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
         ListDatabases { name_only, options }
     }
 }

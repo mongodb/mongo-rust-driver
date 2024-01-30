@@ -2807,32 +2807,6 @@ mod tests {
     }
 }
 
-/// Contains the options that can be used to create a new
-/// [`ClientSession`](../struct.ClientSession.html).
-#[derive(Clone, Debug, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub(crate) struct SessionOptions {
-    pub(crate) default_transaction_options: Option<TransactionOptions>,
-    pub(crate) causal_consistency: Option<bool>,
-    pub(crate) snapshot: Option<bool>,
-}
-
-impl SessionOptions {
-    pub(crate) fn validate(&self) -> Result<()> {
-        if let (Some(causal_consistency), Some(snapshot)) = (self.causal_consistency, self.snapshot)
-        {
-            if causal_consistency && snapshot {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "snapshot and causal consistency are mutually exclusive".to_string(),
-                }
-                .into());
-            }
-        }
-        Ok(())
-    }
-}
-
 /// Contains the options that can be used for a transaction.
 #[skip_serializing_none]
 #[derive(Debug, Default, Serialize, Deserialize, TypedBuilder, Clone)]

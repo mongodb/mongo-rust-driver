@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
 use bson::{Bson, Document};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+use typed_builder::TypedBuilder;
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::sync::Client as SyncClient;
@@ -63,27 +66,39 @@ impl SyncClient {
 #[must_use]
 pub struct ListDatabases<'a, M = ListSpecifications> {
     client: &'a Client,
-    options: Option<op::Options>,
+    options: Option<ListDatabasesOptions>,
     session: Option<&'a mut ClientSession>,
     mode: PhantomData<M>,
+}
+
+/// Specifies the options to a [`Client::list_databases`] operation.
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct ListDatabasesOptions {
+    /// Determines which databases to return based on the user's access privileges. This option is
+    /// only supported on server versions 4.0.5+.
+    pub authorized_databases: Option<bool>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
+
+    /// Filters the query.
+    pub filter: Option<Document>,
 }
 
 pub struct ListSpecifications;
 pub struct ListNames;
 
 impl<'a, M> ListDatabases<'a, M> {
-    option_setters!(options: op::Options;
-        /// Filters the query.
+    option_setters!(options: ListDatabasesOptions;
         filter: Document,
-
-        /// Determines which databases to return based on the user's access privileges. This option is
-        /// only supported on server versions 4.0.5+.
         authorized_databases: bool,
-
-        /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-        /// database profiler, currentOp and logs.
-        ///
-        /// This option is only available on server versions 4.4+.
         comment: Bson,
     );
 

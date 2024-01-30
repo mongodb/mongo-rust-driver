@@ -1,6 +1,5 @@
 //! Contains the functionality for change streams.
 pub mod event;
-pub(crate) mod options;
 pub mod session;
 
 #[cfg(test)]
@@ -21,10 +20,8 @@ use serde::de::DeserializeOwned;
 use tokio::sync::oneshot;
 
 use crate::{
-    change_stream::{
-        event::{ChangeStreamEvent, ResumeToken},
-        options::ChangeStreamOptions,
-    },
+    action::ChangeStreamOptions,
+    change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::{ErrorKind, Result},
     operation::AggregateTarget,
