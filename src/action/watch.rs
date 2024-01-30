@@ -11,7 +11,17 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         session::SessionChangeStream,
         ChangeStream,
-    }, coll::options::AggregateOptions, collation::Collation, error::{ErrorKind, Result}, operation::AggregateTarget, options::ReadConcern, selection_criteria::SelectionCriteria, Client, ClientSession, Collection, Database
+    },
+    coll::options::AggregateOptions,
+    collation::Collation,
+    error::{ErrorKind, Result},
+    operation::AggregateTarget,
+    options::ReadConcern,
+    selection_criteria::SelectionCriteria,
+    Client,
+    ClientSession,
+    Collection,
+    Database,
 };
 
 impl Client {
@@ -239,7 +249,6 @@ pub struct ChangeStreamOptions {
     pub comment: Option<Bson>,
 }
 
-
 /// Describes the modes for configuring the
 /// [`ChangeStreamEvent::full_document`](
 /// crate::change_stream::event::ChangeStreamEvent::full_document) field.
@@ -283,7 +292,6 @@ pub enum FullDocumentBeforeChangeType {
     /// User-defined other types for forward compatibility.
     Other(String),
 }
-
 
 impl ChangeStreamOptions {
     pub(crate) fn aggregate_options(&self) -> AggregateOptions {

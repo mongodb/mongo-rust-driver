@@ -10,17 +10,21 @@ mod watch;
 pub use drop::{DropDatabase, DropDatabaseFuture, DropDatabaseOptions};
 pub use list_databases::{ListDatabases, ListDatabasesOptions, ListSpecificationsFuture};
 pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
-pub use session::{StartSession, StartSessionFuture, SessionOptions};
+pub use session::{SessionOptions, StartSession, StartSessionFuture};
 pub use shutdown::{Shutdown, ShutdownFuture};
-pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture, ChangeStreamOptions, FullDocumentType, FullDocumentBeforeChangeType};
+pub use watch::{
+    ChangeStreamOptions,
+    FullDocumentBeforeChangeType,
+    FullDocumentType,
+    Watch,
+    WatchExplicitSessionFuture,
+    WatchImplicitSessionFuture,
+};
 
 macro_rules! option_setters {
     (
         $opt_field:ident: $opt_field_ty:ty;
-        $(
-            $(#[$($attrss:tt)*])*
-            $opt_name:ident: $opt_ty:ty,
-        )+
+        $($opt_name:ident: $opt_ty:ty,)+
     ) => {
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)

@@ -2,7 +2,12 @@ use bson::RawDocumentBuf;
 use serde::Deserialize;
 
 use crate::{
-    action::ListDatabasesOptions, bson::{doc, Document}, cmap::{Command, RawCommandResponse, StreamDescription}, error::Result, operation::{append_options, OperationWithDefaults, Retryability}, selection_criteria::{ReadPreference, SelectionCriteria}
+    action::ListDatabasesOptions,
+    bson::{doc, Document},
+    cmap::{Command, RawCommandResponse, StreamDescription},
+    error::Result,
+    operation::{append_options, OperationWithDefaults, Retryability},
+    selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
 #[derive(Debug)]

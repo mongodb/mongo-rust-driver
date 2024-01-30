@@ -19,8 +19,8 @@ pub use crate::{
     action::{
         ChangeStreamOptions,
         DropDatabaseOptions,
-        FullDocumentType,
         FullDocumentBeforeChangeType,
+        FullDocumentType,
         ListDatabasesOptions,
         SessionOptions,
     },

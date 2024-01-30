@@ -42,8 +42,8 @@ use super::{
 };
 
 use crate::{
-    bson::{doc, to_bson, Bson, Document},
     action::ChangeStreamOptions,
+    bson::{doc, to_bson, Bson, Document},
     client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
