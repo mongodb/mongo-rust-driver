@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 
 lambda_runtime = "0.6.0"
-mongodb = "2.8.0"
+mongodb = { path = "../../.." }
 serde = "1.0.136"
 tokio = { version = "1", features = ["macros"] }
 tracing = { version = "0.1", features = ["log"] }

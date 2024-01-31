@@ -30,7 +30,7 @@ struct Response {
 
 async fn function_handler(_event: LambdaEvent<Request>) -> Result<Response, Error> {
     let client = get_mongodb_client().await;
-    let names = client.list_database_names(None, None).await?;
+    let names = client.list_database_names().await?;
     let resp = Response {
         status_code: 200,
         body: format!("{:?}", names),
