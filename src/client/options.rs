@@ -2807,7 +2807,7 @@ mod tests {
     }
 }
 
-/// Contains the options that can be used to create a new [`ClientSession`].
+/// Contains the options that can be used to create a new [`ClientSession`](crate::ClientSession).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]

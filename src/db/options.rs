@@ -247,7 +247,7 @@ pub enum TimeseriesGranularity {
     Hours,
 }
 
-/// Specifies the options to a [`Database::drop`] operation.
+/// Specifies the options to a [`Database::drop`](crate::Database::drop) operation.
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -284,7 +284,7 @@ pub struct ListCollectionsOptions {
     pub comment: Option<Bson>,
 }
 
-/// Specifies the options to a [`Client::list_databases`] operation.
+/// Specifies the options to a [`Client::list_databases`](crate::Client::list_databases) operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
