@@ -1,7 +1,5 @@
-use serde::Serialize;
-use typed_builder::TypedBuilder;
-
 use crate::{
+    db::options::DropDatabaseOptions,
     error::Result,
     operation::drop_database as op,
     options::WriteConcern,
@@ -42,16 +40,6 @@ pub struct DropDatabase<'a> {
     db: &'a Database,
     options: Option<DropDatabaseOptions>,
     session: Option<&'a mut ClientSession>,
-}
-
-/// Specifies the options to a [`Database::drop`] operation.
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(into)))]
-#[non_exhaustive]
-pub struct DropDatabaseOptions {
-    /// The write concern for the operation.
-    pub write_concern: Option<WriteConcern>,
 }
 
 impl<'a> DropDatabase<'a> {

@@ -314,7 +314,7 @@ pub(crate) struct Collection {
 pub(crate) struct Session {
     pub(crate) id: String,
     pub(crate) client: String,
-    pub(crate) session_options: Option<crate::action::SessionOptions>,
+    pub(crate) session_options: Option<crate::client::options::SessionOptions>,
 }
 
 #[derive(Debug, Deserialize)]

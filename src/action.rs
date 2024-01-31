@@ -7,19 +7,12 @@ mod session;
 mod shutdown;
 mod watch;
 
-pub use drop::{DropDatabase, DropDatabaseFuture, DropDatabaseOptions};
-pub use list_databases::{ListDatabases, ListDatabasesOptions, ListSpecificationsFuture};
+pub use drop::{DropDatabase, DropDatabaseFuture};
+pub use list_databases::{ListDatabases, ListSpecificationsFuture};
 pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
-pub use session::{SessionOptions, StartSession, StartSessionFuture};
+pub use session::{StartSession, StartSessionFuture};
 pub use shutdown::{Shutdown, ShutdownFuture};
-pub use watch::{
-    ChangeStreamOptions,
-    FullDocumentBeforeChangeType,
-    FullDocumentType,
-    Watch,
-    WatchExplicitSessionFuture,
-    WatchImplicitSessionFuture,
-};
+pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture};
 
 macro_rules! option_setters {
     (

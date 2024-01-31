@@ -1065,7 +1065,7 @@ impl TestOperation for AssertSessionUnpinned {
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabases {
     #[serde(flatten)]
-    options: Option<crate::action::ListDatabasesOptions>,
+    options: Option<crate::db::options::ListDatabasesOptions>,
 }
 
 impl TestOperation for ListDatabases {
@@ -1087,7 +1087,7 @@ impl TestOperation for ListDatabases {
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabaseNames {
     #[serde(flatten)]
-    options: Option<crate::action::ListDatabasesOptions>,
+    options: Option<crate::db::options::ListDatabasesOptions>,
 }
 
 impl TestOperation for ListDatabaseNames {

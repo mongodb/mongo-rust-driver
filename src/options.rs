@@ -16,14 +16,7 @@
 //! ```
 
 pub use crate::{
-    action::{
-        ChangeStreamOptions,
-        DropDatabaseOptions,
-        FullDocumentBeforeChangeType,
-        FullDocumentType,
-        ListDatabasesOptions,
-        SessionOptions,
-    },
+    change_stream::options::*,
     client::{auth::*, options::*},
     coll::options::*,
     collation::*,

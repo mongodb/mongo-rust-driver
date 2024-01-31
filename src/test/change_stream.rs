@@ -3,9 +3,9 @@ use futures_util::{StreamExt, TryStreamExt};
 use semver::VersionReq;
 
 use crate::{
-    action::FullDocumentBeforeChangeType,
     change_stream::{
         event::{ChangeStreamEvent, OperationType},
+        options::FullDocumentBeforeChangeType,
         ChangeStream,
     },
     coll::options::CollectionOptions,

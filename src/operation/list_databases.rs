@@ -2,9 +2,9 @@ use bson::RawDocumentBuf;
 use serde::Deserialize;
 
 use crate::{
-    action::ListDatabasesOptions,
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
+    db::options::ListDatabasesOptions,
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},

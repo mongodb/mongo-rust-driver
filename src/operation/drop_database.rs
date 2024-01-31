@@ -1,9 +1,9 @@
 use bson::Document;
 
 use crate::{
-    action::DropDatabaseOptions,
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
+    db::options::DropDatabaseOptions,
     error::Result,
     operation::{
         append_options,

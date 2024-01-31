@@ -1,5 +1,6 @@
 //! Contains the functionality for change streams.
 pub mod event;
+pub(crate) mod options;
 pub mod session;
 
 #[cfg(test)]
@@ -20,7 +21,6 @@ use serde::de::DeserializeOwned;
 use tokio::sync::oneshot;
 
 use crate::{
-    action::ChangeStreamOptions,
     change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::{ErrorKind, Result},
@@ -197,7 +197,7 @@ pub(crate) struct WatchArgs {
     pub(crate) target: AggregateTarget,
 
     /// The options provided to the initial `$changeStream` stage.
-    pub(crate) options: Option<ChangeStreamOptions>,
+    pub(crate) options: Option<options::ChangeStreamOptions>,
 }
 
 /// Dynamic change stream data needed for resume.
