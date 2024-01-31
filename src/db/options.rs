@@ -247,6 +247,16 @@ pub enum TimeseriesGranularity {
     Hours,
 }
 
+/// Specifies the options to a [`Database::drop`](crate::Database::drop) operation.
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct DropDatabaseOptions {
+    /// The write concern for the operation.
+    pub write_concern: Option<WriteConcern>,
+}
+
 /// Specifies the options to a
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
 #[skip_serializing_none]
@@ -272,6 +282,27 @@ pub struct ListCollectionsOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+}
+
+/// Specifies the options to a [`Client::list_databases`](crate::Client::list_databases) operation.
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct ListDatabasesOptions {
+    /// Determines which databases to return based on the user's access privileges. This option is
+    /// only supported on server versions 4.0.5+.
+    pub authorized_databases: Option<bool>,
+
+    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
+    /// database profiler, currentOp and logs.
+    ///
+    /// This option is only available on server versions 4.4+.
+    pub comment: Option<Bson>,
+
+    /// Filters the query.
+    pub filter: Option<Document>,
 }
 
 /// Specifies how change stream pre- and post-images should be supported.

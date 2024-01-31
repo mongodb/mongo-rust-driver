@@ -2807,15 +2807,30 @@ mod tests {
     }
 }
 
-/// Contains the options that can be used to create a new
-/// [`ClientSession`](../struct.ClientSession.html).
-#[derive(Clone, Debug, Deserialize, Default)]
+/// Contains the options that can be used to create a new [`ClientSession`](crate::ClientSession).
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub(crate) struct SessionOptions {
-    pub(crate) default_transaction_options: Option<TransactionOptions>,
-    pub(crate) causal_consistency: Option<bool>,
-    pub(crate) snapshot: Option<bool>,
+pub struct SessionOptions {
+    /// The default options to use for transactions started on this session.
+    ///
+    /// If these options are not specified, they will be inherited from the
+    /// [`Client`](../struct.Client.html) associated with this session. They will not
+    /// be inherited from the options specified
+    /// on the [`Database`](../struct.Database.html) or [`Collection`](../struct.Collection.html)
+    /// associated with the operations within the transaction.
+    pub default_transaction_options: Option<TransactionOptions>,
+
+    /// If true, all operations performed in the context of this session
+    /// will be [causally consistent](https://www.mongodb.com/docs/manual/core/causal-consistency-read-write-concerns/).
+    ///
+    /// Defaults to true if [`SessionOptions::snapshot`] is unspecified.
+    pub causal_consistency: Option<bool>,
+
+    /// If true, all read operations performed using this client session will share the same
+    /// snapshot.  Defaults to false.
+    pub snapshot: Option<bool>,
 }
 
 impl SessionOptions {

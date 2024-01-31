@@ -1756,7 +1756,7 @@ async fn index_examples() -> Result<()> {
 }
 
 async fn change_streams_examples() -> Result<()> {
-    use crate::{change_stream::options::FullDocumentType, runtime};
+    use crate::{options::FullDocumentType, runtime};
     use std::time::Duration;
 
     let client = TestClient::new().await;

@@ -1,9 +1,9 @@
 use bson::Document;
-use serde::Serialize;
 
 use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
+    db::options::DropDatabaseOptions,
     error::Result,
     operation::{
         append_options,
@@ -18,13 +18,6 @@ use crate::{
 pub(crate) struct DropDatabase {
     target_db: String,
     options: Option<DropDatabaseOptions>,
-}
-
-#[derive(Clone, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct DropDatabaseOptions {
-    /// The write concern for the operation.
-    pub(crate) write_concern: Option<WriteConcern>,
 }
 
 impl DropDatabase {

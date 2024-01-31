@@ -1,4 +1,5 @@
 use crate::{
+    db::options::DropDatabaseOptions,
     error::Result,
     operation::drop_database as op,
     options::WriteConcern,
@@ -37,13 +38,12 @@ impl crate::sync::Database {
 #[must_use]
 pub struct DropDatabase<'a> {
     db: &'a Database,
-    options: Option<op::DropDatabaseOptions>,
+    options: Option<DropDatabaseOptions>,
     session: Option<&'a mut ClientSession>,
 }
 
 impl<'a> DropDatabase<'a> {
-    option_setters!(options: op::DropDatabaseOptions;
-        /// The write concern for the operation.
+    option_setters!(options: DropDatabaseOptions;
         write_concern: WriteConcern,
     );
 

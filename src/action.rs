@@ -17,24 +17,20 @@ pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture};
 macro_rules! option_setters {
     (
         $opt_field:ident: $opt_field_ty:ty;
-        $(
-            $(#[$($attrss:tt)*])*
-            $opt_name:ident: $opt_ty:ty,
-        )+
+        $($opt_name:ident: $opt_ty:ty,)+
     ) => {
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
         }
 
-        #[cfg(test)]
-        #[allow(dead_code)]
-        pub(crate) fn with_options(mut self, value: impl Into<Option<$opt_field_ty>>) -> Self {
+        /// Set all options.  Note that this will replace all previous values set.
+        pub fn with_options(mut self, value: impl Into<Option<$opt_field_ty>>) -> Self {
             self.options = value.into();
             self
         }
 
         $(
-            $(#[$($attrss)*])*
+            #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
             pub fn $opt_name(mut self, value: $opt_ty) -> Self {
                 self.options().$opt_name = Some(value);
                 self

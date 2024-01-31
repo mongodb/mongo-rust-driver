@@ -5,6 +5,7 @@ use bson::{Bson, Document};
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 use crate::sync::Client as SyncClient;
 use crate::{
+    db::options::ListDatabasesOptions,
     error::{ErrorKind, Result},
     operation::list_databases as op,
     results::DatabaseSpecification,
@@ -63,7 +64,7 @@ impl SyncClient {
 #[must_use]
 pub struct ListDatabases<'a, M = ListSpecifications> {
     client: &'a Client,
-    options: Option<op::Options>,
+    options: Option<ListDatabasesOptions>,
     session: Option<&'a mut ClientSession>,
     mode: PhantomData<M>,
 }
@@ -72,18 +73,9 @@ pub struct ListSpecifications;
 pub struct ListNames;
 
 impl<'a, M> ListDatabases<'a, M> {
-    option_setters!(options: op::Options;
-        /// Filters the query.
+    option_setters!(options: ListDatabasesOptions;
         filter: Document,
-
-        /// Determines which databases to return based on the user's access privileges. This option is
-        /// only supported on server versions 4.0.5+.
         authorized_databases: bool,
-
-        /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-        /// database profiler, currentOp and logs.
-        ///
-        /// This option is only available on server versions 4.4+.
         comment: Bson,
     );
 

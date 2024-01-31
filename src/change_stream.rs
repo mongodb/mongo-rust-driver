@@ -21,10 +21,7 @@ use serde::de::DeserializeOwned;
 use tokio::sync::oneshot;
 
 use crate::{
-    change_stream::{
-        event::{ChangeStreamEvent, ResumeToken},
-        options::ChangeStreamOptions,
-    },
+    change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::{ErrorKind, Result},
     operation::AggregateTarget,
@@ -200,7 +197,7 @@ pub(crate) struct WatchArgs {
     pub(crate) target: AggregateTarget,
 
     /// The options provided to the initial `$changeStream` stage.
-    pub(crate) options: Option<ChangeStreamOptions>,
+    pub(crate) options: Option<options::ChangeStreamOptions>,
 }
 
 /// Dynamic change stream data needed for resume.
