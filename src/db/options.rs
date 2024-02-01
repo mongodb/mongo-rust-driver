@@ -8,7 +8,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
-    options::{Collation, CursorType},
+    options:: CursorType,
     selection_criteria::SelectionCriteria,
     serde_util,
 };
@@ -27,95 +27,6 @@ pub struct DatabaseOptions {
 
     /// The default write concern for operations.
     pub write_concern: Option<WriteConcern>,
-}
-
-/// These are the valid options for creating a collection with
-/// [`Database::create_collection`](../struct.Database.html#method.create_collection).
-#[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(into)))]
-#[non_exhaustive]
-pub struct CreateCollectionOptions {
-    /// Whether the collection should be capped. If true, `size` must also be set.
-    pub capped: Option<bool>,
-
-    /// The maximum size (in bytes) for a capped collection. This option is ignored if `capped` is
-    /// not set to true.
-    #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
-    pub size: Option<u64>,
-
-    /// The maximum number of documents in a capped collection. The `size` limit takes precedence
-    /// over this option. If a capped collection reaches the size limit before it reaches the
-    /// maximum number of documents, MongoDB removes old documents.
-    #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
-    pub max: Option<u64>,
-
-    /// The storage engine that the collection should use. The value should take the following
-    /// form:
-    ///
-    /// `{ <storage-engine-name>: <options> }`
-    pub storage_engine: Option<Document>,
-
-    /// Specifies a validator to restrict the schema of documents which can exist in the
-    /// collection. Expressions can be specified using any query operators except `$near`,
-    /// `$nearSphere`, `$text`, and `$where`.
-    pub validator: Option<Document>,
-
-    /// Specifies how strictly the database should apply the validation rules to existing documents
-    /// during an update.
-    pub validation_level: Option<ValidationLevel>,
-
-    /// Specifies whether the database should return an error or simply raise a warning if inserted
-    /// documents do not pass the validation.
-    pub validation_action: Option<ValidationAction>,
-
-    /// The name of the source collection or view to base this view on. If specified, this will
-    /// cause a view to be created rather than a collection.
-    pub view_on: Option<String>,
-
-    /// An array that consists of the aggregation pipeline stages to run against `view_on` to
-    /// determine the contents of the view.
-    pub pipeline: Option<Vec<Document>>,
-
-    /// The default collation for the collection or view.   
-    pub collation: Option<Collation>,
-
-    /// The write concern for the operation.   
-    pub write_concern: Option<WriteConcern>,
-
-    /// The default configuration for indexes created on this collection, including the _id index.
-    pub index_option_defaults: Option<IndexOptionDefaults>,
-
-    /// An object containing options for creating time series collections. See the [`create`
-    /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for
-    /// supported options, and the [Time Series Collections documentation](
-    /// https://www.mongodb.com/docs/manual/core/timeseries-collections/) for more information.
-    ///
-    /// This feature is only available on server versions 5.0 and above.
-    pub timeseries: Option<TimeseriesOptions>,
-
-    /// Used to automatically delete documents in time series collections. See the [`create`
-    /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for more
-    /// information.
-    #[serde(default, with = "serde_util::duration_option_as_int_seconds")]
-    pub expire_after_seconds: Option<Duration>,
-
-    /// Options for supporting change stream pre- and post-images.
-    pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
-
-    /// Options for clustered collections.
-    pub clustered_index: Option<ClusteredIndex>,
-
-    /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
-    pub comment: Option<Bson>,
-
-    /// Map of encrypted fields for the created collection.
-    #[cfg(feature = "in-use-encryption-unstable")]
-    pub encrypted_fields: Option<Document>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during

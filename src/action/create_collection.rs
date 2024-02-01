@@ -1,6 +1,6 @@
 use bson::Document;
 
-use crate::{db::options::CreateCollectionOptions, ClientSession, Database};
+use crate::{operation::create::CreateCollectionOptions, ClientSession, Database};
 
 use crate::action::option_setters;
 

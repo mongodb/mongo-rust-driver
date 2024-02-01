@@ -36,9 +36,9 @@ use crate::{
         command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
+    operation::create::CreateCollectionOptions,
     options::{
         CollectionOptions,
-        CreateCollectionOptions,
         CreateIndexOptions,
         Credential,
         DropCollectionOptions,

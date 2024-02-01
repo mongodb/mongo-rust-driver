@@ -2,9 +2,8 @@ use bson::{doc, Document};
 
 use crate::{
     action::{action_impl, CreateCollection},
-    db::options::CreateCollectionOptions,
+    operation::create as op,
     error::Result,
-    operation::Create,
     ClientSession,
     Database,
     Namespace,
@@ -33,7 +32,7 @@ action_impl! {
                     .is_some()
             };
 
-            let create = Create::new(ns.clone(), self.options);
+            let create = op::Create::new(ns.clone(), self.options);
             self.db.client()
                 .execute_operation(create, self.session.as_deref_mut())
                 .await?;
@@ -62,7 +61,7 @@ impl Database {
     async fn resolve_encrypted_fields(
         &self,
         base_ns: &Namespace,
-        options: &mut Option<CreateCollectionOptions>,
+        options: &mut Option<op::CreateCollectionOptions>,
     ) {
         let has_encrypted_fields = options
             .as_ref()
@@ -89,7 +88,7 @@ impl Database {
     async fn create_aux_collections(
         &self,
         base_ns: &Namespace,
-        options: &Option<CreateCollectionOptions>,
+        options: &Option<op::CreateCollectionOptions>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<()> {
         use crate::error::ErrorKind;
@@ -127,7 +126,7 @@ impl Database {
                 name: None,
                 v: None,
             });
-            let create = Create::new(ns, Some(sub_opts));
+            let create = op::Create::new(ns, Some(sub_opts));
             self.client()
                 .execute_operation(create, session.as_deref_mut())
                 .await?;

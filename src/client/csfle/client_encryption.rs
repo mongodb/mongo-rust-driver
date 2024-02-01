@@ -21,7 +21,7 @@ use crate::{
     },
     client::options::TlsOptions,
     coll::options::CollectionOptions,
-    db::options::CreateCollectionOptions,
+    operation::create::CreateCollectionOptions,
     error::{Error, Result},
     options::{ReadConcern, WriteConcern},
     results::DeleteResult,
