@@ -5,7 +5,7 @@ use crate::{
     concern::WriteConcern,
     cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{CursorBody, Operation, RunCommand},
+    operation::{run_command::RunCommand, CursorBody, Operation},
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
 };

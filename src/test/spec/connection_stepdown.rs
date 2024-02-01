@@ -90,20 +90,18 @@ async fn get_more() {
 
         let db = client.database("admin");
 
-        db.run_command(
-            doc! { "replSetFreeze": 0 },
-            SelectionCriteria::ReadPreference(
+        db.run_command(doc! { "replSetFreeze": 0 })
+            .selection_criteria(SelectionCriteria::ReadPreference(
                 crate::selection_criteria::ReadPreference::Secondary {
                     options: Default::default(),
                 },
-            ),
-        )
-        .await
-        .expect("replSetFreeze should have succeeded");
+            ))
+            .await
+            .expect("replSetFreeze should have succeeded");
 
         client
             .database("admin")
-            .run_command(doc! { "replSetStepDown": 30, "force": true }, None)
+            .run_command(doc! { "replSetStepDown": 30, "force": true })
             .await
             .expect("stepdown should have succeeded");
 
@@ -138,17 +136,14 @@ async fn notwritableprimary_keep_pool() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 10107
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 10107
+                }
+            })
             .await
             .unwrap();
 
@@ -194,17 +189,14 @@ async fn notwritableprimary_reset_pool() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 10107
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 10107
+                }
+            })
             .await
             .unwrap();
 
@@ -247,17 +239,14 @@ async fn shutdown_in_progress() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 91
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 91
+                }
+            })
             .await
             .unwrap();
 
@@ -296,17 +285,14 @@ async fn interrupted_at_shutdown() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 11600
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 11600
+                }
+            })
             .await
             .unwrap();
 

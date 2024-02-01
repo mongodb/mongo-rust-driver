@@ -310,7 +310,7 @@ async fn mmapv1_error_raised() {
 
     let server_status = client
         .database(function_name!())
-        .run_command(doc! { "serverStatus": 1 }, None)
+        .run_command(doc! { "serverStatus": 1 })
         .await
         .unwrap();
     let name = server_status
@@ -382,7 +382,7 @@ async fn label_not_added(retry_reads: bool) {
     };
     client
         .database("admin")
-        .run_command(failpoint, None)
+        .run_command(failpoint)
         .await
         .unwrap();
 

@@ -31,8 +31,6 @@ impl crate::sync::Client {
     ///
     /// Does nothing if `min_pool_size` is unset or zero.
     ///
-    /// `await` will return `()`.
-    ///
     /// [`run`](WarmConnectionPool::run) will return `()`.
     pub fn warm_connection_pool(&self) -> WarmConnectionPool {
         self.async_client.warm_connection_pool()

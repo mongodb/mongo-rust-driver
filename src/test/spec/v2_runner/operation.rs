@@ -1203,14 +1203,11 @@ impl TestOperation for RunCommand {
                 .read_preference
                 .as_ref()
                 .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
-            let result = match session {
-                Some(session) => {
-                    database
-                        .run_command_with_session(self.command.clone(), selection_criteria, session)
-                        .await
-                }
-                None => database.run_command(self.command.clone(), None).await,
-            };
+            let result = database
+                .run_command(self.command.clone())
+                .update_with(selection_criteria, |a, s| a.selection_criteria(s))
+                .update_with(session, |a, s| a.session(s))
+                .await;
             result.map(|doc| Some(Bson::Document(doc)))
         }
         .boxed()

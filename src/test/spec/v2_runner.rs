@@ -464,7 +464,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             match file_ctx
                 .internal_client
                 .database("admin")
-                .run_command(doc! { "killAllSessions": [] }, None)
+                .run_command(doc! { "killAllSessions": [] })
                 .await
             {
                 Ok(_) => {}

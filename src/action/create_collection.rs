@@ -36,6 +36,7 @@ impl crate::sync::Database {
 
 /// Creates a new collection.  Create by calling [`Database::create_collection`] and execute with
 /// `await` (or [`run`](CreateCollection::run) if using the sync client).
+#[must_use]
 pub struct CreateCollection<'a> {
     pub(crate) db: &'a Database,
     pub(crate) name: String,

@@ -18,7 +18,7 @@ pub(crate) mod list_collections;
 pub(crate) mod list_databases;
 mod list_indexes;
 mod raw_output;
-mod run_command;
+pub(crate) mod run_command;
 mod run_cursor_command;
 mod search_index;
 mod update;
@@ -68,7 +68,6 @@ pub(crate) use insert::Insert;
 pub(crate) use list_indexes::ListIndexes;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use raw_output::RawOutput;
-pub(crate) use run_command::RunCommand;
 pub(crate) use run_cursor_command::RunCursorCommand;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};

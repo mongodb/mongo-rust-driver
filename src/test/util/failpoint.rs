@@ -54,7 +54,8 @@ impl FailPoint {
         let criteria = criteria.into();
         client
             .database("admin")
-            .run_command(self.command.clone(), criteria.clone())
+            .run_command(self.command.clone())
+            .update_with(criteria.clone(), |a, c| a.selection_criteria(c))
             .await?;
         Ok(FailPointGuard {
             failpoint_name: self.name().to_string(),
@@ -79,10 +80,8 @@ impl Drop for FailPointGuard {
         let result = runtime::block_on(async move {
             client
                 .database("admin")
-                .run_command(
-                    doc! { "configureFailPoint": name, "mode": "off" },
-                    self.criteria.clone(),
-                )
+                .run_command(doc! { "configureFailPoint": name, "mode": "off" })
+                .update_with(self.criteria.clone(), |a, c| a.selection_criteria(c))
                 .await
         });
 

@@ -456,7 +456,7 @@ async fn cmap_spec_tests() {
         if let Some(ref fail_point) = test_file.fail_point {
             client
                 .database("admin")
-                .run_command(fail_point.clone(), None)
+                .run_command(fail_point.clone())
                 .await
                 .unwrap();
         }
@@ -467,13 +467,10 @@ async fn cmap_spec_tests() {
         if should_disable_fp {
             client
                 .database("admin")
-                .run_command(
-                    doc! {
-                        "configureFailPoint": "failCommand",
-                        "mode": "off"
-                    },
-                    None,
-                )
+                .run_command(doc! {
+                    "configureFailPoint": "failCommand",
+                    "mode": "off"
+                })
                 .await
                 .unwrap();
         }

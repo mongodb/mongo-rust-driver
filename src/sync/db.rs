@@ -102,40 +102,6 @@ impl Database {
         Collection::new(self.async_database.collection_with_options(name, options))
     }
 
-    /// Runs a database-level command.
-    ///
-    /// Note that no inspection is done on `doc`, so the command will not use the database's default
-    /// read concern or write concern. If specific read concern or write concern is desired, it must
-    /// be specified manually.
-    pub fn run_command(
-        &self,
-        command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-    ) -> Result<Document> {
-        runtime::block_on(
-            self.async_database
-                .run_command(command, selection_criteria.into()),
-        )
-    }
-
-    /// Runs a database-level command using the provided `ClientSession`.
-    ///
-    /// Note that no inspection is done on `doc`, so the command will not use the database's default
-    /// read concern or write concern. If specific read concern or write concern is desired, it must
-    /// be specified manually.
-    pub fn run_command_with_session(
-        &self,
-        command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-        session: &mut ClientSession,
-    ) -> Result<Document> {
-        runtime::block_on(self.async_database.run_command_with_session(
-            command,
-            selection_criteria.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more

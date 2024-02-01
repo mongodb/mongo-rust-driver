@@ -5,13 +5,12 @@ use std::{fmt::Debug, sync::Arc};
 
 use crate::{
     bson::Document,
-    client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::{ErrorKind, Result},
+    error::Result,
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{Aggregate, RunCommand, RunCursorCommand},
+    operation::{run_command::RunCommand, Aggregate, RunCursorCommand},
     options::{AggregateOptions, CollectionOptions, DatabaseOptions, RunCursorCommandOptions},
     selection_criteria::SelectionCriteria,
     Client,
@@ -155,33 +154,17 @@ impl Database {
     pub(crate) async fn run_command_common(
         &self,
         command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-        session: impl Into<Option<&mut ClientSession>>,
+        selection_criteria: Option<SelectionCriteria>,
+        session: Option<&mut ClientSession>,
         pinned_connection: Option<&PinnedConnectionHandle>,
     ) -> Result<Document> {
         let operation = RunCommand::new(
             self.name().into(),
             command,
-            selection_criteria.into(),
+            selection_criteria,
             pinned_connection,
         )?;
         self.client().execute_operation(operation, session).await
-    }
-
-    /// Runs a database-level command.
-    ///
-    /// Note that no inspection is done on `doc`, so the command will not use the database's default
-    /// read concern or write concern. If specific read concern or write concern is desired, it must
-    /// be specified manually.
-    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
-    /// command document.
-    pub async fn run_command(
-        &self,
-        command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-    ) -> Result<Document> {
-        self.run_command_common(command, selection_criteria, None, None)
-            .await
     }
 
     /// Runs a database-level command and returns a cursor to the response.
@@ -217,47 +200,6 @@ impl Database {
         let client = self.client();
         client
             .execute_session_cursor_operation(rc_command, session)
-            .await
-    }
-
-    /// Runs a database-level command using the provided `ClientSession`.
-    ///
-    /// If the `ClientSession` provided is currently in a transaction, `command` must not specify a
-    /// read concern. If this operation is the first operation in the transaction, the read concern
-    /// associated with the transaction will be inherited.
-    ///
-    /// Otherwise no inspection is done on `command`, so the command will not use the database's
-    /// default read concern or write concern. If specific read concern or write concern is
-    /// desired, it must be specified manually.
-    pub async fn run_command_with_session(
-        &self,
-        command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-        session: &mut ClientSession,
-    ) -> Result<Document> {
-        let mut selection_criteria = selection_criteria.into();
-        match session.transaction.state {
-            TransactionState::Starting | TransactionState::InProgress => {
-                if command.contains_key("readConcern") {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Cannot set read concern after starting a transaction".into(),
-                    }
-                    .into());
-                }
-                selection_criteria = match selection_criteria {
-                    Some(selection_criteria) => Some(selection_criteria),
-                    None => {
-                        if let Some(ref options) = session.transaction.options {
-                            options.selection_criteria.clone()
-                        } else {
-                            None
-                        }
-                    }
-                };
-            }
-            _ => {}
-        }
-        self.run_command_common(command, selection_criteria, session, None)
             .await
     }
 

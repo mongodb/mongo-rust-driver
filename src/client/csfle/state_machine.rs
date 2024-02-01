@@ -17,7 +17,7 @@ use crate::{
     client::{options::ServerAddress, WeakClient},
     coll::options::FindOptions,
     error::{Error, Result},
-    operation::{RawOutput, RunCommand},
+    operation::{run_command::RunCommand, RawOutput},
     options::ReadConcern,
     runtime::{process::Process, AsyncStream, TlsConfig},
     Client,

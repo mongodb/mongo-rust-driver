@@ -199,14 +199,14 @@ impl TestClient {
         );
         let server_info_doc = client
             .database("admin")
-            .run_command(hello.body, None)
+            .run_command(hello.body)
             .await
             .unwrap();
         let server_info = bson::from_document(server_info_doc).unwrap();
 
         let build_info = client
             .database("test")
-            .run_command(doc! { "buildInfo": 1 }, None)
+            .run_command(doc! { "buildInfo": 1 })
             .await
             .unwrap();
         let mut server_version = Version::parse(build_info.get_str("version").unwrap()).unwrap();
@@ -215,7 +215,7 @@ impl TestClient {
 
         let server_parameters = client
             .database("admin")
-            .run_command(doc! { "getParameter": "*" }, None)
+            .run_command(doc! { "getParameter": "*" })
             .await
             .unwrap_or_default();
 
@@ -254,7 +254,7 @@ impl TestClient {
             cmd.insert("mechanisms", ms);
         }
         self.database(db.into().unwrap_or("admin"))
-            .run_command(cmd, None)
+            .run_command(cmd)
             .await?;
         Ok(())
     }

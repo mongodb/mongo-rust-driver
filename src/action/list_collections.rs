@@ -70,6 +70,7 @@ impl crate::sync::Database {
 /// Gets information about each of the collections in the database.  Create by
 /// calling [`Database::list_collections`] or [`Database::list_collection_names`] and execute
 /// with `await` (or [`run`](ListCollections::run) if using the sync client).
+#[must_use]
 pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
     db: &'a Database,
     options: Option<ListCollectionsOptions>,

@@ -1644,18 +1644,19 @@ impl TestOperation for RunCommand {
             let command = self.command.clone();
 
             let db = test_runner.get_database(id).await;
+            let action = db
+                .run_command(command)
+                .update_with(self.read_preference.clone(), |a, rp| {
+                    a.selection_criteria(rp)
+                });
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        db.run_command_with_session(command, self.read_preference.clone(), session)
-                            .await
+                        action.session(&mut *session).await
                     })
                     .await?
                 }
-                None => {
-                    db.run_command(command, self.read_preference.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -2393,7 +2394,7 @@ impl TestOperation for RenameCollection {
                 "to": crate::bson::to_bson(&to_ns)?,
             };
             let admin = test_runner.internal_client.database("admin");
-            admin.run_command(cmd, None).await?;
+            admin.run_command(cmd).await?;
             Ok(None)
         }
         .boxed()

@@ -72,7 +72,7 @@ async fn min_heartbeat_frequency() {
     let start = Instant::now();
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .expect("ping should eventually succeed");
 

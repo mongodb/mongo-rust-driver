@@ -133,7 +133,7 @@ async fn command_logging_truncation_explicit_limit() {
 
     client
         .database("tracing_test")
-        .run_command(doc! { "hello" : "true" }, None)
+        .run_command(doc! { "hello" : "true" })
         .await
         .expect("hello command should succeed");
 

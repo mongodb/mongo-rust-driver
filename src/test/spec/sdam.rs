@@ -65,7 +65,7 @@ async fn streaming_min_heartbeat_frequency() {
     // discover a server
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
 
@@ -116,7 +116,7 @@ async fn heartbeat_frequency_is_respected() {
     // discover a server
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
 

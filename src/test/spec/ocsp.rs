@@ -26,7 +26,7 @@ async fn run() {
     let client = Client::with_options(options.clone()).unwrap();
     let response = client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await;
 
     match response {
@@ -44,7 +44,7 @@ async fn run() {
     let tls_insecure_client = Client::with_options(options).unwrap();
     tls_insecure_client
         .database("admin")
-        .run_command(doc! { "ping" : 1 }, None)
+        .run_command(doc! { "ping" : 1 })
         .await
         .expect("tls insecure ping should succeed");
 }

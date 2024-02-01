@@ -174,7 +174,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "ping",
-            db_op!($test_name, db, db.run_command(doc! { "ping":  1 }, None)),
+            db_op!($test_name, db, db.run_command(doc! { "ping":  1 })),
         )
         .await;
         $test_func(
@@ -335,14 +335,14 @@ async fn cluster_time_in_commands() {
     // a command invocation.
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
 
     cluster_time_test("ping", &client, handler.as_ref(), |client| async move {
         client
             .database(function_name!())
-            .run_command(doc! { "ping": 1 }, None)
+            .run_command(doc! { "ping": 1 })
             .await
     })
     .await;
