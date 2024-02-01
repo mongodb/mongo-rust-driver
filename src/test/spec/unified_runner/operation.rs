@@ -46,7 +46,7 @@ use crate::{
     client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
-    db::options::RunCursorCommandOptions,
+    db::options::{ListCollectionsOptions, RunCursorCommandOptions},
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{

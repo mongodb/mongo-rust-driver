@@ -6,6 +6,7 @@ use serde::{de::Deserializer, Deserialize};
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
+    db::options::ListCollectionsOptions,
     error::Result,
     options::{
         AggregateOptions,

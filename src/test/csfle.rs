@@ -31,12 +31,12 @@ use tokio::net::TcpListener;
 
 use crate::{
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
+    db::options::CreateCollectionOptions,
     error::{ErrorKind, WriteError, WriteFailure},
     event::{
         command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
-    operation::create::CreateCollectionOptions,
     options::{
         CollectionOptions,
         CreateIndexOptions,

@@ -5,7 +5,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     bson::{serde_helpers, Bson, Document},
     change_stream::event::ResumeToken,
-    operation::create::CreateCollectionOptions,
+    db::options::CreateCollectionOptions,
     serde_util,
     Namespace,
 };

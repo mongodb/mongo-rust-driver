@@ -4,6 +4,7 @@ use bson::{Bson, Document};
 use futures_util::TryStreamExt;
 
 use crate::{
+    db::options::ListCollectionsOptions,
     error::{Error, ErrorKind, Result},
     operation::list_collections as op,
     results::CollectionSpecification,
@@ -71,13 +72,13 @@ impl crate::sync::Database {
 /// with `await` (or [`run`](ListCollections::run) if using the sync client).
 pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
     db: &'a Database,
-    options: Option<op::ListCollectionsOptions>,
+    options: Option<ListCollectionsOptions>,
     mode: PhantomData<M>,
     session: S,
 }
 
 impl<'a, M> ListCollections<'a, M> {
-    option_setters!(options: op::ListCollectionsOptions;
+    option_setters!(options: ListCollectionsOptions;
         /// Filters the query.
         filter: Document,
 

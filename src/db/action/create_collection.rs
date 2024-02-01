@@ -2,8 +2,9 @@ use bson::{doc, Document};
 
 use crate::{
     action::{action_impl, CreateCollection},
-    operation::create as op,
+    db::options::CreateCollectionOptions,
     error::Result,
+    operation::create as op,
     ClientSession,
     Database,
     Namespace,
@@ -61,7 +62,7 @@ impl Database {
     async fn resolve_encrypted_fields(
         &self,
         base_ns: &Namespace,
-        options: &mut Option<op::CreateCollectionOptions>,
+        options: &mut Option<CreateCollectionOptions>,
     ) {
         let has_encrypted_fields = options
             .as_ref()
@@ -88,7 +89,7 @@ impl Database {
     async fn create_aux_collections(
         &self,
         base_ns: &Namespace,
-        options: &Option<op::CreateCollectionOptions>,
+        options: &Option<CreateCollectionOptions>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<()> {
         use crate::error::ErrorKind;

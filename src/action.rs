@@ -31,7 +31,10 @@ pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
 macro_rules! option_setters {
     (
         $opt_field:ident: $opt_field_ty:ty;
-        $($opt_name:ident: $opt_ty:ty,)+
+        $(
+            $(#[$($attrss:tt)*])*
+            $opt_name:ident: $opt_ty:ty,
+        )+
     ) => {
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
@@ -45,6 +48,7 @@ macro_rules! option_setters {
 
         $(
             #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
+            $(#[$($attrss)*])*
             pub fn $opt_name(mut self, value: $opt_ty) -> Self {
                 self.options().$opt_name = Some(value);
                 self
