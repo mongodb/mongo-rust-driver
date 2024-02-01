@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
-use mongodb::{event::{cmap::CmapEvent, command::CommandEvent, sdam::SdamEvent, EventHandler}, options::ClientOptions, Client};
+use mongodb::{bson::doc, event::{cmap::CmapEvent, command::CommandEvent, sdam::SdamEvent, EventHandler}, options::ClientOptions, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
@@ -107,7 +107,9 @@ struct Request {
 
 async fn function_handler(_event: LambdaEvent<Request>) -> Result<Stats, Error> {
     let state = get_state().await;
-    let _names = state.client.list_database_names().await?;
+    let coll = state.client.database("faas_test").collection("faas_test");
+    let id = coll.insert_one(doc! { }, None).await?.inserted_id;
+    coll.delete_one(doc! { "id": id }, None).await?;
 
     let stats = {
         let mut guard = state.stats.lock().unwrap();
