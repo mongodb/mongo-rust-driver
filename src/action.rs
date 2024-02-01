@@ -46,6 +46,14 @@ macro_rules! option_setters {
             self
         }
 
+        /// If the value is `Some`, call the provided function on `self`.  Convenient for chained updates with values that need to be set conditionally.
+        pub fn update_with<Value>(self, value: Option<Value>, f: impl FnOnce(Self, Value) -> Self) -> Self {
+            match value {
+                Some(value) => f(self, value),
+                None => self,
+            }
+        }
+
         $(
             #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
             $(#[$($attrss)*])*

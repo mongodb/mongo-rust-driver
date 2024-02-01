@@ -12,7 +12,13 @@ use futures_util::{
 
 use super::{options::GridFsUploadOptions, Chunk, FilesCollectionDocument, GridFsBucket};
 use crate::{
-    bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef}, bson_util::get_int, client::AsyncDropToken, error::{Error, ErrorKind, GridFsErrorKind, Result}, index::IndexModel, options::{FindOneOptions, ReadPreference, SelectionCriteria}, Collection, OptionalUpdate
+    bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
+    bson_util::get_int,
+    client::AsyncDropToken,
+    error::{Error, ErrorKind, GridFsErrorKind, Result},
+    index::IndexModel,
+    options::{FindOneOptions, ReadPreference, SelectionCriteria},
+    Collection,
 };
 
 // User functions for uploading from readers.
@@ -170,9 +176,13 @@ impl GridFsBucket {
     async fn create_index<T>(&self, coll: &Collection<T>, keys: Document) -> Result<()> {
         // listIndexes returns an error if the collection has not yet been created.
         // Ignore NamespaceExists errors if the collection has already been created.
-        if let Err(error) = self.inner.db.create_collection(coll.name())
+        if let Err(error) = self
+            .inner
+            .db
+            .create_collection(coll.name())
             .update_with(self.write_concern().cloned(), |b, wc| b.write_concern(wc))
-            .await {
+            .await
+        {
             if error.sdam_code() != Some(48) {
                 return Err(error);
             }

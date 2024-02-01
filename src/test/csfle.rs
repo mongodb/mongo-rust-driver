@@ -55,7 +55,6 @@ use crate::{
     Collection,
     IndexModel,
     Namespace,
-    OptionalUpdate,
 };
 
 use super::{

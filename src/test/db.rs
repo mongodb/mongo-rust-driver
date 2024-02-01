@@ -16,7 +16,6 @@ use crate::{
     results::{CollectionSpecification, CollectionType},
     test::util::{EventClient, TestClient},
     Database,
-    OptionalUpdate,
 };
 
 use super::log_uncaptured;

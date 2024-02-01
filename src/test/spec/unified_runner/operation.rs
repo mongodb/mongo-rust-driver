@@ -80,7 +80,6 @@ use crate::{
     Collection,
     Database,
     IndexModel,
-    OptionalUpdate,
     ServerType,
     TopologyType,
 };

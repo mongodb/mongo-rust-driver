@@ -40,7 +40,6 @@ use crate::{
     Collection,
     Database,
     IndexModel,
-    OptionalUpdate,
 };
 
 use super::{OpRunner, OpSessions};
