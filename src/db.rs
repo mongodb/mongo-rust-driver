@@ -5,13 +5,12 @@ use std::{fmt::Debug, sync::Arc};
 
 use crate::{
     bson::Document,
-    cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::Result,
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::{run_command::RunCommand, Aggregate, RunCursorCommand},
-    options::{AggregateOptions, CollectionOptions, DatabaseOptions, RunCursorCommandOptions},
+    operation::Aggregate,
+    options::{AggregateOptions, CollectionOptions, DatabaseOptions},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -149,58 +148,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.clone(), name, Some(options))
-    }
-
-    pub(crate) async fn run_command_common(
-        &self,
-        command: Document,
-        selection_criteria: Option<SelectionCriteria>,
-        session: Option<&mut ClientSession>,
-        pinned_connection: Option<&PinnedConnectionHandle>,
-    ) -> Result<Document> {
-        let operation = RunCommand::new(
-            self.name().into(),
-            command,
-            selection_criteria,
-            pinned_connection,
-        )?;
-        self.client().execute_operation(operation, session).await
-    }
-
-    /// Runs a database-level command and returns a cursor to the response.
-    pub async fn run_cursor_command(
-        &self,
-        command: Document,
-        options: impl Into<Option<RunCursorCommandOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let options: Option<RunCursorCommandOptions> = options.into();
-        let selection_criteria = options
-            .as_ref()
-            .and_then(|options| options.selection_criteria.clone());
-        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
-        let rc_command = RunCursorCommand::new(rcc, options)?;
-        let client = self.client();
-        client.execute_cursor_operation(rc_command).await
-    }
-
-    /// Runs a database-level command and returns a cursor to the response.
-    pub async fn run_cursor_command_with_session(
-        &self,
-        command: Document,
-        options: impl Into<Option<RunCursorCommandOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let mut options: Option<RunCursorCommandOptions> = options.into();
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-        let selection_criteria = options
-            .as_ref()
-            .and_then(|options| options.selection_criteria.clone());
-        let rcc = RunCommand::new(self.name().to_string(), command, selection_criteria, None)?;
-        let rc_command = RunCursorCommand::new(rcc, options)?;
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(rc_command, session)
-            .await
     }
 
     /// Runs an aggregation operation.

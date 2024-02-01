@@ -15,7 +15,7 @@ pub use drop::DropDatabase;
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
 pub use perf::WarmConnectionPool;
-pub use run_command::RunCommand;
+pub use run_command::{RunCommand, RunCursorCommand};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
 pub use watch::Watch;

@@ -1652,7 +1652,7 @@ impl TestOperation for RunCommand {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        action.session(&mut *session).await
+                        action.session(&mut *session.deref_mut()).await
                     })
                     .await?
                 }
@@ -1690,18 +1690,17 @@ impl TestOperation for RunCursorCommand {
             let db = test_runner.get_database(id).await;
             let options = self.options.clone();
 
+            let action = db.run_cursor_command(command).with_options(options);
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        let mut cursor = db
-                            .run_cursor_command_with_session(command, options, session)
-                            .await?;
+                        let mut cursor = action.session(session.deref_mut()).await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
                     .await?
                 }
                 None => {
-                    let cursor = db.run_cursor_command(command, options).await?;
+                    let cursor = action.await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
@@ -1737,14 +1736,12 @@ impl TestOperation for CreateCommandCursor {
             let db = test_runner.get_database(id).await;
             let options = self.options.clone();
 
+            let action = db.run_cursor_command(command).with_options(options);
             match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;
                     with_mut_session!(test_runner, session_id, |session| async {
-                        ses_cursor = Some(
-                            db.run_cursor_command_with_session(command, options, session)
-                                .await,
-                        );
+                        ses_cursor = Some(action.session(session.deref_mut()).await);
                     })
                     .await;
                     let test_cursor = TestCursor::Session {
@@ -1754,7 +1751,7 @@ impl TestOperation for CreateCommandCursor {
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
                 None => {
-                    let doc_cursor = db.run_cursor_command(command, options).await?;
+                    let doc_cursor = action.await?;
                     let test_cursor = TestCursor::Normal(Mutex::new(doc_cursor));
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }

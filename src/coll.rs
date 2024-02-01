@@ -882,18 +882,16 @@ impl<T> Collection<T> {
     ) -> Result<()> {
         let ns = self.namespace();
 
-        self.client()
-            .database(ns.db.as_str())
-            .run_command_common(
-                doc! {
-                    "killCursors": ns.coll.as_str(),
-                    "cursors": [cursor_id]
-                },
-                drop_address.map(SelectionCriteria::from_address),
-                None,
-                pinned_connection,
-            )
-            .await?;
+        let op = crate::operation::run_command::RunCommand::new(
+            ns.db,
+            doc! {
+                "killCursors": ns.coll.as_str(),
+                "cursors": [cursor_id]
+            },
+            drop_address.map(SelectionCriteria::from_address),
+            pinned_connection,
+        )?;
+        self.client().execute_operation(op, None).await?;
         Ok(())
     }
 
