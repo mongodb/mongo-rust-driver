@@ -765,7 +765,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     client
         .database("db")
         .create_collection("coll")
-        .update_with(validator, |b, v| b.validator(v))
+        .optional(validator, |b, v| b.validator(v))
         .await?;
     for f in [
         "corpus/corpus-key-local.json",

@@ -1295,7 +1295,7 @@ impl TestOperation for ListCollectionNames {
             let db = test_runner.get_database(id).await;
             let result = db
                 .list_collection_names()
-                .update_with(self.filter.clone(), |b, f| b.filter(f))
+                .optional(self.filter.clone(), |b, f| b.filter(f))
                 .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::from(result).into()))
@@ -1646,7 +1646,7 @@ impl TestOperation for RunCommand {
             let db = test_runner.get_database(id).await;
             let action = db
                 .run_command(command)
-                .update_with(self.read_preference.clone(), |a, rp| {
+                .optional(self.read_preference.clone(), |a, rp| {
                     a.selection_criteria(rp)
                 });
             let result = match &self.session {

@@ -837,7 +837,7 @@ impl TestOperation for ListCollectionNames {
         async move {
             let action = database
                 .list_collection_names()
-                .update_with(self.filter.clone(), |b, f| b.filter(f));
+                .optional(self.filter.clone(), |b, f| b.filter(f));
             let result = match session {
                 Some(session) => action.session(session).await?,
                 None => action.await?,
@@ -1205,8 +1205,8 @@ impl TestOperation for RunCommand {
                 .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
             let result = database
                 .run_command(self.command.clone())
-                .update_with(selection_criteria, |a, s| a.selection_criteria(s))
-                .update_with(session, |a, s| a.session(s))
+                .optional(selection_criteria, |a, s| a.selection_criteria(s))
+                .optional(session, |a, s| a.session(s))
                 .await;
             result.map(|doc| Some(Bson::Document(doc)))
         }
@@ -1265,7 +1265,7 @@ impl TestOperation for CreateCollection {
             let result = database
                 .create_collection(&self.collection)
                 .with_options(self.options.clone())
-                .update_with(session, |b, s| b.session(s))
+                .optional(session, |b, s| b.session(s))
                 .await;
             result.map(|_| None)
         }

@@ -60,7 +60,7 @@ pub struct RunCommand<'a> {
 impl<'a> RunCommand<'a> {
     /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
     /// updates with values that need to be set conditionally.
-    pub fn update_with<Value>(
+    pub fn optional<Value>(
         self,
         value: Option<Value>,
         f: impl FnOnce(Self, Value) -> Self,

@@ -180,7 +180,7 @@ impl GridFsBucket {
             .inner
             .db
             .create_collection(coll.name())
-            .update_with(self.write_concern().cloned(), |b, wc| b.write_concern(wc))
+            .optional(self.write_concern().cloned(), |b, wc| b.write_concern(wc))
             .await
         {
             if error.sdam_code() != Some(48) {

@@ -23,7 +23,7 @@ use super::log_uncaptured;
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
     let mut colls: Vec<CollectionSpecification> = db
         .list_collections()
-        .update_with(filter, |b, f| b.filter(f))
+        .optional(filter, |b, f| b.filter(f))
         .await
         .unwrap()
         .try_collect()
@@ -329,7 +329,7 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
     let db = client.database(name);
 
     db.create_collection(name)
-        .update_with(defaults.clone(), |b, d| b.index_option_defaults(d))
+        .optional(defaults.clone(), |b, d| b.index_option_defaults(d))
         .await
         .unwrap();
     db.drop().await.unwrap();
