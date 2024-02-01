@@ -836,12 +836,12 @@ impl TestOperation for ListCollectionNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let builder = database
+            let action = database
                 .list_collection_names()
                 .update_with(self.filter.clone(), |b, f| b.filter(f));
             let result = match session {
-                Some(session) => builder.session(session).await?,
-                None => builder.await?,
+                Some(session) => action.session(session).await?,
+                None => action.await?,
             };
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))

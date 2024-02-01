@@ -79,21 +79,8 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
 
 impl<'a, M> ListCollections<'a, M> {
     option_setters!(options: ListCollectionsOptions;
-        /// Filters the query.
         filter: Document,
-
-        /// The number of documents the server should return per cursor batch.
-        ///
-        /// Note that this does not have any affect on the documents that are returned by a cursor,
-        /// only the number of documents kept in memory at a given time (and by extension, the
-        /// number of round trips needed to return the entire set of documents returned by the
-        /// query).
         batch_size: u32,
-
-        /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
-        /// database profiler, currentOp and logs.
-        ///
-        /// This option is only available on server versions 4.4+.
         comment: Bson,
     );
 }
