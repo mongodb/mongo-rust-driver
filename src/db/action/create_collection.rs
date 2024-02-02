@@ -1,11 +1,7 @@
-use bson::{doc, Document};
-
 use crate::{
     action::{action_impl, CreateCollection},
-    db::options::CreateCollectionOptions,
     error::Result,
     operation::create as op,
-    ClientSession,
     Database,
     Namespace,
 };
@@ -40,6 +36,7 @@ action_impl! {
 
             #[cfg(feature = "in-use-encryption-unstable")]
             if has_encrypted_fields {
+                use bson::{doc, Document};
                 let coll = self.db.collection::<Document>(&ns.coll);
                 coll.create_index_common(
                     crate::IndexModel {
@@ -62,7 +59,7 @@ impl Database {
     async fn resolve_encrypted_fields(
         &self,
         base_ns: &Namespace,
-        options: &mut Option<CreateCollectionOptions>,
+        options: &mut Option<crate::db::options::CreateCollectionOptions>,
     ) {
         let has_encrypted_fields = options
             .as_ref()
@@ -89,10 +86,11 @@ impl Database {
     async fn create_aux_collections(
         &self,
         base_ns: &Namespace,
-        options: &Option<CreateCollectionOptions>,
-        mut session: Option<&mut ClientSession>,
+        options: &Option<crate::db::options::CreateCollectionOptions>,
+        mut session: Option<&mut crate::ClientSession>,
     ) -> Result<()> {
         use crate::error::ErrorKind;
+        use bson::doc;
 
         let opts = match options {
             Some(o) => o,
