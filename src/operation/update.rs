@@ -196,7 +196,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
             .as_ref()
             .and_then(|v| v.first())
             .and_then(|doc| doc.get("_id"))
-            .map(Clone::clone);
+            .cloned();
 
         let matched_count = if upserted_id.is_some() { 0 } else { response.n };
 
