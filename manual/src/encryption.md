@@ -291,13 +291,10 @@ async fn main() -> Result<()> {
     // Clear old data
     coll.drop(None).await?;
     // Create the collection with the encryption JSON Schema.
-    db.create_collection(
-        &encrypted_namespace.coll,
-        CreateCollectionOptions::builder()
-            .write_concern(WriteConcern::majority())
-            .validator(doc! { "$jsonSchema": schema })
-            .build(),
-    ).await?;
+    db.create_collection(&encrypted_namespace.coll)
+        .write_concern(WriteConcern::majority())
+        .validator(doc! { "$jsonSchema": schema })
+        .await?;
 
     coll.insert_one(doc! { "encryptedField": "123456789" }, None)
         .await?;
@@ -411,7 +408,7 @@ async fn main() -> Result<()> {
     let db = client.database("example");
     let coll = db.collection::<Document>("encryptedCollection");
     coll.drop(None).await?;
-    db.create_collection("encryptedCollection", None).await?;
+    db.create_collection("encryptedCollection").await?;
     coll.insert_one(
         doc! { "_id": 1, "firstName": "Jane", "lastName": "Doe" },
         None,
@@ -527,13 +524,9 @@ async fn main() -> Result<()> {
     db.drop().await?;
 
     // Create the collection with encrypted fields.
-    db.create_collection(
-        "coll",
-        CreateCollectionOptions::builder()
-            .encrypted_fields(encrypted_fields)
-            .build(),
-    )
-    .await?;
+    db.create_collection("coll")
+        .encrypted_fields(encrypted_fields)
+        .await?;
     let coll = db.collection::<Document>("coll");
 
     // Create and encrypt an indexed and unindexed value.
