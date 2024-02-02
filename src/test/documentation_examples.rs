@@ -1461,12 +1461,9 @@ async fn stable_api_examples() -> GenericResult<()> {
 
     // Start Versioned API Example 6
     let result = db
-        .run_command(
-            doc! {
-                "count": "sales"
-            },
-            None,
-        )
+        .run_command(doc! {
+            "count": "sales"
+        })
         .await;
     if let Err(err) = &result {
         println!("{:#?}", err.kind);
@@ -1665,14 +1662,12 @@ async fn run_command_examples() -> Result<()> {
 
     #[allow(unused)]
     // Start runCommand Example 1
-    let info = db.run_command(doc! {"buildInfo": 1}, None).await?;
+    let info = db.run_command(doc! {"buildInfo": 1}).await?;
     // End runCommand Example 1
 
     #[allow(unused)]
     // Start runCommand Example 2
-    let stats = db
-        .run_command(doc! {"collStats": "restaurants"}, None)
-        .await?;
+    let stats = db.run_command(doc! {"collStats": "restaurants"}).await?;
     // End runCommand Example 2
 
     Ok(())
