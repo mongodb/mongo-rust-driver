@@ -30,6 +30,7 @@ use mongocrypt::ctx::{Algorithm, KmsProvider};
 use tokio::net::TcpListener;
 
 use crate::{
+    action::Action,
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
     db::options::CreateCollectionOptions,
     error::{ErrorKind, WriteError, WriteFailure},

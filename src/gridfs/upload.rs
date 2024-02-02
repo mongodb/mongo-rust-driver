@@ -12,6 +12,7 @@ use futures_util::{
 
 use super::{options::GridFsUploadOptions, Chunk, FilesCollectionDocument, GridFsBucket};
 use crate::{
+    action::Action,
     bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
     bson_util::get_int,
     client::AsyncDropToken,

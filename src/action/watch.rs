@@ -150,8 +150,7 @@ impl<T> crate::sync::Collection<T> {
 }
 
 /// Starts a new [`ChangeStream`] that receives events for all changes in a given scope.  Create by
-/// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`] and execute with
-/// `await` (or [run](Watch::run) if using the sync client).
+/// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`].
 #[must_use]
 pub struct Watch<'a, S = ImplicitSession> {
     client: &'a Client,
@@ -245,7 +244,7 @@ impl<'a> Watch<'a, ImplicitSession> {
 }
 
 action_impl! {
-    impl Action<'a> for Watch<'a, ImplicitSession> {
+    impl<'a> Action for Watch<'a, ImplicitSession> {
         type Future = WatchFuture;
 
         async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
@@ -271,7 +270,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl Action<'a> for Watch<'a, ExplicitSession<'a>> {
+    impl<'a> Action for Watch<'a, ExplicitSession<'a>> {
         type Future = WatchSessionFuture;
 
         async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {

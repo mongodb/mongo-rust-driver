@@ -42,6 +42,7 @@ use super::{
 };
 
 use crate::{
+    action::Action,
     bson::{doc, to_bson, Bson, Document},
     client::session::TransactionState,
     coll::options::Hint,

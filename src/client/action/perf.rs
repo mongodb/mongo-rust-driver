@@ -1,7 +1,7 @@
 use crate::action::action_impl;
 
 action_impl! {
-    impl Action<'a> for crate::action::WarmConnectionPool<'a> {
+    impl<'a> Action for crate::action::WarmConnectionPool<'a> {
         type Future = WarmConnectionPoolFuture;
 
         async fn execute(self) -> () {

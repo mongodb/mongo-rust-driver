@@ -33,8 +33,7 @@ impl crate::sync::Database {
 }
 
 /// Drops the database, deleting all data, collections, and indexes stored in it.  Create by calling
-/// [`Database::drop`] and execute with `await` (or [`run`](DropDatabase::run) if using the sync
-/// client).
+/// [`Database::drop`].
 #[must_use]
 pub struct DropDatabase<'a> {
     db: &'a Database,
@@ -55,7 +54,7 @@ impl<'a> DropDatabase<'a> {
 }
 
 action_impl! {
-    impl Action<'a> for DropDatabase<'a> {
+    impl<'a> Action for DropDatabase<'a> {
         type Future = DropDatabaseFuture;
 
         async fn execute(mut self) -> Result<()> {

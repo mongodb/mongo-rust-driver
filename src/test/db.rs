@@ -3,6 +3,7 @@ use std::cmp::Ord;
 use futures::stream::TryStreamExt;
 
 use crate::{
+    action::Action,
     bson::{doc, Document},
     error::Result,
     options::{

@@ -48,14 +48,6 @@ macro_rules! option_setters {
             self
         }
 
-        /// If the value is `Some`, call the provided function on `self`.  Convenient for chained updates with values that need to be set conditionally.
-        pub fn optional<Value>(self, value: Option<Value>, f: impl FnOnce(Self, Value) -> Self) -> Self {
-            match value {
-                Some(value) => f(self, value),
-                None => self,
-            }
-        }
-
         $(
             #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
             $(#[$($attrss)*])*
@@ -68,6 +60,25 @@ macro_rules! option_setters {
 }
 use option_setters;
 
+/// A pending action to execute on the server.  The action can be configured via chained methods and
+/// executed via `await` (or `run` if using the sync client).
+pub trait Action {
+    /// The type of the value produced by execution.
+    type Output;
+
+    /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
+    /// updates with values that need to be set conditionally.
+    fn optional<Value>(self, value: Option<Value>, f: impl FnOnce(Self, Value) -> Self) -> Self
+    where
+        Self: Sized,
+    {
+        match value {
+            Some(value) => f(self, value),
+            None => self,
+        }
+    }
+}
+
 /// Generates:
 /// * an `IntoFuture` executing the given method body
 /// * an opaque wrapper type for the future in case we want to do something more fancy than
@@ -76,13 +87,13 @@ use option_setters;
 macro_rules! action_impl {
     // Generate with no sync type conversion
     (
-        impl Action$(<$lt:lifetime>)? for $action:ty {
+        impl$(<$lt:lifetime>)? Action for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
         }
     ) => {
         crate::action::action_impl! {
-            impl Action$(<$lt>)? for $action {
+            impl$(<$lt>)? Action for $action {
                 type Future = $f_ty;
                 async fn execute($($args)+) -> $out $code
                 fn sync_wrap(out) -> $out { out }
@@ -91,7 +102,7 @@ macro_rules! action_impl {
     };
     // Generate with a sync type conversion
     (
-        impl Action$(<$lt:lifetime>)? for $action:ty {
+        impl$(<$lt:lifetime>)? Action for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
             fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
@@ -106,6 +117,10 @@ macro_rules! action_impl {
                     $code
                 }))
             }
+        }
+
+        impl$(<$lt>)? crate::action::Action for $action {
+            type Output = $out;
         }
 
         crate::action::action_impl_future_wrapper!($($lt)?, $f_ty, $out);

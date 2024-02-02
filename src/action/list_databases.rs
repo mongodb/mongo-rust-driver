@@ -59,8 +59,7 @@ impl SyncClient {
 }
 
 /// Gets information about each database present in the cluster the Client is connected to.  Create
-/// by calling [`Client::list_databases`] or [`Client::list_database_names`] and execute with
-/// `await` (or [run](ListDatabases::run) if using the sync client).
+/// by calling [`Client::list_databases`] or [`Client::list_database_names`].
 #[must_use]
 pub struct ListDatabases<'a, M = ListSpecifications> {
     client: &'a Client,
@@ -84,7 +83,7 @@ impl<'a, M> ListDatabases<'a, M> {
 }
 
 action_impl! {
-    impl Action<'a> for ListDatabases<'a, ListSpecifications> {
+    impl<'a> Action for ListDatabases<'a, ListSpecifications> {
         type Future = ListDatabasesFuture;
 
         async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
@@ -104,7 +103,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl Action<'a> for ListDatabases<'a, ListNames> {
+    impl<'a> Action for ListDatabases<'a, ListNames> {
         type Future = ListDatabaseNamesFuture;
 
         async fn execute(self) -> Result<Vec<String>> {

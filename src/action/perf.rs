@@ -38,8 +38,7 @@ impl crate::sync::Client {
 }
 
 /// Add connections to the connection pool up to `min_pool_size`.  Create by calling
-/// [`Client::warm_connection_pool`] and execute with `await` (or [`run`](WarmConnectionPool::run)
-/// if using the sync client).
+/// [`Client::warm_connection_pool`].
 #[must_use]
 pub struct WarmConnectionPool<'a> {
     pub(crate) client: &'a Client,

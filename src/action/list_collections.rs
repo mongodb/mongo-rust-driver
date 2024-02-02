@@ -68,8 +68,7 @@ impl crate::sync::Database {
 }
 
 /// Gets information about each of the collections in the database.  Create by
-/// calling [`Database::list_collections`] or [`Database::list_collection_names`] and execute
-/// with `await` (or [`run`](ListCollections::run) if using the sync client).
+/// calling [`Database::list_collections`] or [`Database::list_collection_names`].
 #[must_use]
 pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
     db: &'a Database,
@@ -102,7 +101,7 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
 }
 
 action_impl! {
-    impl Action<'a> for ListCollections<'a, ListSpecifications, ImplicitSession> {
+    impl<'a> Action for ListCollections<'a, ListSpecifications, ImplicitSession> {
         type Future = ListCollectionsFuture;
 
         async fn execute(self) -> Result<Cursor<CollectionSpecification>> {
@@ -123,7 +122,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl Action<'a> for ListCollections<'a, ListSpecifications, ExplicitSession<'a>> {
+    impl<'a> Action for ListCollections<'a, ListSpecifications, ExplicitSession<'a>> {
         type Future = ListCollectionsSessionFuture;
 
         async fn execute(self) -> Result<SessionCursor<CollectionSpecification>> {
@@ -162,7 +161,7 @@ async fn list_collection_names_common(
 }
 
 action_impl! {
-    impl Action<'a> for ListCollections<'a, ListNames, ImplicitSession> {
+    impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
         type Future = ListCollectionNamesFuture;
 
         async fn execute(self) -> Result<Vec<String>> {
@@ -180,7 +179,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl Action<'a> for ListCollections<'a, ListNames, ExplicitSession<'a>> {
+    impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
         type Future = ListCollectionNamesSessionFuture;
 
         async fn execute(self) -> Result<Vec<String>> {

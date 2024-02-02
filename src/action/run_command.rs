@@ -71,8 +71,7 @@ impl crate::sync::Database {
     }
 }
 
-/// Run a database-level command.  Create with [`Database::run_command`] and execute with `await`
-/// (or [`run`](RunCommand::run) if using the sync client).
+/// Run a database-level command.  Create with [`Database::run_command`].
 #[must_use]
 pub struct RunCommand<'a> {
     db: &'a Database,
@@ -82,19 +81,6 @@ pub struct RunCommand<'a> {
 }
 
 impl<'a> RunCommand<'a> {
-    /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
-    /// updates with values that need to be set conditionally.
-    pub fn optional<Value>(
-        self,
-        value: Option<Value>,
-        f: impl FnOnce(Self, Value) -> Self,
-    ) -> Self {
-        match value {
-            Some(value) => f(self, value),
-            None => self,
-        }
-    }
-
     /// Set the selection criteria for the command.
     pub fn selection_criteria(mut self, value: SelectionCriteria) -> Self {
         self.selection_criteria = Some(value);
@@ -109,7 +95,7 @@ impl<'a> RunCommand<'a> {
 }
 
 action_impl! {
-    impl Action<'a> for RunCommand<'a> {
+    impl<'a> Action for RunCommand<'a> {
         type Future = RunCommandFuture;
 
         async fn execute(self) -> Result<Document> {
@@ -150,8 +136,7 @@ action_impl! {
 }
 
 /// Runs a database-level command and returns a cursor to the response.  Create with
-/// [`Database::run_cursor_command`] and execute with `await` (or [`run`](RunCursorCommand::run) if
-/// using the sync client).
+/// [`Database::run_cursor_command`].
 #[must_use]
 pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     db: &'a Database,
@@ -186,7 +171,7 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
 }
 
 action_impl! {
-    impl Action<'a> for RunCursorCommand<'a, ImplicitSession> {
+    impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
         type Future = RunCursorCommandFuture;
 
         async fn execute(self) -> Result<Cursor<Document>> {
@@ -211,7 +196,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl Action<'a> for RunCursorCommand<'a, ExplicitSession<'a>> {
+    impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
         type Future = RunCursorCommandSessionFuture;
 
         async fn execute(mut self) -> Result<SessionCursor<Document>> {

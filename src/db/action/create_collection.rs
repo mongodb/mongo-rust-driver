@@ -11,7 +11,7 @@ use crate::{
 };
 
 action_impl! {
-    impl Action<'a> for CreateCollection<'a> {
+    impl<'a> Action for CreateCollection<'a> {
         type Future = CreateCollectionFuture;
 
         async fn execute(mut self) -> Result<()> {
