@@ -1,4 +1,9 @@
-use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
@@ -628,24 +633,19 @@ impl TestOperation for Aggregate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = database
+                .aggregate(self.pipeline.clone())
+                .with_options(self.options.clone());
             let result = match session {
-                Some(session) => {
-                    let mut cursor = database
-                        .aggregate_with_session(
-                            self.pipeline.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?;
+                Some(mut session) => {
+                    let mut cursor = action.session(session.deref_mut()).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = database
-                        .aggregate(self.pipeline.clone(), self.options.clone())
-                        .await?;
+                    let cursor = action.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };

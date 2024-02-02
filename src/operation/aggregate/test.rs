@@ -4,8 +4,8 @@ use crate::{
     bson::doc,
     error::{ErrorKind, WriteFailure},
     operation::{
+        aggregate::Aggregate,
         test::{self, handle_response_test},
-        Aggregate,
     },
     options::AggregateOptions,
     Namespace,

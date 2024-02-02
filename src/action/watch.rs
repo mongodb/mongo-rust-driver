@@ -12,7 +12,7 @@ use crate::{
     },
     collation::Collation,
     error::{ErrorKind, Result},
-    operation::AggregateTarget,
+    operation::aggregate::AggregateTarget,
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,

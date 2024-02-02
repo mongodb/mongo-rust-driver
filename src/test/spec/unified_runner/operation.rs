@@ -891,42 +891,11 @@ impl TestOperation for UpdateOne {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     session: Option<String>,
     options: AggregateOptions,
-}
-
-// TODO RUST-1364: remove this impl and derive Deserialize instead
-impl<'de> Deserialize<'de> for Aggregate {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        struct Helper {
-            pipeline: Vec<Document>,
-            session: Option<String>,
-            comment: Option<Bson>,
-            #[serde(flatten)]
-            options: AggregateOptions,
-        }
-
-        let mut helper = Helper::deserialize(deserializer)?;
-        match helper.comment {
-            Some(Bson::String(string)) => {
-                helper.options.comment = Some(string);
-            }
-            Some(bson) => {
-                helper.options.comment_bson = Some(bson);
-            }
-            _ => {}
-        }
-
-        Ok(Self {
-            pipeline: helper.pipeline,
-            session: helper.session,
-            options: helper.options,
-        })
-    }
 }
 
 impl TestOperation for Aggregate {
@@ -960,12 +929,10 @@ impl TestOperation for Aggregate {
                                     .await?
                             }
                             AggregateEntity::Database(db) => {
-                                db.aggregate_with_session(
-                                    self.pipeline.clone(),
-                                    self.options.clone(),
-                                    session,
-                                )
-                                .await?
+                                db.aggregate(self.pipeline.clone())
+                                    .with_options(self.options.clone())
+                                    .session(session.deref_mut())
+                                    .await?
                             }
                             AggregateEntity::Other(debug) => {
                                 panic!("Cannot execute aggregate on {}", &debug)
@@ -984,7 +951,8 @@ impl TestOperation for Aggregate {
                                 .await?
                         }
                         Entity::Database(db) => {
-                            db.aggregate(self.pipeline.clone(), self.options.clone())
+                            db.aggregate(self.pipeline.clone())
+                                .with_options(self.options.clone())
                                 .await?
                         }
                         other => panic!("Cannot execute aggregate on {:?}", &other),

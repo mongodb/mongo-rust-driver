@@ -1,18 +1,14 @@
 use std::fmt::Debug;
 
-use super::{gridfs::GridFsBucket, ClientSession, Collection, Cursor, SessionCursor};
+use super::{gridfs::GridFsBucket, Collection};
 use crate::{
-    bson::Document,
-    error::Result,
     options::{
-        AggregateOptions,
         CollectionOptions,
         GridFsBucketOptions,
         ReadConcern,
         SelectionCriteria,
         WriteConcern,
     },
-    runtime,
     Database as AsyncDatabase,
 };
 
@@ -100,38 +96,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.async_database.collection_with_options(name, options))
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_database.aggregate(pipeline, options.into())).map(Cursor::new)
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_database.aggregate_with_session(
-            pipeline,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
     }
 
     /// Creates a new [`GridFsBucket`] in the database with the given options.

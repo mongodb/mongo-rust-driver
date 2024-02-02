@@ -7,7 +7,6 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     options::{
-        AggregateOptions,
         Collation,
         CreateCollectionOptions,
         IndexOptionDefaults,
@@ -258,7 +257,7 @@ async fn db_aggregate() {
         },
     ];
 
-    db.aggregate(pipeline, None)
+    db.aggregate(pipeline)
         .await
         .expect("aggregate should succeed");
 }
@@ -301,9 +300,8 @@ async fn db_aggregate_disk_use() {
         },
     ];
 
-    let options = AggregateOptions::builder().allow_disk_use(true).build();
-
-    db.aggregate(pipeline, Some(options))
+    db.aggregate(pipeline)
+        .allow_disk_use(true)
         .await
         .expect("aggregate with disk use should succeed");
 }

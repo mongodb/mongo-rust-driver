@@ -131,7 +131,8 @@ fn database() {
         doc! { "$project": { "_id": 0, "dummy": 1 } },
     ];
     let cursor = admin_db
-        .aggregate(pipeline, None)
+        .aggregate(pipeline)
+        .run()
         .expect("aggregate should succeed");
     let results: Vec<Document> = cursor
         .collect::<Result<Vec<Document>>>()

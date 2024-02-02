@@ -1,5 +1,5 @@
 mod abort_transaction;
-mod aggregate;
+pub(crate) mod aggregate;
 mod commit_transaction;
 mod count;
 mod count_documents;
@@ -52,7 +52,6 @@ use crate::{
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
-pub(crate) use aggregate::{Aggregate, AggregateTarget, ChangeStreamAggregate};
 pub(crate) use commit_transaction::CommitTransaction;
 pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;

@@ -4,18 +4,12 @@ pub mod options;
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    bson::Document,
     concern::{ReadConcern, WriteConcern},
-    cursor::Cursor,
-    error::Result,
     gridfs::{options::GridFsBucketOptions, GridFsBucket},
-    operation::Aggregate,
-    options::{AggregateOptions, CollectionOptions, DatabaseOptions},
+    options::{CollectionOptions, DatabaseOptions},
     selection_criteria::SelectionCriteria,
     Client,
-    ClientSession,
     Collection,
-    SessionCursor,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -148,51 +142,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.clone(), name, Some(options))
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let mut options = options.into();
-        resolve_options!(
-            self,
-            options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
-        let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
-        let client = self.client();
-        client.execute_cursor_operation(aggregate).await
-    }
-
-    /// Runs an aggregation operation with the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let mut options = options.into();
-        resolve_options!(
-            self,
-            options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
-        let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(aggregate, session)
-            .await
     }
 
     /// Creates a new [`GridFsBucket`] in the database with the given options.

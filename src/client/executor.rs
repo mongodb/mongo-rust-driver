@@ -48,9 +48,8 @@ use crate::{
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
+        aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
         AbortTransaction,
-        AggregateTarget,
-        ChangeStreamAggregate,
         CommandErrorBody,
         CommitTransaction,
         Operation,

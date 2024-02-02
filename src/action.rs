@@ -1,5 +1,6 @@
 //! Action builder types.
 
+mod aggregate;
 mod create_collection;
 mod drop;
 mod list_collections;
@@ -10,6 +11,7 @@ mod session;
 mod shutdown;
 mod watch;
 
+pub use aggregate::Aggregate;
 pub use create_collection::CreateCollection;
 pub use drop::DropDatabase;
 pub use list_collections::ListCollections;

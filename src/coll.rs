@@ -23,7 +23,7 @@ use crate::{
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
     operation::{
-        Aggregate,
+        aggregate::Aggregate,
         Count,
         CountDocuments,
         CreateIndexes,
