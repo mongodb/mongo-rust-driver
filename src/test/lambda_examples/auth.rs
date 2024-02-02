@@ -37,7 +37,7 @@ async fn handler(_: LambdaEvent<Value>) -> Result<Value, lambda_runtime::Error> 
     let client = get_mongodb_client().await;
     let response = client
         .database("db")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await?;
     let json = serde_json::to_value(response)?;
     Ok(json)
@@ -57,7 +57,7 @@ async fn handler_create_client(_: LambdaEvent<Value>) -> Result<Value, lambda_ru
     let client = Client::with_uri_str(uri).await.unwrap();
     let response = client
         .database("db")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await?;
     let json = serde_json::to_value(response)?;
     Ok(json)
