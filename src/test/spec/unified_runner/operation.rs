@@ -895,6 +895,7 @@ impl TestOperation for UpdateOne {
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     session: Option<String>,
+    #[serde(flatten)]
     options: AggregateOptions,
 }
 
