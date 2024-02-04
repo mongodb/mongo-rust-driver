@@ -1,4 +1,4 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,13 +18,13 @@ struct TestFixtures {
 
 /// Get an Insert operation and the documents/options used to construct it.
 fn fixtures(opts: Option<InsertManyOptions>) -> TestFixtures {
-    lazy_static! {
-        static ref DOCUMENTS: Vec<Document> = vec![
+    static DOCUMENTS: Lazy<Vec<Document>> = Lazy::new(|| {
+        vec![
             Document::new(),
             doc! {"_id": 1234, "a": 1},
             doc! {"a": 123, "b": "hello world" },
-        ];
-    }
+        ]
+    });
 
     let options = opts.unwrap_or(InsertManyOptions {
         ordered: Some(true),

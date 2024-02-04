@@ -3,7 +3,7 @@ mod test;
 
 use std::env;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 use crate::{
     bson::{doc, Bson, Document},
@@ -260,28 +260,28 @@ impl FaasEnvironmentName {
     }
 }
 
-lazy_static! {
-    /// Contains the basic handshake information that can be statically determined. This document
-    /// (potentially with additional fields added) can be cloned and put in the `client` field of
-    /// the `hello` or legacy hello command.
-    static ref BASE_CLIENT_METADATA: ClientMetadata = {
-        ClientMetadata {
-            application: None,
-            driver: DriverMetadata {
-                name: "mongo-rust-driver".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            os: OsMetadata {
-                os_type: std::env::consts::OS.into(),
-                architecture: Some(std::env::consts::ARCH.into()),
-                name: None,
-                version: None,
-            },
-            platform: format!("{} with {}", rustc_version_runtime::version_meta().short_version_string, RUNTIME_NAME),
-            env: None,
-        }
-    };
-}
+/// Contains the basic handshake information that can be statically determined. This document
+/// (potentially with additional fields added) can be cloned and put in the `client` field of
+/// the `hello` or legacy hello command.
+static BASE_CLIENT_METADATA: Lazy<ClientMetadata> = Lazy::new(|| ClientMetadata {
+    application: None,
+    driver: DriverMetadata {
+        name: "mongo-rust-driver".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+    },
+    os: OsMetadata {
+        os_type: std::env::consts::OS.into(),
+        architecture: Some(std::env::consts::ARCH.into()),
+        name: None,
+        version: None,
+    },
+    platform: format!(
+        "{} with {}",
+        rustc_version_runtime::version_meta().short_version_string,
+        RUNTIME_NAME
+    ),
+    env: None,
+});
 
 type Truncation = fn(&mut ClientMetadata);
 

@@ -46,8 +46,8 @@ use clap::{App, Arg, ArgMatches};
 use futures::Future;
 #[cfg(feature = "tokio-runtime")]
 use futures::FutureExt;
-use lazy_static::lazy_static;
 use mongodb::options::ClientOptions;
+use once_cell::sync::Lazy;
 
 use crate::{
     bench::{
@@ -69,9 +69,7 @@ use crate::{
     score::{score_test, BenchmarkResult, CompositeScore},
 };
 
-lazy_static! {
-    static ref DATA_PATH: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
-}
+static DATA_PATH: Lazy<PathBuf> = Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("data"));
 
 // benchmark names
 const FLAT_BSON_ENCODING: &'static str = "Flat BSON Encoding";

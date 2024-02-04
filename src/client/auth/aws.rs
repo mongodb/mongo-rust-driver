@@ -2,7 +2,6 @@ use std::{fs::File, io::Read, time::Duration};
 
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
-use lazy_static::lazy_static;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -30,9 +29,7 @@ const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
 const MECH_NAME: &str = "MONGODB-AWS";
 
-lazy_static! {
-    static ref CACHED_CREDENTIAL: Mutex<Option<AwsCredential>> = Mutex::new(None);
-}
+static CACHED_CREDENTIAL: Mutex<Option<AwsCredential>> = Mutex::new(None);
 
 /// Performs MONGODB-AWS authentication for a given stream.
 pub(super) async fn authenticate_stream(

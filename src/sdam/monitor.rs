@@ -7,7 +7,6 @@ use std::{
 };
 
 use bson::doc;
-use lazy_static::lazy_static;
 use tokio::sync::watch;
 
 use super::{
@@ -31,9 +30,8 @@ use crate::{
 };
 
 fn next_monitoring_connection_id() -> u32 {
-    lazy_static! {
-        static ref MONITORING_CONNECTION_ID: AtomicU32 = AtomicU32::new(0);
-    }
+    static MONITORING_CONNECTION_ID: AtomicU32 = AtomicU32::new(0);
+
     MONITORING_CONNECTION_ID.fetch_add(1, Ordering::SeqCst)
 }
 

@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 
@@ -36,10 +36,8 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
     coll
 }
 
-lazy_static! {
-    static ref CLIENT_OPTIONS: ClientOptions =
-        runtime::block_on(async { crate::test::get_client_options().await.clone() });
-}
+static CLIENT_OPTIONS: Lazy<ClientOptions> =
+    Lazy::new(|| runtime::block_on(async { crate::test::get_client_options().await.clone() }));
 
 #[test]
 fn client_options() {

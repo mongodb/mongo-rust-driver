@@ -41,7 +41,7 @@ pub(crate) use self::{
 };
 
 use home::home_dir;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
 
 #[cfg(feature = "tracing-unstable")]
@@ -66,54 +66,50 @@ pub(crate) async fn get_client_options() -> &'static ClientOptions {
         .await
 }
 
-lazy_static! {
-    pub(crate) static ref DEFAULT_URI: String = get_default_uri();
-    pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
-    {
+pub(crate) static DEFAULT_URI: Lazy<String> = Lazy::new(|| get_default_uri());
+pub(crate) static SERVER_API: Lazy<Option<ServerApi>> =
+    Lazy::new(|| match std::env::var("MONGODB_API_VERSION") {
         Ok(server_api_version) if !server_api_version.is_empty() => Some(ServerApi {
             version: ServerApiVersion::from_str(server_api_version.as_str()).unwrap(),
             deprecation_errors: None,
             strict: None,
         }),
         _ => None,
-    };
-    pub(crate) static ref SERVERLESS: bool =
-        matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless");
-    pub(crate) static ref LOAD_BALANCED_SINGLE_URI: Option<String> =
-        std::env::var("SINGLE_MONGOS_LB_URI").ok();
-    pub(crate) static ref LOAD_BALANCED_MULTIPLE_URI: Option<String> =
-        std::env::var("MULTI_MONGOS_LB_URI").ok();
-    pub(crate) static ref ZSTD_COMPRESSION_ENABLED: bool =
-        matches!(std::env::var("ZSTD_COMPRESSION_ENABLED"), Ok(s) if s == "true");
-    pub(crate) static ref ZLIB_COMPRESSION_ENABLED: bool =
-        matches!(std::env::var("ZLIB_COMPRESSION_ENABLED"), Ok(s) if s == "true");
-    pub(crate) static ref SNAPPY_COMPRESSION_ENABLED: bool =
-        matches!(std::env::var("SNAPPY_COMPRESSION_ENABLED"), Ok(s) if s == "true");
-    pub(crate) static ref SERVERLESS_ATLAS_USER: Option<String> =
-        std::env::var("SERVERLESS_ATLAS_USER").ok();
-    pub(crate) static ref SERVERLESS_ATLAS_PASSWORD: Option<String> =
-        std::env::var("SERVERLESS_ATLAS_PASSWORD").ok();
-}
+    });
+pub(crate) static SERVERLESS: Lazy<bool> =
+    Lazy::new(|| matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless"));
+pub(crate) static LOAD_BALANCED_SINGLE_URI: Lazy<Option<String>> =
+    Lazy::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
+pub(crate) static LOAD_BALANCED_MULTIPLE_URI: Lazy<Option<String>> =
+    Lazy::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
+pub(crate) static ZSTD_COMPRESSION_ENABLED: Lazy<bool> =
+    Lazy::new(|| matches!(std::env::var("ZSTD_COMPRESSION_ENABLED"), Ok(s) if s == "true"));
+pub(crate) static ZLIB_COMPRESSION_ENABLED: Lazy<bool> =
+    Lazy::new(|| matches!(std::env::var("ZLIB_COMPRESSION_ENABLED"), Ok(s) if s == "true"));
+pub(crate) static SNAPPY_COMPRESSION_ENABLED: Lazy<bool> =
+    Lazy::new(|| matches!(std::env::var("SNAPPY_COMPRESSION_ENABLED"), Ok(s) if s == "true"));
+pub(crate) static SERVERLESS_ATLAS_USER: Lazy<Option<String>> =
+    Lazy::new(|| std::env::var("SERVERLESS_ATLAS_USER").ok());
+pub(crate) static SERVERLESS_ATLAS_PASSWORD: Lazy<Option<String>> =
+    Lazy::new(|| std::env::var("SERVERLESS_ATLAS_PASSWORD").ok());
 
 // conditional definitions do not work within the lazy_static! macro, so this
 // needs to be defined separately.
 #[cfg(feature = "tracing-unstable")]
-lazy_static! {
-    /// A global default tracing handler that will be installed the first time this
-    /// value is accessed. A global handler must be used anytime the multi-threaded
-    /// test runtime is in use, as non-global handlers only apply to the thread
-    /// they are registered in.
-    /// By default this handler will collect no tracing events.
-    /// Its minimum severity levels can be configured on a per-component basis using
-    /// [`TracingHandler:set_levels`]. The test lock MUST be acquired exclusively in
-    /// any test that will use the handler to avoid mixing events from multiple tests.
-    pub(crate) static ref DEFAULT_GLOBAL_TRACING_HANDLER: TracingHandler = {
-        let handler = TracingHandler::new();
-        tracing::subscriber::set_global_default(handler.clone())
-            .expect("setting global default tracing subscriber failed");
-        handler
-    };
-}
+/// A global default tracing handler that will be installed the first time this
+/// value is accessed. A global handler must be used anytime the multi-threaded
+/// test runtime is in use, as non-global handlers only apply to the thread
+/// they are registered in.
+/// By default this handler will collect no tracing events.
+/// Its minimum severity levels can be configured on a per-component basis using
+/// [`TracingHandler:set_levels`]. The test lock MUST be acquired exclusively in
+/// any test that will use the handler to avoid mixing events from multiple tests.
+pub(crate) static DEFAULT_GLOBAL_TRACING_HANDLER: Lazy<TracingHandler> = Lazy::new(|| {
+    let handler = TracingHandler::new();
+    tracing::subscriber::set_global_default(handler.clone())
+        .expect("setting global default tracing subscriber failed");
+    handler
+});
 
 pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     if options.server_api.is_none() {

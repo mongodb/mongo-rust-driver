@@ -1,5 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
+use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 
 use super::{LookupHosts, SrvPollingMonitor};
@@ -18,12 +19,12 @@ fn localhost_test_build_10gen(port: u16) -> ServerAddress {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref DEFAULT_HOSTS: Vec<ServerAddress> = vec![
+static DEFAULT_HOSTS: Lazy<Vec<ServerAddress>> = Lazy::new(|| {
+    vec![
         localhost_test_build_10gen(27017),
         localhost_test_build_10gen(27108),
-    ];
-}
+    ]
+});
 
 async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
     run_test_srv(None, new_hosts, expected_hosts).await

@@ -8,7 +8,7 @@ use crate::{
 };
 use bson::{rawdoc, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -336,9 +336,9 @@ async fn no_kill_cursors_on_exhausted() {
     assert!(!kill_cursors_sent(&event_client));
 }
 
-lazy_static! {
-    #[allow(clippy::unreadable_literal)]
-    static ref LARGE_DOC: Document = doc! {
+#[allow(clippy::unreadable_literal)]
+static LARGE_DOC: Lazy<Document> = Lazy::new(|| {
+    doc! {
         "text": "the quick brown fox jumped over the lazy sheep dog",
         "in_reply_to_status_id": 22213321312i64,
         "retweet_count": Bson::Null,
@@ -386,8 +386,8 @@ lazy_static! {
             "listed_count": 1,
             "lang": "en"
         }
-    };
-}
+    }
+});
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]

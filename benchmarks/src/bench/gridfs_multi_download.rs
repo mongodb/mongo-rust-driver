@@ -5,18 +5,16 @@ use std::{
 
 use anyhow::{Context, Result};
 use futures::AsyncWriteExt;
-use lazy_static::lazy_static;
 use mongodb::{bson::oid::ObjectId, gridfs::GridFsBucket, Client};
+use once_cell::sync::Lazy;
 
 use crate::{
     bench::{drop_database, Benchmark, DATABASE_NAME},
     fs::{open_async_read_compat, open_async_write_compat},
 };
 
-lazy_static! {
-    static ref DOWNLOAD_PATH: PathBuf =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("gridfs_multi_download");
-}
+static DOWNLOAD_PATH: Lazy<PathBuf> =
+    Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("gridfs_multi_download"));
 
 pub struct GridFsMultiDownloadBenchmark {
     uri: String,
