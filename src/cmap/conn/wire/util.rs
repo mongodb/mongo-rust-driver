@@ -3,13 +3,9 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use lazy_static::lazy_static;
-
 /// Closure to obtain a new, unique request ID.
 pub(crate) fn next_request_id() -> i32 {
-    lazy_static! {
-        static ref REQUEST_ID: AtomicI32 = AtomicI32::new(0);
-    }
+    static REQUEST_ID: AtomicI32 = AtomicI32::new(0);
 
     REQUEST_ID.fetch_add(1, Ordering::SeqCst)
 }

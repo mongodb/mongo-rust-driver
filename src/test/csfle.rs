@@ -24,8 +24,8 @@ use bson::{
     RawDocumentBuf,
 };
 use futures_util::TryStreamExt;
-use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
+use once_cell::sync::Lazy;
 #[cfg(feature = "tokio-runtime")]
 use tokio::net::TcpListener;
 
@@ -91,85 +91,88 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
 
 pub(crate) type KmsProviderList = Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>;
 
-lazy_static! {
-    static ref KMS_PROVIDERS: KmsProviderList = {
-        fn env(name: &str) -> String {
-            std::env::var(name).unwrap()
-        }
-        vec![
-            (
-                KmsProvider::Aws,
-                doc! {
-                    "accessKeyId": env("AWS_ACCESS_KEY_ID"),
-                    "secretAccessKey": env("AWS_SECRET_ACCESS_KEY"),
+static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
+    fn env(name: &str) -> String {
+        std::env::var(name).unwrap()
+    }
+    vec![
+        (
+            KmsProvider::Aws,
+            doc! {
+                "accessKeyId": env("AWS_ACCESS_KEY_ID"),
+                "secretAccessKey": env("AWS_SECRET_ACCESS_KEY"),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Azure,
+            doc! {
+                "tenantId": env("AZURE_TENANT_ID"),
+                "clientId": env("AZURE_CLIENT_ID"),
+                "clientSecret": env("AZURE_CLIENT_SECRET"),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Gcp,
+            doc! {
+                "email": env("GCP_EMAIL"),
+                "privateKey": env("GCP_PRIVATE_KEY"),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Local,
+            doc! {
+                "key": bson::Binary {
+                    subtype: bson::spec::BinarySubtype::Generic,
+                    bytes: base64::decode(env("CSFLE_LOCAL_KEY")).unwrap(),
                 },
-                None,
-            ),
-            (
-                KmsProvider::Azure,
-                doc! {
-                    "tenantId": env("AZURE_TENANT_ID"),
-                    "clientId": env("AZURE_CLIENT_ID"),
-                    "clientSecret": env("AZURE_CLIENT_SECRET"),
-                },
-                None,
-            ),
-            (
-                KmsProvider::Gcp,
-                doc! {
-                    "email": env("GCP_EMAIL"),
-                    "privateKey": env("GCP_PRIVATE_KEY"),
-                },
-                None,
-            ),
-            (
-                KmsProvider::Local,
-                doc! {
-                    "key": bson::Binary {
-                        subtype: bson::spec::BinarySubtype::Generic,
-                        bytes: base64::decode(env("CSFLE_LOCAL_KEY")).unwrap(),
-                    },
-                },
-                None,
-            ),
-            (
-                KmsProvider::Kmip,
-                doc! {
-                    "endpoint": "localhost:5698",
-                },
-                {
-                    let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
-                    Some(
-                        TlsOptions::builder()
-                            .ca_file_path(cert_dir.join("ca.pem"))
-                            .cert_key_file_path(cert_dir.join("client.pem"))
-                            .build(),
-                    )
-                },
-            ),
-        ]
-    };
-    static ref LOCAL_KMS: KmsProviderList = KMS_PROVIDERS
+            },
+            None,
+        ),
+        (
+            KmsProvider::Kmip,
+            doc! {
+                "endpoint": "localhost:5698",
+            },
+            {
+                let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
+                Some(
+                    TlsOptions::builder()
+                        .ca_file_path(cert_dir.join("ca.pem"))
+                        .cert_key_file_path(cert_dir.join("client.pem"))
+                        .build(),
+                )
+            },
+        ),
+    ]
+});
+static LOCAL_KMS: Lazy<KmsProviderList> = Lazy::new(|| {
+    KMS_PROVIDERS
         .iter()
         .filter(|(p, ..)| p == &KmsProvider::Local)
         .cloned()
-        .collect();
-    pub(crate) static ref KMS_PROVIDERS_MAP: HashMap<
+        .collect()
+});
+pub(crate) static KMS_PROVIDERS_MAP: Lazy<
+    HashMap<
         mongocrypt::ctx::KmsProvider,
         (bson::Document, Option<crate::client::options::TlsOptions>),
-    > = {
-        let mut map = HashMap::new();
-        for (prov, conf, tls) in KMS_PROVIDERS.clone() {
-            map.insert(prov, (conf, tls));
-        }
-        map
-    };
-    static ref EXTRA_OPTIONS: Document =
-        doc! { "cryptSharedLibPath": std::env::var("CRYPT_SHARED_LIB_PATH").unwrap() };
-    static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
-    static ref DISABLE_CRYPT_SHARED: bool =
-        std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true");
-}
+    >,
+> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    for (prov, conf, tls) in KMS_PROVIDERS.clone() {
+        map.insert(prov, (conf, tls));
+    }
+    map
+});
+static EXTRA_OPTIONS: Lazy<Document> =
+    Lazy::new(|| doc! { "cryptSharedLibPath": std::env::var("CRYPT_SHARED_LIB_PATH").unwrap() });
+static KV_NAMESPACE: Lazy<Namespace> =
+    Lazy::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
+static DISABLE_CRYPT_SHARED: Lazy<bool> =
+    Lazy::new(|| std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true"));
 
 fn check_env(name: &str, kmip: bool) -> bool {
     if std::env::var("CSFLE_LOCAL_KEY").is_err() {

@@ -3,7 +3,7 @@ use bson::RawDocumentBuf;
 use bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption-unstable")]
 use futures_core::future::BoxFuture;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 
 use std::{
@@ -63,27 +63,25 @@ use crate::{
     ClusterTime,
 };
 
-lazy_static! {
-    pub(crate) static ref REDACTED_COMMANDS: HashSet<&'static str> = {
-        let mut hash_set = HashSet::new();
-        hash_set.insert("authenticate");
-        hash_set.insert("saslstart");
-        hash_set.insert("saslcontinue");
-        hash_set.insert("getnonce");
-        hash_set.insert("createuser");
-        hash_set.insert("updateuser");
-        hash_set.insert("copydbgetnonce");
-        hash_set.insert("copydbsaslstart");
-        hash_set.insert("copydb");
-        hash_set
-    };
-    pub(crate) static ref HELLO_COMMAND_NAMES: HashSet<&'static str> = {
-        let mut hash_set = HashSet::new();
-        hash_set.insert("hello");
-        hash_set.insert(LEGACY_HELLO_COMMAND_NAME_LOWERCASE);
-        hash_set
-    };
-}
+pub(crate) static REDACTED_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut hash_set = HashSet::new();
+    hash_set.insert("authenticate");
+    hash_set.insert("saslstart");
+    hash_set.insert("saslcontinue");
+    hash_set.insert("getnonce");
+    hash_set.insert("createuser");
+    hash_set.insert("updateuser");
+    hash_set.insert("copydbgetnonce");
+    hash_set.insert("copydbsaslstart");
+    hash_set.insert("copydb");
+    hash_set
+});
+pub(crate) static HELLO_COMMAND_NAMES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut hash_set = HashSet::new();
+    hash_set.insert("hello");
+    hash_set.insert(LEGACY_HELLO_COMMAND_NAME_LOWERCASE);
+    hash_set
+});
 
 impl Client {
     /// Execute the given operation.

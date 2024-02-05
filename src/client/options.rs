@@ -17,7 +17,7 @@ use std::{
 
 use bson::UuidRepresentation;
 use derivative::Derivative;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
@@ -83,18 +83,14 @@ const URI_OPTIONS: &[&str] = &[
     "zlibcompressionlevel",
 ];
 
-lazy_static! {
-    /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
-    /// Usernames / passwords that contain these characters must instead include the URL encoded version of them when included
-    /// as part of the connection string.
-    static ref USERINFO_RESERVED_CHARACTERS: HashSet<&'static char> = {
-        [':', '/', '?', '#', '[', ']', '@'].iter().collect()
-    };
+/// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
+/// Usernames / passwords that contain these characters must instead include the URL encoded version
+/// of them when included as part of the connection string.
+static USERINFO_RESERVED_CHARACTERS: Lazy<HashSet<&'static char>> =
+    Lazy::new(|| [':', '/', '?', '#', '[', ']', '@'].iter().collect());
 
-    static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
-        ['/', '\\', ' ', '"', '$'].iter().collect()
-    };
-}
+static ILLEGAL_DATABASE_CHARACTERS: Lazy<HashSet<&'static char>> =
+    Lazy::new(|| ['/', '\\', ' ', '"', '$'].iter().collect());
 
 /// An enum representing the address of a MongoDB server.
 #[derive(Clone, Debug, Eq, Serialize)]
