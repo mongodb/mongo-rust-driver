@@ -6,4 +6,4 @@ pip3 install ziglang
 source ${PROJECT_DIRECTORY}/.cargo/env
 rustup default stable
 
-${PROJECT_DIRECTORY}/.evergreen/run-deployed-lambda-aws-tests.sh
+${DRIVERS_TOOLS}/.evergreen/aws_lambda/run-deployed-lambda-aws-tests.sh
