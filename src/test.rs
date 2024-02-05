@@ -66,7 +66,7 @@ pub(crate) async fn get_client_options() -> &'static ClientOptions {
         .await
 }
 
-pub(crate) static DEFAULT_URI: Lazy<String> = Lazy::new(|| get_default_uri());
+pub(crate) static DEFAULT_URI: Lazy<String> = Lazy::new(get_default_uri);
 pub(crate) static SERVER_API: Lazy<Option<ServerApi>> =
     Lazy::new(|| match std::env::var("MONGODB_API_VERSION") {
         Ok(server_api_version) if !server_api_version.is_empty() => Some(ServerApi {

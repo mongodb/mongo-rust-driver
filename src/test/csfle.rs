@@ -25,6 +25,7 @@ use bson::{
 };
 use futures_util::TryStreamExt;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
+use once_cell::sync::Lazy;
 #[cfg(feature = "tokio-runtime")]
 use tokio::net::TcpListener;
 
