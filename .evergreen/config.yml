@@ -312,7 +312,7 @@ buildvariants:
       - test-plain-auth
 
   - name: serverless-passthrough
-    #patchable: false
+    patchable: false
     display_name: "Serverless (Passthrough)"
     run_on:
       - rhel80-small
@@ -324,9 +324,8 @@ buildvariants:
     tasks:
       - serverless-task-group
 
-
   - name: serverless-terminating
-    #patchable: false
+    patchable: false
     display_name: "Serverless (Terminating)"
     run_on:
       - rhel80-small
@@ -395,11 +394,19 @@ buildvariants:
 
   - name: search-index
     display_name: "Search Index Helpers"
-    patchable: true  # TODO RUST-1684 change to false before merge
+    patchable: false
     run_on:
       - rhel87-small
     tasks:
       - name: search-index-task-group
+
+  - name: aws-lambda
+    display_name: "AWS Lambda"
+    patchable: true
+    run_on:
+      - ubuntu2204-small
+    tasks:
+      - name: test-aws-lambda-task-group
 
 ###############
 # Task Groups #
@@ -592,6 +599,39 @@ task_groups:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
     tasks:
       - test-search-index
+
+  - name: test-aws-lambda-task-group
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install cargo-lambda"
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
+      - command: expansions.update
+        params:
+          file: src/atlas-expansion.yml
+    teardown_group:
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - test-aws-lambda-deployed
 
 #########
 # Tasks #
@@ -1212,6 +1252,24 @@ tasks:
           LOAD_BALANCER: true
       - func: start load balancer
       - func: run driver test suite
+  
+  - name: test-aws-lambda-deployed
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${LAMBDA_AWS_ROLE_ARN}
+          duration_seconds: 3600
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - .evergreen/run-aws-lambda-test.sh
+          env:
+            TEST_LAMBDA_DIRECTORY: ${PROJECT_DIRECTORY}/.evergreen/aws-lambda-test
+            AWS_REGION: us-east-1
+            SAM_BUILD_ARGS: --beta-features --debug
 
 #############
 # Functions #
@@ -1426,6 +1484,14 @@ functions:
       script: |
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh junit-dependencies
+
+  "install cargo-lambda":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/install-dependencies.sh cargo-lambda
 
   "bootstrap mongo-orchestration":
     - command: subprocess.exec
