@@ -179,12 +179,8 @@ pub(crate) struct HelloCommandResponse {
 
     /// The server-generated ID for the connection the "hello" command was run on.
     /// Present on server versions 4.2+.
-    #[serde(deserialize_with = "deserialize_connection_id", default = "none")]
+    #[serde(deserialize_with = "deserialize_connection_id", default)]
     pub connection_id: Option<i64>,
-}
-
-fn none<T>() -> Option<T> {
-    None
 }
 
 fn deserialize_connection_id<'de, D: serde::Deserializer<'de>>(
