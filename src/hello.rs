@@ -179,7 +179,29 @@ pub(crate) struct HelloCommandResponse {
 
     /// The server-generated ID for the connection the "hello" command was run on.
     /// Present on server versions 4.2+.
+    #[serde(deserialize_with = "deserialize_connection_id", default = "none")]
     pub connection_id: Option<i64>,
+}
+
+fn none<T>() -> Option<T> {
+    None
+}
+
+fn deserialize_connection_id<'de, D: serde::Deserializer<'de>>(
+    de: D,
+) -> std::result::Result<Option<i64>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper {
+        Int32(i32),
+        Int64(i64),
+        Double(f64),
+    }
+    Ok(Some(match Helper::deserialize(de)? {
+        Helper::Int32(v) => v as i64,
+        Helper::Int64(v) => v,
+        Helper::Double(v) => v as i64,
+    }))
 }
 
 impl HelloCommandResponse {
