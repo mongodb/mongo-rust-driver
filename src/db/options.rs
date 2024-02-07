@@ -319,7 +319,17 @@ pub struct ChangeStreamPreAndPostImages {
 }
 
 /// Specifies the options to a
-/// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command) operation.
+/// [`Database::run_command`](crate::Database::run_command) operation.
+#[derive(Clone, Debug, Default, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct RunCommandOptions {
+    /// The default read preference for operations.
+    pub selection_criteria: Option<SelectionCriteria>,
+}
+
+/// Specifies the options to a
+/// [`Database::run_cursor_command`](crate::Database::run_cursor_command) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]

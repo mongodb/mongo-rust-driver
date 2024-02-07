@@ -69,7 +69,18 @@ pub trait Action {
     type Output;
 
     /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
-    /// updates with values that need to be set conditionally.
+    /// updates with values that need to be set conditionally.  For example:
+    /// ```rust
+    /// # use mongodb::{Client, error::Result};
+    /// # use bson::Document;
+    /// use mongodb::action::Action;
+    /// async fn list_my_collections(client: &Client, filter: Option<Document>) -> Result<Vec<String>> {
+    ///     client.database("my_db")
+    ///         .list_collection_names()
+    ///         .optional(filter, |a, f| a.filter(f))
+    ///         .await
+    /// }
+    /// ```
     fn optional<Value>(self, value: Option<Value>, f: impl FnOnce(Self, Value) -> Self) -> Self
     where
         Self: Sized,

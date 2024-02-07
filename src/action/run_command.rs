@@ -2,7 +2,7 @@ use bson::Document;
 
 use crate::{
     client::session::TransactionState,
-    db::options::RunCursorCommandOptions,
+    db::options::{RunCommandOptions, RunCursorCommandOptions},
     error::{ErrorKind, Result},
     operation::{run_command, run_cursor_command},
     selection_criteria::SelectionCriteria,
@@ -28,7 +28,7 @@ impl Database {
         RunCommand {
             db: self,
             command,
-            selection_criteria: None,
+            options: None,
             session: None,
         }
     }
@@ -76,16 +76,14 @@ impl crate::sync::Database {
 pub struct RunCommand<'a> {
     db: &'a Database,
     command: Document,
-    selection_criteria: Option<SelectionCriteria>,
+    options: Option<RunCommandOptions>,
     session: Option<&'a mut ClientSession>,
 }
 
 impl<'a> RunCommand<'a> {
-    /// Set the selection criteria for the command.
-    pub fn selection_criteria(mut self, value: SelectionCriteria) -> Self {
-        self.selection_criteria = Some(value);
-        self
-    }
+    option_setters!(options: RunCommandOptions;
+        selection_criteria: SelectionCriteria,
+    );
 
     /// Run the command using the provided [`ClientSession`].
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
@@ -99,7 +97,7 @@ action_impl! {
         type Future = RunCommandFuture;
 
         async fn execute(self) -> Result<Document> {
-            let mut selection_criteria = self.selection_criteria;
+            let mut selection_criteria = self.options.and_then(|o| o.selection_criteria);
             if let Some(session) = &self.session {
                 match session.transaction.state {
                     TransactionState::Starting | TransactionState::InProgress => {
