@@ -26,13 +26,13 @@ use crate::{
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
     let coll = client.database(db_name).collection(coll_name);
-    coll.drop(None).unwrap();
+    coll.drop().run().unwrap();
     coll
 }
 
 fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T> {
     let coll = client.database(db_name).collection(coll_name);
-    coll.drop(None).unwrap();
+    coll.drop().run().unwrap();
     coll
 }
 

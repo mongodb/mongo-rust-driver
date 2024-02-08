@@ -506,7 +506,7 @@ pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
 where
     T: Serialize + DeserializeOwned + Unpin + Debug,
 {
-    match coll.drop(None).await.map_err(|e| *e.kind) {
+    match coll.drop().await.map_err(|e| *e.kind) {
         Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();

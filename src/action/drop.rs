@@ -69,11 +69,11 @@ action_impl! {
     }
 }
 
-impl<T: Send> Collection<T> {
+impl<T> Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
     /// `await` will return `Result<()>`.
-    pub fn drop_2(&self) -> DropCollection<'_, T> {
+    pub fn drop(&self) -> DropCollection<'_, T> {
         DropCollection {
             coll: self,
             options: None,
@@ -83,12 +83,12 @@ impl<T: Send> Collection<T> {
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T: Send> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
     /// [`run`](DropCollection::run) will return `Result<()>`.
-    pub fn drop_2(&self) -> DropCollection<'_, T> {
-        self.async_collection.drop_2()
+    pub fn drop(&self) -> DropCollection<'_, T> {
+        self.async_collection.drop()
     }
 }
 

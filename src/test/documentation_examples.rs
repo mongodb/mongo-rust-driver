@@ -35,7 +35,7 @@ macro_rules! run_on_each_doc {
 }
 
 async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 1
     collection
@@ -106,7 +106,7 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn query_top_level_fields_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 6
     let docs = vec![
@@ -251,7 +251,7 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
 }
 
 async fn query_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 14
     let docs = vec![
@@ -384,7 +384,7 @@ async fn query_embedded_documents_examples(collection: &Collection<Document>) ->
 }
 
 async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 20
     let docs = vec![
@@ -543,7 +543,7 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 }
 
 async fn query_array_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 29
     let docs = vec![
@@ -716,7 +716,7 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 }
 
 async fn query_null_or_missing_fields_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 38
     let docs = vec![
@@ -777,7 +777,7 @@ async fn query_null_or_missing_fields_examples(collection: &Collection<Document>
 }
 
 async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 42
     let docs = vec![
@@ -1059,7 +1059,7 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn update_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 51
     let docs = vec![
@@ -1286,7 +1286,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 55
     let docs = vec![
@@ -1436,7 +1436,7 @@ async fn stable_api_examples() -> GenericResult<()> {
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
     let db = client.database("stable-api-migration-examples");
-    db.collection::<Document>("sales").drop(None).await?;
+    db.collection::<Document>("sales").drop().await?;
 
     use std::{error::Error, result::Result};
 

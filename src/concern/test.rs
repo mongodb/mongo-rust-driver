@@ -7,7 +7,6 @@ use crate::{
         Acknowledgment,
         AggregateOptions,
         DeleteOptions,
-        DropCollectionOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -208,7 +207,7 @@ async fn command_contains_write_concern_insert_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(
         doc! { "foo": "bar" },
         InsertOneOptions::builder()
@@ -258,7 +257,7 @@ async fn command_contains_write_concern_insert_many() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(
         &[doc! { "foo": "bar" }],
         InsertManyOptions::builder()
@@ -308,7 +307,7 @@ async fn command_contains_write_concern_update_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
     coll.update_one(
         doc! { "foo": "bar" },
@@ -361,7 +360,7 @@ async fn command_contains_write_concern_update_many() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -416,7 +415,7 @@ async fn command_contains_write_concern_replace_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
     coll.replace_one(
         doc! { "foo": "bar" },
@@ -469,7 +468,7 @@ async fn command_contains_write_concern_delete_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -522,7 +521,7 @@ async fn command_contains_write_concern_delete_many() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -578,7 +577,7 @@ async fn command_contains_write_concern_find_one_and_delete() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -631,7 +630,7 @@ async fn command_contains_write_concern_find_one_and_replace() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -686,7 +685,7 @@ async fn command_contains_write_concern_find_one_and_update() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -741,7 +740,7 @@ async fn command_contains_write_concern_aggregate() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
     coll.aggregate(
         vec![
@@ -800,34 +799,28 @@ async fn command_contains_write_concern_drop() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     client.clear_cached_events();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.drop(
-        DropCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.drop()
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.drop(
-        DropCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.drop()
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "drop"),
@@ -852,7 +845,7 @@ async fn command_contains_write_concern_create_collection() {
     let db = client.database("test");
     let coll: Collection<Document> = db.collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     db.create_collection(function_name!())
         .write_concern(
             WriteConcern::builder()
@@ -862,7 +855,7 @@ async fn command_contains_write_concern_create_collection() {
         )
         .await
         .unwrap();
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     db.create_collection(function_name!())
         .write_concern(
             WriteConcern::builder()

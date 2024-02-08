@@ -579,8 +579,8 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
 async fn ns_not_found_suppression() {
     let client = TestClient::new().await;
     let coll = client.get_coll(function_name!(), function_name!());
-    coll.drop(None).await.expect("drop should not fail");
-    coll.drop(None).await.expect("drop should not fail");
+    coll.drop().await.expect("drop should not fail");
+    coll.drop().await.expect("drop should not fail");
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
@@ -982,7 +982,7 @@ async fn drop_skip_serializing_none() {
         .database(function_name!())
         .collection(function_name!());
     let options = DropCollectionOptions::builder().build();
-    assert!(coll.drop(options).await.is_ok());
+    assert!(coll.drop().with_options(options).await.is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -1197,7 +1197,7 @@ async fn configure_human_readable_serialization() {
     let non_human_readable_collection: Collection<Data> = client
         .database("db")
         .collection_with_options("nonhumanreadable", collection_options);
-    non_human_readable_collection.drop(None).await.unwrap();
+    non_human_readable_collection.drop().await.unwrap();
 
     non_human_readable_collection
         .insert_one(
@@ -1246,7 +1246,7 @@ async fn configure_human_readable_serialization() {
     let human_readable_collection: Collection<Data> = client
         .database("db")
         .collection_with_options("humanreadable", collection_options);
-    human_readable_collection.drop(None).await.unwrap();
+    human_readable_collection.drop().await.unwrap();
 
     human_readable_collection
         .insert_one(
@@ -1308,7 +1308,7 @@ async fn insert_many_document_sequences() {
     let collection = client
         .database("insert_many_document_sequences")
         .collection::<RawDocumentBuf>("insert_many_document_sequences");
-    collection.drop(None).await.unwrap();
+    collection.drop().await.unwrap();
 
     // A payload with > max_bson_object_size bytes but < max_message_size bytes should require only
     // one round trip

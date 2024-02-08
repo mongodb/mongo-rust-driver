@@ -13,7 +13,6 @@ use crate::{
         CreateIndexOptions,
         DeleteOptions,
         DistinctOptions,
-        DropCollectionOptions,
         DropIndexOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
@@ -123,24 +122,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Drops the collection, deleting all data, users, and indexes stored in it.
-    pub fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
-        runtime::block_on(self.async_collection.drop(options.into()))
-    }
-
-    /// Drops the collection, deleting all data, users, and indexes stored in it using the provided
-    /// `ClientSession`.
-    pub fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_collection
-                .drop_with_session(options.into(), &mut session.async_client_session),
-        )
     }
 
     /// Runs an aggregation operation.

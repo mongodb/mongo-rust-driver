@@ -1229,20 +1229,12 @@ impl TestOperation for DropCollection {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    database
-                        .collection::<Document>(&self.collection)
-                        .drop_with_session(self.options.clone(), session)
-                        .await
-                }
-                None => {
-                    database
-                        .collection::<Document>(&self.collection)
-                        .drop(self.options.clone())
-                        .await
-                }
-            };
+            let result = database
+                .collection::<Document>(&self.collection)
+                .drop()
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await;
             result.map(|_| None)
         }
         .boxed()

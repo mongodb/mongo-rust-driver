@@ -266,8 +266,8 @@ impl GridFsBucket {
 
     /// Removes all of the files and their associated chunks from this bucket.
     pub async fn drop(&self) -> Result<()> {
-        self.files().drop(None).await?;
-        self.chunks().drop(None).await?;
+        self.files().drop().await?;
+        self.chunks().drop().await?;
 
         Ok(())
     }

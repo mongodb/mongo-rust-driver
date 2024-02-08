@@ -164,7 +164,7 @@ macro_rules! for_each_op {
             collection_op!($test_name, coll, coll.count_documents(None, None)),
         )
         .await;
-        $test_func("drop", collection_op!($test_name, coll, coll.drop(None))).await;
+        $test_func("drop", collection_op!($test_name, coll, coll.drop())).await;
 
         // db operations
         $test_func(

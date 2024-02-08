@@ -153,7 +153,7 @@ impl TestContext {
             && internal_client.is_sharded()
             && req.matches(&internal_client.server_version))
         {
-            coll.drop(options).await.unwrap();
+            coll.drop().with_options(options).await.unwrap();
         }
 
         #[allow(unused_mut)]

@@ -71,7 +71,7 @@ async fn deserialize_recovery_token() {
     client
         .database(function_name!())
         .collection::<Document>(function_name!())
-        .drop(None)
+        .drop()
         .await
         .unwrap();
     client

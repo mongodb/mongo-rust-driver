@@ -20,7 +20,7 @@ pub(crate) async fn populate_key_vault(client: &Client, kv_data: Option<&Vec<Doc
                     .write_concern(WriteConcern::majority())
                     .build(),
             );
-        datakeys.drop(None).await.unwrap();
+        datakeys.drop().await.unwrap();
         if !kv_data.is_empty() {
             datakeys.insert_many(kv_data, None).await.unwrap();
         }

@@ -32,7 +32,7 @@ pub async fn example() -> Result<()> {
     let key_vault = client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
     let client_encryption = ClientEncryption::new(
         // The MongoClient to use for reading/writing to the key vault.
         // This can be the same MongoClient used by the main application.
@@ -82,7 +82,7 @@ pub async fn example() -> Result<()> {
     .build()
     .await?;
     let db = encrypted_client.database("test");
-    db.drop(None).await?;
+    db.drop().await?;
 
     // Create the collection with encrypted fields.
     db.create_collection(

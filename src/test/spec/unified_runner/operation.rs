@@ -1576,15 +1576,14 @@ impl TestOperation for DropCollection {
             let database = test_runner.get_database(id).await;
             let collection = database.collection::<Document>(&self.collection).clone();
 
+            let act = collection.drop().with_options(self.options.clone());
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
-                    collection
-                        .drop_with_session(self.options.clone(), session)
-                        .await
+                    act.session(session.deref_mut()).await
                 })
                 .await?;
             } else {
-                collection.drop(self.options.clone()).await?;
+                act.await?;
             }
             Ok(None)
         }

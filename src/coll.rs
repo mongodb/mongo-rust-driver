@@ -241,42 +241,6 @@ impl<T> Collection<T> {
         self.inner.write_concern.as_ref()
     }
 
-    #[allow(clippy::needless_option_as_deref)]
-    async fn drop_common(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let mut session = session.into();
-
-        let mut options: Option<DropCollectionOptions> = options.into();
-        resolve_options!(self, options, [write_concern]);
-
-        #[cfg(feature = "in-use-encryption-unstable")]
-        self.drop_aux_collections(options.as_ref(), session.as_deref_mut())
-            .await?;
-
-        let drop = DropCollection::new(self.namespace(), options);
-        self.client()
-            .execute_operation(drop, session.as_deref_mut())
-            .await
-    }
-
-    /// Drops the collection, deleting all data and indexes stored in it.
-    pub async fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
-        self.drop_common(options, None).await
-    }
-
-    /// Drops the collection, deleting all data and indexes stored in it using the provided
-    /// `ClientSession`.
-    pub async fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_common(options, session).await
-    }
-
     #[cfg(feature = "in-use-encryption-unstable")]
     #[allow(clippy::needless_option_as_deref)]
     async fn drop_aux_collections(

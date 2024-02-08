@@ -236,7 +236,7 @@ async fn session_cursor_with_type() {
 
     let mut session = client.start_session().await.unwrap();
     let coll = client.database("db").collection("coll");
-    coll.drop_with_session(None, &mut session).await.unwrap();
+    coll.drop().session(&mut session).await.unwrap();
 
     coll.insert_many_with_session(
         vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }],
