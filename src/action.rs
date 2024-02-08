@@ -13,7 +13,7 @@ mod watch;
 
 pub use aggregate::Aggregate;
 pub use create_collection::CreateCollection;
-pub use drop::DropDatabase;
+pub use drop::{DropCollection, DropDatabase};
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
 pub use perf::WarmConnectionPool;

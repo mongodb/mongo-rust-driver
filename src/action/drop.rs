@@ -1,5 +1,12 @@
 use crate::{
-    coll::options::DropCollectionOptions, db::options::DropDatabaseOptions, error::Result, operation::drop_database, options::WriteConcern, ClientSession, Collection, Database
+    coll::options::DropCollectionOptions,
+    db::options::DropDatabaseOptions,
+    error::Result,
+    operation::drop_database,
+    options::WriteConcern,
+    ClientSession,
+    Collection,
+    Database,
 };
 
 use super::{action_impl, option_setters};
@@ -62,13 +69,13 @@ action_impl! {
     }
 }
 
-impl<T> Collection<T> {
+impl<T: Send> Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
-    /// 
+    ///
     /// `await` will return `Result<()>`.
     pub fn drop_2(&self) -> DropCollection<'_, T> {
         DropCollection {
-            _coll: self,
+            coll: self,
             options: None,
             session: None,
         }
@@ -76,21 +83,22 @@ impl<T> Collection<T> {
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+impl<T: Send> crate::sync::Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
-    /// 
+    ///
     /// [`run`](DropCollection::run) will return `Result<()>`.
     pub fn drop_2(&self) -> DropCollection<'_, T> {
         self.async_collection.drop_2()
     }
 }
 
-/// Drops the collection, deleting all data and indexes stored in it.  Create by calling [`Collection::drop`].
+/// Drops the collection, deleting all data and indexes stored in it.  Create by calling
+/// [`Collection::drop`].
 #[must_use]
 pub struct DropCollection<'a, T> {
-    _coll: &'a Collection<T>,
-    options: Option<DropCollectionOptions>,
-    session: Option<&'a mut ClientSession>,
+    pub(crate) coll: &'a Collection<T>,
+    pub(crate) options: Option<DropCollectionOptions>,
+    pub(crate) session: Option<&'a mut ClientSession>,
 }
 
 impl<'a, T> DropCollection<'a, T> {
@@ -104,15 +112,7 @@ impl<'a, T> DropCollection<'a, T> {
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
-    }    
-}
-
-action_impl! {
-    impl<'a , T> Action for DropCollection<'a, T> {
-        type Future = DropCollectionFuture;
-
-        async fn execute(self) -> Result<()> {
-            todo!()
-        }
     }
 }
+
+// Action impl in src/coll/action/drop.rs

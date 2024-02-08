@@ -7,7 +7,7 @@ pub(crate) mod create;
 mod create_indexes;
 mod delete;
 mod distinct;
-mod drop_collection;
+pub(crate) mod drop_collection;
 pub(crate) mod drop_database;
 mod drop_indexes;
 mod find;

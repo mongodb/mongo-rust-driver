@@ -1,3 +1,4 @@
+mod action;
 pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
@@ -115,8 +116,13 @@ use crate::{
 #[derive(Debug)]
 pub struct Collection<T> {
     inner: Arc<CollectionInner>,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: std::marker::PhantomData<fn() -> T>,
 }
+
+// Safety: Collection<T> does not contain any T values, so will always be Send and Sync as long as
+// CollectionInner is (which is compile-time asserted below).
+unsafe impl<T> Send for Collection<T> {}
+unsafe impl<T> Sync for Collection<T> {}
 
 // Because derive is too conservative, derive only implements Clone if T is Clone.
 // Collection<T> does not actually store any value of type T (so T does not need to be clone).
@@ -139,6 +145,16 @@ struct CollectionInner {
     write_concern: Option<WriteConcern>,
     human_readable_serialization: bool,
 }
+
+#[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
+const _: fn() = || {
+    fn assert_send<T: Send>(_t: T) {}
+    fn assert_sync<T: Sync>(_t: T) {}
+
+    let _c: CollectionInner = todo!();
+    assert_send(_c);
+    assert_sync(_c);
+};
 
 impl<T> Collection<T> {
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
