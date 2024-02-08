@@ -29,8 +29,7 @@ impl crate::sync::Client {
     }
 }
 
-/// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`] and execute with
-/// `await` (or [run](StartSession::run) if using the sync client).
+/// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`].
 #[must_use]
 pub struct StartSession<'a> {
     client: &'a Client,
@@ -46,7 +45,7 @@ impl<'a> StartSession<'a> {
 }
 
 action_impl! {
-    impl Action<'a> for StartSession<'a> {
+    impl<'a> Action for StartSession<'a> {
         type Future = StartSessionFuture;
 
         async fn execute(self) -> Result<ClientSession> {

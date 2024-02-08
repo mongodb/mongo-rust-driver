@@ -116,7 +116,8 @@ fn database() {
         .expect("insert should succeed");
 
     let coll_names = db
-        .list_collection_names(None)
+        .list_collection_names()
+        .run()
         .expect("list_database_names should succeed");
     assert!(coll_names.contains(&function_name!().to_string()));
 
@@ -128,7 +129,8 @@ fn database() {
         doc! { "$project": { "_id": 0, "dummy": 1 } },
     ];
     let cursor = admin_db
-        .aggregate(pipeline, None)
+        .aggregate(pipeline)
+        .run()
         .expect("aggregate should succeed");
     let results: Vec<Document> = cursor
         .collect::<Result<Vec<Document>>>()
@@ -259,7 +261,8 @@ fn transactions() {
 
     client
         .database(function_name!())
-        .create_collection(function_name!(), None)
+        .create_collection(function_name!())
+        .run()
         .expect("create collection should succeed");
 
     session

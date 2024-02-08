@@ -99,7 +99,7 @@
 //! let db = client.database("mydb");
 //!
 //! // List the names of the collections in that database.
-//! for collection_name in db.list_collection_names(None).await? {
+//! for collection_name in db.list_collection_names().await? {
 //!     println!("{}", collection_name);
 //! }
 //! # Ok(()) }
@@ -368,7 +368,6 @@ pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam:
 
 /// A boxed future.
 pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
-
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(

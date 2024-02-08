@@ -76,7 +76,7 @@ async fn deserialize_recovery_token() {
         .unwrap();
     client
         .database(function_name!())
-        .create_collection(function_name!(), None)
+        .create_collection(function_name!())
         .await
         .unwrap();
     let coll = client

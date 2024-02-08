@@ -58,28 +58,25 @@ async fn insert_err_details() {
     }
     client
         .database("admin")
-        .run_command(
-            doc! {
-                "configureFailPoint": "failCommand",
-                "data": {
-                "failCommands": ["insert"],
-                "writeConcernError": {
-                    "code": 100,
-                    "codeName": "UnsatisfiableWriteConcern",
-                    "errmsg": "Not enough data-bearing nodes",
-                    "errInfo": {
-                    "writeConcern": {
-                        "w": 2,
-                        "wtimeout": 0,
-                        "provenance": "clientSupplied"
-                    }
-                    }
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "data": {
+            "failCommands": ["insert"],
+            "writeConcernError": {
+                "code": 100,
+                "codeName": "UnsatisfiableWriteConcern",
+                "errmsg": "Not enough data-bearing nodes",
+                "errInfo": {
+                "writeConcern": {
+                    "w": 2,
+                    "wtimeout": 0,
+                    "provenance": "clientSupplied"
                 }
-                },
-                "mode": { "times": 1 }
+                }
+            }
             },
-            None,
-        )
+            "mode": { "times": 1 }
+        })
         .await
         .unwrap();
 
@@ -242,7 +239,7 @@ async fn aggregate_out() {
 
     coll.aggregate(pipeline.clone(), None).await.unwrap();
     assert!(db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .unwrap()
         .into_iter()
@@ -254,7 +251,7 @@ async fn aggregate_out() {
         .await
         .unwrap();
     assert!(db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .unwrap()
         .into_iter()

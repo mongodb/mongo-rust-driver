@@ -1,4 +1,4 @@
-mod change_stream;
+pub(crate) mod change_stream;
 
 #[cfg(test)]
 mod test;
@@ -22,8 +22,6 @@ use super::{
     SERVER_4_4_0_WIRE_VERSION,
 };
 
-pub(crate) use change_stream::ChangeStreamAggregate;
-
 #[derive(Debug)]
 pub(crate) struct Aggregate {
     target: AggregateTarget,
@@ -40,16 +38,8 @@ impl Aggregate {
     pub(crate) fn new(
         target: impl Into<AggregateTarget>,
         pipeline: impl IntoIterator<Item = Document>,
-        mut options: Option<AggregateOptions>,
+        options: Option<AggregateOptions>,
     ) -> Self {
-        if let Some(ref mut options) = options {
-            if let Some(ref comment) = options.comment {
-                if options.comment_bson.is_none() {
-                    options.comment_bson = Some(comment.clone().into());
-                }
-            }
-        }
-
         Self {
             target: target.into(),
             pipeline: pipeline.into_iter().collect(),
@@ -113,9 +103,7 @@ impl OperationWithDefaults for Aggregate {
         let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
             None
         } else {
-            self.options
-                .as_ref()
-                .and_then(|opts| opts.comment_bson.clone())
+            self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
         Ok(CursorSpecification::new(

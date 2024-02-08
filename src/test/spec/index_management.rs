@@ -38,7 +38,7 @@ async fn search_index_create_list() {
     let client = Client::test_builder().build().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name, None).await.unwrap();
+    db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
     let name = coll0
@@ -86,7 +86,7 @@ async fn search_index_create_multiple() {
     let client = Client::test_builder().build().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name, None).await.unwrap();
+    db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
     let names = coll0
@@ -154,7 +154,7 @@ async fn search_index_drop() {
     let client = Client::test_builder().build().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name, None).await.unwrap();
+    db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
     let name = coll0
@@ -213,7 +213,7 @@ async fn search_index_update() {
     let client = Client::test_builder().build().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name, None).await.unwrap();
+    db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
     let name = coll0

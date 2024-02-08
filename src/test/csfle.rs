@@ -30,7 +30,9 @@ use once_cell::sync::Lazy;
 use tokio::net::TcpListener;
 
 use crate::{
+    action::Action,
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
+    db::options::CreateCollectionOptions,
     error::{ErrorKind, WriteError, WriteFailure},
     event::{
         command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
@@ -38,7 +40,6 @@ use crate::{
     },
     options::{
         CollectionOptions,
-        CreateCollectionOptions,
         CreateIndexOptions,
         Credential,
         DropCollectionOptions,
@@ -554,12 +555,8 @@ async fn bson_size_limits() -> Result<()> {
     let (client, datakeys) = init_client().await?;
     client
         .database("db")
-        .create_collection(
-            "coll",
-            CreateCollectionOptions::builder()
-                .validator(doc! { "$jsonSchema": load_testdata("limits/limits-schema.json")? })
-                .build(),
-        )
+        .create_collection("coll")
+        .validator(doc! { "$jsonSchema": load_testdata("limits/limits-schema.json")? })
         .await?;
     datakeys
         .insert_one(load_testdata("limits/limits-key.json")?, None)
@@ -683,12 +680,8 @@ async fn views_prohibited() -> Result<()> {
         .await?;
     client
         .database("db")
-        .create_collection(
-            "view",
-            CreateCollectionOptions::builder()
-                .view_on("coll".to_string())
-                .build(),
-        )
+        .create_collection("view")
+        .view_on("coll".to_string())
         .await?;
 
     // Setup: encrypted client.
@@ -768,18 +761,15 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
     let schema = load_testdata("corpus/corpus-schema.json")?;
-    let coll_opts = if local_schema {
+    let validator = if local_schema {
         None
     } else {
-        Some(
-            CreateCollectionOptions::builder()
-                .validator(doc! { "$jsonSchema": schema.clone() })
-                .build(),
-        )
+        Some(doc! { "$jsonSchema": schema.clone() })
     };
     client
         .database("db")
-        .create_collection("coll", coll_opts)
+        .create_collection("coll")
+        .optional(validator, |b, v| b.validator(v))
         .await?;
     for f in [
         "corpus/corpus-key-local.json",
@@ -1600,14 +1590,8 @@ impl DeadlockTestCase {
             .await?;
         client_test
             .database("db")
-            .create_collection(
-                "coll",
-                CreateCollectionOptions::builder()
-                    .validator(
-                        doc! { "$jsonSchema": load_testdata("external/external-schema.json")? },
-                    )
-                    .build(),
-            )
+            .create_collection("coll")
+            .validator(doc! { "$jsonSchema": load_testdata("external/external-schema.json")? })
             .await?;
         let client_encryption = ClientEncryption::new(
             client_test.clone().into_client(),
@@ -2345,19 +2329,15 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
                 .build(),
         )
         .await?;
-    db.create_collection(
-        "explicit_encryption",
-        CreateCollectionOptions::builder()
-            .encrypted_fields(encrypted_fields)
-            .build(),
-    )
-    .await?;
+    db.create_collection("explicit_encryption")
+        .encrypted_fields(encrypted_fields)
+        .await?;
     let keyvault = key_vault_client.database("keyvault");
     keyvault
         .collection::<Document>("datakeys")
         .drop(None)
         .await?;
-    keyvault.create_collection("datakeys", None).await?;
+    keyvault.create_collection("datakeys").await?;
     keyvault
         .collection::<Document>("datakeys")
         .insert_one(
@@ -2676,7 +2656,7 @@ impl DecryptionEventsTestdata {
         db.collection::<Document>("decryption_events")
             .drop(None)
             .await?;
-        db.create_collection("decryption_events", None).await?;
+        db.create_collection("decryption_events").await?;
 
         let client_encryption = ClientEncryption::new(
             setup_client.clone().into_client(),
@@ -3245,12 +3225,8 @@ async fn range_explicit_encryption_test(
         .await?;
     util_client
         .database("db")
-        .create_collection(
-            "explicit_encryption",
-            CreateCollectionOptions::builder()
-                .encrypted_fields(encrypted_fields.clone())
-                .build(),
-        )
+        .create_collection("explicit_encryption")
+        .encrypted_fields(encrypted_fields.clone())
         .await?;
 
     let datakeys_collection = util_client
@@ -3259,7 +3235,7 @@ async fn range_explicit_encryption_test(
     datakeys_collection.drop(None).await?;
     util_client
         .database("keyvault")
-        .create_collection("datakeys", None)
+        .create_collection("datakeys")
         .await?;
 
     datakeys_collection
@@ -3593,7 +3569,7 @@ async fn fle2_example() -> Result<()> {
     .build()
     .await?;
     let db = encrypted_client.database("docsExamples");
-    db.create_collection("encrypted", None).await?;
+    db.create_collection("encrypted").await?;
     let encrypted_coll = db.collection::<Document>("encrypted");
 
     // Auto encrypt an insert and find.

@@ -1,4 +1,3 @@
-pub use crate::client::action::perf::WarmConnectionPoolFuture;
 use crate::Client;
 
 impl Client {
@@ -32,8 +31,6 @@ impl crate::sync::Client {
     ///
     /// Does nothing if `min_pool_size` is unset or zero.
     ///
-    /// `await` will return `()`.
-    ///
     /// [`run`](WarmConnectionPool::run) will return `()`.
     pub fn warm_connection_pool(&self) -> WarmConnectionPool {
         self.async_client.warm_connection_pool()
@@ -41,11 +38,10 @@ impl crate::sync::Client {
 }
 
 /// Add connections to the connection pool up to `min_pool_size`.  Create by calling
-/// [`Client::warm_connection_pool`] and execute with `await` (or [`run`](WarmConnectionPool::run)
-/// if using the sync client).
+/// [`Client::warm_connection_pool`].
 #[must_use]
 pub struct WarmConnectionPool<'a> {
     pub(crate) client: &'a Client,
 }
 
-// IntoFuture impl in src/client/action/perf.rs
+// Action impl in src/client/action/perf.rs

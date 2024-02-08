@@ -4,6 +4,7 @@ use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    action::Action,
     error::Result,
     operation::append_options,
     runtime,
@@ -54,7 +55,8 @@ impl FailPoint {
         let criteria = criteria.into();
         client
             .database("admin")
-            .run_command(self.command.clone(), criteria.clone())
+            .run_command(self.command.clone())
+            .optional(criteria.clone(), |a, c| a.selection_criteria(c))
             .await?;
         Ok(FailPointGuard {
             failpoint_name: self.name().to_string(),
@@ -79,10 +81,8 @@ impl Drop for FailPointGuard {
         let result = runtime::block_on(async move {
             client
                 .database("admin")
-                .run_command(
-                    doc! { "configureFailPoint": name, "mode": "off" },
-                    self.criteria.clone(),
-                )
+                .run_command(doc! { "configureFailPoint": name, "mode": "off" })
+                .optional(self.criteria.clone(), |a, c| a.selection_criteria(c))
                 .await
         });
 

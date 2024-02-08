@@ -1,9 +1,9 @@
 mod abort_transaction;
-mod aggregate;
+pub(crate) mod aggregate;
 mod commit_transaction;
 mod count;
 mod count_documents;
-mod create;
+pub(crate) mod create;
 mod create_indexes;
 mod delete;
 mod distinct;
@@ -14,12 +14,12 @@ mod find;
 mod find_and_modify;
 mod get_more;
 mod insert;
-mod list_collections;
+pub(crate) mod list_collections;
 pub(crate) mod list_databases;
 mod list_indexes;
 mod raw_output;
-mod run_command;
-mod run_cursor_command;
+pub(crate) mod run_command;
+pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
@@ -52,11 +52,9 @@ use crate::{
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
-pub(crate) use aggregate::{Aggregate, AggregateTarget, ChangeStreamAggregate};
 pub(crate) use commit_transaction::CommitTransaction;
 pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;
-pub(crate) use create::Create;
 pub(crate) use create_indexes::CreateIndexes;
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
@@ -66,12 +64,9 @@ pub(crate) use find::Find;
 pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
-pub(crate) use list_collections::ListCollections;
 pub(crate) use list_indexes::ListIndexes;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use raw_output::RawOutput;
-pub(crate) use run_command::RunCommand;
-pub(crate) use run_cursor_command::RunCursorCommand;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 

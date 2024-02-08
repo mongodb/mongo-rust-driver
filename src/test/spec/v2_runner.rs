@@ -171,7 +171,8 @@ impl TestContext {
         }
         internal_client
             .database(&db_name)
-            .create_collection(&coll_name, options)
+            .create_collection(&coll_name)
+            .with_options(options)
             .await
             .unwrap();
 
@@ -463,7 +464,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             match file_ctx
                 .internal_client
                 .database("admin")
-                .run_command(doc! { "killAllSessions": [] }, None)
+                .run_command(doc! { "killAllSessions": [] })
                 .await
             {
                 Ok(_) => {}

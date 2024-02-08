@@ -12,12 +12,13 @@ use futures_util::{
 
 use super::{options::GridFsUploadOptions, Chunk, FilesCollectionDocument, GridFsBucket};
 use crate::{
+    action::Action,
     bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
     bson_util::get_int,
     client::AsyncDropToken,
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
-    options::{CreateCollectionOptions, FindOneOptions, ReadPreference, SelectionCriteria},
+    options::{FindOneOptions, ReadPreference, SelectionCriteria},
     Collection,
 };
 
@@ -175,11 +176,14 @@ impl GridFsBucket {
 
     async fn create_index<T>(&self, coll: &Collection<T>, keys: Document) -> Result<()> {
         // listIndexes returns an error if the collection has not yet been created.
-        let options = CreateCollectionOptions::builder()
-            .write_concern(self.write_concern().cloned())
-            .build();
         // Ignore NamespaceExists errors if the collection has already been created.
-        if let Err(error) = self.inner.db.create_collection(coll.name(), options).await {
+        if let Err(error) = self
+            .inner
+            .db
+            .create_collection(coll.name())
+            .optional(self.write_concern().cloned(), |b, wc| b.write_concern(wc))
+            .await
+        {
             if error.sdam_code() != Some(48) {
                 return Err(error);
             }

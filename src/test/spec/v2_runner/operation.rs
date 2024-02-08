@@ -1,11 +1,18 @@
-use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
 
 use crate::{
+    action::Action,
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
+    db::options::ListCollectionsOptions,
     error::Result,
     options::{
         AggregateOptions,
@@ -26,7 +33,6 @@ use crate::{
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListCollectionsOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -627,24 +633,19 @@ impl TestOperation for Aggregate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = database
+                .aggregate(self.pipeline.clone())
+                .with_options(self.options.clone());
             let result = match session {
-                Some(session) => {
-                    let mut cursor = database
-                        .aggregate_with_session(
-                            self.pipeline.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?;
+                Some(mut session) => {
+                    let mut cursor = action.session(session.deref_mut()).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = database
-                        .aggregate(self.pipeline.clone(), self.options.clone())
-                        .await?;
+                    let cursor = action.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
@@ -789,7 +790,6 @@ impl TestOperation for FindOne {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListCollections {
-    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<ListCollectionsOptions>,
 }
@@ -804,17 +804,16 @@ impl TestOperation for ListCollections {
             let result = match session {
                 Some(session) => {
                     let mut cursor = database
-                        .list_collections_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
+                        .list_collections()
+                        .with_options(self.options.clone())
+                        .session(&mut *session)
                         .await?;
                     cursor.stream(session).try_collect::<Vec<_>>().await?
                 }
                 None => {
                     let cursor = database
-                        .list_collections(self.filter.clone(), self.options.clone())
+                        .list_collections()
+                        .with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -837,13 +836,12 @@ impl TestOperation for ListCollectionNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = database
+                .list_collection_names()
+                .optional(self.filter.clone(), |b, f| b.filter(f));
             let result = match session {
-                Some(session) => {
-                    database
-                        .list_collection_names_with_session(self.filter.clone(), session)
-                        .await?
-                }
-                None => database.list_collection_names(self.filter.clone()).await?,
+                Some(session) => action.session(session).await?,
+                None => action.await?,
             };
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))
@@ -1206,14 +1204,11 @@ impl TestOperation for RunCommand {
                 .read_preference
                 .as_ref()
                 .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
-            let result = match session {
-                Some(session) => {
-                    database
-                        .run_command_with_session(self.command.clone(), selection_criteria, session)
-                        .await
-                }
-                None => database.run_command(self.command.clone(), None).await,
-            };
+            let result = database
+                .run_command(self.command.clone())
+                .optional(selection_criteria, |a, s| a.selection_criteria(s))
+                .optional(session, |a, s| a.session(s))
+                .await;
             result.map(|doc| Some(Bson::Document(doc)))
         }
         .boxed()
@@ -1268,22 +1263,11 @@ impl TestOperation for CreateCollection {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    database
-                        .create_collection_with_session(
-                            &self.collection,
-                            self.options.clone(),
-                            session,
-                        )
-                        .await
-                }
-                None => {
-                    database
-                        .create_collection(&self.collection, self.options.clone())
-                        .await
-                }
-            };
+            let result = database
+                .create_collection(&self.collection)
+                .with_options(self.options.clone())
+                .optional(session, |b, s| b.session(s))
+                .await;
             result.map(|_| None)
         }
         .boxed()
@@ -1309,7 +1293,7 @@ impl TestOperation for AssertCollectionExists {
                         .read_concern(ReadConcern::majority())
                         .build(),
                 )
-                .list_collection_names(None)
+                .list_collection_names()
                 .await
                 .unwrap();
             assert!(
@@ -1339,7 +1323,7 @@ impl TestOperation for AssertCollectionNotExists {
         async move {
             let collections = client
                 .database(&self.database)
-                .list_collection_names(None)
+                .list_collection_names()
                 .await
                 .unwrap();
             assert!(!collections.contains(&self.collection));

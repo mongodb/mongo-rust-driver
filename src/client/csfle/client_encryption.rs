@@ -460,7 +460,9 @@ impl ClientEncryption {
         opts_prime.encrypted_fields = Some(ef_prime.clone());
         (
             ef_prime,
-            db.create_collection(name.as_ref(), opts_prime).await,
+            db.create_collection(name.as_ref())
+                .with_options(opts_prime)
+                .await,
         )
     }
 }

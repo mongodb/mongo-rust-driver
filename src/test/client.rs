@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc, time::Duration};
+use std::{borrow::Cow, collections::HashMap, future::IntoFuture, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::{Deserialize, Serialize};
@@ -54,13 +54,10 @@ async fn metadata_sent_in_handshake() {
 
     let result = client
         .database("admin")
-        .run_command(
-            doc! {
-                "currentOp": 1,
-                "command.currentOp": { "$exists": true }
-            },
-            None,
-        )
+        .run_command(doc! {
+            "currentOp": 1,
+            "command.currentOp": { "$exists": true }
+        })
         .await
         .unwrap();
 
@@ -120,21 +117,19 @@ async fn connection_drop_during_read() {
 
     let _: Result<_, _> = runtime::timeout(
         Duration::from_millis(50),
-        db.run_command(
-            doc! {
-                "count": function_name!(),
-                "query": {
-                    "$where": "sleep(100) && true"
-                }
-            },
-            None,
-        ),
+        db.run_command(doc! {
+            "count": function_name!(),
+            "query": {
+                "$where": "sleep(100) && true"
+            }
+        })
+        .into_future(),
     )
     .await;
 
     runtime::delay_for(Duration::from_millis(200)).await;
 
-    let build_info_response = db.run_command(doc! { "buildInfo": 1 }, None).await.unwrap();
+    let build_info_response = db.run_command(doc! { "buildInfo": 1 }).await.unwrap();
 
     // Ensure that the response to `buildInfo` is read, not the response to `count`.
     assert!(build_info_response.get("version").is_some());
@@ -163,10 +158,10 @@ async fn server_selection_timeout_message() {
     let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
     let error = db
-        .run_command(
-            doc! { "ping": 1 },
-            SelectionCriteria::ReadPreference(unsatisfiable_read_preference),
-        )
+        .run_command(doc! { "ping": 1 })
+        .selection_criteria(SelectionCriteria::ReadPreference(
+            unsatisfiable_read_preference,
+        ))
         .await
         .expect_err("should fail with server selection timeout error");
 
@@ -276,7 +271,7 @@ async fn list_authorized_databases() {
     for name in dbs {
         client
             .database(name)
-            .create_collection("coll", None)
+            .create_collection("coll")
             .await
             .unwrap();
         client
@@ -602,7 +597,7 @@ async fn x509_auth() {
     let client = TestClient::new().await;
     let drop_user_result = client
         .database("$external")
-        .run_command(doc! { "dropUser": &username }, None)
+        .run_command(doc! { "dropUser": &username })
         .await;
 
     match drop_user_result.map_err(|e| *e.kind) {
@@ -750,7 +745,7 @@ async fn retry_commit_txn_check_out() {
     let mut subscriber = handler.subscribe();
     client
         .database("foo")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap_err();
 

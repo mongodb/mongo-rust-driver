@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_impl, option_setters};
+use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -12,7 +12,7 @@ use crate::{
     },
     collation::Collation,
     error::{ErrorKind, Result},
-    operation::AggregateTarget,
+    operation::aggregate::AggregateTarget,
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,
@@ -149,12 +149,8 @@ impl<T> crate::sync::Collection<T> {
     }
 }
 
-pub struct ImplicitSession;
-pub struct ExplicitSession<'a>(&'a mut ClientSession);
-
 /// Starts a new [`ChangeStream`] that receives events for all changes in a given scope.  Create by
-/// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`] and execute with
-/// `await` (or [run](Watch::run) if using the sync client).
+/// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`].
 #[must_use]
 pub struct Watch<'a, S = ImplicitSession> {
     client: &'a Client,
@@ -248,8 +244,8 @@ impl<'a> Watch<'a, ImplicitSession> {
 }
 
 action_impl! {
-    impl Action<'a> for Watch<'a, ImplicitSession> {
-        type Future = WatchImplicitSessionFuture;
+    impl<'a> Action for Watch<'a, ImplicitSession> {
+        type Future = WatchFuture;
 
         async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
             resolve_options!(
@@ -274,8 +270,8 @@ action_impl! {
 }
 
 action_impl! {
-    impl Action<'a> for Watch<'a, ExplicitSession<'a>> {
-        type Future = WatchExplicitSessionFuture;
+    impl<'a> Action for Watch<'a, ExplicitSession<'a>> {
+        type Future = WatchSessionFuture;
 
         async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
             resolve_read_concern_with_session!(

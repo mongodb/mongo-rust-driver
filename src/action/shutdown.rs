@@ -1,7 +1,5 @@
 use crate::Client;
 
-pub use crate::client::action::shutdown::ShutdownFuture;
-
 impl Client {
     /// Shut down this `Client`, terminating background thread workers and closing connections.
     /// Using this method is not required under most circumstances (resources will be cleaned up in
@@ -123,8 +121,7 @@ impl crate::sync::Client {
 }
 
 /// Shut down this `Client`, terminating background thread workers and closing connections.  Create
-/// by calling [`Client::shutdown`] and execute with `await` (or [`run`](Shutdown::run) if using the
-/// sync client).
+/// by calling [`Client::shutdown`].
 #[must_use]
 pub struct Shutdown {
     pub(crate) client: Client,

@@ -110,7 +110,7 @@ async fn concurrent_connections() {
     };
     client
         .database("admin")
-        .run_command(failpoint, None)
+        .run_command(failpoint)
         .await
         .expect("failpoint should succeed");
 
@@ -160,10 +160,7 @@ async fn concurrent_connections() {
     // clear the fail point
     client
         .database("admin")
-        .run_command(
-            doc! { "configureFailPoint": "failCommand", "mode": "off" },
-            None,
-        )
+        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
         .await
         .expect("disabling fail point should succeed");
 }
@@ -258,7 +255,7 @@ async fn connection_error_during_operation() {
 
     client
         .database("test")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .expect_err("ping should fail due to fail point");
 

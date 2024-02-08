@@ -23,7 +23,7 @@ use crate::{
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
     operation::{
-        Aggregate,
+        aggregate::Aggregate,
         Count,
         CountDocuments,
         CreateIndexes,
@@ -289,14 +289,17 @@ impl<T> Collection<T> {
                     let mut cursor = self
                         .inner
                         .db
-                        .list_collections_with_session(filter, None, s)
+                        .list_collections()
+                        .filter(filter)
+                        .session(&mut *s)
                         .await?;
                     cursor.stream(s).try_collect().await?
                 }
                 None => {
                     self.inner
                         .db
-                        .list_collections(filter, None)
+                        .list_collections()
+                        .filter(filter)
                         .await?
                         .try_collect()
                         .await?
@@ -879,18 +882,16 @@ impl<T> Collection<T> {
     ) -> Result<()> {
         let ns = self.namespace();
 
-        self.client()
-            .database(ns.db.as_str())
-            .run_command_common(
-                doc! {
-                    "killCursors": ns.coll.as_str(),
-                    "cursors": [cursor_id]
-                },
-                drop_address.map(SelectionCriteria::from_address),
-                None,
-                pinned_connection,
-            )
-            .await?;
+        let op = crate::operation::run_command::RunCommand::new(
+            ns.db,
+            doc! {
+                "killCursors": ns.coll.as_str(),
+                "cursors": [cursor_id]
+            },
+            drop_address.map(SelectionCriteria::from_address),
+            pinned_connection,
+        )?;
+        self.client().execute_operation(op, None).await?;
         Ok(())
     }
 

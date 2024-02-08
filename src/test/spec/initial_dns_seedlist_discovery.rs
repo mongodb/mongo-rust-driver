@@ -142,7 +142,7 @@ async fn run_test(mut test_file: TestFile) {
         if test_file.ping == Some(true) {
             client
                 .database("db")
-                .run_command(doc! { "ping" : 1 }, None)
+                .run_command(doc! { "ping" : 1 })
                 .await
                 .unwrap();
         }

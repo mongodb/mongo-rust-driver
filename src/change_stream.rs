@@ -24,7 +24,7 @@ use crate::{
     change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::{ErrorKind, Result},
-    operation::AggregateTarget,
+    operation::aggregate::AggregateTarget,
     ClientSession,
     Cursor,
 };

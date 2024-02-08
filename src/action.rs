@@ -1,23 +1,44 @@
 //! Action builder types.
 
+mod aggregate;
+mod create_collection;
 mod drop;
+mod list_collections;
 mod list_databases;
 mod perf;
+mod run_command;
 mod session;
 mod shutdown;
 mod watch;
 
-pub use drop::{DropDatabase, DropDatabaseFuture};
-pub use list_databases::{ListDatabases, ListSpecificationsFuture};
-pub use perf::{WarmConnectionPool, WarmConnectionPoolFuture};
-pub use session::{StartSession, StartSessionFuture};
-pub use shutdown::{Shutdown, ShutdownFuture};
-pub use watch::{Watch, WatchExplicitSessionFuture, WatchImplicitSessionFuture};
+pub use aggregate::Aggregate;
+pub use create_collection::CreateCollection;
+pub use drop::DropDatabase;
+pub use list_collections::ListCollections;
+pub use list_databases::ListDatabases;
+pub use perf::WarmConnectionPool;
+pub use run_command::{RunCommand, RunCursorCommand};
+pub use session::StartSession;
+pub use shutdown::Shutdown;
+pub use watch::Watch;
+
+#[allow(missing_docs)]
+pub struct ListSpecifications;
+#[allow(missing_docs)]
+pub struct ListNames;
+
+#[allow(missing_docs)]
+pub struct ImplicitSession;
+#[allow(missing_docs)]
+pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
 
 macro_rules! option_setters {
     (
         $opt_field:ident: $opt_field_ty:ty;
-        $($opt_name:ident: $opt_ty:ty,)+
+        $(
+            $(#[$($attrss:tt)*])*
+            $opt_name:ident: $opt_ty:ty,
+        )+
     ) => {
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
@@ -31,6 +52,7 @@ macro_rules! option_setters {
 
         $(
             #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
+            $(#[$($attrss)*])*
             pub fn $opt_name(mut self, value: $opt_ty) -> Self {
                 self.options().$opt_name = Some(value);
                 self
@@ -40,6 +62,36 @@ macro_rules! option_setters {
 }
 use option_setters;
 
+/// A pending action to execute on the server.  The action can be configured via chained methods and
+/// executed via `await` (or `run` if using the sync client).
+pub trait Action {
+    /// The type of the value produced by execution.
+    type Output;
+
+    /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
+    /// updates with values that need to be set conditionally.  For example:
+    /// ```rust
+    /// # use mongodb::{Client, error::Result};
+    /// # use bson::Document;
+    /// use mongodb::action::Action;
+    /// async fn list_my_collections(client: &Client, filter: Option<Document>) -> Result<Vec<String>> {
+    ///     client.database("my_db")
+    ///         .list_collection_names()
+    ///         .optional(filter, |a, f| a.filter(f))
+    ///         .await
+    /// }
+    /// ```
+    fn optional<Value>(self, value: Option<Value>, f: impl FnOnce(Self, Value) -> Self) -> Self
+    where
+        Self: Sized,
+    {
+        match value {
+            Some(value) => f(self, value),
+            None => self,
+        }
+    }
+}
+
 /// Generates:
 /// * an `IntoFuture` executing the given method body
 /// * an opaque wrapper type for the future in case we want to do something more fancy than
@@ -48,37 +100,50 @@ use option_setters;
 macro_rules! action_impl {
     // Generate with no sync type conversion
     (
-        impl Action$(<$lt:lifetime>)? for $action:ty {
+        impl$(<$lt:lifetime>)? Action for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
         }
     ) => {
-        crate::action::action_impl_inner! {
-            $action => $f_ty;
-            $($lt)?;
-            async fn($($args)+) -> $out $code
-        }
-
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl$(<$lt>)? $action {
-            /// Synchronously execute this action.
-            pub fn run(self) -> $out {
-                crate::runtime::block_on(std::future::IntoFuture::into_future(self))
+        crate::action::action_impl! {
+            impl$(<$lt>)? Action for $action {
+                type Future = $f_ty;
+                async fn execute($($args)+) -> $out $code
+                fn sync_wrap(out) -> $out { out }
             }
         }
     };
     // Generate with a sync type conversion
     (
-        impl Action$(<$lt:lifetime>)? for $action:ty {
+        impl$(<$lt:lifetime>)? Action for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
             fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
         }
     ) => {
-        crate::action::action_impl_inner! {
-            $action => $f_ty;
-            $($lt)?;
-            async fn($($args)+) -> $out $code
+        impl$(<$lt>)? std::future::IntoFuture for $action {
+            type Output = $out;
+            type IntoFuture = $f_ty$(<$lt>)?;
+
+            fn into_future($($args)+) -> Self::IntoFuture {
+                $f_ty(Box::pin(async move {
+                    $code
+                }))
+            }
+        }
+
+        impl$(<$lt>)? crate::action::Action for $action {
+            type Output = $out;
+        }
+
+        crate::action::action_impl_future_wrapper!($($lt)?, $f_ty, $out);
+
+        impl$(<$lt>)? std::future::Future for $f_ty$(<$lt>)? {
+            type Output = $out;
+
+            fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+                self.0.as_mut().poll(cx)
+            }
         }
 
         #[cfg(any(feature = "sync", feature = "tokio-sync"))]
@@ -92,36 +157,6 @@ macro_rules! action_impl {
     }
 }
 pub(crate) use action_impl;
-
-macro_rules! action_impl_inner {
-    (
-        $action:ty => $f_ty:ident;
-        $($lt:lifetime)?;
-        async fn($($args:ident)+) -> $out:ty $code:block
-    ) => {
-        impl$(<$lt>)? std::future::IntoFuture for $action {
-            type Output = $out;
-            type IntoFuture = $f_ty$(<$lt>)?;
-
-            fn into_future($($args)+) -> Self::IntoFuture {
-                $f_ty(Box::pin(async move {
-                    $code
-                }))
-            }
-        }
-
-        crate::action::action_impl_future_wrapper!($($lt)?, $f_ty, $out);
-
-        impl$(<$lt>)? std::future::Future for $f_ty$(<$lt>)? {
-            type Output = $out;
-
-            fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-                self.0.as_mut().poll(cx)
-            }
-        }
-    }
-}
-pub(crate) use action_impl_inner;
 
 macro_rules! action_impl_future_wrapper {
     (, $f_ty:ident, $out:ty) => {
