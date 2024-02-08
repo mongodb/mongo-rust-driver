@@ -1,14 +1,9 @@
 {
   "runOn": [
     {
-      "minServerVersion": "4.0",
+      "minServerVersion": "4.3.1",
       "topology": [
-        "replicaset"
-      ]
-    },
-    {
-      "minServerVersion": "4.1.7",
-      "topology": [
+        "replicaset",
         "sharded",
         "load-balanced"
       ]
@@ -25,6 +20,105 @@
     }
   ],
   "tests": [
+    {
+      "description": "UpdateOne succeeds with RetryableWriteError from server",
+      "failPoint": {
+        "configureFailPoint": "failCommand",
+        "mode": {
+          "times": 1
+        },
+        "data": {
+          "failCommands": [
+            "update"
+          ],
+          "errorCode": 112,
+          "errorLabels": [
+            "RetryableWriteError"
+          ]
+        }
+      },
+      "operation": {
+        "name": "updateOne",
+        "arguments": {
+          "filter": {
+            "_id": 1
+          },
+          "update": {
+            "$inc": {
+              "x": 1
+            }
+          }
+        }
+      },
+      "outcome": {
+        "result": {
+          "matchedCount": 1,
+          "modifiedCount": 1,
+          "upsertedCount": 0
+        },
+        "collection": {
+          "data": [
+            {
+              "_id": 1,
+              "x": 12
+            },
+            {
+              "_id": 2,
+              "x": 22
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "UpdateOne fails if server does not return RetryableWriteError",
+      "failPoint": {
+        "configureFailPoint": "failCommand",
+        "mode": {
+          "times": 1
+        },
+        "data": {
+          "failCommands": [
+            "update"
+          ],
+          "errorCode": 11600,
+          "errorLabels": []
+        }
+      },
+      "operation": {
+        "name": "updateOne",
+        "arguments": {
+          "filter": {
+            "_id": 1
+          },
+          "update": {
+            "$inc": {
+              "x": 1
+            }
+          }
+        }
+      },
+      "outcome": {
+        "error": true,
+        "result": {
+          "errorLabelsOmit": [
+            "RetryableWriteError"
+          ]
+        },
+        "collection": {
+          "data": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            }
+          ]
+        }
+      }
+    },
     {
       "description": "UpdateOne succeeds after PrimarySteppedDown",
       "failPoint": {
@@ -119,54 +213,6 @@
             {
               "_id": 1,
               "x": 12
-            },
-            {
-              "_id": 2,
-              "x": 22
-            }
-          ]
-        }
-      }
-    },
-    {
-      "description": "UpdateOne fails with a RetryableWriteError label after two connection failures",
-      "failPoint": {
-        "configureFailPoint": "failCommand",
-        "mode": {
-          "times": 2
-        },
-        "data": {
-          "failCommands": [
-            "update"
-          ],
-          "closeConnection": true
-        }
-      },
-      "operation": {
-        "name": "updateOne",
-        "arguments": {
-          "filter": {
-            "_id": 1
-          },
-          "update": {
-            "$inc": {
-              "x": 1
-            }
-          }
-        }
-      },
-      "outcome": {
-        "error": true,
-        "result": {
-          "errorLabelsContain": [
-            "RetryableWriteError"
-          ]
-        },
-        "collection": {
-          "data": [
-            {
-              "_id": 1,
-              "x": 11
             },
             {
               "_id": 2,
