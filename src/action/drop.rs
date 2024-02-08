@@ -73,9 +73,9 @@ impl<T> Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
     /// `await` will return `Result<()>`.
-    pub fn drop(&self) -> DropCollection<'_, T> {
+    pub fn drop(&self) -> DropCollection {
         DropCollection {
-            coll: self,
+            coll: self.ref_untyped(),
             options: None,
             session: None,
         }
@@ -87,7 +87,7 @@ impl<T> crate::sync::Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
     /// [`run`](DropCollection::run) will return `Result<()>`.
-    pub fn drop(&self) -> DropCollection<'_, T> {
+    pub fn drop(&self) -> DropCollection {
         self.async_collection.drop()
     }
 }
@@ -95,13 +95,13 @@ impl<T> crate::sync::Collection<T> {
 /// Drops the collection, deleting all data and indexes stored in it.  Create by calling
 /// [`Collection::drop`].
 #[must_use]
-pub struct DropCollection<'a, T> {
-    pub(crate) coll: &'a Collection<T>,
+pub struct DropCollection<'a> {
+    pub(crate) coll: &'a Collection<bson::Document>,
     pub(crate) options: Option<DropCollectionOptions>,
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
-impl<'a, T> DropCollection<'a, T> {
+impl<'a> DropCollection<'a> {
     option_setters!(options: DropCollectionOptions;
         write_concern: WriteConcern,
         #[cfg(feature = "in-use-encryption-unstable")]

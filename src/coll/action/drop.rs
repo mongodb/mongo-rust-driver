@@ -1,17 +1,11 @@
-use bson::doc;
-use futures_util::TryStreamExt;
-
 use crate::{
     action::{action_impl, DropCollection},
-    coll::DropCollectionOptions,
     error::Result,
     operation::drop_collection as op,
-    ClientSession,
-    Collection,
 };
 
 action_impl! {
-    impl<'a, T> Action for DropCollection<'a, T> {
+    impl<'a> Action for DropCollection<'a> {
         type Future = DropCollectionFuture;
 
         async fn execute(mut self) -> Result<()> {
@@ -30,13 +24,16 @@ action_impl! {
 }
 
 #[cfg(feature = "in-use-encryption-unstable")]
-impl<T> Collection<T> {
+impl<T> crate::Collection<T> {
     #[allow(clippy::needless_option_as_deref)]
     async fn drop_aux_collections(
         &self,
-        options: Option<&DropCollectionOptions>,
-        mut session: Option<&mut ClientSession>,
+        options: Option<&crate::coll::DropCollectionOptions>,
+        mut session: Option<&mut crate::ClientSession>,
     ) -> Result<()> {
+        use bson::doc;
+        use futures_util::TryStreamExt;
+
         // Find associated `encrypted_fields`:
         // * from options to this call
         let mut enc_fields = options.and_then(|o| o.encrypted_fields.as_ref());
