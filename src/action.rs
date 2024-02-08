@@ -100,13 +100,13 @@ pub trait Action {
 macro_rules! action_impl {
     // Generate with no sync type conversion
     (
-        impl$(<$lt:lifetime>)? Action for $action:ty {
+        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
         }
     ) => {
         crate::action::action_impl! {
-            impl$(<$lt>)? Action for $action {
+            impl$(<$lt $(, $($at),+)?>)? Action for $action {
                 type Future = $f_ty;
                 async fn execute($($args)+) -> $out $code
                 fn sync_wrap(out) -> $out { out }
@@ -115,13 +115,13 @@ macro_rules! action_impl {
     };
     // Generate with a sync type conversion
     (
-        impl$(<$lt:lifetime>)? Action for $action:ty {
+        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
             fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
         }
     ) => {
-        impl$(<$lt>)? std::future::IntoFuture for $action {
+        impl$(<$lt $(, $($at),+)?>)? std::future::IntoFuture for $action {
             type Output = $out;
             type IntoFuture = $f_ty$(<$lt>)?;
 
@@ -132,7 +132,7 @@ macro_rules! action_impl {
             }
         }
 
-        impl$(<$lt>)? crate::action::Action for $action {
+        impl$(<$lt $(, $($at),+)?>)? crate::action::Action for $action {
             type Output = $out;
         }
 
@@ -147,7 +147,7 @@ macro_rules! action_impl {
         }
 
         #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        impl$(<$lt>)? $action {
+        impl$(<$lt $(, $($at),+)?>)? $action {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {
                 let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
