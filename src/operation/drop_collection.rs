@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::Document;
 
 use crate::{
@@ -26,17 +23,6 @@ pub(crate) struct DropCollection {
 impl DropCollection {
     pub(crate) fn new(ns: Namespace, options: Option<DropCollectionOptions>) -> Self {
         DropCollection { ns, options }
-    }
-
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            None,
-        )
     }
 }
 
