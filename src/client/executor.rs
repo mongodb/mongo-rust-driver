@@ -327,7 +327,7 @@ impl Client {
                 Err(mut err) => {
                     retry.first_error()?;
 
-                    err.add_labels_and_update_pin(None, &mut session, None)?;
+                    err.add_labels_and_update_pin(None, &mut session, None, None)?;
                     return Err(err);
                 }
             };
@@ -338,7 +338,7 @@ impl Client {
                 Err(mut err) => {
                     retry.first_error()?;
 
-                    err.add_labels_and_update_pin(None, &mut session, None)?;
+                    err.add_labels_and_update_pin(None, &mut session, None, None)?;
                     if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
                         err.add_label(RETRYABLE_WRITE_ERROR);
                     }
@@ -619,6 +619,26 @@ impl Client {
         })
         .await;
 
+        fn try_get_integer(raw_doc: &RawDocument, key: &str) -> Result<i64> {
+            let val = match raw_doc.get(key)? {
+                Some(b) => {
+                    crate::bson_util::get_int_raw(b).ok_or_else(|| ErrorKind::InvalidResponse {
+                        message: format!(
+                            "expected '{}' value to be a number, instead got {:?}",
+                            key, b
+                        ),
+                    })?
+                }
+                None => {
+                    return Err(ErrorKind::InvalidResponse {
+                        message: format!("missing '{}' value in response", key),
+                    }
+                    .into())
+                }
+            };
+            Ok(val)
+        }
+
         let start_time = Instant::now();
         let command_result = match connection.send_message(message, should_compress).await {
             Ok(response) => {
@@ -631,22 +651,7 @@ impl Client {
                 ) -> Result<RawCommandResponse> {
                     let raw_doc = RawDocument::from_bytes(response.as_bytes())?;
 
-                    let ok = match raw_doc.get("ok")? {
-                        Some(b) => crate::bson_util::get_int_raw(b).ok_or_else(|| {
-                            ErrorKind::InvalidResponse {
-                                message: format!(
-                                    "expected ok value to be a number, instead got {:?}",
-                                    b
-                                ),
-                            }
-                        })?,
-                        None => {
-                            return Err(ErrorKind::InvalidResponse {
-                                message: "missing 'ok' value in response".to_string(),
-                            }
-                            .into())
-                        }
-                    };
+                    let ok = try_get_integer(raw_doc, "ok")?;
 
                     let cluster_time: Option<ClusterTime> = raw_doc
                         .get("$clusterTime")?
@@ -725,7 +730,7 @@ impl Client {
                     }
                 }
 
-                err.add_labels_and_update_pin(Some(connection), session, Some(retryability))?;
+                err.add_labels_and_update_pin(Some(connection), session, Some(retryability), None)?;
                 op.handle_error(err)
             }
             Ok(response) => {
@@ -749,6 +754,10 @@ impl Client {
                 })
                 .await;
 
+                let raw_doc = RawDocument::from_bytes(response.as_bytes())?;
+                let ok: i64 = try_get_integer(raw_doc, "ok")?;
+                let is_reply_ok = Some(ok == 1);
+
                 #[cfg(feature = "in-use-encryption-unstable")]
                 let response = {
                     let guard = self.inner.csfle.read().await;
@@ -767,6 +776,7 @@ impl Client {
                             Some(connection),
                             session,
                             Some(retryability),
+                            is_reply_ok,
                         )?;
                         Err(err)
                     }
@@ -961,6 +971,7 @@ impl Error {
         conn: Option<&Connection>,
         session: &mut Option<&mut ClientSession>,
         retryability: Option<Retryability>,
+        is_reply_ok: Option<bool>,
     ) -> Result<()> {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
             &session.transaction.state
@@ -978,7 +989,7 @@ impl Error {
             }
             TransactionState::Committed { .. } => {
                 if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version) {
+                    if self.should_add_retryable_write_label(max_wire_version, conn, is_reply_ok)? {
                         self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
@@ -988,7 +999,7 @@ impl Error {
             }
             TransactionState::Aborted => {
                 if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version) {
+                    if self.should_add_retryable_write_label(max_wire_version, conn, is_reply_ok)? {
                         self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
@@ -996,7 +1007,11 @@ impl Error {
             TransactionState::None => {
                 if retryability == Some(Retryability::Write) {
                     if let Some(max_wire_version) = max_wire_version {
-                        if self.should_add_retryable_write_label(max_wire_version) {
+                        if self.should_add_retryable_write_label(
+                            max_wire_version,
+                            conn,
+                            is_reply_ok,
+                        )? {
                             self.add_label(RETRYABLE_WRITE_ERROR);
                         }
                     }

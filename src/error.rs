@@ -7,11 +7,15 @@ use std::{
     sync::Arc,
 };
 
+use crate::{
+    bson::Document,
+    cmap::Connection,
+    options::ServerAddress,
+    sdam::{ServerType, TopologyVersion},
+};
 use bson::Bson;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-use crate::{bson::Document, options::ServerAddress, sdam::TopologyVersion};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -181,16 +185,29 @@ impl Error {
     /// indicates a 4.4+ server, a label should only be added if the error is a network error.
     /// Otherwise, a label should be added if the error is a network error or the error code
     /// matches one of the retryable write codes.
-    pub(crate) fn should_add_retryable_write_label(&self, max_wire_version: i32) -> bool {
+    pub(crate) fn should_add_retryable_write_label(
+        &self,
+        max_wire_version: i32,
+        conn: Option<&Connection>,
+        is_reply_ok: Option<bool>,
+    ) -> Result<bool> {
         if max_wire_version > 8 {
-            return self.is_network_error();
+            return Ok(self.is_network_error());
         }
         if self.is_network_error() {
-            return true;
+            return Ok(true);
         }
+
+        if let Some(c) = conn {
+            let sd = c.stream_description()?;
+            if sd.initial_server_type == ServerType::Mongos && is_reply_ok == Some(true) {
+                return Ok(false);
+            }
+        }
+
         match &self.sdam_code() {
-            Some(code) => RETRYABLE_WRITE_CODES.contains(code),
-            None => false,
+            Some(code) => Ok(RETRYABLE_WRITE_CODES.contains(code)),
+            None => Ok(false),
         }
     }
 
