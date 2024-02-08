@@ -12,6 +12,7 @@ mod cursor;
 mod db;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod documentation_examples;
+mod hello;
 mod index_management;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod lambda_examples;
