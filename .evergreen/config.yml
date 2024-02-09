@@ -402,7 +402,7 @@ buildvariants:
 
   - name: aws-lambda
     display_name: "AWS Lambda"
-    patchable: true
+    patchable: false
     run_on:
       - ubuntu2204-small
     tasks:
