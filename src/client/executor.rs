@@ -981,6 +981,11 @@ impl Error {
         } else {
             None
         };
+
+        let server_type = match conn {
+            Some(c) => Some(c.stream_description()?.initial_server_type),
+            None => None,
+        };
         match transaction_state {
             TransactionState::Starting | TransactionState::InProgress => {
                 if self.is_network_error() || self.is_server_selection_error() {
@@ -989,7 +994,11 @@ impl Error {
             }
             TransactionState::Committed { .. } => {
                 if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version, conn, is_reply_ok)? {
+                    if self.should_add_retryable_write_label(
+                        max_wire_version,
+                        server_type,
+                        is_reply_ok,
+                    ) {
                         self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
@@ -999,7 +1008,11 @@ impl Error {
             }
             TransactionState::Aborted => {
                 if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version, conn, is_reply_ok)? {
+                    if self.should_add_retryable_write_label(
+                        max_wire_version,
+                        server_type,
+                        is_reply_ok,
+                    ) {
                         self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
@@ -1009,9 +1022,9 @@ impl Error {
                     if let Some(max_wire_version) = max_wire_version {
                         if self.should_add_retryable_write_label(
                             max_wire_version,
-                            conn,
+                            server_type,
                             is_reply_ok,
-                        )? {
+                        ) {
                             self.add_label(RETRYABLE_WRITE_ERROR);
                         }
                     }
