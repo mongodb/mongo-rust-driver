@@ -623,7 +623,7 @@ pub struct AggregateOptions {
 #[non_exhaustive]
 pub struct CountOptions {
     /// The filter to use for the operation.
-    #[serde(skip)]
+    #[serde(skip_serializing)]
     pub filter: Option<Document>,
 
     /// The index to use for the operation.
