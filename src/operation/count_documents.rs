@@ -20,7 +20,7 @@ pub(crate) struct CountDocuments {
 impl CountDocuments {
     pub(crate) fn new(namespace: Namespace, options: Option<CountOptions>) -> Result<Self> {
         let mut pipeline = vec![doc! {
-            "$match": options.as_ref().map(|o| o.filter.clone()).unwrap_or_default(),
+            "$match": options.as_ref().and_then(|o| o.filter.as_ref()).cloned().unwrap_or_default(),
         }];
 
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
