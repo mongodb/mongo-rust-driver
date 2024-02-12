@@ -193,7 +193,7 @@ impl<T> Collection<T> {
         }
     }
 
-    pub(crate) fn as_untyped_ref<'a>(&'a self) -> &'a Collection<Document> {
+    pub(crate) fn as_untyped_ref(&self) -> &Collection<Document> {
         // Safety assertion: a reference `&Collection<T>` is always also a valid reference
         // `&Collection<Document>`
         // * Collection is repr(C), guaranteeing that monomorphized layouts are the same

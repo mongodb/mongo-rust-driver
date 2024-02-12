@@ -1515,13 +1515,10 @@ async fn aggregation_examples() -> GenericResult<()> {
         use futures::TryStreamExt;
         let cursor = db
             .collection::<Document>("sales")
-            .aggregate(
-                vec![
-                    doc! { "$match": { "items.fruit": "banana" } },
-                    doc! { "$sort": { "date": 1 } },
-                ],
-                None,
-            )
+            .aggregate(vec![
+                doc! { "$match": { "items.fruit": "banana" } },
+                doc! { "$sort": { "date": 1 } },
+            ])
             .await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 1
@@ -1533,33 +1530,30 @@ async fn aggregation_examples() -> GenericResult<()> {
         use futures::TryStreamExt;
         let cursor = db
             .collection::<Document>("sales")
-            .aggregate(
-                vec![
-                    doc! {
-                        "$unwind": "$items"
-                    },
-                    doc! { "$match": {
-                        "items.fruit": "banana",
-                    }},
-                    doc! {
-                        "$group": {
-                            "_id": { "day": { "$dayOfWeek": "$date" } },
-                            "count": { "$sum": "$items.quantity" }
-                        }
-                    },
-                    doc! {
-                        "$project": {
-                            "dayOfWeek": "$_id.day",
-                            "numberSold": "$count",
-                            "_id": 0
-                        }
-                    },
-                    doc! {
-                        "$sort": { "numberSold": 1 }
-                    },
-                ],
-                None,
-            )
+            .aggregate(vec![
+                doc! {
+                    "$unwind": "$items"
+                },
+                doc! { "$match": {
+                    "items.fruit": "banana",
+                }},
+                doc! {
+                    "$group": {
+                        "_id": { "day": { "$dayOfWeek": "$date" } },
+                        "count": { "$sum": "$items.quantity" }
+                    }
+                },
+                doc! {
+                    "$project": {
+                        "dayOfWeek": "$_id.day",
+                        "numberSold": "$count",
+                        "_id": 0
+                    }
+                },
+                doc! {
+                    "$sort": { "numberSold": 1 }
+                },
+            ])
             .await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 2
@@ -1591,8 +1585,7 @@ async fn aggregation_examples() -> GenericResult<()> {
                         }
                     }
                 },
-            ],
-            None,
+            ]
         ).await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 3
@@ -1604,36 +1597,33 @@ async fn aggregation_examples() -> GenericResult<()> {
         use futures::TryStreamExt;
         let cursor = db
             .collection::<Document>("air_alliances")
-            .aggregate(
-                vec![
-                    doc! {
-                        "$lookup": {
-                            "from": "air_airlines",
-                            "let": { "constituents": "$airlines" },
-                            "pipeline": [
-                                {
-                                    "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
-                                }
-                            ],
-                            "as": "airlines"
-                        }
-                    },
-                    doc! {
-                        "$project": {
-                            "_id": 0,
-                            "name": 1,
-                            "airlines": {
-                                "$filter": {
-                                    "input": "$airlines",
-                                    "as": "airline",
-                                    "cond": { "$eq": ["$$airline.country", "Canada"] }
-                                }
+            .aggregate(vec![
+                doc! {
+                    "$lookup": {
+                        "from": "air_airlines",
+                        "let": { "constituents": "$airlines" },
+                        "pipeline": [
+                            {
+                                "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
+                            }
+                        ],
+                        "as": "airlines"
+                    }
+                },
+                doc! {
+                    "$project": {
+                        "_id": 0,
+                        "name": 1,
+                        "airlines": {
+                            "$filter": {
+                                "input": "$airlines",
+                                "as": "airline",
+                                "cond": { "$eq": ["$$airline.country", "Canada"] }
                             }
                         }
-                    },
-                ],
-                None,
-            )
+                    }
+                },
+            ])
             .await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 4
