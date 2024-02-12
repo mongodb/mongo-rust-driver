@@ -2,7 +2,7 @@ mod abort_transaction;
 pub(crate) mod aggregate;
 mod commit_transaction;
 pub(crate) mod count;
-mod count_documents;
+pub(crate) mod count_documents;
 pub(crate) mod create;
 mod create_indexes;
 mod delete;
@@ -53,7 +53,6 @@ use crate::{
 
 pub(crate) use abort_transaction::AbortTransaction;
 pub(crate) use commit_transaction::CommitTransaction;
-pub(crate) use count_documents::CountDocuments;
 pub(crate) use create_indexes::CreateIndexes;
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;

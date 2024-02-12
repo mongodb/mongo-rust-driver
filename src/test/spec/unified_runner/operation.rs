@@ -1017,7 +1017,6 @@ impl TestOperation for Distinct {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CountDocuments {
-    filter: Document,
     session: Option<String>,
     #[serde(flatten)]
     options: CountOptions,
@@ -1031,24 +1030,17 @@ impl TestOperation for CountDocuments {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .count_documents()
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .count_documents_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .count_documents(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             Ok(Some(Bson::Int64(result.try_into().unwrap()).into()))
         }

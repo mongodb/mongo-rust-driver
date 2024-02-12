@@ -54,12 +54,12 @@ async fn run_count_test(test_file: TestFile) {
         let result = match test_case.operation.name.as_str() {
             "countDocuments" => {
                 let options = CountOptions::builder()
+                    .filter(arguments.filter)
                     .skip(arguments.skip)
                     .limit(arguments.limit)
                     .collation(arguments.collation)
                     .build();
-                coll.count_documents(arguments.filter.unwrap_or_default(), options)
-                    .await
+                coll.count_documents().with_options(options).await
             }
             "estimatedDocumentCount" => coll.estimated_document_count().await,
             other => panic!("unexpected count operation: {}", other),

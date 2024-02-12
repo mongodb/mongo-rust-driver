@@ -8,7 +8,6 @@ use crate::{
     error::Result,
     index::IndexModel,
     options::{
-        CountOptions,
         CreateIndexOptions,
         DeleteOptions,
         DistinctOptions,
@@ -120,38 +119,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Gets the number of documents matching `filter`.
-    ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
-    pub fn count_documents(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-    ) -> Result<u64> {
-        runtime::block_on(
-            self.async_collection
-                .count_documents(filter.into(), options.into()),
-        )
-    }
-
-    /// Gets the number of documents matching `filter` using the provided `ClientSession`.
-    ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
-    pub fn count_documents_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<u64> {
-        runtime::block_on(self.async_collection.count_documents_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 
     /// Creates the given index on this collection.

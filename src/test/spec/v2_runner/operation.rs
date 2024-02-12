@@ -687,7 +687,6 @@ impl TestOperation for Distinct {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct CountDocuments {
-    filter: Document,
     #[serde(flatten)]
     options: Option<CountOptions>,
 }
@@ -699,22 +698,11 @@ impl TestOperation for CountDocuments {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .count_documents_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .count_documents(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .count_documents()
+                .with_options(self.options.clone())
+                .optional(session, |a, v| a.session(v))
+                .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap())))
         }
         .boxed()

@@ -161,7 +161,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "aggregate",
-            collection_op!($test_name, coll, coll.count_documents(None, None)),
+            collection_op!($test_name, coll, coll.count_documents()),
         )
         .await;
         $test_func("drop", collection_op!($test_name, coll, coll.drop())).await;
@@ -606,7 +606,13 @@ async fn find_and_getmore_share_session() {
             .read_concern(ReadConcern::local())
             .build();
 
-        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
+        while coll
+            .count_documents()
+            .with_options(options.clone())
+            .await
+            .unwrap()
+            != 3
+        {}
     }
 
     for read_pref in read_preferences {

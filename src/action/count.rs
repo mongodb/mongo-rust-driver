@@ -1,6 +1,11 @@
 use bson::Document;
 
-use crate::{coll::options::EstimatedDocumentCountOptions, error::Result, Collection};
+use crate::{
+    coll::options::{CountOptions, EstimatedDocumentCountOptions},
+    error::Result,
+    ClientSession,
+    Collection,
+};
 
 use super::{action_impl, option_setters};
 
@@ -24,6 +29,19 @@ impl<T> Collection<T> {
             options: None,
         }
     }
+
+    /// Gets the number of documents.
+    ///
+    /// Note that this method returns an accurate count.
+    ///
+    /// `await` will return `Result<u64>`.
+    pub fn count_documents(&self) -> CountDocuments {
+        CountDocuments {
+            coll: self.as_untyped_ref(),
+            options: None,
+            session: None,
+        }
+    }
 }
 
 #[cfg(any(feature = "sync", feature = "tokio-sync"))]
@@ -43,6 +61,15 @@ impl<T> crate::sync::Collection<T> {
     /// [`run`](EstimatedDocumentCount::run) will return `Result<u64>`.
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         self.async_collection.estimated_document_count()
+    }
+
+    /// Gets the number of documents.
+    ///
+    /// Note that this method returns an accurate count.
+    ///
+    /// [`run`](CountDocuments::run) will return `Result<u64>`.
+    pub fn count_documents(&self) -> CountDocuments {
+        self.async_collection.count_documents()
     }
 }
 
@@ -70,6 +97,48 @@ action_impl! {
             resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
             let op = crate::operation::count::Count::new(self.coll.namespace(), self.options);
             self.coll.client().execute_operation(op, None).await
+        }
+    }
+}
+
+/// Get an accurate count of documents.  Create by calling [`Collection::count_documents`].
+#[must_use]
+pub struct CountDocuments<'a> {
+    coll: &'a Collection<Document>,
+    options: Option<CountOptions>,
+    session: Option<&'a mut ClientSession>,
+}
+
+impl<'a> CountDocuments<'a> {
+    option_setters!(options: CountOptions;
+        filter: Document,
+        hint: crate::coll::options::Hint,
+        limit: u64,
+        max_time: std::time::Duration,
+        skip: u64,
+        collation: crate::collation::Collation,
+        selection_criteria: crate::selection_criteria::SelectionCriteria,
+        read_concern: crate::options::ReadConcern,
+        comment: bson::Bson,
+    );
+
+    /// Runs the operation using the provided session.
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
+        self.session = Some(value.into());
+        self
+    }
+}
+
+action_impl! {
+    impl<'a> Action for CountDocuments<'a> {
+        type Future = CountDocumentsFuture;
+
+        async fn execute(mut self) -> Result<u64> {
+            resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+            resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
+
+            let op = crate::operation::count_documents::CountDocuments::new(self.coll.namespace(), self.options)?;
+            self.coll.client().execute_operation(op, self.session).await
         }
     }
 }

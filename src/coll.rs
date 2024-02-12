@@ -24,7 +24,6 @@ use crate::{
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
     operation::{
-        CountDocuments,
         CreateIndexes,
         Delete,
         Distinct,
@@ -254,45 +253,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    async fn count_documents_common(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<u64> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, session.as_ref())?;
-        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
-
-        let op = CountDocuments::new(self.namespace(), filter.into(), options)?;
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Gets the number of documents matching `filter`.
-    ///
-    /// Note that this method returns an accurate count.
-    pub async fn count_documents(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-    ) -> Result<u64> {
-        self.count_documents_common(filter, options, None).await
-    }
-
-    /// Gets the number of documents matching `filter` using the provided `ClientSession`.
-    ///
-    /// Note that this method returns an accurate count.
-    pub async fn count_documents_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<u64> {
-        self.count_documents_common(filter, options, session).await
     }
 
     async fn delete_many_common(
