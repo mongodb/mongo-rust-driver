@@ -5,7 +5,12 @@ use bson::Document;
 use crate::{
     coll::options::AggregateOptions,
     error::Result,
+    operation::aggregate::AggregateTarget,
+    options::{ReadConcern, WriteConcern},
+    selection_criteria::SelectionCriteria,
+    Client,
     ClientSession,
+    Collection,
     Cursor,
     Database,
     SessionCursor,
@@ -23,7 +28,25 @@ impl Database {
     /// a `ClientSession` is provided.
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
-            db: self,
+            target: AggregateTargetRef::Database(self),
+            pipeline: pipeline.into_iter().collect(),
+            options: None,
+            session: ImplicitSession,
+        }
+    }
+}
+
+impl<T> Collection<T> {
+    /// Runs an aggregation operation.
+    ///
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
+    /// information on aggregations.
+    ///
+    /// `await` will return `Result<Cursor<Document>>` or `Result<SessionCursor<Document>>` if
+    /// a `ClientSession` is provided.
+    pub fn aggregate_2(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+        Aggregate {
+            target: AggregateTargetRef::Collection(self.as_untyped_ref()),
             pipeline: pipeline.into_iter().collect(),
             options: None,
             session: ImplicitSession,
@@ -45,13 +68,70 @@ impl crate::sync::Database {
     }
 }
 
-/// Run an aggregation operation.  Create by calling [`Database::aggregate`].
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<T> crate::sync::Collection<T> {
+    /// Runs an aggregation operation.
+    ///
+    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
+    /// information on aggregations.
+    ///
+    /// [`run`](Aggregate::run) will return `Result<Cursor<Document>>` or
+    /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
+    pub fn aggregate_2(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+        self.async_collection.aggregate_2(pipeline)
+    }
+}
+
+/// Run an aggregation operation.  Create by calling [`Database::aggregate`] or
+/// [`Collection::aggregate`].
 #[must_use]
 pub struct Aggregate<'a, Session = ImplicitSession> {
-    db: &'a Database,
+    target: AggregateTargetRef<'a>,
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
     session: Session,
+}
+
+enum AggregateTargetRef<'a> {
+    Database(&'a Database),
+    Collection(&'a Collection<Document>),
+}
+
+impl<'a> AggregateTargetRef<'a> {
+    fn target(&self) -> AggregateTarget {
+        match self {
+            Self::Collection(coll) => AggregateTarget::Collection(coll.namespace()),
+            Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
+        }
+    }
+
+    fn client(&self) -> &Client {
+        match self {
+            Self::Collection(coll) => coll.client(),
+            Self::Database(db) => db.client(),
+        }
+    }
+
+    fn read_concern(&self) -> Option<&ReadConcern> {
+        match self {
+            Self::Collection(coll) => coll.read_concern(),
+            Self::Database(db) => db.read_concern(),
+        }
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        match self {
+            Self::Collection(coll) => coll.write_concern(),
+            Self::Database(db) => db.write_concern(),
+        }
+    }
+
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        match self {
+            Self::Collection(coll) => coll.selection_criteria(),
+            Self::Database(db) => db.selection_criteria(),
+        }
+    }
 }
 
 impl<'a, Session> Aggregate<'a, Session> {
@@ -64,9 +144,9 @@ impl<'a, Session> Aggregate<'a, Session> {
         hint: crate::coll::options::Hint,
         max_await_time: Duration,
         max_time: Duration,
-        read_concern: crate::options::ReadConcern,
-        selection_criteria: crate::selection_criteria::SelectionCriteria,
-        write_concern: crate::options::WriteConcern,
+        read_concern: ReadConcern,
+        selection_criteria: SelectionCriteria,
+        write_concern: WriteConcern,
         let_vars: Document,
     );
 }
@@ -78,7 +158,7 @@ impl<'a> Aggregate<'a, ImplicitSession> {
         value: impl Into<&'a mut ClientSession>,
     ) -> Aggregate<'a, ExplicitSession<'a>> {
         Aggregate {
-            db: self.db,
+            target: self.target,
             pipeline: self.pipeline,
             options: self.options,
             session: ExplicitSession(value.into()),
@@ -92,13 +172,13 @@ action_impl! {
 
         async fn execute(mut self) -> Result<Cursor<Document>> {
             resolve_options!(
-                self.db,
+                self.target,
                 self.options,
                 [read_concern, write_concern, selection_criteria]
             );
 
-            let aggregate = crate::operation::aggregate::Aggregate::new(self.db.name().to_string(), self.pipeline, self.options);
-            let client = self.db.client();
+            let aggregate = crate::operation::aggregate::Aggregate::new(self.target.target(), self.pipeline, self.options);
+            let client = self.target.client();
             client.execute_cursor_operation(aggregate).await
         }
 
@@ -113,14 +193,20 @@ action_impl! {
         type Future = AggregateSessionFuture;
 
         async fn execute(mut self) -> Result<SessionCursor<Document>> {
-            resolve_options!(
-                self.db,
-                self.options,
-                [read_concern, write_concern, selection_criteria]
-            );
+            if matches!(self.target, AggregateTargetRef::Collection(_)) {
+                resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+                resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+                resolve_selection_criteria_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+            } else {
+                resolve_options!(
+                    self.target,
+                    self.options,
+                    [read_concern, write_concern, selection_criteria]
+                );
+            }
 
-            let aggregate = crate::operation::aggregate::Aggregate::new(self.db.name().to_string(), self.pipeline, self.options);
-            let client = self.db.client();
+            let aggregate = crate::operation::aggregate::Aggregate::new(self.target.target(), self.pipeline, self.options);
+            let client = self.target.client();
             client.execute_session_cursor_operation(aggregate, self.session.0).await
         }
 

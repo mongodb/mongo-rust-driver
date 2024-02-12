@@ -75,7 +75,7 @@ impl<T> Collection<T> {
     /// `await` will return `Result<()>`.
     pub fn drop(&self) -> DropCollection {
         DropCollection {
-            coll: self.ref_untyped(),
+            coll: self.as_untyped_ref(),
             options: None,
             session: None,
         }

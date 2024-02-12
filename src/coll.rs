@@ -194,14 +194,19 @@ impl<T> Collection<T> {
         }
     }
 
-    pub(crate) fn ref_untyped<'a>(&'a self) -> &'a Collection<Document> {
-        // Safety assertion: a reference `&Collection<T>` is always also a valid reference `&Collection<Document>`
+    pub(crate) fn as_untyped_ref<'a>(&'a self) -> &'a Collection<Document> {
+        // Safety assertion: a reference `&Collection<T>` is always also a valid reference
+        // `&Collection<Document>`
         // * Collection is repr(C), guaranteeing that monomorphized layouts are the same
         // * The `inner` field does not change type in this transmute
         // * The `_phantom` field is zero-sized
-        // * The target type is concrete, so no lifetime extension is possible and no invalid types can exist.
+        // * The target type is concrete, so no lifetime extension is possible and no invalid types
+        //   can exist.
         // If fields are added, this logic must be revisited.
-        let Collection { inner: _, _phantom: _ } = self;
+        let Collection {
+            inner: _,
+            _phantom: _,
+        } = self;
         unsafe { std::mem::transmute(self) }
     }
 

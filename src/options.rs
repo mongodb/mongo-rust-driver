@@ -35,12 +35,9 @@ macro_rules! resolve_options {
     ($obj:expr, $opts:expr, [$( $field:ident ),+] ) => {
         $(
             if let Some(option) = $obj.$field() {
-                if !$opts
-                    .as_ref()
-                    .map(|opts| opts.$field.is_some())
-                    .unwrap_or(false)
-                {
-                    $opts.get_or_insert_with(Default::default).$field = Some(option.clone());
+                let options = $opts.get_or_insert_with(Default::default);
+                if !options.$field.is_some() {
+                    options.$field = Some(option.clone());
                 }
             }
         )+
@@ -89,7 +86,7 @@ macro_rules! resolve_rw_concern_with_session {
                         .map(|opts| opts.$concern.is_some())
                         .unwrap_or(false)
                     {
-                        return Err(ErrorKind::InvalidArgument {
+                        return Err(crate::error::ErrorKind::InvalidArgument {
                             message: format!(
                                 "Cannot set {} concern after starting a transaction",
                                 $name
