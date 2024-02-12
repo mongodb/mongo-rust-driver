@@ -92,48 +92,6 @@ pub struct Aggregate<'a, Session = ImplicitSession> {
     session: Session,
 }
 
-enum AggregateTargetRef<'a> {
-    Database(&'a Database),
-    Collection(&'a Collection<Document>),
-}
-
-impl<'a> AggregateTargetRef<'a> {
-    fn target(&self) -> AggregateTarget {
-        match self {
-            Self::Collection(coll) => AggregateTarget::Collection(coll.namespace()),
-            Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
-        }
-    }
-
-    fn client(&self) -> &Client {
-        match self {
-            Self::Collection(coll) => coll.client(),
-            Self::Database(db) => db.client(),
-        }
-    }
-
-    fn read_concern(&self) -> Option<&ReadConcern> {
-        match self {
-            Self::Collection(coll) => coll.read_concern(),
-            Self::Database(db) => db.read_concern(),
-        }
-    }
-
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        match self {
-            Self::Collection(coll) => coll.write_concern(),
-            Self::Database(db) => db.write_concern(),
-        }
-    }
-
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        match self {
-            Self::Collection(coll) => coll.selection_criteria(),
-            Self::Database(db) => db.selection_criteria(),
-        }
-    }
-}
-
 impl<'a, Session> Aggregate<'a, Session> {
     option_setters!(options: AggregateOptions;
         allow_disk_use: bool,
@@ -212,6 +170,48 @@ action_impl! {
 
         fn sync_wrap(out) -> Result<crate::sync::SessionCursor<Document>> {
             out.map(crate::sync::SessionCursor::new)
+        }
+    }
+}
+
+enum AggregateTargetRef<'a> {
+    Database(&'a Database),
+    Collection(&'a Collection<Document>),
+}
+
+impl<'a> AggregateTargetRef<'a> {
+    fn target(&self) -> AggregateTarget {
+        match self {
+            Self::Collection(coll) => AggregateTarget::Collection(coll.namespace()),
+            Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
+        }
+    }
+
+    fn client(&self) -> &Client {
+        match self {
+            Self::Collection(coll) => coll.client(),
+            Self::Database(db) => db.client(),
+        }
+    }
+
+    fn read_concern(&self) -> Option<&ReadConcern> {
+        match self {
+            Self::Collection(coll) => coll.read_concern(),
+            Self::Database(db) => db.read_concern(),
+        }
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        match self {
+            Self::Collection(coll) => coll.write_concern(),
+            Self::Database(db) => db.write_concern(),
+        }
+    }
+
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        match self {
+            Self::Collection(coll) => coll.selection_criteria(),
+            Self::Database(db) => db.selection_criteria(),
         }
     }
 }

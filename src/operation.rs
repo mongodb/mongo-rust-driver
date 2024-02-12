@@ -1,7 +1,7 @@
 mod abort_transaction;
 pub(crate) mod aggregate;
 mod commit_transaction;
-mod count;
+pub(crate) mod count;
 mod count_documents;
 pub(crate) mod create;
 mod create_indexes;
