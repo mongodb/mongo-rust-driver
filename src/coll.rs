@@ -24,7 +24,6 @@ use crate::{
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
     operation::{
-        aggregate::Aggregate,
         Count,
         CountDocuments,
         CreateIndexes,
@@ -256,49 +255,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let mut options = options.into();
-        resolve_options!(
-            self,
-            options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
-        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
-        let client = self.client();
-        client.execute_cursor_operation(aggregate).await
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_write_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-
-        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(aggregate, session)
-            .await
     }
 
     /// Estimates the number of documents in the collection using collection metadata.

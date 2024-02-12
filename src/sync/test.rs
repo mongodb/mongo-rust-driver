@@ -172,7 +172,8 @@ fn collection() {
         doc! { "$project": { "_id" : 0 } },
     ];
     let cursor = coll
-        .aggregate(pipeline, None)
+        .aggregate(pipeline)
+        .run()
         .expect("aggregate should succeed");
     let results = cursor
         .collect::<Result<Vec<Document>>>()

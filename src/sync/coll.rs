@@ -8,7 +8,6 @@ use crate::{
     error::Result,
     index::IndexModel,
     options::{
-        AggregateOptions,
         CountOptions,
         CreateIndexOptions,
         DeleteOptions,
@@ -122,39 +121,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_collection.aggregate(pipeline, options.into()))
-            .map(Cursor::new)
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_collection.aggregate_with_session(
-            pipeline,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
     }
 
     /// Estimates the number of documents in the collection using collection metadata.

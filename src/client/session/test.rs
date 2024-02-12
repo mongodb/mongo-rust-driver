@@ -140,7 +140,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.aggregate(vec![doc! { "$match": { "x": 1 } }], None)
+                coll.aggregate(vec![doc! { "$match": { "x": 1 } }])
             ),
         )
         .await;
@@ -355,7 +355,7 @@ async fn cluster_time_in_commands() {
             client
                 .database(function_name!())
                 .collection::<Document>(function_name!())
-                .aggregate(vec![doc! { "$match": { "x": 1 } }], None)
+                .aggregate(vec![doc! { "$match": { "x": 1 } }])
                 .await
         },
     )

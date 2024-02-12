@@ -5,7 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        AggregateOptions,
         DeleteOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -742,36 +741,28 @@ async fn command_contains_write_concern_aggregate() {
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.aggregate(
-        vec![
-            doc! { "$match": { "foo": "bar" } },
-            doc! { "$addFields": { "foo": "baz" } },
-            doc! { "$out": format!("{}-out", function_name!()) },
-        ],
-        AggregateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
+    coll.aggregate(vec![
+        doc! { "$match": { "foo": "bar" } },
+        doc! { "$addFields": { "foo": "baz" } },
+        doc! { "$out": format!("{}-out", function_name!()) },
+    ])
+    .write_concern(
+        WriteConcern::builder()
+            .w(Acknowledgment::Nodes(1))
+            .journal(true)
             .build(),
     )
     .await
     .unwrap();
-    coll.aggregate(
-        vec![
-            doc! { "$match": { "foo": "bar" } },
-            doc! { "$addFields": { "foo": "baz" } },
-            doc! { "$out": format!("{}-out", function_name!()) },
-        ],
-        AggregateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
+    coll.aggregate(vec![
+        doc! { "$match": { "foo": "bar" } },
+        doc! { "$addFields": { "foo": "baz" } },
+        doc! { "$out": format!("{}-out", function_name!()) },
+    ])
+    .write_concern(
+        WriteConcern::builder()
+            .w(Acknowledgment::Nodes(1))
+            .journal(false)
             .build(),
     )
     .await

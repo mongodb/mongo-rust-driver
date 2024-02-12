@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-};
+use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
@@ -601,24 +596,19 @@ impl TestOperation for Aggregate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection
+                .aggregate(self.pipeline.clone())
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => {
-                    let mut cursor = collection
-                        .aggregate_with_session(
-                            self.pipeline.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?;
+                    let mut cursor = act.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = collection
-                        .aggregate(self.pipeline.clone(), self.options.clone())
-                        .await?;
+                    let cursor = act.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
@@ -637,8 +627,8 @@ impl TestOperation for Aggregate {
                 .aggregate(self.pipeline.clone())
                 .with_options(self.options.clone());
             let result = match session {
-                Some(mut session) => {
-                    let mut cursor = action.session(session.deref_mut()).await?;
+                Some(session) => {
+                    let mut cursor = action.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()

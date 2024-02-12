@@ -922,11 +922,9 @@ impl TestOperation for Aggregate {
                         let mut cursor = match entity {
                             AggregateEntity::Collection(collection) => {
                                 collection
-                                    .aggregate_with_session(
-                                        self.pipeline.clone(),
-                                        self.options.clone(),
-                                        session,
-                                    )
+                                    .aggregate(self.pipeline.clone())
+                                    .with_options(self.options.clone())
+                                    .session(session.deref_mut())
                                     .await?
                             }
                             AggregateEntity::Database(db) => {
@@ -948,7 +946,8 @@ impl TestOperation for Aggregate {
                     let cursor = match entities.get(id).unwrap() {
                         Entity::Collection(collection) => {
                             collection
-                                .aggregate(self.pipeline.clone(), self.options.clone())
+                                .aggregate(self.pipeline.clone())
+                                .with_options(self.options.clone())
                                 .await?
                         }
                         Entity::Database(db) => {
@@ -1621,7 +1620,7 @@ impl TestOperation for RunCommand {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        action.session(&mut *session.deref_mut()).await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }

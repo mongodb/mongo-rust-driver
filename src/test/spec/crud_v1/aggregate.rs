@@ -3,8 +3,9 @@ use serde::Deserialize;
 
 use super::{run_crud_v1_test, Outcome, TestFile};
 use crate::{
+    action::Action,
     bson::{Bson, Document},
-    options::{AggregateOptions, Collation},
+    options::Collation,
     test::util::TestClient,
 };
 
@@ -48,15 +49,11 @@ async fn run_aggregate_test(test_file: TestFile) {
             }
         }
 
-        let options = AggregateOptions {
-            batch_size: arguments.batch_size,
-            collation: arguments.collation,
-            ..Default::default()
-        };
-
         {
             let cursor = coll
-                .aggregate(arguments.pipeline, options)
+                .aggregate(arguments.pipeline)
+                .optional(arguments.batch_size, |a, v| a.batch_size(v))
+                .optional(arguments.collation, |a, v| a.collation(v))
                 .await
                 .expect(&test_case.description);
 

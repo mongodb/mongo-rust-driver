@@ -208,26 +208,20 @@ async fn transaction_ids_excluded() {
     coll.delete_many(doc! {}, None).await.unwrap();
     assert!(excludes_txn_number("delete"));
 
-    coll.aggregate(
-        vec![
-            doc! { "$match": doc! { "x": 1 } },
-            doc! { "$out": "other_coll" },
-        ],
-        None,
-    )
+    coll.aggregate(vec![
+        doc! { "$match": doc! { "x": 1 } },
+        doc! { "$out": "other_coll" },
+    ])
     .await
     .unwrap();
     assert!(excludes_txn_number("aggregate"));
 
     let req = semver::VersionReq::parse(">=4.2").unwrap();
     if req.matches(&client.server_version) {
-        coll.aggregate(
-            vec![
-                doc! { "$match": doc! { "x": 1 } },
-                doc! { "$merge": "other_coll" },
-            ],
-            None,
-        )
+        coll.aggregate(vec![
+            doc! { "$match": doc! { "x": 1 } },
+            doc! { "$merge": "other_coll" },
+        ])
         .await
         .unwrap();
         assert!(excludes_txn_number("aggregate"));

@@ -11,7 +11,7 @@ use crate::{
         ChangeStream,
     },
     collation::Collation,
-    error::{ErrorKind, Result},
+    error::Result,
     operation::aggregate::AggregateTarget,
     options::ReadConcern,
     selection_criteria::SelectionCriteria,

@@ -44,7 +44,7 @@ impl<T> Collection<T> {
     ///
     /// `await` will return `Result<Cursor<Document>>` or `Result<SessionCursor<Document>>` if
     /// a `ClientSession` is provided.
-    pub fn aggregate_2(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Collection(self.as_untyped_ref()),
             pipeline: pipeline.into_iter().collect(),
@@ -77,8 +77,8 @@ impl<T> crate::sync::Collection<T> {
     ///
     /// [`run`](Aggregate::run) will return `Result<Cursor<Document>>` or
     /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
-    pub fn aggregate_2(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
-        self.async_collection.aggregate_2(pipeline)
+    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+        self.async_collection.aggregate(pipeline)
     }
 }
 

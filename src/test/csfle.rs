@@ -2521,7 +2521,7 @@ async fn decryption_events_command_error() -> Result<()> {
     let _guard = fp.enable(&td.setup_client, None).await?;
     let err = td
         .decryption_events
-        .aggregate(vec![doc! { "$count": "total" }], None)
+        .aggregate(vec![doc! { "$count": "total" }])
         .await
         .unwrap_err();
     assert_eq!(Some(123), err.sdam_code());
@@ -2554,7 +2554,7 @@ async fn decryption_events_network_error() -> Result<()> {
     let _guard = fp.enable(&td.setup_client, None).await?;
     let err = td
         .decryption_events
-        .aggregate(vec![doc! { "$count": "total" }], None)
+        .aggregate(vec![doc! { "$count": "total" }])
         .await
         .unwrap_err();
     assert!(err.is_network_error(), "unexpected error: {}", err);
@@ -2578,11 +2578,7 @@ async fn decryption_events_decrypt_error() -> Result<()> {
     td.decryption_events
         .insert_one(doc! { "encrypted": td.malformed_ciphertext }, None)
         .await?;
-    let err = td
-        .decryption_events
-        .aggregate(vec![], None)
-        .await
-        .unwrap_err();
+    let err = td.decryption_events.aggregate(vec![]).await.unwrap_err();
     assert!(err.is_csfle_error());
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
@@ -2614,7 +2610,7 @@ async fn decryption_events_decrypt_success() -> Result<()> {
     td.decryption_events
         .insert_one(doc! { "encrypted": td.ciphertext }, None)
         .await?;
-    td.decryption_events.aggregate(vec![], None).await?;
+    td.decryption_events.aggregate(vec![]).await?;
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
     assert_eq!(

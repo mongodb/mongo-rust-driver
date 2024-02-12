@@ -17,7 +17,6 @@ use crate::{
     error::{ErrorKind, Result, WriteFailure},
     options::{
         Acknowledgment,
-        AggregateOptions,
         CollectionOptions,
         DeleteOptions,
         DropCollectionOptions,
@@ -237,7 +236,7 @@ async fn aggregate_out() {
     ];
     drop_collection(&out_coll).await;
 
-    coll.aggregate(pipeline.clone(), None).await.unwrap();
+    coll.aggregate(pipeline.clone()).await.unwrap();
     assert!(db
         .list_collection_names()
         .await
@@ -247,9 +246,7 @@ async fn aggregate_out() {
     drop_collection(&out_coll).await;
 
     // check that even with a batch size of 0, a new collection is created.
-    coll.aggregate(pipeline, AggregateOptions::builder().batch_size(0).build())
-        .await
-        .unwrap();
+    coll.aggregate(pipeline).batch_size(0).await.unwrap();
     assert!(db
         .list_collection_names()
         .await
