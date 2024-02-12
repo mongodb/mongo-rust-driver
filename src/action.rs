@@ -13,7 +13,7 @@ mod shutdown;
 mod watch;
 
 pub use aggregate::Aggregate;
-pub use count::EstimatedDocumentCount;
+pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
 pub use drop::{DropCollection, DropDatabase};
 pub use list_collections::ListCollections;
