@@ -108,17 +108,17 @@ async fn count() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 0);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 0);
 
     let _ = coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 1);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 1);
 
     let result = coll
         .insert_many((1..4).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 3);
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 4);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 4);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

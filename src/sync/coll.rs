@@ -13,7 +13,6 @@ use crate::{
         DeleteOptions,
         DistinctOptions,
         DropIndexOptions,
-        EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -121,27 +120,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Estimates the number of documents in the collection using collection metadata.
-    ///
-    /// Due to an oversight in versions 5.0.0 - 5.0.7 of MongoDB, the `count` server command,
-    /// which `estimatedDocumentCount` uses in its implementation, was not included in v1 of the
-    /// Stable API. Users of the Stable API with `estimatedDocumentCount` are recommended to
-    /// upgrade their cluster to 5.0.8+ or set
-    /// [`ServerApi::strict`](crate::options::ServerApi::strict) to false to avoid encountering
-    /// errors.
-    ///
-    /// For more information on the behavior of the `count` server command, see
-    /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
-    pub fn estimated_document_count(
-        &self,
-        options: impl Into<Option<EstimatedDocumentCountOptions>>,
-    ) -> Result<u64> {
-        runtime::block_on(
-            self.async_collection
-                .estimated_document_count(options.into()),
-        )
     }
 
     /// Gets the number of documents matching `filter`.

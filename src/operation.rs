@@ -53,7 +53,6 @@ use crate::{
 
 pub(crate) use abort_transaction::AbortTransaction;
 pub(crate) use commit_transaction::CommitTransaction;
-pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;
 pub(crate) use create_indexes::CreateIndexes;
 pub(crate) use delete::Delete;

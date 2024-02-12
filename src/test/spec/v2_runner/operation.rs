@@ -735,7 +735,8 @@ impl TestOperation for EstimatedDocumentCount {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = collection
-                .estimated_document_count(self.options.clone())
+                .estimated_document_count()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap())))
         }

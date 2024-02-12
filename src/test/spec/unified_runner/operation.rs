@@ -1072,7 +1072,8 @@ impl TestOperation for EstimatedDocumentCount {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .estimated_document_count(self.options.clone())
+                .estimated_document_count()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap()).into()))
         }

@@ -18,7 +18,7 @@ impl<T> Collection<T> {
     /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
     ///
     /// `await` will return `Result<u64>`.
-    pub fn estimated_document_count_2(&self) -> EstimatedDocumentCount {
+    pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         EstimatedDocumentCount {
             coll: self.as_untyped_ref(),
             options: None,
@@ -41,8 +41,8 @@ impl<T> crate::sync::Collection<T> {
     /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
     ///
     /// [`run`](EstimatedDocumentCount::run) will return `Result<u64>`.
-    pub fn estimated_document_count_2(&self) -> EstimatedDocumentCount {
-        self.async_collection.estimated_document_count_2()
+    pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
+        self.async_collection.estimated_document_count()
     }
 }
 

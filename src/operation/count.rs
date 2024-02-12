@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::Document;
 use serde::Deserialize;
 
@@ -21,17 +18,6 @@ pub(crate) struct Count {
 impl Count {
     pub fn new(ns: Namespace, options: Option<EstimatedDocumentCountOptions>) -> Self {
         Count { ns, options }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Count {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            options: None,
-        }
     }
 }
 
