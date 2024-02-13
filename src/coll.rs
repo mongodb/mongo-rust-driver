@@ -108,10 +108,7 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
-// Safety: `Collection` must be `repr(C)` and must not contain any values of T to enable
-// `ref_untyped`.
 #[derive(Debug)]
-#[repr(C)]
 pub struct Collection<T> {
     inner: Arc<CollectionInner>,
     _phantom: std::marker::PhantomData<fn() -> T>,
@@ -174,22 +171,6 @@ impl<T> Collection<T> {
             inner: self.inner.clone(),
             _phantom: Default::default(),
         }
-    }
-
-    pub(crate) fn as_untyped_ref(&self) -> &Collection<Document> {
-        // Safety assertion: a reference `&Collection<T>` is always also a valid reference
-        // `&Collection<Document>`
-        // * Collection is repr(C), guaranteeing that monomorphized layouts are the same
-        // * The `inner` field does not change type in this transmute
-        // * The `_phantom` field is zero-sized
-        // * The target type is concrete, so no lifetime extension is possible and no invalid types
-        //   can exist.
-        // If fields are added, this logic must be revisited.
-        let Collection {
-            inner: _,
-            _phantom: _,
-        } = self;
-        unsafe { std::mem::transmute(self) }
     }
 
     pub(crate) fn clone_unconcerned(&self) -> Self {

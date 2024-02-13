@@ -16,7 +16,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, option_setters, CollRef, ExplicitSession, ImplicitSession};
 
 impl Database {
     /// Runs an aggregation operation.
@@ -46,7 +46,7 @@ impl<T> Collection<T> {
     /// a `ClientSession` is provided.
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
-            target: AggregateTargetRef::Collection(self.as_untyped_ref()),
+            target: AggregateTargetRef::Collection(CollRef::new(self)),
             pipeline: pipeline.into_iter().collect(),
             options: None,
             session: ImplicitSession,
@@ -176,41 +176,41 @@ action_impl! {
 
 enum AggregateTargetRef<'a> {
     Database(&'a Database),
-    Collection(&'a Collection<Document>),
+    Collection(CollRef<'a>),
 }
 
 impl<'a> AggregateTargetRef<'a> {
     fn target(&self) -> AggregateTarget {
         match self {
-            Self::Collection(coll) => AggregateTarget::Collection(coll.namespace()),
+            Self::Collection(cr) => AggregateTarget::Collection(cr.coll.namespace()),
             Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
         }
     }
 
     fn client(&self) -> &Client {
         match self {
-            Self::Collection(coll) => coll.client(),
+            Self::Collection(cr) => cr.coll.client(),
             Self::Database(db) => db.client(),
         }
     }
 
     fn read_concern(&self) -> Option<&ReadConcern> {
         match self {
-            Self::Collection(coll) => coll.read_concern(),
+            Self::Collection(cr) => cr.coll.read_concern(),
             Self::Database(db) => db.read_concern(),
         }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
         match self {
-            Self::Collection(coll) => coll.write_concern(),
+            Self::Collection(cr) => cr.coll.write_concern(),
             Self::Database(db) => db.write_concern(),
         }
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match self {
-            Self::Collection(coll) => coll.selection_criteria(),
+            Self::Collection(cr) => cr.coll.selection_criteria(),
             Self::Database(db) => db.selection_criteria(),
         }
     }

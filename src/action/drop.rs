@@ -9,7 +9,7 @@ use crate::{
     Database,
 };
 
-use super::{action_impl, option_setters};
+use super::{action_impl, option_setters, CollRef};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
@@ -75,7 +75,7 @@ impl<T> Collection<T> {
     /// `await` will return `Result<()>`.
     pub fn drop(&self) -> DropCollection {
         DropCollection {
-            coll: self.as_untyped_ref(),
+            cr: CollRef::new(self),
             options: None,
             session: None,
         }
@@ -96,7 +96,7 @@ impl<T> crate::sync::Collection<T> {
 /// [`Collection::drop`].
 #[must_use]
 pub struct DropCollection<'a> {
-    pub(crate) coll: &'a Collection<bson::Document>,
+    pub(crate) cr: CollRef<'a>,
     pub(crate) options: Option<DropCollectionOptions>,
     pub(crate) session: Option<&'a mut ClientSession>,
 }

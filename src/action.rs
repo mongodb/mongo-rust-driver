@@ -12,7 +12,10 @@ mod session;
 mod shutdown;
 mod watch;
 
+use std::marker::PhantomData;
+
 pub use aggregate::Aggregate;
+use bson::Document;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
 pub use drop::{DropCollection, DropDatabase};
@@ -171,3 +174,19 @@ macro_rules! action_impl_future_wrapper {
     };
 }
 pub(crate) use action_impl_future_wrapper;
+
+use crate::Collection;
+
+pub(crate) struct CollRef<'a> {
+    pub(crate) coll: Collection<Document>,
+    _ref: PhantomData<&'a ()>,
+}
+
+impl<'a> CollRef<'a> {
+    fn new<T>(coll: &'a Collection<T>) -> Self {
+        Self {
+            coll: coll.clone_with_type(),
+            _ref: PhantomData,
+        }
+    }
+}

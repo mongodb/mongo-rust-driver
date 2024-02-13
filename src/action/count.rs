@@ -7,7 +7,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters};
+use super::{action_impl, option_setters, CollRef};
 
 impl<T> Collection<T> {
     /// Estimates the number of documents in the collection using collection metadata.
@@ -25,7 +25,7 @@ impl<T> Collection<T> {
     /// `await` will return `Result<u64>`.
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         EstimatedDocumentCount {
-            coll: self.as_untyped_ref(),
+            cr: CollRef::new(self),
             options: None,
         }
     }
@@ -37,7 +37,7 @@ impl<T> Collection<T> {
     /// `await` will return `Result<u64>`.
     pub fn count_documents(&self) -> CountDocuments {
         CountDocuments {
-            coll: self.as_untyped_ref(),
+            cr: CollRef::new(self),
             options: None,
             session: None,
         }
@@ -76,7 +76,7 @@ impl<T> crate::sync::Collection<T> {
 /// Gather an estimated document count.  Create by calling [`Collection::estimated_document_count`].
 #[must_use]
 pub struct EstimatedDocumentCount<'a> {
-    coll: &'a Collection<Document>,
+    cr: CollRef<'a>,
     options: Option<EstimatedDocumentCountOptions>,
 }
 
@@ -94,9 +94,9 @@ action_impl! {
         type Future = EstimatedDocumentCountFuture;
 
         async fn execute(mut self) -> Result<u64> {
-            resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
-            let op = crate::operation::count::Count::new(self.coll.namespace(), self.options);
-            self.coll.client().execute_operation(op, None).await
+            resolve_options!(self.cr.coll, self.options, [read_concern, selection_criteria]);
+            let op = crate::operation::count::Count::new(self.cr.coll.namespace(), self.options);
+            self.cr.coll.client().execute_operation(op, None).await
         }
     }
 }
@@ -104,7 +104,7 @@ action_impl! {
 /// Get an accurate count of documents.  Create by calling [`Collection::count_documents`].
 #[must_use]
 pub struct CountDocuments<'a> {
-    coll: &'a Collection<Document>,
+    cr: CollRef<'a>,
     options: Option<CountOptions>,
     session: Option<&'a mut ClientSession>,
 }
@@ -134,11 +134,11 @@ action_impl! {
         type Future = CountDocumentsFuture;
 
         async fn execute(mut self) -> Result<u64> {
-            resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-            resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
+            resolve_read_concern_with_session!(self.cr.coll, self.options, self.session.as_ref())?;
+            resolve_selection_criteria_with_session!(self.cr.coll, self.options, self.session.as_ref())?;
 
-            let op = crate::operation::count_documents::CountDocuments::new(self.coll.namespace(), self.options)?;
-            self.coll.client().execute_operation(op, self.session).await
+            let op = crate::operation::count_documents::CountDocuments::new(self.cr.coll.namespace(), self.options)?;
+            self.cr.coll.client().execute_operation(op, self.session).await
         }
     }
 }
