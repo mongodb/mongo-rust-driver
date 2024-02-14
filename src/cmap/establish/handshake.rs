@@ -67,7 +67,7 @@ struct RuntimeEnvironment {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum FaasEnvironmentName {
+pub(crate) enum FaasEnvironmentName {
     AwsLambda,
     AzureFunc,
     GcpFunc,
@@ -221,7 +221,7 @@ fn var_set(name: &str) -> bool {
 }
 
 impl FaasEnvironmentName {
-    fn new() -> Option<Self> {
+    pub(crate) fn new() -> Option<Self> {
         use FaasEnvironmentName::*;
         let mut found: Option<Self> = None;
         let lambda_env = env::var_os("AWS_EXECUTION_ENV")

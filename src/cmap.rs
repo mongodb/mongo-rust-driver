@@ -184,3 +184,7 @@ impl ConnectionPool {
         self.manager.broadcast(msg)
     }
 }
+
+pub(crate) fn is_faas() -> bool {
+    establish::handshake::FaasEnvironmentName::new().is_some()
+}

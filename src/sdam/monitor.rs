@@ -48,9 +48,10 @@ pub(crate) struct Monitor {
     sdam_event_emitter: Option<SdamEventEmitter>,
     client_options: ClientOptions,
 
+    /// Whether this monitor is allowed to use the streaming protocol.
+    allow_streaming: bool,
+
     /// The most recent topology version returned by the server in a hello response.
-    /// If some, indicates that this monitor should use the streaming protocol. If none, it should
-    /// use the polling protocol.
     topology_version: Option<TopologyVersion>,
 
     /// Handle to the RTT monitor, used to get the latest known round trip time for a given server
@@ -61,6 +62,14 @@ pub(crate) struct Monitor {
     /// been removed from the topology and no longer needs to be monitored and to receive
     /// cancellation requests.
     request_receiver: MonitorRequestReceiver,
+}
+
+// TODO: put this in client options
+#[non_exhaustive]
+enum ServerMonitoringMode {
+    Stream,
+    Poll,
+    Auto,
 }
 
 impl Monitor {
@@ -79,6 +88,12 @@ impl Monitor {
             connection_establisher.clone(),
             client_options.clone(),
         );
+        let monitoring_mode = ServerMonitoringMode::Auto; // TODO
+        let streaming = match monitoring_mode {
+            ServerMonitoringMode::Stream => true,
+            ServerMonitoringMode::Poll => false,
+            ServerMonitoringMode::Auto => !crate::cmap::is_faas(),
+        };
         let monitor = Self {
             address,
             client_options,
@@ -89,6 +104,7 @@ impl Monitor {
             rtt_monitor_handle,
             request_receiver: manager_receiver,
             connection: None,
+            allow_streaming: streaming,
             topology_version: None,
         };
 
@@ -108,7 +124,7 @@ impl Monitor {
             //
             // We only go to sleep when using the polling protocol (i.e. server never returned a
             // topologyVersion) or when the most recent check failed.
-            if self.topology_version.is_none() || !check_succeeded {
+            if self.topology_version.is_none() || !check_succeeded || !self.allow_streaming {
                 self.request_receiver
                     .wait_for_check_request(
                         self.client_options.min_heartbeat_frequency(),
@@ -180,7 +196,7 @@ impl Monitor {
         self.emit_event(|| {
             SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
-                awaited: self.topology_version.is_some(),
+                awaited: self.topology_version.is_some() && self.allow_streaming,
                 driver_connection_id,
                 server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
             })
@@ -213,10 +229,14 @@ impl Monitor {
                     } else {
                         // If the initial handshake returned a topology version, send it back to the
                         // server to begin streaming responses.
-                        let opts = self.topology_version.map(|tv| AwaitableHelloOptions {
-                            topology_version: tv,
-                            max_await_time: heartbeat_frequency,
-                        });
+                        let opts = if self.allow_streaming {
+                            self.topology_version.map(|tv| AwaitableHelloOptions {
+                                topology_version: tv,
+                                max_await_time: heartbeat_frequency,
+                            })
+                        } else {
+                            None
+                        };
 
                         let command = hello_command(
                             self.client_options.server_api.as_ref(),
@@ -280,7 +300,7 @@ impl Monitor {
                         duration,
                         reply,
                         server_address: self.address.clone(),
-                        awaited: self.topology_version.is_some(),
+                        awaited: self.topology_version.is_some() && self.allow_streaming,
                         driver_connection_id,
                         server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
@@ -296,7 +316,7 @@ impl Monitor {
                         duration,
                         failure: e.clone(),
                         server_address: self.address.clone(),
-                        awaited: self.topology_version.is_some(),
+                        awaited: self.topology_version.is_some() && self.allow_streaming,
                         driver_connection_id,
                         server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
