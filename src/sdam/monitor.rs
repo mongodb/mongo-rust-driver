@@ -89,7 +89,7 @@ impl Monitor {
             client_options.clone(),
         );
         let monitoring_mode = ServerMonitoringMode::Auto; // TODO
-        let streaming = match monitoring_mode {
+        let allow_streaming = match monitoring_mode {
             ServerMonitoringMode::Stream => true,
             ServerMonitoringMode::Poll => false,
             ServerMonitoringMode::Auto => !crate::cmap::is_faas(),
@@ -104,12 +104,14 @@ impl Monitor {
             rtt_monitor_handle,
             request_receiver: manager_receiver,
             connection: None,
-            allow_streaming: streaming,
+            allow_streaming,
             topology_version: None,
         };
 
         runtime::execute(monitor.execute());
-        runtime::execute(rtt_monitor.execute());
+        if allow_streaming {
+            runtime::execute(rtt_monitor.execute());
+        }
     }
 
     async fn execute(mut self) {
@@ -285,6 +287,9 @@ impl Monitor {
             }
         };
         let duration = start.elapsed();
+        if !self.allow_streaming && matches!(result, HelloResult::Ok(_)) {
+            self.rtt_monitor_handle.add_sample(duration);
+        }
 
         match result {
             HelloResult::Ok(ref r) => {
