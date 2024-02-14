@@ -54,6 +54,9 @@ pub(crate) struct Monitor {
     /// The most recent topology version returned by the server in a hello response.
     topology_version: Option<TopologyVersion>,
 
+    /// The RTT monitor; once it's started this is None.
+    pending_rtt_monitor: Option<RttMonitor>,
+
     /// Handle to the RTT monitor, used to get the latest known round trip time for a given server
     /// and to reset the RTT when the monitor disconnects from the server.
     rtt_monitor_handle: RttMonitorHandle,
@@ -101,6 +104,7 @@ impl Monitor {
             topology_updater,
             topology_watcher,
             sdam_event_emitter,
+            pending_rtt_monitor: Some(rtt_monitor),
             rtt_monitor_handle,
             request_receiver: manager_receiver,
             connection: None,
@@ -109,9 +113,6 @@ impl Monitor {
         };
 
         runtime::execute(monitor.execute());
-        if allow_streaming {
-            runtime::execute(rtt_monitor.execute());
-        }
     }
 
     async fn execute(mut self) {
@@ -119,6 +120,12 @@ impl Monitor {
 
         while self.is_alive() {
             let check_succeeded = self.check_server().await;
+
+            if self.topology_version.is_some() && self.allow_streaming {
+                if let Some(rtt_monitor) = self.pending_rtt_monitor.take() {
+                    runtime::execute(rtt_monitor.execute());
+                }
+            }
 
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
@@ -287,12 +294,13 @@ impl Monitor {
             }
         };
         let duration = start.elapsed();
-        if !self.allow_streaming && matches!(result, HelloResult::Ok(_)) {
-            self.rtt_monitor_handle.add_sample(duration);
-        }
 
+        let awaited = self.topology_version.is_some() && self.allow_streaming;
         match result {
             HelloResult::Ok(ref r) => {
+                if !awaited {
+                    self.rtt_monitor_handle.add_sample(duration);
+                }
                 self.emit_event(|| {
                     let mut reply = r
                         .raw_command_response
@@ -305,7 +313,7 @@ impl Monitor {
                         duration,
                         reply,
                         server_address: self.address.clone(),
-                        awaited: self.topology_version.is_some() && self.allow_streaming,
+                        awaited,
                         driver_connection_id,
                         server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
@@ -321,7 +329,7 @@ impl Monitor {
                         duration,
                         failure: e.clone(),
                         server_address: self.address.clone(),
-                        awaited: self.topology_version.is_some() && self.allow_streaming,
+                        awaited,
                         driver_connection_id,
                         server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
