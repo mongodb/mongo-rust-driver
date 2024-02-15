@@ -68,6 +68,7 @@ const URI_OPTIONS: &[&str] = &[
     "replicaset",
     "retrywrites",
     "retryreads",
+    "servermonitoringmode",
     "serverselectiontimeoutms",
     "sockettimeoutms",
     "tls",
@@ -512,6 +513,12 @@ pub struct ClientOptions {
     #[builder(default)]
     pub retry_writes: Option<bool>,
 
+    /// Configures which server monitoring protocol to use.
+    ///
+    /// The default is [`Auto`](ServerMonitoringMode::Auto).
+    #[builder(default)]
+    pub server_monitoring_mode: Option<ServerMonitoringMode>,
+
     /// The handler that should process all Server Discovery and Monitoring events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default, setter(strip_option))]
@@ -843,6 +850,11 @@ pub struct ConnectionString {
     ///
     /// The default value is true.
     pub retry_writes: Option<bool>,
+
+    /// Configures which server monitoring protocol to use.
+    ///
+    /// The default is [`Auto`](ServerMonitoringMode::Auto).
+    pub server_monitoring_mode: Option<ServerMonitoringMode>,
 
     /// Specifies whether the Client should directly connect to a single host rather than
     /// autodiscover all servers in the cluster.
@@ -1340,6 +1352,7 @@ impl ClientOptions {
             connect_timeout: conn_str.connect_timeout,
             retry_reads: conn_str.retry_reads,
             retry_writes: conn_str.retry_writes,
+            server_monitoring_mode: conn_str.server_monitoring_mode,
             socket_timeout: conn_str.socket_timeout,
             direct_connection: conn_str.direct_connection,
             default_database: conn_str.default_database,
@@ -2182,6 +2195,19 @@ impl ConnectionString {
             k @ "retryreads" => {
                 self.retry_reads = Some(get_bool!(value, k));
             }
+            "servermonitoringmode" => {
+                self.server_monitoring_mode = Some(match value.to_lowercase().as_str() {
+                    "stream" => ServerMonitoringMode::Stream,
+                    "poll" => ServerMonitoringMode::Poll,
+                    "auto" => ServerMonitoringMode::Auto,
+                    other => {
+                        return Err(Error::invalid_argument(format!(
+                            "{:?} is not a valid server monitoring mode",
+                            other
+                        )));
+                    }
+                });
+            }
             k @ "serverselectiontimeoutms" => {
                 self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
             }
@@ -2874,4 +2900,18 @@ pub struct TransactionOptions {
         default
     )]
     pub max_commit_time: Option<Duration>,
+}
+
+/// Which server monitoring protocol to use.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum ServerMonitoringMode {
+    /// The client will use the streaming protocol when the server supports it and fall back to the
+    /// polling protocol otherwise.
+    Stream,
+    /// The client will use the polling protocol.
+    Poll,
+    /// The client will use the polling protocol when running on a FaaS platform and behave the
+    /// same as `Stream` otherwise.
+    Auto,
 }

@@ -16,6 +16,7 @@ use super::{
     TopologyWatcher,
 };
 use crate::{
+    client::options::ServerMonitoringMode,
     cmap::{establish::ConnectionEstablisher, Connection},
     error::{Error, Result},
     event::sdam::{
@@ -67,14 +68,6 @@ pub(crate) struct Monitor {
     request_receiver: MonitorRequestReceiver,
 }
 
-// TODO: put this in client options
-#[non_exhaustive]
-enum ServerMonitoringMode {
-    Stream,
-    Poll,
-    Auto,
-}
-
 impl Monitor {
     pub(crate) fn start(
         address: ServerAddress,
@@ -91,8 +84,11 @@ impl Monitor {
             connection_establisher.clone(),
             client_options.clone(),
         );
-        let monitoring_mode = ServerMonitoringMode::Auto; // TODO
-        let allow_streaming = match monitoring_mode {
+        let allow_streaming = match client_options
+            .server_monitoring_mode
+            .clone()
+            .unwrap_or(ServerMonitoringMode::Auto)
+        {
             ServerMonitoringMode::Stream => true,
             ServerMonitoringMode::Poll => false,
             ServerMonitoringMode::Auto => !crate::cmap::is_faas(),
