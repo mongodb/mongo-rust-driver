@@ -690,6 +690,8 @@ impl Serialize for ClientOptions {
 
             retrywrites: &'a Option<bool>,
 
+            servermonitoringmode: Option<String>,
+
             #[serde(
                 flatten,
                 serialize_with = "SelectionCriteria::serialize_for_client_options"
@@ -730,6 +732,7 @@ impl Serialize for ClientOptions {
             replicaset: &self.repl_set_name,
             retryreads: &self.retry_reads,
             retrywrites: &self.retry_writes,
+            servermonitoringmode: self.server_monitoring_mode.as_ref().map(|m| format!("{:?}", m).to_lowercase()),
             selectioncriteria: &self.selection_criteria,
             serverselectiontimeoutms: &self.server_selection_timeout,
             sockettimeoutms: &self.socket_timeout,
