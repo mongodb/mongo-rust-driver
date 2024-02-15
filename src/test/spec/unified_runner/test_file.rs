@@ -425,6 +425,7 @@ pub(crate) enum ExpectedEventType {
     // TODO RUST-1055 Remove this when connection usage is serialized.
     #[serde(skip)]
     CmapWithoutConnectionReady,
+    Sdam,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
