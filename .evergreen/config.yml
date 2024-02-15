@@ -1566,13 +1566,11 @@ functions:
       params:
         working_dir: src
         shell: bash
+        include_expansions_in_env:
+          - SERVERLESS_ATLAS_USER
+          - SERVERLESS_ATLAS_PASSWORD
         script: |
           ${PREPARE_SHELL}
-
-          # Export without xtrace to avoid leaking credentials.
-          set +o xtrace
-          export SERVERLESS_ATLAS_USER=${SERVERLESS_ATLAS_USER}
-          export SERVERLESS_ATLAS_PASSWORD=${SERVERLESS_ATLAS_PASSWORD}
 
           export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
           . .evergreen/generate-uri.sh
