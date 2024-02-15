@@ -732,7 +732,10 @@ impl Serialize for ClientOptions {
             replicaset: &self.repl_set_name,
             retryreads: &self.retry_reads,
             retrywrites: &self.retry_writes,
-            servermonitoringmode: self.server_monitoring_mode.as_ref().map(|m| format!("{:?}", m).to_lowercase()),
+            servermonitoringmode: self
+                .server_monitoring_mode
+                .as_ref()
+                .map(|m| format!("{:?}", m).to_lowercase()),
             selectioncriteria: &self.selection_criteria,
             serverselectiontimeoutms: &self.server_selection_timeout,
             sockettimeoutms: &self.socket_timeout,

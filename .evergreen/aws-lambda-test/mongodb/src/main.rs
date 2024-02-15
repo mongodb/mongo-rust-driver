@@ -34,10 +34,12 @@ impl Stats {
 
     fn handle_sdam(&mut self, event: &SdamEvent) {
         match event {
-            SdamEvent::ServerHeartbeatStarted(_) => {
+            SdamEvent::ServerHeartbeatStarted(ev) => {
+                assert!(!ev.awaited);
                 self.heartbeats_started += 1;
             }
             SdamEvent::ServerHeartbeatFailed(ev) => {
+                assert!(!ev.awaited);
                 self.failed_heartbeat_durations_millis.push(ev.duration.as_millis());
             }
             _ => (),
