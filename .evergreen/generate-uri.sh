@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o errexit
-set -o xtrace
 
 if [[ "$SSL" = "ssl" ]]; then
   DRIVERS_TOOLS_X509="${DRIVERS_TOOLS}/.evergreen/x509gen"
