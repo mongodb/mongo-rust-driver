@@ -1566,13 +1566,11 @@ functions:
       params:
         working_dir: src
         shell: bash
+        include_expansions_in_env:
+          - SERVERLESS_ATLAS_USER
+          - SERVERLESS_ATLAS_PASSWORD
         script: |
           ${PREPARE_SHELL}
-
-          # Export without xtrace to avoid leaking credentials.
-          set +o xtrace
-          export SERVERLESS_ATLAS_USER=${SERVERLESS_ATLAS_USER}
-          export SERVERLESS_ATLAS_PASSWORD=${SERVERLESS_ATLAS_PASSWORD}
 
           export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
           . .evergreen/generate-uri.sh
@@ -1726,9 +1724,6 @@ functions:
           cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
           set +o xtrace
 
-          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-          export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
           export OIDC_TOKEN_DIR=/tmp/tokens
 
           . ./activate-authoidcvenv.sh
