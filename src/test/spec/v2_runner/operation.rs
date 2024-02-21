@@ -687,6 +687,7 @@ impl TestOperation for Distinct {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct CountDocuments {
+    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<CountOptions>,
 }
@@ -699,7 +700,7 @@ impl TestOperation for CountDocuments {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = collection
-                .count_documents()
+                .count_documents(self.filter.clone().unwrap_or_default())
                 .with_options(self.options.clone())
                 .optional(session, |a, v| a.session(v))
                 .await?;

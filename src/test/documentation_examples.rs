@@ -15,7 +15,7 @@ use crate::{
 
 macro_rules! assert_coll_count {
     ($coll:expr, $expected:expr) => {
-        assert_eq!($coll.count_documents().await.unwrap(), $expected);
+        assert_eq!($coll.count_documents(doc! {}).await.unwrap(), $expected);
     };
 }
 
@@ -1487,7 +1487,10 @@ async fn stable_api_examples() -> GenericResult<()> {
     // };
 
     // Start Versioned API Example 7
-    let count = db.collection::<Document>("sales").count_documents().await?;
+    let count = db
+        .collection::<Document>("sales")
+        .count_documents(doc! {})
+        .await?;
     // End Versioned API Example 7
 
     // Start Versioned API Example 8

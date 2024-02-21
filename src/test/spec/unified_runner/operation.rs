@@ -1018,6 +1018,7 @@ impl TestOperation for Distinct {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CountDocuments {
     session: Option<String>,
+    filter: Option<Document>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -1031,7 +1032,7 @@ impl TestOperation for CountDocuments {
         async move {
             let collection = test_runner.get_collection(id).await;
             let action = collection
-                .count_documents()
+                .count_documents(self.filter.clone().unwrap_or_default())
                 .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {

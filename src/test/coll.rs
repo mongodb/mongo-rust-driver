@@ -203,16 +203,10 @@ async fn delete() {
     let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
-    assert_eq!(
-        coll.count_documents().filter(doc! {"x": 3}).await.unwrap(),
-        4
-    );
+    assert_eq!(coll.count_documents(doc! {"x": 3}).await.unwrap(), 4);
     let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
-    assert_eq!(
-        coll.count_documents().filter(doc! {"x": 3 }).await.unwrap(),
-        0
-    );
+    assert_eq!(coll.count_documents(doc! {"x": 3 }).await.unwrap(), 0);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -507,7 +501,9 @@ async fn large_insert_ordered_with_errors() {
             assert_eq!(write_errors.len(), 1);
             assert_eq!(write_errors[0].index, 7499);
             assert_eq!(
-                coll.count_documents().await.expect("count should succeed"),
+                coll.count_documents(doc! {})
+                    .await
+                    .expect("count should succeed"),
                 7499
             );
         }
@@ -930,7 +926,7 @@ async fn count_documents_with_wc() {
 
     coll.insert_one(doc! {}, None).await.unwrap();
 
-    coll.count_documents()
+    coll.count_documents(doc! {})
         .await
         .expect("count_documents should succeed");
 }
@@ -960,7 +956,7 @@ async fn collection_options_inherited() {
     coll.find_one(None, None).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
-    coll.count_documents().await.unwrap();
+    coll.count_documents(doc! {}).await.unwrap();
     assert_options_inherited(&client, "aggregate").await;
 }
 

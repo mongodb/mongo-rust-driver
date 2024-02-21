@@ -622,10 +622,6 @@ pub struct AggregateOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CountOptions {
-    /// The filter to use for the operation.
-    #[serde(skip_serializing)]
-    pub filter: Option<Document>,
-
     /// The index to use for the operation.
     pub hint: Option<Hint>,
 

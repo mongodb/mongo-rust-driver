@@ -111,8 +111,7 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .find_one_and_delete_with_session(doc! { "x": 1 }, None, s,)));
 
     ops.push(op!("aggregate", true, |coll, s| coll
-        .count_documents()
-        .filter(doc! { "x": 1 })
+        .count_documents(doc! { "x": 1 })
         .session(s)));
 
     ops.push(op!("aggregate", true, |coll, s| coll

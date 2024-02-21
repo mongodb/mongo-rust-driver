@@ -161,7 +161,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "aggregate",
-            collection_op!($test_name, coll, coll.count_documents()),
+            collection_op!($test_name, coll, coll.count_documents(doc! {})),
         )
         .await;
         $test_func("drop", collection_op!($test_name, coll, coll.drop())).await;
@@ -607,7 +607,7 @@ async fn find_and_getmore_share_session() {
             .build();
 
         while coll
-            .count_documents()
+            .count_documents(doc! {})
             .with_options(options.clone())
             .await
             .unwrap()

@@ -35,9 +35,10 @@ impl<T> Collection<T> {
     /// Note that this method returns an accurate count.
     ///
     /// `await` will return `Result<u64>`.
-    pub fn count_documents(&self) -> CountDocuments {
+    pub fn count_documents(&self, filter: Document) -> CountDocuments {
         CountDocuments {
             cr: CollRef::new(self),
+            filter,
             options: None,
             session: None,
         }
@@ -68,8 +69,8 @@ impl<T> crate::sync::Collection<T> {
     /// Note that this method returns an accurate count.
     ///
     /// [`run`](CountDocuments::run) will return `Result<u64>`.
-    pub fn count_documents(&self) -> CountDocuments {
-        self.async_collection.count_documents()
+    pub fn count_documents(&self, filter: Document) -> CountDocuments {
+        self.async_collection.count_documents(filter)
     }
 }
 
@@ -105,13 +106,13 @@ action_impl! {
 #[must_use]
 pub struct CountDocuments<'a> {
     cr: CollRef<'a>,
+    filter: Document,
     options: Option<CountOptions>,
     session: Option<&'a mut ClientSession>,
 }
 
 impl<'a> CountDocuments<'a> {
     option_setters!(options: CountOptions;
-        filter: Document,
         hint: crate::coll::options::Hint,
         limit: u64,
         max_time: std::time::Duration,
@@ -137,7 +138,7 @@ action_impl! {
             resolve_read_concern_with_session!(self.cr.coll, self.options, self.session.as_ref())?;
             resolve_selection_criteria_with_session!(self.cr.coll, self.options, self.session.as_ref())?;
 
-            let op = crate::operation::count_documents::CountDocuments::new(self.cr.coll.namespace(), self.options)?;
+            let op = crate::operation::count_documents::CountDocuments::new(self.cr.coll.namespace(), self.filter, self.options)?;
             self.cr.coll.client().execute_operation(op, self.session).await
         }
     }
