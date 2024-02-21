@@ -151,17 +151,9 @@ action_impl! {
         type Future = AggregateSessionFuture;
 
         async fn execute(mut self) -> Result<SessionCursor<Document>> {
-            if matches!(self.target, AggregateTargetRef::Collection(_)) {
-                resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-                resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-                resolve_selection_criteria_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-            } else {
-                resolve_options!(
-                    self.target,
-                    self.options,
-                    [read_concern, write_concern, selection_criteria]
-                );
-            }
+            resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+            resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+            resolve_selection_criteria_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
 
             let aggregate = crate::operation::aggregate::Aggregate::new(self.target.target(), self.pipeline, self.options);
             let client = self.target.client();
