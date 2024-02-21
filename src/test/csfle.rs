@@ -42,7 +42,6 @@ use crate::{
         CollectionOptions,
         CreateIndexOptions,
         Credential,
-        DropCollectionOptions,
         FindOptions,
         IndexOptions,
         InsertOneOptions,
@@ -81,11 +80,11 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
                 .write_concern(WriteConcern::majority())
                 .build(),
         );
-    datakeys.drop(None).await?;
+    datakeys.drop().await?;
     client
         .database("db")
         .collection::<Document>("coll")
-        .drop(None)
+        .drop()
         .await?;
     Ok((client, datakeys))
 }
@@ -676,7 +675,7 @@ async fn views_prohibited() -> Result<()> {
     client
         .database("db")
         .collection::<Document>("view")
-        .drop(None)
+        .drop()
         .await?;
     client
         .database("db")
@@ -1571,12 +1570,12 @@ impl DeadlockTestCase {
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
-            .drop(None)
+            .drop()
             .await?;
         client_test
             .database("db")
             .collection::<Document>("coll")
-            .drop(None)
+            .drop()
             .await?;
         client_keyvault
             .database("keyvault")
@@ -2323,20 +2322,14 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
 
     let db = key_vault_client.database("db");
     db.collection::<Document>("explicit_encryption")
-        .drop(
-            DropCollectionOptions::builder()
-                .encrypted_fields(encrypted_fields.clone())
-                .build(),
-        )
+        .drop()
+        .encrypted_fields(encrypted_fields.clone())
         .await?;
     db.create_collection("explicit_encryption")
         .encrypted_fields(encrypted_fields)
         .await?;
     let keyvault = key_vault_client.database("keyvault");
-    keyvault
-        .collection::<Document>("datakeys")
-        .drop(None)
-        .await?;
+    keyvault.collection::<Document>("datakeys").drop().await?;
     keyvault.create_collection("datakeys").await?;
     keyvault
         .collection::<Document>("datakeys")
@@ -2476,7 +2469,7 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
     let datakeys = client
         .database("keyvault")
         .collection::<Document>("datakeys");
-    datakeys.drop(None).await?;
+    datakeys.drop().await?;
     datakeys
         .create_index(
             IndexModel {
@@ -2528,7 +2521,7 @@ async fn decryption_events_command_error() -> Result<()> {
     let _guard = fp.enable(&td.setup_client, None).await?;
     let err = td
         .decryption_events
-        .aggregate(vec![doc! { "$count": "total" }], None)
+        .aggregate(vec![doc! { "$count": "total" }])
         .await
         .unwrap_err();
     assert_eq!(Some(123), err.sdam_code());
@@ -2561,7 +2554,7 @@ async fn decryption_events_network_error() -> Result<()> {
     let _guard = fp.enable(&td.setup_client, None).await?;
     let err = td
         .decryption_events
-        .aggregate(vec![doc! { "$count": "total" }], None)
+        .aggregate(vec![doc! { "$count": "total" }])
         .await
         .unwrap_err();
     assert!(err.is_network_error(), "unexpected error: {}", err);
@@ -2585,11 +2578,7 @@ async fn decryption_events_decrypt_error() -> Result<()> {
     td.decryption_events
         .insert_one(doc! { "encrypted": td.malformed_ciphertext }, None)
         .await?;
-    let err = td
-        .decryption_events
-        .aggregate(vec![], None)
-        .await
-        .unwrap_err();
+    let err = td.decryption_events.aggregate(vec![]).await.unwrap_err();
     assert!(err.is_csfle_error());
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
@@ -2621,7 +2610,7 @@ async fn decryption_events_decrypt_success() -> Result<()> {
     td.decryption_events
         .insert_one(doc! { "encrypted": td.ciphertext }, None)
         .await?;
-    td.decryption_events.aggregate(vec![], None).await?;
+    td.decryption_events.aggregate(vec![]).await?;
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
     assert_eq!(
@@ -2654,7 +2643,7 @@ impl DecryptionEventsTestdata {
         }
         let db = setup_client.database("db");
         db.collection::<Document>("decryption_events")
-            .drop(None)
+            .drop()
             .await?;
         db.create_collection("decryption_events").await?;
 
@@ -3217,11 +3206,8 @@ async fn range_explicit_encryption_test(
         .database("db")
         .collection::<Document>("explicit_encryption");
     explicit_encryption_collection
-        .drop(
-            DropCollectionOptions::builder()
-                .encrypted_fields(encrypted_fields.clone())
-                .build(),
-        )
+        .drop()
+        .encrypted_fields(encrypted_fields.clone())
         .await?;
     util_client
         .database("db")
@@ -3232,7 +3218,7 @@ async fn range_explicit_encryption_test(
     let datakeys_collection = util_client
         .database("keyvault")
         .collection::<Document>("datakeys");
-    datakeys_collection.drop(None).await?;
+    datakeys_collection.drop().await?;
     util_client
         .database("keyvault")
         .create_collection("datakeys")
@@ -3526,7 +3512,7 @@ async fn fle2_example() -> Result<()> {
     test_client
         .database("keyvault")
         .collection::<Document>("datakeys")
-        .drop(None)
+        .drop()
         .await?;
     test_client.database("docsExamples").drop().await?;
 

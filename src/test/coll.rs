@@ -17,7 +17,6 @@ use crate::{
     error::{ErrorKind, Result, WriteFailure},
     options::{
         Acknowledgment,
-        AggregateOptions,
         CollectionOptions,
         DeleteOptions,
         DropCollectionOptions,
@@ -109,17 +108,17 @@ async fn count() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 0);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 0);
 
     let _ = coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 1);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 1);
 
     let result = coll
         .insert_many((1..4).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 3);
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 4);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 4);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -204,10 +203,10 @@ async fn delete() {
     let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
-    assert_eq!(coll.count_documents(doc! {"x": 3}, None).await.unwrap(), 4);
+    assert_eq!(coll.count_documents(doc! {"x": 3}).await.unwrap(), 4);
     let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
-    assert_eq!(coll.count_documents(doc! {"x": 3 }, None).await.unwrap(), 0);
+    assert_eq!(coll.count_documents(doc! {"x": 3 }).await.unwrap(), 0);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -237,7 +236,7 @@ async fn aggregate_out() {
     ];
     drop_collection(&out_coll).await;
 
-    coll.aggregate(pipeline.clone(), None).await.unwrap();
+    coll.aggregate(pipeline.clone()).await.unwrap();
     assert!(db
         .list_collection_names()
         .await
@@ -247,9 +246,7 @@ async fn aggregate_out() {
     drop_collection(&out_coll).await;
 
     // check that even with a batch size of 0, a new collection is created.
-    coll.aggregate(pipeline, AggregateOptions::builder().batch_size(0).build())
-        .await
-        .unwrap();
+    coll.aggregate(pipeline).batch_size(0).await.unwrap();
     assert!(db
         .list_collection_names()
         .await
@@ -504,7 +501,7 @@ async fn large_insert_ordered_with_errors() {
             assert_eq!(write_errors.len(), 1);
             assert_eq!(write_errors[0].index, 7499);
             assert_eq!(
-                coll.count_documents(None, None)
+                coll.count_documents(doc! {})
                     .await
                     .expect("count should succeed"),
                 7499
@@ -579,8 +576,8 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
 async fn ns_not_found_suppression() {
     let client = TestClient::new().await;
     let coll = client.get_coll(function_name!(), function_name!());
-    coll.drop(None).await.expect("drop should not fail");
-    coll.drop(None).await.expect("drop should not fail");
+    coll.drop().await.expect("drop should not fail");
+    coll.drop().await.expect("drop should not fail");
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
@@ -929,7 +926,7 @@ async fn count_documents_with_wc() {
 
     coll.insert_one(doc! {}, None).await.unwrap();
 
-    coll.count_documents(doc! {}, None)
+    coll.count_documents(doc! {})
         .await
         .expect("count_documents should succeed");
 }
@@ -959,7 +956,7 @@ async fn collection_options_inherited() {
     coll.find_one(None, None).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
-    coll.count_documents(None, None).await.unwrap();
+    coll.count_documents(doc! {}).await.unwrap();
     assert_options_inherited(&client, "aggregate").await;
 }
 
@@ -982,7 +979,7 @@ async fn drop_skip_serializing_none() {
         .database(function_name!())
         .collection(function_name!());
     let options = DropCollectionOptions::builder().build();
-    assert!(coll.drop(options).await.is_ok());
+    assert!(coll.drop().with_options(options).await.is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -1197,7 +1194,7 @@ async fn configure_human_readable_serialization() {
     let non_human_readable_collection: Collection<Data> = client
         .database("db")
         .collection_with_options("nonhumanreadable", collection_options);
-    non_human_readable_collection.drop(None).await.unwrap();
+    non_human_readable_collection.drop().await.unwrap();
 
     non_human_readable_collection
         .insert_one(
@@ -1246,7 +1243,7 @@ async fn configure_human_readable_serialization() {
     let human_readable_collection: Collection<Data> = client
         .database("db")
         .collection_with_options("humanreadable", collection_options);
-    human_readable_collection.drop(None).await.unwrap();
+    human_readable_collection.drop().await.unwrap();
 
     human_readable_collection
         .insert_one(
@@ -1308,7 +1305,7 @@ async fn insert_many_document_sequences() {
     let collection = client
         .database("insert_many_document_sequences")
         .collection::<RawDocumentBuf>("insert_many_document_sequences");
-    collection.drop(None).await.unwrap();
+    collection.drop().await.unwrap();
 
     // A payload with > max_bson_object_size bytes but < max_message_size bytes should require only
     // one round trip

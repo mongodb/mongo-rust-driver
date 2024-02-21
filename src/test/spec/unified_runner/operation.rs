@@ -922,11 +922,9 @@ impl TestOperation for Aggregate {
                         let mut cursor = match entity {
                             AggregateEntity::Collection(collection) => {
                                 collection
-                                    .aggregate_with_session(
-                                        self.pipeline.clone(),
-                                        self.options.clone(),
-                                        session,
-                                    )
+                                    .aggregate(self.pipeline.clone())
+                                    .with_options(self.options.clone())
+                                    .session(session.deref_mut())
                                     .await?
                             }
                             AggregateEntity::Database(db) => {
@@ -948,7 +946,8 @@ impl TestOperation for Aggregate {
                     let cursor = match entities.get(id).unwrap() {
                         Entity::Collection(collection) => {
                             collection
-                                .aggregate(self.pipeline.clone(), self.options.clone())
+                                .aggregate(self.pipeline.clone())
+                                .with_options(self.options.clone())
                                 .await?
                         }
                         Entity::Database(db) => {
@@ -1018,8 +1017,8 @@ impl TestOperation for Distinct {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CountDocuments {
-    filter: Document,
     session: Option<String>,
+    filter: Option<Document>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -1032,24 +1031,17 @@ impl TestOperation for CountDocuments {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .count_documents(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .count_documents_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .count_documents(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             Ok(Some(Bson::Int64(result.try_into().unwrap()).into()))
         }
@@ -1073,7 +1065,8 @@ impl TestOperation for EstimatedDocumentCount {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .estimated_document_count(self.options.clone())
+                .estimated_document_count()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap()).into()))
         }
@@ -1576,15 +1569,14 @@ impl TestOperation for DropCollection {
             let database = test_runner.get_database(id).await;
             let collection = database.collection::<Document>(&self.collection).clone();
 
+            let act = collection.drop().with_options(self.options.clone());
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
-                    collection
-                        .drop_with_session(self.options.clone(), session)
-                        .await
+                    act.session(session.deref_mut()).await
                 })
                 .await?;
             } else {
-                collection.drop(self.options.clone()).await?;
+                act.await?;
             }
             Ok(None)
         }
@@ -1622,7 +1614,7 @@ impl TestOperation for RunCommand {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        action.session(&mut *session.deref_mut()).await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }

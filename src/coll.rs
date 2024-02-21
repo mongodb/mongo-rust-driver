@@ -1,3 +1,4 @@
+mod action;
 pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
@@ -23,13 +24,9 @@ use crate::{
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
     operation::{
-        aggregate::Aggregate,
-        Count,
-        CountDocuments,
         CreateIndexes,
         Delete,
         Distinct,
-        DropCollection,
         DropIndexes,
         Find,
         FindAndModify,
@@ -111,11 +108,10 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
-
 #[derive(Debug)]
 pub struct Collection<T> {
     inner: Arc<CollectionInner>,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: std::marker::PhantomData<fn() -> T>,
 }
 
 // Because derive is too conservative, derive only implements Clone if T is Clone.
@@ -223,211 +219,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    #[allow(clippy::needless_option_as_deref)]
-    async fn drop_common(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let mut session = session.into();
-
-        let mut options: Option<DropCollectionOptions> = options.into();
-        resolve_options!(self, options, [write_concern]);
-
-        #[cfg(feature = "in-use-encryption-unstable")]
-        self.drop_aux_collections(options.as_ref(), session.as_deref_mut())
-            .await?;
-
-        let drop = DropCollection::new(self.namespace(), options);
-        self.client()
-            .execute_operation(drop, session.as_deref_mut())
-            .await
-    }
-
-    /// Drops the collection, deleting all data and indexes stored in it.
-    pub async fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
-        self.drop_common(options, None).await
-    }
-
-    /// Drops the collection, deleting all data and indexes stored in it using the provided
-    /// `ClientSession`.
-    pub async fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_common(options, session).await
-    }
-
-    #[cfg(feature = "in-use-encryption-unstable")]
-    #[allow(clippy::needless_option_as_deref)]
-    async fn drop_aux_collections(
-        &self,
-        options: Option<&DropCollectionOptions>,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<()> {
-        // Find associated `encrypted_fields`:
-        // * from options to this call
-        let mut enc_fields = options.and_then(|o| o.encrypted_fields.as_ref());
-        let enc_opts = self.client().auto_encryption_opts().await;
-        // * from client-wide `encrypted_fields_map`:
-        let client_enc_fields = enc_opts
-            .as_ref()
-            .and_then(|eo| eo.encrypted_fields_map.as_ref());
-        if enc_fields.is_none() {
-            enc_fields =
-                client_enc_fields.and_then(|efm| efm.get(&format!("{}", self.namespace())));
-        }
-        // * from a `list_collections` call:
-        let found;
-        if enc_fields.is_none() && client_enc_fields.is_some() {
-            let filter = doc! { "name": self.name() };
-            let mut specs: Vec<_> = match session.as_deref_mut() {
-                Some(s) => {
-                    let mut cursor = self
-                        .inner
-                        .db
-                        .list_collections()
-                        .filter(filter)
-                        .session(&mut *s)
-                        .await?;
-                    cursor.stream(s).try_collect().await?
-                }
-                None => {
-                    self.inner
-                        .db
-                        .list_collections()
-                        .filter(filter)
-                        .await?
-                        .try_collect()
-                        .await?
-                }
-            };
-            if let Some(spec) = specs.pop() {
-                if let Some(enc) = spec.options.encrypted_fields {
-                    found = enc;
-                    enc_fields = Some(&found);
-                }
-            }
-        }
-
-        // Drop the collections.
-        if let Some(enc_fields) = enc_fields {
-            for ns in crate::client::csfle::aux_collections(&self.namespace(), enc_fields)? {
-                let drop = DropCollection::new(ns, options.cloned());
-                self.client()
-                    .execute_operation(drop, session.as_deref_mut())
-                    .await?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let mut options = options.into();
-        resolve_options!(
-            self,
-            options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
-        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
-        let client = self.client();
-        client.execute_cursor_operation(aggregate).await
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_write_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-
-        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(aggregate, session)
-            .await
-    }
-
-    /// Estimates the number of documents in the collection using collection metadata.
-    ///
-    /// Due to an oversight in versions 5.0.0 - 5.0.7 of MongoDB, the `count` server command,
-    /// which `estimatedDocumentCount` uses in its implementation, was not included in v1 of the
-    /// Stable API. Users of the Stable API with `estimatedDocumentCount` are recommended to
-    /// upgrade their cluster to 5.0.8+ or set
-    /// [`ServerApi::strict`](crate::options::ServerApi::strict) to false to avoid encountering
-    /// errors.
-    ///
-    /// For more information on the behavior of the `count` server command, see
-    /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
-    pub async fn estimated_document_count(
-        &self,
-        options: impl Into<Option<EstimatedDocumentCountOptions>>,
-    ) -> Result<u64> {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-
-        let op = Count::new(self.namespace(), options);
-
-        self.client().execute_operation(op, None).await
-    }
-
-    async fn count_documents_common(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<u64> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, session.as_ref())?;
-        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
-
-        let op = CountDocuments::new(self.namespace(), filter.into(), options)?;
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Gets the number of documents matching `filter`.
-    ///
-    /// Note that this method returns an accurate count.
-    pub async fn count_documents(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-    ) -> Result<u64> {
-        self.count_documents_common(filter, options, None).await
-    }
-
-    /// Gets the number of documents matching `filter` using the provided `ClientSession`.
-    ///
-    /// Note that this method returns an accurate count.
-    pub async fn count_documents_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<u64> {
-        self.count_documents_common(filter, options, session).await
     }
 
     async fn delete_many_common(

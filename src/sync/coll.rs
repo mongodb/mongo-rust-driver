@@ -8,14 +8,10 @@ use crate::{
     error::Result,
     index::IndexModel,
     options::{
-        AggregateOptions,
-        CountOptions,
         CreateIndexOptions,
         DeleteOptions,
         DistinctOptions,
-        DropCollectionOptions,
         DropIndexOptions,
-        EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -123,110 +119,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Drops the collection, deleting all data, users, and indexes stored in it.
-    pub fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
-        runtime::block_on(self.async_collection.drop(options.into()))
-    }
-
-    /// Drops the collection, deleting all data, users, and indexes stored in it using the provided
-    /// `ClientSession`.
-    pub fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_collection
-                .drop_with_session(options.into(), &mut session.async_client_session),
-        )
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_collection.aggregate(pipeline, options.into()))
-            .map(Cursor::new)
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_collection.aggregate_with_session(
-            pipeline,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
-    }
-
-    /// Estimates the number of documents in the collection using collection metadata.
-    ///
-    /// Due to an oversight in versions 5.0.0 - 5.0.7 of MongoDB, the `count` server command,
-    /// which `estimatedDocumentCount` uses in its implementation, was not included in v1 of the
-    /// Stable API. Users of the Stable API with `estimatedDocumentCount` are recommended to
-    /// upgrade their cluster to 5.0.8+ or set
-    /// [`ServerApi::strict`](crate::options::ServerApi::strict) to false to avoid encountering
-    /// errors.
-    ///
-    /// For more information on the behavior of the `count` server command, see
-    /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
-    pub fn estimated_document_count(
-        &self,
-        options: impl Into<Option<EstimatedDocumentCountOptions>>,
-    ) -> Result<u64> {
-        runtime::block_on(
-            self.async_collection
-                .estimated_document_count(options.into()),
-        )
-    }
-
-    /// Gets the number of documents matching `filter`.
-    ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
-    pub fn count_documents(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-    ) -> Result<u64> {
-        runtime::block_on(
-            self.async_collection
-                .count_documents(filter.into(), options.into()),
-        )
-    }
-
-    /// Gets the number of documents matching `filter` using the provided `ClientSession`.
-    ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
-    pub fn count_documents_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<u64> {
-        runtime::block_on(self.async_collection.count_documents_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 
     /// Creates the given index on this collection.

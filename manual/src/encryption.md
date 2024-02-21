@@ -147,7 +147,7 @@ async fn main() -> Result<()> {
     let key_vault = key_vault_client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
 
     let client_encryption = ClientEncryption::new(
         key_vault_client,
@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
         .database(&encrypted_namespace.db)
         .collection::<Document>(&encrypted_namespace.coll);
     // Clear old data.
-    coll.drop(None).await?;
+    coll.drop().await?;
 
     coll.insert_one(doc! { "encryptedField": "123456789" }, None)
         .await?;
@@ -252,7 +252,7 @@ async fn main() -> Result<()> {
     let key_vault = key_vault_client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
     
     let client_encryption = ClientEncryption::new(
         key_vault_client,
@@ -289,7 +289,7 @@ async fn main() -> Result<()> {
     let db = client.database(&encrypted_namespace.db);
     let coll = db.collection::<Document>(&encrypted_namespace.coll);
     // Clear old data
-    coll.drop(None).await?;
+    coll.drop().await?;
     // Create the collection with the encryption JSON Schema.
     db.create_collection(&encrypted_namespace.coll)
         .write_concern(WriteConcern::majority())
@@ -358,7 +358,7 @@ async fn main() -> Result<()> {
     let key_vault = key_vault_client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
     let client_encryption = ClientEncryption::new(
         key_vault_client,
         key_vault_namespace.clone(),
@@ -407,7 +407,7 @@ async fn main() -> Result<()> {
     .await?;
     let db = client.database("example");
     let coll = db.collection::<Document>("encryptedCollection");
-    coll.drop(None).await?;
+    coll.drop().await?;
     db.create_collection("encryptedCollection").await?;
     coll.insert_one(
         doc! { "_id": 1, "firstName": "Jane", "lastName": "Doe" },
@@ -471,7 +471,7 @@ async fn main() -> Result<()> {
     let key_vault = client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
     let client_encryption = ClientEncryption::new(
         // The MongoClient to use for reading/writing to the key vault.
         // This can be the same MongoClient used by the main application.
@@ -613,13 +613,13 @@ async fn main() -> Result<()> {
     let client = Client::with_uri_str(URI).await?;
     let coll = client.database("test").collection::<Document>("coll");
     // Clear old data
-    coll.drop(None).await?;
+    coll.drop().await?;
 
     // Set up the key vault (key_vault_namespace) for this example.
     let key_vault = client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
 
     let client_encryption = ClientEncryption::new(
         // The MongoClient to use for reading/writing to the key vault.
@@ -716,13 +716,13 @@ async fn main() -> Result<()> {
     .await?;
     let coll = client.database("test").collection::<Document>("coll");
     // Clear old data
-    coll.drop(None).await?;
+    coll.drop().await?;
 
     // Set up the key vault (key_vault_namespace) for this example.
     let key_vault = client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
 
     let client_encryption = ClientEncryption::new(
         // The MongoClient to use for reading/writing to the key vault.

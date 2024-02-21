@@ -47,7 +47,7 @@ impl Benchmark for JsonMultiImportBenchmark {
     }
 
     async fn before_task(&mut self) -> Result<()> {
-        self.coll.drop(None).await?;
+        self.coll.drop().await?;
         self.db.create_collection(COLL_NAME.as_str(), None).await?;
 
         Ok(())

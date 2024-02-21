@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-};
+use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
@@ -601,24 +596,19 @@ impl TestOperation for Aggregate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection
+                .aggregate(self.pipeline.clone())
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => {
-                    let mut cursor = collection
-                        .aggregate_with_session(
-                            self.pipeline.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?;
+                    let mut cursor = act.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = collection
-                        .aggregate(self.pipeline.clone(), self.options.clone())
-                        .await?;
+                    let cursor = act.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
@@ -637,8 +627,8 @@ impl TestOperation for Aggregate {
                 .aggregate(self.pipeline.clone())
                 .with_options(self.options.clone());
             let result = match session {
-                Some(mut session) => {
-                    let mut cursor = action.session(session.deref_mut()).await?;
+                Some(session) => {
+                    let mut cursor = action.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
@@ -697,7 +687,7 @@ impl TestOperation for Distinct {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct CountDocuments {
-    filter: Document,
+    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<CountOptions>,
 }
@@ -709,22 +699,11 @@ impl TestOperation for CountDocuments {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .count_documents_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .count_documents(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .count_documents(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone())
+                .optional(session, |a, v| a.session(v))
+                .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap())))
         }
         .boxed()
@@ -745,7 +724,8 @@ impl TestOperation for EstimatedDocumentCount {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = collection
-                .estimated_document_count(self.options.clone())
+                .estimated_document_count()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap())))
         }
@@ -1229,20 +1209,12 @@ impl TestOperation for DropCollection {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    database
-                        .collection::<Document>(&self.collection)
-                        .drop_with_session(self.options.clone(), session)
-                        .await
-                }
-                None => {
-                    database
-                        .collection::<Document>(&self.collection)
-                        .drop(self.options.clone())
-                        .await
-                }
-            };
+            let result = database
+                .collection::<Document>(&self.collection)
+                .drop()
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await;
             result.map(|_| None)
         }
         .boxed()

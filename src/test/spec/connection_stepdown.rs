@@ -5,14 +5,7 @@ use futures::stream::StreamExt;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{
-        Acknowledgment,
-        ClientOptions,
-        DropCollectionOptions,
-        FindOptions,
-        InsertManyOptions,
-        WriteConcern,
-    },
+    options::{Acknowledgment, ClientOptions, FindOptions, InsertManyOptions, WriteConcern},
     runtime,
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, util::EventClient},
@@ -45,13 +38,7 @@ async fn run_test<F: Future>(
 
     let wc_majority = WriteConcern::builder().w(Acknowledgment::Majority).build();
 
-    let _: Result<_, _> = coll
-        .drop(Some(
-            DropCollectionOptions::builder()
-                .write_concern(wc_majority.clone())
-                .build(),
-        ))
-        .await;
+    let _: Result<_, _> = coll.drop().write_concern(wc_majority.clone()).await;
 
     db.create_collection(&name)
         .write_concern(wc_majority)

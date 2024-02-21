@@ -140,7 +140,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.aggregate(vec![doc! { "$match": { "x": 1 } }], None)
+                coll.aggregate(vec![doc! { "$match": { "x": 1 } }])
             ),
         )
         .await;
@@ -161,10 +161,10 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "aggregate",
-            collection_op!($test_name, coll, coll.count_documents(None, None)),
+            collection_op!($test_name, coll, coll.count_documents(doc! {})),
         )
         .await;
-        $test_func("drop", collection_op!($test_name, coll, coll.drop(None))).await;
+        $test_func("drop", collection_op!($test_name, coll, coll.drop())).await;
 
         // db operations
         $test_func(
@@ -355,7 +355,7 @@ async fn cluster_time_in_commands() {
             client
                 .database(function_name!())
                 .collection::<Document>(function_name!())
-                .aggregate(vec![doc! { "$match": { "x": 1 } }], None)
+                .aggregate(vec![doc! { "$match": { "x": 1 } }])
                 .await
         },
     )
@@ -606,7 +606,13 @@ async fn find_and_getmore_share_session() {
             .read_concern(ReadConcern::local())
             .build();
 
-        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
+        while coll
+            .count_documents(doc! {})
+            .with_options(options.clone())
+            .await
+            .unwrap()
+            != 3
+        {}
     }
 
     for read_pref in read_preferences {

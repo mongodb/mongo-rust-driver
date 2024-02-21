@@ -58,10 +58,11 @@ async fn run_count_test(test_file: TestFile) {
                     .limit(arguments.limit)
                     .collation(arguments.collation)
                     .build();
-                coll.count_documents(arguments.filter.unwrap_or_default(), options)
+                coll.count_documents(arguments.filter.unwrap_or_default())
+                    .with_options(options)
                     .await
             }
-            "estimatedDocumentCount" => coll.estimated_document_count(None).await,
+            "estimatedDocumentCount" => coll.estimated_document_count().await,
             other => panic!("unexpected count operation: {}", other),
         }
         .expect(&test_case.description);

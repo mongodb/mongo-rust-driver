@@ -26,7 +26,7 @@ pub async fn example() -> Result<()> {
     let key_vault = key_vault_client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
     let client_encryption = ClientEncryption::new(
         key_vault_client,
         key_vault_namespace.clone(),
@@ -75,7 +75,7 @@ pub async fn example() -> Result<()> {
     .await?;
     let db = client.database("example");
     let coll = db.collection::<Document>("encryptedCollection");
-    coll.drop(None).await?;
+    coll.drop().await?;
     db.create_collection("encryptedCollection", None).await?;
     coll.insert_one(
         doc! { "_id": 1, "firstName": "Jane", "lastName": "Doe" },

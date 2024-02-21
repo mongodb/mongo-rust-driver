@@ -55,7 +55,7 @@ async fn init_stream(
             .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
             .build(),
     );
-    coll.drop(None).await?;
+    coll.drop().await?;
     let stream = coll.watch().await?;
     Ok(Some((client, coll, stream)))
 }
@@ -637,7 +637,7 @@ async fn create_coll_pre_post() -> Result<()> {
     }
 
     let db = client.database("create_coll_pre_post");
-    db.collection::<Document>("test").drop(None).await?;
+    db.collection::<Document>("test").drop().await?;
     db.create_collection("test")
         .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
         .await?;
@@ -666,7 +666,7 @@ async fn split_large_event() -> Result<()> {
 
     let db = client.database("change_stream_tests");
     db.collection::<Document>("split_large_event")
-        .drop(None)
+        .drop()
         .await?;
     db.create_collection("split_large_event")
         .change_stream_pre_and_post_images(ChangeStreamPreAndPostImages { enabled: true })
