@@ -291,6 +291,15 @@ impl EventHandler {
                 events.retain(|ev| !matches!(ev, Event::Cmap(CmapEvent::ConnectionReady(_))));
                 events
             }
+            ExpectedEventType::Sdam => {
+                let events = self.sdam_events.read().unwrap();
+                events
+                    .iter()
+                    .cloned()
+                    .map(|(event, _)| Event::Sdam(event))
+                    .filter(filter)
+                    .collect()
+            }
         }
     }
 

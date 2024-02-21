@@ -192,7 +192,7 @@ Integration Tests
 
 Integration tests are provided in the "unified" directory and are
 written in the `Unified Test Format
-<../unified-test-format/unified-test-format.rst>`_.
+<../../unified-test-format/unified-test-format.md>`_.
 
 Prose Tests
 -----------

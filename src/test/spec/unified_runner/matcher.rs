@@ -356,10 +356,24 @@ fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result
             ExpectedSdamEvent::TopologyDescriptionChanged {},
         ) => Ok(()),
         (
-            SdamEvent::ServerHeartbeatSucceeded(_),
-            ExpectedSdamEvent::ServerHeartbeatSucceeded {},
-        ) => Ok(()),
-        (SdamEvent::ServerHeartbeatFailed(_), ExpectedSdamEvent::ServerHeartbeatFailed {}) => {
+            SdamEvent::ServerHeartbeatStarted(actual),
+            ExpectedSdamEvent::ServerHeartbeatStarted { awaited },
+        ) => {
+            match_opt(&actual.awaited, awaited)?;
+            Ok(())
+        }
+        (
+            SdamEvent::ServerHeartbeatSucceeded(actual),
+            ExpectedSdamEvent::ServerHeartbeatSucceeded { awaited },
+        ) => {
+            match_opt(&actual.awaited, awaited)?;
+            Ok(())
+        }
+        (
+            SdamEvent::ServerHeartbeatFailed(actual),
+            ExpectedSdamEvent::ServerHeartbeatFailed { awaited },
+        ) => {
+            match_opt(&actual.awaited, awaited)?;
             Ok(())
         }
         _ => expected_err(actual, expected),
