@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::RawBsonRef;
 use serde::Deserialize;
 
@@ -16,7 +13,7 @@ use crate::{
 pub(crate) struct Distinct {
     ns: Namespace,
     field_name: String,
-    query: Option<Document>,
+    query: Document,
     options: Option<DistinctOptions>,
 }
 
@@ -24,7 +21,7 @@ impl Distinct {
     pub fn new(
         ns: Namespace,
         field_name: String,
-        query: Option<Document>,
+        query: Document,
         options: Option<DistinctOptions>,
     ) -> Self {
         Distinct {
@@ -32,19 +29,6 @@ impl Distinct {
             field_name,
             query,
             options,
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Distinct {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            field_name: String::new(),
-            query: None,
-            options: None,
         }
     }
 }
@@ -61,8 +45,8 @@ impl OperationWithDefaults for Distinct {
             "key": self.field_name.clone(),
         };
 
-        if let Some(ref query) = self.query {
-            body.insert("query", query.clone());
+        if !self.query.is_empty() {
+            body.insert("query", self.query.clone());
         }
 
         append_options(&mut body, self.options.as_ref())?;

@@ -220,7 +220,7 @@ impl<T> Collection<T> {
         let op = Distinct::new(
             self.namespace(),
             field_name.as_ref().to_string(),
-            filter.into(),
+            filter.into().unwrap(),
             options,
         );
         self.client().execute_operation(op, session).await
