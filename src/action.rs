@@ -3,6 +3,7 @@
 mod aggregate;
 mod count;
 mod create_collection;
+mod create_index;
 mod drop;
 mod list_collections;
 mod list_databases;
@@ -18,6 +19,7 @@ pub use aggregate::Aggregate;
 use bson::Document;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
+pub use create_index::CreateIndex;
 pub use drop::{DropCollection, DropDatabase};
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
@@ -178,14 +180,14 @@ pub(crate) use action_impl_future_wrapper;
 use crate::Collection;
 
 pub(crate) struct CollRef<'a> {
-    pub(crate) coll: Collection<Document>,
+    pub(crate) inner: Collection<Document>,
     _ref: PhantomData<&'a ()>,
 }
 
 impl<'a> CollRef<'a> {
     fn new<T>(coll: &'a Collection<T>) -> Self {
         Self {
-            coll: coll.clone_with_type(),
+            inner: coll.clone_with_type(),
             _ref: PhantomData,
         }
     }

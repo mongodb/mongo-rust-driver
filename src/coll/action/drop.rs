@@ -9,14 +9,14 @@ action_impl! {
         type Future = DropCollectionFuture;
 
         async fn execute(mut self) -> Result<()> {
-            resolve_options!(self.cr.coll, self.options, [write_concern]);
+            resolve_options!(self.cr.inner, self.options, [write_concern]);
 
             #[cfg(feature = "in-use-encryption-unstable")]
-            self.cr.coll.drop_aux_collections(self.options.as_ref(), self.session.as_deref_mut())
+            self.cr.inner.drop_aux_collections(self.options.as_ref(), self.session.as_deref_mut())
                 .await?;
 
-            let drop = op::DropCollection::new(self.cr.coll.namespace(), self.options);
-            self.cr.coll.client()
+            let drop = op::DropCollection::new(self.cr.inner.namespace(), self.options);
+            self.cr.inner.client()
                 .execute_operation(drop, self.session.as_deref_mut())
                 .await
         }

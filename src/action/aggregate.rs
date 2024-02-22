@@ -174,35 +174,35 @@ enum AggregateTargetRef<'a> {
 impl<'a> AggregateTargetRef<'a> {
     fn target(&self) -> AggregateTarget {
         match self {
-            Self::Collection(cr) => AggregateTarget::Collection(cr.coll.namespace()),
+            Self::Collection(cr) => AggregateTarget::Collection(cr.inner.namespace()),
             Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
         }
     }
 
     fn client(&self) -> &Client {
         match self {
-            Self::Collection(cr) => cr.coll.client(),
+            Self::Collection(cr) => cr.inner.client(),
             Self::Database(db) => db.client(),
         }
     }
 
     fn read_concern(&self) -> Option<&ReadConcern> {
         match self {
-            Self::Collection(cr) => cr.coll.read_concern(),
+            Self::Collection(cr) => cr.inner.read_concern(),
             Self::Database(db) => db.read_concern(),
         }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
         match self {
-            Self::Collection(cr) => cr.coll.write_concern(),
+            Self::Collection(cr) => cr.inner.write_concern(),
             Self::Database(db) => db.write_concern(),
         }
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match self {
-            Self::Collection(cr) => cr.coll.selection_criteria(),
+            Self::Collection(cr) => cr.inner.selection_criteria(),
             Self::Database(db) => db.selection_criteria(),
         }
     }
