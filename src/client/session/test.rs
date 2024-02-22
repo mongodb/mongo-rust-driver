@@ -156,7 +156,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "distinct",
-            collection_op!($test_name, coll, coll.distinct("x", None, None)),
+            collection_op!($test_name, coll, coll.distinct("x", doc! {})),
         )
         .await;
         $test_func(

@@ -11,7 +11,7 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
-    coll::options::{DistinctOptions, DropCollectionOptions},
+    coll::options::DropCollectionOptions,
     concern::WriteConcern,
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
     runtime,
@@ -218,12 +218,12 @@ impl TestContext {
             && test.operations.iter().any(|op| op.name == "distinct")
         {
             for server_address in internal_client.options().hosts.clone() {
-                let options = DistinctOptions::builder()
-                    .selection_criteria(Some(SelectionCriteria::Predicate(Arc::new(
+                coll.distinct("_id", doc! {})
+                    .selection_criteria(SelectionCriteria::Predicate(Arc::new(
                         move |server_info: &ServerInfo| *server_info.address() == server_address,
-                    ))))
-                    .build();
-                coll.distinct("_id", None, options).await.unwrap();
+                    )))
+                    .await
+                    .unwrap();
             }
         }
 

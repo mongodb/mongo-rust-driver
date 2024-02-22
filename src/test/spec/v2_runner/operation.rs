@@ -644,23 +644,11 @@ impl TestOperation for Distinct {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .distinct_with_session(
-                            &self.field_name,
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .distinct(&self.field_name, self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             Ok(Some(Bson::Array(result)))
         }
         .boxed()

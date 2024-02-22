@@ -982,25 +982,17 @@ impl TestOperation for Distinct {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .distinct(&self.field_name, self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .distinct_with_session(
-                                &self.field_name,
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => act.await?,
             };
             Ok(Some(Bson::Array(result).into()))
         }

@@ -19,7 +19,7 @@ impl<T> Collection<T> {
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
     /// `await` will return `Result<Vec<Bson>>`.
-    pub fn distinct_2(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
+    pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         Distinct {
             coll: CollRef::new(self),
             field_name: field_name.as_ref().to_string(),
@@ -35,8 +35,8 @@ impl<T> crate::sync::Collection<T> {
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
     /// [`run`](Distinct::run) will return `Result<Vec<Bson>>`.
-    pub fn distinct_2(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
-        self.async_collection.distinct_2(field_name, filter)
+    pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
+        self.async_collection.distinct(field_name, filter)
     }
 }
 

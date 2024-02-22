@@ -4,11 +4,10 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::{ClientSession, Cursor, SessionCursor};
 use crate::{
-    bson::{Bson, Document},
+    bson::Document,
     error::Result,
     index::IndexModel,
     options::{
-        DistinctOptions,
         DropIndexOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -110,37 +109,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection.
-    pub fn distinct(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-    ) -> Result<Vec<Bson>> {
-        runtime::block_on(self.async_collection.distinct(
-            field_name.as_ref(),
-            filter.into(),
-            options.into(),
-        ))
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection using
-    /// the provided `ClientSession`.
-    pub fn distinct_with_session(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<Bson>> {
-        runtime::block_on(self.async_collection.distinct_with_session(
-            field_name.as_ref(),
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 
     /// Updates all documents matching `query` in the collection.

@@ -16,14 +16,14 @@ use serde::{
 
 use self::options::*;
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Document},
     bson_util,
     client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
-    operation::{Distinct, DropIndexes, Find, FindAndModify, Insert, ListIndexes, Update},
+    operation::{DropIndexes, Find, FindAndModify, Insert, ListIndexes, Update},
     results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
@@ -202,52 +202,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    async fn distinct_common(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Vec<Bson>> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, session.as_ref())?;
-        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
-
-        let op = Distinct::new(
-            self.namespace(),
-            field_name.as_ref().to_string(),
-            filter.into().unwrap(),
-            options,
-        );
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection.
-    pub async fn distinct(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-    ) -> Result<Vec<Bson>> {
-        self.distinct_common(field_name, filter, options, None)
-            .await
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection using
-    /// the provided `ClientSession`.
-    pub async fn distinct_with_session(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<Bson>> {
-        self.distinct_common(field_name, filter, options, session)
-            .await
     }
 
     async fn drop_indexes_common(

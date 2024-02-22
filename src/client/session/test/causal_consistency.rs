@@ -127,12 +127,9 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         ])
         .session(s)));
 
-    ops.push(op!("distinct", true, |coll, s| coll.distinct_with_session(
-        "x",
-        doc! {},
-        None,
-        s,
-    )));
+    ops.push(op!("distinct", true, |coll, s| coll
+        .distinct("x", doc! {},)
+        .session(s)));
 
     ops.into_iter()
 }
