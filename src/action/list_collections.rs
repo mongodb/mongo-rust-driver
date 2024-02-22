@@ -77,11 +77,12 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
     session: S,
 }
 
-impl<'a, M> ListCollections<'a, M> {
+impl<'a, M, S> ListCollections<'a, M, S> {
     option_setters!(options: ListCollectionsOptions;
         filter: Document,
         batch_size: u32,
         comment: Bson,
+        authorized_collections: bool,
     );
 }
 

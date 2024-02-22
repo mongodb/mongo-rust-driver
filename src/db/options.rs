@@ -285,6 +285,12 @@ pub struct ListCollectionsOptions {
 
     /// Filters the list operation.
     pub filter: Option<Document>,
+
+    /// When `true` and used with
+    /// [`list_collection_names`](crate::Database::list_collection_names), the command returns
+    /// only those collections for which the user has privileges.  When used with
+    /// [`list_collections`](crate::Database::list_collections) this option has no effect.
+    pub authorized_collections: Option<bool>,
 }
 
 /// Specifies the options to a [`Client::list_databases`](crate::Client::list_databases) operation.
