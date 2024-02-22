@@ -4,6 +4,7 @@ mod aggregate;
 mod count;
 mod create_collection;
 mod create_index;
+mod delete;
 mod drop;
 mod list_collections;
 mod list_databases;
@@ -20,6 +21,7 @@ use bson::Document;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
 pub use create_index::CreateIndex;
+pub use delete::Delete;
 pub use drop::{DropCollection, DropDatabase};
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
@@ -38,6 +40,11 @@ pub struct ListNames;
 pub struct ImplicitSession;
 #[allow(missing_docs)]
 pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
+
+#[allow(missing_docs)]
+pub struct Single;
+#[allow(missing_docs)]
+pub struct Multiple;
 
 macro_rules! option_setters {
     (

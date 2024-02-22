@@ -13,7 +13,7 @@ use crate::{
     IndexModel,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, option_setters, CollRef, Multiple, Single};
 
 impl<T> Collection<T> {
     /// Creates the given index on this collection.
@@ -76,9 +76,6 @@ pub struct CreateIndex<'a, M = Single> {
     session: Option<&'a mut ClientSession>,
     _mode: PhantomData<M>,
 }
-
-pub struct Single;
-pub struct Multiple;
 
 impl<'a, M> CreateIndex<'a, M> {
     option_setters!(options: CreateIndexOptions;
