@@ -185,7 +185,7 @@ async fn index_management_drops() {
     );
 
     // Test dropping single index.
-    coll.drop_index("a_1", None)
+    coll.drop_index("a_1")
         .await
         .expect("Test failed to drop index");
     let names = coll
@@ -195,7 +195,7 @@ async fn index_management_drops() {
     assert_eq!(names, vec!["_id_", "b_1", "c_1"]);
 
     // Test dropping several indexes.
-    coll.drop_indexes(None)
+    coll.drop_indexes()
         .await
         .expect("Test failed to drop indexes");
     let names = coll
@@ -247,13 +247,9 @@ async fn index_management_executes_commands() {
 
     // Collection::drop_index and Collection::drop_indexes execute dropIndexes.
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 0);
-    coll.drop_index("a_1", None)
-        .await
-        .expect("Drop index op failed");
+    coll.drop_index("a_1").await.expect("Drop index op failed");
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 1);
-    coll.drop_indexes(None)
-        .await
-        .expect("Drop indexes op failed");
+    coll.drop_indexes().await.expect("Drop indexes op failed");
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 2);
 }
 

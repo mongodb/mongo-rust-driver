@@ -8,7 +8,6 @@ use crate::{
     error::Result,
     index::IndexModel,
     options::{
-        DropIndexOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -126,46 +125,6 @@ impl<T> Collection<T> {
         runtime::block_on(
             self.async_collection
                 .update_many(query, update.into(), options.into()),
-        )
-    }
-
-    /// Drops the index specified by `name` from this collection.
-    pub fn drop_index(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-    ) -> Result<()> {
-        runtime::block_on(self.async_collection.drop_index(name, options))
-    }
-
-    /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
-    pub fn drop_index_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(self.async_collection.drop_index_with_session(
-            name,
-            options,
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Drops all indexes associated with this collection.
-    pub fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
-        runtime::block_on(self.async_collection.drop_indexes(options))
-    }
-
-    /// Drops all indexes associated with this collection using the provided `ClientSession`.
-    pub fn drop_indexes_with_session(
-        &self,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_collection
-                .drop_indexes_with_session(options, &mut session.async_client_session),
         )
     }
 

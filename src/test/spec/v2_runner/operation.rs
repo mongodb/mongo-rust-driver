@@ -1320,18 +1320,11 @@ impl TestOperation for DropIndex {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            match session {
-                Some(session) => {
-                    collection
-                        .drop_index_with_session(self.name.clone(), self.options.clone(), session)
-                        .await?
-                }
-                None => {
-                    collection
-                        .drop_index(self.name.clone(), self.options.clone())
-                        .await?
-                }
-            }
+            collection
+                .drop_index(self.name.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             Ok(None)
         }
         .boxed()

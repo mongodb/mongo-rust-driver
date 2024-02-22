@@ -23,7 +23,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
-    operation::{DropIndexes, Find, FindAndModify, Insert, ListIndexes, Update},
+    operation::{Find, FindAndModify, Insert, ListIndexes, Update},
     results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
@@ -202,75 +202,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    async fn drop_indexes_common(
-        &self,
-        name: impl Into<Option<&str>>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        // If there is no provided name, that means we should drop all indexes.
-        let index_name = name.into().unwrap_or("*").to_string();
-
-        let drop_index = DropIndexes::new(self.namespace(), index_name, options);
-        self.client().execute_operation(drop_index, session).await
-    }
-
-    async fn drop_index_common(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let name = name.as_ref();
-        if name == "*" {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Cannot pass name \"*\" to drop_index since more than one index would be \
-                          dropped."
-                    .to_string(),
-            }
-            .into());
-        }
-        self.drop_indexes_common(name, options, session).await
-    }
-
-    /// Drops the index specified by `name` from this collection.
-    pub async fn drop_index(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-    ) -> Result<()> {
-        self.drop_index_common(name, options, None).await
-    }
-
-    /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
-    pub async fn drop_index_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_index_common(name, options, session).await
-    }
-
-    /// Drops all indexes associated with this collection.
-    pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
-        self.drop_indexes_common(None, options, None).await
-    }
-
-    /// Drops all indexes associated with this collection using the provided `ClientSession`.
-    pub async fn drop_indexes_with_session(
-        &self,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_indexes_common(None, options, session).await
     }
 
     /// Lists all indexes on this collection.

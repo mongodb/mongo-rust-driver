@@ -16,7 +16,7 @@ impl<T> Collection<T> {
     /// Drops the index specified by `name` from this collection.
     ///
     /// `await` will return `Result<()>`.
-    pub fn drop_index_2(&self, name: impl AsRef<str>) -> DropIndex {
+    pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
             name: Some(name.as_ref().to_string()),
@@ -28,13 +28,30 @@ impl<T> Collection<T> {
     /// Drops all indexes associated with this collection.
     ///
     /// `await` will return `Result<()>`.
-    pub fn drop_indexes_2(&self) -> DropIndex {
+    pub fn drop_indexes(&self) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
             name: None,
             options: None,
             session: None,
         }
+    }
+}
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+impl<T> crate::sync::Collection<T> {
+    /// Drops the index specified by `name` from this collection.
+    ///
+    /// [`run`](DropIndex::run) will return `Result<()>`.
+    pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
+        self.async_collection.drop_index(name)
+    }
+
+    /// Drops all indexes associated with this collection.
+    ///
+    /// [`run`](DropIndex::run) will return `Result<()>`.
+    pub fn drop_indexes(&self) -> DropIndex {
+        self.async_collection.drop_indexes()
     }
 }
 
