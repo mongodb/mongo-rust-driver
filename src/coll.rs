@@ -23,8 +23,8 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
-    operation::{Delete, Distinct, DropIndexes, Find, FindAndModify, Insert, ListIndexes, Update},
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    operation::{Distinct, DropIndexes, Find, FindAndModify, Insert, ListIndexes, Update},
+    results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -202,85 +202,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    async fn delete_many_common(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<DeleteResult> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let delete = Delete::new(self.namespace(), query, None, options);
-        self.client().execute_operation(delete, session).await
-    }
-
-    /// Deletes all documents stored in the collection matching `query`.
-    pub async fn delete_many(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        self.delete_many_common(query, options, None).await
-    }
-
-    /// Deletes all documents stored in the collection matching `query` using the provided
-    /// `ClientSession`.
-    pub async fn delete_many_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        self.delete_many_common(query, options, session).await
-    }
-
-    async fn delete_one_common(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<DeleteResult> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let delete = Delete::new(self.namespace(), query, Some(1), options);
-        self.client().execute_operation(delete, session).await
-    }
-
-    /// Deletes up to one document found matching `query`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn delete_one(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        self.delete_one_common(query, options, None).await
-    }
-
-    /// Deletes up to one document found matching `query` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn delete_one_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        self.delete_one_common(query, options, session).await
     }
 
     async fn distinct_common(

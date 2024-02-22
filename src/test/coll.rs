@@ -200,11 +200,11 @@ async fn delete() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
+    let delete_one_result = coll.delete_one(doc! {"x": 3}).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
     assert_eq!(coll.count_documents(doc! {"x": 3}).await.unwrap(), 4);
-    let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
+    let delete_many_result = coll.delete_many(doc! {"x": 3}).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
     assert_eq!(coll.count_documents(doc! {"x": 3 }).await.unwrap(), 0);
 }
@@ -583,7 +583,10 @@ async fn ns_not_found_suppression() {
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let client = EventClient::new().await;
     let coll = client.database(name).collection::<Document>(name);
-    let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
+    let _: Result<DeleteResult> = coll
+        .delete_many(doc! {})
+        .with_options(options.clone())
+        .await;
 
     let events = client.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);

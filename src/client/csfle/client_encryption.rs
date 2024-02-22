@@ -173,7 +173,7 @@ impl ClientEncryption {
     /// collection. Returns the result of the internal deleteOne() operation on the key vault
     /// collection.
     pub async fn delete_key(&self, id: &Binary) -> Result<DeleteResult> {
-        self.key_vault.delete_one(doc! { "_id": id }, None).await
+        self.key_vault.delete_one(doc! { "_id": id }).await
     }
 
     /// Finds a single key document with the given UUID (BSON binary subtype 0x04).

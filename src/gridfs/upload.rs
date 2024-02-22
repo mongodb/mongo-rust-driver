@@ -385,7 +385,7 @@ impl Drop for GridFsUploadStream {
             let chunks = self.bucket.chunks().clone();
             let id = self.id.clone();
             self.drop_token.spawn(async move {
-                let _result = chunks.delete_many(doc! { "files_id": id }, None).await;
+                let _result = chunks.delete_many(doc! { "files_id": id }).await;
             })
         }
     }
@@ -571,7 +571,7 @@ async fn clean_up_chunks(
     chunks: Collection<Chunk<'static>>,
     original_error: Option<Error>,
 ) -> Result<()> {
-    match chunks.delete_many(doc! { "files_id": id }, None).await {
+    match chunks.delete_many(doc! { "files_id": id }).await {
         Ok(_) => match original_error {
             Some(error) => Err(error),
             None => Ok(()),

@@ -22,7 +22,7 @@ impl<T> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<DeleteResult>`.
-    pub fn delete_one_2(&self, query: Document) -> Delete {
+    pub fn delete_one(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
             query,
@@ -35,7 +35,7 @@ impl<T> Collection<T> {
     /// Deletes all documents stored in the collection matching `query`.
     ///
     /// `await` will return `Result<DeleteResult>`.
-    pub fn delete_many_2(&self, query: Document) -> Delete {
+    pub fn delete_many(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
             query,
@@ -56,15 +56,15 @@ impl<T> crate::sync::Collection<T> {
     /// retryable writes.
     ///
     /// [`run`](Delete::run) will return `Result<DeleteResult>`.
-    pub fn delete_one_2(&self, query: Document) -> Delete {
-        self.async_collection.delete_one_2(query)
+    pub fn delete_one(&self, query: Document) -> Delete {
+        self.async_collection.delete_one(query)
     }
 
     /// Deletes all documents stored in the collection matching `query`.
     ///
     /// [`run`](Delete::run) will return `Result<DeleteResult>`.
-    pub fn delete_many_2(&self, query: Document) -> Delete {
-        self.async_collection.delete_many_2(query)
+    pub fn delete_many(&self, query: Document) -> Delete {
+        self.async_collection.delete_many(query)
     }
 }
 

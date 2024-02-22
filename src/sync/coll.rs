@@ -8,7 +8,6 @@ use crate::{
     error::Result,
     index::IndexModel,
     options::{
-        DeleteOptions,
         DistinctOptions,
         DropIndexOptions,
         FindOneAndDeleteOptions,
@@ -26,7 +25,7 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    results::{InsertManyResult, InsertOneResult, UpdateResult},
     runtime,
     Collection as AsyncCollection,
     Namespace,
@@ -111,63 +110,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Deletes all documents stored in the collection matching `query`.
-    pub fn delete_many(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_many(query, options.into()))
-    }
-
-    /// Deletes all documents stored in the collection matching `query` using the provided
-    /// `ClientSession`.
-    pub fn delete_many_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_many_with_session(
-            query,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Deletes up to one document found matching `query`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn delete_one(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_one(query, options.into()))
-    }
-
-    /// Deletes up to one document found matching `query` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn delete_one_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_one_with_session(
-            query,
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection.
