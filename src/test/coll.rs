@@ -1063,7 +1063,7 @@ async fn invalid_utf8_response() {
         .keys(doc! {"name": 1})
         .options(IndexOptions::builder().unique(true).build())
         .build();
-    coll.create_index(index_model, None)
+    coll.create_index(index_model)
         .await
         .expect("creating an index should succeed");
 

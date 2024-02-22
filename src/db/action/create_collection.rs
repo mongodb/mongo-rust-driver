@@ -1,5 +1,5 @@
 use crate::{
-    action::{action_impl, CreateCollection},
+    action::{action_impl, Action, CreateCollection},
     error::Result,
     operation::create as op,
     Database,
@@ -38,14 +38,13 @@ action_impl! {
             if has_encrypted_fields {
                 use bson::{doc, Document};
                 let coll = self.db.collection::<Document>(&ns.coll);
-                coll.create_index_common(
+                coll.create_index(
                     crate::IndexModel {
                         keys: doc! {"__safeContent__": 1},
                         options: None,
-                    },
-                    None,
-                    self.session.as_deref_mut(),
+                    }
                 )
+                .optional(self.session.as_deref_mut(), |a, s| a.session(s))
                 .await?;
             }
 

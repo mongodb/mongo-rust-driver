@@ -1325,15 +1325,11 @@ impl TestOperation for CreateIndex {
                 .options(options)
                 .build();
 
-            let name = match session {
-                Some(session) => {
-                    collection
-                        .create_index_with_session(index, None, session)
-                        .await?
-                        .index_name
-                }
-                None => collection.create_index(index, None).await?.index_name,
-            };
+            let name = collection
+                .create_index(index)
+                .optional(session, |a, s| a.session(s))
+                .await?
+                .index_name;
             Ok(Some(name.into()))
         }
         .boxed()

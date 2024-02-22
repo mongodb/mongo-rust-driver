@@ -8,7 +8,6 @@ use crate::{
     error::Result,
     index::IndexModel,
     options::{
-        CreateIndexOptions,
         DeleteOptions,
         DistinctOptions,
         DropIndexOptions,
@@ -27,14 +26,7 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    results::{
-        CreateIndexResult,
-        CreateIndexesResult,
-        DeleteResult,
-        InsertManyResult,
-        InsertOneResult,
-        UpdateResult,
-    },
+    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     runtime,
     Collection as AsyncCollection,
     Namespace,
@@ -119,52 +111,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Creates the given index on this collection.
-    pub fn create_index(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexResult> {
-        runtime::block_on(self.async_collection.create_index(index, options))
-    }
-
-    /// Creates the given index on this collection using the provided `ClientSession`.
-    pub fn create_index_with_session(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexResult> {
-        runtime::block_on(self.async_collection.create_index_with_session(
-            index,
-            options,
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Creates the given indexes on this collection.
-    pub fn create_indexes(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexesResult> {
-        runtime::block_on(self.async_collection.create_indexes(indexes, options))
-    }
-
-    /// Creates the given indexes on this collection using the provided `ClientSession`.
-    pub fn create_indexes_with_session(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexesResult> {
-        runtime::block_on(self.async_collection.create_indexes_with_session(
-            indexes,
-            options,
-            &mut session.async_client_session,
-        ))
     }
 
     /// Deletes all documents stored in the collection matching `query`.

@@ -23,25 +23,8 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
-    operation::{
-        CreateIndexes,
-        Delete,
-        Distinct,
-        DropIndexes,
-        Find,
-        FindAndModify,
-        Insert,
-        ListIndexes,
-        Update,
-    },
-    results::{
-        CreateIndexResult,
-        CreateIndexesResult,
-        DeleteResult,
-        InsertManyResult,
-        InsertOneResult,
-        UpdateResult,
-    },
+    operation::{Delete, Distinct, DropIndexes, Find, FindAndModify, Insert, ListIndexes, Update},
+    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -234,75 +217,6 @@ impl<T> Collection<T> {
 
         let delete = Delete::new(self.namespace(), query, None, options);
         self.client().execute_operation(delete, session).await
-    }
-
-    async fn create_indexes_common(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<CreateIndexesResult> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let indexes: Vec<IndexModel> = indexes.into_iter().collect();
-
-        let create_indexes = CreateIndexes::new(self.namespace(), indexes, options);
-        self.client()
-            .execute_operation(create_indexes, session)
-            .await
-    }
-
-    pub(crate) async fn create_index_common(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<CreateIndexResult> {
-        let response = self
-            .create_indexes_common(vec![index], options, session)
-            .await?;
-        Ok(response.into_create_index_result())
-    }
-
-    /// Creates the given index on this collection.
-    pub async fn create_index(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexResult> {
-        self.create_index_common(index, options, None).await
-    }
-
-    /// Creates the given index on this collection using the provided `ClientSession`.
-    pub async fn create_index_with_session(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexResult> {
-        self.create_index_common(index, options, session).await
-    }
-
-    /// Creates the given indexes on this collection.
-    pub async fn create_indexes(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexesResult> {
-        self.create_indexes_common(indexes, options, None).await
-    }
-
-    /// Creates the given indexes on this collection using the provided `ClientSession`.
-    pub async fn create_indexes_with_session(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexesResult> {
-        self.create_indexes_common(indexes, options, session).await
     }
 
     /// Deletes all documents stored in the collection matching `query`.

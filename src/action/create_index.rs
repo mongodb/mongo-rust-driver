@@ -19,7 +19,7 @@ impl<T> Collection<T> {
     /// Creates the given index on this collection.
     ///
     /// `await` will return `Result<CreateIndexResult>`.
-    pub fn create_index_2(&self, index: IndexModel) -> CreateIndex {
+    pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         CreateIndex {
             coll: CollRef::new(self),
             indexes: vec![index],
@@ -32,7 +32,7 @@ impl<T> Collection<T> {
     /// Creates the given indexes on this collection.
     ///
     /// `await` will return `Result<CreateIndexesResult>`.
-    pub fn create_indexes_2(
+    pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
     ) -> CreateIndex<'_, Multiple> {
@@ -51,18 +51,18 @@ impl<T> crate::sync::Collection<T> {
     /// Creates the given index on this collection.
     ///
     /// [`run`](CreateIndex::run) will return `Result<CreateIndexResult>`.
-    pub fn create_index_2(&self, index: IndexModel) -> CreateIndex {
-        self.async_collection.create_index_2(index)
+    pub fn create_index(&self, index: IndexModel) -> CreateIndex {
+        self.async_collection.create_index(index)
     }
 
     /// Creates the given indexes on this collection.
     ///
     /// [`run`](CreateIndex::run) will return `Result<CreateIndexesResult>`.
-    pub fn create_indexes_2(
+    pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
     ) -> CreateIndex<'_, Multiple> {
-        self.async_collection.create_indexes_2(indexes)
+        self.async_collection.create_indexes(indexes)
     }
 }
 

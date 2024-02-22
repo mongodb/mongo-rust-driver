@@ -2002,19 +2002,19 @@ impl TestOperation for CreateIndex {
                 .build();
 
             let collection = test_runner.get_collection(id).await;
+            let act = collection.create_index(index);
             let name = match self.session {
                 Some(ref session_id) => {
                     with_mut_session!(test_runner, session_id, |session| {
                         async move {
-                            collection
-                                .create_index_with_session(index, None, session)
+                            act.session(session.deref_mut())
                                 .await
                                 .map(|model| model.index_name)
                         }
                     })
                     .await?
                 }
-                None => collection.create_index(index, None).await?.index_name,
+                None => act.await?.index_name,
             };
             Ok(Some(Bson::String(name).into()))
         }

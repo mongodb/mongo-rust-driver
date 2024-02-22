@@ -218,7 +218,7 @@ impl GridFsBucket {
         }
 
         let index_model = IndexModel::builder().keys(keys).build();
-        coll.create_index(index_model, None).await?;
+        coll.create_index(index_model).await?;
 
         Ok(())
     }
