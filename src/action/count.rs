@@ -95,9 +95,9 @@ action_impl! {
         type Future = EstimatedDocumentCountFuture;
 
         async fn execute(mut self) -> Result<u64> {
-            resolve_options!(self.cr.inner, self.options, [read_concern, selection_criteria]);
-            let op = crate::operation::count::Count::new(self.cr.inner.namespace(), self.options);
-            self.cr.inner.client().execute_operation(op, None).await
+            resolve_options!(self.cr, self.options, [read_concern, selection_criteria]);
+            let op = crate::operation::count::Count::new(self.cr.namespace(), self.options);
+            self.cr.client().execute_operation(op, None).await
         }
     }
 }
@@ -135,11 +135,11 @@ action_impl! {
         type Future = CountDocumentsFuture;
 
         async fn execute(mut self) -> Result<u64> {
-            resolve_read_concern_with_session!(self.cr.inner, self.options, self.session.as_ref())?;
-            resolve_selection_criteria_with_session!(self.cr.inner, self.options, self.session.as_ref())?;
+            resolve_read_concern_with_session!(self.cr, self.options, self.session.as_ref())?;
+            resolve_selection_criteria_with_session!(self.cr, self.options, self.session.as_ref())?;
 
-            let op = crate::operation::count_documents::CountDocuments::new(self.cr.inner.namespace(), self.filter, self.options)?;
-            self.cr.inner.client().execute_operation(op, self.session).await
+            let op = crate::operation::count_documents::CountDocuments::new(self.cr.namespace(), self.filter, self.options)?;
+            self.cr.client().execute_operation(op, self.session).await
         }
     }
 }

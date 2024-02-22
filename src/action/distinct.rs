@@ -71,16 +71,16 @@ action_impl! {
         type Future = DistinctFuture;
 
         async fn execute(mut self) -> Result<Vec<Bson>> {
-            resolve_read_concern_with_session!(self.coll.inner, self.options, self.session.as_ref())?;
-            resolve_selection_criteria_with_session!(self.coll.inner, self.options, self.session.as_ref())?;
+            resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+            resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
 
             let op = Op::new(
-                self.coll.inner.namespace(),
+                self.coll.namespace(),
                 self.field_name,
                 self.filter,
                 self.options,
             );
-            self.coll.inner.client().execute_operation(op, self.session).await
+            self.coll.client().execute_operation(op, self.session).await
         }
     }
 }

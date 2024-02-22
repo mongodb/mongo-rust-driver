@@ -7,6 +7,7 @@ mod create_index;
 mod delete;
 mod distinct;
 mod drop;
+mod drop_index;
 mod list_collections;
 mod list_databases;
 mod perf;
@@ -15,7 +16,7 @@ mod session;
 mod shutdown;
 mod watch;
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Deref};
 
 pub use aggregate::Aggregate;
 use bson::Document;
@@ -25,6 +26,7 @@ pub use create_index::CreateIndex;
 pub use delete::Delete;
 pub use distinct::Distinct;
 pub use drop::{DropCollection, DropDatabase};
+pub use drop_index::DropIndex;
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
 pub use perf::WarmConnectionPool;
@@ -189,7 +191,7 @@ pub(crate) use action_impl_future_wrapper;
 use crate::Collection;
 
 pub(crate) struct CollRef<'a> {
-    pub(crate) inner: Collection<Document>,
+    inner: Collection<Document>,
     _ref: PhantomData<&'a ()>,
 }
 
@@ -199,5 +201,13 @@ impl<'a> CollRef<'a> {
             inner: coll.clone_with_type(),
             _ref: PhantomData,
         }
+    }
+}
+
+impl<'a> Deref for CollRef<'a> {
+    type Target = Collection<Document>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
