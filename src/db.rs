@@ -90,7 +90,7 @@ impl Database {
     }
 
     /// Get the `Client` that this collection descended from.
-    pub(crate) fn client(&self) -> &Client {
+    pub fn client(&self) -> &Client {
         &self.inner.client
     }
 
