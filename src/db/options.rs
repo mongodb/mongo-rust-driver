@@ -289,7 +289,7 @@ pub struct ListCollectionsOptions {
     /// When `true` and used with
     /// [`list_collection_names`](crate::Database::list_collection_names), the command returns
     /// only those collections for which the user has privileges.  When used with
-    /// [`list_collections](crate::Database::list_collections) this option has no effect.
+    /// [`list_collections`](crate::Database::list_collections) this option has no effect.
     pub authorized_collections: Option<bool>,
 }
 
