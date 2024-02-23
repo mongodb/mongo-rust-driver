@@ -3,10 +3,7 @@ pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
-use futures_util::{
-    future,
-    stream::{StreamExt, TryStreamExt},
-};
+use futures_util::stream::StreamExt;
 use serde::{
     de::{DeserializeOwned, Error as DeError},
     Deserialize,
@@ -22,8 +19,7 @@ use crate::{
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    index::IndexModel,
-    operation::{Find, FindAndModify, Insert, ListIndexes, Update},
+    operation::{Find, FindAndModify, Insert, Update},
     results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
@@ -202,54 +198,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.write_concern.as_ref()
-    }
-
-    /// Lists all indexes on this collection.
-    pub async fn list_indexes(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-    ) -> Result<Cursor<IndexModel>> {
-        let list_indexes = ListIndexes::new(self.namespace(), options.into());
-        let client = self.client();
-        client.execute_cursor_operation(list_indexes).await
-    }
-
-    /// Lists all indexes on this collection using the provided `ClientSession`.
-    pub async fn list_indexes_with_session(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<IndexModel>> {
-        let list_indexes = ListIndexes::new(self.namespace(), options.into());
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(list_indexes, session)
-            .await
-    }
-
-    async fn list_index_names_common(
-        &self,
-        cursor: impl TryStreamExt<Ok = IndexModel, Error = Error>,
-    ) -> Result<Vec<String>> {
-        cursor
-            .try_filter_map(|index| future::ok(index.get_name()))
-            .try_collect()
-            .await
-    }
-
-    /// Gets the names of all indexes on the collection.
-    pub async fn list_index_names(&self) -> Result<Vec<String>> {
-        let cursor = self.list_indexes(None).await?;
-        self.list_index_names_common(cursor).await
-    }
-
-    /// Gets the names of all indexes on the collection using the provided `ClientSession`.
-    pub async fn list_index_names_with_session(
-        &self,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        let mut cursor = self.list_indexes_with_session(None, session).await?;
-        self.list_index_names_common(cursor.stream(session)).await
     }
 
     async fn update_many_common(

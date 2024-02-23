@@ -191,7 +191,7 @@ impl GridFsBucket {
 
         // From the spec: Drivers MUST check whether the indexes already exist before attempting to
         // create them.
-        let mut indexes = coll.list_indexes(None).await?;
+        let mut indexes = coll.list_indexes().await?;
         'outer: while let Some(index_model) = indexes.try_next().await? {
             if index_model.keys.len() != keys.len() {
                 continue;

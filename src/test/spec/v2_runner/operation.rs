@@ -1344,22 +1344,16 @@ impl TestOperation for ListIndexes {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection.list_indexes().with_options(self.options.clone());
             let indexes: Vec<IndexModel> = match session {
                 Some(session) => {
-                    collection
-                        .list_indexes_with_session(self.options.clone(), session)
+                    act.session(&mut *session)
                         .await?
                         .stream(session)
                         .try_collect()
                         .await?
                 }
-                None => {
-                    collection
-                        .list_indexes(self.options.clone())
-                        .await?
-                        .try_collect()
-                        .await?
-                }
+                None => act.await?.try_collect().await?,
             };
             let indexes: Vec<Document> = indexes
                 .iter()
@@ -1381,9 +1375,10 @@ impl TestOperation for ListIndexNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection.list_index_names();
             let names = match session {
-                Some(session) => collection.list_index_names_with_session(session).await?,
-                None => collection.list_index_names().await?,
+                Some(session) => act.session(session).await?,
+                None => act.await?,
             };
             Ok(Some(names.into()))
         }

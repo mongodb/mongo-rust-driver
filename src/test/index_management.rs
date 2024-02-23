@@ -129,7 +129,7 @@ async fn index_management_lists() {
     ];
 
     let mut indexes = coll
-        .list_indexes(None)
+        .list_indexes()
         .await
         .expect("Test failed to list indexes");
 
@@ -240,7 +240,7 @@ async fn index_management_executes_commands() {
 
     // Collection::list_indexes and Collection::list_index_names execute listIndexes.
     assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 0);
-    coll.list_indexes(None).await.expect("List index op failed");
+    coll.list_indexes().await.expect("List index op failed");
     assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 1);
     coll.list_index_names().await.expect("List index op failed");
     assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 2);

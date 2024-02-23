@@ -6,7 +6,6 @@ use super::{ClientSession, Cursor, SessionCursor};
 use crate::{
     bson::Document,
     error::Result,
-    index::IndexModel,
     options::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -15,7 +14,6 @@ use crate::{
         FindOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
         SelectionCriteria,
@@ -125,43 +123,6 @@ impl<T> Collection<T> {
         runtime::block_on(
             self.async_collection
                 .update_many(query, update.into(), options.into()),
-        )
-    }
-
-    /// Lists all indexes on this collection.
-    pub fn list_indexes(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-    ) -> Result<Cursor<IndexModel>> {
-        runtime::block_on(self.async_collection.list_indexes(options)).map(Cursor::new)
-    }
-
-    /// Lists all indexes on this collection using the provided `ClientSession`.
-    pub fn list_indexes_with_session(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<IndexModel>> {
-        runtime::block_on(
-            self.async_collection
-                .list_indexes_with_session(options, &mut session.async_client_session),
-        )
-        .map(SessionCursor::new)
-    }
-
-    /// Gets the names of all indexes on the collection.
-    pub fn list_index_names(&self) -> Result<Vec<String>> {
-        runtime::block_on(self.async_collection.list_index_names())
-    }
-
-    /// Gets the names of all indexes on the collection using the provided `ClientSession`.
-    pub fn list_index_names_with_session(
-        &self,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_collection
-                .list_index_names_with_session(&mut session.async_client_session),
         )
     }
 

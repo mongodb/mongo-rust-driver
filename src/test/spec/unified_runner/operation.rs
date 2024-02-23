@@ -2023,12 +2023,12 @@ impl TestOperation for ListIndexes {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection.list_indexes().with_options(self.options.clone());
             let indexes: Vec<IndexModel> = match self.session {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session, |session| {
                         async {
-                            collection
-                                .list_indexes_with_session(self.options.clone(), session)
+                            act.session(session.deref_mut())
                                 .await?
                                 .stream(session)
                                 .try_collect()
@@ -2037,13 +2037,7 @@ impl TestOperation for ListIndexes {
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .list_indexes(self.options.clone())
-                        .await?
-                        .try_collect()
-                        .await?
-                }
+                None => act.await?.try_collect().await?,
             };
             let indexes: Vec<Document> = indexes
                 .iter()
@@ -2068,14 +2062,15 @@ impl TestOperation for ListIndexNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection.list_index_names();
             let names = match self.session {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session.as_str(), |s| {
-                        async move { collection.list_index_names_with_session(s).await }
+                        async move { act.session(s.deref_mut()).await }
                     })
                     .await?
                 }
-                None => collection.list_index_names().await?,
+                None => act.await?,
             };
             Ok(Some(Bson::from(names).into()))
         }

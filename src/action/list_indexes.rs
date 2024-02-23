@@ -29,7 +29,7 @@ impl<T> Collection<T> {
     ///
     /// `await` will return `Result<Cursor<IndexModel>>` (or `Result<SessionCursor<IndexModel>>` if
     /// a `ClientSession` is provided).
-    pub fn list_indexes_2(&self) -> ListIndexes {
+    pub fn list_indexes(&self) -> ListIndexes {
         ListIndexes {
             coll: CollRef::new(self),
             options: None,
@@ -41,7 +41,7 @@ impl<T> Collection<T> {
     /// Gets the names of all indexes on the collection.
     ///
     /// `await` will return `Result<Vec<String>>`.
-    pub fn list_index_names_2(&self) -> ListIndexes<ListNames> {
+    pub fn list_index_names(&self) -> ListIndexes<ListNames> {
         ListIndexes {
             coll: CollRef::new(self),
             options: None,
@@ -57,15 +57,15 @@ impl<T> crate::sync::Collection<T> {
     ///
     /// [`run`](ListIndexes::run) will return `Result<Cursor<IndexModel>>` (or
     /// `Result<SessionCursor<IndexModel>>` if a `ClientSession` is provided).
-    pub fn list_indexes_2(&self) -> ListIndexes {
-        self.async_collection.list_indexes_2()
+    pub fn list_indexes(&self) -> ListIndexes {
+        self.async_collection.list_indexes()
     }
 
     /// Gets the names of all indexes on the collection.
     ///
     /// [`run`](ListIndexes::run) will return `Result<Vec<String>>`.
-    pub fn list_index_names_2(&self) -> ListIndexes<ListNames> {
-        self.async_collection.list_index_names_2()
+    pub fn list_index_names(&self) -> ListIndexes<ListNames> {
+        self.async_collection.list_index_names()
     }
 }
 
