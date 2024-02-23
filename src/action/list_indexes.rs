@@ -1,21 +1,34 @@
-use std::marker::PhantomData;
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use bson::Bson;
 use futures_util::stream::TryStreamExt;
 
-use crate::{ClientSession, Cursor, IndexModel, SessionCursor};
-use crate::{coll::options::ListIndexesOptions, Collection};
-use crate::operation::ListIndexes as Op;
-use crate::error::Result;
+use crate::{
+    coll::options::ListIndexesOptions,
+    error::Result,
+    operation::ListIndexes as Op,
+    ClientSession,
+    Collection,
+    Cursor,
+    IndexModel,
+    SessionCursor,
+};
 
-use super::{CollRef, ExplicitSession, ImplicitSession, ListNames, ListSpecifications};
-use super::{action_impl, option_setters};
+use super::{
+    action_impl,
+    option_setters,
+    CollRef,
+    ExplicitSession,
+    ImplicitSession,
+    ListNames,
+    ListSpecifications,
+};
 
 impl<T> Collection<T> {
     /// Lists all indexes on this collection.
     ///
-    /// `await` will return `Result<Cursor<IndexModel>>` (or `Result<SessionCursor<IndexModel>>` if a `ClientSession` is provided).
+    /// `await` will return `Result<Cursor<IndexModel>>` (or `Result<SessionCursor<IndexModel>>` if
+    /// a `ClientSession` is provided).
     pub fn list_indexes_2(&self) -> ListIndexes {
         ListIndexes {
             coll: CollRef::new(self),
@@ -42,7 +55,8 @@ impl<T> Collection<T> {
 impl<T> crate::sync::Collection<T> {
     /// Lists all indexes on this collection.
     ///
-    /// [`run`](ListIndexes::run) will return `Result<Cursor<IndexModel>>` (or `Result<SessionCursor<IndexModel>>` if a `ClientSession` is provided).
+    /// [`run`](ListIndexes::run) will return `Result<Cursor<IndexModel>>` (or
+    /// `Result<SessionCursor<IndexModel>>` if a `ClientSession` is provided).
     pub fn list_indexes_2(&self) -> ListIndexes {
         self.async_collection.list_indexes_2()
     }
@@ -55,7 +69,8 @@ impl<T> crate::sync::Collection<T> {
     }
 }
 
-/// List indexes on a collection.  Construct with [`Collection::list_indexes`] or [`Collection::list_index_names`].
+/// List indexes on a collection.  Construct with [`Collection::list_indexes`] or
+/// [`Collection::list_index_names`].
 #[must_use]
 pub struct ListIndexes<'a, Mode = ListSpecifications, Session = ImplicitSession> {
     coll: CollRef<'a>,
