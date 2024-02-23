@@ -1711,10 +1711,7 @@ async fn index_examples() -> Result<()> {
     use crate::IndexModel;
     // Start Index Example 1
     db.collection::<Document>("records")
-        .create_index(
-            IndexModel::builder().keys(doc! { "score": 1 }).build(),
-            None,
-        )
+        .create_index(IndexModel::builder().keys(doc! { "score": 1 }).build())
         .await?;
     // End Index Example 1
 
@@ -1730,7 +1727,6 @@ async fn index_examples() -> Result<()> {
                         .build(),
                 )
                 .build(),
-            None,
         )
         .await?;
     // End Index Example 2
