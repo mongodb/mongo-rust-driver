@@ -15,6 +15,7 @@ mod perf;
 mod run_command;
 mod session;
 mod shutdown;
+mod update;
 mod watch;
 
 use std::{marker::PhantomData, ops::Deref};
@@ -35,6 +36,7 @@ pub use perf::WarmConnectionPool;
 pub use run_command::{RunCommand, RunCursorCommand};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
+pub use update::Update;
 pub use watch::Watch;
 
 #[allow(missing_docs)]

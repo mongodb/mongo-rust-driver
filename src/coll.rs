@@ -385,6 +385,10 @@ impl<T> Collection<T> {
 
         client.execute_session_cursor_operation(find, session).await
     }
+
+    pub(crate) fn human_readable_serialization(&self) -> bool {
+        self.inner.human_readable_serialization
+    }
 }
 
 impl<T> Collection<T>
