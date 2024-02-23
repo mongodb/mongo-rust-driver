@@ -1181,7 +1181,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                 },
                 "$currentDate": { "lastModified": true },
             },
-            None,
         )
         .await?;
     // End Example 52
@@ -1216,7 +1215,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                 },
                 "$currentDate": { "lastModified": true },
             },
-            None,
         )
         .await?;
     // End Example 53
@@ -1348,19 +1346,19 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
     assert_coll_count!(collection, 5);
 
     // Start Example 57
-    collection.delete_many(doc! { "status": "A" }, None).await?;
+    collection.delete_many(doc! { "status": "A" }).await?;
     // End Example 57
 
     assert_coll_count!(collection, 3);
 
     // Start Example 58
-    collection.delete_one(doc! { "status": "D" }, None).await?;
+    collection.delete_one(doc! { "status": "D" }).await?;
     // End Example 58
 
     assert_coll_count!(collection, 2);
 
     // Start Example 56
-    collection.delete_many(doc! {}, None).await?;
+    collection.delete_many(doc! {}).await?;
     // End Example 56
 
     assert_coll_count!(collection, 0);

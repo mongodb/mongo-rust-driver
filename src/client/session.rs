@@ -82,7 +82,7 @@ pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: Lazy<HashSet<&'static str>> = L
 ///
 /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
 ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
-///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
+///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).await?;
 ///     // An "UnknownTransactionCommitResult" label indicates that it is unknown whether the
 ///     // commit has satisfied the write concern associated with the transaction. If an error
 ///     // with this label is returned, it is safe to retry the commit until the write concern is
@@ -525,7 +525,7 @@ impl ClientSession {
     ///
     /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
-    ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
+    ///     coll.delete_one(doc! { "y": 2 }).session(session).await?;
     ///     Ok(())
     /// }
     /// ```

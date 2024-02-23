@@ -1,5 +1,5 @@
 use crate::{
-    action::{action_impl, Action, CreateCollection},
+    action::{action_impl, CreateCollection},
     error::Result,
     operation::create as op,
     Database,
@@ -36,6 +36,7 @@ action_impl! {
 
             #[cfg(feature = "in-use-encryption-unstable")]
             if has_encrypted_fields {
+                use crate::action::Action;
                 use bson::{doc, Document};
                 let coll = self.db.collection::<Document>(&ns.coll);
                 coll.create_index(
