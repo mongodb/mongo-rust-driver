@@ -684,7 +684,6 @@ async fn split_large_event() -> Result<()> {
     coll.update_one(
         doc! {},
         doc! { "$set": { "value": "z".repeat(10 * 1024 * 1024) } },
-        None,
     )
     .await?;
 

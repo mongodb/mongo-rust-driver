@@ -823,11 +823,8 @@ impl TestOperation for UpdateMany {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .update_many(
-                    self.filter.clone(),
-                    self.update.clone(),
-                    self.options.clone(),
-                )
+                .update_many(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -854,29 +851,17 @@ impl TestOperation for UpdateOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .update_one(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .update_one_with_session(
-                                self.filter.clone(),
-                                self.update.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .update_one(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))

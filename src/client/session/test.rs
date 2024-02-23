@@ -85,7 +85,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.update_one(doc! {}, doc! { "$inc": {"x": 5 } }, None)
+                coll.update_one(doc! {}, doc! { "$inc": {"x": 5 } })
             ),
         )
         .await;
@@ -94,7 +94,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.update_many(doc! {}, doc! { "$inc": {"x": 5 } }, None)
+                coll.update_many(doc! {}, doc! { "$inc": {"x": 5 } })
             ),
         )
         .await;

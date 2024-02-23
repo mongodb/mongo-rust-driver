@@ -22,7 +22,7 @@ impl<T> Collection<T> {
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// `await` will return `Result<UpdateResult>`.
-    pub fn update_many_2(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+    pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
             query,
@@ -46,7 +46,7 @@ impl<T> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<UpdateResult>`.
-    pub fn update_one_2(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+    pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
             query,
@@ -68,8 +68,8 @@ impl<T> crate::sync::Collection<T> {
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// [`run`](Update::run) will return `Result<UpdateResult>`.
-    pub fn update_many_2(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
-        self.async_collection.update_many_2(query, update)
+    pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+        self.async_collection.update_many(query, update)
     }
 
     /// Updates up to one document matching `query` in the collection.
@@ -85,8 +85,8 @@ impl<T> crate::sync::Collection<T> {
     /// retryable writes.
     ///
     /// [`run`](Update::run) will return `Result<UpdateResult>`.
-    pub fn update_one_2(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
-        self.async_collection.update_one_2(query, update)
+    pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+        self.async_collection.update_one(query, update)
     }
 }
 

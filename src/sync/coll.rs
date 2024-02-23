@@ -18,7 +18,6 @@ use crate::{
         ReplaceOptions,
         SelectionCriteria,
         UpdateModifications,
-        UpdateOptions,
         WriteConcern,
     },
     results::{InsertManyResult, InsertOneResult, UpdateResult},
@@ -106,95 +105,6 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Updates all documents matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub fn update_many(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(
-            self.async_collection
-                .update_many(query, update.into(), options.into()),
-        )
-    }
-
-    /// Updates all documents matching `query` in the collection using the provided `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub fn update_many_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.update_many_with_session(
-            query,
-            update.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Updates up to one document matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn update_one(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(
-            self.async_collection
-                .update_one(query, update.into(), options.into()),
-        )
-    }
-
-    /// Updates up to one document matching `query` in the collection using the provided
-    /// `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn update_one_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.update_one_with_session(
-            query,
-            update.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 
     /// Finds the documents in the collection matching `filter`.

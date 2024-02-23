@@ -200,7 +200,7 @@ async fn transaction_ids_excluded() {
         !started.command.contains_key("txnNumber")
     };
 
-    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(excludes_txn_number("update"));
@@ -249,7 +249,7 @@ async fn transaction_ids_included() {
     coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
     assert!(includes_txn_number("insert"));
 
-    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(includes_txn_number("update"));

@@ -254,7 +254,6 @@ impl GridFsBucket {
             .update_one(
                 doc! { "_id": id },
                 doc! { "$set": { "filename": new_filename.as_ref() } },
-                None,
             )
             .await?;
 

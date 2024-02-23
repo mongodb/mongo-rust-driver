@@ -29,7 +29,6 @@ use crate::{
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
-        UpdateOptions,
         WriteConcern,
     },
     results::DeleteResult,
@@ -163,22 +162,22 @@ async fn update() {
     assert_eq!(result.inserted_ids.len(), 5);
 
     let update_one_results = coll
-        .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }}, None)
+        .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }})
         .await
         .unwrap();
     assert_eq!(update_one_results.modified_count, 1);
     assert!(update_one_results.upserted_id.is_none());
 
     let update_many_results = coll
-        .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}}, None)
+        .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}})
         .await
         .unwrap();
     assert_eq!(update_many_results.modified_count, 4);
     assert!(update_many_results.upserted_id.is_none());
 
-    let options = UpdateOptions::builder().upsert(true).build();
     let upsert_results = coll
-        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, options)
+        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }})
+        .upsert(true)
         .await
         .unwrap();
     assert_eq!(upsert_results.modified_count, 0);
@@ -1099,7 +1098,7 @@ async fn invalid_utf8_response() {
         .expect("inserting new document should succeed");
 
     let update_err = coll
-        .update_one(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc}, None)
+        .update_one(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc})
         .await
         .expect_err("update setting duplicate key should fail")
         .kind;
@@ -1107,7 +1106,7 @@ async fn invalid_utf8_response() {
 
     // test triggering an invalid error message via an update_many.
     let update_err = coll
-        .update_many(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc}, None)
+        .update_many(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc})
         .await
         .expect_err("update setting duplicate key should fail")
         .kind;

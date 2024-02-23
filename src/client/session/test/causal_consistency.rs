@@ -62,20 +62,12 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     )));
 
     ops.push(op!("update", false, |coll, s| coll
-        .update_one_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .update_one(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
-        .update_many_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .update_many(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
         .replace_one_with_session(
