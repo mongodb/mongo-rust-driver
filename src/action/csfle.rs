@@ -1,3 +1,5 @@
+//! Action builders for in-use encryption.
+
 mod create_data_key;
 pub(crate) mod encrypt;
 

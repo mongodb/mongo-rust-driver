@@ -2,7 +2,10 @@ use bson::{doc, Binary};
 use mongocrypt::ctx::{Ctx, KmsProvider};
 
 use crate::{
-    action::{action_impl, CreateDataKey, DataKeyOptions},
+    action::{
+        action_impl,
+        csfle::{CreateDataKey, DataKeyOptions},
+    },
     error::{Error, Result},
 };
 

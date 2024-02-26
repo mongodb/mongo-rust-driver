@@ -4,21 +4,19 @@ use mongocrypt::ctx::{Algorithm, CtxBuilder};
 use crate::{
     action::{
         action_impl,
-        csfle::encrypt::{Expression, Value},
-        Encrypt,
-        EncryptOptions,
+        csfle::encrypt::{Encrypt, EncryptKey, EncryptOptions, Expression, Value},
     },
     error::{Error, Result},
 };
 
-use super::{ClientEncryption, EncryptKey};
+use super::ClientEncryption;
 
 action_impl! {
     impl<'a> Action for Encrypt<'a, Value> {
         type Future = EncryptFuture;
 
         async fn execute(self) -> Result<Binary> {
-            let builder = self.client_enc.get_ctx_builder_2(self.key, self.algorithm, self.options.unwrap_or_default())?;
+            let builder = self.client_enc.get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?;
             let ctx = builder.build_explicit_encrypt(self.mode.value)?;
             let result = self.client_enc.exec.run_ctx(ctx, None).await?;
             let bin_ref = result
@@ -34,7 +32,7 @@ action_impl! {
         type Future = EncryptExpressionFuture;
 
         async fn execute(self) -> Result<Document> {
-            let builder = self.client_enc.get_ctx_builder_2(self.key, self.algorithm, self.options.unwrap_or_default())?;
+            let builder = self.client_enc.get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?;
             let ctx = builder.build_explicit_encrypt_expression(self.mode.value)?;
             let result = self.client_enc.exec.run_ctx(ctx, None).await?;
             let doc_ref = result
@@ -50,7 +48,7 @@ action_impl! {
 }
 
 impl ClientEncryption {
-    fn get_ctx_builder_2(
+    fn get_ctx_builder(
         &self,
         key: EncryptKey,
         algorithm: Algorithm,

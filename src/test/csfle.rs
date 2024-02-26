@@ -231,7 +231,6 @@ async fn custom_key_material() -> Result<()> {
             EncryptKey::Id(new_key_id),
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
-        .run()
         .await?;
     let expected = base64::decode(
         "AQAAAAAAAAAAAAAAAAAAAAACz0ZOLuuhEYi807ZXTdhbqhLaS2/t9wLifJnnNYwiw79d75QYIZ6M/\
@@ -380,7 +379,6 @@ async fn data_key_double_encryption() -> Result<()> {
                 EncryptKey::Id(datakey_id),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
         assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
         let coll = client_encrypted
@@ -404,7 +402,6 @@ async fn data_key_double_encryption() -> Result<()> {
                 EncryptKey::AltName(format!("{}_altname", provider.name())),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
         assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
         assert_eq!(other_encrypted.bytes, encrypted.bytes);
@@ -507,7 +504,6 @@ async fn external_key_vault() -> Result<()> {
                 EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
@@ -857,7 +853,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             .expect("no value to encrypt")
             .clone()
             .try_into()?;
-        let result = client_encryption.encrypt(value, key, algo).run().await;
+        let result = client_encryption.encrypt(value, key, algo).await;
         let mut subdoc_copied = subdoc.clone();
         if subdoc.get_bool("allowed")? {
             subdoc_copied.insert("value", result?);
@@ -999,7 +995,6 @@ async fn validate_roundtrip(
             EncryptKey::Id(key_id),
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
-        .run()
         .await?;
     let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
     assert_eq!(value, decrypted);
@@ -1584,7 +1579,6 @@ impl DeadlockTestCase {
                 EncryptKey::AltName("local".to_string()),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
 
         // Run test case
@@ -2040,7 +2034,6 @@ async fn explicit_encryption_case_1() -> Result<()> {
             Algorithm::Indexed,
         )
         .contention_factor(0)
-        .run()
         .await?;
     enc_coll
         .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
@@ -2055,7 +2048,6 @@ async fn explicit_encryption_case_1() -> Result<()> {
         )
         .query_type("equality".to_string())
         .contention_factor(0)
-        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload }, None)
@@ -2101,7 +2093,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
                 Algorithm::Indexed,
             )
             .contention_factor(10)
-            .run()
             .await?;
         enc_coll
             .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
@@ -2117,7 +2108,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
         )
         .query_type("equality".to_string())
         .contention_factor(0)
-        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload }, None)
@@ -2138,7 +2128,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
         )
         .query_type("equality")
         .contention_factor(10)
-        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload2 }, None)
@@ -2180,7 +2169,6 @@ async fn explicit_encryption_case_3() -> Result<()> {
             EncryptKey::Id(testdata.key1_id.clone()),
             Algorithm::Unindexed,
         )
-        .run()
         .await?;
     enc_coll
         .insert_one(
@@ -2228,7 +2216,6 @@ async fn explicit_encryption_case_4() -> Result<()> {
             Algorithm::Indexed,
         )
         .contention_factor(0)
-        .run()
         .await?;
     let roundtrip = testdata
         .client_encryption
@@ -2263,7 +2250,6 @@ async fn explicit_encryption_case_5() -> Result<()> {
             EncryptKey::Id(testdata.key1_id.clone()),
             Algorithm::Unindexed,
         )
-        .run()
         .await?;
     let roundtrip = testdata
         .client_encryption
@@ -2626,7 +2612,6 @@ impl DecryptionEventsTestdata {
                 EncryptKey::Id(key_id),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
         let mut malformed_ciphertext = ciphertext.clone();
         let last = malformed_ciphertext.bytes.last_mut().unwrap();
@@ -3065,10 +3050,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         Bson::Binary(bin) => bin.clone(),
         v => panic!("invalid keyId {:?}", v),
     };
-    let encrypted_payload = ce
-        .encrypt("123-45-6789", key, Algorithm::Unindexed)
-        .run()
-        .await?;
+    let encrypted_payload = ce.encrypt("123-45-6789", key, Algorithm::Unindexed).await?;
     let coll = db.collection::<Document>("case_1");
     coll.insert_one(doc! { "ssn": encrypted_payload }, None)
         .await?;
@@ -3232,7 +3214,6 @@ async fn range_explicit_encryption_test(
             )
             .contention_factor(0)
             .range_options(range_options.clone())
-            .run()
             .await?;
 
         explicit_encryption_collection
@@ -3255,7 +3236,6 @@ async fn range_explicit_encryption_test(
         )
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let decrypted = client_encryption
@@ -3288,7 +3268,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = explicit_encryption_collection
@@ -3309,7 +3288,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = encrypted_client
@@ -3331,7 +3309,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = encrypted_client
@@ -3349,7 +3326,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = encrypted_client
@@ -3368,7 +3344,6 @@ async fn range_explicit_encryption_test(
             .encrypt(num, key1_id.clone(), Algorithm::RangePreview)
             .contention_factor(0)
             .range_options(range_options.clone())
-            .run()
             .await
             .unwrap_err();
         assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
@@ -3385,7 +3360,6 @@ async fn range_explicit_encryption_test(
             .encrypt(value, key1_id.clone(), Algorithm::RangePreview)
             .contention_factor(0)
             .range_options(range_options.clone())
-            .run()
             .await
             .unwrap_err();
         assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
@@ -3407,7 +3381,6 @@ async fn range_explicit_encryption_test(
             )
             .contention_factor(0)
             .range_options(range_options)
-            .run()
             .await
             .unwrap_err();
         assert!(matches!(*error.kind, ErrorKind::Encryption(_)));

@@ -6,7 +6,7 @@ use serde::Deserialize;
 use super::{Entity, TestOperation, TestRunner};
 
 use crate::{
-    action::DataKeyOptions,
+    action::csfle::DataKeyOptions,
     bson::{doc, Bson},
     client_encryption::MasterKey,
     error::Result,

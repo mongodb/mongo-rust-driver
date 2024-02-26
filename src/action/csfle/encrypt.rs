@@ -1,8 +1,11 @@
-use bson::RawDocumentBuf;
+use bson::{Binary, Bson, RawDocumentBuf};
 use mongocrypt::ctx::Algorithm;
+use serde::Serialize;
+use serde_with::skip_serializing_none;
+use typed_builder::TypedBuilder;
 
 use super::super::option_setters;
-use crate::client_encryption::{ClientEncryption, EncryptKey, RangeOptions};
+use crate::client_encryption::ClientEncryption;
 
 impl ClientEncryption {
     /// Encrypts a BsonValue with a given key and algorithm.
@@ -12,7 +15,7 @@ impl ClientEncryption {
     /// `AutoEncryptionOptions.bypass_auto_encryption` must be false.
     ///
     /// `await` will return a `Result<Binary>` (subtype 6) containing the encrypted value.
-    pub fn encrypt_2(
+    pub fn encrypt(
         &self,
         value: impl Into<bson::RawBson>,
         key: impl Into<EncryptKey>,
@@ -37,7 +40,7 @@ impl ClientEncryption {
     /// "rangePreview" query type.
     ///
     /// `await` returns a `Result<Document>` containing the encrypted expression.
-    pub fn encrypt_expression_2(
+    pub fn encrypt_expression(
         &self,
         expression: RawDocumentBuf,
         key: impl Into<EncryptKey>,
@@ -49,6 +52,28 @@ impl ClientEncryption {
             algorithm: Algorithm::RangePreview,
             options: None,
         }
+    }
+}
+
+/// An encryption key reference.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum EncryptKey {
+    /// Find the key by _id value.
+    Id(Binary),
+    /// Find the key by alternate name.
+    AltName(String),
+}
+
+impl From<Binary> for EncryptKey {
+    fn from(bin: Binary) -> Self {
+        Self::Id(bin)
+    }
+}
+
+impl From<String> for EncryptKey {
+    fn from(s: String) -> Self {
+        Self::AltName(s)
     }
 }
 
@@ -85,9 +110,32 @@ pub struct EncryptOptions {
     pub range_options: Option<RangeOptions>,
 }
 
+/// NOTE: These options are experimental and not intended for public use.
+///
+/// The index options for a Queryable Encryption field supporting "rangePreview" queries.
+/// The options set must match the values set in the encryptedFields of the destination collection.
+#[skip_serializing_none]
+#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct RangeOptions {
+    /// The minimum value. This option must be set if `precision` is set.
+    pub min: Option<Bson>,
+
+    /// The maximum value. This option must be set if `precision` is set.
+    pub max: Option<Bson>,
+
+    /// The sparsity.
+    pub sparsity: i64,
+
+    /// The precision. This value must only be set for Double and Decimal128 fields.
+    pub precision: Option<i32>,
+}
+
 impl<'a, Mode> Encrypt<'a, Mode> {
     option_setters!(options: EncryptOptions;
         contention_factor: i64,
+        range_options: RangeOptions,
     );
 }
 
@@ -95,14 +143,6 @@ impl<'a> Encrypt<'a, Value> {
     /// Set the [`EncryptOptions::query_type`] option.
     pub fn query_type(mut self, value: impl Into<String>) -> Self {
         self.options().query_type = Some(value.into());
-        self
-    }
-}
-
-impl<'a> Encrypt<'a, Expression> {
-    /// Set the [`EncryptOptions::range_options`] option.
-    pub fn range_options(mut self, value: RangeOptions) -> Self {
-        self.options().range_options = Some(value);
         self
     }
 }

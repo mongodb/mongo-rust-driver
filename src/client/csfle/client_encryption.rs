@@ -3,25 +3,11 @@
 mod create_data_key;
 mod encrypt;
 
-use mongocrypt::{
-    ctx::{Algorithm, CtxBuilder, KmsProvider},
-    Crypt,
-};
+use mongocrypt::{ctx::KmsProvider, Crypt};
 use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
-use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{
-        doc,
-        spec::BinarySubtype,
-        Binary,
-        Bson,
-        Document,
-        RawBinaryRef,
-        RawBson,
-        RawDocumentBuf,
-    },
+    bson::{doc, spec::BinarySubtype, Binary, Bson, Document, RawBinaryRef, RawDocumentBuf},
     client::options::TlsOptions,
     coll::options::CollectionOptions,
     db::options::CreateCollectionOptions,
@@ -36,6 +22,8 @@ use crate::{
 };
 
 use super::{options::KmsProviders, state_machine::CryptExecutor};
+
+pub use crate::action::csfle::encrypt::{EncryptKey, RangeOptions};
 
 /// A handle to the key vault.  Used to create data encryption keys, and to explicitly encrypt and
 /// decrypt values when auto-encryption is not an option.
@@ -176,154 +164,6 @@ impl ClientEncryption {
         self.key_vault
             .find_one(doc! { "keyAltNames": key_alt_name.as_ref() }, None)
             .await
-    }
-
-    /// Encrypts a BsonValue with a given key and algorithm.
-    /// `EncryptAction::run` returns a `Binary` (subtype 6) containing the encrypted value.
-    ///
-    /// To insert or query with an "Indexed" encrypted payload, use a `Client` configured with
-    /// `AutoEncryptionOptions`. `AutoEncryptionOptions.bypass_query_analysis` may be true.
-    /// `AutoEncryptionOptions.bypass_auto_encryption` must be false.
-    ///
-    /// The returned `EncryptAction` must be executed via `run`, e.g.
-    /// ```no_run
-    /// # use mongocrypt::ctx::Algorithm;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
-    /// # async fn func() -> Result<()> {
-    /// # let client_encryption: ClientEncryption = todo!();
-    /// # let key = String::new();
-    /// let encrypted = client_encryption
-    ///     .encrypt(
-    ///         "plaintext",
-    ///         key,
-    ///         Algorithm::AeadAes256CbcHmacSha512Deterministic,
-    ///     )
-    ///     .contention_factor(10)
-    ///     .run().await?;
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn encrypt(
-        &self,
-        value: impl Into<bson::RawBson>,
-        key: impl Into<EncryptKey>,
-        algorithm: Algorithm,
-    ) -> EncryptAction {
-        EncryptAction {
-            client_enc: self,
-            value: value.into(),
-            opts: EncryptOptions {
-                key: key.into(),
-                algorithm,
-                contention_factor: None,
-                query_type: None,
-                range_options: None,
-            },
-        }
-    }
-
-    /// NOTE: This method is experimental only. It is not intended for public use.
-    ///
-    /// Encrypts a match or aggregate expression with the given key.
-    /// `EncryptExpressionAction::run` returns a [`Document`] containing the encrypted expression.
-    ///
-    /// The expression will be encrypted using the [`Algorithm::RangePreview`] algorithm and the
-    /// "rangePreview" query type.
-    ///
-    /// The returned `EncryptExpressionAction` must be executed via `run`, e.g.
-    /// ```no_run
-    /// # use mongocrypt::ctx::Algorithm;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
-    /// # use bson::rawdoc;
-    /// # async fn func() -> Result<()> {
-    /// # let client_encryption: ClientEncryption = todo!();
-    /// # let key = String::new();
-    /// let expression  = rawdoc! {
-    ///     "$and": [
-    ///         { "field": { "$gte": 5 } },
-    ///         { "field": { "$lte": 10 } },
-    ///     ]
-    /// };
-    /// let encrypted_expression = client_encryption
-    ///     .encrypt_expression(
-    ///         expression,
-    ///         key,
-    ///     )
-    ///     .contention_factor(10)
-    ///     .run().await?;
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn encrypt_expression(
-        &self,
-        expression: RawDocumentBuf,
-        key: impl Into<EncryptKey>,
-    ) -> EncryptExpressionAction {
-        EncryptExpressionAction {
-            client_enc: self,
-            value: expression,
-            opts: EncryptOptions {
-                key: key.into(),
-                algorithm: Algorithm::RangePreview,
-                contention_factor: None,
-                query_type: Some("rangePreview".into()),
-                range_options: None,
-            },
-        }
-    }
-
-    async fn encrypt_final(&self, value: RawBson, opts: EncryptOptions) -> Result<Binary> {
-        let builder = self.get_ctx_builder(&opts)?;
-        let ctx = builder.build_explicit_encrypt(value)?;
-        let result = self.exec.run_ctx(ctx, None).await?;
-        let bin_ref = result
-            .get_binary("v")
-            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-        Ok(bin_ref.to_binary())
-    }
-
-    async fn encrypt_expression_final(
-        &self,
-        value: RawDocumentBuf,
-        opts: EncryptOptions,
-    ) -> Result<Document> {
-        let builder = self.get_ctx_builder(&opts)?;
-        let ctx = builder.build_explicit_encrypt_expression(value)?;
-        let result = self.exec.run_ctx(ctx, None).await?;
-        let doc_ref = result
-            .get_document("v")
-            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-        let doc = doc_ref
-            .to_owned()
-            .to_document()
-            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-        Ok(doc)
-    }
-
-    fn get_ctx_builder(&self, opts: &EncryptOptions) -> Result<CtxBuilder> {
-        let mut builder = self.crypt.ctx_builder();
-        match &opts.key {
-            EncryptKey::Id(id) => {
-                builder = builder.key_id(&id.bytes)?;
-            }
-            EncryptKey::AltName(name) => {
-                builder = builder.key_alt_name(name)?;
-            }
-        }
-        builder = builder.algorithm(opts.algorithm)?;
-        if let Some(factor) = opts.contention_factor {
-            builder = builder.contention_factor(factor)?;
-        }
-        if let Some(qtype) = &opts.query_type {
-            builder = builder.query_type(qtype)?;
-        }
-        if let Some(range_options) = &opts.range_options {
-            let options_doc = bson::to_document(range_options)?;
-            builder = builder.range_options(options_doc)?;
-        }
-        Ok(builder)
     }
 
     /// Decrypts an encrypted value (BSON binary of subtype 6).
@@ -472,121 +312,3 @@ impl MasterKey {
 // pub struct RewrapManyDataKeyResult {
 // pub bulk_write_result: Option<BulkWriteResult>,
 // }
-
-/// The options for explicit encryption.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub(crate) struct EncryptOptions {
-    pub(crate) key: EncryptKey,
-    pub(crate) algorithm: Algorithm,
-    pub(crate) contention_factor: Option<i64>,
-    pub(crate) query_type: Option<String>,
-    pub(crate) range_options: Option<RangeOptions>,
-}
-
-/// NOTE: These options are experimental and not intended for public use.
-///
-/// The index options for a Queryable Encryption field supporting "rangePreview" queries.
-/// The options set must match the values set in the encryptedFields of the destination collection.
-#[skip_serializing_none]
-#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
-#[non_exhaustive]
-pub struct RangeOptions {
-    /// The minimum value. This option must be set if `precision` is set.
-    pub min: Option<Bson>,
-
-    /// The maximum value. This option must be set if `precision` is set.
-    pub max: Option<Bson>,
-
-    /// The sparsity.
-    pub sparsity: i64,
-
-    /// The precision. This value must only be set for Double and Decimal128 fields.
-    pub precision: Option<i32>,
-}
-
-/// A pending `ClientEncryption::encrypt` action.
-pub struct EncryptAction<'a> {
-    client_enc: &'a ClientEncryption,
-    value: bson::RawBson,
-    opts: EncryptOptions,
-}
-
-impl<'a> EncryptAction<'a> {
-    /// Execute the encryption.
-    pub async fn run(self) -> Result<Binary> {
-        self.client_enc.encrypt_final(self.value, self.opts).await
-    }
-
-    /// Set the contention factor.
-    pub fn contention_factor(mut self, factor: impl Into<Option<i64>>) -> Self {
-        self.opts.contention_factor = factor.into();
-        self
-    }
-
-    /// Set the query type.
-    pub fn query_type(mut self, qtype: impl Into<String>) -> Self {
-        self.opts.query_type = Some(qtype.into());
-        self
-    }
-
-    /// NOTE: This method is experimental and not intended for public use.
-    ///
-    /// Set the range options. This method should only be called when the algorithm is
-    /// [`Algorithm::RangePreview`].
-    pub fn range_options(mut self, range_options: impl Into<Option<RangeOptions>>) -> Self {
-        self.opts.range_options = range_options.into();
-        self
-    }
-}
-
-/// A pending `ClientEncryption::encrypt_expression` action.
-pub struct EncryptExpressionAction<'a> {
-    client_enc: &'a ClientEncryption,
-    value: RawDocumentBuf,
-    opts: EncryptOptions,
-}
-
-impl<'a> EncryptExpressionAction<'a> {
-    /// Execute the encryption of the expression.
-    pub async fn run(self) -> Result<Document> {
-        self.client_enc
-            .encrypt_expression_final(self.value, self.opts)
-            .await
-    }
-
-    /// Set the contention factor.
-    pub fn contention_factor(mut self, factor: impl Into<Option<i64>>) -> Self {
-        self.opts.contention_factor = factor.into();
-        self
-    }
-
-    /// Set the range options.
-    pub fn range_options(mut self, range_options: impl Into<Option<RangeOptions>>) -> Self {
-        self.opts.range_options = range_options.into();
-        self
-    }
-}
-
-/// An encryption key reference.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum EncryptKey {
-    /// Find the key by _id value.
-    Id(Binary),
-    /// Find the key by alternate name.
-    AltName(String),
-}
-
-impl From<Binary> for EncryptKey {
-    fn from(bin: Binary) -> Self {
-        Self::Id(bin)
-    }
-}
-
-impl From<String> for EncryptKey {
-    fn from(s: String) -> Self {
-        Self::AltName(s)
-    }
-}

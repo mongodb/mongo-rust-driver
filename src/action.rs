@@ -5,7 +5,7 @@ mod count;
 mod create_collection;
 mod create_index;
 #[cfg(feature = "in-use-encryption-unstable")]
-pub(crate) mod csfle;
+pub mod csfle;
 mod delete;
 mod distinct;
 mod drop;
@@ -27,8 +27,6 @@ use bson::Document;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
 pub use create_index::CreateIndex;
-#[cfg(feature = "in-use-encryption-unstable")]
-pub use csfle::*;
 pub use delete::Delete;
 pub use distinct::Distinct;
 pub use drop::{DropCollection, DropDatabase};
