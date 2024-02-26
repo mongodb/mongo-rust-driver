@@ -1,8 +1,8 @@
 use bson::RawDocumentBuf;
 use mongocrypt::ctx::Algorithm;
 
-use crate::client_encryption::{ClientEncryption, EncryptKey, RangeOptions};
 use super::super::option_setters;
+use crate::client_encryption::{ClientEncryption, EncryptKey, RangeOptions};
 
 impl ClientEncryption {
     /// Encrypts a BsonValue with a given key and algorithm.
@@ -20,7 +20,9 @@ impl ClientEncryption {
     ) -> Encrypt {
         Encrypt {
             client_enc: self,
-            mode: Value { value: value.into() },
+            mode: Value {
+                value: value.into(),
+            },
             key: key.into(),
             algorithm,
             options: None,

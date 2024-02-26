@@ -1,9 +1,15 @@
 use bson::{Binary, Document};
 use mongocrypt::ctx::{Algorithm, CtxBuilder};
 
-use crate::action::{action_impl, Encrypt, EncryptOptions};
-use crate::action::csfle::encrypt::{Expression, Value};
-use crate::error::{Error, Result};
+use crate::{
+    action::{
+        action_impl,
+        csfle::encrypt::{Expression, Value},
+        Encrypt,
+        EncryptOptions,
+    },
+    error::{Error, Result},
+};
 
 use super::{ClientEncryption, EncryptKey};
 
@@ -38,7 +44,7 @@ action_impl! {
                 .to_owned()
                 .to_document()
                 .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-            Ok(doc)    
+            Ok(doc)
         }
     }
 }
