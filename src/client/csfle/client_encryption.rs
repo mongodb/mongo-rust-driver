@@ -7,17 +7,15 @@ use mongocrypt::{ctx::KmsProvider, Crypt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bson::{doc, spec::BinarySubtype, Binary, Bson, Document, RawBinaryRef, RawDocumentBuf},
+    bson::{doc, spec::BinarySubtype, Binary, RawBinaryRef, RawDocumentBuf},
     client::options::TlsOptions,
     coll::options::CollectionOptions,
-    db::options::CreateCollectionOptions,
     error::{Error, Result},
     options::{ReadConcern, WriteConcern},
     results::DeleteResult,
     Client,
     Collection,
     Cursor,
-    Database,
     Namespace,
 };
 
@@ -185,59 +183,6 @@ impl ClientEncryption {
             .get("v")?
             .ok_or_else(|| Error::internal("invalid decryption result"))?
             .to_raw_bson())
-    }
-
-    /// Creates a new collection with encrypted fields, automatically creating new data encryption
-    /// keys when needed based on the configured [`CreateCollectionOptions::encrypted_fields`].
-    ///
-    /// Returns the potentially updated `encrypted_fields` along with status, as keys may have been
-    /// created even when a failure occurs.
-    ///
-    /// Does not affect any auto encryption settings on existing MongoClients that are already
-    /// configured with auto encryption.
-    pub async fn create_encrypted_collection(
-        &self,
-        db: &Database,
-        name: impl AsRef<str>,
-        master_key: MasterKey,
-        options: CreateCollectionOptions,
-    ) -> (Document, Result<()>) {
-        let ef = match options.encrypted_fields.as_ref() {
-            Some(ef) => ef,
-            None => {
-                return (
-                    doc! {},
-                    Err(Error::invalid_argument(
-                        "no encrypted_fields defined for collection",
-                    )),
-                );
-            }
-        };
-        let mut ef_prime = ef.clone();
-        if let Ok(fields) = ef_prime.get_array_mut("fields") {
-            for f in fields {
-                let f_doc = if let Some(d) = f.as_document_mut() {
-                    d
-                } else {
-                    continue;
-                };
-                if f_doc.get("keyId") == Some(&Bson::Null) {
-                    let d = match self.create_data_key(master_key.clone()).await {
-                        Ok(v) => v,
-                        Err(e) => return (ef_prime, Err(e)),
-                    };
-                    f_doc.insert("keyId", d);
-                }
-            }
-        }
-        let mut opts_prime = options.clone();
-        opts_prime.encrypted_fields = Some(ef_prime.clone());
-        (
-            ef_prime,
-            db.create_collection(name.as_ref())
-                .with_options(opts_prime)
-                .await,
-        )
     }
 }
 

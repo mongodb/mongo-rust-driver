@@ -32,7 +32,6 @@ use tokio::net::TcpListener;
 use crate::{
     action::Action,
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
-    db::options::CreateCollectionOptions,
     error::{ErrorKind, WriteError, WriteFailure},
     event::{
         command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
@@ -2967,7 +2966,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     )?;
 
     // Case 1: Simple Creation and Validation
-    let options = CreateCollectionOptions::builder()
+    ce.create_encrypted_collection(&db, "case_1", master_key.clone())
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -2975,8 +2974,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": Bson::Null,
             }],
         })
-        .build();
-    ce.create_encrypted_collection(&db, "case_1", master_key.clone(), options)
         .await
         .1?;
     let coll = db.collection::<Document>("case_1");
@@ -2989,12 +2986,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
 
     // Case 2: Missing encryptedFields
     let result = ce
-        .create_encrypted_collection(
-            &db,
-            "case_2",
-            master_key.clone(),
-            CreateCollectionOptions::default(),
-        )
+        .create_encrypted_collection(&db, "case_2", master_key.clone())
         .await
         .1;
     assert!(
@@ -3004,7 +2996,8 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     );
 
     // Case 3: Invalid keyId
-    let options = CreateCollectionOptions::builder()
+    let result = ce
+        .create_encrypted_collection(&db, "case_1", master_key.clone())
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -3012,9 +3005,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": false,
             }],
         })
-        .build();
-    let result = ce
-        .create_encrypted_collection(&db, "case_1", master_key.clone(), options)
         .await
         .1;
     assert!(
@@ -3024,7 +3014,8 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     );
 
     // Case 4: Insert encrypted value
-    let options = CreateCollectionOptions::builder()
+    let (ef, result) = ce
+        .create_encrypted_collection(&db, "case_4", master_key.clone())
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -3032,9 +3023,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": Bson::Null,
             }],
         })
-        .build();
-    let (ef, result) = ce
-        .create_encrypted_collection(&db, "case_4", master_key.clone(), options)
         .await;
     result?;
     let key = match ef.get_array("fields")?[0]

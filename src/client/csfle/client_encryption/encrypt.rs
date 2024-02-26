@@ -16,8 +16,10 @@ action_impl! {
         type Future = EncryptFuture;
 
         async fn execute(self) -> Result<Binary> {
-            let builder = self.client_enc.get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?;
-            let ctx = builder.build_explicit_encrypt(self.mode.value)?;
+            let ctx = self
+                .client_enc
+                .get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?
+                .build_explicit_encrypt(self.mode.value)?;
             let result = self.client_enc.exec.run_ctx(ctx, None).await?;
             let bin_ref = result
                 .get_binary("v")
