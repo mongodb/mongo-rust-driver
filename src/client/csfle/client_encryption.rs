@@ -1,7 +1,9 @@
 //! Support for explicit encryption.
 
+mod create_data_key;
+
 use mongocrypt::{
-    ctx::{Algorithm, Ctx, CtxBuilder, KmsProvider},
+    ctx::{Algorithm, CtxBuilder, KmsProvider},
     Crypt,
 };
 use serde::{Deserialize, Serialize};
@@ -94,75 +96,6 @@ impl ClientEncryption {
             exec,
             key_vault,
         })
-    }
-
-    /// Creates a new key document and inserts into the key vault collection.
-    /// `CreateDataKeyAction::run` returns a `Binary` (subtype 0x04) with the _id of the created
-    /// document as a UUID.
-    ///
-    /// The returned `CreateDataKeyAction` must be executed via `run`, e.g.
-    /// ```no_run
-    /// # use mongocrypt::ctx::Algorithm;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
-    /// # async fn func() -> Result<()> {
-    /// # let client_encryption: ClientEncryption = todo!();
-    /// # let master_key = todo!();
-    /// let key = client_encryption
-    ///     .create_data_key(master_key)
-    ///     .key_alt_names(["altname1".to_string(), "altname2".to_string()])
-    ///     .run().await?;
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn create_data_key(&self, master_key: MasterKey) -> CreateDataKeyAction {
-        CreateDataKeyAction {
-            client_enc: self,
-            opts: DataKeyOptions {
-                master_key,
-                key_alt_names: None,
-                key_material: None,
-            },
-        }
-    }
-
-    pub(crate) async fn create_data_key_final(
-        &self,
-        kms_provider: &KmsProvider,
-        opts: impl Into<Option<DataKeyOptions>>,
-    ) -> Result<Binary> {
-        let ctx = self.create_data_key_ctx(kms_provider, opts.into().as_ref())?;
-        let data_key = self.exec.run_ctx(ctx, None).await?;
-        self.key_vault.insert_one(&data_key, None).await?;
-        let bin_ref = data_key
-            .get_binary("_id")
-            .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
-        Ok(bin_ref.to_binary())
-    }
-
-    fn create_data_key_ctx(
-        &self,
-        kms_provider: &KmsProvider,
-        opts: Option<&DataKeyOptions>,
-    ) -> Result<Ctx> {
-        let mut builder = self.crypt.ctx_builder();
-        let mut key_doc = doc! { "provider": kms_provider.name() };
-        if let Some(opts) = opts {
-            if !matches!(opts.master_key, MasterKey::Local) {
-                let master_doc = bson::to_document(&opts.master_key)?;
-                key_doc.extend(master_doc);
-            }
-            if let Some(alt_names) = &opts.key_alt_names {
-                for name in alt_names {
-                    builder = builder.key_alt_name(name)?;
-                }
-            }
-            if let Some(material) = &opts.key_material {
-                builder = builder.key_material(material)?;
-            }
-        }
-        builder = builder.key_encryption_key(&key_doc)?;
-        Ok(builder.build_datakey()?)
     }
 
     // pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: impl
@@ -448,7 +381,7 @@ impl ClientEncryption {
                     continue;
                 };
                 if f_doc.get("keyId") == Some(&Bson::Null) {
-                    let d = match self.create_data_key(master_key.clone()).run().await {
+                    let d = match self.create_data_key(master_key.clone()).await {
                         Ok(v) => v,
                         Err(e) => return (ef_prime, Err(e)),
                     };
@@ -464,44 +397,6 @@ impl ClientEncryption {
                 .with_options(opts_prime)
                 .await,
         )
-    }
-}
-
-/// Options for creating a data key.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub(crate) struct DataKeyOptions {
-    pub(crate) master_key: MasterKey,
-    pub(crate) key_alt_names: Option<Vec<String>>,
-    pub(crate) key_material: Option<Vec<u8>>,
-}
-
-/// A pending `ClientEncryption::create_data_key` action.
-pub struct CreateDataKeyAction<'a> {
-    client_enc: &'a ClientEncryption,
-    opts: DataKeyOptions,
-}
-
-impl<'a> CreateDataKeyAction<'a> {
-    /// Execute the pending data key creation.
-    pub async fn run(self) -> Result<Binary> {
-        self.client_enc
-            .create_data_key_final(&self.opts.master_key.provider(), self.opts)
-            .await
-    }
-
-    /// Set an optional list of alternate names that can be used to reference the key.
-    pub fn key_alt_names(mut self, names: impl IntoIterator<Item = String>) -> Self {
-        self.opts.key_alt_names = Some(names.into_iter().collect());
-        self
-    }
-
-    /// Set a buffer of 96 bytes to use as custom key material for the data key being
-    /// created.  If unset, key material for the new data key is generated from a cryptographically
-    /// secure random device.
-    pub fn key_material(mut self, material: impl IntoIterator<Item = u8>) -> Self {
-        self.opts.key_material = Some(material.into_iter().collect());
-        self
     }
 }
 

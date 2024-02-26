@@ -215,7 +215,6 @@ async fn custom_key_material() -> Result<()> {
     let id = enc
         .create_data_key(MasterKey::Local)
         .key_material(key)
-        .run()
         .await?;
     let mut key_doc = datakeys
         .find_one(doc! { "_id": id.clone() }, None)
@@ -334,7 +333,6 @@ async fn data_key_double_encryption() -> Result<()> {
         let datakey_id = client_encryption
             .create_data_key(master_key)
             .key_alt_names([format!("{}_altname", provider.name())])
-            .run()
             .await?;
         assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
         let docs: Vec<_> = client
@@ -1018,7 +1016,6 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
                 .to_string(),
             endpoint,
         })
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
@@ -1075,7 +1072,6 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
                 .to_string(),
             endpoint: Some("kms.us-east-1.amazonaws.com:12345".to_string()),
         })
-        .run()
         .await;
     assert!(result.unwrap_err().is_network_error());
 
@@ -1099,7 +1095,6 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
                 .to_string(),
             endpoint: Some("kms.us-east-2.amazonaws.com".to_string()),
         })
-        .run()
         .await;
     assert!(result.unwrap_err().is_csfle_error());
 
@@ -1123,7 +1118,6 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
                 .to_string(),
             endpoint: Some("doesnotexist.invalid".to_string()),
         })
-        .run()
         .await;
     assert!(result.unwrap_err().is_network_error());
 
@@ -1147,15 +1141,11 @@ async fn custom_endpoint_azure() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let key_id = client_encryption
         .create_data_key(master_key.clone())
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid
-        .create_data_key(master_key)
-        .run()
-        .await;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -1181,15 +1171,11 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let key_id = client_encryption
         .create_data_key(master_key.clone())
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid
-        .create_data_key(master_key)
-        .run()
-        .await;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -1213,7 +1199,7 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
     };
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let result = client_encryption.create_data_key(master_key).run().await;
+    let result = client_encryption.create_data_key(master_key).await;
     let err = result.unwrap_err();
     assert!(err.is_csfle_error());
     assert!(
@@ -1241,15 +1227,11 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let key_id = client_encryption
         .create_data_key(master_key.clone())
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid
-        .create_data_key(master_key)
-        .run()
-        .await;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -1269,7 +1251,7 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
     };
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let key_id = client_encryption.create_data_key(master_key).run().await?;
+    let key_id = client_encryption.create_data_key(master_key).await?;
     validate_roundtrip(&client_encryption, key_id).await
 }
 
@@ -1287,7 +1269,7 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     };
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let result = client_encryption.create_data_key(master_key).run().await;
+    let result = client_encryption.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
@@ -1746,7 +1728,6 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
                 .to_string(),
             endpoint: Some(endpoint.into()),
         })
-        .run()
         .await
         .map(|_| ())
 }
@@ -1875,7 +1856,6 @@ async fn kms_tls_options() -> Result<()> {
     ) -> Result<()> {
         let err = client_encryption
             .create_data_key(master_key)
-            .run()
             .await
             .unwrap_err();
         let err_str = err.to_string();
@@ -2002,7 +1982,6 @@ async fn kms_tls_options() -> Result<()> {
     // This one succeeds!
     client_encryption_with_tls
         .create_data_key(kmip_key.clone())
-        .run()
         .await?;
     provider_test(
         &client_encryption_expired,
@@ -2377,13 +2356,11 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["abc".to_string()])
-        .run()
         .await?;
     // Fails: duplicate key
     let err = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["abc".to_string()])
-        .run()
         .await
         .unwrap_err();
     assert_eq!(
@@ -2396,7 +2373,6 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     let err = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["def".to_string()])
-        .run()
         .await
         .unwrap_err();
     assert_eq!(
@@ -2420,10 +2396,7 @@ async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
     let (client_encryption, key) = unique_index_keyaltnames_setup().await?;
 
     // Succeeds
-    let new_key = client_encryption
-        .create_data_key(MasterKey::Local)
-        .run()
-        .await?;
+    let new_key = client_encryption.create_data_key(MasterKey::Local).await?;
     client_encryption.add_key_alt_name(&new_key, "abc").await?;
     // Still succeeds, has alt name
     let prev_key = client_encryption
@@ -2490,7 +2463,6 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
     let key = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["def".to_string()])
-        .run()
         .await?;
     Ok((client_encryption, key))
 }
@@ -2647,10 +2619,7 @@ impl DecryptionEventsTestdata {
             KV_NAMESPACE.clone(),
             LOCAL_KMS.clone(),
         )?;
-        let key_id = client_encryption
-            .create_data_key(MasterKey::Local)
-            .run()
-            .await?;
+        let key_id = client_encryption.create_data_key(MasterKey::Local).await?;
         let ciphertext = client_encryption
             .encrypt(
                 "hello",
@@ -3517,8 +3486,8 @@ async fn fle2_example() -> Result<()> {
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?;
-    let key1_id = ce.create_data_key(MasterKey::Local).run().await?;
-    let key2_id = ce.create_data_key(MasterKey::Local).run().await?;
+    let key1_id = ce.create_data_key(MasterKey::Local).await?;
+    let key2_id = ce.create_data_key(MasterKey::Local).await?;
 
     // Create an encryptedFieldsMap.
     let encrypted_fields_map = [(
