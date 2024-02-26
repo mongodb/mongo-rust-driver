@@ -5,7 +5,7 @@ mod count;
 mod create_collection;
 mod create_index;
 #[cfg(feature = "in-use-encryption-unstable")]
-mod csfle;
+pub(crate) mod csfle;
 mod delete;
 mod distinct;
 mod drop;

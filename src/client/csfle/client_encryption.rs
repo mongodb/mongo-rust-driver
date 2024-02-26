@@ -1,6 +1,7 @@
 //! Support for explicit encryption.
 
 mod create_data_key;
+mod encrypt;
 
 use mongocrypt::{
     ctx::{Algorithm, CtxBuilder, KmsProvider},
