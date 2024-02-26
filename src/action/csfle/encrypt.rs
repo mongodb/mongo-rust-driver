@@ -50,7 +50,10 @@ impl ClientEncryption {
             mode: Expression { value: expression },
             key: key.into(),
             algorithm: Algorithm::RangePreview,
-            options: None,
+            options: Some(EncryptOptions {
+                query_type: Some("rangePreview".into()),
+                ..Default::default()
+            }),
         }
     }
 }

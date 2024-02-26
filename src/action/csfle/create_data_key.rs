@@ -8,6 +8,7 @@ impl ClientEncryption {
     /// `await` will return `Result<Binary>` (subtype 0x04) with the _id of the created
     /// document as a UUID.
     pub fn create_data_key(&self, master_key: MasterKey) -> CreateDataKey {
+        dbg!("construct");
         CreateDataKey {
             client_enc: self,
             master_key,
