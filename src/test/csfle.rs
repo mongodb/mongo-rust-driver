@@ -2697,7 +2697,6 @@ async fn on_demand_aws_failure() -> Result<()> {
                 .to_string(),
             endpoint: None,
         })
-        .run()
         .await;
     assert!(result.is_err(), "Expected error, got {:?}", result);
 
@@ -2724,7 +2723,6 @@ async fn on_demand_aws_success() -> Result<()> {
             .to_string(),
         endpoint: None,
     })
-    .run()
     .await?;
 
     Ok(())
@@ -2753,7 +2751,6 @@ async fn on_demand_gcp_credentials() -> Result<()> {
             key_version: None,
             endpoint: None,
         })
-        .run()
         .await;
 
     if std::env::var("ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED").is_ok() {
@@ -2865,7 +2862,6 @@ async fn azure_imds_integration_failure() -> Result<()> {
             key_name: "KEY-NAME".to_string(),
             key_version: None,
         })
-        .run()
         .await;
 
     assert!(result.is_err(), "expected error, got {:?}", result);
