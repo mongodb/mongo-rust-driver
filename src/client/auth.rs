@@ -3,6 +3,7 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
+#[cfg(feature = "oidc-auth")]
 pub(crate) mod oidc;
 mod plain;
 mod sasl;
@@ -89,6 +90,7 @@ pub enum AuthMechanism {
 
     /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.  NOTE: this is not supported by the Rust driver.
     // TODO RUST-1497: remove the NOTE.
+    #[cfg(feature = "oidc-auth")]
     MongoDbOidc,
 }
 
@@ -183,6 +185,7 @@ impl AuthMechanism {
 
                 Ok(())
             }
+            #[cfg(feature = "oidc-auth")]
             AuthMechanism::MongoDbOidc => {
                 let is_automatic = credential
                     .mechanism_properties
@@ -225,6 +228,7 @@ impl AuthMechanism {
             AuthMechanism::Plain => PLAIN_STR,
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => MONGODB_AWS_STR,
+            #[cfg(feature = "oidc-auth")]
             AuthMechanism::MongoDbOidc => MONGODB_OIDC_STR,
         }
     }
@@ -238,6 +242,7 @@ impl AuthMechanism {
             }
             AuthMechanism::MongoDbX509 => "$external",
             AuthMechanism::Plain => uri_db.unwrap_or("$external"),
+            #[cfg(feature = "oidc-auth")]
             AuthMechanism::MongoDbOidc => "$external",
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => "$external",
@@ -267,6 +272,7 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
+            #[cfg(feature = "oidc-auth")]
             Self::MongoDbOidc => Ok(None),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
@@ -319,6 +325,7 @@ impl AuthMechanism {
                     .into(),
             }
             .into()),
+            #[cfg(feature = "oidc-auth")]
             AuthMechanism::MongoDbOidc => {
                 oidc::authenticate_stream(stream, credential, server_api).await
             }
@@ -341,8 +348,15 @@ impl FromStr for AuthMechanism {
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
+            #[cfg(feature = "oidc-auth")]
             MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
-
+            #[cfg(not(feature = "oidc-auth"))]
+            MONGODB_OIDC_STR => Err(ErrorKind::InvalidArgument {
+                message: "MONGODB-OIDC auth is only supported with the oidc-auth feature flag and \
+                          the tokio runtime"
+                    .into(),
+            }
+            .into()),
             #[cfg(feature = "aws-auth")]
             MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
             #[cfg(not(feature = "aws-auth"))]
@@ -389,11 +403,27 @@ pub struct Credential {
     /// Additional properties for the given mechanism.
     pub mechanism_properties: Option<Document>,
 
-    /// The token callbacks for OIDC authentication.
+    /// The token callback for OIDC authentication.
     /// TODO RUST-1497: make this `pub`
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
+    #[cfg(feature = "oidc-auth")]
+    pub(crate) oidc_callback: Option<oidc::Callback>,
+
+    /// TODO RUST-1497: make this `pub`
+    /// Cache is a cache of saved information used by some authentication mechanisms
+    #[serde(skip)]
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    pub(crate) cache: Option<Cache>,
+}
+
+/// An enum representing the different types of caches that can be used by authentication
+/// mechanisms.
+/// TODO RUST-1497: make this `pub`
+#[derive(Clone, Debug)]
+pub(crate) enum Cache {
+    #[cfg(feature = "oidc-auth")]
+    Oidc(oidc::Cache),
 }
 
 impl Credential {
@@ -415,7 +445,7 @@ impl Credential {
         }
     }
 
-    /// Attempts to authenticate a stream according this credential, returning an error
+    /// Attempts to authenticate a stream according to this credential, returning an error
     /// result on failure. A mechanism may be negotiated if one is not provided as part of the
     /// credential.
     pub(crate) async fn authenticate_stream(
