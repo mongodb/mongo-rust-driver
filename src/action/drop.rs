@@ -24,7 +24,7 @@ impl Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
     ///
@@ -82,7 +82,7 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Drops the collection, deleting all data and indexes stored in it.
     ///

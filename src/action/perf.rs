@@ -18,7 +18,7 @@ impl Client {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Client {
     /// Add connections to the connection pool up to `min_pool_size`.  This is normally not needed -
     /// the connection pool will be filled in the background, and new connections created as needed

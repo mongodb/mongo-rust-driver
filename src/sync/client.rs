@@ -14,7 +14,7 @@ use crate::{
 /// such as servers being added or removed.
 ///
 /// `Client` is a wrapper around the asynchronous [`mongodb::Client`](../struct.Client.html), and it
-/// starts up an async-std runtime internally to run that wrapped client on.
+/// starts up a tokio runtime internally to run that wrapped client on.
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:

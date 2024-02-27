@@ -49,7 +49,7 @@ impl Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Gets information about each of the collections in the database.
     ///

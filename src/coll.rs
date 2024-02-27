@@ -52,12 +52,7 @@ use crate::{
 /// #     bson::doc,
 /// #     error::Result,
 /// # };
-/// # #[cfg(feature = "async-std-runtime")]
-/// # use async_std::task;
-/// # #[cfg(feature = "tokio-runtime")]
-/// # use tokio::task;
 /// #
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// # use mongodb::Client;
 /// #
@@ -77,7 +72,7 @@ use crate::{
 ///     let coll_ref = coll.clone();
 ///
 ///     // Spawn several tasks that operate on the same collection concurrently.
-///     task::spawn(async move {
+///     tokio::task::spawn(async move {
 ///         // Perform operations with `coll_ref` that work with directly our model.
 ///         coll_ref.insert_one(Item { id: i }, None).await;
 ///     });

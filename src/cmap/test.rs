@@ -425,8 +425,7 @@ impl Matchable for CmapEvent {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cmap_spec_tests() {
     async fn run_cmap_spec_tests(test_file: TestFile) {
         if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {

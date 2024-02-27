@@ -78,40 +78,18 @@ mod unix {
     #[derive(Debug)]
     pub(crate) enum AsyncUnixStream {
         /// Wrapper around `tokio::net:UnixStream`.
-        #[cfg(feature = "tokio-runtime")]
         Tokio(tokio::net::UnixStream),
-
-        /// Wrapper around `async_std::net::UnixStream`.
-        #[cfg(feature = "async-std-runtime")]
-        AsyncStd(async_std::os::unix::net::UnixStream),
     }
 
-    #[cfg(feature = "tokio-runtime")]
     impl From<tokio::net::UnixStream> for AsyncUnixStream {
         fn from(stream: tokio::net::UnixStream) -> Self {
             Self::Tokio(stream)
         }
     }
 
-    #[cfg(feature = "async-std-runtime")]
-    impl From<async_std::os::unix::net::UnixStream> for AsyncUnixStream {
-        fn from(stream: async_std::os::unix::net::UnixStream) -> Self {
-            Self::AsyncStd(stream)
-        }
-    }
-
     impl AsyncUnixStream {
-        #[cfg(feature = "tokio-runtime")]
         async fn try_connect(address: &Path) -> Result<Self> {
             use tokio::net::UnixStream;
-
-            let stream = UnixStream::connect(address).await?;
-            Ok(stream.into())
-        }
-
-        #[cfg(feature = "async-std-runtime")]
-        async fn try_connect(address: &Path) -> Result<Self> {
-            use async_std::os::unix::net::UnixStream;
 
             let stream = UnixStream::connect(address).await?;
             Ok(stream.into())
@@ -137,15 +115,7 @@ mod unix {
             buf: &mut ReadBuf,
         ) -> Poll<tokio::io::Result<()>> {
             match self.deref_mut() {
-                #[cfg(feature = "tokio-runtime")]
                 Self::Tokio(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
-
-                #[cfg(feature = "async-std-runtime")]
-                Self::AsyncStd(ref mut inner) => {
-                    use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                    Pin::new(&mut inner.compat()).poll_read(cx, buf)
-                }
             }
         }
     }
@@ -157,29 +127,13 @@ mod unix {
             buf: &[u8],
         ) -> Poll<tokio::io::Result<usize>> {
             match self.deref_mut() {
-                #[cfg(feature = "tokio-runtime")]
                 Self::Tokio(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
-
-                #[cfg(feature = "async-std-runtime")]
-                Self::AsyncStd(ref mut inner) => {
-                    use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                    Pin::new(&mut inner.compat()).poll_write(cx, buf)
-                }
             }
         }
 
         fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
             match self.deref_mut() {
-                #[cfg(feature = "tokio-runtime")]
                 Self::Tokio(ref mut inner) => Pin::new(inner).poll_flush(cx),
-
-                #[cfg(feature = "async-std-runtime")]
-                Self::AsyncStd(ref mut inner) => {
-                    use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                    Pin::new(&mut inner.compat()).poll_flush(cx)
-                }
             }
         }
 
@@ -188,15 +142,7 @@ mod unix {
             cx: &mut Context,
         ) -> Poll<tokio::io::Result<()>> {
             match self.deref_mut() {
-                #[cfg(feature = "tokio-runtime")]
                 Self::Tokio(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
-
-                #[cfg(feature = "async-std-runtime")]
-                Self::AsyncStd(ref mut inner) => {
-                    use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                    Pin::new(&mut inner.compat()).poll_shutdown(cx)
-                }
             }
         }
 
@@ -206,25 +152,13 @@ mod unix {
             bufs: &[futures_io::IoSlice<'_>],
         ) -> Poll<std::result::Result<usize, std::io::Error>> {
             match self.get_mut() {
-                #[cfg(feature = "tokio-runtime")]
                 Self::Tokio(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-
-                #[cfg(feature = "async-std-runtime")]
-                Self::AsyncStd(ref mut inner) => {
-                    use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                    Pin::new(&mut inner.compat()).poll_write_vectored(cx, bufs)
-                }
             }
         }
 
         fn is_write_vectored(&self) -> bool {
             match self {
-                #[cfg(feature = "tokio-runtime")]
                 Self::Tokio(ref inner) => inner.is_write_vectored(),
-
-                #[cfg(feature = "async-std-runtime")]
-                Self::AsyncStd(_) => false,
             }
         }
     }
@@ -234,30 +168,16 @@ mod unix {
 #[derive(Debug)]
 pub(crate) enum AsyncTcpStream {
     /// Wrapper around `tokio::net:TcpStream`.
-    #[cfg(feature = "tokio-runtime")]
     Tokio(tokio::net::TcpStream),
-
-    /// Wrapper around `async_std::net::TcpStream`.
-    #[cfg(feature = "async-std-runtime")]
-    AsyncStd(async_std::net::TcpStream),
 }
 
-#[cfg(feature = "tokio-runtime")]
 impl From<tokio::net::TcpStream> for AsyncTcpStream {
     fn from(stream: tokio::net::TcpStream) -> Self {
         Self::Tokio(stream)
     }
 }
 
-#[cfg(feature = "async-std-runtime")]
-impl From<async_std::net::TcpStream> for AsyncTcpStream {
-    fn from(stream: async_std::net::TcpStream) -> Self {
-        Self::AsyncStd(stream)
-    }
-}
-
 impl AsyncTcpStream {
-    #[cfg(feature = "tokio-runtime")]
     async fn try_connect(address: &SocketAddr) -> Result<Self> {
         use tokio::net::TcpStream;
 
@@ -269,23 +189,6 @@ impl AsyncTcpStream {
         socket.set_tcp_keepalive(&conf)?;
         let std_stream = std::net::TcpStream::from(socket);
         let stream = TcpStream::from_std(std_stream)?;
-
-        Ok(stream.into())
-    }
-
-    #[cfg(feature = "async-std-runtime")]
-    async fn try_connect(address: &SocketAddr) -> Result<Self> {
-        use async_std::net::TcpStream;
-
-        let stream = TcpStream::connect(address).await?;
-        stream.set_nodelay(true)?;
-
-        let std_stream: std::net::TcpStream = stream.try_into()?;
-        let socket = socket2::Socket::from(std_stream);
-        let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
-        socket.set_tcp_keepalive(&conf)?;
-        let std_stream = std::net::TcpStream::from(socket);
-        let stream = TcpStream::from(std_stream);
 
         Ok(stream.into())
     }
@@ -405,15 +308,7 @@ impl AsyncRead for AsyncTcpStream {
         buf: &mut ReadBuf,
     ) -> Poll<tokio::io::Result<()>> {
         match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut inner) => {
-                use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                Pin::new(&mut inner.compat()).poll_read(cx, buf)
-            }
         }
     }
 }
@@ -425,43 +320,19 @@ impl AsyncWrite for AsyncTcpStream {
         buf: &[u8],
     ) -> Poll<tokio::io::Result<usize>> {
         match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut inner) => {
-                use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                Pin::new(&mut inner.compat()).poll_write(cx, buf)
-            }
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
         match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut inner) => Pin::new(inner).poll_flush(cx),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut inner) => {
-                use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                Pin::new(&mut inner.compat()).poll_flush(cx)
-            }
         }
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
         match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut inner) => {
-                use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                Pin::new(&mut inner.compat()).poll_shutdown(cx)
-            }
         }
     }
 
@@ -471,25 +342,13 @@ impl AsyncWrite for AsyncTcpStream {
         bufs: &[futures_io::IoSlice<'_>],
     ) -> Poll<std::result::Result<usize, std::io::Error>> {
         match self.get_mut() {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut inner) => {
-                use tokio_util::compat::FuturesAsyncReadCompatExt;
-
-                Pin::new(&mut inner.compat()).poll_write_vectored(cx, bufs)
-            }
         }
     }
 
     fn is_write_vectored(&self) -> bool {
         match self {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref inner) => inner.is_write_vectored(),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(_) => false,
         }
     }
 }

@@ -3,8 +3,7 @@ use crate::test::spec::{
     ExpectedEventType,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     // The Rust driver's asynchronous check-in of connections means that sometimes a new
     // connection will be created, rather than re-using an existing one; the connectionReady

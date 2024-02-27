@@ -61,7 +61,7 @@ impl Client {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Client {
     /// Shut down this `Client`, terminating background thread workers and closing connections.
     /// Using this method is not required under most circumstances (resources will be cleaned up in

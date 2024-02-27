@@ -196,8 +196,7 @@ macro_rules! for_each_op {
 
 /// Prose test 1 from sessions spec.
 /// This test also satisifies the `endSession` testing requirement of prose test 5.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn pool_is_lifo() {
     let client = TestClient::new().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
@@ -229,8 +228,7 @@ async fn pool_is_lifo() {
 }
 
 /// Prose test 2 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn cluster_time_in_commands() {
     let test_client = TestClient::new().await;
@@ -381,8 +379,7 @@ async fn cluster_time_in_commands() {
 }
 
 /// Prose test 3 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn session_usage() {
     let client = TestClient::new().await;
@@ -409,8 +406,7 @@ async fn session_usage() {
 }
 
 /// Prose test 7 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
     let client = EventClient::new().await;
@@ -450,8 +446,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 }
 
 /// Prose test 8 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
     let client = EventClient::new().await;
@@ -500,8 +495,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 }
 
 /// Prose test 10 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
     let client = EventClient::new().await;

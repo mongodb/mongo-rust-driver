@@ -48,8 +48,7 @@ async fn run_test<F: Future>(
     test(client, db, coll).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn get_more() {
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
@@ -107,8 +106,7 @@ async fn get_more() {
     run_test("get_more", get_more_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn notwritableprimary_keep_pool() {
     async fn notwritableprimary_keep_pool_test(
         client: EventClient,
@@ -158,8 +156,7 @@ async fn notwritableprimary_keep_pool() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn notwritableprimary_reset_pool() {
     async fn notwritableprimary_reset_pool_test(
         client: EventClient,
@@ -211,8 +208,7 @@ async fn notwritableprimary_reset_pool() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn shutdown_in_progress() {
     async fn shutdown_in_progress_test(
         client: EventClient,
@@ -257,8 +253,7 @@ async fn shutdown_in_progress() {
     run_test("shutdown_in_progress", shutdown_in_progress_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn interrupted_at_shutdown() {
     async fn interrupted_at_shutdown_test(
         client: EventClient,

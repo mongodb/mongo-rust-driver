@@ -96,10 +96,7 @@ impl TestRunner {
     }
 
     pub(crate) async fn new_with_connection_string(connection_string: &str) -> Self {
-        #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
         let options = ClientOptions::parse(connection_string).await.unwrap();
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        let options = ClientOptions::parse(connection_string).unwrap();
         Self {
             internal_client: TestClient::with_options(Some(options)).await,
             entities: Arc::new(RwLock::new(EntityMap::new())),

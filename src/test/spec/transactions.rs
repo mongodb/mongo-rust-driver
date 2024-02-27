@@ -19,8 +19,7 @@ use crate::{
     Collection,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_legacy() {
     run_v2_tests(&["transactions", "legacy"])
         // TODO RUST-582: unskip this file
@@ -28,15 +27,13 @@ async fn run_legacy() {
         .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_legacy_convenient_api() {
     run_v2_tests(&["transactions-convenient-api"]).await;
 }
 
 // TODO RUST-902: Reduce transactionLifetimeLimitSeconds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     run_unified_tests(&["transactions", "unified"])
         // TODO RUST-1656: unskip these files
@@ -45,8 +42,7 @@ async fn run_unified() {
 }
 
 // This test checks that deserializing an operation correctly still retrieves the recovery token.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 async fn deserialize_recovery_token() {
     #[derive(Debug, Serialize)]
@@ -97,8 +93,7 @@ async fn deserialize_recovery_token() {
     assert!(session.transaction.recovery_token.is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn convenient_api_custom_error() {
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
@@ -132,8 +127,7 @@ async fn convenient_api_custom_error() {
     assert_eq!(&["find", "abortTransaction"], &commands[..]);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn convenient_api_returned_value() {
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
@@ -163,8 +157,7 @@ async fn convenient_api_returned_value() {
     assert_eq!(42, value);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
@@ -198,8 +191,7 @@ async fn convenient_api_retry_timeout_callback() {
     assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_timeout_commit_unknown() {
     let mut options = get_client_options().await.clone();
     if Client::test_builder().build().await.is_sharded() {
@@ -253,8 +245,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     assert_eq!(Some(251), err.sdam_code());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_timeout_commit_transient() {
     let mut options = get_client_options().await.clone();
     if Client::test_builder().build().await.is_sharded() {

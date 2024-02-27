@@ -12,8 +12,7 @@ use crate::{
 };
 
 // Test that creating indexes works as expected.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn index_management_creates() {
     let client = TestClient::new().await;
@@ -59,8 +58,7 @@ async fn index_management_creates() {
 }
 
 // Test that creating a duplicate index works as expected.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn index_management_handles_duplicates() {
     let client = TestClient::new().await;
@@ -99,8 +97,7 @@ async fn index_management_handles_duplicates() {
 }
 
 // Test that listing indexes works as expected.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn index_management_lists() {
     let client = TestClient::new().await;
@@ -161,8 +158,7 @@ async fn index_management_lists() {
 }
 
 // Test that dropping indexes works as expected.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn index_management_drops() {
     let client = TestClient::new().await;
@@ -206,8 +202,7 @@ async fn index_management_drops() {
 }
 
 // Test that index management commands execute the expected database commands.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn index_management_executes_commands() {
     let client = EventClient::new().await;
@@ -253,8 +248,7 @@ async fn index_management_executes_commands() {
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 2);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn commit_quorum_error() {
     let client = TestClient::new().await;

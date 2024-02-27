@@ -13,15 +13,13 @@ use crate::{
 type Result<T> = anyhow::Result<T>;
 
 // Prose test 1.1 Single Principal Implicit Username
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn single_principal_implicit_username() -> Result<()> {
     if std::env::var("OIDC_TOKEN_DIR").is_err() {
         log_uncaptured("Skipping OIDC test");
         return Ok(());
     }
-    let mut opts =
-        ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
+    let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.credential = Some(Credential {
         mechanism: Some(AuthMechanism::MongoDbOidc),
         oidc_callbacks: Some(oidc::Callbacks::new(|_info, _params| {

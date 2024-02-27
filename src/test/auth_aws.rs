@@ -4,8 +4,7 @@ use crate::{bson::Document, client::auth::aws::test_utils::*, test::DEFAULT_URI,
 
 use super::TestClient;
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn auth_aws() {
     let client = TestClient::new().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
@@ -19,8 +18,7 @@ async fn get_client() -> Client {
     Client::with_uri_str(DEFAULT_URI.clone()).await.unwrap()
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn credential_caching() {
     // This test should only be run when authenticating using AWS endpoints.
     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
@@ -60,8 +58,7 @@ async fn credential_caching() {
     assert!(cached_credential().await.is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn credential_caching_environment_vars() {
     // This test should only be run when authenticating using AWS endpoints.
     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {

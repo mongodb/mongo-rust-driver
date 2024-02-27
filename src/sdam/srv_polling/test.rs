@@ -67,8 +67,7 @@ fn make_lookup_hosts(hosts: Vec<ServerAddress>) -> Result<LookupHosts> {
 }
 
 // If a new DNS record is returned, it should be reflected in the topology.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn add_new_dns_record() {
     let hosts = vec![
         localhost_test_build_10gen(27017),
@@ -80,8 +79,7 @@ async fn add_new_dns_record() {
 }
 
 // If a DNS record is no longer returned, it should be reflected in the topology.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn remove_dns_record() {
     let hosts = vec![localhost_test_build_10gen(27017)];
 
@@ -89,8 +87,7 @@ async fn remove_dns_record() {
 }
 
 // If a single DNS record is replaced, it should be reflected in the topology.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn replace_single_dns_record() {
     let hosts = vec![
         localhost_test_build_10gen(27017),
@@ -101,8 +98,7 @@ async fn replace_single_dns_record() {
 }
 
 // If all DNS records are replaced, it should be reflected in the topology.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn replace_all_dns_records() {
     let hosts = vec![localhost_test_build_10gen(27019)];
 
@@ -110,8 +106,7 @@ async fn replace_all_dns_records() {
 }
 
 // If a timeout error occurs, the topology should be unchanged.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn timeout_error() {
     run_test(
         Err(std::io::ErrorKind::TimedOut.into()),
@@ -121,16 +116,14 @@ async fn timeout_error() {
 }
 
 // If no results are returned, the topology should be unchanged.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn no_results() {
     run_test(Ok(Vec::new()), DEFAULT_HOSTS.iter().cloned().collect()).await;
 }
 
 // SRV polling is not done for load-balanced clusters (as per spec at
 // https://github.com/mongodb/specifications/blob/master/source/polling-srv-records-for-mongos-discovery/tests/README.rst#test-that-srv-polling-is-not-done-for-load-balalanced-clusters).
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn load_balanced_no_srv_polling() {
     if get_client_options().await.load_balanced != Some(true) {
         log_uncaptured("skipping load_balanced_no_srv_polling due to not load balanced topology");
@@ -156,8 +149,7 @@ async fn load_balanced_no_srv_polling() {
 }
 
 // SRV polling with srvMaxHosts MongoClient option: All DNS records are selected (srvMaxHosts = 0)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn srv_max_hosts_zero() {
     let hosts = vec![
         localhost_test_build_10gen(27017),
@@ -171,8 +163,7 @@ async fn srv_max_hosts_zero() {
 
 // SRV polling with srvMaxHosts MongoClient option: All DNS records are selected (srvMaxHosts >=
 // records)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn srv_max_hosts_gt_actual() {
     let hosts = vec![
         localhost_test_build_10gen(27019),
@@ -184,8 +175,7 @@ async fn srv_max_hosts_gt_actual() {
 
 // SRV polling with srvMaxHosts MongoClient option: New DNS records are randomly selected
 // (srvMaxHosts > 0)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn srv_max_hosts_random() {
     let hosts = vec![
         localhost_test_build_10gen(27017),

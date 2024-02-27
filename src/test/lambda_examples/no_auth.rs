@@ -40,8 +40,7 @@ async fn main() -> Result<(), lambda_runtime::Error> {
 }
 // end lambda connection example 1
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_handler() {
     if std::env::var("MONGODB_API_VERSION").is_ok() {
         return;

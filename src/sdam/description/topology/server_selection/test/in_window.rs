@@ -110,14 +110,12 @@ async fn run_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn select_in_window() {
     run_spec_test(&["server-selection", "in_window"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn load_balancing_test() {
     let mut setup_client_options = get_client_options().await.clone();
 

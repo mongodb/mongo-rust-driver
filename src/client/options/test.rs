@@ -213,14 +213,12 @@ async fn run_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run_uri_options_spec_tests() {
     run_spec_test(&["uri-options"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run_connection_string_spec_tests() {
     run_spec_test(&["connection-string"], run_test).await;
 }
@@ -240,8 +238,7 @@ async fn parse_uri(option: &str, suggestion: Option<&str>) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn uuid_representations() {
     let mut uuid_repr = parse_uri_with_uuid_representation("csharpLegacy")
         .await
@@ -281,8 +278,7 @@ async fn parse_uri_with_uuid_representation(uuid_repr: &str) -> Result<UuidRepre
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn parse_unknown_options() {
     parse_uri("invalidoption", None).await;
     parse_uri("x", None).await;
@@ -299,8 +295,7 @@ async fn parse_unknown_options() {
     parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn parse_with_no_default_database() {
     let uri = "mongodb://localhost/";
 
@@ -318,8 +313,7 @@ async fn parse_with_no_default_database() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn options_debug_omits_uri() {
     let uri = "mongodb://username:password@localhost/";
     let options = ClientOptions::parse(uri).await.unwrap();
@@ -330,8 +324,7 @@ async fn options_debug_omits_uri() {
     assert!(!debug_output.contains("uri"));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn options_enforce_min_heartbeat_frequency() {
     let options = ClientOptions::builder()
         .hosts(vec![ServerAddress::parse("a:123").unwrap()])

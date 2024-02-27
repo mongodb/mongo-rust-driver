@@ -45,7 +45,7 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Estimates the number of documents in the collection using collection metadata.
     ///

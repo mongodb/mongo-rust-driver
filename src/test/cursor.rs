@@ -10,8 +10,7 @@ use crate::{
     test::{log_uncaptured, util::EventClient, TestClient, SERVERLESS},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn tailable_cursor() {
     if *SERVERLESS {
@@ -84,8 +83,7 @@ async fn tailable_cursor() {
     };
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn session_cursor_next() {
     let client = TestClient::new().await;
@@ -113,8 +111,7 @@ async fn session_cursor_next() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn batch_exhaustion() {
     let client = EventClient::new().await;
 
@@ -159,8 +156,7 @@ async fn batch_exhaustion() {
     assert_eq!(0, id);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn borrowed_deserialization() {
     let client = EventClient::new().await;
 
@@ -229,8 +225,7 @@ async fn borrowed_deserialization() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn session_cursor_with_type() {
     let client = TestClient::new().await;
 
@@ -258,8 +253,7 @@ async fn session_cursor_with_type() {
     let _ = cursor_with_type.next(&mut session).await.unwrap().unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cursor_final_batch() {
     let client = TestClient::new().await;
     let coll = client

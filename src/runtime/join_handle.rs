@@ -12,12 +12,7 @@ use std::{
 #[derive(Debug)]
 pub(crate) enum AsyncJoinHandle<T> {
     /// Wrapper around `tokio::task:JoinHandle`.
-    #[cfg(feature = "tokio-runtime")]
     Tokio(tokio::task::JoinHandle<T>),
-
-    /// Wrapper around `tokio::task:JoinHandle`.
-    #[cfg(feature = "async-std-runtime")]
-    AsyncStd(async_std::task::JoinHandle<T>),
 }
 
 impl<T> Future for AsyncJoinHandle<T> {
@@ -30,11 +25,7 @@ impl<T> Future for AsyncJoinHandle<T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut handle) => Pin::new(handle).poll(cx).map(|result| result.unwrap()),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut handle) => Pin::new(handle).poll(cx),
         }
     }
 }

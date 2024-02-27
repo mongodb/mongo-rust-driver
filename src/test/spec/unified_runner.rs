@@ -100,8 +100,7 @@ impl IntoFuture for RunUnifiedTestsAction {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn valid_pass() {
     let mut skipped_files = vec![
         // TODO RUST-1570: unskip this file
@@ -133,14 +132,12 @@ async fn valid_pass() {
         .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn valid_fail() {
     expect_failures(&["unified-test-format", "valid-fail"], None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn invalid() {
     expect_failures(
         &["unified-test-format", "invalid"],

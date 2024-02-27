@@ -1,7 +1,6 @@
 use crate::test::spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests};
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     let mut skipped_tests = vec![];
     if cfg!(not(feature = "openssl-tls")) {
@@ -13,8 +12,7 @@ async fn run_unified() {
         .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_legacy() {
     // TODO RUST-528: unskip this file
     let mut skipped_files = vec!["timeoutMS.json"];

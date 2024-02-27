@@ -110,9 +110,9 @@ pub struct CommandFailedEvent {
 /// #     },
 /// #     options::ClientOptions,
 /// # };
-/// # #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+/// # #[cfg(feature = "sync")]
 /// # use mongodb::sync::Client;
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
+/// # #[cfg(not(feature = "sync"))]
 /// # use mongodb::Client;
 /// #
 /// struct FailedCommandLogger;

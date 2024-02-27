@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bson::{Bson, Document};
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 use crate::sync::Client as SyncClient;
 use crate::{
     db::options::ListDatabasesOptions,
@@ -41,7 +41,7 @@ impl Client {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl SyncClient {
     /// Gets information about each database present in the cluster the Client is connected to.
     ///

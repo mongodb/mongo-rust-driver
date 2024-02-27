@@ -170,7 +170,7 @@ macro_rules! action_impl {
             }
         }
 
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+        #[cfg(feature = "sync")]
         impl$(<$lt $(, $($at),+)?>)? $action {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {

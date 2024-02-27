@@ -47,7 +47,7 @@ impl Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Runs a database-level command.
     ///
