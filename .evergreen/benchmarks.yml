@@ -326,10 +326,6 @@ axes:
         display_name: "tokio"
         variables:
           ASYNC_RUNTIME: "tokio"
-      - id: "async-std"
-        display_name: "async-std"
-        variables:
-          ASYNC_RUNTIME: "async-std"
 
   - id: "os"
     display_name: OS
