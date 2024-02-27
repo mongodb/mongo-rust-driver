@@ -11,14 +11,12 @@ source ./.evergreen/env.sh
 # https://docs.rs/about/builds#read-only-directories where we or a dependency modify source code during the
 # build process.
 
-source ./.evergreen/feature-combinations.sh
-
 # build with all available features to ensure all optional dependencies are brought in too.
-cargo +nightly build $ADDITIONAL_FEATURES
+cargo +nightly build --all-features
 cargo clean
 
 chmod -R 555 ${CARGO_HOME}/registry/src
 
 # this invocation mirrors the way docs.rs builds our documentation (see the [package.metadata.docs.rs] section
 # in Cargo.toml).
-cargo +nightly rustdoc $ADDITIONAL_FEATURES -- -D warnings --cfg docsrs
+cargo +nightly rustdoc --all-features -- -D warnings --cfg docsrs

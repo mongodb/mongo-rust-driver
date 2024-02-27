@@ -12,9 +12,8 @@ if [ "$RUST_VERSION" != "" ]; then
   cp .evergreen/MSRV-Cargo.lock Cargo.lock
 fi
 
-source ./.evergreen/feature-combinations.sh
+# Test with default features.
+cargo $TOOLCHAIN build
 
-# Test compilation with all feature combinations.
-for ((i = 0; i < ${#FEATURE_COMBINATIONS[@]}; i++)); do
-  cargo $TOOLCHAIN build ${FEATURE_COMBINATIONS[$i]}
-done
+# Test with all features.
+cargo $TOOLCHAIN build --all-features
