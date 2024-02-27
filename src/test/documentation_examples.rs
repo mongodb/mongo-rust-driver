@@ -1753,7 +1753,7 @@ async fn change_streams_examples() -> Result<()> {
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let writer_inventory = inventory.clone();
     let handle = runtime::spawn(async move {
-        let mut interval = runtime::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
                 _ = interval.tick() => {

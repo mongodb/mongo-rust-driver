@@ -31,11 +31,11 @@ impl Process {
     /// Issue a kill signal to the child process and immediately return; to wait for the process to
     /// actually exit, use `wait`.
     pub(crate) fn kill(&mut self) -> Result<()> {
-        return Ok(self.child.start_kill()?);
+        Ok(self.child.start_kill()?)
     }
 
     pub(crate) async fn wait(&mut self) -> Result<ExitStatus> {
-        return Ok(self.child.wait().await?);
+        Ok(self.child.wait().await?)
     }
 }
 

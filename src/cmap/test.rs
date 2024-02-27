@@ -169,7 +169,7 @@ impl Executor {
 
         // Mock a monitoring task responding to errors reported by the pool.
         let manager = pool.manager.clone();
-        runtime::execute(async move {
+        runtime::spawn(async move {
             while let Some(update) = receiver.recv().await {
                 let (update, ack) = update.into_parts();
                 if let UpdateMessage::ApplicationError { error, .. } = update {
@@ -228,7 +228,7 @@ impl Operation {
     /// Execute this operation.
     async fn execute(self, state: Arc<State>) -> Result<()> {
         match self {
-            Operation::Wait { ms } => runtime::delay_for(Duration::from_millis(ms)).await,
+            Operation::Wait { ms } => tokio::time::sleep(Duration::from_millis(ms)).await,
             Operation::WaitForThread { target } => {
                 state
                     .threads
@@ -247,7 +247,7 @@ impl Operation {
                 let event_name = event.clone();
                 let task = async move {
                     while state.count_events(&event) < count {
-                        runtime::delay_for(Duration::from_millis(100)).await;
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 };
                 runtime::timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)

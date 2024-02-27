@@ -21,7 +21,6 @@ use crate::{
         WriteConcern,
     },
     results::{InsertManyResult, InsertOneResult, UpdateResult},
-    runtime,
     Collection as AsyncCollection,
     Namespace,
 };
@@ -113,7 +112,8 @@ impl<T> Collection<T> {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOptions>>,
     ) -> Result<Cursor<T>> {
-        runtime::block_on(self.async_collection.find(filter.into(), options.into()))
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_collection.find(filter.into(), options.into()))
             .map(Cursor::new)
     }
 
@@ -124,12 +124,13 @@ impl<T> Collection<T> {
         options: impl Into<Option<FindOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>> {
-        runtime::block_on(self.async_collection.find_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_collection.find_with_session(
+                filter.into(),
+                options.into(),
+                &mut session.async_client_session,
+            ))
+            .map(SessionCursor::new)
     }
 }
 
@@ -143,7 +144,7 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOneOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_collection
                 .find_one(filter.into(), options.into()),
         )
@@ -157,7 +158,7 @@ where
         options: impl Into<Option<FindOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_with_session(
             filter.into(),
             options.into(),
             &mut session.async_client_session,
@@ -180,7 +181,7 @@ where
         filter: Document,
         options: impl Into<Option<FindOneAndDeleteOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_collection
                 .find_one_and_delete(filter, options.into()),
         )
@@ -199,7 +200,7 @@ where
         options: impl Into<Option<FindOneAndDeleteOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_delete_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
             filter,
             options.into(),
             &mut session.async_client_session,
@@ -221,7 +222,7 @@ where
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<FindOneAndUpdateOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_update(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update(
             filter,
             update.into(),
             options.into(),
@@ -244,7 +245,7 @@ where
         options: impl Into<Option<FindOneAndUpdateOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_update_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
             filter,
             update.into(),
             options.into(),
@@ -270,7 +271,7 @@ where
         replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_replace(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_replace(
             filter,
             replacement,
             options.into(),
@@ -291,12 +292,14 @@ where
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_replace_with_session(
-            filter,
-            replacement,
-            options.into(),
-            &mut session.async_client_session,
-        ))
+        crate::sync::TOKIO_RUNTIME.block_on(
+            self.async_collection.find_one_and_replace_with_session(
+                filter,
+                replacement,
+                options.into(),
+                &mut session.async_client_session,
+            ),
+        )
     }
 }
 
@@ -315,7 +318,7 @@ where
         docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
-        runtime::block_on(self.async_collection.insert_many(docs, options.into()))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
     }
 
     /// Inserts the documents in `docs` into the collection using the provided `ClientSession`.
@@ -330,7 +333,7 @@ where
         options: impl Into<Option<InsertManyOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertManyResult> {
-        runtime::block_on(self.async_collection.insert_many_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many_with_session(
             docs,
             options.into(),
             &mut session.async_client_session,
@@ -348,7 +351,7 @@ where
         doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_collection
                 .insert_one(doc.borrow(), options.into()),
         )
@@ -366,7 +369,7 @@ where
         options: impl Into<Option<InsertOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertOneResult> {
-        runtime::block_on(self.async_collection.insert_one_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_one_with_session(
             doc.borrow(),
             options.into(),
             &mut session.async_client_session,
@@ -385,7 +388,7 @@ where
         replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.replace_one(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one(
             query,
             replacement.borrow(),
             options.into(),
@@ -406,7 +409,7 @@ where
         options: impl Into<Option<ReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.replace_one_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one_with_session(
             query,
             replacement.borrow(),
             options.into(),

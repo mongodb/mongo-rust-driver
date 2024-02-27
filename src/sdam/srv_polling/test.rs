@@ -7,7 +7,6 @@ use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
     error::Result,
     options::{ClientOptions, ServerAddress},
-    runtime,
     sdam::Topology,
     test::{get_client_options, log_uncaptured},
 };
@@ -141,7 +140,7 @@ async fn load_balanced_no_srv_polling() {
     ]));
     let mut topology = Topology::new(options).unwrap();
     topology.watch().wait_until_initialized().await;
-    runtime::delay_for(rescan_interval * 2).await;
+    tokio::time::sleep(rescan_interval * 2).await;
     assert_eq!(
         hosts.into_iter().collect::<HashSet<_>>(),
         topology.server_addresses()

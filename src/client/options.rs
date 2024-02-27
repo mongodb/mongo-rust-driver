@@ -39,9 +39,6 @@ use crate::{
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
-#[cfg(feature = "sync")]
-use crate::runtime;
-
 pub use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
@@ -1150,7 +1147,7 @@ impl ClientOptions {
     /// [the async version](#method.parse)
     #[cfg(feature = "sync")]
     pub fn parse_sync(s: impl AsRef<str>) -> Result<Self> {
-        runtime::block_on(Self::parse_uri(s.as_ref(), None))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -1178,7 +1175,7 @@ impl ClientOptions {
         uri: &str,
         resolver_config: ResolverConfig,
     ) -> Result<Self> {
-        runtime::block_on(Self::parse_uri(uri, Some(resolver_config)))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
     }
 
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
@@ -1291,7 +1288,7 @@ impl ClientOptions {
     /// Creates a `ClientOptions` from the given `ConnectionString`.
     #[cfg(feature = "sync")]
     pub fn parse_connection_string_sync(conn_str: ConnectionString) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string_internal(conn_str, None))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(conn_str, None))
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
@@ -1303,7 +1300,7 @@ impl ClientOptions {
         conn_str: ConnectionString,
         resolver_config: ResolverConfig,
     ) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string_internal(
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(
             conn_str,
             Some(resolver_config),
         ))

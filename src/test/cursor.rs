@@ -57,7 +57,7 @@ async fn tailable_cursor() {
         );
     }
 
-    let delay = runtime::delay_for(await_time);
+    let delay = tokio::time::sleep(await_time);
     let next_doc = cursor.next();
 
     let next_doc = match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
@@ -69,11 +69,11 @@ async fn tailable_cursor() {
         ),
     };
 
-    runtime::execute(async move {
+    runtime::spawn(async move {
         coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
     });
 
-    let delay = runtime::delay_for(await_time);
+    let delay = tokio::time::sleep(await_time);
 
     match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
         Either::Left((..)) => panic!("should have gotten next document, but instead timed"),

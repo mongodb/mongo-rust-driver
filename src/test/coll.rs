@@ -32,7 +32,6 @@ use crate::{
         WriteConcern,
     },
     results::DeleteResult,
-    runtime,
     test::{
         get_client_options,
         log_uncaptured,
@@ -284,7 +283,7 @@ async fn kill_cursors_on_drop() {
     // The `Drop` implementation for `Cursor' spawns a back tasks that emits certain events. If the
     // task hasn't been scheduled yet, we may not see the event here. To account for this, we wait
     // for a small amount of time before checking.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     assert!(kill_cursors_sent(&event_client));
 }
@@ -317,7 +316,7 @@ async fn no_kill_cursors_on_exhausted() {
     std::mem::drop(cursor);
 
     // wait for any tasks to get spawned from `Cursor`'s `Drop`.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(!kill_cursors_sent(&event_client));
 }
 

@@ -19,7 +19,6 @@ use crate::{
         ServerAddress,
         WriteConcern,
     },
-    runtime,
     sync::{Client, ClientSession, Collection},
     test::TestClient as AsyncTestClient,
 };
@@ -36,8 +35,9 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
     coll
 }
 
-static CLIENT_OPTIONS: Lazy<ClientOptions> =
-    Lazy::new(|| runtime::block_on(async { crate::test::get_client_options().await.clone() }));
+static CLIENT_OPTIONS: Lazy<ClientOptions> = Lazy::new(|| {
+    crate::sync::TOKIO_RUNTIME.block_on(async { crate::test::get_client_options().await.clone() })
+});
 
 #[test]
 fn client_options() {
@@ -223,7 +223,7 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let should_skip = runtime::block_on(async {
+    let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
         !test_client.supports_transactions()
     });
@@ -405,20 +405,21 @@ fn mixed_sync_and_async() -> Result<()> {
     const COLL_NAME: &str = "test";
 
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
-    let async_client = runtime::block_on(async { AsyncTestClient::new().await });
+    let async_client = crate::sync::TOKIO_RUNTIME.block_on(async { AsyncTestClient::new().await });
     let sync_db = sync_client.database(DB_NAME);
     sync_db.drop().run()?;
     sync_db
         .collection::<Document>(COLL_NAME)
         .insert_one(doc! { "a": 1 }, None)?;
-    let mut found = runtime::block_on(async {
-        async_client
-            .database(DB_NAME)
-            .collection::<Document>(COLL_NAME)
-            .find_one(doc! {}, None)
-            .await
-    })?
-    .unwrap();
+    let mut found = crate::sync::TOKIO_RUNTIME
+        .block_on(async {
+            async_client
+                .database(DB_NAME)
+                .collection::<Document>(COLL_NAME)
+                .find_one(doc! {}, None)
+                .await
+        })?
+        .unwrap();
     found.remove("_id");
     assert_eq!(found, doc! { "a": 1 });
 

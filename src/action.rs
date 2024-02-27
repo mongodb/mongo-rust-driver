@@ -174,7 +174,7 @@ macro_rules! action_impl {
         impl$(<$lt $(, $($at),+)?>)? $action {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {
-                let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
+                let $($wrap_args)+ = crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self));
                 return $wrap_code
             }
         }

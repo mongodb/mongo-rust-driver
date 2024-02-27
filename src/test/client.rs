@@ -113,7 +113,7 @@ async fn connection_drop_during_read() {
     )
     .await;
 
-    runtime::delay_for(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     let build_info_response = db.run_command(doc! { "buildInfo": 1 }).await.unwrap();
 

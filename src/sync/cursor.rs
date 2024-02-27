@@ -5,7 +5,6 @@ use super::ClientSession;
 use crate::{
     bson::{Document, RawDocument},
     error::Result,
-    runtime,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
     SessionCursorStream,
@@ -105,7 +104,7 @@ impl<T> Cursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self) -> Result<bool> {
-        runtime::block_on(self.async_cursor.advance())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_cursor.advance())
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -174,7 +173,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        runtime::block_on(self.async_cursor.next())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_cursor.next())
     }
 }
 
@@ -234,7 +233,8 @@ impl<T> SessionCursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
-        runtime::block_on(self.async_cursor.advance(&mut session.async_client_session))
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_cursor.advance(&mut session.async_client_session))
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -357,6 +357,6 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        runtime::block_on(self.async_stream.next())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.next())
     }
 }

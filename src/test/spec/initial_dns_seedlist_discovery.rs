@@ -6,7 +6,6 @@ use crate::{
     bson::doc,
     client::Client,
     options::{ClientOptions, ResolverConfig},
-    runtime,
     test::{get_client_options, log_uncaptured, run_spec_test, TestClient},
 };
 
@@ -174,7 +173,7 @@ async fn run_test(mut test_file: TestFile) {
                 )
             }
 
-            runtime::delay_for(Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 

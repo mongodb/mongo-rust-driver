@@ -11,7 +11,6 @@ use crate::{
     error::Result,
     event::sdam::SdamEvent,
     options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
-    runtime,
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
@@ -200,7 +199,7 @@ macro_rules! for_each_op {
 async fn pool_is_lifo() {
     let client = TestClient::new().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
-    runtime::delay_for(Duration::from_millis(500)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     if client.is_standalone() {
         return;
@@ -215,10 +214,10 @@ async fn pool_is_lifo() {
     // End both sessions, waiting after each to ensure the background task got scheduled
     // in the Drop impls.
     drop(a);
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     drop(b);
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     let s1 = client.start_session().await.unwrap();
     assert_eq!(s1.id(), &b_id);
@@ -422,7 +421,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
         .expect("insert should succeed");
 
     // wait for sessions to be returned to the pool and clear them out.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
     let mut cursor = coll.find(doc! {}, None).await.expect("find should succeed");
@@ -436,7 +435,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
         .as_document()
         .expect("session id should be a document");
 
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(
         client.is_session_checked_in(session_id).await,
         "session not checked back in"
@@ -464,7 +463,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
     }
 
     // wait for sessions to be returned to the pool and clear them out.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
     let options = FindOptions::builder().batch_size(3).build();
@@ -485,7 +484,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         .as_document()
         .expect("session id should be a document");
 
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(
         client.is_session_checked_in(session_id).await,
         "session not checked back in"

@@ -8,7 +8,6 @@ use crate::{
         ChangeStream as AsyncChangeStream,
     },
     error::Result,
-    runtime,
 };
 
 use super::ClientSession;
@@ -112,7 +111,7 @@ where
     /// # }
     /// ```
     pub fn next_if_any(&mut self) -> Result<Option<T>> {
-        runtime::block_on(self.async_stream.next_if_any())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.next_if_any())
     }
 }
 
@@ -123,7 +122,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        runtime::block_on(self.async_stream.next())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.next())
     }
 }
 
@@ -200,7 +199,8 @@ where
     /// # }
     /// ```
     pub fn next(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        runtime::block_on(self.async_stream.next(&mut session.async_client_session))
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_stream.next(&mut session.async_client_session))
     }
 
     /// Returns whether the change stream will continue to receive events.
@@ -234,7 +234,7 @@ where
     /// # }
     /// ```
     pub fn next_if_any(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_stream
                 .next_if_any(&mut session.async_client_session),
         )

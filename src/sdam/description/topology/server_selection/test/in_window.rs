@@ -227,7 +227,7 @@ async fn load_balancing_test() {
         for _ in 0..max_pool_size {
             let client = client.clone();
             let selector = selector.clone();
-            runtime::execute(async move {
+            runtime::spawn(async move {
                 let options = FindOptions::builder()
                     .selection_criteria(SelectionCriteria::Predicate(selector))
                     .build();
