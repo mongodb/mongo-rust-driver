@@ -173,9 +173,6 @@ serde-hex = "0.1.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
-# async-std-runtime and sync are excluded here because they conflict with the default features.
-# Neither feature has any unique documentation associated with it, so we do not need to
-# include them in our documentation build.
 features = [
     "sync",
     "zstd-compression",

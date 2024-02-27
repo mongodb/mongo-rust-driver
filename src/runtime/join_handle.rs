@@ -16,11 +16,6 @@ pub(crate) enum AsyncJoinHandle<T> {
 }
 
 impl<T> Future for AsyncJoinHandle<T> {
-    // tokio wraps the Output of its JoinHandle in a Result that contains an error if the task
-    // panicked, while async-std does not.
-    //
-    // Given that async-std will panic or abort the task in this scenario, there is not a
-    // lot of value in preserving the error in tokio.
     type Output = T;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
