@@ -24,24 +24,40 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
-pub struct Callback {
-    inner: Arc<CallbackInner>,
+pub enum Callback {
+    Machine(Arc<CallbackInner>),
+    Human(Arc<CallbackInner>),
 }
 
 impl Callback {
-    /// Create a new instance with either a human or machine token request callback.
-    pub fn new<F>(callback: F) -> Self
+    /// Create a new instance with a human token request callback.
+    pub fn new_human<F>(callback: F) -> Self
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
             + Send
             + Sync
             + 'static,
     {
-        Self {
-            inner: Arc::new(CallbackInner {
-                callback: Box::new(callback),
-            }),
-        }
+        Self::Human({
+            Arc::new(CallbackInner {
+                f: Box::new(callback),
+            })
+        })
+    }
+
+    /// Create a new instance with a machine token request callback.
+    pub fn new_machine<F>(callback: F) -> Self
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Self::Machine({
+            Arc::new(CallbackInner {
+                f: Box::new(callback),
+            })
+        })
     }
 }
 
@@ -52,8 +68,7 @@ impl std::fmt::Debug for Callback {
 }
 
 struct CallbackInner {
-    callback:
-        Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
+    f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
 #[derive(Clone, Debug)]
@@ -101,7 +116,7 @@ impl Authenticator {
         Self {
             username: None,
             properties: Properties {
-                callback: None,
+                f: None,
                 provider_name: None,
                 allowed_hosts: Vec::new(),
             },
@@ -143,7 +158,7 @@ pub struct IdpServerResponse {
 
 #[derive(Clone, Debug)]
 pub struct Properties {
-    pub callback: Option<Callback>,
+    pub f: Option<Callback>,
     pub provider_name: Option<String>,
     pub allowed_hosts: Vec<String>,
 }
@@ -154,11 +169,16 @@ pub(crate) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
-    let callback = credential
+    let callback = if let Callback::Machine(callback) = credential
         .oidc_callback
         .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .clone();
+        .clone()
+    {
+        callback
+    } else {
+        todo!()
+    };
 
     let mut start_doc = rawdoc! {};
     if let Some(username) = credential.username.as_deref() {
@@ -185,7 +205,7 @@ pub(crate) async fn authenticate_stream(
             refresh_token: None,
             idp_info: Some(server_info),
         };
-        (callback.inner.callback)(cb_context).await?
+        (callback.f)(cb_context).await?
     };
 
     let sasl_continue = SaslContinue::new(
