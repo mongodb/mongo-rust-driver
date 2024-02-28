@@ -146,7 +146,9 @@ pub(crate) async fn authenticate_stream(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
-    // TODO RUST-1662: Use the Cached credential and add Cache invalidation
+    // RUST-1662: Attempt speculative auth first, only works with a cache.
+    // First handle speculative authentication. If that succeeds, we are done.
+
     match credential
         .oidc_callback
         .as_ref()
@@ -169,6 +171,8 @@ async fn authenticate_human(
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
+    // TODO RUST-1662: Use the Cached credential and add Cache invalidation
+    // human, unlike machine, will also check for a chached refresh token
     let source = credential.source.as_deref().unwrap_or("$external");
     Ok(())
 }
@@ -179,6 +183,7 @@ async fn authenticate_machine(
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
+    // TODO RUST-1662: Use the Cached credential and add Cache invalidation
     let source = credential.source.as_deref().unwrap_or("$external");
     let mut start_doc = rawdoc! {};
     if let Some(username) = credential.username.as_deref() {

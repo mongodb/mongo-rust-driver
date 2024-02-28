@@ -120,6 +120,16 @@ pub(crate) struct Connection {
     /// monitoring connections as we do not emit events for those.
     #[derivative(Debug = "ignore")]
     event_emitter: Option<CmapEventEmitter>,
+
+    /// The token callback for OIDC authentication.
+    /// TODO RUST-1497: make this `pub`
+    /// Credential::builder().oidc_callback(oidc::Callback::human(...)).build()
+    /// the name of the field here does not well encompass what this field actually is since
+    /// it contains all the OIDC state information, not just the callback, but it conforms
+    /// to how a user would interact with it.
+    #[derivative(Debug = "ignore")]
+    #[cfg(feature = "oidc-auth")]
+    pub(crate) oidc_access_token: Option<String>,
 }
 
 impl Connection {
@@ -146,6 +156,8 @@ impl Connection {
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
+            #[cfg(feature = "oidc-auth")]
+            oidc_access_token: None,
         }
     }
 
@@ -435,6 +447,8 @@ impl Connection {
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
             more_to_come: false,
+            #[cfg(feature = "oidc-auth")]
+            oidc_access_token: self.oidc_access_token.take(),
         }
     }
 
