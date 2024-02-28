@@ -24,9 +24,15 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
-pub enum Callback {
-    Machine(Arc<CallbackInner>),
-    Human(Arc<CallbackInner>),
+pub struct Callback {
+    callback_function: CallbackFunction,
+    cache: Cache,
+}
+
+#[derive(Clone)]
+pub(crate) enum CallbackFunction {
+    Machine(Arc<CallbackFunctionInner>),
+    Human(Arc<CallbackFunctionInner>),
 }
 
 impl Callback {
@@ -38,11 +44,12 @@ impl Callback {
             + Sync
             + 'static,
     {
-        Self::Human({
-            Arc::new(CallbackInner {
+        Self {
+            callback_function: CallbackFunction::Human(Arc::new(CallbackFunctionInner {
                 f: Box::new(callback),
-            })
-        })
+            })),
+            cache: Cache::default(),
+        }
     }
 
     /// Create a new instance with a machine token request callback.
@@ -53,11 +60,12 @@ impl Callback {
             + Sync
             + 'static,
     {
-        Self::Machine({
-            Arc::new(CallbackInner {
+        Self {
+            callback_function: CallbackFunction::Machine(Arc::new(CallbackFunctionInner {
                 f: Box::new(callback),
-            })
-        })
+            })),
+            cache: Cache::default(),
+        }
     }
 }
 
@@ -67,7 +75,7 @@ impl std::fmt::Debug for Callback {
     }
 }
 
-pub struct CallbackInner {
+pub struct CallbackFunctionInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
@@ -108,7 +116,6 @@ impl Default for Authenticator {
         Self {
             username: None,
             properties: Properties {
-                f: None,
                 provider_name: None,
                 allowed_hosts: Vec::new(),
             },
@@ -150,7 +157,6 @@ pub struct IdpServerResponse {
 
 #[derive(Clone, Debug)]
 pub struct Properties {
-    pub f: Option<Callback>,
     pub provider_name: Option<String>,
     pub allowed_hosts: Vec<String>,
 }
@@ -161,10 +167,11 @@ pub(crate) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
-    let callback = if let Callback::Machine(callback) = credential
+    let callback = if let CallbackFunction::Machine(callback) = credential
         .oidc_callback
         .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
+        .callback_function
         .clone()
     {
         callback

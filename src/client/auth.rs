@@ -409,13 +409,6 @@ pub struct Credential {
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[cfg(feature = "oidc-auth")]
     pub(crate) oidc_callback: Option<oidc::Callback>,
-
-    /// TODO RUST-1497: make this `pub`
-    /// oidc_cache is a cache of saved information used by oidc authentication
-    #[serde(skip)]
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[cfg(feature = "oidc-auth")]
-    pub(crate) oidc_cache: Option<oidc::Cache>,
 }
 
 impl Credential {
