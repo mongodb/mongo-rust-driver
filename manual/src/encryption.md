@@ -159,7 +159,6 @@ async fn main() -> Result<()> {
     let data_key_id = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(["encryption_example_1".to_string()])
-        .run()
         .await?;
     let schema = doc! {
         "properties": {
@@ -264,7 +263,6 @@ async fn main() -> Result<()> {
     let data_key_id = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(["encryption_example_2".to_string()])
-        .run()
         .await?;
     let schema = doc! {
         "properties": {
@@ -367,12 +365,10 @@ async fn main() -> Result<()> {
     let key1_id = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(["firstName".to_string()])
-        .run()
         .await?;
     let key2_id = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(["lastName".to_string()])
-        .run()
         .await?;
 
     let encrypted_fields_map = vec![(
@@ -483,11 +479,9 @@ async fn main() -> Result<()> {
     // Create a new data key for the encryptedField.
     let indexed_key_id = client_encryption
         .create_data_key(MasterKey::Local)
-        .run()
         .await?;
     let unindexed_key_id = client_encryption
         .create_data_key(MasterKey::Local)
-        .run()
         .await?;
 
     let encrypted_fields = doc! {
@@ -535,11 +529,9 @@ async fn main() -> Result<()> {
     let insert_payload_indexed = client_encryption
         .encrypt(val, indexed_key_id.clone(), Algorithm::Indexed)
         .contention_factor(1)
-        .run()
         .await?;
     let insert_payload_unindexed = client_encryption
         .encrypt(unindexed_val, unindexed_key_id, Algorithm::Unindexed)
-        .run()
         .await?;
 
     // Insert the payloads.
@@ -559,7 +551,6 @@ async fn main() -> Result<()> {
         .encrypt(val, indexed_key_id, Algorithm::Indexed)
         .query_type("equality")
         .contention_factor(1)
-        .run()
         .await?;
 
     // Find the document we inserted using the encrypted payload.
@@ -633,7 +624,6 @@ async fn main() -> Result<()> {
     let data_key_id = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(["encryption_example_3".to_string()])
-        .run()
         .await?;
 
     // Explicitly encrypt a field:
@@ -643,7 +633,6 @@ async fn main() -> Result<()> {
             data_key_id,
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
-        .run()
         .await?;
     coll.insert_one(doc! { "encryptedField": encrypted_field }, None)
         .await?;
@@ -736,7 +725,6 @@ async fn main() -> Result<()> {
     let data_key_id = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(["encryption_example_4".to_string()])
-        .run()
         .await?;
 
     // Explicitly encrypt a field:
@@ -746,7 +734,6 @@ async fn main() -> Result<()> {
             data_key_id,
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
-        .run()
         .await?;
     coll.insert_one(doc! { "encryptedField": encrypted_field }, None)
         .await?;

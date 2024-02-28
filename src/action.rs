@@ -4,6 +4,8 @@ mod aggregate;
 mod count;
 mod create_collection;
 mod create_index;
+#[cfg(feature = "in-use-encryption-unstable")]
+pub mod csfle;
 mod delete;
 mod distinct;
 mod drop;
@@ -60,7 +62,7 @@ macro_rules! option_setters {
         $(
             $(#[$($attrss:tt)*])*
             $opt_name:ident: $opt_ty:ty,
-        )+
+        )*
     ) => {
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
@@ -79,7 +81,7 @@ macro_rules! option_setters {
                 self.options().$opt_name = Some(value);
                 self
             }
-        )+
+        )*
     };
 }
 use option_setters;
