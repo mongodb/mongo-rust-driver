@@ -2,6 +2,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::sync::RwLock;
 
 use bson::rawdoc;
 use serde::Deserialize;
@@ -23,10 +24,30 @@ use crate::{
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 /// The user-supplied callbacks for OIDC authentication.
-#[derive(Clone)]
 pub struct State {
     callback: Callback,
-    cache: Cache,
+    cache: Arc<RwLock<Cache>>,
+}
+
+impl Clone for State {
+    fn clone(&self) -> Self {
+        Self {
+            callback: self.callback.clone(),
+            cache: Arc::new(RwLock::new(Cache::default())),
+        }
+    }
+}
+
+impl State {
+    pub(crate) async fn get_refresh_token(&self) -> Option<String> {
+        self.cache.read().await.refresh_token.clone()
+    }
+
+    // TODO RUST-1662: This function will actually be used.
+    #[allow(dead_code)]
+    pub(crate) async fn get_access_token(&self) -> Option<String> {
+        self.cache.read().await.access_token.clone()
+    }
 }
 
 #[derive(Clone)]
@@ -48,7 +69,7 @@ impl Callback {
             callback: Callback::Human(Arc::new(CallbackInner {
                 f: Box::new(callback),
             })),
-            cache: Cache::default(),
+            cache: Arc::new(RwLock::new(Cache::default())),
         }
     }
 
@@ -64,7 +85,7 @@ impl Callback {
             callback: Callback::Machine(Arc::new(CallbackInner {
                 f: Box::new(callback),
             })),
-            cache: Cache::default(),
+            cache: Arc::new(RwLock::new(Cache::default())),
         }
     }
 }
@@ -83,10 +104,8 @@ pub struct CallbackInner {
 pub struct Cache {
     refresh_token: Option<String>,
     access_token: Option<String>,
-    idp_info: Option<IdpServerInfo>,
     token_gen_id: i32,
     last_call_time: Instant,
-    lock: tokio::sync::Mutex<()>,
 }
 
 impl Clone for Cache {
@@ -94,10 +113,8 @@ impl Clone for Cache {
         Self {
             refresh_token: self.refresh_token.clone(),
             access_token: self.access_token.clone(),
-            idp_info: self.idp_info.clone(),
             token_gen_id: self.token_gen_id,
             last_call_time: self.last_call_time,
-            lock: tokio::sync::Mutex::new(()),
         }
     }
 }
@@ -107,10 +124,8 @@ impl Default for Cache {
         Self {
             refresh_token: None,
             access_token: None,
-            idp_info: None,
             token_gen_id: 0,
             last_call_time: Instant::now(),
-            lock: tokio::sync::Mutex::new(()),
         }
     }
 }
@@ -165,6 +180,27 @@ pub(crate) async fn authenticate_stream(
     }
 }
 
+async fn update_oidc_cache(
+    credential: &Credential,
+    response: &IdpServerResponse,
+    token_gen_id: i32,
+) {
+    {
+        let mut cache = credential
+            .oidc_callback
+            .as_ref()
+            // unwrap() is safe here because authenticate_human is only called if oidc_callback is Some
+            .unwrap()
+            .cache
+            .write()
+            .await;
+        cache.access_token = Some(response.access_token.clone());
+        cache.refresh_token = response.refresh_token.clone();
+        cache.last_call_time = Instant::now();
+        cache.token_gen_id = token_gen_id;
+    }
+}
+
 async fn authenticate_human(
     conn: &mut Connection,
     credential: &Credential,
@@ -172,8 +208,59 @@ async fn authenticate_human(
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
     // TODO RUST-1662: Use the Cached credential and add Cache invalidation
-    // human, unlike machine, will also check for a chached refresh token
+    // this differs from the machine flow in that we will also try the refresh token
     let source = credential.source.as_deref().unwrap_or("$external");
+    let mut start_doc = rawdoc! {};
+    if let Some(username) = credential.username.as_deref() {
+        start_doc.append("n", username);
+    }
+    let sasl_start = SaslStart::new(
+        source.to_string(),
+        AuthMechanism::MongoDbOidc,
+        start_doc.into_bytes(),
+        server_api.cloned(),
+    )
+    .into_command();
+    let response = send_sasl_command(conn, sasl_start).await?;
+    if response.done {
+        return Err(invalid_auth_response());
+    }
+
+    // Even though most caching will be handled in RUST-1662, the refresh token only exists in the
+    // cache, so we need to access the cache to get it
+    let refresh_token = credential.oidc_callback.as_ref()
+        // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
+        .unwrap().get_refresh_token().await;
+
+    let idp_response = {
+        let server_info: IdpServerInfo =
+            bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
+        const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+        let cb_context = CallbackContext {
+            timeout_seconds: Some(Instant::now() + CALLBACK_TIMEOUT),
+            version: 1,
+            refresh_token,
+            idp_info: Some(server_info),
+        };
+        (callback.f)(cb_context).await?
+    };
+
+    // we'll go ahead and update the cache, also,
+    // TODO RUST 1662: Mofify this comment to just say we are updating the cache
+    update_oidc_cache(credential, &idp_response, 1).await;
+
+    let sasl_continue = SaslContinue::new(
+        source.to_string(),
+        response.conversation_id,
+        rawdoc! { "jwt": idp_response.access_token }.into_bytes(),
+        server_api.cloned(),
+    )
+    .into_command();
+    let response = send_sasl_command(conn, sasl_continue).await?;
+    if !response.done {
+        return Err(invalid_auth_response());
+    }
+
     Ok(())
 }
 
@@ -212,6 +299,10 @@ async fn authenticate_machine(
         };
         (callback.f)(cb_context).await?
     };
+
+    // we'll go ahead and update the cache, also,
+    // TODO RUST 1662: Mofify this comment to just say we are updating the cache
+    update_oidc_cache(credential, &idp_response, 1).await;
 
     let sasl_continue = SaslContinue::new(
         source.to_string(),
