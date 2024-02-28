@@ -81,8 +81,6 @@ pub struct CallbackInner {
 
 #[derive(Debug)]
 pub struct Cache {
-    username: Option<String>,
-    properties: Properties,
     refresh_token: Option<String>,
     access_token: Option<String>,
     idp_info: Option<IdpServerInfo>,
@@ -94,8 +92,6 @@ pub struct Cache {
 impl Clone for Cache {
     fn clone(&self) -> Self {
         Self {
-            username: self.username.clone(),
-            properties: self.properties.clone(),
             refresh_token: self.refresh_token.clone(),
             access_token: self.access_token.clone(),
             idp_info: self.idp_info.clone(),
@@ -109,11 +105,6 @@ impl Clone for Cache {
 impl Default for Cache {
     fn default() -> Self {
         Self {
-            username: None,
-            properties: Properties {
-                provider_name: None,
-                allowed_hosts: Vec::new(),
-            },
             refresh_token: None,
             access_token: None,
             idp_info: None,
@@ -150,31 +141,45 @@ pub struct IdpServerResponse {
     pub refresh_token: Option<String>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Properties {
-    pub provider_name: Option<String>,
-    pub allowed_hosts: Vec<String>,
-}
-
 pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
     // TODO RUST-1662: Use the Cached credential and add Cache invalidation
-    let source = credential.source.as_deref().unwrap_or("$external");
-    let callback = if let Callback::Machine(callback) = credential
+    match credential
         .oidc_callback
         .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
         .callback
         .clone()
     {
-        callback
-    } else {
-        todo!()
-    };
+        Callback::Machine(callback) => {
+            authenticate_machine(conn, credential, server_api, callback).await
+        }
+        Callback::Human(callback) => {
+            authenticate_human(conn, credential, server_api, callback).await
+        }
+    }
+}
 
+async fn authenticate_human(
+    conn: &mut Connection,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    callback: Arc<CallbackInner>,
+) -> Result<()> {
+    let source = credential.source.as_deref().unwrap_or("$external");
+    Ok(())
+}
+
+async fn authenticate_machine(
+    conn: &mut Connection,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    callback: Arc<CallbackInner>,
+) -> Result<()> {
+    let source = credential.source.as_deref().unwrap_or("$external");
     let mut start_doc = rawdoc! {};
     if let Some(username) = credential.username.as_deref() {
         start_doc.append("n", username);
