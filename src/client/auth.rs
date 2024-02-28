@@ -415,10 +415,11 @@ pub struct Credential {
 
     /// The token callback for OIDC authentication.
     /// TODO RUST-1497: make this `pub`
+    /// Credential::builder().oidc_callback(oidc::Callback::human(...)).build()
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[cfg(feature = "oidc-auth")]
-    pub(crate) oidc_callback: Option<oidc::Callback>,
+    pub(crate) oidc_callback: Option<oidc::State>,
 }
 
 impl Credential {

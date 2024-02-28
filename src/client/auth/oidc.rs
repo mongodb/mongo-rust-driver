@@ -24,28 +24,28 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
-pub struct Callback {
-    callback_function: CallbackFunction,
+pub struct State {
+    callback: Callback,
     cache: Cache,
 }
 
 #[derive(Clone)]
-pub(crate) enum CallbackFunction {
-    Machine(Arc<CallbackFunctionInner>),
-    Human(Arc<CallbackFunctionInner>),
+pub(crate) enum Callback {
+    Machine(Arc<CallbackInner>),
+    Human(Arc<CallbackInner>),
 }
 
 impl Callback {
     /// Create a new instance with a human token request callback.
-    pub fn new_human<F>(callback: F) -> Self
+    pub fn human<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
             + Send
             + Sync
             + 'static,
     {
-        Self {
-            callback_function: CallbackFunction::Human(Arc::new(CallbackFunctionInner {
+        State {
+            callback: Callback::Human(Arc::new(CallbackInner {
                 f: Box::new(callback),
             })),
             cache: Cache::default(),
@@ -53,15 +53,15 @@ impl Callback {
     }
 
     /// Create a new instance with a machine token request callback.
-    pub fn new_machine<F>(callback: F) -> Self
+    pub fn machine<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
             + Send
             + Sync
             + 'static,
     {
-        Self {
-            callback_function: CallbackFunction::Machine(Arc::new(CallbackFunctionInner {
+        State {
+            callback: Callback::Machine(Arc::new(CallbackInner {
                 f: Box::new(callback),
             })),
             cache: Cache::default(),
@@ -75,17 +75,12 @@ impl std::fmt::Debug for Callback {
     }
 }
 
-pub struct CallbackFunctionInner {
+pub struct CallbackInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct Cache {
-    data: Authenticator,
-}
-
 #[derive(Debug)]
-pub struct Authenticator {
+pub struct Cache {
     username: Option<String>,
     properties: Properties,
     refresh_token: Option<String>,
@@ -96,7 +91,7 @@ pub struct Authenticator {
     lock: tokio::sync::Mutex<()>,
 }
 
-impl Clone for Authenticator {
+impl Clone for Cache {
     fn clone(&self) -> Self {
         Self {
             username: self.username.clone(),
@@ -111,7 +106,7 @@ impl Clone for Authenticator {
     }
 }
 
-impl Default for Authenticator {
+impl Default for Cache {
     fn default() -> Self {
         Self {
             username: None,
@@ -166,12 +161,13 @@ pub(crate) async fn authenticate_stream(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
+    // TODO RUST-1662: Use the Cached credential and add Cache invalidation
     let source = credential.source.as_deref().unwrap_or("$external");
-    let callback = if let CallbackFunction::Machine(callback) = credential
+    let callback = if let Callback::Machine(callback) = credential
         .oidc_callback
         .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .callback_function
+        .callback
         .clone()
     {
         callback
