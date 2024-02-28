@@ -1,14 +1,9 @@
 {
   "runOn": [
     {
-      "minServerVersion": "4.0",
+      "minServerVersion": "4.3.1",
       "topology": [
-        "replicaset"
-      ]
-    },
-    {
-      "minServerVersion": "4.1.7",
-      "topology": [
+        "replicaset",
         "sharded",
         "load-balanced"
       ]
@@ -25,6 +20,103 @@
     }
   ],
   "tests": [
+    {
+      "description": "ReplaceOne succeeds with RetryableWriteError from server",
+      "failPoint": {
+        "configureFailPoint": "failCommand",
+        "mode": {
+          "times": 1
+        },
+        "data": {
+          "failCommands": [
+            "update"
+          ],
+          "errorCode": 112,
+          "errorLabels": [
+            "RetryableWriteError"
+          ]
+        }
+      },
+      "operation": {
+        "name": "replaceOne",
+        "arguments": {
+          "filter": {
+            "_id": 1
+          },
+          "replacement": {
+            "_id": 1,
+            "x": 111
+          }
+        }
+      },
+      "outcome": {
+        "result": {
+          "matchedCount": 1,
+          "modifiedCount": 1,
+          "upsertedCount": 0
+        },
+        "collection": {
+          "data": [
+            {
+              "_id": 1,
+              "x": 111
+            },
+            {
+              "_id": 2,
+              "x": 22
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "ReplaceOne fails if server does not return RetryableWriteError",
+      "failPoint": {
+        "configureFailPoint": "failCommand",
+        "mode": {
+          "times": 1
+        },
+        "data": {
+          "failCommands": [
+            "update"
+          ],
+          "errorCode": 11600,
+          "errorLabels": []
+        }
+      },
+      "operation": {
+        "name": "replaceOne",
+        "arguments": {
+          "filter": {
+            "_id": 1
+          },
+          "replacement": {
+            "_id": 1,
+            "x": 111
+          }
+        }
+      },
+      "outcome": {
+        "error": true,
+        "result": {
+          "errorLabelsOmit": [
+            "RetryableWriteError"
+          ]
+        },
+        "collection": {
+          "data": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            }
+          ]
+        }
+      }
+    },
     {
       "description": "ReplaceOne succeeds after PrimarySteppedDown",
       "failPoint": {
@@ -117,53 +209,6 @@
             {
               "_id": 1,
               "x": 111
-            },
-            {
-              "_id": 2,
-              "x": 22
-            }
-          ]
-        }
-      }
-    },
-    {
-      "description": "ReplaceOne fails with a RetryableWriteError label after two connection failures",
-      "failPoint": {
-        "configureFailPoint": "failCommand",
-        "mode": {
-          "times": 2
-        },
-        "data": {
-          "failCommands": [
-            "update"
-          ],
-          "closeConnection": true
-        }
-      },
-      "operation": {
-        "name": "replaceOne",
-        "arguments": {
-          "filter": {
-            "_id": 1
-          },
-          "replacement": {
-            "_id": 1,
-            "x": 111
-          }
-        }
-      },
-      "outcome": {
-        "error": true,
-        "result": {
-          "errorLabelsContain": [
-            "RetryableWriteError"
-          ]
-        },
-        "collection": {
-          "data": [
-            {
-              "_id": 1,
-              "x": 11
             },
             {
               "_id": 2,
