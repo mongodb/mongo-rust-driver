@@ -67,7 +67,7 @@ impl std::fmt::Debug for Callback {
     }
 }
 
-struct CallbackInner {
+pub struct CallbackInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
