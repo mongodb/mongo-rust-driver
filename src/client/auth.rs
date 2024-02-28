@@ -411,19 +411,11 @@ pub struct Credential {
     pub(crate) oidc_callback: Option<oidc::Callback>,
 
     /// TODO RUST-1497: make this `pub`
-    /// Cache is a cache of saved information used by some authentication mechanisms
+    /// oidc_cache is a cache of saved information used by oidc authentication
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub(crate) cache: Option<Cache>,
-}
-
-/// An enum representing the different types of caches that can be used by authentication
-/// mechanisms.
-/// TODO RUST-1497: make this `pub`
-#[derive(Clone, Debug)]
-pub(crate) enum Cache {
     #[cfg(feature = "oidc-auth")]
-    Oidc(oidc::Cache),
+    pub(crate) oidc_cache: Option<oidc::Cache>,
 }
 
 impl Credential {

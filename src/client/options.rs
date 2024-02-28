@@ -2059,10 +2059,26 @@ impl ConnectionString {
                         Some(index) => {
                             let (k, v) = exclusive_split_at(kvp, index);
                             let key = k.ok_or_else(err_func)?;
-                            if key == "ALLOWED_HOSTS" {
-                                return Err(Error::invalid_argument(
-                                    "ALLOWED_HOSTS must only be specified through client options",
-                                ));
+                            match key {
+                                "ALLOWED_HOSTS" => {
+                                    return Err(Error::invalid_argument(
+                                        "ALLOWED_HOSTS must only be specified through client \
+                                         options",
+                                    ));
+                                }
+                                "OIDC_CALLBACK" => {
+                                    return Err(Error::invalid_argument(
+                                        "OIDC_CALLBACK must only be specified through client \
+                                         options",
+                                    ));
+                                }
+                                "OIDC_HUMAN_CALLBACK" => {
+                                    return Err(Error::invalid_argument(
+                                        "OIDC_HUMAN_CALLBACK must only be specified through \
+                                         client options",
+                                    ));
+                                }
+                                _ => {}
                             }
                             let value = v.ok_or_else(err_func)?;
                             doc.insert(key, value);
