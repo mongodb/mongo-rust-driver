@@ -71,17 +71,9 @@ pub struct CallbackInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Cache {
     data: Authenticator,
-}
-
-impl Cache {
-    fn new() -> Self {
-        Self {
-            data: Authenticator::new(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -111,8 +103,8 @@ impl Clone for Authenticator {
     }
 }
 
-impl Authenticator {
-    fn new() -> Self {
+impl Default for Authenticator {
+    fn default() -> Self {
         Self {
             username: None,
             properties: Properties {
