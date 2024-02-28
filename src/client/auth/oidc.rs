@@ -50,12 +50,16 @@ impl State {
     }
 }
 
+// TODO RUST-1497: This enum will be public
+#[allow(dead_code)]
 #[derive(Clone)]
-pub(crate) enum Callback {
+enum Callback {
     Machine(Arc<CallbackInner>),
     Human(Arc<CallbackInner>),
 }
 
+// TODO RUST-1497: This methods will be public
+#[allow(dead_code)]
 impl Callback {
     /// Create a new instance with a human token request callback.
     pub fn human<F>(callback: F) -> State
