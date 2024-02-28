@@ -62,20 +62,12 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     )));
 
     ops.push(op!("update", false, |coll, s| coll
-        .update_one_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .update_one(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
-        .update_many_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .update_many(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
         .replace_one_with_session(
@@ -86,10 +78,12 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         )));
 
     ops.push(op!("delete", false, |coll, s| coll
-        .delete_one_with_session(doc! { "x": 1 }, None, s,)));
+        .delete_one(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("delete", false, |coll, s| coll
-        .delete_many_with_session(doc! { "x": 1 }, None, s,)));
+        .delete_many(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
         .find_one_and_update_with_session(
@@ -125,12 +119,9 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         ])
         .session(s)));
 
-    ops.push(op!("distinct", true, |coll, s| coll.distinct_with_session(
-        "x",
-        doc! {},
-        None,
-        s,
-    )));
+    ops.push(op!("distinct", true, |coll, s| coll
+        .distinct("x", doc! {},)
+        .session(s)));
 
     ops.into_iter()
 }

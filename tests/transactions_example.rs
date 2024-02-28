@@ -58,12 +58,11 @@ async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
     let events = client.database("reporting").collection("events");
 
     employees
-        .update_one_with_session(
+        .update_one(
             doc! { "employee": 3 },
-            doc! { "$set": { "status": "Inactive" } },
-            None,
-            session,
+            doc! { "$set": { "status": "Inactive" } }
         )
+        .session(&mut *session)
         .await?;
 
     events

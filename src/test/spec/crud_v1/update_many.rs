@@ -64,7 +64,8 @@ async fn run_update_many_test(test_file: TestFile) {
         };
 
         let result = coll
-            .update_many(arguments.filter, arguments.update, options)
+            .update_many(arguments.filter, arguments.update)
+            .with_options(options)
             .await
             .expect(&test_case.description);
         assert_eq!(

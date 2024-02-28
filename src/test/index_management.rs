@@ -3,7 +3,7 @@ use futures::stream::TryStreamExt;
 use crate::{
     bson::doc,
     error::ErrorKind,
-    options::{CommitQuorum, CreateIndexOptions, IndexOptions},
+    options::{CommitQuorum, IndexOptions},
     test::{
         log_uncaptured,
         util::{EventClient, TestClient},
@@ -23,10 +23,7 @@ async fn index_management_creates() {
 
     // Test creating a single index with driver-generated name.
     let result = coll
-        .create_index(
-            IndexModel::builder().keys(doc! { "a": 1, "b": -1 }).build(),
-            None,
-        )
+        .create_index(IndexModel::builder().keys(doc! { "a": 1, "b": -1 }).build())
         .await
         .expect("Test failed to create index");
 
@@ -34,20 +31,17 @@ async fn index_management_creates() {
 
     // Test creating several indexes, with both specified and unspecified names.
     let result = coll
-        .create_indexes(
-            vec![
-                IndexModel::builder().keys(doc! { "c": 1 }).build(),
-                IndexModel::builder()
-                    .keys(doc! { "d": 1 })
-                    .options(
-                        IndexOptions::builder()
-                            .name("customname".to_string())
-                            .build(),
-                    )
-                    .build(),
-            ],
-            None,
-        )
+        .create_indexes(vec![
+            IndexModel::builder().keys(doc! { "c": 1 }).build(),
+            IndexModel::builder()
+                .keys(doc! { "d": 1 })
+                .options(
+                    IndexOptions::builder()
+                        .name("customname".to_string())
+                        .build(),
+                )
+                .build(),
+        ])
         .await
         .expect("Test failed to create indexes");
 
@@ -75,7 +69,7 @@ async fn index_management_handles_duplicates() {
         .await;
 
     let result = coll
-        .create_index(IndexModel::builder().keys(doc! { "a": 1 }).build(), None)
+        .create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
         .await
         .expect("Test failed to create index");
 
@@ -83,7 +77,7 @@ async fn index_management_handles_duplicates() {
 
     // Insert duplicate.
     let result = coll
-        .create_index(IndexModel::builder().keys(doc! { "a": 1 }).build(), None)
+        .create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
         .await
         .expect("Test failed to create index");
 
@@ -91,13 +85,10 @@ async fn index_management_handles_duplicates() {
 
     // Test partial duplication.
     let result = coll
-        .create_indexes(
-            vec![
-                IndexModel::builder().keys(doc! { "a": 1 }).build(), // Duplicate
-                IndexModel::builder().keys(doc! { "b": 1 }).build(), // Not duplicate
-            ],
-            None,
-        )
+        .create_indexes(vec![
+            IndexModel::builder().keys(doc! { "a": 1 }).build(), // Duplicate
+            IndexModel::builder().keys(doc! { "b": 1 }).build(), // Not duplicate
+        ])
         .await
         .expect("Test failed to create indexes");
 
@@ -126,7 +117,7 @@ async fn index_management_lists() {
             .build(),
     ];
 
-    coll.create_indexes(insert_data.clone(), None)
+    coll.create_indexes(insert_data.clone())
         .await
         .expect("Test failed to create indexes");
 
@@ -138,7 +129,7 @@ async fn index_management_lists() {
     ];
 
     let mut indexes = coll
-        .list_indexes(None)
+        .list_indexes()
         .await
         .expect("Test failed to list indexes");
 
@@ -180,14 +171,11 @@ async fn index_management_drops() {
         .await;
 
     let result = coll
-        .create_indexes(
-            vec![
-                IndexModel::builder().keys(doc! { "a": 1 }).build(),
-                IndexModel::builder().keys(doc! { "b": 1 }).build(),
-                IndexModel::builder().keys(doc! { "c": 1 }).build(),
-            ],
-            None,
-        )
+        .create_indexes(vec![
+            IndexModel::builder().keys(doc! { "a": 1 }).build(),
+            IndexModel::builder().keys(doc! { "b": 1 }).build(),
+            IndexModel::builder().keys(doc! { "c": 1 }).build(),
+        ])
         .await
         .expect("Test failed to create multiple indexes");
 
@@ -197,7 +185,7 @@ async fn index_management_drops() {
     );
 
     // Test dropping single index.
-    coll.drop_index("a_1", None)
+    coll.drop_index("a_1")
         .await
         .expect("Test failed to drop index");
     let names = coll
@@ -207,7 +195,7 @@ async fn index_management_drops() {
     assert_eq!(names, vec!["_id_", "b_1", "c_1"]);
 
     // Test dropping several indexes.
-    coll.drop_indexes(None)
+    coll.drop_indexes()
         .await
         .expect("Test failed to drop indexes");
     let names = coll
@@ -232,20 +220,17 @@ async fn index_management_executes_commands() {
         client.get_command_started_events(&["createIndexes"]).len(),
         0
     );
-    coll.create_index(IndexModel::builder().keys(doc! { "a": 1 }).build(), None)
+    coll.create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
         .await
         .expect("Create Index op failed");
     assert_eq!(
         client.get_command_started_events(&["createIndexes"]).len(),
         1
     );
-    coll.create_indexes(
-        vec![
-            IndexModel::builder().keys(doc! { "b": 1 }).build(),
-            IndexModel::builder().keys(doc! { "c": 1 }).build(),
-        ],
-        None,
-    )
+    coll.create_indexes(vec![
+        IndexModel::builder().keys(doc! { "b": 1 }).build(),
+        IndexModel::builder().keys(doc! { "c": 1 }).build(),
+    ])
     .await
     .expect("Create Indexes op failed");
     assert_eq!(
@@ -255,20 +240,16 @@ async fn index_management_executes_commands() {
 
     // Collection::list_indexes and Collection::list_index_names execute listIndexes.
     assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 0);
-    coll.list_indexes(None).await.expect("List index op failed");
+    coll.list_indexes().await.expect("List index op failed");
     assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 1);
     coll.list_index_names().await.expect("List index op failed");
     assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 2);
 
     // Collection::drop_index and Collection::drop_indexes execute dropIndexes.
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 0);
-    coll.drop_index("a_1", None)
-        .await
-        .expect("Drop index op failed");
+    coll.drop_index("a_1").await.expect("Drop index op failed");
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 1);
-    coll.drop_indexes(None)
-        .await
-        .expect("Drop indexes op failed");
+    coll.drop_indexes().await.expect("Drop indexes op failed");
     assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 2);
 }
 
@@ -287,10 +268,10 @@ async fn commit_quorum_error() {
         .await;
 
     let model = IndexModel::builder().keys(doc! { "x": 1 }).build();
-    let options = CreateIndexOptions::builder()
+    let result = coll
+        .create_index(model)
         .commit_quorum(CommitQuorum::Majority)
-        .build();
-    let result = coll.create_index(model, options).await;
+        .await;
 
     if client.server_version_lt(4, 4) {
         let err = result.unwrap_err();

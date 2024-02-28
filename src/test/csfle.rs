@@ -40,7 +40,6 @@ use crate::{
     },
     options::{
         CollectionOptions,
-        CreateIndexOptions,
         Credential,
         FindOptions,
         IndexOptions,
@@ -222,7 +221,7 @@ async fn custom_key_material() -> Result<()> {
         .find_one(doc! { "_id": id.clone() }, None)
         .await?
         .unwrap();
-    datakeys.delete_one(doc! { "_id": id}, None).await?;
+    datakeys.delete_one(doc! { "_id": id}).await?;
     let new_key_id = bson::Binary::from_uuid(bson::Uuid::from_bytes([0; 16]));
     key_doc.insert("_id", new_key_id.clone());
     datakeys.insert_one(key_doc, None).await?;
@@ -2471,21 +2470,17 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
         .collection::<Document>("datakeys");
     datakeys.drop().await?;
     datakeys
-        .create_index(
-            IndexModel {
-                keys: doc! { "keyAltNames": 1 },
-                options: Some(
-                    IndexOptions::builder()
-                        .name("keyAltNames_1".to_string())
-                        .unique(true)
-                        .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
-                        .build(),
-                ),
-            },
-            CreateIndexOptions::builder()
-                .write_concern(WriteConcern::majority())
-                .build(),
-        )
+        .create_index(IndexModel {
+            keys: doc! { "keyAltNames": 1 },
+            options: Some(
+                IndexOptions::builder()
+                    .name("keyAltNames_1".to_string())
+                    .unique(true)
+                    .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
+                    .build(),
+            ),
+        })
+        .write_concern(WriteConcern::majority())
         .await?;
     let client_encryption = ClientEncryption::new(
         client.into_client(),

@@ -464,7 +464,8 @@ impl TestOperation for DeleteMany {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .delete_many(self.filter.clone(), self.options.clone())
+                .delete_many(self.filter.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -490,24 +491,17 @@ impl TestOperation for DeleteOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .delete_one(self.filter.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .delete_one_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .delete_one(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -829,11 +823,8 @@ impl TestOperation for UpdateMany {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .update_many(
-                    self.filter.clone(),
-                    self.update.clone(),
-                    self.options.clone(),
-                )
+                .update_many(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -860,29 +851,17 @@ impl TestOperation for UpdateOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .update_one(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .update_one_with_session(
-                                self.filter.clone(),
-                                self.update.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .update_one(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -988,25 +967,17 @@ impl TestOperation for Distinct {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .distinct(&self.field_name, self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .distinct_with_session(
-                                &self.field_name,
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => act.await?,
             };
             Ok(Some(Bson::Array(result).into()))
         }
@@ -2002,19 +1973,19 @@ impl TestOperation for CreateIndex {
                 .build();
 
             let collection = test_runner.get_collection(id).await;
+            let act = collection.create_index(index);
             let name = match self.session {
                 Some(ref session_id) => {
                     with_mut_session!(test_runner, session_id, |session| {
                         async move {
-                            collection
-                                .create_index_with_session(index, None, session)
+                            act.session(session.deref_mut())
                                 .await
                                 .map(|model| model.index_name)
                         }
                     })
                     .await?
                 }
-                None => collection.create_index(index, None).await?.index_name,
+                None => act.await?.index_name,
             };
             Ok(Some(Bson::String(name).into()))
         }
@@ -2037,12 +2008,12 @@ impl TestOperation for ListIndexes {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection.list_indexes().with_options(self.options.clone());
             let indexes: Vec<IndexModel> = match self.session {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session, |session| {
                         async {
-                            collection
-                                .list_indexes_with_session(self.options.clone(), session)
+                            act.session(session.deref_mut())
                                 .await?
                                 .stream(session)
                                 .try_collect()
@@ -2051,13 +2022,7 @@ impl TestOperation for ListIndexes {
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .list_indexes(self.options.clone())
-                        .await?
-                        .try_collect()
-                        .await?
-                }
+                None => act.await?.try_collect().await?,
             };
             let indexes: Vec<Document> = indexes
                 .iter()
@@ -2082,14 +2047,15 @@ impl TestOperation for ListIndexNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection.list_index_names();
             let names = match self.session {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session.as_str(), |s| {
-                        async move { collection.list_index_names_with_session(s).await }
+                        async move { act.session(s.deref_mut()).await }
                     })
                     .await?
                 }
-                None => collection.list_index_names().await?,
+                None => act.await?,
             };
             Ok(Some(Bson::from(names).into()))
         }

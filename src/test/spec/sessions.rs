@@ -1,4 +1,5 @@
 use std::{
+    future::IntoFuture,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -128,9 +129,15 @@ async fn implicit_session_after_connection() {
             r.map(|_| ())
         }
         ops.push(coll.insert_one(doc! {}, None).map(ignore_val).boxed());
-        ops.push(coll.delete_one(doc! {}, None).map(ignore_val).boxed());
         ops.push(
-            coll.update_one(doc! {}, doc! { "$set": { "a": 1 } }, None)
+            coll.delete_one(doc! {})
+                .into_future()
+                .map(ignore_val)
+                .boxed(),
+        );
+        ops.push(
+            coll.update_one(doc! {}, doc! { "$set": { "a": 1 } })
+                .into_future()
                 .map(ignore_val)
                 .boxed(),
         );

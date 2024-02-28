@@ -5,7 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        DeleteOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -15,7 +14,6 @@ use crate::{
         ReadConcern,
         ReplaceOptions,
         TransactionOptions,
-        UpdateOptions,
         WriteConcern,
     },
     test::{EventClient, TestClient},
@@ -308,34 +306,24 @@ async fn command_contains_write_concern_update_one() {
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.update_one(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "baz" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.update_one(
-        doc! { "foo": "baz" },
-        doc! { "$set": { "foo": "quux" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.update_one(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.update_one(doc! { "foo": "baz" }, doc! { "$set": { "foo": "quux" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -363,34 +351,24 @@ async fn command_contains_write_concern_update_many() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.update_many(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "baz" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.update_many(
-        doc! { "foo": "baz" },
-        doc! { "$set": { "foo": "quux" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.update_many(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.update_many(doc! { "foo": "baz" }, doc! { "$set": { "foo": "quux" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -471,32 +449,24 @@ async fn command_contains_write_concern_delete_one() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_one(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.delete_one(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.delete_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "delete"),
@@ -524,35 +494,27 @@ async fn command_contains_write_concern_delete_many() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_many(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_many(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_many(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_many(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "delete"),

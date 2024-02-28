@@ -2,8 +2,9 @@ use serde::Deserialize;
 
 use super::{run_crud_v1_test, Outcome, TestFile};
 use crate::{
+    action::Action,
     bson::{Bson, Document},
-    options::{Collation, DeleteOptions},
+    options::Collation,
     test::util::TestClient,
 };
 
@@ -50,13 +51,9 @@ async fn run_delete_many_test(test_file: TestFile) {
             }
         }
 
-        let options = DeleteOptions {
-            collation: arguments.collation,
-            ..Default::default()
-        };
-
         let result = coll
-            .delete_many(arguments.filter, options)
+            .delete_many(arguments.filter)
+            .optional(arguments.collation, |a, c| a.collation(c))
             .await
             .expect(&test_case.description);
 

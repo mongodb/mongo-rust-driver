@@ -85,7 +85,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.update_one(doc! {}, doc! { "$inc": {"x": 5 } }, None)
+                coll.update_one(doc! {}, doc! { "$inc": {"x": 5 } })
             ),
         )
         .await;
@@ -94,18 +94,18 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.update_many(doc! {}, doc! { "$inc": {"x": 5 } }, None)
+                coll.update_many(doc! {}, doc! { "$inc": {"x": 5 } })
             ),
         )
         .await;
         $test_func(
             "delete",
-            collection_op!($test_name, coll, coll.delete_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.delete_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
             "delete",
-            collection_op!($test_name, coll, coll.delete_many(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.delete_many(doc! { "x": 1 })),
         )
         .await;
         $test_func(
@@ -156,7 +156,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "distinct",
-            collection_op!($test_name, coll, coll.distinct("x", None, None)),
+            collection_op!($test_name, coll, coll.distinct("x", doc! {})),
         )
         .await;
         $test_func(

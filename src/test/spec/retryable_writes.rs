@@ -200,12 +200,12 @@ async fn transaction_ids_excluded() {
         !started.command.contains_key("txnNumber")
     };
 
-    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(excludes_txn_number("update"));
 
-    coll.delete_many(doc! {}, None).await.unwrap();
+    coll.delete_many(doc! {}).await.unwrap();
     assert!(excludes_txn_number("delete"));
 
     coll.aggregate(vec![
@@ -249,7 +249,7 @@ async fn transaction_ids_included() {
     coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
     assert!(includes_txn_number("insert"));
 
-    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(includes_txn_number("update"));
@@ -259,7 +259,7 @@ async fn transaction_ids_included() {
         .unwrap();
     assert!(includes_txn_number("update"));
 
-    coll.delete_one(doc! {}, None).await.unwrap();
+    coll.delete_one(doc! {}).await.unwrap();
     assert!(includes_txn_number("delete"));
 
     coll.find_one_and_delete(doc! {}, None).await.unwrap();

@@ -124,7 +124,7 @@ impl ClientSession {
     ///
     /// fn execute_transaction(coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session)?;
-    ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session)?;
+    ///     coll.delete_one(doc! { "y": 2 }).session(session).run()?;
     ///     Ok(())   
     /// }
     /// ```
