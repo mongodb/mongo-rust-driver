@@ -211,6 +211,16 @@ impl AuthMechanism {
                         "password must not be set for MONGODB-OIDC authentication",
                     ));
                 }
+                // TODO RUST-1670: handle ALLOWED_HOSTS
+                // let default_allowed = vec![
+                //     "*.mongodb.net",
+                //     "*.mongodb-dev.net",
+                //     "*.mongodb-qa.net",
+                //     "*.mongodbgov.net",
+                //     "localhost",
+                //     "127.0.0.1",
+                //     "::1",
+                // ]
                 Ok(())
             }
             _ => Ok(()),
