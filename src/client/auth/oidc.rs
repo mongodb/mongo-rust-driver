@@ -58,7 +58,7 @@ enum Callback {
     Human(Arc<CallbackInner>),
 }
 
-// TODO RUST-1497: This methods will be public
+// TODO RUST-1497: These methods will be public
 #[allow(dead_code)]
 impl Callback {
     /// Create a new instance with a human token request callback.
@@ -250,7 +250,7 @@ async fn authenticate_human(
     };
 
     // we'll go ahead and update the cache, also,
-    // TODO RUST 1662: Mofify this comment to just say we are updating the cache
+    // TODO RUST 1662: Modify this comment to just say we are updating the cache
     update_oidc_cache(credential, &idp_response, 1).await;
 
     let sasl_continue = SaslContinue::new(
@@ -305,7 +305,7 @@ async fn authenticate_machine(
     };
 
     // we'll go ahead and update the cache, also,
-    // TODO RUST 1662: Mofify this comment to just say we are updating the cache
+    // TODO RUST 1662: Modify this comment to just say we are updating the cache
     update_oidc_cache(credential, &idp_response, 1).await;
 
     let sasl_continue = SaslContinue::new(
