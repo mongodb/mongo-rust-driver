@@ -9,7 +9,7 @@ source ./.evergreen/env.sh
 if [ "$RUST_VERSION" != "" ]; then
   rustup toolchain install $RUST_VERSION
   TOOLCHAIN="+${RUST_VERSION}"
-  cp .evergreen/MSRV-Cargo.lock Cargo.lock
+  patch Cargo.toml .evergreen/MSRV-Cargo.toml.diff
 fi
 
 # Test with default features.
