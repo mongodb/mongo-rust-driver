@@ -32,8 +32,8 @@ impl From<TestCredential> for Credential {
                 .mechanism
                 .and_then(|s| AuthMechanism::from_str(s.as_str()).ok()),
             mechanism_properties: test_credential.mechanism_properties,
-            #[cfg(feature = "oidc-auth")]
-            oidc_callbacks: None,
+            #[cfg(feature = "tokio-runtime")]
+            oidc_callback: None,
         }
     }
 }

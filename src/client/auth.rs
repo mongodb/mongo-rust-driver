@@ -3,7 +3,7 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
-#[cfg(feature = "oidc-auth")]
+#[cfg(feature = "tokio-runtime")]
 pub(crate) mod oidc;
 mod plain;
 mod sasl;
@@ -90,7 +90,7 @@ pub enum AuthMechanism {
 
     /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.  NOTE: this is not supported by the Rust driver.
     // TODO RUST-1497: remove the NOTE.
-    #[cfg(feature = "oidc-auth")]
+    #[cfg(feature = "tokio-runtime")]
     MongoDbOidc,
 }
 
@@ -185,7 +185,7 @@ impl AuthMechanism {
 
                 Ok(())
             }
-            #[cfg(feature = "oidc-auth")]
+            #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbOidc => {
                 let is_automatic = credential
                     .mechanism_properties
@@ -240,7 +240,7 @@ impl AuthMechanism {
             AuthMechanism::Plain => PLAIN_STR,
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => MONGODB_AWS_STR,
-            #[cfg(feature = "oidc-auth")]
+            #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbOidc => MONGODB_OIDC_STR,
         }
     }
@@ -254,7 +254,7 @@ impl AuthMechanism {
             }
             AuthMechanism::MongoDbX509 => "$external",
             AuthMechanism::Plain => uri_db.unwrap_or("$external"),
-            #[cfg(feature = "oidc-auth")]
+            #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbOidc => "$external",
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => "$external",
@@ -284,7 +284,7 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
-            #[cfg(feature = "oidc-auth")]
+            #[cfg(feature = "tokio-runtime")]
             Self::MongoDbOidc => Ok(None),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
@@ -337,7 +337,7 @@ impl AuthMechanism {
                     .into(),
             }
             .into()),
-            #[cfg(feature = "oidc-auth")]
+            #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbOidc => {
                 oidc::authenticate_stream(stream, credential, server_api).await
             }
@@ -360,12 +360,12 @@ impl FromStr for AuthMechanism {
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
-            #[cfg(feature = "oidc-auth")]
+            #[cfg(feature = "tokio-runtime")]
             MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
-            #[cfg(not(feature = "oidc-auth"))]
+            #[cfg(not(feature = "tokio-runtime"))]
             MONGODB_OIDC_STR => Err(ErrorKind::InvalidArgument {
-                message: "MONGODB-OIDC auth is only supported with the oidc-auth feature flag and \
-                          the tokio runtime"
+                message: "MONGODB-OIDC auth is only supported with the tokio-runtime feature flag \
+                          and the tokio runtime"
                     .into(),
             }
             .into()),
@@ -423,7 +423,7 @@ pub struct Credential {
     // to how a user would interact with it.
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[cfg(feature = "oidc-auth")]
+    #[cfg(feature = "tokio-runtime")]
     pub(crate) oidc_callback: Option<oidc::State>,
 }
 

@@ -66,10 +66,6 @@ bson-uuid-1 = ["bson/uuid-1"]
 # This can only be used with the tokio-runtime feature flag.
 aws-auth = ["reqwest"]
 
-# Enable support for MONGODB-OIDC authentication.
-# This can only be used with the tokio-runtime feature flag.
-oidc-auth = ["reqwest"]
-
 # Enable support for on-demand Azure KMS credentials.
 # This can only be used with the tokio-runtime feature flag.
 azure-kms = ["reqwest"]

@@ -50,16 +50,14 @@ impl State {
     }
 }
 
-// TODO RUST-1497: This struct will be public
-#[allow(dead_code)]
 #[derive(Clone)]
-struct Callback {
+#[non_exhaustive]
+pub struct Callback {
     inner: Arc<CallbackInner>,
     kind: CallbackKind,
 }
 
-// TODO RUST-1497: This enum will be public
-#[allow(dead_code)]
+#[non_exhaustive]
 #[derive(Clone, Copy)]
 enum CallbackKind {
     Human,
