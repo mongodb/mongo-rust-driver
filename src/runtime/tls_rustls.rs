@@ -2,9 +2,7 @@ use std::{
     convert::TryFrom,
     fs::File,
     io::{BufReader, Seek},
-    pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
     time::SystemTime,
 };
 
@@ -16,10 +14,7 @@ use rustls::{
     RootCertStore,
 };
 use rustls_pemfile::{certs, read_one, Item};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpStream,
-};
+use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -28,10 +23,7 @@ use crate::{
     error::{ErrorKind, Result},
 };
 
-#[derive(Debug)]
-pub(crate) struct AsyncTlsStream {
-    inner: tokio_rustls::client::TlsStream<TcpStream>,
-}
+pub(super) type TlsStream = tokio_rustls::client::TlsStream<TcpStream>;
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
 /// and reuse it for multiple connections.
@@ -52,52 +44,22 @@ impl TlsConfig {
     }
 }
 
-impl AsyncTlsStream {
-    pub(crate) async fn connect(
-        host: &str,
-        tcp_stream: TcpStream,
-        cfg: &TlsConfig,
-    ) -> Result<Self> {
-        let name = ServerName::try_from(host).map_err(|e| ErrorKind::DnsResolve {
-            message: format!("could not resolve {:?}: {}", host, e),
-        })?;
+pub(super) async fn tls_connect(
+    host: &str,
+    tcp_stream: TcpStream,
+    cfg: &TlsConfig,
+) -> Result<TlsStream> {
+    let name = ServerName::try_from(host).map_err(|e| ErrorKind::DnsResolve {
+        message: format!("could not resolve {:?}: {}", host, e),
+    })?;
 
-        let conn = cfg
-            .connector
-            .connect_with(name, tcp_stream, |c| {
-                c.set_buffer_limit(None);
-            })
-            .await?;
-        Ok(Self { inner: conn })
-    }
-}
-
-impl AsyncRead for AsyncTlsStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for AsyncTlsStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
-    }
+    let conn = cfg
+        .connector
+        .connect_with(name, tcp_stream, |c| {
+            c.set_buffer_limit(None);
+        })
+        .await?;
+    Ok(conn)
 }
 
 /// Converts `TlsOptions` into a rustls::ClientConfig.

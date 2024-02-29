@@ -14,7 +14,10 @@ use crate::{
     runtime,
 };
 
-use super::{tls::AsyncTlsStream, TlsConfig};
+use super::{
+    tls::{tls_connect, TlsStream},
+    TlsConfig,
+};
 
 pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
@@ -29,7 +32,7 @@ pub(crate) enum AsyncStream {
     Tcp(TcpStream),
 
     /// A TLS connection over TCP.
-    Tls(AsyncTlsStream),
+    Tls(TlsStream),
 
     /// A Unix domain socket connection.
     #[cfg(unix)]
@@ -47,9 +50,7 @@ impl AsyncStream {
 
                 // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
                 match tls_cfg {
-                    Some(cfg) => Ok(AsyncStream::Tls(
-                        AsyncTlsStream::connect(host, inner, cfg).await?,
-                    )),
+                    Some(cfg) => Ok(AsyncStream::Tls(tls_connect(host, inner, cfg).await?)),
                     None => Ok(AsyncStream::Tcp(inner)),
                 }
             }

@@ -1,17 +1,10 @@
-use std::{
-    pin::Pin,
-    sync::Once,
-    task::{Context, Poll},
-};
+use std::{pin::Pin, sync::Once};
 
 use openssl::{
     error::ErrorStack,
     ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
 };
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpStream,
-};
+use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
 use crate::{
@@ -19,10 +12,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
 };
 
-#[derive(Debug)]
-pub(crate) struct AsyncTlsStream {
-    inner: SslStream<TcpStream>,
-}
+pub(super) type TlsStream = SslStream<TcpStream>;
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
 /// and reuse it for multiple connections.
@@ -54,56 +44,26 @@ impl TlsConfig {
     }
 }
 
-impl AsyncTlsStream {
-    pub(crate) async fn connect(
-        host: &str,
-        tcp_stream: TcpStream,
-        cfg: &TlsConfig,
-    ) -> Result<Self> {
-        init_trust();
+pub(super) async fn tls_connect(
+    host: &str,
+    tcp_stream: TcpStream,
+    cfg: &TlsConfig,
+) -> Result<TlsStream> {
+    init_trust();
 
-        let mut stream = make_ssl_stream(host, tcp_stream, cfg).map_err(|err| {
-            Error::from(ErrorKind::InvalidTlsConfig {
-                message: err.to_string(),
-            })
-        })?;
-        Pin::new(&mut stream).connect().await.map_err(|err| {
-            use std::io;
-            match err.into_io_error() {
-                Ok(err) => err,
-                Err(err) => io::Error::new(io::ErrorKind::Other, err),
-            }
-        })?;
-        Ok(AsyncTlsStream { inner: stream })
-    }
-}
-
-impl AsyncRead for AsyncTlsStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for AsyncTlsStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
-    }
+    let mut stream = make_ssl_stream(host, tcp_stream, cfg).map_err(|err| {
+        Error::from(ErrorKind::InvalidTlsConfig {
+            message: err.to_string(),
+        })
+    })?;
+    Pin::new(&mut stream).connect().await.map_err(|err| {
+        use std::io;
+        match err.into_io_error() {
+            Ok(err) => err,
+            Err(err) => io::Error::new(io::ErrorKind::Other, err),
+        }
+    })?;
+    Ok(stream)
 }
 
 fn make_openssl_connector(cfg: TlsOptions) -> std::result::Result<SslConnector, ErrorStack> {
