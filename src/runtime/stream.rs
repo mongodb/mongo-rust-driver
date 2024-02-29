@@ -19,7 +19,7 @@ use super::{tls::AsyncTlsStream, TlsConfig};
 pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 
-/// A runtime-agnostic async stream possibly using TLS.
+/// An async stream possibly using TLS.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum AsyncStream {
@@ -33,7 +33,7 @@ pub(crate) enum AsyncStream {
 
     /// A Unix domain socket connection.
     #[cfg(unix)]
-    Unix(unix::AsyncUnixStream),
+    Unix(tokio::net::UnixStream),
 }
 
 impl AsyncStream {
@@ -54,112 +54,9 @@ impl AsyncStream {
                 }
             }
             #[cfg(unix)]
-            ServerAddress::Unix { .. } => Ok(AsyncStream::Unix(
-                unix::AsyncUnixStream::connect(&address).await?,
+            ServerAddress::Unix { path } => Ok(AsyncStream::Unix(
+                tokio::net::UnixStream::connect(path.as_path()).await?,
             )),
-        }
-    }
-}
-
-/// A runtime-agnostic async unix domain socket stream.
-#[cfg(unix)]
-mod unix {
-    use std::{
-        ops::DerefMut,
-        path::Path,
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
-    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-
-    use crate::{client::options::ServerAddress, error::Result};
-
-    #[derive(Debug)]
-    pub(crate) enum AsyncUnixStream {
-        /// Wrapper around `tokio::net:UnixStream`.
-        Tokio(tokio::net::UnixStream),
-    }
-
-    impl From<tokio::net::UnixStream> for AsyncUnixStream {
-        fn from(stream: tokio::net::UnixStream) -> Self {
-            Self::Tokio(stream)
-        }
-    }
-
-    impl AsyncUnixStream {
-        async fn try_connect(address: &Path) -> Result<Self> {
-            use tokio::net::UnixStream;
-
-            let stream = UnixStream::connect(address).await?;
-            Ok(stream.into())
-        }
-
-        pub(crate) async fn connect(address: &ServerAddress) -> Result<Self> {
-            debug_assert!(
-                matches!(address, ServerAddress::Unix { .. }),
-                "address must be unix"
-            );
-
-            match address {
-                ServerAddress::Unix { ref path } => Self::try_connect(path.as_path()).await,
-                _ => unreachable!(),
-            }
-        }
-    }
-
-    impl AsyncRead for AsyncUnixStream {
-        fn poll_read(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            buf: &mut ReadBuf,
-        ) -> Poll<tokio::io::Result<()>> {
-            match self.deref_mut() {
-                Self::Tokio(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
-            }
-        }
-    }
-
-    impl AsyncWrite for AsyncUnixStream {
-        fn poll_write(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            buf: &[u8],
-        ) -> Poll<tokio::io::Result<usize>> {
-            match self.deref_mut() {
-                Self::Tokio(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
-            }
-        }
-
-        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
-            match self.deref_mut() {
-                Self::Tokio(ref mut inner) => Pin::new(inner).poll_flush(cx),
-            }
-        }
-
-        fn poll_shutdown(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context,
-        ) -> Poll<tokio::io::Result<()>> {
-            match self.deref_mut() {
-                Self::Tokio(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
-            }
-        }
-
-        fn poll_write_vectored(
-            self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            bufs: &[futures_io::IoSlice<'_>],
-        ) -> Poll<std::result::Result<usize, std::io::Error>> {
-            match self.get_mut() {
-                Self::Tokio(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-            }
-        }
-
-        fn is_write_vectored(&self) -> bool {
-            match self {
-                Self::Tokio(ref inner) => inner.is_write_vectored(),
-            }
         }
     }
 }
