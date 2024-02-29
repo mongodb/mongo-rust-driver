@@ -5,8 +5,7 @@ use crate::{db::options::TimeseriesOptions, test::log_uncaptured, Client};
 
 type Result<T> = anyhow::Result<T>;
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn list_collections_timeseries() -> Result<()> {
     let client = Client::test_builder().build().await;
     if client.server_version_lt(5, 0) {

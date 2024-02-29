@@ -23,15 +23,9 @@ use crate::{
 ///
 /// ```rust
 /// 
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # use mongodb::{bson::Document, Client, error::Result};
-/// # #[cfg(feature = "async-std-runtime")]
-/// # use async_std::task;
-/// # #[cfg(feature = "tokio-runtime")]
-/// # use tokio::task;
 /// #
 /// #
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// let db = client.database("items");
@@ -39,7 +33,7 @@ use crate::{
 /// for i in 0..5 {
 ///     let db_ref = db.clone();
 ///
-///     task::spawn(async move {
+///     tokio::task::spawn(async move {
 ///         let collection = db_ref.collection::<Document>(&format!("coll{}", i));
 ///
 ///         // Do something with the collection

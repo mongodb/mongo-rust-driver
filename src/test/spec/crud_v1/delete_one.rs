@@ -79,8 +79,7 @@ async fn run_delete_one_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     run_crud_v1_test(&["crud", "v1", "write"], run_delete_one_test).await;
 }

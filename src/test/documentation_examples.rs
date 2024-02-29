@@ -1369,7 +1369,6 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
 type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn stable_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
@@ -1734,6 +1733,7 @@ async fn index_examples() -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_variables)]
 async fn change_streams_examples() -> Result<()> {
     use crate::{options::FullDocumentType, runtime};
     use std::time::Duration;
@@ -1753,7 +1753,7 @@ async fn change_streams_examples() -> Result<()> {
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let writer_inventory = inventory.clone();
     let handle = runtime::spawn(async move {
-        let mut interval = runtime::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
                 _ = interval.tick() => {
@@ -1877,8 +1877,7 @@ async fn convenient_transaction_examples() -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn test() {
     let client = TestClient::new().await;
     let coll = client

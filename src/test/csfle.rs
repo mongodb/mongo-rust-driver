@@ -10,8 +10,6 @@ use std::{
 };
 
 use anyhow::Context;
-#[cfg(not(feature = "tokio-runtime"))]
-use async_std::net::TcpListener;
 use bson::{
     doc,
     rawdoc,
@@ -26,7 +24,6 @@ use bson::{
 use futures_util::TryStreamExt;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
 use once_cell::sync::Lazy;
-#[cfg(feature = "tokio-runtime")]
 use tokio::net::TcpListener;
 
 use crate::{
@@ -192,8 +189,7 @@ fn check_env(name: &str, kmip: bool) -> bool {
 }
 
 // Prose test 1. Custom Key Material Test
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_key_material() -> Result<()> {
     if !check_env("custom_key_material", false) {
         return Ok(());
@@ -242,8 +238,7 @@ async fn custom_key_material() -> Result<()> {
 }
 
 // Prose test 2. Data Key and Double Encryption
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn data_key_double_encryption() -> Result<()> {
     if !check_env("data_key_double_encryption", true) {
         return Ok(());
@@ -433,8 +428,7 @@ fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
 }
 
 // Prose test 3. External Key Vault Test
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn external_key_vault() -> Result<()> {
     if !check_env("external_key_vault", true) {
         return Ok(());
@@ -535,8 +529,7 @@ fn load_testdata(name: &str) -> Result<Document> {
 }
 
 // Prose test 4. BSON Size Limits and Batch Splitting
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bson_size_limits() -> Result<()> {
     if !check_env("bson_size_limits", false) {
         return Ok(());
@@ -655,8 +648,7 @@ async fn bson_size_limits() -> Result<()> {
 }
 
 // Prose test 5. Views Are Prohibited
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn views_prohibited() -> Result<()> {
     if !check_env("views_prohibited", false) {
         return Ok(());
@@ -727,8 +719,7 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
 }
 
 // Prose test 6. Corpus Test (collection schema)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn corpus_coll_schema() -> Result<()> {
     if !check_env("corpus_coll_schema", true) {
         return Ok(());
@@ -738,8 +729,7 @@ async fn corpus_coll_schema() -> Result<()> {
 }
 
 // Prose test 6. Corpus Test (local schema)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn corpus_local_schema() -> Result<()> {
     if !check_env("corpus_local_schema", true) {
         return Ok(());
@@ -1017,8 +1007,7 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 1. aws, no endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_aws_no_endpoint", false) {
         return Ok(());
@@ -1028,8 +1017,7 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 2. aws, endpoint without port)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_no_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_no_port", false) {
         return Ok(());
@@ -1039,8 +1027,7 @@ async fn custom_endpoint_aws_no_port() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 3. aws, endpoint with port)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_with_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_with_port", false) {
         return Ok(());
@@ -1050,8 +1037,7 @@ async fn custom_endpoint_aws_with_port() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 4. aws, endpoint with invalid port)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_invalid_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_port", false) {
         return Ok(());
@@ -1073,8 +1059,7 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 5. aws, invalid region)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_invalid_region() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_region", false) {
         return Ok(());
@@ -1096,8 +1081,7 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 6. aws, invalid domain)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_domain", false) {
         return Ok(());
@@ -1119,8 +1103,7 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 7. azure)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_azure() -> Result<()> {
     if !check_env("custom_endpoint_azure", false) {
         return Ok(());
@@ -1146,8 +1129,7 @@ async fn custom_endpoint_azure() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 8. gcp)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_gcp_valid() -> Result<()> {
     if !check_env("custom_endpoint_gcp_valid", false) {
         return Ok(());
@@ -1176,8 +1158,7 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 9. gcp, invalid endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_gcp_invalid() -> Result<()> {
     if !check_env("custom_endpoint_gcp_invalid", false) {
         return Ok(());
@@ -1206,8 +1187,7 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 10. kmip, no endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_no_endpoint", true) {
         return Ok(());
@@ -1232,8 +1212,7 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 11. kmip, valid endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_valid_endpoint", true) {
         return Ok(());
@@ -1250,8 +1229,7 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 12. kmip, invalid endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_invalid_endpoint", true) {
         return Ok(());
@@ -1270,8 +1248,7 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via loading shared library)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_shared_library", false) {
         return Ok(());
@@ -1318,8 +1295,7 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via mongocryptdBypassSpawn)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_spawn", false) {
         return Ok(());
@@ -1395,8 +1371,7 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassAutoEncryption)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
         return Ok(());
@@ -1405,8 +1380,7 @@ async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassQueryAnalysis)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_query_analysis", false) {
         return Ok(());
@@ -1415,8 +1389,7 @@ async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
 }
 
 // Prose test 9. Deadlock Tests
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn deadlock() -> Result<()> {
     if !check_env("deadlock", false) {
         return Ok(());
@@ -1678,8 +1651,7 @@ impl DeadlockExpectation {
 }
 
 // Prose test 10. KMS TLS Tests
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn kms_tls() -> Result<()> {
     if !check_env("kms_tls", true) {
         return Ok(());
@@ -1726,8 +1698,7 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
 }
 
 // Prose test 11. KMS TLS Options Tests
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn kms_tls_options() -> Result<()> {
     if !check_env("kms_tls_options", true) {
         return Ok(());
@@ -2006,8 +1977,7 @@ async fn fle2v2_ok(name: &str) -> bool {
 }
 
 // Prose test 12. Explicit Encryption (Case 1: can insert encrypted indexed and find)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_1() -> Result<()> {
     if !check_env("explicit_encryption_case_1", false) {
         return Ok(());
@@ -2064,8 +2034,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
 
 // Prose test 12. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero
 // contention)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_2() -> Result<()> {
     if !check_env("explicit_encryption_case_2", false) {
         return Ok(());
@@ -2142,8 +2111,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
 }
 
 // Prose test 12. Explicit Encryption (Case 3: can insert encrypted unindexed)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_3() -> Result<()> {
     if !check_env("explicit_encryption_case_3", false) {
         return Ok(());
@@ -2191,8 +2159,7 @@ async fn explicit_encryption_case_3() -> Result<()> {
 }
 
 // Prose test 12. Explicit Encryption (Case 4: can roundtrip encrypted indexed)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_4() -> Result<()> {
     if !check_env("explicit_encryption_case_4", false) {
         return Ok(());
@@ -2226,8 +2193,7 @@ async fn explicit_encryption_case_4() -> Result<()> {
 }
 
 // Prose test 12. Explicit Encryption (Case 5: can roundtrip encrypted unindexed)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_5() -> Result<()> {
     if !check_env("explicit_encryption_case_5", false) {
         return Ok(());
@@ -2328,8 +2294,7 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
 }
 
 // Prose test 13. Unique Index on keyAltNames (Case 1: createDataKey())
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     if !check_env("unique_index_keyaltnames_create_data_key", false) {
         return Ok(());
@@ -2371,8 +2336,7 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
 }
 
 // Prose test 13. Unique Index on keyAltNames (Case 2: addKeyAltName())
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
     if !check_env("unique_index_keyaltnames_add_key_alt_name", false) {
         return Ok(());
@@ -2453,8 +2417,7 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
 }
 
 // Prose test 14. Decryption Events (Case 1: Command Error)
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn decryption_events_command_error() -> Result<()> {
     if !check_env("decryption_events_command_error", false) {
         return Ok(());
@@ -2483,8 +2446,7 @@ async fn decryption_events_command_error() -> Result<()> {
 }
 
 // Prose test 14. Decryption Events (Case 2: Network Error)
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn decryption_events_network_error() -> Result<()> {
     if !check_env("decryption_events_network_error", false) {
         return Ok(());
@@ -2516,8 +2478,7 @@ async fn decryption_events_network_error() -> Result<()> {
 }
 
 // Prose test 14. Decryption Events (Case 3: Decrypt Error)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn decryption_events_decrypt_error() -> Result<()> {
     if !check_env("decryption_events_decrypt_error", false) {
         return Ok(());
@@ -2548,8 +2509,7 @@ async fn decryption_events_decrypt_error() -> Result<()> {
 }
 
 // Prose test 14. Decryption Events (Case 4: Decrypt Success)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn decryption_events_decrypt_success() -> Result<()> {
     if !check_env("decryption_events_decrypt_success", false) {
         return Ok(());
@@ -2672,8 +2632,7 @@ impl crate::event::command::CommandEventHandler for DecryptionEventsHandler {
 
 // Prose test 15. On-demand AWS Credentials (failure)
 #[cfg(feature = "aws-auth")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn on_demand_aws_failure() -> Result<()> {
     if !check_env("on_demand_aws_failure", false) {
         return Ok(());
@@ -2704,8 +2663,7 @@ async fn on_demand_aws_failure() -> Result<()> {
 
 // Prose test 15. On-demand AWS Credentials (success)
 #[cfg(feature = "aws-auth")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn on_demand_aws_success() -> Result<()> {
     if !check_env("on_demand_aws_success", false) {
         return Ok(());
@@ -2731,8 +2689,7 @@ async fn on_demand_aws_success() -> Result<()> {
 
 // Prose test 17. On-demand GCP Credentials
 #[cfg(feature = "gcp-kms")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn on_demand_gcp_credentials() -> Result<()> {
     let util_client = TestClient::new().await.into_client();
     let client_encryption = ClientEncryption::new(
@@ -2770,8 +2727,7 @@ async fn on_demand_gcp_credentials() -> Result<()> {
 
 // Prose test 18. Azure IMDS Credentials
 #[cfg(feature = "azure-kms")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn azure_imds() -> Result<()> {
     if !check_env("azure_imds", false) {
         return Ok(());
@@ -2842,8 +2798,7 @@ async fn azure_imds() -> Result<()> {
 
 // Prose test 19. Azure IMDS Credentials Integration Test (case 1: failure)
 #[cfg(feature = "azure-kms")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn azure_imds_integration_failure() -> Result<()> {
     if !check_env("azure_imds_integration_failure", false) {
         return Ok(());
@@ -2870,8 +2825,7 @@ async fn azure_imds_integration_failure() -> Result<()> {
 }
 
 // Prose test 20. Bypass creating mongocryptd client when shared library is loaded
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_client() -> Result<()> {
     if !check_env("bypass_mongocryptd_client", false) {
         return Ok(());
@@ -2918,14 +2872,12 @@ async fn bypass_mongocryptd_client() -> Result<()> {
 }
 
 // Prost test 21. Automatic Data Encryption Keys
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn auto_encryption_keys_local() -> Result<()> {
     auto_encryption_keys(MasterKey::Local).await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn auto_encryption_keys_aws() -> Result<()> {
     auto_encryption_keys(MasterKey::Aws {
         region: "us-east-1".to_string(),
@@ -3043,8 +2995,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
 }
 
 // Prose test 22. Range explicit encryption
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn range_explicit_encryption() -> Result<()> {
     if !fle2v2_ok("range_explicit_encryption").await {
         return Ok(());
@@ -3400,19 +3351,11 @@ fn get_raw_bson_from_num(bson_type: &str, num: i32) -> RawBson {
 }
 
 async fn bind(addr: &str) -> Result<TcpListener> {
-    #[cfg(feature = "tokio-runtime")]
-    {
-        Ok(TcpListener::bind(addr.parse::<std::net::SocketAddr>()?).await?)
-    }
-    #[cfg(not(feature = "tokio-runtime"))]
-    {
-        Ok(TcpListener::bind(addr).await?)
-    }
+    Ok(TcpListener::bind(addr.parse::<std::net::SocketAddr>()?).await?)
 }
 
 // FLE 2.0 Documentation Example
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn fle2_example() -> Result<()> {
     if !check_env("fle2_example", false) {
         return Ok(());

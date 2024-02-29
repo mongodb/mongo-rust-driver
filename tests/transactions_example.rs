@@ -1,5 +1,3 @@
-#![cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
-
 // START TRANSACTIONS EXAMPLE
 use mongodb::{
     bson::{doc, Document},

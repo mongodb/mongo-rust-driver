@@ -54,7 +54,7 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Runs an aggregation operation.
     ///
@@ -68,7 +68,7 @@ impl crate::sync::Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Runs an aggregation operation.
     ///

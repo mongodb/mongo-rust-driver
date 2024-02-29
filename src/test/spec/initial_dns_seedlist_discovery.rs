@@ -6,7 +6,6 @@ use crate::{
     bson::doc,
     client::Client,
     options::{ClientOptions, ResolverConfig},
-    runtime,
     test::{get_client_options, log_uncaptured, run_spec_test, TestClient},
 };
 
@@ -174,7 +173,7 @@ async fn run_test(mut test_file: TestFile) {
                 )
             }
 
-            runtime::delay_for(Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 
@@ -201,8 +200,7 @@ async fn run_test(mut test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn replica_set() {
     let client = TestClient::new().await;
     let skip =
@@ -225,8 +223,7 @@ async fn replica_set() {
     run_spec_test(&["initial-dns-seedlist-discovery", "replica-set"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn load_balanced() {
     let client = TestClient::new().await;
     if !client.is_load_balanced() {
@@ -243,8 +240,7 @@ async fn load_balanced() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn sharded() {
     let client = TestClient::new().await;
     if !client.is_sharded() {

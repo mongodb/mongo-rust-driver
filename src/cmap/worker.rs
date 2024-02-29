@@ -243,7 +243,7 @@ impl ConnectionPoolWorker {
             max_connecting,
         };
 
-        runtime::execute(async move {
+        runtime::spawn(async move {
             worker.execute().await;
         });
 
@@ -254,7 +254,7 @@ impl ConnectionPoolWorker {
     /// dropped. Once all handles are dropped, the pool will close any available connections and
     /// emit a pool closed event.
     async fn execute(mut self) {
-        let mut maintenance_interval = runtime::interval(self.maintenance_frequency);
+        let mut maintenance_interval = tokio::time::interval(self.maintenance_frequency);
         let mut shutdown_ack = None;
 
         loop {
@@ -327,10 +327,7 @@ impl ConnectionPoolWorker {
                                 break;
                             }
                             BroadcastMessage::FillPool => {
-                                crate::runtime::execute(fill_pool(
-                                    self.weak_requester.clone(),
-                                    ack,
-                                ));
+                                crate::runtime::spawn(fill_pool(self.weak_requester.clone(), ack));
                             }
                             #[cfg(test)]
                             BroadcastMessage::SyncWorkers => {
@@ -630,7 +627,7 @@ impl ConnectionPoolWorker {
                 let updater = self.server_updater.clone();
                 let credential = self.credential.clone();
 
-                runtime::execute(async move {
+                runtime::spawn(async move {
                     let connection = establish_connection(
                         establisher,
                         pending_connection,

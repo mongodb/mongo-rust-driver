@@ -7,7 +7,6 @@ use crate::{
     action::Action,
     error::Result,
     operation::append_options,
-    runtime,
     selection_criteria::SelectionCriteria,
     Client,
 };
@@ -78,12 +77,17 @@ impl Drop for FailPointGuard {
         let client = self.client.clone();
         let name = self.failpoint_name.clone();
 
-        let result = runtime::block_on(async move {
-            client
-                .database("admin")
-                .run_command(doc! { "configureFailPoint": name, "mode": "off" })
-                .optional(self.criteria.clone(), |a, c| a.selection_criteria(c))
-                .await
+        // This forces the Tokio runtime to not finish shutdown until this future has completed.
+        // Unfortunately, this also means that tests using FailPointGuards have to use the
+        // multi-threaded runtime.
+        let result = tokio::task::block_in_place(|| {
+            futures::executor::block_on(async move {
+                client
+                    .database("admin")
+                    .run_command(doc! { "configureFailPoint": name, "mode": "off" })
+                    .optional(self.criteria.clone(), |a, c| a.selection_criteria(c))
+                    .await
+            })
         });
 
         if let Err(e) = result {

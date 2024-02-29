@@ -18,8 +18,7 @@ use crate::{
     },
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run_unified() {
     run_unified_tests(&["gridfs"])
         // The Rust driver doesn't support the disableMD5 option.
@@ -29,8 +28,7 @@ async fn run_unified() {
         .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn download_stream_across_buffers() {
     let client = TestClient::new().await;
 
@@ -74,8 +72,7 @@ async fn download_stream_across_buffers() {
     assert_eq!(buf, data);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn upload_stream() {
     let client = TestClient::new().await;
     let bucket_options = GridFsBucketOptions::builder().chunk_size_bytes(4).build();
@@ -128,8 +125,7 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
     assert_eq!(file.filename, Some(filename));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn upload_stream_multiple_buffers() {
     let client = TestClient::new().await;
     let bucket_options = GridFsBucketOptions::builder().chunk_size_bytes(3).build();
@@ -180,8 +176,7 @@ async fn upload_stream_multiple_buffers() {
     assert_eq!(uploaded, data);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn upload_stream_errors() {
     let client = TestClient::new().await;
     let client = if client.is_sharded() {
@@ -252,8 +247,7 @@ async fn upload_stream_errors() {
     assert_closed(&bucket, upload_stream).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn drop_aborts() {
     let client = TestClient::new().await;
     let bucket = client.database("upload_stream_abort").gridfs_bucket(None);
@@ -267,8 +261,7 @@ async fn drop_aborts() {
     assert_no_chunks_written(&bucket, &id).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn write_future_dropped() {
     let client = TestClient::new().await;
     let bucket = client
@@ -332,8 +325,7 @@ async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
         .is_none());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn test_gridfs_bucket_find_one() {
     let data = &[1, 2, 3, 4];
     let client = TestClient::new().await;

@@ -96,10 +96,7 @@ impl TestRunner {
     }
 
     pub(crate) async fn new_with_connection_string(connection_string: &str) -> Self {
-        #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
         let options = ClientOptions::parse(connection_string).await.unwrap();
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        let options = ClientOptions::parse(connection_string).unwrap();
         Self {
             internal_client: TestClient::with_options(Some(options)).await,
             entities: Arc::new(RwLock::new(EntityMap::new())),
@@ -239,13 +236,13 @@ impl TestRunner {
                 // implicit session used in the first operation is returned to the pool before
                 // the second operation is executed.
                 if test_case.description == "Server supports implicit sessions" {
-                    runtime::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
 
             if let Some(ref events) = test_case.expect_events {
                 // Hack: make sure in-flight events are recorded.
-                runtime::delay_for(Duration::from_millis(500)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
                 for expected in events {
                     let entities = self.entities.read().await;
                     let entity = entities.get(&expected.client).unwrap();
@@ -557,7 +554,7 @@ impl TestRunner {
                     let (sender, mut receiver) = mpsc::unbounded_channel::<ThreadMessage>();
                     let runner = self.clone();
                     let d = description.as_ref().to_string();
-                    runtime::execute(async move {
+                    runtime::spawn(async move {
                         while let Some(msg) = receiver.recv().await {
                             match msg {
                                 ThreadMessage::ExecuteOperation(op) => {

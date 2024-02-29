@@ -12,8 +12,7 @@ use crate::{
     SearchIndexModel,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     if env::var("INDEX_MANAGEMENT_TEST_UNIFIED").is_err() {
         log_uncaptured(
@@ -25,8 +24,7 @@ async fn run() {
 }
 
 /// Search Index Case 1: Driver can successfully create and list search indexes
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn search_index_create_list() {
     if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
@@ -73,8 +71,7 @@ async fn search_index_create_list() {
 }
 
 /// Search Index Case 2: Driver can successfully create multiple indexes in batch
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn search_index_create_multiple() {
     if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
@@ -141,8 +138,7 @@ async fn search_index_create_multiple() {
 }
 
 /// Search Index Case 3: Driver can successfully drop search indexes
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn search_index_drop() {
     if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
@@ -200,8 +196,7 @@ async fn search_index_drop() {
 }
 
 /// Search Index Case 4: Driver can update a search index
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn search_index_update() {
     if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
@@ -273,8 +268,7 @@ async fn search_index_update() {
 }
 
 /// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn search_index_drop_not_found() {
     if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");

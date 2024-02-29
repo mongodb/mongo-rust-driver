@@ -103,60 +103,54 @@ async fn run_test(test_file: TestFile) {
             );
         }
     } else if test_file.error == Some(true) {
-        // skip on sync to avoid compilation conflicts with the sync version of
-        // ClientOptions::parse.
-        #[cfg(not(any(feature = "sync", feature = "tokio-sync")))]
-        {
-            use crate::{
-                client::options::ClientOptions,
-                selection_criteria::SelectionCriteria,
-                Client,
-            };
+        use crate::{
+            client::options::ClientOptions,
+            selection_criteria::SelectionCriteria,
+            Client,
+        };
 
-            let mut options = Vec::new();
-            if let Some(ref mode) = test_file.read_preference.mode {
-                options.push(format!("readPreference={}", mode));
-            }
-            if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
-                options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
-            }
+        let mut options = Vec::new();
+        if let Some(ref mode) = test_file.read_preference.mode {
+            options.push(format!("readPreference={}", mode));
+        }
+        if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
+            options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
+        }
+        if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
+            options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
+        }
+
+        let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
+        ClientOptions::parse(uri_str)
+            .await
+            .err()
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected client construction to fail with read preference {:#?}",
+                    test_file.read_preference
+                )
+            });
+
+        // if the options contain a read preference that is supported by the type system, ensure
+        // that it still can't be used to construct a client.
+        if let Ok(rp) = test_file.read_preference.try_into() {
+            let mut opts = ClientOptions::builder()
+                .selection_criteria(SelectionCriteria::ReadPreference(rp))
+                .build();
             if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
-                options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
+                opts.heartbeat_freq = Some(Duration::from_secs(heartbeat_freq));
             }
-
-            let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
-            ClientOptions::parse(uri_str)
-                .await
-                .err()
-                .unwrap_or_else(|| {
-                    panic!(
-                        "expected client construction to fail with read preference {:#?}",
-                        test_file.read_preference
-                    )
-                });
-
-            // if the options contain a read preference that is supported by the type system, ensure
-            // that it still can't be used to construct a client.
-            if let Ok(rp) = test_file.read_preference.try_into() {
-                let mut opts = ClientOptions::builder()
-                    .selection_criteria(SelectionCriteria::ReadPreference(rp))
-                    .build();
-                if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
-                    opts.heartbeat_freq = Some(Duration::from_secs(heartbeat_freq));
-                }
-                Client::with_options(opts.clone()).err().unwrap_or_else(|| {
-                    panic!(
-                        "expected client construction to fail with options: {:#?}",
-                        opts
-                    )
-                });
-            }
+            Client::with_options(opts.clone()).err().unwrap_or_else(|| {
+                panic!(
+                    "expected client construction to fail with options: {:#?}",
+                    opts
+                )
+            });
         }
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_replica_set_no_primary() {
     run_spec_test(
         &[
@@ -170,8 +164,7 @@ async fn server_selection_replica_set_no_primary() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_replica_set_with_primary() {
     run_spec_test(
         &[
@@ -185,8 +178,7 @@ async fn server_selection_replica_set_with_primary() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_sharded() {
     run_spec_test(
         &["server-selection", "server_selection", "Sharded", "read"],
@@ -195,8 +187,7 @@ async fn server_selection_sharded() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_single() {
     run_spec_test(
         &["server-selection", "server_selection", "Single", "read"],
@@ -205,8 +196,7 @@ async fn server_selection_single() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_unknown() {
     run_spec_test(
         &["server-selection", "server_selection", "Unknown", "read"],
@@ -215,8 +205,7 @@ async fn server_selection_unknown() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_load_balanced() {
     run_spec_test(
         &[
@@ -230,32 +219,27 @@ async fn server_selection_load_balanced() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn max_staleness_replica_set_no_primary() {
     run_spec_test(&["max-staleness", "ReplicaSetNoPrimary"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn max_staleness_replica_set_with_primary() {
     run_spec_test(&["max-staleness", "ReplicaSetWithPrimary"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn max_staleness_sharded() {
     run_spec_test(&["max-staleness", "Sharded"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn max_staleness_single() {
     run_spec_test(&["max-staleness", "Single"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn max_staleness_unknown() {
     run_spec_test(&["max-staleness", "Unknown"], run_test).await;
 }

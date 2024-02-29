@@ -63,8 +63,7 @@ fn test_snappy_compressor() {
     assert_eq!(b"foobarSNAPPY", original_bytes.as_slice());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[cfg(feature = "zlib-compression")]
 async fn ping_server_with_zlib_compression() {
     let mut client_options = get_client_options().await.clone();
@@ -72,8 +71,7 @@ async fn ping_server_with_zlib_compression() {
     send_ping_with_compression(client_options).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[cfg(feature = "zstd-compression")]
 async fn ping_server_with_zstd_compression() {
     let mut client_options = get_client_options().await.clone();
@@ -81,8 +79,7 @@ async fn ping_server_with_zstd_compression() {
     send_ping_with_compression(client_options).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[cfg(feature = "snappy-compression")]
 async fn ping_server_with_snappy_compression() {
     let mut client_options = get_client_options().await.clone();
@@ -90,8 +87,7 @@ async fn ping_server_with_snappy_compression() {
     send_ping_with_compression(client_options).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[cfg(all(
     feature = "zstd-compression",
     feature = "zlib-compression",

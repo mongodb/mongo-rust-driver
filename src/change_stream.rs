@@ -46,15 +46,9 @@ use crate::{
 /// A `ChangeStream` can be iterated like any other [`Stream`]:
 ///
 /// ```
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
-/// # {
-/// # #[cfg(feature = "tokio-runtime")]
 /// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result, bson::doc,
 /// # change_stream::event::ChangeStreamEvent};
-/// # #[cfg(feature = "async-std-runtime")]
-/// # use async_std::{task, stream::StreamExt};
-/// # #[cfg(feature = "tokio-runtime")]
 /// # use tokio::task;
 /// #
 /// # async fn func() -> Result<()> {
@@ -71,7 +65,6 @@ use crate::{
 /// }
 /// #
 /// # Ok(())
-/// # }
 /// # }
 /// ```
 ///

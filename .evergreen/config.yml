@@ -111,50 +111,6 @@ buildvariants:
       - name: .replicaset
       - name: .sharded
 
-  - name: async-std-ubuntu
-    display_name: "async-std Runtime (Ubuntu)"
-    run_on:
-      - ubuntu2204-arm64-small
-    expansions:
-      ASYNC_STD: true
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - name: .rapid .replicaset
-
-  - name: async-std-rhel
-    display_name: "async-std Runtime (RHEL)"
-    run_on:
-      - rhel87-small
-    expansions:
-      ASYNC_STD: true
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - name: .rapid .replicaset
-
-  - name: async-std-macos
-    display_name: "async-std Runtime (MacOS)"
-    run_on:
-      - macos-1100
-    expansions:
-      ASYNC_STD: true
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - name: .rapid .replicaset
-
-  - name: async-std-windows
-    display_name: "async-std Runtime (Windows)"
-    run_on:
-      - windows-64-vs2017-small
-    expansions:
-      ASYNC_STD: true
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - name: .rapid .replicaset
-
   - name: openssl-rhel
     display_name: "OpenSSL (RHEL)"
     run_on:
@@ -1074,17 +1030,6 @@ tasks:
           TOPOLOGY: replica_set
       - func: "run sync tests"
 
-  - name: test-async-std-sync
-    tags: [sync]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: rapid
-          TOPOLOGY: replica_set
-      - func: "run sync tests"
-        vars:
-          ASYNC_STD: true
-
   - name: test-oidc
     commands:
       - func: bootstrap oidc
@@ -1539,7 +1484,6 @@ functions:
         # explicitly rather than setting add_expansions_to_env: true.
         include_expansions_in_env:
           - PROJECT_DIRECTORY
-          - ASYNC_STD
           - OPENSSL
           - COMPRESSION
           - MONGODB_URI
@@ -1557,7 +1501,6 @@ functions:
         # Ditto comment above regarding explicitly listing expansions.
         include_expansions_in_env:
           - PROJECT_DIRECTORY
-          - ASYNC_STD
           - MONGODB_URI
 
   "run serverless tests":

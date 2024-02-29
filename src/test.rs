@@ -1,4 +1,3 @@
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
 #[cfg(feature = "aws-auth")]
@@ -10,10 +9,8 @@ mod coll;
 mod csfle;
 mod cursor;
 mod db;
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod documentation_examples;
 mod index_management;
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod lambda_examples;
 pub(crate) mod spec;
 mod timeseries;

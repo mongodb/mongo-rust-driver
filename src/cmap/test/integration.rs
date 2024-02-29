@@ -37,8 +37,7 @@ struct DatabaseEntry {
     name: String,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn acquire_connection_and_send_command() {
     let client_options = get_client_options().await.clone();
     let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
@@ -81,8 +80,7 @@ async fn acquire_connection_and_send_command() {
     assert!(names.iter().any(|name| name == "config"));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn concurrent_connections() {
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
@@ -165,8 +163,7 @@ async fn concurrent_connections() {
         .expect("disabling fail point should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 
 async fn connection_error_during_establishment() {
@@ -227,8 +224,7 @@ async fn connection_error_during_establishment() {
         .expect("closed event with error reason should have been seen");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 
 async fn connection_error_during_operation() {

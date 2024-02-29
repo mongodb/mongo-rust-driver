@@ -7,8 +7,7 @@ use crate::{
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     if std::env::var_os("MONGO_OCSP_TESTS").is_none() {
         log_uncaptured("skipping test due to missing environment variable MONGO_OCSP_TESTS");

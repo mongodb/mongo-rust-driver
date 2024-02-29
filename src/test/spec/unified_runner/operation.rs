@@ -1713,7 +1713,7 @@ impl TestOperation for EndSession {
                 session.client_session.take();
             })
             .await;
-            runtime::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             Ok(None)
         }
         .boxed()
@@ -2735,7 +2735,7 @@ impl TestOperation for Wait {
         &'a self,
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
-        runtime::delay_for(Duration::from_millis(self.ms)).boxed()
+        tokio::time::sleep(Duration::from_millis(self.ms)).boxed()
     }
 }
 

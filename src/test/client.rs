@@ -41,8 +41,7 @@ struct DriverMetadata {
     pub version: String,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn metadata_sent_in_handshake() {
     let client = TestClient::new().await;
 
@@ -72,25 +71,13 @@ async fn metadata_sent_in_handshake() {
     assert_eq!(metadata.driver.name, "mongo-rust-driver");
     assert_eq!(metadata.driver.version, env!("CARGO_PKG_VERSION"));
 
-    #[cfg(feature = "tokio-runtime")]
-    {
-        assert!(
-            metadata.platform.contains("tokio"),
-            "platform should contain tokio: {}",
-            metadata.platform
-        );
-    }
+    assert!(
+        metadata.platform.contains("tokio"),
+        "platform should contain tokio: {}",
+        metadata.platform
+    );
 
-    #[cfg(feature = "async-std-runtime")]
-    {
-        assert!(
-            metadata.platform.contains("async-std"),
-            "platform should contain async-std: {}",
-            metadata.platform
-        );
-    }
-
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    #[cfg(feature = "sync")]
     {
         assert!(
             metadata.platform.contains("sync"),
@@ -100,8 +87,7 @@ async fn metadata_sent_in_handshake() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn connection_drop_during_read() {
     let mut options = get_client_options().await.clone();
@@ -127,7 +113,7 @@ async fn connection_drop_during_read() {
     )
     .await;
 
-    runtime::delay_for(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     let build_info_response = db.run_command(doc! { "buildInfo": 1 }).await.unwrap();
 
@@ -135,8 +121,7 @@ async fn connection_drop_during_read() {
     assert!(build_info_response.get("version").is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_timeout_message() {
     if get_client_options().await.repl_set_name.is_none() {
         log_uncaptured("skipping server_selection_timeout_message due to missing replica set name");
@@ -171,8 +156,7 @@ async fn server_selection_timeout_message() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn list_databases() {
     let expected_dbs = &[
@@ -217,8 +201,7 @@ async fn list_databases() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn list_database_names() {
     let client = TestClient::new().await;
@@ -253,8 +236,7 @@ async fn list_database_names() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn list_authorized_databases() {
     let client = TestClient::new().await;
@@ -451,8 +433,7 @@ async fn scram_test(
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_sha1() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -473,8 +454,7 @@ async fn scram_sha1() {
     scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_sha256() {
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -494,8 +474,7 @@ async fn scram_sha256() {
     scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_both() {
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -521,8 +500,7 @@ async fn scram_both() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_missing_user_uri() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -532,8 +510,7 @@ async fn scram_missing_user_uri() {
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_missing_user_options() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -543,8 +520,7 @@ async fn scram_missing_user_options() {
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn saslprep() {
     let client = TestClient::new().await;
 
@@ -585,8 +561,7 @@ async fn saslprep() {
     auth_test_uri("%E2%85%A8", "I%C2%ADV", None, true).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn x509_auth() {
     let username = match std::env::var("MONGO_X509_USER") {
@@ -634,8 +609,7 @@ async fn x509_auth() {
         .unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn plain_auth() {
     if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
         log_uncaptured("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
@@ -680,8 +654,7 @@ async fn plain_auth() {
 
 /// Test verifies that retrying a commitTransaction operation after a checkOut
 /// failure works.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_commit_txn_check_out() {
     let setup_client = TestClient::new().await;
     if !setup_client.is_replica_set() {
@@ -817,16 +790,14 @@ async fn retry_commit_txn_check_out() {
 }
 
 /// Verifies that `Client::shutdown` succeeds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_with_nothing() {
     let client = Client::test_builder().build().await.into_client();
     client.shutdown().await;
 }
 
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_with_resources() {
     let events = Arc::new(EventHandler::new());
     let client = Client::test_builder()
@@ -882,16 +853,14 @@ async fn manual_shutdown_with_resources() {
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_immediate_with_nothing() {
     let client = Client::test_builder().build().await.into_client();
     client.shutdown().immediate(true).await;
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
     let events = Arc::new(EventHandler::new());
     let client = Client::test_builder()
@@ -934,8 +903,7 @@ async fn manual_shutdown_immediate_with_resources() {
     assert!(events.get_command_started_events(&["delete"]).is_empty());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_one_and_delete_serde_consistency() {
     let client = Client::test_builder().build().await;
 
@@ -968,8 +936,7 @@ async fn find_one_and_delete_serde_consistency() {
 }
 
 // Verifies that `Client::warm_connection_pool` succeeds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn warm_connection_pool() {
     let client = Client::test_builder()
         .options({
