@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use crate::{
     action::bulk_write::write_models::WriteModel,
     bson::doc,
-    test::{spec::unified_runner::run_unified_tests, EventHandler},
+    test::{log_uncaptured, spec::unified_runner::run_unified_tests, EventHandler},
     Client,
     Namespace,
 };
@@ -21,6 +21,11 @@ async fn max_write_batch_size_batching() {
         .build()
         .await;
     let mut subscriber = handler.subscribe();
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
+        return;
+    }
 
     let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
 
@@ -57,6 +62,13 @@ async fn max_bson_object_size_with_document_sequences() {
         .await;
     let mut subscriber = handler.subscribe();
 
+    if client.server_version_lt(8, 0) {
+        log_uncaptured(
+            "skipping max_bson_object_size_with_document_sequences: bulkWrite requires 8.0+",
+        );
+        return;
+    }
+
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
     let document = doc! { "a": "b".repeat(max_bson_object_size / 2) };
@@ -85,6 +97,11 @@ async fn max_message_size_bytes_batching() {
         .build()
         .await;
     let mut subscriber = handler.subscribe();
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping max_message_size_bytes_batching: bulkWrite requires 8.0+");
+        return;
+    }
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
     let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;

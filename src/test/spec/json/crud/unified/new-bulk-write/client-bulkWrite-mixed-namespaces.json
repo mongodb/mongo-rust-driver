@@ -1,6 +1,11 @@
 {
   "description": "client bulkWrite with mixed namespaces",
   "schemaVersion": "1.0",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.0"
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -14,7 +19,7 @@
       "database": {
         "id": "database0",
         "client": "client0",
-        "databaseName": "bulkWrite-db0"
+        "databaseName": "db0"
       }
     },
     {
@@ -35,7 +40,7 @@
       "database": {
         "id": "database1",
         "client": "client0",
-        "databaseName": "bulkWrite-db1"
+        "databaseName": "db1"
       }
     },
     {
@@ -48,12 +53,12 @@
   ],
   "initialData": [
     {
-      "databaseName": "bulkWrite-db0",
+      "databaseName": "db0",
       "collectionName": "coll0",
       "documents": []
     },
     {
-      "databaseName": "bulkWrite-db0",
+      "databaseName": "db0",
       "collectionName": "coll1",
       "documents": [
         {
@@ -67,7 +72,7 @@
       ]
     },
     {
-      "databaseName": "bulkWrite-db1",
+      "databaseName": "db1",
       "collectionName": "coll2",
       "documents": [
         {
@@ -81,14 +86,14 @@
       ]
     }
   ],
+  "_yamlAnchors": {
+    "db0Coll0Namespace": "db0.coll0",
+    "db0Coll1Namespace": "db0.coll1",
+    "db1Coll2Namespace": "db1.coll2"
+  },
   "tests": [
     {
       "description": "client bulkWrite with mixed namespaces",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -97,10 +102,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "bulkWrite-db0",
-                    "coll": "coll0"
-                  },
+                  "namespace": "db0.coll0",
                   "document": {
                     "_id": 1
                   }
@@ -108,10 +110,7 @@
               },
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "bulkWrite-db0",
-                    "coll": "coll0"
-                  },
+                  "namespace": "db0.coll0",
                   "document": {
                     "_id": 2
                   }
@@ -119,10 +118,7 @@
               },
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "bulkWrite-db0",
-                    "coll": "coll1"
-                  },
+                  "namespace": "db0.coll1",
                   "filter": {
                     "_id": 1
                   },
@@ -135,10 +131,7 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "bulkWrite-db1",
-                    "coll": "coll2"
-                  },
+                  "namespace": "db1.coll2",
                   "filter": {
                     "_id": 3
                   }
@@ -146,10 +139,7 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "bulkWrite-db0",
-                    "coll": "coll1"
-                  },
+                  "namespace": "db0.coll1",
                   "filter": {
                     "_id": 2
                   }
@@ -157,10 +147,7 @@
               },
               {
                 "replaceOne": {
-                  "namespace": {
-                    "db": "bulkWrite-db1",
-                    "coll": "coll2"
-                  },
+                  "namespace": "db1.coll2",
                   "filter": {
                     "_id": 4
                   },
@@ -269,13 +256,13 @@
                   ],
                   "nsInfo": [
                     {
-                      "ns": "bulkWrite-db0.coll0"
+                      "ns": "db0.coll0"
                     },
                     {
-                      "ns": "bulkWrite-db0.coll1"
+                      "ns": "db0.coll1"
                     },
                     {
-                      "ns": "bulkWrite-db1.coll2"
+                      "ns": "db1.coll2"
                     }
                   ]
                 }
@@ -286,7 +273,7 @@
       ],
       "outcome": [
         {
-          "databaseName": "bulkWrite-db0",
+          "databaseName": "db0",
           "collectionName": "coll0",
           "documents": [
             {
@@ -298,7 +285,7 @@
           ]
         },
         {
-          "databaseName": "bulkWrite-db0",
+          "databaseName": "db0",
           "collectionName": "coll1",
           "documents": [
             {
@@ -308,7 +295,7 @@
           ]
         },
         {
-          "databaseName": "bulkWrite-db1",
+          "databaseName": "db1",
           "collectionName": "coll2",
           "documents": [
             {

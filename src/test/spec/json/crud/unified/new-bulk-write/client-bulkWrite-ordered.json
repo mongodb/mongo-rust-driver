@@ -1,6 +1,11 @@
 {
   "description": "client bulkWrite with ordered option",
   "schemaVersion": "1.0",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.0"
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -32,14 +37,12 @@
       "documents": []
     }
   ],
+  "_yamlAnchors": {
+    "namespace": "crud-tests.coll0"
+  },
   "tests": [
     {
       "description": "client bulkWrite with ordered: false",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -48,12 +51,10 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
-                    "_id": 1
+                    "_id": 1,
+                    "x": 11
                   }
                 }
               }
@@ -83,9 +84,26 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
-                  "ordered": false
+                  "errorsOnly": false,
+                  "ordered": false,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 1,
+                        "x": 11
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -98,7 +116,8 @@
           "databaseName": "crud-tests",
           "documents": [
             {
-              "_id": 1
+              "_id": 1,
+              "x": 11
             }
           ]
         }
@@ -106,11 +125,6 @@
     },
     {
       "description": "client bulkWrite with ordered: true",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -119,12 +133,10 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
-                    "_id": 4
+                    "_id": 1,
+                    "x": 11
                   }
                 }
               }
@@ -140,7 +152,7 @@
             "deletedCount": 0,
             "insertResults": {
               "0": {
-                "insertedId": 4
+                "insertedId": 1
               }
             },
             "updateResults": {},
@@ -154,9 +166,26 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
-                  "ordered": true
+                  "errorsOnly": false,
+                  "ordered": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 1,
+                        "x": 11
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -169,7 +198,8 @@
           "databaseName": "crud-tests",
           "documents": [
             {
-              "_id": 4
+              "_id": 1,
+              "x": 11
             }
           ]
         }
@@ -177,11 +207,6 @@
     },
     {
       "description": "client bulkWrite defaults to ordered: true",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -190,12 +215,10 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
-                    "_id": 4
+                    "_id": 1,
+                    "x": 11
                   }
                 }
               }
@@ -210,7 +233,7 @@
             "deletedCount": 0,
             "insertResults": {
               "0": {
-                "insertedId": 4
+                "insertedId": 1
               }
             },
             "updateResults": {},
@@ -224,9 +247,26 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
-                  "ordered": true
+                  "errorsOnly": false,
+                  "ordered": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 1,
+                        "x": 11
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -239,7 +279,8 @@
           "databaseName": "crud-tests",
           "documents": [
             {
-              "_id": 4
+              "_id": 1,
+              "x": 11
             }
           ]
         }

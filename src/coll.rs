@@ -776,17 +776,9 @@ impl<'de> Deserialize<'de> for Namespace {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum NamespaceHelper {
-            String(String),
-            Object { db: String, coll: String },
-        }
-        match NamespaceHelper::deserialize(deserializer)? {
-            NamespaceHelper::String(string) => Self::from_str(&string)
-                .ok_or_else(|| D::Error::custom("Missing one or more fields in namespace")),
-            NamespaceHelper::Object { db, coll } => Ok(Self { db, coll }),
-        }
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s)
+            .ok_or_else(|| D::Error::custom("Missing one or more fields in namespace"))
     }
 }
 

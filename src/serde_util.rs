@@ -196,14 +196,18 @@ where
 }
 
 pub(crate) fn serialize_indexed_map<S: Serializer, T: Serialize>(
-    map: &HashMap<usize, T>,
+    map: &Option<HashMap<usize, T>>,
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
-    let string_map: BTreeMap<_, _> = map
-        .iter()
-        .map(|(index, result)| (index.to_string(), result))
-        .collect();
-    string_map.serialize(serializer)
+    if let Some(map) = map {
+        let string_map: BTreeMap<_, _> = map
+            .iter()
+            .map(|(index, result)| (index.to_string(), result))
+            .collect();
+        string_map.serialize(serializer)
+    } else {
+        serializer.serialize_none()
+    }
 }
 
 #[cfg(test)]

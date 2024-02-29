@@ -1,6 +1,11 @@
 {
   "description": "client bulkWrite results",
-  "schemaVersion": "1.18",
+  "schemaVersion": "1.0",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.0"
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -57,14 +62,12 @@
       ]
     }
   ],
+  "_yamlAnchors": {
+    "namespace": "crud-tests.coll0"
+  },
   "tests": [
     {
       "description": "client bulkWrite with verboseResults: true returns detailed results",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -73,10 +76,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
                     "_id": 8,
                     "x": 88
@@ -85,10 +85,7 @@
               },
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -101,10 +98,7 @@
               },
               {
                 "updateMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$and": [
                       {
@@ -128,10 +122,7 @@
               },
               {
                 "replaceOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 4
                   },
@@ -143,10 +134,7 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 5
                   }
@@ -154,10 +142,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$and": [
                       {
@@ -222,9 +207,12 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
                   "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,
@@ -347,11 +335,6 @@
     },
     {
       "description": "client bulkWrite with verboseResults: false omits detailed results",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -360,10 +343,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
                     "_id": 8,
                     "x": 88
@@ -372,10 +352,7 @@
               },
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -388,10 +365,7 @@
               },
               {
                 "updateMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$and": [
                       {
@@ -415,10 +389,7 @@
               },
               {
                 "replaceOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 4
                   },
@@ -430,10 +401,7 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 5
                   }
@@ -441,10 +409,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$and": [
                       {
@@ -488,9 +453,12 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
                   "errorsOnly": true,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,
@@ -613,11 +581,6 @@
     },
     {
       "description": "client bulkWrite defaults to verboseResults: false",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -626,10 +589,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
                     "_id": 8,
                     "x": 88
@@ -638,10 +598,7 @@
               },
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -654,10 +611,7 @@
               },
               {
                 "updateMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$and": [
                       {
@@ -681,10 +635,7 @@
               },
               {
                 "replaceOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 4
                   },
@@ -696,10 +647,7 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 5
                   }
@@ -707,10 +655,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$and": [
                       {
@@ -753,9 +698,12 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
                   "errorsOnly": true,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,

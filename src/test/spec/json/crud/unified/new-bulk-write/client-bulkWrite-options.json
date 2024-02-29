@@ -1,6 +1,11 @@
 {
   "description": "client bulkWrite top-level options",
   "schemaVersion": "1.0",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.0"
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -41,14 +46,19 @@
       ]
     }
   ],
+  "_yamlAnchors": {
+    "namespace": "crud-tests.coll0",
+    "comment": {
+      "bulk": "write"
+    },
+    "let": {
+      "id1": 1,
+      "id2": 2
+    }
+  },
   "tests": [
     {
       "description": "client bulkWrite comment",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -57,10 +67,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
                     "_id": 3,
                     "x": 33
@@ -95,11 +102,29 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "comment": {
                     "bulk": "write"
-                  }
+                  },
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 3,
+                        "x": 33
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -129,11 +154,6 @@
     },
     {
       "description": "client bulkWrite bypassDocumentValidation",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -142,13 +162,10 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "document": {
-                    "_id": 4,
-                    "x": 44
+                    "_id": 3,
+                    "x": 33
                   }
                 }
               }
@@ -164,7 +181,7 @@
             "deletedCount": 0,
             "insertResults": {
               "0": {
-                "insertedId": 4
+                "insertedId": 3
               }
             },
             "updateResults": {},
@@ -178,9 +195,27 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
-                  "bypassDocumentValidation": true
+                  "errorsOnly": false,
+                  "ordered": true,
+                  "bypassDocumentValidation": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 3,
+                        "x": 33
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }
@@ -201,8 +236,8 @@
               "x": 22
             },
             {
-              "_id": 4,
-              "x": 44
+              "_id": 3,
+              "x": 33
             }
           ]
         }
@@ -210,11 +245,6 @@
     },
     {
       "description": "client bulkWrite let",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -223,10 +253,7 @@
             "models": [
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$expr": {
                       "$eq": [
@@ -244,10 +271,7 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "$expr": {
                       "$eq": [
@@ -293,12 +317,52 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "let": {
                     "id1": 1,
                     "id2": 2
-                  }
+                  },
+                  "ops": [
+                    {
+                      "update": 0,
+                      "filter": {
+                        "$expr": {
+                          "$eq": [
+                            "$_id",
+                            "$$id1"
+                          ]
+                        }
+                      },
+                      "updateMods": {
+                        "$inc": {
+                          "x": 1
+                        }
+                      },
+                      "multi": false
+                    },
+                    {
+                      "delete": 0,
+                      "filter": {
+                        "$expr": {
+                          "$eq": [
+                            "$_id",
+                            "$$id2"
+                          ]
+                        }
+                      },
+                      "multi": false
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
                 }
               }
             }

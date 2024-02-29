@@ -69,6 +69,13 @@ impl<'a> BulkWrite<'a> {
         }
     }
 
+    fn is_verbose(&self) -> bool {
+        self.options
+            .as_ref()
+            .and_then(|o| o.verbose_results)
+            .unwrap_or(false)
+    }
+
     async fn iterate_results_cursor(
         &self,
         mut stream: impl TryStream<Ok = SingleOperationResponse, Error = Error> + Unpin,
@@ -90,7 +97,7 @@ impl<'a> BulkWrite<'a> {
                             let inserted_id = self.get_inserted_id(result_index)?;
                             let insert_result = InsertOneResult { inserted_id };
                             result
-                                .get_or_insert_with(Default::default)
+                                .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
                                 .add_insert_result(result_index, insert_result);
                         }
                         OperationType::Update => {
@@ -106,13 +113,13 @@ impl<'a> BulkWrite<'a> {
                                 upserted_id: upserted.map(|upserted| upserted.id),
                             };
                             result
-                                .get_or_insert_with(Default::default)
+                                .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
                                 .add_update_result(result_index, update_result);
                         }
                         OperationType::Delete => {
                             let delete_result = DeleteResult { deleted_count: n };
                             result
-                                .get_or_insert_with(Default::default)
+                                .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
                                 .add_delete_result(result_index, delete_result);
                         }
                     }
@@ -283,7 +290,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                 if response.summary.n_errors < self.n_attempted as i64 {
                     bulk_write_error
                         .partial_result
-                        .get_or_insert_with(Default::default)
+                        .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
                         .populate_summary_info(&response.summary);
                 }
 
@@ -322,7 +329,9 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                         if bulk_write_error.write_errors.is_empty()
                             && bulk_write_error.write_concern_errors.is_empty()
                         {
-                            Ok(bulk_write_error.partial_result.unwrap_or_default())
+                            Ok(bulk_write_error
+                                .partial_result
+                                .unwrap_or_else(|| BulkWriteResult::new(self.is_verbose())))
                         } else {
                             let error = Error::new(
                                 ErrorKind::ClientBulkWrite(bulk_write_error),

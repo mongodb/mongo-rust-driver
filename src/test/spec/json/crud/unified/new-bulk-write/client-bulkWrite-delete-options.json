@@ -1,6 +1,11 @@
 {
   "description": "client bulkWrite delete options",
   "schemaVersion": "1.0",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.0"
+    }
+  ],
   "createEntities": [
     {
       "client": {
@@ -45,14 +50,16 @@
       ]
     }
   ],
+  "_yamlAnchors": {
+    "namespace": "crud-tests.coll0",
+    "collation": {
+      "locale": "simple"
+    },
+    "hint": "_id_"
+  },
   "tests": [
     {
       "description": "client bulk write delete with collation",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -61,10 +68,7 @@
             "models": [
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -75,10 +79,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": {
                       "$gt": 1
@@ -89,7 +90,8 @@
                   }
                 }
               }
-            ]
+            ],
+            "verboseResults": true
           },
           "expectResult": {
             "insertedCount": 0,
@@ -97,14 +99,15 @@
             "matchedCount": 0,
             "modifiedCount": 0,
             "deletedCount": 3,
-            "insertResults": {
-              "$$unsetOrMatches": {}
-            },
-            "updateResults": {
-              "$$unsetOrMatches": {}
-            },
+            "insertResults": {},
+            "updateResults": {},
             "deleteResults": {
-              "$$unsetOrMatches": {}
+              "0": {
+                "deletedCount": 1
+              },
+              "1": {
+                "deletedCount": 2
+              }
             }
           }
         }
@@ -115,8 +118,12 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "delete": 0,
@@ -140,6 +147,11 @@
                       },
                       "multi": true
                     }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
                   ]
                 }
               }
@@ -157,11 +169,6 @@
     },
     {
       "description": "client bulk write delete with hint",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -170,10 +177,7 @@
             "models": [
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -182,10 +186,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "crud-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "crud-tests.coll0",
                   "filter": {
                     "_id": {
                       "$gt": 1
@@ -194,7 +195,8 @@
                   "hint": "_id_"
                 }
               }
-            ]
+            ],
+            "verboseResults": true
           },
           "expectResult": {
             "insertedCount": 0,
@@ -202,14 +204,15 @@
             "matchedCount": 0,
             "modifiedCount": 0,
             "deletedCount": 3,
-            "insertResults": {
-              "$$unsetOrMatches": {}
-            },
-            "updateResults": {
-              "$$unsetOrMatches": {}
-            },
+            "insertResults": {},
+            "updateResults": {},
             "deleteResults": {
-              "$$unsetOrMatches": {}
+              "0": {
+                "deletedCount": 1
+              },
+              "1": {
+                "deletedCount": 2
+              }
             }
           }
         }
@@ -220,8 +223,12 @@
           "events": [
             {
               "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
                 "command": {
                   "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "delete": 0,
