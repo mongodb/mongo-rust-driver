@@ -26,8 +26,6 @@ exclude = [
     "tests/**",
 ]
 
-# NOTE: any new features added to this list should also be added to the features
-# list in the [package.metadata.docs.rs] section below.
 [features]
 default = []
 sync = []
@@ -173,13 +171,4 @@ serde-hex = "0.1.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
-features = [
-    "sync",
-    "zstd-compression",
-    "snappy-compression",
-    "zlib-compression",
-    "openssl-tls",
-    "aws-auth",
-    "tracing-unstable",
-    "in-use-encryption-unstable"
-]
+all-features = true
