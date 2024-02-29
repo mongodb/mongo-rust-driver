@@ -1,21 +1,22 @@
-use bson::Document;
-use futures_util::FutureExt;
-
-use crate::{
-    client::{
-        auth::{oidc, AuthMechanism, Credential},
-        options::ClientOptions,
-    },
-    test::log_uncaptured,
-    Client,
-};
-
+#[cfg(feature = "oidc-auth")]
 type Result<T> = anyhow::Result<T>;
 
 // Prose test 1.1 Single Principal Implicit Username
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[cfg(feature = "oidc-auth")]
+#[cfg_attr(all(feature = "tokio-runtime"), tokio::test)]
 async fn single_principal_implicit_username() -> Result<()> {
+    use bson::Document;
+    use futures_util::FutureExt;
+
+    use crate::{
+        client::{
+            auth::{AuthMechanism, Credential},
+            options::ClientOptions,
+        },
+        oidc,
+        test::log_uncaptured,
+        Client,
+    };
     if std::env::var("OIDC_TOKEN_DIR").is_err() {
         log_uncaptured("Skipping OIDC test");
         return Ok(());
