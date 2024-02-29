@@ -33,7 +33,7 @@ impl Clone for State {
     fn clone(&self) -> Self {
         Self {
             callback: self.callback.clone(),
-            cache: Arc::new(RwLock::new(Cache::default())),
+            cache: Arc::new(RwLock::new(Cache::new())),
         }
     }
 }
@@ -50,18 +50,41 @@ impl State {
     }
 }
 
-// TODO RUST-1497: This enum will be public
+// TODO RUST-1497: This struct will be public
 #[allow(dead_code)]
 #[derive(Clone)]
-enum Callback {
-    Machine(Arc<CallbackInner>),
-    Human(Arc<CallbackInner>),
+struct Callback {
+    inner: Arc<CallbackInner>,
+    kind: CallbackKind,
 }
 
-// TODO RUST-1497: These methods will be public
+// TODO RUST-1497: This enum will be public
+#[allow(dead_code)]
+#[derive(Clone, Copy)]
+enum CallbackKind {
+    Human,
+    Machine,
+}
+
+// TODO RUST-1497: These will no longer be dead_code
 #[allow(dead_code)]
 impl Callback {
-    /// Create a new instance with a human token request callback.
+    fn new<F>(callback: F, kind: CallbackKind) -> Callback
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Callback {
+            inner: Arc::new(CallbackInner {
+                f: Box::new(callback),
+            }),
+            kind,
+        }
+    }
+
+    /// Create a new human token request callback.
     pub fn human<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
@@ -69,15 +92,10 @@ impl Callback {
             + Sync
             + 'static,
     {
-        State {
-            callback: Callback::Human(Arc::new(CallbackInner {
-                f: Box::new(callback),
-            })),
-            cache: Arc::new(RwLock::new(Cache::default())),
-        }
+        Self::create_state(callback, CallbackKind::Human)
     }
 
-    /// Create a new instance with a machine token request callback.
+    /// Create a new machine token request callback.
     pub fn machine<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
@@ -85,11 +103,19 @@ impl Callback {
             + Sync
             + 'static,
     {
+        Self::create_state(callback, CallbackKind::Machine)
+    }
+
+    fn create_state<F>(callback: F, kind: CallbackKind) -> State
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
         State {
-            callback: Callback::Machine(Arc::new(CallbackInner {
-                f: Box::new(callback),
-            })),
-            cache: Arc::new(RwLock::new(Cache::default())),
+            callback: Self::new(callback, kind),
+            cache: Arc::new(RwLock::new(Cache::new())),
         }
     }
 }
@@ -123,8 +149,8 @@ impl Clone for Cache {
     }
 }
 
-impl Default for Cache {
-    fn default() -> Self {
+impl Cache {
+    fn new() -> Self {
         Self {
             refresh_token: None,
             access_token: None,
@@ -144,6 +170,7 @@ pub struct IdpServerInfo {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct CallbackContext {
     pub timeout_seconds: Option<Instant>,
     pub version: i32,
@@ -156,7 +183,7 @@ pub struct CallbackContext {
 #[non_exhaustive]
 pub struct IdpServerResponse {
     pub access_token: String,
-    pub expires_in_seconds: Option<Instant>,
+    pub expires: Option<Instant>,
     pub refresh_token: Option<String>,
 }
 
@@ -168,19 +195,15 @@ pub(crate) async fn authenticate_stream(
     // RUST-1662: Attempt speculative auth first, only works with a cache.
     // First handle speculative authentication. If that succeeds, we are done.
 
-    match credential
+    let Callback { inner, kind } = credential
         .oidc_callback
         .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
         .callback
-        .clone()
-    {
-        Callback::Machine(callback) => {
-            authenticate_machine(conn, credential, server_api, callback).await
-        }
-        Callback::Human(callback) => {
-            authenticate_human(conn, credential, server_api, callback).await
-        }
+        .clone();
+    match kind {
+        CallbackKind::Machine => authenticate_machine(conn, credential, server_api, inner).await,
+        CallbackKind::Human => authenticate_human(conn, credential, server_api, inner).await,
     }
 }
 
