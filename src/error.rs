@@ -7,18 +7,12 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    bson::Document,
-    options::ServerAddress,
-    sdam::{ServerType, TopologyVersion},
-};
-use bson::Bson;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
     action::bulk_write::error::BulkWriteError as ClientBulkWriteError,
-    bson::Document,
+    bson::{Bson, Document},
     options::ServerAddress,
     sdam::{ServerType, TopologyVersion},
 };

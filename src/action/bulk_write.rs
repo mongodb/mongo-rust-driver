@@ -118,7 +118,7 @@ impl<'a> BulkWrite<'a> {
 }
 
 action_impl! {
-    impl Action<'a> for BulkWrite<'a> {
+    impl<'a> Action for BulkWrite<'a> {
         type Future = BulkWriteFuture;
 
         async fn execute(mut self) -> Result<BulkWriteResult> {
