@@ -101,13 +101,9 @@ impl<'a> BulkWrite<'a> {
 impl<'a> BulkWrite<'a> {
     option_setters!(options: BulkWriteOptions;
         ordered: bool,
-
         bypass_document_validation: bool,
-
         comment: Bson,
-
         let_vars: Document,
-
         verbose_results: bool,
     );
 
