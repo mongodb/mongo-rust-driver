@@ -1,7 +1,8 @@
 type Result<T> = anyhow::Result<T>;
 
 // Prose test 1.1 Single Principal Implicit Username
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg(feature = "tokio-runtime")]
+#[tokio::test]
 async fn single_principal_implicit_username() -> Result<()> {
     use crate::{
         client::{
