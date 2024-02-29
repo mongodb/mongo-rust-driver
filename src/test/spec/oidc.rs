@@ -19,9 +19,9 @@ async fn single_principal_implicit_username() -> Result<()> {
     }
     let mut opts =
         ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
-    opts.credential = Some(Credential {
-        mechanism: Some(AuthMechanism::MongoDbOidc),
-        oidc_callback: Some(oidc::Callback::machine(|_| {
+    opts.credential = Credential::builder()
+        .mechanism(AuthMechanism::MongoDbOidc)
+        .oidc_callback(oidc::Callback::machine(|_| {
             async move {
                 Ok(oidc::IdpServerResponse {
                     access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
@@ -30,9 +30,9 @@ async fn single_principal_implicit_username() -> Result<()> {
                 })
             }
             .boxed()
-        })),
-        ..Credential::default()
-    });
+        }))
+        .build()
+        .into();
     let client = Client::with_options(opts)?;
     client
         .database("test")
