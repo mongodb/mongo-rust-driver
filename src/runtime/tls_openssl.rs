@@ -8,7 +8,10 @@ use openssl::{
     error::ErrorStack,
     ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
 };
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+};
 use tokio_openssl::SslStream;
 
 use crate::{
@@ -16,11 +19,9 @@ use crate::{
     error::{Error, ErrorKind, Result},
 };
 
-use super::stream::AsyncTcpStream;
-
 #[derive(Debug)]
 pub(crate) struct AsyncTlsStream {
-    inner: SslStream<AsyncTcpStream>,
+    inner: SslStream<TcpStream>,
 }
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
@@ -56,7 +57,7 @@ impl TlsConfig {
 impl AsyncTlsStream {
     pub(crate) async fn connect(
         host: &str,
-        tcp_stream: AsyncTcpStream,
+        tcp_stream: TcpStream,
         cfg: &TlsConfig,
     ) -> Result<Self> {
         init_trust();
@@ -136,9 +137,9 @@ fn init_trust() {
 
 fn make_ssl_stream(
     host: &str,
-    tcp_stream: AsyncTcpStream,
+    tcp_stream: TcpStream,
     cfg: &TlsConfig,
-) -> std::result::Result<SslStream<AsyncTcpStream>, ErrorStack> {
+) -> std::result::Result<SslStream<TcpStream>, ErrorStack> {
     let ssl = cfg
         .connector
         .configure()?

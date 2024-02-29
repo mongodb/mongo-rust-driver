@@ -16,7 +16,10 @@ use rustls::{
     RootCertStore,
 };
 use rustls_pemfile::{certs, read_one, Item};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+};
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -25,11 +28,9 @@ use crate::{
     error::{ErrorKind, Result},
 };
 
-use super::stream::AsyncTcpStream;
-
 #[derive(Debug)]
 pub(crate) struct AsyncTlsStream {
-    inner: tokio_rustls::client::TlsStream<AsyncTcpStream>,
+    inner: tokio_rustls::client::TlsStream<TcpStream>,
 }
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
@@ -54,7 +55,7 @@ impl TlsConfig {
 impl AsyncTlsStream {
     pub(crate) async fn connect(
         host: &str,
-        tcp_stream: AsyncTcpStream,
+        tcp_stream: TcpStream,
         cfg: &TlsConfig,
     ) -> Result<Self> {
         let name = ServerName::try_from(host).map_err(|e| ErrorKind::DnsResolve {

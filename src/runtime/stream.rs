@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::{io::AsyncWrite, net::TcpStream};
 
 use crate::{
     error::{ErrorKind, Result},
@@ -26,7 +26,7 @@ pub(crate) enum AsyncStream {
     Null,
 
     /// A basic TCP connection to the server.
-    Tcp(AsyncTcpStream),
+    Tcp(TcpStream),
 
     /// A TLS connection over TCP.
     Tls(AsyncTlsStream),
@@ -43,7 +43,7 @@ impl AsyncStream {
     ) -> Result<Self> {
         match &address {
             ServerAddress::Tcp { host, .. } => {
-                let inner = AsyncTcpStream::connect(&address).await?;
+                let inner = tcp_connect(&address).await?;
 
                 // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
                 match tls_cfg {
@@ -164,65 +164,46 @@ mod unix {
     }
 }
 
-/// A runtime-agnostic async stream.
-#[derive(Debug)]
-pub(crate) enum AsyncTcpStream {
-    /// Wrapper around `tokio::net:TcpStream`.
-    Tokio(tokio::net::TcpStream),
+async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
+    let stream = TcpStream::connect(address).await?;
+    stream.set_nodelay(true)?;
+
+    let socket = socket2::Socket::from(stream.into_std()?);
+    let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
+    socket.set_tcp_keepalive(&conf)?;
+    let std_stream = std::net::TcpStream::from(socket);
+    Ok(TcpStream::from_std(std_stream)?)
 }
 
-impl From<tokio::net::TcpStream> for AsyncTcpStream {
-    fn from(stream: tokio::net::TcpStream) -> Self {
-        Self::Tokio(stream)
-    }
-}
+async fn tcp_connect(address: &ServerAddress) -> Result<TcpStream> {
+    let mut socket_addrs: Vec<_> = runtime::resolve_address(address).await?.collect();
 
-impl AsyncTcpStream {
-    async fn try_connect(address: &SocketAddr) -> Result<Self> {
-        use tokio::net::TcpStream;
-
-        let stream = TcpStream::connect(address).await?;
-        stream.set_nodelay(true)?;
-
-        let socket = socket2::Socket::from(stream.into_std()?);
-        let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
-        socket.set_tcp_keepalive(&conf)?;
-        let std_stream = std::net::TcpStream::from(socket);
-        let stream = TcpStream::from_std(std_stream)?;
-
-        Ok(stream.into())
-    }
-
-    pub(crate) async fn connect(address: &ServerAddress) -> Result<Self> {
-        let mut socket_addrs: Vec<_> = runtime::resolve_address(address).await?.collect();
-
-        if socket_addrs.is_empty() {
-            return Err(ErrorKind::DnsResolve {
-                message: format!("No DNS results for domain {}", address),
-            }
-            .into());
+    if socket_addrs.is_empty() {
+        return Err(ErrorKind::DnsResolve {
+            message: format!("No DNS results for domain {}", address),
         }
-
-        // After considering various approaches, we decided to do what other drivers do, namely try
-        // each of the addresses in sequence with a preference for IPv4.
-        socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
-
-        let mut connect_error = None;
-
-        for address in &socket_addrs {
-            connect_error = match Self::try_connect(address).await {
-                Ok(stream) => return Ok(stream),
-                Err(err) => Some(err),
-            };
-        }
-
-        Err(connect_error.unwrap_or_else(|| {
-            ErrorKind::Internal {
-                message: "connecting to all DNS results failed but no error reported".to_string(),
-            }
-            .into()
-        }))
+        .into());
     }
+
+    // After considering various approaches, we decided to do what other drivers do, namely try
+    // each of the addresses in sequence with a preference for IPv4.
+    socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
+
+    let mut connect_error = None;
+
+    for address in &socket_addrs {
+        connect_error = match tcp_try_connect(address).await {
+            Ok(stream) => return Ok(stream),
+            Err(err) => Some(err),
+        };
+    }
+
+    Err(connect_error.unwrap_or_else(|| {
+        ErrorKind::Internal {
+            message: "connecting to all DNS results failed but no error reported".to_string(),
+        }
+        .into()
+    }))
 }
 
 impl tokio::io::AsyncRead for AsyncStream {
@@ -297,58 +278,6 @@ impl AsyncWrite for AsyncStream {
             Self::Tls(ref inner) => inner.is_write_vectored(),
             #[cfg(unix)]
             Self::Unix(ref inner) => inner.is_write_vectored(),
-        }
-    }
-}
-
-impl AsyncRead for AsyncTcpStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf,
-    ) -> Poll<tokio::io::Result<()>> {
-        match self.deref_mut() {
-            Self::Tokio(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
-        }
-    }
-}
-
-impl AsyncWrite for AsyncTcpStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<tokio::io::Result<usize>> {
-        match self.deref_mut() {
-            Self::Tokio(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
-        }
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
-        match self.deref_mut() {
-            Self::Tokio(ref mut inner) => Pin::new(inner).poll_flush(cx),
-        }
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
-        match self.deref_mut() {
-            Self::Tokio(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
-        }
-    }
-
-    fn poll_write_vectored(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bufs: &[futures_io::IoSlice<'_>],
-    ) -> Poll<std::result::Result<usize, std::io::Error>> {
-        match self.get_mut() {
-            Self::Tokio(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-        }
-    }
-
-    fn is_write_vectored(&self) -> bool {
-        match self {
-            Self::Tokio(ref inner) => inner.is_write_vectored(),
         }
     }
 }

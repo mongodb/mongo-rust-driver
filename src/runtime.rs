@@ -42,8 +42,7 @@ where
     F: Future<Output = O> + Send + 'static,
     O: Send + 'static,
 {
-    let handle = tokio::runtime::Handle::current();
-    AsyncJoinHandle::Tokio(handle.spawn(fut))
+    AsyncJoinHandle::spawn(fut)
 }
 
 /// Await on a future for a maximum amount of time before returning an error.
