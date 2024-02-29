@@ -1,6 +1,6 @@
 {
   "description": "client bulkWrite retryable writes",
-  "schemaVersion": "1.18",
+  "schemaVersion": "1.20",
   "runOnRequirements": [
     {
       "minServerVersion": "8.0",
@@ -15,7 +15,8 @@
         "id": "client0",
         "observeEvents": [
           "commandStartedEvent"
-        ]
+        ],
+        "useMultipleMongoses": false
       }
     },
     {
@@ -53,6 +54,9 @@
       ]
     }
   ],
+  "_yamlAnchors": {
+    "namespace": "retryable-writes-tests.coll0"
+  },
   "tests": [
     {
       "description": "client bulkWrite with no multi: true operations succeeds after retryable top-level error",
@@ -86,10 +90,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "document": {
                     "_id": 4,
                     "x": 44
@@ -98,10 +99,7 @@
               },
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -114,10 +112,7 @@
               },
               {
                 "replaceOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 2
                   },
@@ -128,16 +123,14 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 3
                   }
                 }
               }
-            ]
+            ],
+            "verboseResults": true
           },
           "expectResult": {
             "insertedCount": 1,
@@ -146,13 +139,26 @@
             "modifiedCount": 2,
             "deletedCount": 1,
             "insertResults": {
-              "$$unsetOrMatches": {}
+              "0": {
+                "insertedId": 4
+              }
             },
             "updateResults": {
-              "$$unsetOrMatches": {}
+              "1": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              },
+              "2": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              }
             },
             "deleteResults": {
-              "$$unsetOrMatches": {}
+              "3": {
+                "deletedCount": 1
+              }
             }
           }
         }
@@ -166,6 +172,9 @@
                 "commandName": "bulkWrite",
                 "databaseName": "admin",
                 "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,
@@ -217,6 +226,9 @@
                 "commandName": "bulkWrite",
                 "databaseName": "admin",
                 "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,
@@ -319,10 +331,7 @@
             "models": [
               {
                 "updateMany": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -335,10 +344,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 3
                   }
@@ -363,6 +369,9 @@
                 "commandName": "bulkWrite",
                 "databaseName": "admin",
                 "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": true,
+                  "ordered": true,
                   "ops": [
                     {
                       "update": 0,
@@ -431,10 +440,7 @@
             "models": [
               {
                 "insertOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "document": {
                     "_id": 4,
                     "x": 44
@@ -443,10 +449,7 @@
               },
               {
                 "updateOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -459,10 +462,7 @@
               },
               {
                 "replaceOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 2
                   },
@@ -473,16 +473,14 @@
               },
               {
                 "deleteOne": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 3
                   }
                 }
               }
-            ]
+            ],
+            "verboseResults": true
           },
           "expectResult": {
             "insertedCount": 1,
@@ -491,13 +489,26 @@
             "modifiedCount": 2,
             "deletedCount": 1,
             "insertResults": {
-              "$$unsetOrMatches": {}
+              "0": {
+                "insertedId": 4
+              }
             },
             "updateResults": {
-              "$$unsetOrMatches": {}
+              "1": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              },
+              "2": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedId": null
+              }
             },
             "deleteResults": {
-              "$$unsetOrMatches": {}
+              "3": {
+                "deletedCount": 1
+              }
             }
           }
         }
@@ -511,6 +522,9 @@
                 "commandName": "bulkWrite",
                 "databaseName": "admin",
                 "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,
@@ -562,6 +576,9 @@
                 "commandName": "bulkWrite",
                 "databaseName": "admin",
                 "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
                   "ops": [
                     {
                       "insert": 0,
@@ -647,10 +664,7 @@
             "models": [
               {
                 "updateMany": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 1
                   },
@@ -663,10 +677,7 @@
               },
               {
                 "deleteMany": {
-                  "namespace": {
-                    "db": "retryable-writes-tests",
-                    "coll": "coll0"
-                  },
+                  "namespace": "retryable-writes-tests.coll0",
                   "filter": {
                     "_id": 3
                   }
@@ -693,6 +704,9 @@
                 "commandName": "bulkWrite",
                 "databaseName": "admin",
                 "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": true,
+                  "ordered": true,
                   "ops": [
                     {
                       "update": 0,
