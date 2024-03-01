@@ -163,12 +163,13 @@ action_impl! {
     }
 }
 
-/*
 action_impl! {
-    impl<'a, T> Action for Find<'a, T, Single, ImplicitSession> {
+    impl<'a, T> Action for Find<'a, T, Single, ImplicitSession>
+        where T: DeserializeOwned
+    {
         type Future = FindOneFuture;
 
-        async fn execute(mut self) -> Result<Option<T>> {
+        async fn execute(self) -> Result<Option<T>> {
             use futures_util::stream::StreamExt;
             let mut options = self.options.unwrap_or_default();
             options.limit = Some(-1);
@@ -177,4 +178,3 @@ action_impl! {
         }
     }
 }
-*/

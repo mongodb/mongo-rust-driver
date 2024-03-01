@@ -142,13 +142,17 @@ pub trait Action {
 macro_rules! action_impl {
     // Generate with no sync type conversion
     (
-        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty {
+        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty
+            $(where $wt:ident: $wb:path)?
+        {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
         }
     ) => {
         crate::action::action_impl! {
-            impl$(<$lt $(, $($at),+)?>)? Action for $action {
+            impl$(<$lt $(, $($at),+)?>)? Action for $action
+                $(where $wt: $wb)?
+            {
                 type Future = $f_ty;
                 async fn execute($($args)+) -> $out $code
                 fn sync_wrap(out) -> $out { out }
@@ -157,13 +161,17 @@ macro_rules! action_impl {
     };
     // Generate with a sync type conversion
     (
-        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty {
+        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty
+            $(where $wt:ident: $wb:path)?
+        {
             type Future = $f_ty:ident;
             async fn execute($($args:ident)+) -> $out:ty $code:block
             fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
         }
     ) => {
-        impl$(<$lt $(, $($at),+)?>)? std::future::IntoFuture for $action {
+        impl$(<$lt $(, $($at),+)?>)? std::future::IntoFuture for $action
+            $(where $wt: $wb)?
+        {
             type Output = $out;
             type IntoFuture = $f_ty$(<$lt $(, $($at)+)?>)?;
 
@@ -174,13 +182,17 @@ macro_rules! action_impl {
             }
         }
 
-        impl$(<$lt $(, $($at),+)?>)? crate::action::Action for $action {
+        impl$(<$lt $(, $($at),+)?>)? crate::action::Action for $action
+            $(where $wt: $wb)?
+        {
             type Output = $out;
         }
 
         crate::action::action_impl_future_wrapper!($f_ty, $out $(, $lt)? $($(, $($at),+)?)?);
 
-        impl$(<$lt $(, $($at),+)?>)? std::future::Future for $f_ty$(<$lt $(, $($at),+)?>)? {
+        impl$(<$lt $(, $($at),+)?>)? std::future::Future for $f_ty$(<$lt $(, $($at),+)?>)?
+            $(where $wt: $wb)?
+        {
             type Output = $out;
 
             fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
@@ -189,7 +201,9 @@ macro_rules! action_impl {
         }
 
         #[cfg(feature = "sync")]
-        impl$(<$lt $(, $($at),+)?>)? $action {
+        impl$(<$lt $(, $($at),+)?>)? $action
+            $(where $wt: $wb)?
+        {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {
                 let $($wrap_args)+ = crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self));
