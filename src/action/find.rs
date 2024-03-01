@@ -1,6 +1,7 @@
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use bson::{Bson, Document};
+use serde::de::DeserializeOwned;
 
 use crate::{
     coll::options::{CursorType, FindOptions, Hint},
@@ -15,16 +16,34 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, option_setters, ExplicitSession, ImplicitSession, Single, Multiple};
 
 impl<T> Collection<T> {
     /// Finds the documents in the collection matching `filter`.
+    ///
+    /// `await` will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is provided).
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
             filter,
             options: None,
             session: ImplicitSession,
+            _mode: PhantomData
+        }
+    }
+}
+
+impl<T: DeserializeOwned> Collection<T> {
+    /// Finds a single document in the collection matching `filter`.
+    ///
+    /// `await` will return `Result<Option<T>>`.
+    pub fn find_one_2(&self, filter: Document) -> Find<'_, T, Single> {
+        Find {
+            coll: self,
+            filter,
+            options: None,
+            session: ImplicitSession,
+            _mode: PhantomData
         }
     }
 }
@@ -32,36 +51,43 @@ impl<T> Collection<T> {
 #[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Finds the documents in the collection matching `filter`.
+    ///
+    /// [`run`](Find::run) will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is provided).
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         self.async_collection.find(filter)
     }
 }
 
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T> where T: DeserializeOwned {
+    /// Finds a single document in the collection matching `filter`.
+    ///
+    /// [`run`](Find::run) will return `Result<Option<T>>`.
+    pub fn find_one_2(&self, filter: Document) -> Find<'_, T, Single> {
+        self.async_collection.find_one_2(filter)
+    }
+}
+
 /// Finds the documents in a collection matching a filter.  Construct with [`Collection::find`].
 #[must_use]
-pub struct Find<'a, T, Session = ImplicitSession> {
+pub struct Find<'a, T, Mode = Multiple, Session = ImplicitSession> {
     coll: &'a Collection<T>,
     filter: Document,
     options: Option<FindOptions>,
     session: Session,
+    _mode: PhantomData<Mode>,
 }
 
-impl<'a, T, Session> Find<'a, T, Session> {
+impl<'a, T, Mode, Session> Find<'a, T, Mode, Session> {
     option_setters!(options: FindOptions;
-        allow_disk_use: bool,
         allow_partial_results: bool,
-        batch_size: u32,
         comment: String,
         comment_bson: Bson,
-        cursor_type: CursorType,
         hint: Hint,
-        limit: i64,
         max: Document,
-        max_await_time: Duration,
         max_scan: u64,
         max_time: Duration,
         min: Document,
-        no_cursor_timeout: bool,
         projection: Document,
         read_concern: ReadConcern,
         return_key: bool,
@@ -74,23 +100,36 @@ impl<'a, T, Session> Find<'a, T, Session> {
     );
 }
 
-impl<'a, T> Find<'a, T, ImplicitSession> {
+// Some options don't make sense for `find_one`.
+impl<'a, T, Session> Find<'a, T, Multiple, Session> {
+    option_setters!(FindOptions;
+        allow_disk_use: bool,
+        batch_size: u32,
+        cursor_type: CursorType,
+        limit: i64,
+        max_await_time: Duration,
+        no_cursor_timeout: bool,
+    );
+}
+
+impl<'a, T, Mode> Find<'a, T, Mode, ImplicitSession> {
     /// Runs the query using the provided session.
     pub fn session<'s>(
         self,
         value: impl Into<&'s mut ClientSession>,
-    ) -> Find<'a, T, ExplicitSession<'s>> {
+    ) -> Find<'a, T, Mode, ExplicitSession<'s>> {
         Find {
             coll: self.coll,
             filter: self.filter,
             options: self.options,
             session: ExplicitSession(value.into()),
+            _mode: PhantomData,
         }
     }
 }
 
 action_impl! {
-    impl<'a, T> Action for Find<'a, T, ImplicitSession> {
+    impl<'a, T> Action for Find<'a, T, Multiple, ImplicitSession> {
         type Future = FindFuture;
 
         async fn execute(mut self) -> Result<Cursor<T>> {
@@ -107,7 +146,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl<'a, T> Action for Find<'a, T, ExplicitSession<'a>> {
+    impl<'a, T> Action for Find<'a, T, Multiple, ExplicitSession<'a>> {
         type Future = FindSessionFuture;
 
         async fn execute(mut self) -> Result<SessionCursor<T>> {
@@ -123,3 +162,19 @@ action_impl! {
         }
     }
 }
+
+/*
+action_impl! {
+    impl<'a, T> Action for Find<'a, T, Single, ImplicitSession> {
+        type Future = FindOneFuture;
+
+        async fn execute(mut self) -> Result<Option<T>> {
+            use futures_util::stream::StreamExt;
+            let mut options = self.options.unwrap_or_default();
+            options.limit = Some(-1);
+            let mut cursor = self.coll.find(self.filter).with_options(options).await?;
+            cursor.next().await.transpose()
+        }
+    }
+}
+*/

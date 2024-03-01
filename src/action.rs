@@ -59,6 +59,7 @@ pub struct Single;
 pub struct Multiple;
 
 macro_rules! option_setters {
+    // Include options aggregate accessors.
     (
         $opt_field:ident: $opt_field_ty:ty;
         $(
@@ -72,10 +73,25 @@ macro_rules! option_setters {
 
         /// Set all options.  Note that this will replace all previous values set.
         pub fn with_options(mut self, value: impl Into<Option<$opt_field_ty>>) -> Self {
-            self.options = value.into();
+            self.$opt_field = value.into();
             self
         }
 
+        crate::action::option_setters!($opt_field_ty;
+            $(
+                $(#[$($attrss)*])*
+                $opt_name: $opt_ty,
+            )*
+        );
+    };
+    // Just generate field setters.
+    (
+        $opt_field_ty:ty;
+        $(
+            $(#[$($attrss:tt)*])*
+            $opt_name:ident: $opt_ty:ty,
+        )*
+    ) => {
         $(
             #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
             $(#[$($attrss)*])*
