@@ -178,3 +178,26 @@ action_impl! {
         }
     }
 }
+
+/*
+action_impl! {
+    impl<'a, T> Action for Find<'a, T, Single, ExplicitSession<'a>>
+        where T: DeserializeOwned + Send
+    {
+        type Future = FindOneSessionFuture;
+
+        async fn execute(self) -> Result<Option<T>> {
+            use futures_util::stream::StreamExt;
+            let mut options = self.options.unwrap_or_default();
+            options.limit = Some(-1);
+            let mut cursor = self.coll
+                .find(self.filter)
+                .with_options(options)
+                .session(&mut *self.session.0)
+                .await?;
+            let mut stream = cursor.stream(self.session.0);
+            stream.next().await.transpose()
+        }
+    }
+}
+*/
