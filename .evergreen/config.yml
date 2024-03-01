@@ -339,7 +339,7 @@ buildvariants:
 
   - name: oidc
     display_name: OIDC
-    patchable: false
+    patchable: true
     run_on:
       - rhel87-small
     expansions:
