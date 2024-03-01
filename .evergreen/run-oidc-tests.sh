@@ -8,6 +8,8 @@ set -o xtrace
 
 set +o errexit
 
+FEATURE_FLAGS+=("tokio-runtime")
+
 cargo_test test::spec::oidc prose.xml
 
 junit-report-merger results.xml prose.xml
