@@ -1,5 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
+use action_macro::action_impl_2;
 use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
@@ -179,8 +180,7 @@ action_impl! {
     }
 }
 
-/*
-action_impl! {
+action_impl_2! {
     impl<'a, T> Action for Find<'a, T, Single, ExplicitSession<'a>>
         where T: DeserializeOwned + Send
     {
@@ -200,4 +200,3 @@ action_impl! {
         }
     }
 }
-*/

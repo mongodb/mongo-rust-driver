@@ -69,6 +69,7 @@ in-use-encryption-unstable = ["mongocrypt", "rayon", "num_cpus"]
 tracing-unstable = ["tracing", "log"]
 
 [dependencies]
+action_macro = { path = "action_macro" }
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
