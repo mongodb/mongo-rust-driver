@@ -2,7 +2,7 @@ use std::{borrow::Borrow, fmt::Debug};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{ClientSession, Cursor, SessionCursor};
+use super::ClientSession;
 use crate::{
     bson::Document,
     error::Result,
@@ -11,7 +11,6 @@ use crate::{
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
         FindOneOptions,
-        FindOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
@@ -110,33 +109,6 @@ where
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Finds the documents in the collection matching `filter`.
-    pub fn find(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-    ) -> Result<Cursor<T>> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_collection.find(filter.into(), options.into()))
-            .map(Cursor::new)
-    }
-
-    /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.
-    pub fn find_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<T>> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_collection.find_with_session(
-                filter.into(),
-                options.into(),
-                &mut session.async_client_session,
-            ))
-            .map(SessionCursor::new)
     }
 }
 

@@ -57,7 +57,8 @@ async fn run_find_test(test_file: TestFile) {
         };
 
         let cursor = coll
-            .find(arguments.filter, options)
+            .find(arguments.filter)
+            .with_options(options)
             .await
             .expect(&test_case.description);
         assert_eq!(

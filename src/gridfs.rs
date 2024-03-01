@@ -234,7 +234,7 @@ impl GridFsBucket {
         options: impl Into<Option<GridFsFindOptions>>,
     ) -> Result<Cursor<FilesCollectionDocument>> {
         let find_options = options.into().map(FindOptions::from);
-        self.files().find(filter, find_options).await
+        self.files().find(filter).with_options(find_options).await
     }
 
     /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the

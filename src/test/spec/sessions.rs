@@ -154,7 +154,7 @@ async fn implicit_session_after_connection() {
         );
         ops.push(
             async {
-                let cursor = coll.find(doc! {}, None).await.unwrap();
+                let cursor = coll.find(doc! {}).await.unwrap();
                 let r: Result<Vec<_>> = cursor.try_collect().await;
                 r.map(|_| ())
             }
@@ -241,7 +241,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
     let mut subscriber = client.handler.subscribe();
     let coll = client.database(name).collection(name);
 
-    let _ = coll.find(doc! {}, None).await;
+    let _ = coll.find(doc! {}).await;
     let event = subscriber
         .filter_map_event(Duration::from_millis(500), |event| match event {
             Event::Command(CommandEvent::Started(command_started_event))

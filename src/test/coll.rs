@@ -131,7 +131,7 @@ async fn find() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let mut cursor = coll.find(None, None).await.unwrap().enumerate();
+    let mut cursor = coll.find(doc! {}).await.unwrap().enumerate();
 
     while let Some((i, result)) = cursor.next().await {
         let doc = result.unwrap();
@@ -271,10 +271,7 @@ async fn kill_cursors_on_drop() {
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    let cursor = coll
-        .find(None, FindOptions::builder().batch_size(1).build())
-        .await
-        .unwrap();
+    let cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
 
     assert!(!kill_cursors_sent(&event_client));
 
@@ -306,10 +303,7 @@ async fn no_kill_cursors_on_exhausted() {
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    let cursor = coll
-        .find(None, FindOptions::builder().build())
-        .await
-        .unwrap();
+    let cursor = coll.find(doc! {}).await.unwrap();
 
     assert!(!kill_cursors_sent(&event_client));
 
@@ -544,7 +538,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
-    coll.find(None, options).await.unwrap();
+    coll.find(doc! {}).with_options(options).await.unwrap();
 
     let events = event_client.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
@@ -780,9 +774,9 @@ async fn typed_insert_many() {
     ];
     coll.insert_many(insert_data.clone(), None).await.unwrap();
 
-    let options = FindOptions::builder().sort(doc! { "x": 1 }).build();
     let actual: Vec<UserType> = coll
-        .find(doc! { "x": 2 }, options)
+        .find(doc! { "x": 2 })
+        .sort(doc! { "x": 1 })
         .await
         .unwrap()
         .try_collect()
@@ -920,7 +914,7 @@ async fn collection_options_inherited() {
         .database(function_name!())
         .collection_with_options::<Document>(function_name!(), options);
 
-    coll.find(None, None).await.unwrap();
+    coll.find(doc! {}).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
     coll.find_one(None, None).await.unwrap();
@@ -988,7 +982,7 @@ async fn cursor_batch_size() {
     coll.insert_many(vec![&doc; 10], None).await.unwrap();
 
     let opts = FindOptions::builder().batch_size(3).build();
-    let cursor_no_session = coll.find(doc! {}, opts.clone()).await.unwrap();
+    let cursor_no_session = coll.find(doc! {}).with_options(opts.clone()).await.unwrap();
     let docs: Vec<_> = cursor_no_session.try_collect().await.unwrap();
     assert_eq!(docs.len(), 10);
 
@@ -999,7 +993,9 @@ async fn cursor_batch_size() {
     }
     let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
-        .find_with_session(doc! {}, opts.clone(), &mut session)
+        .find(doc! {})
+        .with_options(opts.clone())
+        .session(&mut session)
         .await
         .unwrap();
     let mut docs = Vec::new();
@@ -1009,7 +1005,9 @@ async fn cursor_batch_size() {
     assert_eq!(docs.len(), 10);
 
     let mut cursor = coll
-        .find_with_session(doc! {}, opts, &mut session)
+        .find(doc! {})
+        .with_options(opts)
+        .session(&mut session)
         .await
         .unwrap();
     let docs: Vec<_> = cursor.stream(&mut session).try_collect().await.unwrap();

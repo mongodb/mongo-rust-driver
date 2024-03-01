@@ -585,12 +585,11 @@ impl Find {
             selection_criteria: None,
             let_vars: self.let_vars.clone(),
         };
+        let act = collection.find(self.filter.clone()).with_options(options);
         match &self.session {
             Some(session_id) => {
                 let cursor = with_mut_session!(test_runner, session_id, |session| async {
-                    collection
-                        .find_with_session(self.filter.clone(), options, session)
-                        .await
+                    act.session(session.deref_mut()).await
                 })
                 .await?;
                 Ok(TestCursor::Session {
@@ -599,7 +598,7 @@ impl Find {
                 })
             }
             None => {
-                let cursor = collection.find(self.filter.clone(), options).await?;
+                let cursor = act.await?;
                 Ok(TestCursor::Normal(Mutex::new(cursor)))
             }
         }

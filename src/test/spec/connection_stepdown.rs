@@ -5,7 +5,7 @@ use futures::stream::StreamExt;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{Acknowledgment, ClientOptions, FindOptions, InsertManyOptions, WriteConcern},
+    options::{Acknowledgment, ClientOptions, InsertManyOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, util::EventClient},
     Collection,
@@ -68,10 +68,7 @@ async fn get_more() {
         .await
         .unwrap();
 
-        let mut cursor = coll
-            .find(None, Some(FindOptions::builder().batch_size(2).build()))
-            .await
-            .unwrap();
+        let mut cursor = coll.find(doc! {}).batch_size(2).await.unwrap();
 
         let db = client.database("admin");
 

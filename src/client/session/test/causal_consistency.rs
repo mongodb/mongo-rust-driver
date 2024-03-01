@@ -55,11 +55,9 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     ops.push(op!("find", true, |coll, session| coll
         .find_one_with_session(doc! { "x": 1 }, None, session)));
 
-    ops.push(op!("find", true, |coll, session| coll.find_with_session(
-        doc! { "x": 1 },
-        None,
-        session
-    )));
+    ops.push(op!("find", true, |coll, session| coll
+        .find(doc! { "x": 1 })
+        .session(session)));
 
     ops.push(op!("update", false, |coll, s| coll
         .update_one(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)

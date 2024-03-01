@@ -197,7 +197,7 @@ async fn retry_read_different_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_read_different_mongos")
-        .find(doc! {}, None)
+        .find(doc! {})
         .await;
     assert!(result.is_err());
     let events = client.get_command_events(&["find"]);
@@ -254,7 +254,7 @@ async fn retry_read_same_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_read_same_mongos")
-        .find(doc! {}, None)
+        .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
     let events = client.get_command_events(&["find"]);

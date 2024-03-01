@@ -162,9 +162,10 @@ fn collection() {
     coll.insert_one(doc! { "x": 1 }, None)
         .expect("insert should succeed");
 
-    let find_options = FindOptions::builder().projection(doc! { "_id": 0 }).build();
     let cursor = coll
-        .find(doc! { "x": 1 }, find_options)
+        .find(doc! { "x": 1 })
+        .projection(doc! { "_id": 0 })
+        .run()
         .expect("find should succeed");
     let results = cursor
         .collect::<Result<Vec<Document>>>()
@@ -383,7 +384,11 @@ fn borrowed_deserialization() {
         .sort(doc! { "_id": 1 })
         .build();
 
-    let mut cursor = coll.find(None, options.clone()).unwrap();
+    let mut cursor = coll
+        .find(doc! {})
+        .with_options(options.clone())
+        .run()
+        .unwrap();
 
     let mut i = 0;
     while cursor.advance().unwrap() {
@@ -393,7 +398,12 @@ fn borrowed_deserialization() {
     }
 
     let mut session = client.start_session().run().unwrap();
-    let mut cursor = coll.find_with_session(None, options, &mut session).unwrap();
+    let mut cursor = coll
+        .find(doc! {})
+        .with_options(options)
+        .session(&mut session)
+        .run()
+        .unwrap();
 
     let mut i = 0;
     while cursor.advance(&mut session).unwrap() {

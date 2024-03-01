@@ -12,13 +12,14 @@ use crate::{
     ClientSession,
     Collection,
     Cursor,
+    SessionCursor,
 };
 
 use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
 
 impl<T> Collection<T> {
     /// Finds the documents in the collection matching `filter`.
-    pub fn find_2(&self, filter: Document) -> Find<'_, T> {
+    pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
             filter,
@@ -31,11 +32,12 @@ impl<T> Collection<T> {
 #[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Finds the documents in the collection matching `filter`.
-    pub fn find_2(&self, filter: Document) -> Find<'_, T> {
-        self.async_collection.find_2(filter)
+    pub fn find(&self, filter: Document) -> Find<'_, T> {
+        self.async_collection.find(filter)
     }
 }
 
+/// Finds the documents in a collection matching a filter.  Construct with [`Collection::find`].
 #[must_use]
 pub struct Find<'a, T, Session = ImplicitSession> {
     coll: &'a Collection<T>,
@@ -100,6 +102,24 @@ action_impl! {
 
         fn sync_wrap(out) -> Result<crate::sync::Cursor<T>> {
             out.map(crate::sync::Cursor::new)
+        }
+    }
+}
+
+action_impl! {
+    impl<'a, T> Action for Find<'a, T, ExplicitSession<'a>> {
+        type Future = FindSessionFuture;
+
+        async fn execute(mut self) -> Result<SessionCursor<T>> {
+            resolve_read_concern_with_session!(self.coll, self.options, Some(&mut *self.session.0))?;
+            resolve_selection_criteria_with_session!(self.coll, self.options, Some(&mut *self.session.0))?;
+
+            let find = Op::new(self.coll.namespace(), self.filter, self.options);
+            self.coll.client().execute_session_cursor_operation(find, self.session.0).await
+        }
+
+        fn sync_wrap(out) -> Result<crate::sync::SessionCursor<T>> {
+            out.map(crate::sync::SessionCursor::new)
         }
     }
 }

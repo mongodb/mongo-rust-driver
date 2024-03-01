@@ -183,7 +183,7 @@ async fn rtt_is_updated() {
     client
         .database("foo")
         .collection::<Document>("bar")
-        .find(None, None)
+        .find(doc! {})
         .await
         .unwrap();
 

@@ -14,7 +14,7 @@ use super::{options::GridFsDownloadByNameOptions, Chunk, FilesCollectionDocument
 use crate::{
     bson::{doc, Bson},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    options::{FindOneOptions, FindOptions},
+    options::FindOneOptions,
     Collection,
     Cursor,
 };
@@ -161,10 +161,10 @@ impl GridFsBucket {
             return Ok(());
         }
 
-        let options = FindOptions::builder().sort(doc! { "n": 1 }).build();
         let mut cursor = self
             .chunks()
-            .find(doc! { "files_id": &file.id }, options)
+            .find(doc! { "files_id": &file.id })
+            .sort(doc! { "n": 1 })
             .await?;
 
         let mut n = 0;
@@ -272,8 +272,10 @@ impl GridFsDownloadStream {
         let initial_state = if file.length == 0 {
             State::Done
         } else {
-            let options = FindOptions::builder().sort(doc! { "n": 1 }).build();
-            let cursor = chunks.find(doc! { "files_id": &file.id }, options).await?;
+            let cursor = chunks
+                .find(doc! { "files_id": &file.id })
+                .sort(doc! { "n": 1 })
+                .await?;
             State::Idle(Some(Idle {
                 buffer: Vec::new(),
                 cursor: Box::new(cursor),

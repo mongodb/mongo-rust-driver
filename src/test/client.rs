@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Bson},
-    coll::options::FindOptions,
     error::{CommandError, Error, ErrorKind},
     event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -816,10 +815,7 @@ async fn manual_shutdown_with_resources() {
     // Scope to force drop of resources
     {
         // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
-        let _cursor = coll
-            .find(None, FindOptions::builder().batch_size(1).build())
-            .await
-            .unwrap();
+        let _cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
         // Similarly, sessions need an in-progress transaction to have cleanup.
         let mut session = client.start_session().await.unwrap();
         if session.start_transaction(None).await.is_err() {
@@ -880,10 +876,7 @@ async fn manual_shutdown_immediate_with_resources() {
     // Resources are scoped to past the `shutdown_immediate`.
 
     // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
-    let _cursor = coll
-        .find(None, FindOptions::builder().batch_size(1).build())
-        .await
-        .unwrap();
+    let _cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
     // Similarly, sessions need an in-progress transaction to have cleanup.
     let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();

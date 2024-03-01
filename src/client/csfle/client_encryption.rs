@@ -105,7 +105,7 @@ impl ClientEncryption {
     /// Finds all documents in the key vault collection.
     /// Returns the result of the internal find() operation on the key vault collection.
     pub async fn get_keys(&self) -> Result<Cursor<RawDocumentBuf>> {
-        self.key_vault.find(doc! {}, None).await
+        self.key_vault.find(doc! {}).await
     }
 
     /// Adds a keyAltName to the keyAltNames array of the key document in the key vault collection

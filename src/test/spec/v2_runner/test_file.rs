@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer};
 
 use crate::{
     bson::Document,
-    options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
+    options::{ReadPreference, SelectionCriteria, SessionOptions},
     test::{
         log_uncaptured,
         spec::merge_uri_options,
@@ -177,12 +177,10 @@ impl Outcome {
             .database(db_name)
             .collection_with_options(coll_name, coll_opts);
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
-        let options = FindOptions::builder()
+        let actual_data: Vec<Document> = coll
+            .find(doc! {})
             .sort(doc! { "_id": 1 })
             .selection_criteria(selection_criteria)
-            .build();
-        let actual_data: Vec<Document> = coll
-            .find(None, options)
             .await
             .unwrap()
             .try_collect()

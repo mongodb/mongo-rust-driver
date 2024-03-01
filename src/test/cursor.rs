@@ -40,13 +40,9 @@ async fn tailable_cursor() {
     let await_time = Duration::from_millis(500);
 
     let mut cursor = coll
-        .find(
-            None,
-            FindOptions::builder()
-                .cursor_type(CursorType::TailableAwait)
-                .max_await_time(await_time)
-                .build(),
-        )
+        .find(doc! {})
+        .cursor_type(CursorType::TailableAwait)
+        .max_await_time(await_time)
         .await
         .unwrap();
 
@@ -97,9 +93,10 @@ async fn session_cursor_next() {
         .await
         .unwrap();
 
-    let opts = FindOptions::builder().batch_size(1).build();
     let mut cursor = coll
-        .find_with_session(None, opts, &mut session)
+        .find(doc! {})
+        .batch_size(1)
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -137,10 +134,7 @@ async fn batch_exhaustion() {
     .unwrap();
 
     // Start a find where batch size will line up with limit.
-    let cursor = coll
-        .find(None, FindOptions::builder().batch_size(2).limit(4).build())
-        .await
-        .unwrap();
+    let cursor = coll.find(doc! {}).batch_size(2).limit(4).await.unwrap();
     let v: Vec<_> = cursor.try_collect().await.unwrap();
     assert_eq!(4, v.len());
 
@@ -202,7 +196,11 @@ async fn borrowed_deserialization() {
         .sort(doc! { "_id": 1 })
         .build();
 
-    let mut cursor = coll.find(None, options.clone()).await.unwrap();
+    let mut cursor = coll
+        .find(doc! {})
+        .with_options(options.clone())
+        .await
+        .unwrap();
 
     let mut i = 0;
     while cursor.advance().await.unwrap() {
@@ -213,7 +211,9 @@ async fn borrowed_deserialization() {
 
     let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
-        .find_with_session(None, options.clone(), &mut session)
+        .find(doc! {})
+        .with_options(options.clone())
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -241,10 +241,8 @@ async fn session_cursor_with_type() {
     .await
     .unwrap();
 
-    let mut cursor: crate::SessionCursor<bson::Document> = coll
-        .find_with_session(doc! {}, None, &mut session)
-        .await
-        .unwrap();
+    let mut cursor: crate::SessionCursor<bson::Document> =
+        coll.find(doc! {}).session(&mut session).await.unwrap();
 
     let _ = cursor.next(&mut session).await.unwrap().unwrap();
 
@@ -272,10 +270,7 @@ async fn cursor_final_batch() {
     .await
     .unwrap();
 
-    let mut cursor = coll
-        .find(None, FindOptions::builder().batch_size(3).build())
-        .await
-        .unwrap();
+    let mut cursor = coll.find(doc! {}).batch_size(3).await.unwrap();
     let mut found = 0;
     while cursor.advance().await.unwrap() {
         found += 1;

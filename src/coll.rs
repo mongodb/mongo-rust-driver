@@ -18,14 +18,12 @@ use crate::{
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    operation::{Find, FindAndModify, Insert, Update},
+    operation::{FindAndModify, Insert, Update},
     results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
-    Cursor,
     Database,
-    SessionCursor,
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
@@ -225,38 +223,6 @@ where
         Ok(())
     }
 
-    /// Finds the documents in the collection matching `filter`.
-    pub async fn find(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-    ) -> Result<Cursor<T>> {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-
-        let find = Find::new(self.namespace(), filter.into(), options);
-        let client = self.client();
-
-        client.execute_cursor_operation(find).await
-    }
-
-    /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.
-    pub async fn find_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<T>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-
-        let find = Find::new(self.namespace(), filter.into(), options);
-        let client = self.client();
-
-        client.execute_session_cursor_operation(find, session).await
-    }
-
     pub(crate) fn human_readable_serialization(&self) -> bool {
         self.inner.human_readable_serialization
     }
@@ -276,7 +242,10 @@ where
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
-        let mut cursor = self.find(filter, Some(options)).await?;
+        let mut cursor = self
+            .find(filter.into().unwrap_or_default())
+            .with_options(options)
+            .await?;
         cursor.next().await.transpose()
     }
 
@@ -294,7 +263,9 @@ where
 
         let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
         let mut cursor = self
-            .find_with_session(filter, Some(options), session)
+            .find(filter.into().unwrap_or_default())
+            .with_options(options)
+            .session(&mut *session)
             .await?;
         let mut cursor = cursor.stream(session);
         cursor.next().await.transpose()

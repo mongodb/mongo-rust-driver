@@ -16,7 +16,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::{ClientOptions, FindOptions, InsertManyOptions},
+    options::{ClientOptions, InsertManyOptions},
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     sdam::MIN_HEARTBEAT_FREQUENCY,
@@ -163,9 +163,9 @@ async fn run_legacy() {
             };
 
             let coll = client.get_coll(&db_name, &coll_name);
-            let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
-                .find(None, options)
+                .find(doc! {})
+                .sort(doc! { "_id": 1 })
                 .await
                 .unwrap()
                 .try_collect()
@@ -373,7 +373,7 @@ async fn label_not_added(retry_reads: bool) {
         .await
         .unwrap();
 
-    let err = coll.find(doc! {}, None).await.unwrap_err();
+    let err = coll.find(doc! {}).await.unwrap_err();
 
     assert!(!err.contains_label("RetryableWriteError"));
 }

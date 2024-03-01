@@ -386,20 +386,19 @@ impl TestOperation for Find {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection
+                .find(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => {
-                    let mut cursor = collection
-                        .find_with_session(self.filter.clone(), self.options.clone(), session)
-                        .await?;
+                    let mut cursor = act.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = collection
-                        .find(self.filter.clone(), self.options.clone())
-                        .await?;
+                    let cursor = act.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };

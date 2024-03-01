@@ -331,7 +331,7 @@ async fn data_key_double_encryption() -> Result<()> {
         let docs: Vec<_> = client
             .database("keyvault")
             .collection::<Document>("datakeys")
-            .find(doc! { "_id": datakey_id.clone() }, None)
+            .find(doc! { "_id": datakey_id.clone() })
             .await?
             .try_collect()
             .await?;
@@ -2019,7 +2019,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
         .contention_factor(0)
         .await?;
     let found: Vec<_> = enc_coll
-        .find(doc! { "encryptedIndexed": find_payload }, None)
+        .find(doc! { "encryptedIndexed": find_payload })
         .await?
         .try_collect()
         .await?;
@@ -2078,7 +2078,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
         .contention_factor(0)
         .await?;
     let found: Vec<_> = enc_coll
-        .find(doc! { "encryptedIndexed": find_payload }, None)
+        .find(doc! { "encryptedIndexed": find_payload })
         .await?
         .try_collect()
         .await?;
@@ -2098,7 +2098,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
         .contention_factor(10)
         .await?;
     let found: Vec<_> = enc_coll
-        .find(doc! { "encryptedIndexed": find_payload2 }, None)
+        .find(doc! { "encryptedIndexed": find_payload2 })
         .await?
         .try_collect()
         .await?;
@@ -2145,7 +2145,7 @@ async fn explicit_encryption_case_3() -> Result<()> {
         .await?;
 
     let found: Vec<_> = enc_coll
-        .find(doc! { "_id": 1 }, None)
+        .find(doc! { "_id": 1 })
         .await?
         .try_collect()
         .await?;
@@ -3206,7 +3206,8 @@ async fn range_explicit_encryption_test(
         .await?;
 
     let docs: Vec<RawDocumentBuf> = explicit_encryption_collection
-        .find(find_payload, find_options.clone())
+        .find(find_payload)
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3228,7 +3229,8 @@ async fn range_explicit_encryption_test(
     let docs: Vec<RawDocumentBuf> = encrypted_client
         .database("db")
         .collection("explicit_encryption")
-        .find(find_payload, find_options.clone())
+        .find(find_payload)
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3249,7 +3251,8 @@ async fn range_explicit_encryption_test(
     let docs: Vec<RawDocumentBuf> = encrypted_client
         .database("db")
         .collection("explicit_encryption")
-        .find(find_payload, find_options.clone())
+        .find(find_payload)
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3266,7 +3269,8 @@ async fn range_explicit_encryption_test(
     let docs: Vec<RawDocumentBuf> = encrypted_client
         .database("db")
         .collection("explicit_encryption")
-        .find(doc! { "$expr": find_payload }, find_options.clone())
+        .find(doc! { "$expr": find_payload })
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
