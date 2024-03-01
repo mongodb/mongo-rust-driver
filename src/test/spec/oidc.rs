@@ -1,9 +1,7 @@
-type Result<T> = anyhow::Result<T>;
-
 // Prose test 1.1 Single Principal Implicit Username
 #[cfg(feature = "tokio-runtime")]
 #[tokio::test]
-async fn single_principal_implicit_username() -> Result<()> {
+async fn single_principal_implicit_username() -> anyhow::Result<()> {
     use crate::{
         client::{
             auth::{oidc, AuthMechanism, Credential},
