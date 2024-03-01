@@ -1,8 +1,9 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Error, ItemImpl};
+use syn::{parse_macro_input, spanned::Spanned, Error, ImplItem, ImplItemType, ItemImpl};
 
 #[proc_macro]
 pub fn action_impl_2(input: TokenStream) -> TokenStream {
@@ -26,10 +27,42 @@ fn fallible(input: ItemImpl) -> Result<proc_macro2::TokenStream, Error> {
 
     let generics = input.generics;
     let action = input.self_ty;
+    let future_ty = find_item(&input.items, "Future type", |item| {
+        let item_ty = impl_item_type(item)?;
+        if item_ty.ident.to_string() != "Future" {
+            return None;
+        }
+        Some(&item_ty.ty)
+    })?;
 
     Ok(quote! {
         impl #generics std::future::IntoFuture for #action {
-            
+            type IntoFuture = #future_ty;
         }
     })
+}
+
+/// Finds the single item that matches the predicate.
+fn find_item<'a, T>(items: &'a [ImplItem], name: &str, pred: impl Fn(&'a ImplItem) -> Option<T>) -> Result<T, Error> {
+    let mut found = None;
+    for item in items {
+        if let Some(v) = pred(item) {
+            if found.is_none() {
+                found = Some(v);
+            } else {
+                return Err(Error::new(item.span(), format!("Duplicate {} found", name)));
+            }
+        }
+    }
+    match found {
+        Some(v) => Ok(v),
+        None => Err(Error::new(Span::call_site(), format!("No {} found", name))),
+    }
+}
+
+fn impl_item_type(item: &ImplItem) -> Option<&ImplItemType> {
+    match item {
+        ImplItem::Type(t) => Some(t),
+        _ => None,
+    }
 }
