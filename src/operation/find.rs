@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -20,28 +17,12 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct Find {
     ns: Namespace,
-    filter: Option<Document>,
+    filter: Document,
     options: Option<Box<FindOptions>>,
 }
 
 impl Find {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            None,
-            None,
-        )
-    }
-
-    pub(crate) fn new(
-        ns: Namespace,
-        filter: Option<Document>,
-        mut options: Option<FindOptions>,
-    ) -> Self {
+    pub(crate) fn new(ns: Namespace, filter: Document, mut options: Option<FindOptions>) -> Self {
         if let Some(ref mut options) = options {
             if let Some(ref comment) = options.comment {
                 if options.comment_bson.is_none() {
@@ -99,8 +80,8 @@ impl OperationWithDefaults for Find {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        if let Some(ref filter) = self.filter {
-            body.insert("filter", filter.clone());
+        if !self.filter.is_empty() {
+            body.insert("filter", self.filter.clone());
         }
 
         Ok(Command::new_read(

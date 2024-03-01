@@ -10,6 +10,7 @@ mod delete;
 mod distinct;
 mod drop;
 mod drop_index;
+mod find;
 mod list_collections;
 mod list_databases;
 mod list_indexes;
@@ -147,7 +148,7 @@ macro_rules! action_impl {
     ) => {
         impl$(<$lt $(, $($at),+)?>)? std::future::IntoFuture for $action {
             type Output = $out;
-            type IntoFuture = $f_ty$(<$lt>)?;
+            type IntoFuture = $f_ty$(<$lt $(, $($at)+)?>)?;
 
             fn into_future($($args)+) -> Self::IntoFuture {
                 $f_ty(Box::pin(async move {
@@ -160,9 +161,9 @@ macro_rules! action_impl {
             type Output = $out;
         }
 
-        crate::action::action_impl_future_wrapper!($($lt)?, $f_ty, $out);
+        crate::action::action_impl_future_wrapper!($f_ty, $out $(, $lt)? $($(, $($at),+)?)?);
 
-        impl$(<$lt>)? std::future::Future for $f_ty$(<$lt>)? {
+        impl$(<$lt $(, $($at),+)?>)? std::future::Future for $f_ty$(<$lt $(, $($at),+)?>)? {
             type Output = $out;
 
             fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
@@ -175,7 +176,7 @@ macro_rules! action_impl {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {
                 let $($wrap_args)+ = crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self));
-                return $wrap_code
+                $wrap_code
             }
         }
     }
@@ -183,13 +184,17 @@ macro_rules! action_impl {
 pub(crate) use action_impl;
 
 macro_rules! action_impl_future_wrapper {
-    (, $f_ty:ident, $out:ty) => {
+    ($f_ty:ident, $out:ty) => {
         /// Opaque future type for action execution.
         pub struct $f_ty(crate::BoxFuture<'static, $out>);
     };
-    ($lt:lifetime, $f_ty:ident, $out:ty) => {
+    ($f_ty:ident, $out:ty, $lt:lifetime) => {
         /// Opaque future type for action execution.
         pub struct $f_ty<$lt>(crate::BoxFuture<$lt, $out>);
+    };
+    ($f_ty:ident, $out:ty, $lt:lifetime, $($at:ident),+) => {
+        /// Opaque future type for action execution.
+        pub struct $f_ty<$lt, $($at),+>(crate::BoxFuture<$lt, $out>);
     };
 }
 pub(crate) use action_impl_future_wrapper;
