@@ -4,14 +4,9 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::{ClientSession, Cursor, SessionCursor};
 use crate::{
-    bson::{Bson, Document},
+    bson::Document,
     error::Result,
-    index::IndexModel,
     options::{
-        CreateIndexOptions,
-        DeleteOptions,
-        DistinctOptions,
-        DropIndexOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -19,23 +14,13 @@ use crate::{
         FindOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
         SelectionCriteria,
         UpdateModifications,
-        UpdateOptions,
         WriteConcern,
     },
-    results::{
-        CreateIndexResult,
-        CreateIndexesResult,
-        DeleteResult,
-        InsertManyResult,
-        InsertOneResult,
-        UpdateResult,
-    },
-    runtime,
+    results::{InsertManyResult, InsertOneResult, UpdateResult},
     Collection as AsyncCollection,
     Namespace,
 };
@@ -121,313 +106,14 @@ impl<T> Collection<T> {
         self.async_collection.write_concern()
     }
 
-    /// Creates the given index on this collection.
-    pub fn create_index(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexResult> {
-        runtime::block_on(self.async_collection.create_index(index, options))
-    }
-
-    /// Creates the given index on this collection using the provided `ClientSession`.
-    pub fn create_index_with_session(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexResult> {
-        runtime::block_on(self.async_collection.create_index_with_session(
-            index,
-            options,
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Creates the given indexes on this collection.
-    pub fn create_indexes(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexesResult> {
-        runtime::block_on(self.async_collection.create_indexes(indexes, options))
-    }
-
-    /// Creates the given indexes on this collection using the provided `ClientSession`.
-    pub fn create_indexes_with_session(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexesResult> {
-        runtime::block_on(self.async_collection.create_indexes_with_session(
-            indexes,
-            options,
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Deletes all documents stored in the collection matching `query`.
-    pub fn delete_many(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_many(query, options.into()))
-    }
-
-    /// Deletes all documents stored in the collection matching `query` using the provided
-    /// `ClientSession`.
-    pub fn delete_many_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_many_with_session(
-            query,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Deletes up to one document found matching `query`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn delete_one(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_one(query, options.into()))
-    }
-
-    /// Deletes up to one document found matching `query` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn delete_one_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        runtime::block_on(self.async_collection.delete_one_with_session(
-            query,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection.
-    pub fn distinct(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-    ) -> Result<Vec<Bson>> {
-        runtime::block_on(self.async_collection.distinct(
-            field_name.as_ref(),
-            filter.into(),
-            options.into(),
-        ))
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection using
-    /// the provided `ClientSession`.
-    pub fn distinct_with_session(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<Bson>> {
-        runtime::block_on(self.async_collection.distinct_with_session(
-            field_name.as_ref(),
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Updates all documents matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub fn update_many(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(
-            self.async_collection
-                .update_many(query, update.into(), options.into()),
-        )
-    }
-
-    /// Drops the index specified by `name` from this collection.
-    pub fn drop_index(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-    ) -> Result<()> {
-        runtime::block_on(self.async_collection.drop_index(name, options))
-    }
-
-    /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
-    pub fn drop_index_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(self.async_collection.drop_index_with_session(
-            name,
-            options,
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Drops all indexes associated with this collection.
-    pub fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
-        runtime::block_on(self.async_collection.drop_indexes(options))
-    }
-
-    /// Drops all indexes associated with this collection using the provided `ClientSession`.
-    pub fn drop_indexes_with_session(
-        &self,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_collection
-                .drop_indexes_with_session(options, &mut session.async_client_session),
-        )
-    }
-
-    /// Lists all indexes on this collection.
-    pub fn list_indexes(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-    ) -> Result<Cursor<IndexModel>> {
-        runtime::block_on(self.async_collection.list_indexes(options)).map(Cursor::new)
-    }
-
-    /// Lists all indexes on this collection using the provided `ClientSession`.
-    pub fn list_indexes_with_session(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<IndexModel>> {
-        runtime::block_on(
-            self.async_collection
-                .list_indexes_with_session(options, &mut session.async_client_session),
-        )
-        .map(SessionCursor::new)
-    }
-
-    /// Gets the names of all indexes on the collection.
-    pub fn list_index_names(&self) -> Result<Vec<String>> {
-        runtime::block_on(self.async_collection.list_index_names())
-    }
-
-    /// Gets the names of all indexes on the collection using the provided `ClientSession`.
-    pub fn list_index_names_with_session(
-        &self,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_collection
-                .list_index_names_with_session(&mut session.async_client_session),
-        )
-    }
-
-    /// Updates all documents matching `query` in the collection using the provided `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub fn update_many_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.update_many_with_session(
-            query,
-            update.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Updates up to one document matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn update_one(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(
-            self.async_collection
-                .update_one(query, update.into(), options.into()),
-        )
-    }
-
-    /// Updates up to one document matching `query` in the collection using the provided
-    /// `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn update_one_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.update_one_with_session(
-            query,
-            update.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
     /// Finds the documents in the collection matching `filter`.
     pub fn find(
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOptions>>,
     ) -> Result<Cursor<T>> {
-        runtime::block_on(self.async_collection.find(filter.into(), options.into()))
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_collection.find(filter.into(), options.into()))
             .map(Cursor::new)
     }
 
@@ -438,12 +124,13 @@ impl<T> Collection<T> {
         options: impl Into<Option<FindOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>> {
-        runtime::block_on(self.async_collection.find_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_collection.find_with_session(
+                filter.into(),
+                options.into(),
+                &mut session.async_client_session,
+            ))
+            .map(SessionCursor::new)
     }
 }
 
@@ -457,7 +144,7 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOneOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_collection
                 .find_one(filter.into(), options.into()),
         )
@@ -471,7 +158,7 @@ where
         options: impl Into<Option<FindOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_with_session(
             filter.into(),
             options.into(),
             &mut session.async_client_session,
@@ -494,7 +181,7 @@ where
         filter: Document,
         options: impl Into<Option<FindOneAndDeleteOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_collection
                 .find_one_and_delete(filter, options.into()),
         )
@@ -513,7 +200,7 @@ where
         options: impl Into<Option<FindOneAndDeleteOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_delete_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
             filter,
             options.into(),
             &mut session.async_client_session,
@@ -535,7 +222,7 @@ where
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<FindOneAndUpdateOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_update(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update(
             filter,
             update.into(),
             options.into(),
@@ -558,7 +245,7 @@ where
         options: impl Into<Option<FindOneAndUpdateOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_update_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
             filter,
             update.into(),
             options.into(),
@@ -584,7 +271,7 @@ where
         replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_replace(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_replace(
             filter,
             replacement,
             options.into(),
@@ -605,12 +292,14 @@ where
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        runtime::block_on(self.async_collection.find_one_and_replace_with_session(
-            filter,
-            replacement,
-            options.into(),
-            &mut session.async_client_session,
-        ))
+        crate::sync::TOKIO_RUNTIME.block_on(
+            self.async_collection.find_one_and_replace_with_session(
+                filter,
+                replacement,
+                options.into(),
+                &mut session.async_client_session,
+            ),
+        )
     }
 }
 
@@ -629,7 +318,7 @@ where
         docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
-        runtime::block_on(self.async_collection.insert_many(docs, options.into()))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
     }
 
     /// Inserts the documents in `docs` into the collection using the provided `ClientSession`.
@@ -644,7 +333,7 @@ where
         options: impl Into<Option<InsertManyOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertManyResult> {
-        runtime::block_on(self.async_collection.insert_many_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many_with_session(
             docs,
             options.into(),
             &mut session.async_client_session,
@@ -662,7 +351,7 @@ where
         doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_collection
                 .insert_one(doc.borrow(), options.into()),
         )
@@ -680,7 +369,7 @@ where
         options: impl Into<Option<InsertOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertOneResult> {
-        runtime::block_on(self.async_collection.insert_one_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_one_with_session(
             doc.borrow(),
             options.into(),
             &mut session.async_client_session,
@@ -699,7 +388,7 @@ where
         replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.replace_one(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one(
             query,
             replacement.borrow(),
             options.into(),
@@ -720,7 +409,7 @@ where
         options: impl Into<Option<ReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {
-        runtime::block_on(self.async_collection.replace_one_with_session(
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one_with_session(
             query,
             replacement.borrow(),
             options.into(),

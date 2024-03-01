@@ -1,16 +1,8 @@
 macro_rules! spawn_blocking_and_await {
     ($blocking_call:expr) => {{
-        #[cfg(feature = "tokio-runtime")]
-        {
-            tokio::task::spawn_blocking(move || $blocking_call)
-                .await
-                .unwrap()
-        }
-
-        #[cfg(feature = "async-std-runtime")]
-        {
-            async_std::task::spawn_blocking(move || $blocking_call).await
-        }
+        tokio::task::spawn_blocking(move || $blocking_call)
+            .await
+            .unwrap()
     }};
 }
 
@@ -19,15 +11,7 @@ where
     T: Future + Send + 'static,
     T::Output: Send + 'static,
 {
-    #[cfg(feature = "tokio-runtime")]
-    {
-        tokio::task::spawn(future).map(|result| result.unwrap())
-    }
-
-    #[cfg(feature = "async-std-runtime")]
-    {
-        async_std::task::spawn(future)
-    }
+    tokio::task::spawn(future).map(|result| result.unwrap())
 }
 
 mod bench;
@@ -44,7 +28,6 @@ use std::{
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
 use futures::Future;
-#[cfg(feature = "tokio-runtime")]
 use futures::FutureExt;
 use mongodb::options::ClientOptions;
 use once_cell::sync::Lazy;
@@ -600,8 +583,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     ids
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::main)]
-#[cfg_attr(feature = "async-std-runtime", async_std::main)]
+#[tokio::main]
 async fn main() {
     // ensure MAX_ID is kept up to date.
     assert!(

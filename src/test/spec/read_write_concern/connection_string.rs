@@ -71,8 +71,7 @@ async fn run_connection_string_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     run_spec_test(
         &["read-write-concern", "connection-string"],

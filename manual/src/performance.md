@@ -29,7 +29,7 @@ This is especially noticeable when using a framework that provides connection po
 
 ### Runtime
 
-A `Client` is implicitly bound to the instance of the `tokio` or `async-std` runtime in which it was created.  Attempting to execute operations on a different runtime instance will cause incorrect behavior and unpredictable failures.  This is easy to accidentally invoke when testing, as the `tokio::test` or `async_std::test` helper macros create a new runtime for each test.
+A `Client` is implicitly bound to the instance of the `tokio` runtime in which it was created.  Attempting to execute operations on a different runtime instance will cause incorrect behavior and unpredictable failures.  This is easy to accidentally invoke when testing, as the `tokio::test` helper macro creates a new runtime for each test.
 ```rust,no_run
 # extern crate mongodb;
 # extern crate once_cell;
@@ -89,7 +89,7 @@ or
 #[tokio::test]
 async fn test_list_dbs() -> Result<(), Box<dyn Error>> {
     let client = Client::with_uri_str("mongodb://example.com").await?;
-    CLIENT.list_database_names(None, None).await?;
+    client.list_database_names(None, None).await?;
     Ok(())
 }
 ```

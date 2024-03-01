@@ -8,11 +8,6 @@ source .evergreen/cargo-test.sh
 
 FEATURE_FLAGS+=("tracing-unstable")
 
-if [ "$ASYNC_STD" = true ]; then
-  CARGO_OPTIONS+=("--no-default-features")
-  FEATURE_FLAGS+=("async-std-runtime")
-fi
-
 if [ "$OPENSSL" = true ]; then
   FEATURE_FLAGS+=("openssl-tls")
 fi

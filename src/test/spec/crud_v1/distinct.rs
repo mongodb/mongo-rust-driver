@@ -51,15 +51,15 @@ async fn run_distinct_test(test_file: TestFile) {
         };
 
         let result = coll
-            .distinct(&arguments.field_name, arguments.filter, opts)
+            .distinct(&arguments.field_name, arguments.filter.unwrap_or_default())
+            .with_options(opts)
             .await
             .expect(&test_case.description);
         assert_eq!(result, outcome.result, "{}", test_case.description);
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     run_crud_v1_test(&["crud", "v1", "read"], run_distinct_test).await;
 }

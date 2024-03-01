@@ -99,7 +99,7 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
     /// stream does not observe changes from system collections or the "config", "local" or
@@ -116,7 +116,7 @@ impl crate::sync::Client {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in this database. The stream does not observe changes from system
@@ -132,7 +132,7 @@ impl crate::sync::Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in this collection. A

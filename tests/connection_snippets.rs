@@ -4,7 +4,6 @@
 
 extern crate mongodb;
 
-#[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
 mod async_scram {
     // ASYNC SCRAM CONNECTION EXAMPLE STARTS HERE
     use mongodb::{options::ClientOptions, Client};
@@ -24,7 +23,6 @@ mod async_scram {
     // CONNECTION EXAMPLE ENDS HERE
 }
 
-#[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
 mod async_x509 {
     // ASYNC X509 CONNECTION EXAMPLE STARTS HERE
     use mongodb::{
@@ -57,13 +55,13 @@ mod async_x509 {
     // CONNECTION EXAMPLE ENDS HERE
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 mod sync_scram {
     // SYNC SCRAM CONNECTION EXAMPLE STARTS HERE
     use mongodb::{options::ClientOptions, sync::Client};
 
     fn main() -> mongodb::error::Result<()> {
-        let client_options = ClientOptions::parse(
+        let client_options = ClientOptions::parse_sync(
             "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority",
         )?;
         let client = Client::with_options(client_options)?;
@@ -75,7 +73,7 @@ mod sync_scram {
     // CONNECTION EXAMPLE ENDS HERE
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 mod sync_x509 {
     // SYNC X509 CONNECTION EXAMPLE STARTS HERE
     use mongodb::{
@@ -86,7 +84,7 @@ mod sync_x509 {
 
     fn main() -> mongodb::error::Result<()> {
         let mut client_options =
-            ClientOptions::parse("mongodb+srv://<cluster-url>/<dbname>?w=majority")?;
+            ClientOptions::parse_sync("mongodb+srv://<cluster-url>/<dbname>?w=majority")?;
         client_options.credential = Some(
             Credential::builder()
                 .mechanism(AuthMechanism::MongoDbX509)

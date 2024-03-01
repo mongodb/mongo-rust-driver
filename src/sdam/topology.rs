@@ -80,7 +80,7 @@ impl Topology {
                 let tracing_emitter =
                     TopologyTracingEventEmitter::new(options.tracing_max_document_length_bytes, id);
                 let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
-                runtime::execute(async move {
+                runtime::spawn(async move {
                     while let Some(event) = rx.recv().await {
                         let (event, ack) = event.into_parts();
 
@@ -359,7 +359,7 @@ impl TopologyWorker {
     }
 
     fn start(mut self) {
-        runtime::execute(async move {
+        runtime::spawn(async move {
             self.initialize().await;
             let mut shutdown_ack = None;
 

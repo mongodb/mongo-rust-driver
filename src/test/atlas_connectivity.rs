@@ -39,14 +39,12 @@ async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
         .expect("findOne should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_free_tier_repl_set() {
     run_test("MONGO_ATLAS_FREE_TIER_REPL_URI", None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_free_tier_repl_set_srv() {
     run_test("MONGO_ATLAS_FREE_TIER_REPL_URI_SRV", None).await;
     run_test(
@@ -56,14 +54,12 @@ async fn atlas_free_tier_repl_set_srv() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_serverless() {
     run_test("MONGO_ATLAS_SERVERLESS_URI", None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_serverless_srv() {
     run_test("MONGO_ATLAS_SERVERLESS_URI_SRV", None).await;
     run_test(
@@ -73,14 +69,12 @@ async fn atlas_serverless_srv() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_repl_set() {
     run_test("MONGO_ATLAS_REPL_URI", None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_repl_set_srv() {
     run_test("MONGO_ATLAS_REPL_URI_SRV", None).await;
     run_test(
@@ -90,14 +84,12 @@ async fn atlas_repl_set_srv() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_sharded() {
     run_test("MONGO_ATLAS_SHARDED_URI", None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_sharded_srv() {
     run_test("MONGO_ATLAS_SHARDED_URI_SRV", None).await;
     run_test(
@@ -107,14 +99,12 @@ async fn atlas_sharded_srv() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_tls_11() {
     run_test("MONGO_ATLAS_TLS11_URI", None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_tls11_srv() {
     run_test("MONGO_ATLAS_TLS11_URI_SRV", None).await;
     run_test(
@@ -124,14 +114,12 @@ async fn atlas_tls11_srv() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_tls_12() {
     run_test("MONGO_ATLAS_TLS12_URI", None).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn atlas_tls12_srv() {
     run_test("MONGO_ATLAS_TLS12_URI_SRV", None).await;
     run_test(

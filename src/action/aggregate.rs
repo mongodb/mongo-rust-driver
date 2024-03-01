@@ -54,7 +54,7 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Runs an aggregation operation.
     ///
@@ -68,7 +68,7 @@ impl crate::sync::Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl<T> crate::sync::Collection<T> {
     /// Runs an aggregation operation.
     ///
@@ -174,35 +174,35 @@ enum AggregateTargetRef<'a> {
 impl<'a> AggregateTargetRef<'a> {
     fn target(&self) -> AggregateTarget {
         match self {
-            Self::Collection(cr) => AggregateTarget::Collection(cr.coll.namespace()),
+            Self::Collection(cr) => AggregateTarget::Collection(cr.namespace()),
             Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
         }
     }
 
     fn client(&self) -> &Client {
         match self {
-            Self::Collection(cr) => cr.coll.client(),
+            Self::Collection(cr) => cr.client(),
             Self::Database(db) => db.client(),
         }
     }
 
     fn read_concern(&self) -> Option<&ReadConcern> {
         match self {
-            Self::Collection(cr) => cr.coll.read_concern(),
+            Self::Collection(cr) => cr.read_concern(),
             Self::Database(db) => db.read_concern(),
         }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
         match self {
-            Self::Collection(cr) => cr.coll.write_concern(),
+            Self::Collection(cr) => cr.write_concern(),
             Self::Database(db) => db.write_concern(),
         }
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match self {
-            Self::Collection(cr) => cr.coll.selection_criteria(),
+            Self::Collection(cr) => cr.selection_criteria(),
             Self::Database(db) => db.selection_criteria(),
         }
     }

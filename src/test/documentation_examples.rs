@@ -1181,7 +1181,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                 },
                 "$currentDate": { "lastModified": true },
             },
-            None,
         )
         .await?;
     // End Example 52
@@ -1216,7 +1215,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                 },
                 "$currentDate": { "lastModified": true },
             },
-            None,
         )
         .await?;
     // End Example 53
@@ -1348,19 +1346,19 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
     assert_coll_count!(collection, 5);
 
     // Start Example 57
-    collection.delete_many(doc! { "status": "A" }, None).await?;
+    collection.delete_many(doc! { "status": "A" }).await?;
     // End Example 57
 
     assert_coll_count!(collection, 3);
 
     // Start Example 58
-    collection.delete_one(doc! { "status": "D" }, None).await?;
+    collection.delete_one(doc! { "status": "D" }).await?;
     // End Example 58
 
     assert_coll_count!(collection, 2);
 
     // Start Example 56
-    collection.delete_many(doc! {}, None).await?;
+    collection.delete_many(doc! {}).await?;
     // End Example 56
 
     assert_coll_count!(collection, 0);
@@ -1371,7 +1369,6 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
 type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn stable_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
@@ -1713,10 +1710,7 @@ async fn index_examples() -> Result<()> {
     use crate::IndexModel;
     // Start Index Example 1
     db.collection::<Document>("records")
-        .create_index(
-            IndexModel::builder().keys(doc! { "score": 1 }).build(),
-            None,
-        )
+        .create_index(IndexModel::builder().keys(doc! { "score": 1 }).build())
         .await?;
     // End Index Example 1
 
@@ -1732,7 +1726,6 @@ async fn index_examples() -> Result<()> {
                         .build(),
                 )
                 .build(),
-            None,
         )
         .await?;
     // End Index Example 2
@@ -1740,6 +1733,7 @@ async fn index_examples() -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_variables)]
 async fn change_streams_examples() -> Result<()> {
     use crate::{options::FullDocumentType, runtime};
     use std::time::Duration;
@@ -1759,7 +1753,7 @@ async fn change_streams_examples() -> Result<()> {
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let writer_inventory = inventory.clone();
     let handle = runtime::spawn(async move {
-        let mut interval = runtime::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
                 _ = interval.tick() => {
@@ -1883,8 +1877,7 @@ async fn convenient_transaction_examples() -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn test() {
     let client = TestClient::new().await;
     let coll = client

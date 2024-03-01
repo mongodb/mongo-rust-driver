@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flags.
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has a sync API that may be enabled via feature flags.
 
 For more detailed documentation, see https://www.mongodb.com/docs/drivers/rust/current/. This documentation includes detailed content about features, runnable examples, troubleshooting resources, and more.
 
@@ -49,34 +49,20 @@ mongodb = "2.8.0"
 
 Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
 
-#### Configuring the async runtime
-The driver supports both of the most popular async runtime crates, namely [`tokio`](https://crates.io/crates/tokio) and [`async-std`](https://crates.io/crates/async-std). By default, the driver will use [`tokio`](https://crates.io/crates/tokio), but you can explicitly choose a runtime by specifying one of `"tokio-runtime"` or `"async-std-runtime"` feature flags in your `Cargo.toml`.
-
-For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
-```toml
-[dependencies.mongodb]
-version = "2.8.0"
-default-features = false
-features = ["async-std-runtime"]
-```
-
 #### Enabling the sync API
-The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
+The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
 version = "2.8.0"
-features = ["tokio-sync"]
+features = ["sync"]
 ```
-Using the `"sync"` feature also requires using `default-features = false`.
 **Note:** The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
 
 ### All Feature Flags
 
 | Feature              | Description                                                                                                                           | Extra dependencies              | Default |
 |:---------------------|:--------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------|:--------|
-| `tokio-runtime`      | Enable support for the `tokio` async runtime                                                                                          | `tokio` with the `full` feature | yes     |
-| `async-std-runtime`  | Enable support for the `async-std` runtime                                                                                            | `async-std`                     | no      |
-| `sync`               | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std`                     | no      |
+| `sync`               | Expose the synchronous API (`mongodb::sync`).                                                                                         | n/a                             | no      |
 | `aws-auth`           | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest`                       | no      |
 | `bson-uuid-0_8`      | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |
 | `bson-uuid-1`        | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                    | n/a                             | no      |

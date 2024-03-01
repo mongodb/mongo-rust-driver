@@ -76,8 +76,7 @@ fn tracing_truncation() {
 }
 
 /// Prose test 1: Default truncation limit
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn command_logging_truncation_default_limit() {
     let client = TestClient::new().await;
     let coll = client.init_db_and_coll("tracing_test", "truncation").await;
@@ -118,8 +117,7 @@ async fn command_logging_truncation_default_limit() {
 }
 
 /// Prose test 2: explicitly configured truncation limit
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn command_logging_truncation_explicit_limit() {
     let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(5);
@@ -155,8 +153,7 @@ async fn command_logging_truncation_explicit_limit() {
 }
 
 /// Prose test 3: mid-codepoint truncation
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn command_logging_truncation_mid_codepoint() {
     let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(215);
@@ -488,8 +485,7 @@ fn topology_description_tracing_representation() {
     )
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn command_logging_unified() {
     run_unified_tests(&["command-logging-and-monitoring", "logging"])
         // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
@@ -499,8 +495,7 @@ async fn command_logging_unified() {
         .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn connection_logging_unified() {
     run_unified_tests(&["connection-monitoring-and-pooling", "logging"])
         .skip_tests(&[
@@ -516,8 +511,7 @@ async fn connection_logging_unified() {
         .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn server_selection_logging_unified() {
     run_unified_tests(&["server-selection", "logging"])
         .skip_tests(&[

@@ -16,7 +16,7 @@ pub use coll::Collection;
 pub use cursor::{Cursor, SessionCursor, SessionCursorIter};
 pub use db::Database;
 
-#[cfg(feature = "tokio-sync")]
+#[cfg(feature = "sync")]
 pub(crate) static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
     once_cell::sync::Lazy::new(|| match tokio::runtime::Runtime::new() {
         Ok(runtime) => runtime,

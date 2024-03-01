@@ -1,7 +1,6 @@
 use crate::test::spec::unified_runner::run_unified_tests;
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn command_monitoring_unified() {
     run_unified_tests(&["command-logging-and-monitoring", "monitoring"])
         .skip_tests(&[

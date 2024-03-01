@@ -12,10 +12,12 @@ async fn single_principal_implicit_username() -> anyhow::Result<()> {
     };
     use bson::Document;
     use futures_util::FutureExt;
+
     if std::env::var("OIDC_TOKEN_DIR").is_err() {
         log_uncaptured("Skipping OIDC test");
         return Ok(());
     }
+
     let mut opts =
         ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.credential = Credential::builder()

@@ -63,8 +63,7 @@ async fn handler_create_client(_: LambdaEvent<Value>) -> Result<Value, lambda_ru
     Ok(json)
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_handler() {
     let event = LambdaEvent::new(Value::Null, Default::default());
     handler_create_client(event).await.unwrap();

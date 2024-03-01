@@ -191,7 +191,7 @@ impl GridFsBucket {
 
         // From the spec: Drivers MUST check whether the indexes already exist before attempting to
         // create them.
-        let mut indexes = coll.list_indexes(None).await?;
+        let mut indexes = coll.list_indexes().await?;
         'outer: while let Some(index_model) = indexes.try_next().await? {
             if index_model.keys.len() != keys.len() {
                 continue;
@@ -218,7 +218,7 @@ impl GridFsBucket {
         }
 
         let index_model = IndexModel::builder().keys(keys).build();
-        coll.create_index(index_model, None).await?;
+        coll.create_index(index_model).await?;
 
         Ok(())
     }
@@ -385,7 +385,7 @@ impl Drop for GridFsUploadStream {
             let chunks = self.bucket.chunks().clone();
             let id = self.id.clone();
             self.drop_token.spawn(async move {
-                let _result = chunks.delete_many(doc! { "files_id": id }, None).await;
+                let _result = chunks.delete_many(doc! { "files_id": id }).await;
             })
         }
     }
@@ -571,7 +571,7 @@ async fn clean_up_chunks(
     chunks: Collection<Chunk<'static>>,
     original_error: Option<Error>,
 ) -> Result<()> {
-    match chunks.delete_many(doc! { "files_id": id }, None).await {
+    match chunks.delete_many(doc! { "files_id": id }).await {
         Ok(_) => match original_error {
             Some(error) => Err(error),
             None => Ok(()),

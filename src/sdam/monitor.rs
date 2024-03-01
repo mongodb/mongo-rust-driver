@@ -108,7 +108,7 @@ impl Monitor {
             topology_version: None,
         };
 
-        runtime::execute(monitor.execute());
+        runtime::spawn(monitor.execute());
     }
 
     async fn execute(mut self) {
@@ -119,7 +119,7 @@ impl Monitor {
 
             if self.topology_version.is_some() && self.allow_streaming {
                 if let Some(rtt_monitor) = self.pending_rtt_monitor.take() {
-                    runtime::execute(rtt_monitor.execute());
+                    runtime::spawn(rtt_monitor.execute());
                 }
             }
 
@@ -285,7 +285,7 @@ impl Monitor {
                 };
                 HelloResult::Cancelled { reason: reason_error }
             }
-            _ = runtime::delay_for(timeout) => {
+            _ = tokio::time::sleep(timeout) => {
                 HelloResult::Err(Error::network_timeout())
             }
         };
@@ -468,7 +468,7 @@ impl RttMonitor {
             let start = Instant::now();
             let check_succeded = tokio::select! {
                 r = perform_check => r.is_ok(),
-                _ = runtime::delay_for(timeout) => {
+                _ = tokio::time::sleep(timeout) => {
                     false
                 }
             };
@@ -485,7 +485,7 @@ impl RttMonitor {
                 // responsible for resetting the average RTT."
             }
 
-            runtime::delay_for(
+            tokio::time::sleep(
                 self.client_options
                     .heartbeat_freq
                     .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
@@ -646,7 +646,7 @@ impl MonitorRequestReceiver {
     async fn wait_for_check_request(&mut self, delay: Duration, timeout: Duration) {
         let _ = runtime::timeout(timeout, async {
             let wait_for_check_request = async {
-                runtime::delay_for(delay).await;
+                tokio::time::sleep(delay).await;
                 self.topology_check_request_receiver
                     .wait_for_check_request()
                     .await;

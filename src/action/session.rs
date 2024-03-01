@@ -19,7 +19,7 @@ impl Client {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Client {
     /// Starts a new [`ClientSession`].
     ///

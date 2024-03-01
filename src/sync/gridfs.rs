@@ -21,7 +21,6 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    runtime,
 };
 
 pub use crate::gridfs::FilesCollectionDocument;
@@ -63,7 +62,7 @@ impl GridFsBucket {
     /// this bucket. This method returns an error if the `id` does not match any files in the
     /// bucket.
     pub fn delete(&self, id: Bson) -> Result<()> {
-        runtime::block_on(self.async_bucket.delete(id))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.delete(id))
     }
 
     /// Finds the [`FilesCollectionDocument`]s in the bucket matching the given `filter`.
@@ -72,18 +71,20 @@ impl GridFsBucket {
         filter: Document,
         options: impl Into<Option<GridFsFindOptions>>,
     ) -> Result<Cursor<FilesCollectionDocument>> {
-        runtime::block_on(self.async_bucket.find(filter, options)).map(Cursor::new)
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_bucket.find(filter, options))
+            .map(Cursor::new)
     }
 
     /// Renames the file with the given `id` to `new_filename`. This method returns an error if the
     /// `id` does not match any files in the bucket.
     pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
-        runtime::block_on(self.async_bucket.rename(id, new_filename))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.rename(id, new_filename))
     }
 
     /// Removes all of the files and their associated chunks from this bucket.
     pub fn drop(&self) -> Result<()> {
-        runtime::block_on(self.async_bucket.drop())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.drop())
     }
 }
 
@@ -109,7 +110,7 @@ pub struct GridFsDownloadStream {
 
 impl Read for GridFsDownloadStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        runtime::block_on(self.async_stream.read(buf))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.read(buf))
     }
 }
 
@@ -124,7 +125,9 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     pub fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        runtime::block_on(self.async_bucket.open_download_stream(id)).map(GridFsDownloadStream::new)
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_bucket.open_download_stream(id))
+            .map(GridFsDownloadStream::new)
     }
 
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
@@ -139,11 +142,12 @@ impl GridFsBucket {
         filename: impl AsRef<str>,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<GridFsDownloadStream> {
-        runtime::block_on(
-            self.async_bucket
-                .open_download_stream_by_name(filename, options),
-        )
-        .map(GridFsDownloadStream::new)
+        crate::sync::TOKIO_RUNTIME
+            .block_on(
+                self.async_bucket
+                    .open_download_stream_by_name(filename, options),
+            )
+            .map(GridFsDownloadStream::new)
     }
 }
 
@@ -217,24 +221,24 @@ impl GridFsUploadStream {
     /// these steps, the chunks associated with this stream are deleted. It is an error to write to,
     /// abort, or close the stream after this method has been called.
     pub fn close(&mut self) -> std::io::Result<()> {
-        runtime::block_on(self.async_stream.close())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.close())
     }
 
     /// Aborts the stream, discarding any chunks that have already been written to the chunks
     /// collection. Once this method has been called, it is an error to attempt to write to, abort,
     /// or close the stream.
     pub fn abort(&mut self) -> Result<()> {
-        runtime::block_on(self.async_stream.abort())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.abort())
     }
 }
 
 impl Write for GridFsUploadStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        runtime::block_on(self.async_stream.write(buf))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.write(buf))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        runtime::block_on(self.async_stream.flush())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.flush())
     }
 }
 

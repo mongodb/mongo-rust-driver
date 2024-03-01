@@ -5,8 +5,7 @@ use crate::{
     Collection,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn details() {
     let client = EventClient::new().await;
 

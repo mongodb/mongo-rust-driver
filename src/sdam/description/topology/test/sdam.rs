@@ -553,38 +553,32 @@ fn verify_description_outcome(
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn single() {
     run_spec_test(&["server-discovery-and-monitoring", "single"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn rs() {
     run_spec_test(&["server-discovery-and-monitoring", "rs"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn sharded() {
     run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn errors() {
     run_spec_test(&["server-discovery-and-monitoring", "errors"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn monitoring() {
     run_spec_test(&["server-discovery-and-monitoring", "monitoring"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn load_balanced() {
     run_spec_test(
         &["server-discovery-and-monitoring", "load-balanced"],
@@ -593,8 +587,7 @@ async fn load_balanced() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn topology_closed_event_last() {
     let event_handler = EventHandler::new();
@@ -635,8 +628,7 @@ async fn topology_closed_event_last() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_events() {
     let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
@@ -703,8 +695,7 @@ async fn heartbeat_events() {
         .expect("should see server heartbeat failed event");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn direct_connection() {
     let test_client = TestClient::new().await;
@@ -757,8 +748,7 @@ async fn direct_connection() {
         .expect("write should succeed with directConnection unspecified");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn pool_cleared_error_does_not_mark_unknown() {
     let address = ServerAddress::parse("a:1234").unwrap();
     let mut options = ClientOptions::builder()

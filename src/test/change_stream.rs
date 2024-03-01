@@ -61,8 +61,7 @@ async fn init_stream(
 }
 
 /// Prose test 1: ChangeStream must continuously track the last seen resumeToken
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn tracks_resume_token() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("track_resume_token", false).await? {
         Some(t) => t,
@@ -131,8 +130,7 @@ fn expected_tokens(events: &[CommandSucceededEvent]) -> Result<Vec<Bson>> {
 
 /// Prose test 2: ChangeStream will throw an exception if the server response is missing the resume
 /// token
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn errors_on_missing_token() -> Result<()> {
     let (_, coll, _) = match init_stream("errors_on_missing_token", false).await? {
         Some(t) => t,
@@ -150,8 +148,7 @@ async fn errors_on_missing_token() -> Result<()> {
 
 /// Prose test 3: After receiving a resumeToken, ChangeStream will automatically resume one time on
 /// a resumable error
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resumes_on_error() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("resumes_on_error", true).await? {
         Some(t) => t,
@@ -193,8 +190,7 @@ async fn resumes_on_error() -> Result<()> {
 
 /// Prose test 4: ChangeStream will not attempt to resume on any error encountered while executing
 /// an aggregate command
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn does_not_resume_aggregate() -> Result<()> {
     let (client, coll, _) = match init_stream("does_not_resume_aggregate", true).await? {
         Some(t) => t,
@@ -222,8 +218,7 @@ async fn does_not_resume_aggregate() -> Result<()> {
 
 /// Prose test 7: A cursor returned from an aggregate command with a cursor id and an initial empty
 /// batch is not closed on the driver side
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn empty_batch_not_closed() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("empty_batch_not_closed", false).await? {
         Some(t) => t,
@@ -253,8 +248,7 @@ async fn empty_batch_not_closed() -> Result<()> {
 
 /// Prose test 8: The killCursors command sent during the "Resume Process" must not be allowed to
 /// throw an exception
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     let (client, coll, mut stream) =
         match init_stream("resume_kill_cursor_error_suppressed", true).await? {
@@ -298,8 +292,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 /// Prose test 9: $changeStream stage for ChangeStream against a server >=4.0 and <4.0.7 that has
 /// not received any results yet MUST include a startAtOperationTime option when resuming a change
 /// stream.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_start_at_operation_time() -> Result<()> {
     let (client, coll, mut stream) =
         match init_stream("resume_start_at_operation_time", true).await? {
@@ -352,8 +345,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
 
 /// Prose test 11: Running against a server >=4.0.7, resume token at the end of a batch must return
 /// the postBatchResumeToken from the current command response
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn batch_end_resume_token() -> Result<()> {
     let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
         Some(t) => t,
@@ -384,8 +376,7 @@ async fn batch_end_resume_token() -> Result<()> {
 }
 
 /// Prose test 12: Running against a server <4.0.7, end of batch resume token must follow the spec
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn batch_end_resume_token_legacy() -> Result<()> {
     let (client, coll, mut stream) =
         match init_stream("batch_end_resume_token_legacy", false).await? {
@@ -422,8 +413,7 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
 }
 
 /// Prose test 13: Mid-batch resume token must be `_id` of last document returned.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn batch_mid_resume_token() -> Result<()> {
     let (_, coll, mut stream) = match init_stream("batch_mid_resume_token", false).await? {
         Some(t) => t,
@@ -458,8 +448,7 @@ async fn batch_mid_resume_token() -> Result<()> {
 
 /// Prose test 14: Resume token with a non-empty batch for the initial `aggregate` must follow the
 /// spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn aggregate_batch() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
         Some(t) => t,
@@ -504,8 +493,7 @@ async fn aggregate_batch() -> Result<()> {
 // Prose test 16: removed
 
 /// Prose test 17: Resuming a change stream with no results uses `startAfter`.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_start_after() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
@@ -561,8 +549,7 @@ async fn resume_uses_start_after() -> Result<()> {
 }
 
 /// Prose test 18: Resuming a change stream after results uses `resumeAfter`.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_resume_after() -> Result<()> {
     let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,
@@ -621,8 +608,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)] // multi_thread required for FailPoint
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn create_coll_pre_post() -> Result<()> {
     let client = TestClient::new().await;
     if !VersionReq::parse(">=6.0")
@@ -646,8 +632,7 @@ async fn create_coll_pre_post() -> Result<()> {
 }
 
 // Prose test 19: large event splitting
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn split_large_event() -> Result<()> {
     let client = Client::test_builder().build().await;
     if !(client.server_version_matches(">= 6.0.9, < 6.1")
@@ -684,7 +669,6 @@ async fn split_large_event() -> Result<()> {
     coll.update_one(
         doc! {},
         doc! { "$set": { "value": "z".repeat(10 * 1024 * 1024) } },
-        None,
     )
     .await?;
 

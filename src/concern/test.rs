@@ -5,7 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        DeleteOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -15,7 +14,6 @@ use crate::{
         ReadConcern,
         ReplaceOptions,
         TransactionOptions,
-        UpdateOptions,
         WriteConcern,
     },
     test::{EventClient, TestClient},
@@ -102,8 +100,7 @@ fn write_concern_deserialize() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn inconsistent_write_concern_rejected() {
     let client = TestClient::new().await;
@@ -123,8 +120,7 @@ async fn inconsistent_write_concern_rejected() {
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
     let client = TestClient::new().await;
@@ -143,8 +139,7 @@ async fn unacknowledged_write_concern_rejected() {
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
     let client = EventClient::new().await;
@@ -199,8 +194,7 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
     let client = EventClient::new().await;
@@ -249,8 +243,7 @@ async fn command_contains_write_concern_insert_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
     let client = EventClient::new().await;
@@ -299,8 +292,7 @@ async fn command_contains_write_concern_insert_many() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
     let client = EventClient::new().await;
@@ -308,34 +300,24 @@ async fn command_contains_write_concern_update_one() {
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.update_one(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "baz" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.update_one(
-        doc! { "foo": "baz" },
-        doc! { "$set": { "foo": "quux" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.update_one(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.update_one(doc! { "foo": "baz" }, doc! { "$set": { "foo": "quux" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -352,8 +334,7 @@ async fn command_contains_write_concern_update_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
     let client = EventClient::new().await;
@@ -363,34 +344,24 @@ async fn command_contains_write_concern_update_many() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.update_many(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "baz" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.update_many(
-        doc! { "foo": "baz" },
-        doc! { "$set": { "foo": "quux" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.update_many(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.update_many(doc! { "foo": "baz" }, doc! { "$set": { "foo": "quux" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -407,8 +378,7 @@ async fn command_contains_write_concern_update_many() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_replace_one() {
     let client = EventClient::new().await;
@@ -460,8 +430,7 @@ async fn command_contains_write_concern_replace_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_one() {
     let client = EventClient::new().await;
@@ -471,32 +440,24 @@ async fn command_contains_write_concern_delete_one() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_one(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.delete_one(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.delete_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "delete"),
@@ -513,8 +474,7 @@ async fn command_contains_write_concern_delete_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_many() {
     let client = EventClient::new().await;
@@ -524,35 +484,27 @@ async fn command_contains_write_concern_delete_many() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_many(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_many(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_many(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_many(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "delete"),
@@ -569,8 +521,7 @@ async fn command_contains_write_concern_delete_many() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
     let client = EventClient::new().await;
@@ -622,8 +573,7 @@ async fn command_contains_write_concern_find_one_and_delete() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
     let client = EventClient::new().await;
@@ -677,8 +627,7 @@ async fn command_contains_write_concern_find_one_and_replace() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
     let client = EventClient::new().await;
@@ -732,8 +681,7 @@ async fn command_contains_write_concern_find_one_and_update() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_aggregate() {
     let client = EventClient::new().await;
@@ -783,8 +731,7 @@ async fn command_contains_write_concern_aggregate() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
     let client = EventClient::new().await;
@@ -828,8 +775,7 @@ async fn command_contains_write_concern_drop() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_create_collection() {
     let client = EventClient::new().await;

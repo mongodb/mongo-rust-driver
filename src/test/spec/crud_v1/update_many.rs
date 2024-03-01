@@ -64,7 +64,8 @@ async fn run_update_many_test(test_file: TestFile) {
         };
 
         let result = coll
-            .update_many(arguments.filter, arguments.update, options)
+            .update_many(arguments.filter, arguments.update)
+            .with_options(options)
             .await
             .expect(&test_case.description);
         assert_eq!(
@@ -106,8 +107,7 @@ async fn run_update_many_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     run_crud_v1_test(&["crud", "v1", "write"], run_update_many_test).await;
 }

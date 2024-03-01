@@ -1,7 +1,7 @@
 runOn:
     -
         minServerVersion: "4.1.8"
-        topology: ["sharded"]
+        topology: ["sharded", "load-balanced"]
         # serverless proxy doesn't use recovery tokens
         serverless: "forbid"
 
@@ -69,92 +69,6 @@ tests:
             autocommit: false
             # commitTransaction applies w:majority on retries
             writeConcern: { w: majority, wtimeout: 10000 }
-            recoveryToken: 42
-          command_name: commitTransaction
-          database_name: admin
-      - command_started_event:
-          command:
-            commitTransaction: 1
-            lsid: session0
-            txnNumber:
-              $numberLong: "1"
-            startTransaction:
-            autocommit: false
-            # commitTransaction applies w:majority on retries
-            writeConcern: { w: majority, wtimeout: 10000 }
-            recoveryToken: 42
-          command_name: commitTransaction
-          database_name: admin
-
-    outcome:
-      collection:
-        data:
-          - _id: 1
-
-  - description: commitTransaction retry succeeds on new mongos
-    useMultipleMongoses: true
-    operations:
-      - name: startTransaction
-        object: session0
-        arguments:
-          options:
-            writeConcern:
-              w: majority
-      - name: insertOne
-        object: collection
-        arguments:
-          session: session0
-          document:
-            _id: 1
-        result:
-          insertedId: 1
-      # Enable the fail point only on the Mongos that session0 is pinned to.
-      - name: targetedFailPoint
-        object: testRunner
-        arguments:
-          session: session0
-          failPoint:
-            configureFailPoint: failCommand
-            mode: { times: 1 }
-            data:
-              failCommands: ["commitTransaction"]
-              errorLabels: ["RetryableWriteError"]
-              writeConcernError:
-                code: 91
-                errmsg: Replication is being shut down
-      # The client sees a retryable writeConcernError on the first
-      # commitTransaction due to the fail point but it actually succeeds on the
-      # server (SERVER-39346). The retry will succeed both on a new mongos and
-      # on the original.
-      - name: commitTransaction
-        object: session0
-
-    expectations:
-      - command_started_event:
-          command:
-            insert: *collection_name
-            documents:
-              - _id: 1
-            ordered: true
-            readConcern:
-            lsid: session0
-            txnNumber:
-              $numberLong: "1"
-            startTransaction: true
-            autocommit: false
-            writeConcern:
-          command_name: insert
-          database_name: *database_name
-      - command_started_event:
-          command:
-            commitTransaction: 1
-            lsid: session0
-            txnNumber:
-              $numberLong: "1"
-            startTransaction:
-            autocommit: false
-            writeConcern:
-              w: majority
             recoveryToken: 42
           command_name: commitTransaction
           database_name: admin

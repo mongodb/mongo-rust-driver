@@ -1,4 +1,5 @@
 use std::{
+    future::IntoFuture,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -23,8 +24,7 @@ use crate::{
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     let mut skipped_files = vec![];
     let client = TestClient::new().await;
@@ -39,8 +39,7 @@ async fn run_unified() {
 }
 
 // Sessions prose test 1
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
     let client = TestClient::new().await;
     assert!(client
@@ -51,8 +50,7 @@ async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
         .is_err());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 async fn explicit_session_created_on_same_client() {
     let client0 = TestClient::new().await;
@@ -86,8 +84,7 @@ async fn explicit_session_created_on_same_client() {
 }
 
 // Sessions prose test 14
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn implicit_session_after_connection() {
     struct EventHandler {
         lsids: Mutex<Vec<Document>>,
@@ -128,9 +125,15 @@ async fn implicit_session_after_connection() {
             r.map(|_| ())
         }
         ops.push(coll.insert_one(doc! {}, None).map(ignore_val).boxed());
-        ops.push(coll.delete_one(doc! {}, None).map(ignore_val).boxed());
         ops.push(
-            coll.update_one(doc! {}, doc! { "$set": { "a": 1 } }, None)
+            coll.delete_one(doc! {})
+                .into_future()
+                .map(ignore_val)
+                .boxed(),
+        );
+        ops.push(
+            coll.update_one(doc! {}, doc! { "$set": { "a": 1 } })
+                .into_future()
                 .map(ignore_val)
                 .boxed(),
         );
@@ -227,8 +230,7 @@ async fn clean_up_mongocryptd(mut process: Process, name: &str) {
 }
 
 // Sessions prose test 18
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn sessions_not_supported_implicit_session_ignored() {
     let name = "sessions_not_supported_implicit_session_ignored";
 
@@ -271,8 +273,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
 }
 
 // Sessions prose test 19
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn sessions_not_supported_explicit_session_error() {
     let name = "sessions_not_supported_explicit_session_error";
 

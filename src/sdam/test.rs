@@ -28,8 +28,7 @@ use crate::{
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn min_heartbeat_frequency() {
     let mut setup_client_options = get_client_options().await.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
@@ -89,8 +88,7 @@ async fn min_heartbeat_frequency() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn sdam_pool_management() {
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
@@ -171,8 +169,7 @@ async fn sdam_pool_management() {
         .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn hello_ok_true() {
     let mut setup_client_options = get_client_options().await.clone();
     setup_client_options.hosts.drain(1..);
@@ -235,8 +232,7 @@ async fn hello_ok_true() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
     let client = TestClient::new().await;
     if !client.is_replica_set() {
@@ -265,8 +261,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
 
 /// Test verifying that a server's monitor stops after the server has been removed from the
 /// topology.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let handler = Arc::new(EventHandler::new());
     let options = ClientOptions::builder()

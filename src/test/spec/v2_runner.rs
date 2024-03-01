@@ -11,10 +11,9 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
-    coll::options::{DistinctOptions, DropCollectionOptions},
+    coll::options::DropCollectionOptions,
     concern::WriteConcern,
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
-    runtime,
     sdam::{ServerInfo, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::SelectionCriteria,
     test::{
@@ -218,12 +217,12 @@ impl TestContext {
             && test.operations.iter().any(|op| op.name == "distinct")
         {
             for server_address in internal_client.options().hosts.clone() {
-                let options = DistinctOptions::builder()
-                    .selection_criteria(Some(SelectionCriteria::Predicate(Arc::new(
+                coll.distinct("_id", doc! {})
+                    .selection_criteria(SelectionCriteria::Predicate(Arc::new(
                         move |server_info: &ServerInfo| *server_info.address() == server_address,
-                    ))))
-                    .build();
-                coll.distinct("_id", None, options).await.unwrap();
+                    )))
+                    .await
+                    .unwrap();
             }
         }
 
@@ -271,7 +270,7 @@ impl TestContext {
                 other => panic!("invalid object for `endSession`: {:?}", other),
             };
             drop(session.take());
-            runtime::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             return None;
         }
 
@@ -345,7 +344,7 @@ impl<'a> OpRunner<'a> {
                 // implicit session used in the first operation is returned to the pool before
                 // the second operation is executed.
                 if self.description == "Server supports implicit sessions" {
-                    runtime::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
                 result
             }
@@ -497,7 +496,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
 
         // wait for the transaction in progress to be aborted implicitly when the session is dropped
         if test.description.as_str() == "implicit abort" {
-            runtime::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
         if let Some(expectations) = &test.expectations {

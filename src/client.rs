@@ -53,21 +53,15 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// so it can safely be shared across threads or async tasks. For example:
 ///
 /// ```rust
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # use mongodb::{bson::Document, Client, error::Result};
-/// # #[cfg(feature = "async-std-runtime")]
-/// # use async_std::task;
-/// # #[cfg(feature = "tokio-runtime")]
-/// # use tokio::task;
 /// #
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// let client = Client::with_uri_str("mongodb://example.com").await?;
 ///
 /// for i in 0..5 {
 ///     let client_ref = client.clone();
 ///
-///     task::spawn(async move {
+///     tokio::task::spawn(async move {
 ///         let collection = client_ref.database("items").collection::<Document>(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
@@ -484,7 +478,7 @@ impl Client {
         }
     }
 
-    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+    #[cfg(test)]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
         let watcher = self.inner.topology.watch();
         let state = watcher.peek_latest();

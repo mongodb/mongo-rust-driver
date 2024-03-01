@@ -1,4 +1,4 @@
-#[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+#[cfg(test)]
 mod test;
 
 mod resolver_config;
@@ -38,9 +38,6 @@ use crate::{
     serde_util,
     srv::{OriginalSrvInfo, SrvResolver},
 };
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-use crate::runtime;
 
 pub use resolver_config::ResolverConfig;
 
@@ -250,7 +247,7 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+    #[cfg(test)]
     pub(crate) fn into_document(self) -> Document {
         match self {
             Self::Tcp { host, port } => {
@@ -1142,25 +1139,15 @@ impl ClientOptions {
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: maps to the `level` field of the `Compressor::Zlib` variant
     ///     (which requires the `zlib-compression` feature flag) of the [`Compressor`] enum
-    ///
-    /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
-    /// version](#method.parse-1).
-    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub async fn parse(s: impl AsRef<str>) -> Result<Self> {
         Self::parse_uri(s, None).await
     }
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse)
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-    pub fn parse(s: impl AsRef<str>) -> Result<Self> {
-        runtime::block_on(Self::parse_uri(s.as_ref(), None))
-    }
-
-    /// This method is the same as `parse`, but is provided to make the async version available when
-    /// the `sync` feature is enabled.
-    pub async fn parse_async(s: impl AsRef<str>) -> Result<Self> {
-        Self::parse_uri(s, None).await
+    #[cfg(feature = "sync")]
+    pub fn parse_sync(s: impl AsRef<str>) -> Result<Self> {
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -1174,10 +1161,6 @@ impl ClientOptions {
     ///
     /// See the docstring on `ClientOptions::parse` for information on how the various URI options
     /// map to fields on `ClientOptions`.
-    ///
-    /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
-    /// version](#method.parse_with_resolver_config-1).
-    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub async fn parse_with_resolver_config(
         uri: impl AsRef<str>,
         resolver_config: ResolverConfig,
@@ -1187,9 +1170,12 @@ impl ClientOptions {
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse_with_resolver_config)
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-    pub fn parse_with_resolver_config(uri: &str, resolver_config: ResolverConfig) -> Result<Self> {
-        runtime::block_on(Self::parse_uri(uri, Some(resolver_config)))
+    #[cfg(feature = "sync")]
+    pub fn parse_sync_with_resolver_config(
+        uri: &str,
+        resolver_config: ResolverConfig,
+    ) -> Result<Self> {
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
     }
 
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
@@ -1300,21 +1286,21 @@ impl ClientOptions {
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    #[cfg(feature = "sync")]
     pub fn parse_connection_string_sync(conn_str: ConnectionString) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string_internal(conn_str, None))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(conn_str, None))
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    #[cfg(feature = "sync")]
     pub fn parse_connection_string_with_resolver_config_sync(
         conn_str: ConnectionString,
         resolver_config: ResolverConfig,
     ) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string_internal(
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(
             conn_str,
             Some(resolver_config),
         ))
@@ -2457,7 +2443,7 @@ impl<'de> serde::de::Visitor<'de> for ConnectionStringVisitor {
     }
 }
 
-#[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+#[cfg(test)]
 mod tests {
     use std::time::Duration;
 
@@ -2531,40 +2517,34 @@ mod tests {
         }
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_without_scheme() {
         assert!(ClientOptions::parse("localhost:27017").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_invalid_scheme() {
         assert!(ClientOptions::parse("mangodb://localhost:27017")
             .await
             .is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_nothing_after_scheme() {
         assert!(ClientOptions::parse("mongodb://").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_only_slash_after_scheme() {
         assert!(ClientOptions::parse("mongodb:///").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_no_host() {
         assert!(ClientOptions::parse("mongodb://:27017").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn no_port() {
         let uri = "mongodb://localhost";
 
@@ -2578,8 +2558,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn no_port_trailing_slash() {
         let uri = "mongodb://localhost/";
 
@@ -2593,8 +2572,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_port() {
         let uri = "mongodb://localhost/";
 
@@ -2611,8 +2589,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_port_and_trailing_slash() {
         let uri = "mongodb://localhost:27017/";
 
@@ -2629,8 +2606,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_read_concern() {
         let uri = "mongodb://localhost:27017/?readConcernLevel=foo";
 
@@ -2648,16 +2624,14 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_w_negative_int() {
         assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1")
             .await
             .is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_w_non_negative_int() {
         let uri = "mongodb://localhost:27017/?w=1";
         let write_concern = WriteConcern::builder().w(Acknowledgment::from(1)).build();
@@ -2676,8 +2650,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_w_string() {
         let uri = "mongodb://localhost:27017/?w=foo";
         let write_concern = WriteConcern::builder()
@@ -2698,8 +2671,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_invalid_j() {
         assert!(
             ClientOptions::parse("mongodb://localhost:27017/?journal=foo")
@@ -2708,8 +2680,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_j() {
         let uri = "mongodb://localhost:27017/?journal=true";
         let write_concern = WriteConcern::builder().journal(true).build();
@@ -2728,8 +2699,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_wtimeout_non_int() {
         assert!(
             ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo")
@@ -2738,8 +2708,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_wtimeout_negative_int() {
         assert!(
             ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1")
@@ -2748,8 +2717,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_wtimeout() {
         let uri = "mongodb://localhost:27017/?wtimeoutMS=27";
         let write_concern = WriteConcern::builder()
@@ -2770,8 +2738,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_all_write_concern_options() {
         let uri = "mongodb://localhost:27017/?w=majority&journal=false&wtimeoutMS=27";
         let write_concern = WriteConcern::builder()
@@ -2794,8 +2761,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_mixed_options() {
         let uri = "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\
                    journal=false&wtimeoutMS=27&replicaSet=foo&heartbeatFrequencyMS=1000&\

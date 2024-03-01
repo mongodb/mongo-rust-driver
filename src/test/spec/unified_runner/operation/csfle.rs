@@ -6,8 +6,9 @@ use serde::Deserialize;
 use super::{Entity, TestOperation, TestRunner};
 
 use crate::{
+    action::csfle::DataKeyOptions,
     bson::{doc, Bson},
-    client_encryption::{DataKeyOptions, MasterKey},
+    client_encryption::MasterKey,
     error::Result,
 };
 
@@ -108,32 +109,46 @@ impl TestOperation for AddKeyAltName {
     }
 }
 
-impl<'de> Deserialize<'de> for DataKeyOptions {
+#[derive(Debug)]
+pub(super) struct CreateDataKey {
+    kms_provider: mongocrypt::ctx::KmsProvider,
+    master_key: MasterKey,
+    opts: Option<DataKeyOptions>,
+}
+
+impl<'de> Deserialize<'de> for CreateDataKey {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct Helper {
+        struct TestOptions {
             master_key: Option<MasterKey>,
             key_alt_names: Option<Vec<String>>,
             key_material: Option<bson::Binary>,
         }
-        let h = Helper::deserialize(deserializer)?;
-        Ok(DataKeyOptions {
-            master_key: h.master_key.unwrap_or(MasterKey::Local),
-            key_alt_names: h.key_alt_names,
-            key_material: h.key_material.map(|bin| bin.bytes),
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct TestOp {
+            kms_provider: mongocrypt::ctx::KmsProvider,
+            opts: Option<TestOptions>,
+        }
+        let t_op = TestOp::deserialize(deserializer)?;
+        Ok(CreateDataKey {
+            kms_provider: t_op.kms_provider,
+            master_key: t_op
+                .opts
+                .as_ref()
+                .and_then(|o| o.master_key.as_ref())
+                .cloned()
+                .unwrap_or(MasterKey::Local),
+            opts: t_op.opts.map(|to| DataKeyOptions {
+                key_alt_names: to.key_alt_names,
+                key_material: to.key_material.map(|bin| bin.bytes),
+            }),
         })
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct CreateDataKey {
-    kms_provider: mongocrypt::ctx::KmsProvider,
-    opts: Option<DataKeyOptions>,
 }
 
 impl TestOperation for CreateDataKey {
@@ -145,7 +160,9 @@ impl TestOperation for CreateDataKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let key = ce
-                .create_data_key_final(&self.kms_provider, self.opts.clone())
+                .create_data_key(self.master_key.clone())
+                .with_options(self.opts.clone())
+                .test_kms_provider(self.kms_provider.clone())
                 .await?;
             Ok(Some(Entity::Bson(Bson::Binary(key))))
         }

@@ -3,28 +3,42 @@
 mod aggregate;
 mod count;
 mod create_collection;
+mod create_index;
+#[cfg(feature = "in-use-encryption-unstable")]
+pub mod csfle;
+mod delete;
+mod distinct;
 mod drop;
+mod drop_index;
 mod list_collections;
 mod list_databases;
+mod list_indexes;
 mod perf;
 mod run_command;
 mod session;
 mod shutdown;
+mod update;
 mod watch;
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Deref};
 
 pub use aggregate::Aggregate;
 use bson::Document;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
+pub use create_index::CreateIndex;
+pub use delete::Delete;
+pub use distinct::Distinct;
 pub use drop::{DropCollection, DropDatabase};
+pub use drop_index::DropIndex;
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
+pub use list_indexes::ListIndexes;
 pub use perf::WarmConnectionPool;
 pub use run_command::{RunCommand, RunCursorCommand};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
+pub use update::Update;
 pub use watch::Watch;
 
 #[allow(missing_docs)]
@@ -37,13 +51,18 @@ pub struct ImplicitSession;
 #[allow(missing_docs)]
 pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
 
+#[allow(missing_docs)]
+pub struct Single;
+#[allow(missing_docs)]
+pub struct Multiple;
+
 macro_rules! option_setters {
     (
         $opt_field:ident: $opt_field_ty:ty;
         $(
             $(#[$($attrss:tt)*])*
             $opt_name:ident: $opt_ty:ty,
-        )+
+        )*
     ) => {
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
@@ -62,7 +81,7 @@ macro_rules! option_setters {
                 self.options().$opt_name = Some(value);
                 self
             }
-        )+
+        )*
     };
 }
 use option_setters;
@@ -151,11 +170,11 @@ macro_rules! action_impl {
             }
         }
 
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+        #[cfg(feature = "sync")]
         impl$(<$lt $(, $($at),+)?>)? $action {
             /// Synchronously execute this action.
             pub fn run(self) -> $sync_out {
-                let $($wrap_args)+ = crate::runtime::block_on(std::future::IntoFuture::into_future(self));
+                let $($wrap_args)+ = crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self));
                 return $wrap_code
             }
         }
@@ -178,15 +197,23 @@ pub(crate) use action_impl_future_wrapper;
 use crate::Collection;
 
 pub(crate) struct CollRef<'a> {
-    pub(crate) coll: Collection<Document>,
+    inner: Collection<Document>,
     _ref: PhantomData<&'a ()>,
 }
 
 impl<'a> CollRef<'a> {
     fn new<T>(coll: &'a Collection<T>) -> Self {
         Self {
-            coll: coll.clone_with_type(),
+            inner: coll.clone_with_type(),
             _ref: PhantomData,
         }
+    }
+}
+
+impl<'a> Deref for CollRef<'a> {
+    type Target = Collection<Document>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }

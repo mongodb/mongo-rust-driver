@@ -29,11 +29,9 @@ use crate::{
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
-        UpdateOptions,
         WriteConcern,
     },
     results::DeleteResult,
-    runtime,
     test::{
         get_client_options,
         log_uncaptured,
@@ -43,8 +41,7 @@ use crate::{
     IndexModel,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn insert_err_details() {
     let client = TestClient::new().await;
@@ -99,8 +96,7 @@ async fn insert_err_details() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn count() {
     let client = TestClient::new().await;
@@ -121,8 +117,7 @@ async fn count() {
     assert_eq!(coll.estimated_document_count().await.unwrap(), 4);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find() {
     let client = TestClient::new().await;
@@ -147,8 +142,7 @@ async fn find() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn update() {
     let client = TestClient::new().await;
@@ -163,30 +157,29 @@ async fn update() {
     assert_eq!(result.inserted_ids.len(), 5);
 
     let update_one_results = coll
-        .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }}, None)
+        .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }})
         .await
         .unwrap();
     assert_eq!(update_one_results.modified_count, 1);
     assert!(update_one_results.upserted_id.is_none());
 
     let update_many_results = coll
-        .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}}, None)
+        .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}})
         .await
         .unwrap();
     assert_eq!(update_many_results.modified_count, 4);
     assert!(update_many_results.upserted_id.is_none());
 
-    let options = UpdateOptions::builder().upsert(true).build();
     let upsert_results = coll
-        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, options)
+        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }})
+        .upsert(true)
         .await
         .unwrap();
     assert_eq!(upsert_results.modified_count, 0);
     assert!(upsert_results.upserted_id.is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete() {
     let client = TestClient::new().await;
@@ -200,17 +193,16 @@ async fn delete() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
+    let delete_one_result = coll.delete_one(doc! {"x": 3}).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
     assert_eq!(coll.count_documents(doc! {"x": 3}).await.unwrap(), 4);
-    let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
+    let delete_many_result = coll.delete_many(doc! {"x": 3}).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
     assert_eq!(coll.count_documents(doc! {"x": 3 }).await.unwrap(), 0);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn aggregate_out() {
     let client = TestClient::new().await;
@@ -261,8 +253,7 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
         .is_empty()
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn kill_cursors_on_drop() {
     let client = TestClient::new().await;
@@ -292,13 +283,12 @@ async fn kill_cursors_on_drop() {
     // The `Drop` implementation for `Cursor' spawns a back tasks that emits certain events. If the
     // task hasn't been scheduled yet, we may not see the event here. To account for this, we wait
     // for a small amount of time before checking.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     assert!(kill_cursors_sent(&event_client));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
     let client = TestClient::new().await;
@@ -326,7 +316,7 @@ async fn no_kill_cursors_on_exhausted() {
     std::mem::drop(cursor);
 
     // wait for any tasks to get spawned from `Cursor`'s `Drop`.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(!kill_cursors_sent(&event_client));
 }
 
@@ -383,8 +373,7 @@ static LARGE_DOC: Lazy<Document> = Lazy::new(|| {
     }
 });
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn large_insert() {
     if std::env::consts::OS != "linux" {
@@ -431,8 +420,7 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
     docs
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn large_insert_unordered_with_errors() {
     if std::env::consts::OS != "linux" {
@@ -470,8 +458,7 @@ async fn large_insert_unordered_with_errors() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn large_insert_ordered_with_errors() {
     if std::env::consts::OS != "linux" {
@@ -511,8 +498,7 @@ async fn large_insert_ordered_with_errors() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn empty_insert() {
     let client = TestClient::new().await;
@@ -530,22 +516,19 @@ async fn empty_insert() {
     };
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_allow_disk_use() {
     let find_opts = FindOptions::builder().allow_disk_use(true).build();
     allow_disk_use_test(find_opts, Some(true)).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_do_not_allow_disk_use() {
     let find_opts = FindOptions::builder().allow_disk_use(false).build();
     allow_disk_use_test(find_opts, Some(false)).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_allow_disk_use_not_specified() {
     let find_opts = FindOptions::builder().build();
     allow_disk_use_test(find_opts, None).await;
@@ -570,8 +553,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     assert_eq!(allow_disk_use, expected_value);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn ns_not_found_suppression() {
     let client = TestClient::new().await;
@@ -583,7 +565,10 @@ async fn ns_not_found_suppression() {
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let client = EventClient::new().await;
     let coll = client.database(name).collection::<Document>(name);
-    let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
+    let _: Result<DeleteResult> = coll
+        .delete_many(doc! {})
+        .with_options(options.clone())
+        .await;
 
     let events = client.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
@@ -598,16 +583,14 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     assert_eq!(event_hint, expected_hint);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete_hint_keys_specified() {
     let options = DeleteOptions::builder().hint(Hint::Keys(doc! {})).build();
     delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete_hint_string_specified() {
     let options = DeleteOptions::builder()
@@ -616,8 +599,7 @@ async fn delete_hint_string_specified() {
     delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete_hint_not_specified() {
     delete_hint_test(None, function_name!()).await;
@@ -647,8 +629,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     assert_eq!(event_hint, expected_hint);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_keys_specified() {
     let options = FindOneAndDeleteOptions::builder()
@@ -657,8 +638,7 @@ async fn find_one_and_delete_hint_keys_specified() {
     find_one_and_delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_string_specified() {
     let options = FindOneAndDeleteOptions::builder()
@@ -667,15 +647,13 @@ async fn find_one_and_delete_hint_string_specified() {
     find_one_and_delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_not_specified() {
     find_one_and_delete_hint_test(None, function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_server_version() {
     let client = EventClient::new().await;
@@ -701,8 +679,7 @@ async fn find_one_and_delete_hint_server_version() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
     let client = EventClient::new().await;
@@ -738,8 +715,7 @@ struct UserType {
     str: String,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_insert_one() {
     let client = TestClient::new().await;
@@ -784,8 +760,7 @@ where
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_insert_many() {
     let client = TestClient::new().await;
@@ -816,8 +791,7 @@ async fn typed_insert_many() {
     assert_eq!(actual, insert_data);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_find_one_and_replace() {
     let client = TestClient::new().await;
@@ -846,8 +820,7 @@ async fn typed_find_one_and_replace() {
     assert_eq!(result, replacement);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_replace_one() {
     let client = TestClient::new().await;
@@ -872,8 +845,7 @@ async fn typed_replace_one() {
     assert_eq!(result, replacement);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_returns() {
     let client = TestClient::new().await;
@@ -908,8 +880,7 @@ async fn typed_returns() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn count_documents_with_wc() {
     let mut options = get_client_options().await.clone();
@@ -931,8 +902,7 @@ async fn count_documents_with_wc() {
         .expect("count_documents should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn collection_options_inherited() {
     let client = EventClient::new().await;
@@ -970,8 +940,7 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn drop_skip_serializing_none() {
     let client = TestClient::new().await;
@@ -982,8 +951,7 @@ async fn drop_skip_serializing_none() {
     assert!(coll.drop().with_options(options).await.is_ok());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn collection_generic_bounds() {
     #[derive(Deserialize)]
@@ -1009,8 +977,7 @@ async fn collection_generic_bounds() {
 
 /// Verify that a cursor with multiple batches whose last batch isn't full
 /// iterates without errors.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cursor_batch_size() {
     let client = TestClient::new().await;
     let coll = client
@@ -1051,8 +1018,7 @@ async fn cursor_batch_size() {
 
 /// Test that the driver gracefully handles cases where the server returns invalid UTF-8 in error
 /// messages. See SERVER-24007 and related tickets for details.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn invalid_utf8_response() {
     let client = TestClient::new().await;
     let coll = client
@@ -1063,7 +1029,7 @@ async fn invalid_utf8_response() {
         .keys(doc! {"name": 1})
         .options(IndexOptions::builder().unique(true).build())
         .build();
-    coll.create_index(index_model, None)
+    coll.create_index(index_model)
         .await
         .expect("creating an index should succeed");
 
@@ -1096,7 +1062,7 @@ async fn invalid_utf8_response() {
         .expect("inserting new document should succeed");
 
     let update_err = coll
-        .update_one(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc}, None)
+        .update_one(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc})
         .await
         .expect_err("update setting duplicate key should fail")
         .kind;
@@ -1104,7 +1070,7 @@ async fn invalid_utf8_response() {
 
     // test triggering an invalid error message via an update_many.
     let update_err = coll
-        .update_many(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc}, None)
+        .update_many(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc})
         .await
         .expect_err("update setting duplicate key should fail")
         .kind;
@@ -1160,8 +1126,7 @@ fn test_namespace_fromstr() {
     assert_eq!(t.coll, "something.else");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn configure_human_readable_serialization() {
     #[derive(Deserialize)]
     struct StringOrBytes(String);
@@ -1281,8 +1246,7 @@ async fn configure_human_readable_serialization() {
         .unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn insert_many_document_sequences() {
     if cfg!(feature = "in-use-encryption-unstable") {
         log_uncaptured(

@@ -1,40 +1,30 @@
 use std::{
     future::Future,
-    ops::DerefMut,
     pin::Pin,
     task::{Context, Poll},
 };
 
-/// A runtime-agnostic handle used for awaiting on tasks spawned in `AsyncRuntime::execute`.
-/// Wraps either `tokio::task::JoinHandle` or `async_std::task::JoinHandle`.
-///
-/// Note: the `Future::Output` of this handle is `Result<T>`, not just `T`.
+/// A handle used for awaiting on tasks spawned in `AsyncRuntime::execute`.
 #[derive(Debug)]
-pub(crate) enum AsyncJoinHandle<T> {
-    /// Wrapper around `tokio::task:JoinHandle`.
-    #[cfg(feature = "tokio-runtime")]
-    Tokio(tokio::task::JoinHandle<T>),
+pub(crate) struct AsyncJoinHandle<T>(tokio::task::JoinHandle<T>);
 
-    /// Wrapper around `tokio::task:JoinHandle`.
-    #[cfg(feature = "async-std-runtime")]
-    AsyncStd(async_std::task::JoinHandle<T>),
+impl<T> AsyncJoinHandle<T> {
+    pub(crate) fn spawn<F>(fut: F) -> Self
+    where
+        F: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let handle = tokio::runtime::Handle::current();
+        AsyncJoinHandle(handle.spawn(fut))
+    }
 }
 
 impl<T> Future for AsyncJoinHandle<T> {
-    // tokio wraps the Output of its JoinHandle in a Result that contains an error if the task
-    // panicked, while async-std does not.
-    //
-    // Given that async-std will panic or abort the task in this scenario, there is not a
-    // lot of value in preserving the error in tokio.
     type Output = T;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.deref_mut() {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut handle) => Pin::new(handle).poll(cx).map(|result| result.unwrap()),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut handle) => Pin::new(handle).poll(cx),
-        }
+        // Tokio wraps the task's return value with a `Result` that catches panics; in our case
+        // we want to propagate the panic, so for once `unwrap` is the right tool to use.
+        Pin::new(&mut self.0).poll(cx).map(|result| result.unwrap())
     }
 }

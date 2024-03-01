@@ -208,14 +208,11 @@ impl GridFsBucket {
     /// this bucket. This method returns an error if the `id` does not match any files in the
     /// bucket.
     pub async fn delete(&self, id: Bson) -> Result<()> {
-        let delete_result = self
-            .files()
-            .delete_one(doc! { "_id": id.clone() }, None)
-            .await?;
+        let delete_result = self.files().delete_one(doc! { "_id": id.clone() }).await?;
         // Delete chunks regardless of whether a file was found. This will remove any possibly
         // orphaned chunks.
         self.chunks()
-            .delete_many(doc! { "files_id": id.clone() }, None)
+            .delete_many(doc! { "files_id": id.clone() })
             .await?;
 
         if delete_result.deleted_count == 0 {
@@ -257,7 +254,6 @@ impl GridFsBucket {
             .update_one(
                 doc! { "_id": id },
                 doc! { "$set": { "filename": new_filename.as_ref() } },
-                None,
             )
             .await?;
 

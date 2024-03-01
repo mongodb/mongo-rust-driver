@@ -15,16 +15,10 @@ use crate::{
     options::{AuthMechanism, Credential, DriverInfo, ServerApi},
 };
 
-#[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
+#[cfg(not(feature = "sync"))]
 const RUNTIME_NAME: &str = "tokio";
 
-#[cfg(all(feature = "async-std-runtime", not(feature = "sync")))]
-const RUNTIME_NAME: &str = "async-std";
-
 #[cfg(feature = "sync")]
-const RUNTIME_NAME: &str = "sync (with async-std)";
-
-#[cfg(feature = "tokio-sync")]
 const RUNTIME_NAME: &str = "sync (with tokio)";
 
 #[derive(Clone, Debug)]

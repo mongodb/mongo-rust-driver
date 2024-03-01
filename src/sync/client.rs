@@ -5,7 +5,6 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     error::Result,
     options::{ClientOptions, DatabaseOptions, SelectionCriteria},
-    runtime,
     Client as AsyncClient,
 };
 
@@ -14,7 +13,7 @@ use crate::{
 /// such as servers being added or removed.
 ///
 /// `Client` is a wrapper around the asynchronous [`mongodb::Client`](../struct.Client.html), and it
-/// starts up an async-std runtime internally to run that wrapped client on.
+/// starts up a tokio runtime internally to run that wrapped client on.
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
@@ -83,7 +82,8 @@ impl Client {
     /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more
     /// details.
     pub fn with_uri_str(uri: impl AsRef<str>) -> Result<Self> {
-        let async_client = runtime::block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
+        let async_client =
+            crate::sync::TOKIO_RUNTIME.block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
         Ok(Self { async_client })
     }
 

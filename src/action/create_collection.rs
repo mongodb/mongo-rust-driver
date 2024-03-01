@@ -21,7 +21,7 @@ impl Database {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 impl crate::sync::Database {
     /// Creates a new collection in the database with the given `name`.
     ///
