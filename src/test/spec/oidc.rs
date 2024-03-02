@@ -1,5 +1,4 @@
 // Prose test 1.1 Single Principal Implicit Username
-#[cfg(feature = "tokio-runtime")]
 #[tokio::test]
 async fn single_principal_implicit_username() -> anyhow::Result<()> {
     use crate::{
@@ -18,8 +17,7 @@ async fn single_principal_implicit_username() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let mut opts =
-        ClientOptions::parse_async("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
+    let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.credential = Credential::builder()
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::machine(|_| {
