@@ -1,6 +1,5 @@
 use std::{marker::PhantomData, time::Duration};
 
-use action_macro::action_impl_2;
 use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
@@ -17,19 +16,20 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession, Single, Multiple};
+use super::{action_impl, option_setters, ExplicitSession, ImplicitSession, Multiple, Single};
 
 impl<T> Collection<T> {
     /// Finds the documents in the collection matching `filter`.
     ///
-    /// `await` will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is provided).
+    /// `await` will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is
+    /// provided).
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
             filter,
             options: None,
             session: ImplicitSession,
-            _mode: PhantomData
+            _mode: PhantomData,
         }
     }
 }
@@ -44,7 +44,7 @@ impl<T: DeserializeOwned> Collection<T> {
             filter,
             options: None,
             session: ImplicitSession,
-            _mode: PhantomData
+            _mode: PhantomData,
         }
     }
 }
@@ -53,14 +53,15 @@ impl<T: DeserializeOwned> Collection<T> {
 impl<T> crate::sync::Collection<T> {
     /// Finds the documents in the collection matching `filter`.
     ///
-    /// [`run`](Find::run) will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is provided).
+    /// [`run`](Find::run) will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a
+    /// session is provided).
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         self.async_collection.find(filter)
     }
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> where T: DeserializeOwned {
+impl<T: DeserializeOwned> crate::sync::Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
     /// [`run`](Find::run) will return `Result<Option<T>>`.
@@ -165,8 +166,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl<'a, T> Action for Find<'a, T, Single, ImplicitSession>
-        where T: DeserializeOwned
+    impl<'a, T: DeserializeOwned> Action for Find<'a, T, Single, ImplicitSession>
     {
         type Future = FindOneFuture;
 
@@ -180,7 +180,7 @@ action_impl! {
     }
 }
 
-action_impl_2! {
+action_impl! {
     impl<'a, T: DeserializeOwned + Send> Action for Find<'a, T, Single, ExplicitSession<'a>> {
         type Future = FindOneSessionFuture;
 

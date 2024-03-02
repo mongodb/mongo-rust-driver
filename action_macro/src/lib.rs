@@ -1,12 +1,30 @@
 extern crate proc_macro;
 
-use proc_macro::TokenStream;
-use proc_macro2::Span;
 use quote::quote;
-use syn::{braced, parenthesized, parse::{Parse, ParseStream}, parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, Block, Generics, Ident, Lifetime, LifetimeParam, Token, Type};
+use syn::{
+    braced,
+    parenthesized,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    parse_quote,
+    parse_quote_spanned,
+    spanned::Spanned,
+    Block,
+    Error,
+    Generics,
+    Ident,
+    Lifetime,
+    Token,
+    Type,
+};
 
+/// Generates:
+/// * an `IntoFuture` executing the given method body
+/// * an opaque wrapper type for the future in case we want to do something more fancy than
+///   BoxFuture.
+/// * a `run` method for sync execution, optionally with a wrapper function
 #[proc_macro]
-pub fn action_impl_2(input: TokenStream) -> TokenStream {
+pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ActionImpl {
         generics,
         lifetime,
@@ -27,17 +45,12 @@ pub fn action_impl_2(input: TokenStream) -> TokenStream {
     }
 
     let SyncWrap {
-        arg_mut: sync_arg_mut,
-        arg: sync_arg,
+        sync_arg_mut,
+        sync_arg,
         sync_output,
         sync_body,
-     } = sync_wrap.unwrap_or_else(|| {
-        SyncWrap {
-            arg_mut: None,
-            arg: Ident::new("out", Span::call_site()),
-            sync_output: exec_output.clone(),
-            sync_body: parse_quote!({ out }),
-        }
+    } = sync_wrap.unwrap_or_else(|| {
+        parse_quote! { fn sync_wrap(out) -> #exec_output { out } }
     });
 
     quote! {
@@ -77,13 +90,11 @@ pub fn action_impl_2(input: TokenStream) -> TokenStream {
     }.into()
 }
 
-/*
-impl<generics> Action for ActionType {
-    type Future = FutureName;
-    async fn execute([mut] self) -> OutType { <exec body> }
-    [SyncWrap]
-}
-*/
+// impl<generics> Action for ActionType {
+// type Future = FutureName;
+// async fn execute([mut] self) -> OutType { <exec body> }
+// [SyncWrap]
+// }
 struct ActionImpl {
     generics: Generics,
     lifetime: Lifetime,
@@ -109,7 +120,7 @@ impl Parse for ActionImpl {
         }
         let lifetime = match lifetime {
             Some(lt) => lt.lifetime.clone(),
-            None => Lifetime::new("'static'", generics.span()),
+            None => parse_quote_spanned! { generics.span() => 'static },
         };
         parse_name(input, "Action")?;
         input.parse::<Token![for]>()?;
@@ -166,8 +177,8 @@ impl Parse for ActionImpl {
 
 // fn sync_wrap([mut] out) -> OutType { <out body> }
 struct SyncWrap {
-    arg_mut: Option<Token![mut]>,
-    arg: Ident,
+    sync_arg_mut: Option<Token![mut]>,
+    sync_arg: Ident,
     sync_output: Type,
     sync_body: Block,
 }
@@ -178,8 +189,8 @@ impl Parse for SyncWrap {
         parse_name(input, "sync_wrap")?;
         let args_input;
         parenthesized!(args_input in input);
-        let arg_mut = args_input.parse()?;
-        let arg = args_input.parse()?;
+        let sync_arg_mut = args_input.parse()?;
+        let sync_arg = args_input.parse()?;
         if !args_input.is_empty() {
             return Err(args_input.error("unexpected token"));
         }
@@ -188,8 +199,8 @@ impl Parse for SyncWrap {
         let sync_body = input.parse()?;
 
         Ok(SyncWrap {
-            arg_mut,
-            arg,
+            sync_arg_mut,
+            sync_arg,
             sync_output,
             sync_body,
         })
@@ -198,8 +209,12 @@ impl Parse for SyncWrap {
 
 /// Parse an identifier with a specific expected value.
 fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
-    if input.parse::<Ident>()?.to_string() != name {
-        return Err(input.error(format!("expected '{}'", name)));
+    let ident = input.parse::<Ident>()?;
+    if ident.to_string() != name {
+        return Err(Error::new(
+            ident.span(),
+            format!("expected '{}', got '{}'", name, ident),
+        ));
     }
     Ok(())
 }
