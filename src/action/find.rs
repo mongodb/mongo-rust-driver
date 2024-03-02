@@ -181,9 +181,7 @@ action_impl! {
 }
 
 action_impl_2! {
-    impl<'a, T> Action for Find<'a, T, Single, ExplicitSession<'a>>
-        where T: DeserializeOwned + Send
-    {
+    impl<'a, T: DeserializeOwned + Send> Action for Find<'a, T, Single, ExplicitSession<'a>> {
         type Future = FindOneSessionFuture;
 
         async fn execute(self) -> Result<Option<T>> {
