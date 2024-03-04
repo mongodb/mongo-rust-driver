@@ -1,7 +1,7 @@
 //! Action builder types.
 
 mod aggregate;
-pub(crate) mod bulk_write;
+mod bulk_write;
 mod count;
 mod create_collection;
 mod create_index;
