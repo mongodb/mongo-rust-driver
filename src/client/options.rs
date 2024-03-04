@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+mod bulk_write;
 mod resolver_config;
 
 use std::{
@@ -39,6 +40,7 @@ use crate::{
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
+pub use bulk_write::*;
 pub use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;

@@ -11,11 +11,10 @@ use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 #[cfg(feature = "tracing-unstable")]
 use crate::trace;
 use crate::{
-    action::bulk_write::error::BulkWriteError,
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     client::options::{ServerApi, ServerApiVersion},
     concern::{Acknowledgment, ReadConcernLevel},
-    error::{Error, ErrorKind},
+    error::{ClientBulkWriteError, Error, ErrorKind},
     gridfs::options::GridFsBucketOptions,
     options::{
         ClientOptions,
@@ -574,7 +573,7 @@ impl ExpectError {
 
         if let Some(ref expected_result) = self.expect_result {
             let actual_result = match *error.kind {
-                ErrorKind::ClientBulkWrite(BulkWriteError {
+                ErrorKind::ClientBulkWrite(ClientBulkWriteError {
                     partial_result: Some(ref partial_result),
                     ..
                 }) => Some(bson::to_bson(partial_result).map_err(|e| e.to_string())?),

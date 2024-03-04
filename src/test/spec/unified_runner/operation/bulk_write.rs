@@ -3,10 +3,10 @@ use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    action::bulk_write::{write_models::WriteModel, BulkWriteOptions},
     bson::{Array, Bson, Document},
     coll::options::UpdateModifications,
     error::Result,
+    options::{BulkWriteOptions, WriteModel},
     test::spec::unified_runner::{Entity, TestRunner},
     Namespace,
 };

@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::{
-    action::bulk_write::write_models::WriteModel,
     bson::doc,
+    options::WriteModel,
     test::{log_uncaptured, spec::unified_runner::run_unified_tests, EventHandler},
     Client,
     Namespace,

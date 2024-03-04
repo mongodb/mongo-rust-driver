@@ -1,5 +1,7 @@
 //! Contains the types of results returned by CRUD operations.
 
+mod bulk_write;
+
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
@@ -12,6 +14,8 @@ use crate::{
 
 use bson::{Binary, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
+
+pub use bulk_write::*;
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.

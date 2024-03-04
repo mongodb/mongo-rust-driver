@@ -1,74 +1,22 @@
 #![allow(missing_docs)]
 
-pub(crate) mod error;
-pub(crate) mod results;
-pub(crate) mod write_models;
-
 use std::collections::HashMap;
-
-use serde::{ser::SerializeMap, Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{Bson, Document},
-    error::{Error, ErrorKind, Result},
+    error::{ClientBulkWriteError, Error, ErrorKind, Result},
     operation::bulk_write::BulkWrite as BulkWriteOperation,
+    options::{BulkWriteOptions, WriteModel},
+    results::BulkWriteResult,
     Client,
     ClientSession,
 };
 
 use super::{action_impl, option_setters};
 
-use error::BulkWriteError;
-use results::BulkWriteResult;
-use write_models::WriteModel;
-
 impl Client {
     pub fn bulk_write(&self, models: impl IntoIterator<Item = WriteModel>) -> BulkWrite {
         BulkWrite::new(self.clone(), models.into_iter().collect())
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct BulkWriteOptions {
-    pub ordered: Option<bool>,
-    pub bypass_document_validation: Option<bool>,
-    pub comment: Option<Bson>,
-    #[serde(rename = "let")]
-    pub let_vars: Option<Document>,
-    pub verbose_results: Option<bool>,
-}
-
-impl Serialize for BulkWriteOptions {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut map_serializer = serializer.serialize_map(None)?;
-
-        let ordered = self.ordered.unwrap_or(true);
-        map_serializer.serialize_entry("ordered", &ordered)?;
-
-        if let Some(bypass_document_validation) = self.bypass_document_validation {
-            map_serializer
-                .serialize_entry("bypassDocumentValidation", &bypass_document_validation)?;
-        }
-
-        if let Some(ref comment) = self.comment {
-            map_serializer.serialize_entry("comment", comment)?;
-        }
-
-        if let Some(ref let_vars) = self.let_vars {
-            map_serializer.serialize_entry("let", let_vars)?;
-        }
-
-        let errors_only = self.verbose_results.map(|b| !b).unwrap_or(true);
-        map_serializer.serialize_entry("errorsOnly", &errors_only)?;
-
-        map_serializer.end()
     }
 }
 
@@ -201,12 +149,13 @@ impl ExecutionStatus {
                     Self::Error(error)
                 }
                 _ => {
-                    let bulk_write_error: Error = ErrorKind::ClientBulkWrite(BulkWriteError {
-                        write_errors: HashMap::new(),
-                        write_concern_errors: Vec::new(),
-                        partial_result: Some(current_result),
-                    })
-                    .into();
+                    let bulk_write_error: Error =
+                        ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+                            write_errors: HashMap::new(),
+                            write_concern_errors: Vec::new(),
+                            partial_result: Some(current_result),
+                        })
+                        .into();
                     Self::Error(bulk_write_error.with_source(error))
                 }
             },
@@ -228,7 +177,7 @@ impl ExecutionStatus {
     /// Gets a BulkWriteError from a given Error. This method should only be called when adding a
     /// new result or error to the existing state, as it requires that the given Error's kind is
     /// ClientBulkWrite.
-    fn get_current_bulk_write_error(error: &mut Error) -> &mut BulkWriteError {
+    fn get_current_bulk_write_error(error: &mut Error) -> &mut ClientBulkWriteError {
         match *error.kind {
             ErrorKind::ClientBulkWrite(ref mut bulk_write_error) => bulk_write_error,
             _ => unreachable!(),

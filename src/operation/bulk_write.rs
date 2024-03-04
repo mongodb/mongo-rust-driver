@@ -1,5 +1,3 @@
-#![allow(unused_variables, dead_code)]
-
 mod server_responses;
 
 use std::collections::HashMap;
@@ -8,19 +6,14 @@ use futures_core::TryStream;
 use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
-    action::bulk_write::{
-        error::BulkWriteError,
-        results::BulkWriteResult,
-        write_models::{OperationType, WriteModel},
-        BulkWriteOptions,
-    },
     bson::{rawdoc, Bson, RawDocumentBuf},
     bson_util::{self, array_entry_size_bytes, extend_raw_document_buf, vec_to_raw_array_buf},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{Error, ErrorKind, Result},
+    error::{ClientBulkWriteError, Error, ErrorKind, Result},
     operation::OperationWithDefaults,
-    results::{DeleteResult, InsertOneResult, UpdateResult},
+    options::{BulkWriteOptions, OperationType, WriteModel},
+    results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
     Client,
     ClientSession,
     Cursor,
@@ -79,7 +72,7 @@ impl<'a> BulkWrite<'a> {
     async fn iterate_results_cursor(
         &self,
         mut stream: impl TryStream<Ok = SingleOperationResponse, Error = Error> + Unpin,
-        error: &mut BulkWriteError,
+        error: &mut ClientBulkWriteError,
     ) -> Result<()> {
         let result = &mut error.partial_result;
 
@@ -240,7 +233,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
             }
 
             if split {
-                // Remove the namespace doc from the list if one was added for this operation
+                // Remove the namespace doc from the list if one was added for this operation.
                 if namespace_size > 0 {
                     let last_index = namespace_info.namespaces.len() - 1;
                     namespace_info.namespaces.remove(last_index);
@@ -283,7 +276,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
             async move {
                 let response: WriteResponseBody<Response> = response.body()?;
 
-                let mut bulk_write_error = BulkWriteError::default();
+                let mut bulk_write_error = ClientBulkWriteError::default();
 
                 // A partial result with summary info should only be created if one or more
                 // operations were successful.
@@ -352,10 +345,6 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
             }
             .boxed(),
         )
-    }
-
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        Err(error)
     }
 
     fn retryability(&self) -> Retryability {

@@ -1,4 +1,6 @@
-use serde::Serialize;
+#![allow(missing_docs)]
+
+use serde::{ser::SerializeMap, Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::{
@@ -8,6 +10,49 @@ use crate::{
     options::UpdateModifications,
     Namespace,
 };
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct BulkWriteOptions {
+    pub ordered: Option<bool>,
+    pub bypass_document_validation: Option<bool>,
+    pub comment: Option<Bson>,
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
+    pub verbose_results: Option<bool>,
+}
+
+impl Serialize for BulkWriteOptions {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map_serializer = serializer.serialize_map(None)?;
+
+        let ordered = self.ordered.unwrap_or(true);
+        map_serializer.serialize_entry("ordered", &ordered)?;
+
+        if let Some(bypass_document_validation) = self.bypass_document_validation {
+            map_serializer
+                .serialize_entry("bypassDocumentValidation", &bypass_document_validation)?;
+        }
+
+        if let Some(ref comment) = self.comment {
+            map_serializer.serialize_entry("comment", comment)?;
+        }
+
+        if let Some(ref let_vars) = self.let_vars {
+            map_serializer.serialize_entry("let", let_vars)?;
+        }
+
+        let errors_only = self.verbose_results.map(|b| !b).unwrap_or(true);
+        map_serializer.serialize_entry("errorsOnly", &errors_only)?;
+
+        map_serializer.end()
+    }
+}
 
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize)]

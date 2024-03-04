@@ -1,11 +1,6 @@
 use serde::Deserialize;
 
-use crate::{
-    action::bulk_write::results::BulkWriteResult,
-    bson::Bson,
-    error::WriteError,
-    operation::CursorInfo,
-};
+use crate::{bson::Bson, error::WriteError, operation::CursorInfo, results::BulkWriteResult};
 
 /// The top-level response to the bulkWrite command.
 #[derive(Deserialize)]
