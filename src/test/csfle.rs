@@ -212,7 +212,7 @@ async fn custom_key_material() -> Result<()> {
         .key_material(key)
         .await?;
     let mut key_doc = datakeys
-        .find_one(doc! { "_id": id.clone() }, None)
+        .find_one(doc! { "_id": id.clone() })
         .await?
         .unwrap();
     datakeys.delete_one(doc! { "_id": id}).await?;
@@ -383,7 +383,7 @@ async fn data_key_double_encryption() -> Result<()> {
             None,
         )
         .await?;
-        let found = coll.find_one(doc! { "_id": provider.name() }, None).await?;
+        let found = coll.find_one(doc! { "_id": provider.name() }).await?;
         assert_eq!(
             found.as_ref().and_then(|doc| doc.get("value")),
             Some(&Bson::String(format!("hello {}", provider.name()))),
@@ -858,7 +858,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         .collection::<Document>("coll");
     let id = coll.insert_one(corpus_copied, None).await?.inserted_id;
     let corpus_decrypted = coll
-        .find_one(doc! { "_id": id.clone() }, None)
+        .find_one(doc! { "_id": id.clone() })
         .await?
         .expect("document lookup failed");
     assert_eq!(corpus, corpus_decrypted);
@@ -868,7 +868,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     let corpus_encrypted_actual = client
         .database("db")
         .collection::<Document>("coll")
-        .find_one(doc! { "_id": id }, None)
+        .find_one(doc! { "_id": id })
         .await?
         .expect("encrypted document lookup failed");
     for (name, field) in &corpus_encrypted_expected {
@@ -1592,7 +1592,7 @@ impl DeadlockTestCase {
         let found = client_encrypted
             .database("db")
             .collection::<Document>("coll")
-            .find_one(doc! { "_id": 0 }, None)
+            .find_one(doc! { "_id": 0 })
             .await?;
         assert_eq!(found, Some(doc! { "_id": 0, "encrypted": "string0" }));
 
@@ -3442,12 +3442,9 @@ async fn fle2_example() -> Result<()> {
 
     // Encrypt a find.
     let found = encrypted_coll
-        .find_one(
-            doc! {
-                "encryptedIndexed": "indexedValue",
-            },
-            None,
-        )
+        .find_one(doc! {
+            "encryptedIndexed": "indexedValue",
+        })
         .await?
         .unwrap();
     assert_eq!("indexedValue", found.get_str("encryptedIndexed")?);
@@ -3457,10 +3454,7 @@ async fn fle2_example() -> Result<()> {
     let unencrypted_coll = test_client
         .database("docsExamples")
         .collection::<Document>("encrypted");
-    let found = unencrypted_coll
-        .find_one(doc! { "_id": 1 }, None)
-        .await?
-        .unwrap();
+    let found = unencrypted_coll.find_one(doc! { "_id": 1 }).await?.unwrap();
     assert_eq!(
         Some(ElementType::Binary),
         found.get("encryptedIndexed").map(Bson::element_type)

@@ -325,7 +325,7 @@ fn collection_generic_bounds() {
     let coll: Collection<Foo> = client
         .database(function_name!())
         .collection(function_name!());
-    let _result: Result<Option<Foo>> = coll.find_one(None, None);
+    let _result: Result<Option<Foo>> = coll.find_one(doc! {}).run();
 
     #[derive(Serialize)]
     struct Bar;
@@ -430,7 +430,7 @@ fn mixed_sync_and_async() -> Result<()> {
             async_client
                 .database(DB_NAME)
                 .collection::<Document>(COLL_NAME)
-                .find_one(doc! {}, None)
+                .find_one(doc! {})
                 .await
         })?
         .unwrap();

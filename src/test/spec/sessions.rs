@@ -285,7 +285,8 @@ async fn sessions_not_supported_explicit_session_error() {
     let coll = client.database(name).collection(name);
 
     let error = coll
-        .find_one_with_session(doc! {}, None, &mut session)
+        .find_one(doc! {})
+        .session(&mut session)
         .await
         .unwrap_err();
     assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));

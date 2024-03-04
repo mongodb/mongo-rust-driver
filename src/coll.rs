@@ -3,7 +3,6 @@ pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
-use futures_util::stream::StreamExt;
 use serde::{
     de::{DeserializeOwned, Error as DeError},
     Deserialize,
@@ -225,50 +224,6 @@ where
 
     pub(crate) fn human_readable_serialization(&self) -> bool {
         self.inner.human_readable_serialization
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
-    /// Finds a single document in the collection matching `filter`.
-    pub async fn find_one(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-    ) -> Result<Option<T>> {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-
-        let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
-        let mut cursor = self
-            .find(filter.into().unwrap_or_default())
-            .with_options(options)
-            .await?;
-        cursor.next().await.transpose()
-    }
-
-    /// Finds a single document in the collection matching `filter` using the provided
-    /// `ClientSession`.
-    pub async fn find_one_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-
-        let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
-        let mut cursor = self
-            .find(filter.into().unwrap_or_default())
-            .with_options(options)
-            .session(&mut *session)
-            .await?;
-        let mut cursor = cursor.stream(session);
-        cursor.next().await.transpose()
     }
 }
 

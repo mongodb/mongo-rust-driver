@@ -19,7 +19,7 @@ use crate::{
     client::AsyncDropToken,
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
-    options::{FindOneOptions, ReadPreference, SelectionCriteria},
+    options::{ReadPreference, SelectionCriteria},
     Collection,
 };
 
@@ -153,14 +153,12 @@ impl GridFsBucket {
 
     async fn create_indexes(&self) -> Result<()> {
         if !self.inner.created_indexes.load(Ordering::SeqCst) {
-            let find_options = FindOneOptions::builder()
-                .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
-                .projection(doc! { "_id": 1 })
-                .build();
             if self
                 .files()
                 .clone_with_type::<Document>()
-                .find_one(None, find_options)
+                .find_one(doc! {})
+                .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+                .projection(doc! { "_id": 1 })
                 .await?
                 .is_none()
             {

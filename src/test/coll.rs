@@ -21,7 +21,6 @@ use crate::{
         DeleteOptions,
         DropCollectionOptions,
         FindOneAndDeleteOptions,
-        FindOneOptions,
         FindOptions,
         Hint,
         IndexOptions,
@@ -683,18 +682,15 @@ async fn no_read_preference_to_standalone() {
         return;
     }
 
-    let options = FindOneOptions::builder()
+    client
+        .database(function_name!())
+        .collection::<Document>(function_name!())
+        .find_one(doc! {})
         .selection_criteria(SelectionCriteria::ReadPreference(
             ReadPreference::SecondaryPreferred {
                 options: Default::default(),
             },
         ))
-        .build();
-
-    client
-        .database(function_name!())
-        .collection::<Document>(function_name!())
-        .find_one(None, options)
         .await
         .unwrap();
 
@@ -743,7 +739,7 @@ where
 {
     coll.insert_one(insert_data.clone(), None).await.unwrap();
     let result = coll
-        .find_one(to_document(&insert_data).unwrap(), None)
+        .find_one(to_document(&insert_data).unwrap())
         .await
         .unwrap();
     match result {
@@ -810,7 +806,7 @@ async fn typed_find_one_and_replace() {
         .unwrap();
     assert_eq!(result, insert_data);
 
-    let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
+    let result = coll.find_one(doc! { "x": 2 }).await.unwrap().unwrap();
     assert_eq!(result, replacement);
 }
 
@@ -835,7 +831,7 @@ async fn typed_replace_one() {
         .await
         .unwrap();
 
-    let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
+    let result = coll.find_one(doc! { "x": 2 }).await.unwrap().unwrap();
     assert_eq!(result, replacement);
 }
 
@@ -917,7 +913,7 @@ async fn collection_options_inherited() {
     coll.find(doc! {}).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
     coll.count_documents(doc! {}).await.unwrap();
@@ -957,7 +953,7 @@ async fn collection_generic_bounds() {
     let coll: Collection<Foo> = client
         .database(function_name!())
         .collection(function_name!());
-    let _result: Result<Option<Foo>> = coll.find_one(None, None).await;
+    let _result: Result<Option<Foo>> = coll.find_one(doc! {}).await;
 
     #[derive(Serialize)]
     struct Bar;
@@ -1174,7 +1170,7 @@ async fn configure_human_readable_serialization() {
     // instead.
     let document_collection = non_human_readable_collection.clone_with_type::<Document>();
     let doc = document_collection
-        .find_one(doc! { "id": 0 }, None)
+        .find_one(doc! { "id": 0 })
         .await
         .unwrap()
         .unwrap();
@@ -1193,7 +1189,7 @@ async fn configure_human_readable_serialization() {
         .unwrap();
 
     let doc = document_collection
-        .find_one(doc! { "id": 1 }, None)
+        .find_one(doc! { "id": 1 })
         .await
         .unwrap()
         .unwrap();
@@ -1222,7 +1218,7 @@ async fn configure_human_readable_serialization() {
     // Proper deserialization to a string demonstrates that the data was correctly serialized as a
     // string.
     human_readable_collection
-        .find_one(doc! { "id": 0 }, None)
+        .find_one(doc! { "id": 0 })
         .await
         .unwrap();
 
@@ -1239,7 +1235,7 @@ async fn configure_human_readable_serialization() {
         .unwrap();
 
     human_readable_collection
-        .find_one(doc! { "id": 1 }, None)
+        .find_one(doc! { "id": 1 })
         .await
         .unwrap();
 }

@@ -14,7 +14,6 @@ use super::{options::GridFsDownloadByNameOptions, Chunk, FilesCollectionDocument
 use crate::{
     bson::{doc, Bson},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    options::FindOneOptions,
     Collection,
     Cursor,
 };
@@ -42,21 +41,19 @@ impl GridFsBucket {
         } else {
             (-1, -revision - 1)
         };
-        let options = FindOneOptions::builder()
-            .sort(doc! { "uploadDate": sort })
-            .skip(skip as u64)
-            .build();
 
         match self
             .files()
-            .find_one(doc! { "filename": filename }, options)
+            .find_one(doc! { "filename": filename })
+            .sort(doc! { "uploadDate": sort })
+            .skip(skip as u64)
             .await?
         {
             Some(fcd) => Ok(fcd),
             None => {
                 if self
                     .files()
-                    .find_one(doc! { "filename": filename }, None)
+                    .find_one(doc! { "filename": filename })
                     .await?
                     .is_some()
                 {

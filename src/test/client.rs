@@ -603,7 +603,7 @@ async fn x509_auth() {
     client
         .database(function_name!())
         .collection::<Document>(function_name!())
-        .find_one(None, None)
+        .find_one(doc! {})
         .await
         .unwrap();
 }
@@ -632,7 +632,7 @@ async fn plain_auth() {
     let client = Client::with_options(options).unwrap();
     let coll = client.database("ldap").collection("test");
 
-    let doc = coll.find_one(None, None).await.unwrap().unwrap();
+    let doc = coll.find_one(doc! {}).await.unwrap().unwrap();
 
     #[derive(Debug, Deserialize, PartialEq)]
     struct TestDocument {
@@ -915,7 +915,7 @@ async fn find_one_and_delete_serde_consistency() {
     };
 
     coll.insert_one(&doc, None).await.unwrap();
-    let rec: Foo = coll.find_one(doc! {}, None).await.unwrap().unwrap();
+    let rec: Foo = coll.find_one(doc! {}).await.unwrap().unwrap();
     assert_eq!(doc.problematic, rec.problematic);
     let rec: Foo = coll
         .find_one_and_delete(doc! {}, None)

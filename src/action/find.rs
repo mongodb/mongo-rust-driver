@@ -34,11 +34,11 @@ impl<T> Collection<T> {
     }
 }
 
-impl<T: DeserializeOwned> Collection<T> {
+impl<T: DeserializeOwned + Send> Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
     /// `await` will return `Result<Option<T>>`.
-    pub fn find_one_2(&self, filter: Document) -> Find<'_, T, Single> {
+    pub fn find_one(&self, filter: Document) -> Find<'_, T, Single> {
         Find {
             coll: self,
             filter,
@@ -61,12 +61,12 @@ impl<T> crate::sync::Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T: DeserializeOwned> crate::sync::Collection<T> {
+impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
     /// [`run`](Find::run) will return `Result<Option<T>>`.
-    pub fn find_one_2(&self, filter: Document) -> Find<'_, T, Single> {
-        self.async_collection.find_one_2(filter)
+    pub fn find_one(&self, filter: Document) -> Find<'_, T, Single> {
+        self.async_collection.find_one(filter)
     }
 }
 

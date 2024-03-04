@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{future::IntoFuture, sync::Arc, time::Duration};
 
 use bson::doc;
 
@@ -60,10 +60,13 @@ async fn retry_releases_connection() {
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    runtime::timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
-        .await
-        .expect("operation should not time out")
-        .expect("find should succeed");
+    runtime::timeout(
+        Duration::from_secs(1),
+        collection.find_one(doc! {}).into_future(),
+    )
+    .await
+    .expect("operation should not time out")
+    .expect("find should succeed");
 }
 
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
@@ -110,7 +113,7 @@ async fn retry_read_pool_cleared() {
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = runtime::spawn(async move { coll.find_one(doc! {}, None).await });
+        let task = runtime::spawn(async move { coll.find_one(doc! {}).await });
         tasks.push(task);
     }
 

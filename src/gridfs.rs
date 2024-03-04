@@ -244,8 +244,14 @@ impl GridFsBucket {
         filter: Document,
         options: impl Into<Option<GridFsFindOneOptions>>,
     ) -> Result<Option<FilesCollectionDocument>> {
-        let find_options = options.into().map(FindOneOptions::from);
-        self.files().find_one(filter, find_options).await
+        let find_options = options
+            .into()
+            .map(FindOneOptions::from)
+            .map(FindOptions::from);
+        self.files()
+            .find_one(filter)
+            .with_options(find_options)
+            .await
     }
 
     /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an

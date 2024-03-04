@@ -930,7 +930,7 @@ where
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
-pub struct FindOneOptions {
+pub(crate) struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
     pub allow_partial_results: Option<bool>,

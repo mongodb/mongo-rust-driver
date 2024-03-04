@@ -10,7 +10,6 @@ use crate::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
-        FindOneOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
@@ -109,38 +108,6 @@ where
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
-    /// Finds a single document in the collection matching `filter`.
-    pub fn find_one(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection
-                .find_one(filter.into(), options.into()),
-        )
-    }
-
-    /// Finds a single document in the collection matching `filter` using the provided
-    /// `ClientSession`.
-    pub fn find_one_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 }
 

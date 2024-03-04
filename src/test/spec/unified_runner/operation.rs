@@ -1087,8 +1087,10 @@ impl TestOperation for FindOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let options: FindOptions = self.options.clone().into();
             let result = collection
-                .find_one(self.filter.clone(), self.options.clone())
+                .find_one(self.filter.clone().unwrap_or_default())
+                .with_options(options)
                 .await?;
             match result {
                 Some(result) => Ok(Some(Bson::from(result).into())),

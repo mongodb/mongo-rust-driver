@@ -150,7 +150,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "find",
-            collection_op!($test_name, coll, coll.find_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.find_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(

@@ -96,7 +96,7 @@ async fn human_single_principal_implicit_username() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().unwrap());
     Ok(())

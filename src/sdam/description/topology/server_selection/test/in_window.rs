@@ -177,7 +177,7 @@ async fn load_balancing_test() {
                 .collection::<Document>("load_balancing_test");
             handles.push(runtime::spawn(async move {
                 for _ in 0..iterations {
-                    collection.find_one(None, None).await?;
+                    collection.find_one(doc! {}).await?;
                 }
                 Ok(())
             }))

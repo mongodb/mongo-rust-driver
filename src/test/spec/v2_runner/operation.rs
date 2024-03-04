@@ -684,17 +684,12 @@ impl TestOperation for FindOne {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = collection
+                .find_one(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone().map(FindOptions::from));
             let result = match session {
-                Some(session) => {
-                    collection
-                        .find_one_with_session(self.filter.clone(), self.options.clone(), session)
-                        .await?
-                }
-                None => {
-                    collection
-                        .find_one(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                Some(session) => action.session(session).await?,
+                None => action.await?,
             };
             match result {
                 Some(result) => Ok(Some(Bson::from(result))),

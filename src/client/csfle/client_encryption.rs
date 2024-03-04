@@ -99,7 +99,7 @@ impl ClientEncryption {
     /// Finds a single key document with the given UUID (BSON binary subtype 0x04).
     /// Returns the result of the internal find() operation on the key vault collection.
     pub async fn get_key(&self, id: &Binary) -> Result<Option<RawDocumentBuf>> {
-        self.key_vault.find_one(doc! { "_id": id }, None).await
+        self.key_vault.find_one(doc! { "_id": id }).await
     }
 
     /// Finds all documents in the key vault collection.
@@ -160,7 +160,7 @@ impl ClientEncryption {
         key_alt_name: impl AsRef<str>,
     ) -> Result<Option<RawDocumentBuf>> {
         self.key_vault
-            .find_one(doc! { "keyAltNames": key_alt_name.as_ref() }, None)
+            .find_one(doc! { "keyAltNames": key_alt_name.as_ref() })
             .await
     }
 

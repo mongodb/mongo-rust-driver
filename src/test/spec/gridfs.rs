@@ -319,7 +319,7 @@ async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
     assert!(bucket
         .chunks()
         .clone_with_type::<Document>()
-        .find_one(doc! { "files_id": id }, None)
+        .find_one(doc! { "files_id": id })
         .await
         .unwrap()
         .is_none());

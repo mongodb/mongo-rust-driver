@@ -8,7 +8,6 @@ use crate::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
-        FindOneOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
@@ -158,17 +157,15 @@ async fn snapshot_read_concern() {
             .read_concern(ReadConcern::snapshot())
             .build();
         session.start_transaction(options).await.unwrap();
-        let result = coll.find_one_with_session(None, None, &mut session).await;
+        let result = coll.find_one(doc! {}).session(&mut session).await;
         assert!(result.is_ok());
         assert_event_contains_read_concern(&client).await;
     }
 
     if client.server_version_lt(4, 9) {
-        let options = FindOneOptions::builder()
-            .read_concern(ReadConcern::snapshot())
-            .build();
         let error = coll
-            .find_one(None, options)
+            .find_one(doc! {})
+            .read_concern(ReadConcern::snapshot())
             .await
             .expect_err("non-transaction find one with snapshot read concern should fail");
         // ensure that an error from the server is returned
