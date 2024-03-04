@@ -1,6 +1,6 @@
 {
   "description": "client bulkWrite update options",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "runOnRequirements": [
     {
       "minServerVersion": "8.0"

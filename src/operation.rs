@@ -86,7 +86,9 @@ impl<'a, O> OperationResponse<'a, O> {
     fn get_sync_result(self) -> Result<O> {
         match self {
             Self::Sync(result) => result,
-            Self::Async(_) => unreachable!(),
+            Self::Async(_) => Err(Error::internal(
+                "get_sync_result was called on an async response",
+            )),
         }
     }
 }

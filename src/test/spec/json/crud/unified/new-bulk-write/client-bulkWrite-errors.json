@@ -59,7 +59,8 @@
     "writeConcernError": {
       "code": 91,
       "errmsg": "Replication is being shut down"
-    }
+    },
+    "undefinedVarCode": 17276
   },
   "tests": [
     {
@@ -144,11 +145,6 @@
     },
     {
       "description": "an individual operation fails during an unordered bulkWrite",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -229,11 +225,6 @@
     },
     {
       "description": "detailed results are omitted from error when verboseResults is false",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "8.0"
-        }
-      ],
       "operations": [
         {
           "object": "client0",
@@ -302,8 +293,8 @@
       "description": "a top-level failure occurs during a bulkWrite",
       "operations": [
         {
-          "name": "failPoint",
           "object": "testRunner",
+          "name": "failPoint",
           "arguments": {
             "client": "client0",
             "failPoint": {
@@ -338,6 +329,43 @@
           },
           "expectError": {
             "errorCode": 8
+          }
+        }
+      ]
+    },
+    {
+      "description": "a bulk write with only errors does not report a partial result",
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "deleteOne": {
+                  "namespace": "crud-tests.coll0",
+                  "filter": {
+                    "$expr": {
+                      "$eq": [
+                        "$_id",
+                        "$$id2"
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectError": {
+            "expectResult": {
+              "$$unsetOrMatches": {}
+            },
+            "writeErrors": {
+              "0": {
+                "code": 17276
+              }
+            }
           }
         }
       ]

@@ -125,8 +125,8 @@ impl WriteModel {
         }
     }
 
-    // Returns the operation-specific fields that should be included in this model's entry in the
-    // ops array. Also returns an inserted ID if this is an insert operation.
+    /// Returns the operation-specific fields that should be included in this model's entry in the
+    /// ops array. Also returns an inserted ID if this is an insert operation.
     pub(crate) fn get_ops_document_contents(&self) -> Result<(RawDocumentBuf, Option<Bson>)> {
         let (mut model_document, inserted_id) = match self {
             Self::InsertOne { document, .. } => {

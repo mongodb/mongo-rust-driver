@@ -1,6 +1,6 @@
 {
   "description": "client bulkWrite with mixed namespaces",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "runOnRequirements": [
     {
       "minServerVersion": "8.0"
@@ -152,7 +152,7 @@
                     "_id": 4
                   },
                   "replacement": {
-                    "x": 44
+                    "x": 45
                   }
                 }
               }
@@ -249,7 +249,7 @@
                         "_id": 4
                       },
                       "updateMods": {
-                        "x": 44
+                        "x": 45
                       },
                       "multi": false
                     }
@@ -300,7 +300,7 @@
           "documents": [
             {
               "_id": 4,
-              "x": 44
+              "x": 45
             }
           ]
         }
