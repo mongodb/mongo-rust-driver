@@ -1,15 +1,15 @@
-use std::{marker::PhantomData, time::Duration};
+use std::{borrow::Borrow, marker::PhantomData, time::Duration};
 
 use bson::{Bson, Document};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    coll::options::{FindOneAndDeleteOptions, Hint},
+    coll::options::{FindOneAndDeleteOptions, Hint, UpdateModifications},
     collation::Collation,
     error::Result,
     operation::{
         find_and_modify::options::{FindAndModifyOptions, Modification},
-        FindAndModify as Op,
+        FindAndModify as Op, UpdateOrReplace,
     },
     options::WriteConcern,
     ClientSession,
@@ -18,7 +18,7 @@ use crate::{
 
 use super::{action_impl, option_setters};
 
-impl<T: DeserializeOwned + Send> Collection<T> {
+impl<T: DeserializeOwned> Collection<T> {
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -31,7 +31,60 @@ impl<T: DeserializeOwned + Send> Collection<T> {
         FindAndModify {
             coll: self,
             filter,
-            modification: Modification::Delete,
+            modification: Ok(Modification::Delete),
+            options: None,
+            session: None,
+            _mode: PhantomData,
+        }
+    }
+
+    /// Atomically finds up to one document in the collection matching `filter` and updates it.
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    ///
+    /// `await` will return `Result<Option<T>>`.
+    pub async fn find_one_and_update_2(
+        &self,
+        filter: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> FindAndModify<'_, T, Update> {
+        let update = update.into();
+        FindAndModify {
+            coll: self,
+            filter,
+            modification: Ok(Modification::Update(update.into())),
+            options: None,
+            session: None,
+            _mode: PhantomData,
+        }
+    }
+}
+
+impl<T: Serialize + DeserializeOwned> Collection<T> {
+    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
+    /// `replacement`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn find_one_and_replace_2(
+        &self,
+        filter: Document,
+        replacement: impl Borrow<T>,
+    ) -> FindAndModify<'_, T, Replace> {
+        let human_readable_serialization = self.human_readable_serialization();
+        FindAndModify {
+            coll: self,
+            filter,
+            modification: UpdateOrReplace::replacement(replacement.borrow(), human_readable_serialization)
+                .map(Modification::Update),
             options: None,
             session: None,
             _mode: PhantomData,
@@ -60,13 +113,15 @@ impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
 pub struct FindAndModify<'a, T, Mode> {
     coll: &'a Collection<T>,
     filter: Document,
-    modification: Modification,
+    modification: Result<Modification>,
     options: Option<FindAndModifyOptions>,
     session: Option<&'a mut ClientSession>,
     _mode: PhantomData<Mode>,
 }
 
 pub struct Delete;
+pub struct Update;
+pub struct Replace;
 
 impl<'a, T, Mode> FindAndModify<'a, T, Mode> {
     fn options(&mut self) -> &mut FindAndModifyOptions {
@@ -110,9 +165,9 @@ action_impl! {
             let op = Op::<T>::with_modification(
                 self.coll.namespace(),
                 self.filter,
-                self.modification,
+                self.modification?,
                 self.options,
-            );
+            )?;
             self.coll.client().execute_operation(op, self.session).await
         }
     }

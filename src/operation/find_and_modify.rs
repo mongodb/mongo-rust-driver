@@ -41,14 +41,21 @@ impl<T: DeserializeOwned> FindAndModify<T> {
         query: Document,
         modification: Modification,
         options: Option<FindAndModifyOptions>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        if let Modification::Update(
+            UpdateOrReplace::UpdateModifications(
+                UpdateModifications::Document(d)
+             )
+            ) = &modification {
+            bson_util::update_document_check(d)?;
+        };
+        Ok(Self {
             ns,
             query,
             modification,
             options,
             _phantom: PhantomData,
-        }
+        })
     }
 }
 

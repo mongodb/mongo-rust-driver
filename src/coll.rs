@@ -221,6 +221,10 @@ where
         self.client().execute_operation(op, None).await?;
         Ok(())
     }
+
+    pub(crate) fn human_readable_serialization(&self) -> bool {
+        self.inner.human_readable_serialization
+    }
 }
 
 impl<T> Collection<T>
