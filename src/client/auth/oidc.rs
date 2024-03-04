@@ -24,18 +24,10 @@ use crate::{
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 /// The user-supplied callbacks for OIDC authentication.
+#[derive(Clone)]
 pub struct State {
     callback: Callback,
     cache: Arc<RwLock<Cache>>,
-}
-
-impl Clone for State {
-    fn clone(&self) -> Self {
-        Self {
-            callback: self.callback.clone(),
-            cache: Arc::new(RwLock::new(Cache::new())),
-        }
-    }
 }
 
 impl State {
