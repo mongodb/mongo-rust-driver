@@ -3,9 +3,18 @@ use std::{marker::PhantomData, time::Duration};
 use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
-use crate::{coll::options::{FindOneAndDeleteOptions, Hint}, collation::Collation, operation::find_and_modify::options::{FindAndModifyOptions, Modification}, options::WriteConcern, ClientSession, Collection};
-use crate::error::Result;
-use crate::operation::FindAndModify as Op;
+use crate::{
+    coll::options::{FindOneAndDeleteOptions, Hint},
+    collation::Collation,
+    error::Result,
+    operation::{
+        find_and_modify::options::{FindAndModifyOptions, Modification},
+        FindAndModify as Op,
+    },
+    options::WriteConcern,
+    ClientSession,
+    Collection,
+};
 
 use super::{action_impl, option_setters};
 
@@ -18,10 +27,7 @@ impl<T: DeserializeOwned + Send> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<Option<T>>`.
-    pub fn find_one_and_delete_2(
-        &self,
-        filter: Document,
-    ) -> FindAndModify<'_, T, Delete> {
+    pub fn find_one_and_delete(&self, filter: Document) -> FindAndModify<'_, T, Delete> {
         FindAndModify {
             coll: self,
             filter,
@@ -43,15 +49,13 @@ impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
     /// retryable writes.
     ///
     /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
-    pub fn find_one_and_delete_2(
-        &self,
-        filter: Document,
-    ) -> FindAndModify<'_, T, Delete> {
-        self.async_collection.find_one_and_delete_2(filter)
+    pub fn find_one_and_delete(&self, filter: Document) -> FindAndModify<'_, T, Delete> {
+        self.async_collection.find_one_and_delete(filter)
     }
 }
 
-/// Atomically find up to one document in the collection matching a filter and modify it.  Construct with [`Collection::find_one_and_delete`].
+/// Atomically find up to one document in the collection matching a filter and modify it.  Construct
+/// with [`Collection::find_one_and_delete`].
 #[must_use]
 pub struct FindAndModify<'a, T, Mode> {
     coll: &'a Collection<T>,
@@ -66,14 +70,12 @@ pub struct Delete;
 
 impl<'a, T, Mode> FindAndModify<'a, T, Mode> {
     fn options(&mut self) -> &mut FindAndModifyOptions {
-        self.options.get_or_insert_with(<FindAndModifyOptions>::default)
+        self.options
+            .get_or_insert_with(<FindAndModifyOptions>::default)
     }
 
     /// Runs the operation using the provided session.
-    pub fn session(
-        mut self,
-        value: impl Into<&'a mut ClientSession>,
-    ) -> Self {
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
@@ -94,7 +96,7 @@ impl<'a, T> FindAndModify<'a, T, Delete> {
         collation: Collation,
         hint: Hint,
         let_vars: Document,
-        comment: Bson,    
+        comment: Bson,
     }
 }
 
@@ -104,7 +106,7 @@ action_impl! {
 
         async fn execute(mut self) -> Result<Option<T>> {
             resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-            
+
             let op = Op::<T>::with_modification(
                 self.coll.namespace(),
                 self.filter,

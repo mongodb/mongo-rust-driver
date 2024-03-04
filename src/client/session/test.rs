@@ -109,11 +109,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "findAndModify",
-            collection_op!(
-                $test_name,
-                coll,
-                coll.find_one_and_delete(doc! { "x": 1 }, None)
-            ),
+            collection_op!($test_name, coll, coll.find_one_and_delete(doc! { "x": 1 })),
         )
         .await;
         $test_func(

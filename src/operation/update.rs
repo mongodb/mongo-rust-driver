@@ -22,8 +22,14 @@ pub(crate) enum UpdateOrReplace {
 }
 
 impl UpdateOrReplace {
-    pub(crate) fn replacement<T: Serialize>(update: &T, human_readable_serialization: bool) -> Result<Self> {
-        Ok(Self::Replacement(to_raw_document_buf_with_options(update, human_readable_serialization)?))
+    pub(crate) fn replacement<T: Serialize>(
+        update: &T,
+        human_readable_serialization: bool,
+    ) -> Result<Self> {
+        Ok(Self::Replacement(to_raw_document_buf_with_options(
+            update,
+            human_readable_serialization,
+        )?))
     }
 
     pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {

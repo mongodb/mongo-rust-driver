@@ -905,22 +905,11 @@ impl TestOperation for FindOneAndDelete {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .find_one_and_delete_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .find_one_and_delete(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .find_one_and_delete(self.filter.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }

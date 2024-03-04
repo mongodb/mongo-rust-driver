@@ -11,12 +11,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{
-        options::{
-            FindOneAndDeleteOptions,
-            FindOneAndReplaceOptions,
-            FindOneAndUpdateOptions,
-            UpdateModifications,
-        },
+        options::{FindOneAndReplaceOptions, FindOneAndUpdateOptions, UpdateModifications},
         Namespace,
     },
     error::{ErrorKind, Result},
@@ -58,20 +53,6 @@ impl<T: DeserializeOwned> FindAndModify<T> {
 }
 
 impl<T: DeserializeOwned> FindAndModify<T> {
-    pub fn with_delete(
-        ns: Namespace,
-        query: Document,
-        options: Option<FindOneAndDeleteOptions>,
-    ) -> Self {
-        FindAndModify {
-            ns,
-            query,
-            modification: Modification::Delete,
-            options: options.map(Into::into),
-            _phantom: Default::default(),
-        }
-    }
-
     pub fn with_update(
         ns: Namespace,
         query: Document,
@@ -100,7 +81,10 @@ impl<T: DeserializeOwned> FindAndModify<T> {
         Ok(FindAndModify {
             ns,
             query,
-            modification: Modification::Update(UpdateOrReplace::replacement(replacement, human_readable_serialization)?),
+            modification: Modification::Update(UpdateOrReplace::replacement(
+                replacement,
+                human_readable_serialization,
+            )?),
             options: options.map(Into::into),
             _phantom: Default::default(),
         })
@@ -131,10 +115,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 
         let (key, modification) = match &self.modification {
             Modification::Delete => ("remove", true.into()),
-            Modification::Update(update_or_replace) => (
-                "update",
-                update_or_replace.to_raw_bson()?,
-            ),
+            Modification::Update(update_or_replace) => ("update", update_or_replace.to_raw_bson()?),
         };
         body.append(key, modification);
 

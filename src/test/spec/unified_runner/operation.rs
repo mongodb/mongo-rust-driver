@@ -1368,7 +1368,8 @@ impl TestOperation for FindOneAndDelete {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one_and_delete(self.filter.clone(), self.options.clone())
+                .find_one_and_delete(self.filter.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))

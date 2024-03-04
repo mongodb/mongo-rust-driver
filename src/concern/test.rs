@@ -5,7 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
         InsertManyOptions,
@@ -528,32 +527,24 @@ async fn command_contains_write_concern_find_one_and_delete() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.find_one_and_delete(
-        doc! { "foo": "bar" },
-        FindOneAndDeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_delete(
-        doc! { "foo": "bar" },
-        FindOneAndDeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_delete(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_delete(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),

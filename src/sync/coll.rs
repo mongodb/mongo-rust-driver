@@ -7,7 +7,6 @@ use crate::{
     bson::Document,
     error::Result,
     options::{
-        FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
         InsertManyOptions,
@@ -115,43 +114,6 @@ impl<T> Collection<T>
 where
     T: DeserializeOwned + Send + Sync,
 {
-    /// Atomically finds up to one document in the collection matching `filter` and deletes it.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_delete(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection
-                .find_one_and_delete(filter, options.into()),
-        )
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and deletes it using
-    /// the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_delete_with_session(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
-            filter,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported

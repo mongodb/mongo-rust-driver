@@ -138,7 +138,8 @@ async fn implicit_session_after_connection() {
                 .boxed(),
         );
         ops.push(
-            coll.find_one_and_delete(doc! {}, None)
+            coll.find_one_and_delete(doc! {})
+                .into_future()
                 .map(ignore_val)
                 .boxed(),
         );

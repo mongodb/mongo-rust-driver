@@ -227,52 +227,6 @@ impl<T> Collection<T>
 where
     T: DeserializeOwned + Send + Sync,
 {
-    async fn find_one_and_delete_common(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Option<T>> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let op = FindAndModify::with_delete(self.namespace(), filter, options);
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and deletes it.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_delete(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-    ) -> Result<Option<T>> {
-        self.find_one_and_delete_common(filter, options, None).await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and deletes it using
-    /// the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_delete_with_session(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        self.find_one_and_delete_common(filter, options, session)
-            .await
-    }
-
     async fn find_one_and_update_common(
         &self,
         filter: Document,

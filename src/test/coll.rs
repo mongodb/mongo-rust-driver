@@ -608,7 +608,10 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     }
 
     let coll = client.database(name).collection(name);
-    let _: Result<Option<Document>> = coll.find_one_and_delete(doc! {}, options.clone()).await;
+    let _: Result<Option<Document>> = coll
+        .find_one_and_delete(doc! {})
+        .with_options(options.clone())
+        .await;
 
     let events = client.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
@@ -654,10 +657,10 @@ async fn find_one_and_delete_hint_server_version() {
         .database(function_name!())
         .collection::<Document>("coll");
 
-    let options = FindOneAndDeleteOptions::builder()
+    let res = coll
+        .find_one_and_delete(doc! {})
         .hint(Hint::Name(String::new()))
-        .build();
-    let res = coll.find_one_and_delete(doc! {}, options).await;
+        .await;
 
     let req1 = VersionReq::parse("< 4.2").unwrap();
     let req2 = VersionReq::parse("4.2.*").unwrap();
@@ -857,7 +860,7 @@ async fn typed_returns() {
     assert_eq!(result, insert_data);
 
     let result = coll
-        .find_one_and_delete(doc! { "x": 2 }, None)
+        .find_one_and_delete(doc! { "x": 2 })
         .await
         .unwrap()
         .unwrap();

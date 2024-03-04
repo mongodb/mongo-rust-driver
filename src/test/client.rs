@@ -917,14 +917,10 @@ async fn find_one_and_delete_serde_consistency() {
     coll.insert_one(&doc, None).await.unwrap();
     let rec: Foo = coll.find_one(doc! {}).await.unwrap().unwrap();
     assert_eq!(doc.problematic, rec.problematic);
-    let rec: Foo = coll
-        .find_one_and_delete(doc! {}, None)
-        .await
-        .unwrap()
-        .unwrap();
+    let rec: Foo = coll.find_one_and_delete(doc! {}).await.unwrap().unwrap();
     assert_eq!(doc.problematic, rec.problematic);
 
-    let nothing = coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    let nothing = coll.find_one_and_delete(doc! {}).await.unwrap();
     assert!(nothing.is_none());
 }
 
