@@ -143,7 +143,6 @@ action_impl! {
                 self.update,
                 self.multi,
                 self.options,
-                self.coll.human_readable_serialization(),
             );
             self.coll.client().execute_operation(op, self.session).await
         }

@@ -11,7 +11,7 @@ pub(crate) mod drop_collection;
 pub(crate) mod drop_database;
 mod drop_indexes;
 mod find;
-mod find_and_modify;
+pub(crate) mod find_and_modify;
 mod get_more;
 mod insert;
 pub(crate) mod list_collections;

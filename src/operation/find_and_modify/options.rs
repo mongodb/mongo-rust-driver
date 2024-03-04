@@ -19,16 +19,16 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub(super) enum Modification<'a, T> {
+pub(crate) enum Modification {
     Delete,
-    Update(UpdateOrReplace<'a, T>),
+    Update(UpdateOrReplace),
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, TypedBuilder, Serialize, Default)]
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
-pub(super) struct FindAndModifyOptions {
+pub(crate) struct FindAndModifyOptions {
     #[builder(default)]
     pub(crate) sort: Option<Document>,
 

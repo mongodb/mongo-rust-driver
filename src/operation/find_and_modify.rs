@@ -1,6 +1,6 @@
-mod options;
+pub(crate) mod options;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 use bson::{from_slice, RawBson};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -30,16 +30,34 @@ use crate::{
     options::WriteConcern,
 };
 
-pub(crate) struct FindAndModify<'a, R, T: DeserializeOwned> {
+use super::UpdateOrReplace;
+
+pub(crate) struct FindAndModify<T: DeserializeOwned> {
     ns: Namespace,
     query: Document,
-    modification: Modification<'a, R>,
-    human_readable_serialization: Option<bool>,
+    modification: Modification,
     options: Option<FindAndModifyOptions>,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: PhantomData<fn() -> T>,
 }
 
-impl<T: DeserializeOwned> FindAndModify<'_, (), T> {
+impl<T: DeserializeOwned> FindAndModify<T> {
+    pub(crate) fn with_modification(
+        ns: Namespace,
+        query: Document,
+        modification: Modification,
+        options: Option<FindAndModifyOptions>,
+    ) -> Self {
+        Self {
+            ns,
+            query,
+            modification,
+            options,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: DeserializeOwned> FindAndModify<T> {
     pub fn with_delete(
         ns: Namespace,
         query: Document,
@@ -49,7 +67,6 @@ impl<T: DeserializeOwned> FindAndModify<'_, (), T> {
             ns,
             query,
             modification: Modification::Delete,
-            human_readable_serialization: None,
             options: options.map(Into::into),
             _phantom: Default::default(),
         }
@@ -68,33 +85,29 @@ impl<T: DeserializeOwned> FindAndModify<'_, (), T> {
             ns,
             query,
             modification: Modification::Update(update.into()),
-            human_readable_serialization: None,
             options: options.map(Into::into),
             _phantom: Default::default(),
         })
     }
-}
 
-impl<'a, R: Serialize, T: DeserializeOwned> FindAndModify<'a, R, T> {
-    pub fn with_replace(
+    pub fn with_replace<R: Serialize>(
         ns: Namespace,
         query: Document,
-        replacement: &'a R,
+        replacement: &R,
         options: Option<FindOneAndReplaceOptions>,
         human_readable_serialization: bool,
     ) -> Result<Self> {
         Ok(FindAndModify {
             ns,
             query,
-            modification: Modification::Update(replacement.into()),
-            human_readable_serialization: Some(human_readable_serialization),
+            modification: Modification::Update(UpdateOrReplace::replacement(replacement, human_readable_serialization)?),
             options: options.map(Into::into),
             _phantom: Default::default(),
         })
     }
 }
 
-impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndModify<'a, R, T> {
+impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
     type O = Option<T>;
     type Command = RawDocumentBuf;
     const NAME: &'static str = "findAndModify";
@@ -120,8 +133,7 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
             Modification::Delete => ("remove", true.into()),
             Modification::Update(update_or_replace) => (
                 "update",
-                update_or_replace
-                    .to_raw_bson(self.human_readable_serialization.unwrap_or_default())?,
+                update_or_replace.to_raw_bson()?,
             ),
         };
         body.append(key, modification);

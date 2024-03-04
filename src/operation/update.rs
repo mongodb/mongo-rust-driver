@@ -16,13 +16,17 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub(crate) enum UpdateOrReplace<'a, T = ()> {
+pub(crate) enum UpdateOrReplace {
     UpdateModifications(UpdateModifications),
-    Replacement(&'a T),
+    Replacement(RawDocumentBuf),
 }
 
-impl<'a, T: Serialize> UpdateOrReplace<'a, T> {
-    pub(crate) fn to_raw_bson(&self, human_readable_serialization: bool) -> Result<RawBson> {
+impl UpdateOrReplace {
+    pub(crate) fn replacement<T: Serialize>(update: &T, human_readable_serialization: bool) -> Result<Self> {
+        Ok(Self::Replacement(to_raw_document_buf_with_options(update, human_readable_serialization)?))
+    }
+
+    pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
         match self {
             Self::UpdateModifications(update_modifications) => match update_modifications {
                 UpdateModifications::Document(document) => {
@@ -30,39 +34,30 @@ impl<'a, T: Serialize> UpdateOrReplace<'a, T> {
                 }
                 UpdateModifications::Pipeline(pipeline) => bson_util::to_raw_bson_array(pipeline),
             },
-            Self::Replacement(replacement) => {
-                let replacement_doc =
-                    to_raw_document_buf_with_options(replacement, human_readable_serialization)?;
+            Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(&replacement_doc)?;
-                Ok(replacement_doc.into())
+                Ok(replacement_doc.clone().into())
             }
         }
     }
 }
 
-impl From<UpdateModifications> for UpdateOrReplace<'_> {
+impl From<UpdateModifications> for UpdateOrReplace {
     fn from(update_modifications: UpdateModifications) -> Self {
         Self::UpdateModifications(update_modifications)
     }
 }
 
-impl<'a, T: Serialize> From<&'a T> for UpdateOrReplace<'a, T> {
-    fn from(t: &'a T) -> Self {
-        Self::Replacement(t)
-    }
-}
-
 #[derive(Debug)]
-pub(crate) struct Update<'a, T = ()> {
+pub(crate) struct Update {
     ns: Namespace,
     filter: Document,
-    update: UpdateOrReplace<'a, T>,
+    update: UpdateOrReplace,
     multi: Option<bool>,
     options: Option<UpdateOptions>,
-    human_readable_serialization: bool,
 }
 
-impl Update<'_> {
+impl Update {
     #[cfg(test)]
     fn empty() -> Self {
         Self::with_update(
@@ -71,7 +66,6 @@ impl Update<'_> {
             UpdateModifications::Document(doc! {}),
             false,
             None,
-            false,
         )
     }
 
@@ -81,7 +75,6 @@ impl Update<'_> {
         update: UpdateModifications,
         multi: bool,
         options: Option<UpdateOptions>,
-        human_readable_serialization: bool,
     ) -> Self {
         Self {
             ns,
@@ -89,32 +82,30 @@ impl Update<'_> {
             update: update.into(),
             multi: multi.then_some(true),
             options,
-            human_readable_serialization,
         }
     }
 }
 
-impl<'a, T: Serialize> Update<'a, T> {
-    pub(crate) fn with_replace(
+impl Update {
+    pub(crate) fn with_replace<T: Serialize>(
         ns: Namespace,
         filter: Document,
-        update: &'a T,
+        update: &T,
         multi: bool,
         options: Option<UpdateOptions>,
         human_readable_serialization: bool,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             ns,
             filter,
-            update: update.into(),
+            update: UpdateOrReplace::replacement(update, human_readable_serialization)?,
             multi: multi.then_some(true),
             options,
-            human_readable_serialization,
-        }
+        })
     }
 }
 
-impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
+impl OperationWithDefaults for Update {
     type O = UpdateResult;
     type Command = RawDocumentBuf;
 
@@ -127,7 +118,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
 
         let mut update = rawdoc! {
             "q": RawDocumentBuf::from_document(&self.filter)?,
-            "u": self.update.to_raw_bson(self.human_readable_serialization)?,
+            "u": self.update.to_raw_bson()?,
         };
 
         if let Some(ref options) = self.options {

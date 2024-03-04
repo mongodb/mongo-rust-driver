@@ -221,10 +221,6 @@ where
         self.client().execute_operation(op, None).await?;
         Ok(())
     }
-
-    pub(crate) fn human_readable_serialization(&self) -> bool {
-        self.inner.human_readable_serialization
-    }
 }
 
 impl<T> Collection<T>
@@ -635,7 +631,7 @@ where
             false,
             options.map(UpdateOptions::from_replace_options),
             self.inner.human_readable_serialization,
-        );
+        )?;
         self.client().execute_operation(update, session).await
     }
 
