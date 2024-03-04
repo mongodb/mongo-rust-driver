@@ -56,7 +56,7 @@ impl<'a> BulkWrite<'a> {
         models: &'a [WriteModel],
         offset: usize,
         options: Option<&'a BulkWriteOptions>,
-    ) -> Self {
+    ) -> BulkWrite<'a> {
         let encrypted = client.should_auto_encrypt().await;
         Self {
             client,
