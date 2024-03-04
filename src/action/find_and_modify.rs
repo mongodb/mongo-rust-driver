@@ -80,8 +80,8 @@ impl<'a, T> FindAndModify<'a, T, Delete> {
 }
 
 action_impl! {
-    impl<'a, T: DeserializeOwned + Send> Action for FindAndModify<'a, T, Delete> {
-        type Future = FindAndDeleteFuture;
+    impl<'a, T: DeserializeOwned + Send, Mode> Action for FindAndModify<'a, T, Mode> {
+        type Future = FindAndDeleteFuture<'a, T: DeserializeOwned + Send>;
 
         async fn execute(mut self) -> Result<Option<T>> {
             resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
