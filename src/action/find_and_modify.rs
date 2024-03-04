@@ -33,6 +33,25 @@ impl<T: DeserializeOwned + Send> Collection<T> {
     }
 }
 
+#[cfg(feature = "sync")]
+impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
+    /// Atomically finds up to one document in the collection matching `filter` and deletes it.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    ///
+    /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
+    pub fn find_one_and_delete_2(
+        &self,
+        filter: Document,
+    ) -> FindAndModify<'_, T, Delete> {
+        self.async_collection.find_one_and_delete_2(filter)
+    }
+}
+
+/// Atomically find up to one document in the collection matching a filter and modify it.  Construct with [`Collection::find_one_and_delete`].
 #[must_use]
 pub struct FindAndModify<'a, T, Mode> {
     coll: &'a Collection<T>,
