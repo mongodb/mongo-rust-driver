@@ -11,7 +11,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{
-        options::{FindOneAndReplaceOptions, FindOneAndUpdateOptions, UpdateModifications},
+        options::{FindOneAndReplaceOptions, UpdateModifications},
         Namespace,
     },
     error::{ErrorKind, Result},
@@ -42,11 +42,10 @@ impl<T: DeserializeOwned> FindAndModify<T> {
         modification: Modification,
         options: Option<FindAndModifyOptions>,
     ) -> Result<Self> {
-        if let Modification::Update(
-            UpdateOrReplace::UpdateModifications(
-                UpdateModifications::Document(d)
-             )
-            ) = &modification {
+        if let Modification::Update(UpdateOrReplace::UpdateModifications(
+            UpdateModifications::Document(d),
+        )) = &modification
+        {
             bson_util::update_document_check(d)?;
         };
         Ok(Self {
@@ -60,24 +59,6 @@ impl<T: DeserializeOwned> FindAndModify<T> {
 }
 
 impl<T: DeserializeOwned> FindAndModify<T> {
-    pub fn with_update(
-        ns: Namespace,
-        query: Document,
-        update: UpdateModifications,
-        options: Option<FindOneAndUpdateOptions>,
-    ) -> Result<Self> {
-        if let UpdateModifications::Document(ref d) = update {
-            bson_util::update_document_check(d)?;
-        };
-        Ok(FindAndModify {
-            ns,
-            query,
-            modification: Modification::Update(update.into()),
-            options: options.map(Into::into),
-            _phantom: Default::default(),
-        })
-    }
-
     pub fn with_replace<R: Serialize>(
         ns: Namespace,
         query: Document,

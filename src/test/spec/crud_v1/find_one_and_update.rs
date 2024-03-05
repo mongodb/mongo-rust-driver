@@ -71,7 +71,8 @@ async fn run_find_one_and_update_test(test_file: TestFile) {
         };
 
         let result = coll
-            .find_one_and_update(arguments.filter, arguments.update, options)
+            .find_one_and_update(arguments.filter, arguments.update)
+            .with_options(options)
             .await
             .expect(&test_case.description);
         assert_eq!(

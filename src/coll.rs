@@ -229,68 +229,6 @@ where
 
 impl<T> Collection<T>
 where
-    T: DeserializeOwned + Send + Sync,
-{
-    async fn find_one_and_update_common(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Option<T>> {
-        let update = update.into();
-
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and updates it.
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_update(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-    ) -> Result<Option<T>> {
-        self.find_one_and_update_common(filter, update, options, None)
-            .await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and updates it using
-    /// the provided `ClientSession`. Both `Document` and `Vec<Document>` implement
-    /// `Into<UpdateModifications>`, so either can be passed in place of constructing the enum
-    /// case. Note: pipeline updates are only supported in MongoDB 4.2+.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_update_with_session(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        self.find_one_and_update_common(filter, update, options, session)
-            .await
-    }
-}
-
-impl<T> Collection<T>
-where
     T: Serialize + DeserializeOwned + Send + Sync,
 {
     async fn find_one_and_replace_common(

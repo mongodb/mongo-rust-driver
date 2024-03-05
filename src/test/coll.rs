@@ -853,7 +853,7 @@ async fn typed_returns() {
     coll.insert_one(insert_data.clone(), None).await.unwrap();
 
     let result = coll
-        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } }, None)
+        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } })
         .await
         .unwrap()
         .unwrap();

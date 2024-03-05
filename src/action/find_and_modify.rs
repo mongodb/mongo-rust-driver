@@ -4,12 +4,19 @@ use bson::{Bson, Document};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    coll::options::{FindOneAndDeleteOptions, Hint, UpdateModifications},
+    coll::options::{
+        FindOneAndDeleteOptions,
+        FindOneAndUpdateOptions,
+        Hint,
+        ReturnDocument,
+        UpdateModifications,
+    },
     collation::Collation,
     error::Result,
     operation::{
         find_and_modify::options::{FindAndModifyOptions, Modification},
-        FindAndModify as Op, UpdateOrReplace,
+        FindAndModify as Op,
+        UpdateOrReplace,
     },
     options::WriteConcern,
     ClientSession,
@@ -49,7 +56,7 @@ impl<T: DeserializeOwned> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<Option<T>>`.
-    pub async fn find_one_and_update_2(
+    pub fn find_one_and_update(
         &self,
         filter: Document,
         update: impl Into<UpdateModifications>,
@@ -74,7 +81,7 @@ impl<T: Serialize + DeserializeOwned> Collection<T> {
     /// retryability. See the documentation
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
-    pub async fn find_one_and_replace_2(
+    pub fn find_one_and_replace_2(
         &self,
         filter: Document,
         replacement: impl Borrow<T>,
@@ -83,8 +90,11 @@ impl<T: Serialize + DeserializeOwned> Collection<T> {
         FindAndModify {
             coll: self,
             filter,
-            modification: UpdateOrReplace::replacement(replacement.borrow(), human_readable_serialization)
-                .map(Modification::Update),
+            modification: UpdateOrReplace::replacement(
+                replacement.borrow(),
+                human_readable_serialization,
+            )
+            .map(Modification::Update),
             options: None,
             session: None,
             _mode: PhantomData,
@@ -104,6 +114,25 @@ impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
     /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
     pub fn find_one_and_delete(&self, filter: Document) -> FindAndModify<'_, T, Delete> {
         self.async_collection.find_one_and_delete(filter)
+    }
+
+    /// Atomically finds up to one document in the collection matching `filter` and updates it.
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    ///
+    /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
+    pub fn find_one_and_update(
+        &self,
+        filter: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> FindAndModify<'_, T, Update> {
+        self.async_collection.find_one_and_update(filter, update)
     }
 }
 
@@ -152,6 +181,34 @@ impl<'a, T> FindAndModify<'a, T, Delete> {
         hint: Hint,
         let_vars: Document,
         comment: Bson,
+    }
+}
+
+impl<'a, T> FindAndModify<'a, T, Update> {
+    /// Set all options.  Note that this will replace all previous values set.
+    pub fn with_options(mut self, value: impl Into<Option<FindOneAndUpdateOptions>>) -> Self {
+        self.options = value.into().map(FindAndModifyOptions::from);
+        self
+    }
+
+    option_setters! { FindOneAndUpdateOptions;
+        array_filters: Vec<Document>,
+        bypass_document_validation: bool,
+        max_time: Duration,
+        projection: Document,
+        sort: Document,
+        upsert: bool,
+        write_concern: WriteConcern,
+        collation: Collation,
+        hint: Hint,
+        let_vars: Document,
+        comment: Bson,
+    }
+
+    /// Set the [`FindOneAndUpdateOptions::return_document`] option.
+    pub fn return_document(mut self, value: ReturnDocument) -> Self {
+        self.options().new = Some(value.as_bool());
+        self
     }
 }
 

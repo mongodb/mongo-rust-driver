@@ -6,7 +6,6 @@ use crate::{
     options::{
         Acknowledgment,
         FindOneAndReplaceOptions,
-        FindOneAndUpdateOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
@@ -625,34 +624,24 @@ async fn command_contains_write_concern_find_one_and_update() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.find_one_and_update(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "fun" } },
-        FindOneAndUpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_update(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "fun" } },
-        FindOneAndUpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),

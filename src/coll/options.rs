@@ -61,6 +61,15 @@ pub enum ReturnDocument {
     Before,
 }
 
+impl ReturnDocument {
+    pub(crate) fn as_bool(&self) -> bool {
+        match self {
+            ReturnDocument::After => true,
+            ReturnDocument::Before => false,
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for ReturnDocument {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;

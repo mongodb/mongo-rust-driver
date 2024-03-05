@@ -8,13 +8,11 @@ use crate::{
     error::Result,
     options::{
         FindOneAndReplaceOptions,
-        FindOneAndUpdateOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
         ReplaceOptions,
         SelectionCriteria,
-        UpdateModifications,
         WriteConcern,
     },
     results::{InsertManyResult, InsertOneResult, UpdateResult},
@@ -107,57 +105,6 @@ where
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: DeserializeOwned + Send + Sync,
-{
-    /// Atomically finds up to one document in the collection matching `filter` and updates it.
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_update(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update(
-            filter,
-            update.into(),
-            options.into(),
-        ))
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and updates it using
-    /// the provided `ClientSession`. Both `Document` and `Vec<Document>` implement
-    /// `Into<UpdateModifications>`, so either can be passed in place of constructing the enum
-    /// case. Note: pipeline updates are only supported in MongoDB 4.2+.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_update_with_session(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
-            filter,
-            update.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 }
 

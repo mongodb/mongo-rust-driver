@@ -130,11 +130,5 @@ impl From<FindOneAndReplaceOptions> for FindAndModifyOptions {
 }
 
 fn return_document_to_bool(return_document: Option<ReturnDocument>) -> Option<bool> {
-    if let Some(return_document) = return_document {
-        return match return_document {
-            ReturnDocument::After => Some(true),
-            ReturnDocument::Before => Some(false),
-        };
-    }
-    None
+    return_document.as_ref().map(ReturnDocument::as_bool)
 }

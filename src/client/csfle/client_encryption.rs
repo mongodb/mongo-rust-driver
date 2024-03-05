@@ -120,7 +120,6 @@ impl ClientEncryption {
             .find_one_and_update(
                 doc! { "_id": id },
                 doc! { "$addToSet": { "keyAltNames": key_alt_name } },
-                None,
             )
             .await
     }
@@ -150,7 +149,7 @@ impl ClientEncryption {
             }
         };
         self.key_vault
-            .find_one_and_update(doc! { "_id": id }, vec![update], None)
+            .find_one_and_update(doc! { "_id": id }, vec![update])
             .await
     }
 

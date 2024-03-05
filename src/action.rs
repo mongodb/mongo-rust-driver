@@ -106,9 +106,13 @@ macro_rules! option_setters {
 }
 use option_setters;
 
+pub(crate) mod private {
+    pub trait Sealed {}
+}
+
 /// A pending action to execute on the server.  The action can be configured via chained methods and
 /// executed via `await` (or `run` if using the sync client).
-pub trait Action {
+pub trait Action: private::Sealed {
     /// The type of the value produced by execution.
     type Output;
 

@@ -1288,29 +1288,17 @@ impl TestOperation for FindOneAndUpdate {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .find_one_and_update(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .find_one_and_update_with_session(
-                                self.filter.clone(),
-                                self.update.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .find_one_and_update(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
