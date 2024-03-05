@@ -1,11 +1,9 @@
+use serde::Deserialize;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
-
-use bson::rawdoc;
-use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -16,10 +14,11 @@ use crate::{
         },
         options::ServerApi,
     },
-    cmap::Connection,
+    cmap::{Command, Connection},
     error::{Error, Result},
     BoxFuture,
 };
+use bson::{doc, rawdoc};
 
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
@@ -159,6 +158,36 @@ pub struct IdpServerResponse {
     pub access_token: String,
     pub expires: Option<Instant>,
     pub refresh_token: Option<String>,
+}
+
+/// Constructs the first client message in the OIDC handshake for speculative authentication
+pub(crate) async fn build_speculative_client_first(credential: &Credential) -> Command {
+    self::build_client_first(credential, None).await
+}
+
+/// Constructs the first client message in the OIDC handshake.
+pub(crate) async fn build_client_first(
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+) -> Command {
+    let mut auth_command_doc = doc! {
+        "authenticate": 1,
+        "mechanism": MONGODB_OIDC_STR,
+    };
+
+    if let Some(access_token) = credential.oidc_callback.as_ref()
+        // this unwrap is safe because we are in the build_client_first function which only gets called if oidc_callback is Some
+        .unwrap().cache.read().await.access_token.clone()
+    {
+        auth_command_doc.insert("jwt", access_token);
+    }
+
+    let mut command = Command::new("authenticate", "$external", auth_command_doc);
+    if let Some(server_api) = server_api {
+        command.set_server_api(server_api);
+    }
+
+    command
 }
 
 pub(crate) async fn authenticate_stream(
