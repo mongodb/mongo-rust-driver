@@ -26,7 +26,7 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 const HUMAN_CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const MACHINE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
 const INVALIDATE_SLEEP_TIMEOUT: Duration = Duration::from_millis(100);
-const API_VERISON: u32 = 1;
+const API_VERSION: u32 = 1;
 
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
@@ -118,7 +118,7 @@ pub struct Cache {
     idp_server_info: Option<IdpServerInfo>,
     refresh_token: Option<String>,
     access_token: Option<String>,
-    token_gen_id: i32,
+    token_gen_id: u32,
     last_call_time: Instant,
 }
 
@@ -147,7 +147,7 @@ pub struct IdpServerInfo {
 #[non_exhaustive]
 pub struct CallbackContext {
     pub timeout_seconds: Option<Instant>,
-    pub version: i32,
+    pub version: u32,
     pub refresh_token: Option<String>,
     pub idp_info: Option<IdpServerInfo>,
 }
@@ -268,7 +268,7 @@ async fn do_two_step_auth(
     let idp_response = {
         let cb_context = CallbackContext {
             timeout_seconds: Some(Instant::now() + timeout),
-            version: 1,
+            version: API_VERSION,
             refresh_token: None,
             idp_info: Some(server_info.clone()),
         };
@@ -330,7 +330,7 @@ async fn authenticate_human(
         let idp_response = {
             let cb_context = CallbackContext {
                 timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
-                version: 1,
+                version: API_VERSION,
                 refresh_token,
                 idp_info: credential
                     .oidc_callback
