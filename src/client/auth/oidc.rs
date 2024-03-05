@@ -14,11 +14,11 @@ use crate::{
         },
         options::ServerApi,
     },
-    cmap::{Command, Connection},
+    cmap::{Command, Connection, RawCommandResponse},
     error::{Error, Result},
     BoxFuture,
 };
-use bson::{doc, rawdoc};
+use bson::{doc, rawdoc, Document};
 
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
@@ -160,8 +160,15 @@ pub struct IdpServerResponse {
     pub refresh_token: Option<String>,
 }
 
-/// Constructs the first client message in the OIDC handshake for speculative authentication
 pub(crate) async fn build_speculative_client_first(credential: &Credential) -> Command {
+    self::build_client_first(credential, None).await
+}
+
+/// Constructs the first client message in the OIDC handshake for speculative authentication
+pub(crate) async fn build_client_first(
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+) -> Command {
     let mut auth_command_doc = doc! {
         "authenticate": 1,
         "mechanism": MONGODB_OIDC_STR,
@@ -174,16 +181,24 @@ pub(crate) async fn build_speculative_client_first(credential: &Credential) -> C
         auth_command_doc.insert("jwt", access_token);
     }
 
-    Command::new("authenticate", "$external", auth_command_doc)
+    let mut command = Command::new("authenticate", "$external", auth_command_doc);
+    if let Some(server_api) = server_api {
+        command.set_server_api(server_api);
+    }
+
+    command
 }
 
 pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
+    server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
-    // RUST-1662: Attempt speculative auth first, only works with a cache.
-    // First handle speculative authentication. If that succeeds, we are done.
+    match server_first.into() {
+        Some(_) => return Ok(()),
+        None => {}
+    }
 
     let Callback { inner, kind } = credential
         .oidc_callback

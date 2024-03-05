@@ -344,7 +344,7 @@ impl AuthMechanism {
             }
             .into()),
             AuthMechanism::MongoDbOidc => {
-                oidc::authenticate_stream(stream, credential, server_api).await
+                oidc::authenticate_stream(stream, credential, server_api, None).await
             }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
@@ -470,6 +470,9 @@ impl Credential {
                 }
                 FirstRound::X509(server_first) => {
                     x509::authenticate_stream(conn, self, server_api, server_first).await
+                }
+                FirstRound::Oidc(server_first) => {
+                    oidc::authenticate_stream(conn, self, server_api, server_first).await
                 }
             };
         }
