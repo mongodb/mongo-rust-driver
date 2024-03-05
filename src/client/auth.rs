@@ -197,12 +197,12 @@ impl AuthMechanism {
                 // TODO RUST-1660: Handle specific provider validation, perhaps also do Azure as
                 // part of this ticket. Specific providers will add predefined oidc_callback,
                 // so it is always correct to say oidc_callback must be Some for oidc auth.
-                if credential.oidc_callback.is_none() {
-                    return Err(Error::invalid_argument(
-                        "oidc_callback or PROVIDER_NAME must be specified for MONGODB-OIDC \
-                         authentication",
-                    ));
-                }
+                // if credential.oidc_callback.is_none() {
+                //    return Err(Error::invalid_argument(
+                //        "oidc_callback or PROVIDER_NAME must be specified for MONGODB-OIDC \
+                //         authentication",
+                //    ));
+                //}
                 if credential
                     .source
                     .as_ref()
