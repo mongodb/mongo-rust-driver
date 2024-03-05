@@ -261,7 +261,7 @@ async fn transaction_ids_included() {
     coll.find_one_and_delete(doc! {}).await.unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    coll.find_one_and_replace(doc! {}, doc! { "x": 1 }, None)
+    coll.find_one_and_replace(doc! {}, doc! { "x": 1 })
         .await
         .unwrap();
     assert!(includes_txn_number("findAndModify"));

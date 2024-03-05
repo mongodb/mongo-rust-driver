@@ -68,7 +68,8 @@ async fn run_find_one_and_replace_test(test_file: TestFile) {
         };
 
         let result = coll
-            .find_one_and_replace(arguments.filter, arguments.replacement, options)
+            .find_one_and_replace(arguments.filter, arguments.replacement)
+            .with_options(options)
             .await
             .expect(&test_case.description);
         assert_eq!(

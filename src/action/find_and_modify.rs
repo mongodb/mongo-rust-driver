@@ -6,6 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     coll::options::{
         FindOneAndDeleteOptions,
+        FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
         Hint,
         ReturnDocument,
@@ -81,7 +82,7 @@ impl<T: Serialize + DeserializeOwned> Collection<T> {
     /// retryability. See the documentation
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
-    pub fn find_one_and_replace_2(
+    pub fn find_one_and_replace(
         &self,
         filter: Document,
         replacement: impl Borrow<T>,
@@ -133,6 +134,25 @@ impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
         update: impl Into<UpdateModifications>,
     ) -> FindAndModify<'_, T, Update> {
         self.async_collection.find_one_and_update(filter, update)
+    }
+}
+
+#[cfg(feature = "sync")]
+impl<T: Serialize + DeserializeOwned> crate::sync::Collection<T> {
+    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
+    /// `replacement`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn find_one_and_replace(
+        &self,
+        filter: Document,
+        replacement: impl Borrow<T>,
+    ) -> FindAndModify<'_, T, Replace> {
+        self.async_collection
+            .find_one_and_replace(filter, replacement)
     }
 }
 
@@ -206,6 +226,33 @@ impl<'a, T> FindAndModify<'a, T, Update> {
     }
 
     /// Set the [`FindOneAndUpdateOptions::return_document`] option.
+    pub fn return_document(mut self, value: ReturnDocument) -> Self {
+        self.options().new = Some(value.as_bool());
+        self
+    }
+}
+
+impl<'a, T> FindAndModify<'a, T, Replace> {
+    /// Set all options.  Note that this will replace all previous values set.
+    pub fn with_options(mut self, value: impl Into<Option<FindOneAndReplaceOptions>>) -> Self {
+        self.options = value.into().map(FindAndModifyOptions::from);
+        self
+    }
+
+    option_setters! { FindOneAndReplaceOptions;
+        bypass_document_validation: bool,
+        max_time: Duration,
+        projection: Document,
+        sort: Document,
+        upsert: bool,
+        write_concern: WriteConcern,
+        collation: Collation,
+        hint: Hint,
+        let_vars: Document,
+        comment: Bson,
+    }
+
+    /// Set the [`FindOneAndReplaceOptions::return_document`] option.
     pub fn return_document(mut self, value: ReturnDocument) -> Self {
         self.options().new = Some(value.as_bool());
         self

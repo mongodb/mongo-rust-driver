@@ -126,7 +126,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.find_one_and_replace(doc! {}, doc! {"x": 1}, None)
+                coll.find_one_and_replace(doc! {}, doc! {"x": 1})
             ),
         )
         .await;

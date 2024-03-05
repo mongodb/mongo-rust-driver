@@ -1,13 +1,12 @@
 use std::{borrow::Borrow, fmt::Debug};
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 use super::ClientSession;
 use crate::{
     bson::Document,
     error::Result,
     options::{
-        FindOneAndReplaceOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
@@ -105,55 +104,6 @@ where
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: Serialize + DeserializeOwned + Send + Sync,
-{
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_replace(
-        &self,
-        filter: Document,
-        replacement: T,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_replace(
-            filter,
-            replacement,
-            options.into(),
-        ))
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_replace_with_session(
-        &self,
-        filter: Document,
-        replacement: T,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection.find_one_and_replace_with_session(
-                filter,
-                replacement,
-                options.into(),
-                &mut session.async_client_session,
-            ),
-        )
     }
 }
 

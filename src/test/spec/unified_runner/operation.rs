@@ -1325,11 +1325,8 @@ impl TestOperation for FindOneAndReplace {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one_and_replace(
-                    self.filter.clone(),
-                    self.replacement.clone(),
-                    self.options.clone(),
-                )
+                .find_one_and_replace(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
 

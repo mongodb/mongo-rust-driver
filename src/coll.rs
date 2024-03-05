@@ -3,12 +3,7 @@ pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
-use serde::{
-    de::{DeserializeOwned, Error as DeError},
-    Deserialize,
-    Deserializer,
-    Serialize,
-};
+use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 use self::options::*;
 use crate::{
@@ -17,7 +12,7 @@ use crate::{
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    operation::{FindAndModify, Insert, Update},
+    operation::{Insert, Update},
     results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
@@ -224,67 +219,6 @@ where
 
     pub(crate) fn human_readable_serialization(&self) -> bool {
         self.inner.human_readable_serialization
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: Serialize + DeserializeOwned + Send + Sync,
-{
-    async fn find_one_and_replace_common(
-        &self,
-        filter: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Option<T>> {
-        let mut options = options.into();
-        let session = session.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let op = FindAndModify::with_replace(
-            self.namespace(),
-            filter,
-            replacement.borrow(),
-            options,
-            self.inner.human_readable_serialization,
-        )?;
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_replace(
-        &self,
-        filter: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-    ) -> Result<Option<T>> {
-        self.find_one_and_replace_common(filter, replacement, options, None)
-            .await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_replace_with_session(
-        &self,
-        filter: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        self.find_one_and_replace_common(filter, replacement, options, session)
-            .await
     }
 }
 

@@ -3,17 +3,14 @@ pub(crate) mod options;
 use std::{fmt::Debug, marker::PhantomData};
 
 use bson::{from_slice, RawBson};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
     bson::{doc, rawdoc, Document, RawDocumentBuf},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::{
-        options::{FindOneAndReplaceOptions, UpdateModifications},
-        Namespace,
-    },
+    coll::{options::UpdateModifications, Namespace},
     error::{ErrorKind, Result},
     operation::{
         append_options_to_raw_document,
@@ -54,27 +51,6 @@ impl<T: DeserializeOwned> FindAndModify<T> {
             modification,
             options,
             _phantom: PhantomData,
-        })
-    }
-}
-
-impl<T: DeserializeOwned> FindAndModify<T> {
-    pub fn with_replace<R: Serialize>(
-        ns: Namespace,
-        query: Document,
-        replacement: &R,
-        options: Option<FindOneAndReplaceOptions>,
-        human_readable_serialization: bool,
-    ) -> Result<Self> {
-        Ok(FindAndModify {
-            ns,
-            query,
-            modification: Modification::Update(UpdateOrReplace::replacement(
-                replacement,
-                human_readable_serialization,
-            )?),
-            options: options.map(Into::into),
-            _phantom: Default::default(),
         })
     }
 }

@@ -5,7 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        FindOneAndReplaceOptions,
         InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
@@ -570,34 +569,24 @@ async fn command_contains_write_concern_find_one_and_replace() {
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.find_one_and_replace(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        FindOneAndReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_replace(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        FindOneAndReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),

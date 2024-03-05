@@ -803,7 +803,7 @@ async fn typed_find_one_and_replace() {
         str: "b".into(),
     };
     let result = coll
-        .find_one_and_replace(doc! { "x": 1 }, replacement.clone(), None)
+        .find_one_and_replace(doc! { "x": 1 }, replacement.clone())
         .await
         .unwrap()
         .unwrap();
