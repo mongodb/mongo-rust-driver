@@ -250,6 +250,50 @@ async fn send_sasl_start_command(
     send_sasl_command(conn, sasl_start).await
 }
 
+async fn do_two_step_auth(
+    source: &str,
+    conn: &mut Connection,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    callback: Arc<CallbackInner>,
+    timeout: Duration,
+) -> Result<()> {
+    let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
+    if response.done {
+        return Err(invalid_auth_response());
+    }
+
+    let server_info: IdpServerInfo =
+        bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
+    let idp_response = {
+        let cb_context = CallbackContext {
+            timeout_seconds: Some(Instant::now() + timeout),
+            version: 1,
+            refresh_token: None,
+            idp_info: Some(server_info.clone()),
+        };
+        (callback.f)(cb_context).await?
+    };
+
+    // Update the credential and connection caches with the access token and the credential cache
+    // with the refresh token and token_gen_id
+    update_caches(conn, credential, &idp_response, Some(server_info)).await;
+
+    let sasl_continue = SaslContinue::new(
+        source.to_string(),
+        response.conversation_id,
+        rawdoc! { "jwt": idp_response.access_token }.into_bytes(),
+        server_api.cloned(),
+    )
+    .into_command();
+    let response = send_sasl_command(conn, sasl_continue).await?;
+    if !response.done {
+        return Err(invalid_auth_response());
+    }
+
+    Ok(())
+}
+
 async fn authenticate_human(
     conn: &mut Connection,
     credential: &Credential,
@@ -319,40 +363,15 @@ async fn authenticate_human(
         invalidate_caches(conn, credential, access_token).await;
     }
 
-    let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
-    if response.done {
-        return Err(invalid_auth_response());
-    }
-
-    let server_info: IdpServerInfo =
-        bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
-    let idp_response = {
-        let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
-            version: 1,
-            refresh_token: None,
-            idp_info: Some(server_info.clone()),
-        };
-        (callback.f)(cb_context).await?
-    };
-
-    // Update the credential and connection caches with the access token and the credential cache
-    // with the refresh token and token_gen_id
-    update_caches(conn, credential, &idp_response, Some(server_info)).await;
-
-    let sasl_continue = SaslContinue::new(
-        source.to_string(),
-        response.conversation_id,
-        rawdoc! { "jwt": idp_response.access_token }.into_bytes(),
-        server_api.cloned(),
+    do_two_step_auth(
+        source,
+        conn,
+        credential,
+        server_api,
+        callback,
+        HUMAN_CALLBACK_TIMEOUT,
     )
-    .into_command();
-    let response = send_sasl_command(conn, sasl_continue).await?;
-    if !response.done {
-        return Err(invalid_auth_response());
-    }
-
-    Ok(())
+    .await
 }
 
 async fn authenticate_machine(
@@ -384,41 +403,15 @@ async fn authenticate_machine(
         tokio::time::sleep(INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
-    let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
-    if response.done {
-        return Err(invalid_auth_response());
-    }
-
-    let server_info: IdpServerInfo =
-        bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
-    let idp_response = {
-        let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + MACHINE_CALLBACK_TIMEOUT),
-            version: 1,
-            refresh_token: None,
-            idp_info: Some(server_info.clone()),
-        };
-        (callback.f)(cb_context).await?
-    };
-
-    // Update the credential and connection caches with the access token and the credential cache
-    // with the refresh token and token_gen_id. In the machine flow, the refresh token will always
-    // be None.
-    update_caches(conn, credential, &idp_response, Some(server_info)).await;
-
-    let sasl_continue = SaslContinue::new(
-        source.to_string(),
-        response.conversation_id,
-        rawdoc! { "jwt": idp_response.access_token }.into_bytes(),
-        server_api.cloned(),
+    do_two_step_auth(
+        source,
+        conn,
+        credential,
+        server_api,
+        callback,
+        MACHINE_CALLBACK_TIMEOUT,
     )
-    .into_command();
-    let response = send_sasl_command(conn, sasl_continue).await?;
-    if !response.done {
-        return Err(invalid_auth_response());
-    }
-
-    Ok(())
+    .await
 }
 
 fn auth_error(s: impl AsRef<str>) -> Error {
