@@ -14,7 +14,7 @@ use crate::{
         },
         options::ServerApi,
     },
-    cmap::{Command, Connection, RawCommandResponse},
+    cmap::{Command, Connection},
     error::{Error, Result},
     BoxFuture,
 };
@@ -195,9 +195,9 @@ pub(crate) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
     server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
-    match server_first.into() {
-        Some(_) => return Ok(()),
-        None => {}
+    if server_first.into().is_some() {
+        // speculative authentication succeeded, no need to authenticate again
+        return Ok(());
     }
 
     let Callback { inner, kind } = credential
