@@ -199,7 +199,8 @@ impl AuthMechanism {
                 // so it is always correct to say oidc_callback must be Some for oidc auth.
                 if credential.oidc_callback.is_none() {
                     return Err(Error::invalid_argument(
-                        "oidc_callback must be specified for MONGODB-OIDC authentication",
+                        "oidc_callback or PROVIDER_NAME must be specified for MONGODB-OIDC \
+                         authentication",
                     ));
                 }
                 if credential
