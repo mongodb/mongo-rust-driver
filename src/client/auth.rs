@@ -194,6 +194,8 @@ impl AuthMechanism {
                          authentication",
                     ));
                 }
+                // TODO RUST-1660: Handle specific provider validation, perhaps also do Azure as
+                // part of this ticket.
                 if credential
                     .source
                     .as_ref()
@@ -208,6 +210,16 @@ impl AuthMechanism {
                         "password must not be set for MONGODB-OIDC authentication",
                     ));
                 }
+                // TODO RUST-1670: handle ALLOWED_HOSTS
+                // let default_allowed = vec![
+                //     "*.mongodb.net",
+                //     "*.mongodb-dev.net",
+                //     "*.mongodb-qa.net",
+                //     "*.mongodbgov.net",
+                //     "localhost",
+                //     "127.0.0.1",
+                //     "::1",
+                // ]
                 Ok(())
             }
             _ => Ok(()),
@@ -342,7 +354,6 @@ impl FromStr for AuthMechanism {
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
             MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
-
             #[cfg(feature = "aws-auth")]
             MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
             #[cfg(not(feature = "aws-auth"))]
@@ -389,11 +400,15 @@ pub struct Credential {
     /// Additional properties for the given mechanism.
     pub mechanism_properties: Option<Document>,
 
-    /// The token callbacks for OIDC authentication.
-    /// TODO RUST-1497: make this `pub`
+    /// The token callback for OIDC authentication.
+    // TODO RUST-1497: make this `pub`
+    // Credential::builder().oidc_callback(oidc::Callback::human(...)).build()
+    // the name of the field here does not well encompass what this field actually is since
+    // it contains all the OIDC state information, not just the callback, but it conforms
+    // to how a user would interact with it.
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
+    pub(crate) oidc_callback: Option<oidc::State>,
 }
 
 impl Credential {
@@ -415,7 +430,7 @@ impl Credential {
         }
     }
 
-    /// Attempts to authenticate a stream according this credential, returning an error
+    /// Attempts to authenticate a stream according to this credential, returning an error
     /// result on failure. A mechanism may be negotiated if one is not provided as part of the
     /// credential.
     pub(crate) async fn authenticate_stream(

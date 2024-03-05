@@ -120,6 +120,10 @@ pub(crate) struct Connection {
     /// monitoring connections as we do not emit events for those.
     #[derivative(Debug = "ignore")]
     event_emitter: Option<CmapEventEmitter>,
+
+    /// The token callback for OIDC authentication.
+    #[derivative(Debug = "ignore")]
+    pub(crate) oidc_access_token: Option<String>,
 }
 
 impl Connection {
@@ -146,6 +150,7 @@ impl Connection {
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
+            oidc_access_token: None,
         }
     }
 
@@ -435,6 +440,7 @@ impl Connection {
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
             more_to_come: false,
+            oidc_access_token: self.oidc_access_token.take(),
         }
     }
 
