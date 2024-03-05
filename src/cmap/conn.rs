@@ -123,7 +123,7 @@ pub(crate) struct Connection {
 
     /// The token callback for OIDC authentication.
     #[derivative(Debug = "ignore")]
-    pub(crate) oidc_access_token: Option<String>,
+    pub(crate) oidc_access_token: tokio::sync::RwLock<Option<String>>,
 }
 
 impl Connection {
@@ -150,7 +150,7 @@ impl Connection {
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
-            oidc_access_token: None,
+            oidc_access_token: tokio::sync::RwLock::new(None),
         }
     }
 
@@ -440,7 +440,7 @@ impl Connection {
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
             more_to_come: false,
-            oidc_access_token: self.oidc_access_token.take(),
+            oidc_access_token: tokio::sync::RwLock::new(None),
         }
     }
 

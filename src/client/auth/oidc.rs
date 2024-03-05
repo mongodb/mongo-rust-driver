@@ -30,18 +30,6 @@ pub struct State {
     cache: Arc<RwLock<Cache>>,
 }
 
-impl State {
-    pub(crate) async fn get_refresh_token(&self) -> Option<String> {
-        self.cache.read().await.refresh_token.clone()
-    }
-
-    // TODO RUST-1662: This function will actually be used.
-    #[allow(dead_code)]
-    pub(crate) async fn get_access_token(&self) -> Option<String> {
-        self.cache.read().await.access_token.clone()
-    }
-}
-
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Callback {
@@ -55,6 +43,10 @@ enum CallbackKind {
     Human,
     Machine,
 }
+
+const HUMAN_CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const MACHINE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
+const API_VERISON: u32 = 1;
 
 // TODO RUST-1497: These will no longer be dead_code
 #[allow(dead_code)]
@@ -197,7 +189,8 @@ pub(crate) async fn authenticate_stream(
     }
 }
 
-async fn update_oidc_cache(
+async fn update_oidc_caches(
+    conn: &Connection,
     credential: &Credential,
     response: &IdpServerResponse,
     token_gen_id: i32,
@@ -216,19 +209,23 @@ async fn update_oidc_cache(
         cache.last_call_time = Instant::now();
         cache.token_gen_id = token_gen_id;
     }
+    {
+        let mut cache = conn.oidc_access_token.write().await;
+        *cache = Some(response.access_token.clone());
+    }
 }
 
-async fn authenticate_human(
+async fn send_sasl_start_command(
+    source: &str,
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    callback: Arc<CallbackInner>,
-) -> Result<()> {
-    // TODO RUST-1662: Use the Cached credential and add Cache invalidation
-    // this differs from the machine flow in that we will also try the refresh token
-    let source = credential.source.as_deref().unwrap_or("$external");
+    access_token: Option<String>,
+) -> Result<SaslResponse> {
     let mut start_doc = rawdoc! {};
-    if let Some(username) = credential.username.as_deref() {
+    if let Some(access_token) = access_token {
+        start_doc.append("jwt", access_token);
+    } else if let Some(username) = credential.username.as_deref() {
         start_doc.append("n", username);
     }
     let sasl_start = SaslStart::new(
@@ -238,23 +235,47 @@ async fn authenticate_human(
         server_api.cloned(),
     )
     .into_command();
-    let response = send_sasl_command(conn, sasl_start).await?;
+    send_sasl_command(conn, sasl_start).await
+}
+
+async fn authenticate_human(
+    conn: &mut Connection,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    callback: Arc<CallbackInner>,
+) -> Result<()> {
+    let source = credential.source.as_deref().unwrap_or("$external");
+
+    // If the access token is in the cache, we can use it to send the sasl start command and avoid
+    // the callback and sasl_continue
+    if let Some(access_token) = credential.oidc_callback.as_ref()
+        // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
+        .unwrap().cache.read().await.access_token.clone()
+    {
+        let response =
+            send_sasl_start_command(source, conn, credential, server_api, Some(access_token))
+                .await?;
+        if response.done {
+            return Err(invalid_auth_response());
+        }
+        return Ok(());
+    }
+
+    let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
     if response.done {
         return Err(invalid_auth_response());
     }
 
-    // Even though most caching will be handled in RUST-1662, the refresh token only exists in the
-    // cache, so we need to access the cache to get it
+    // For the human flow, we need to send the refresh token from the cache to the callback
     let refresh_token = credential.oidc_callback.as_ref()
         // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
-        .unwrap().get_refresh_token().await;
+        .unwrap().cache.read().await.refresh_token.clone();
 
     let idp_response = {
         let server_info: IdpServerInfo =
             bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
-        const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
         let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + CALLBACK_TIMEOUT),
+            timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
             version: 1,
             refresh_token,
             idp_info: Some(server_info),
@@ -262,9 +283,9 @@ async fn authenticate_human(
         (callback.f)(cb_context).await?
     };
 
-    // we'll go ahead and update the cache, also,
-    // TODO RUST 1662: Modify this comment to just say we are updating the cache
-    update_oidc_cache(credential, &idp_response, 1).await;
+    // Update the credential and connection caches with the access token and the credential cache
+    // with the refresh token and token_gen_id
+    update_oidc_caches(conn, credential, &idp_response, 1).await;
 
     let sasl_continue = SaslContinue::new(
         source.to_string(),
@@ -287,29 +308,33 @@ async fn authenticate_machine(
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
-    // TODO RUST-1662: Use the Cached credential and add Cache invalidation
     let source = credential.source.as_deref().unwrap_or("$external");
-    let mut start_doc = rawdoc! {};
-    if let Some(username) = credential.username.as_deref() {
-        start_doc.append("n", username);
+
+    // If the access token is in the cache, we can use it to send the sasl start command and avoid
+    // the callback and sasl_continue
+    if let Some(access_token) = credential.oidc_callback.as_ref()
+        // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
+        .unwrap().cache.read().await.access_token.clone()
+    {
+        let response =
+            send_sasl_start_command(source, conn, credential, server_api, Some(access_token))
+                .await?;
+        if response.done {
+            return Err(invalid_auth_response());
+        }
+        return Ok(());
     }
-    let sasl_start = SaslStart::new(
-        source.to_string(),
-        AuthMechanism::MongoDbOidc,
-        start_doc.into_bytes(),
-        server_api.cloned(),
-    )
-    .into_command();
-    let response = send_sasl_command(conn, sasl_start).await?;
+
+    let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
     if response.done {
         return Err(invalid_auth_response());
     }
+
     let idp_response = {
         let server_info: IdpServerInfo =
             bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
-        const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
         let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + CALLBACK_TIMEOUT),
+            timeout_seconds: Some(Instant::now() + MACHINE_CALLBACK_TIMEOUT),
             version: 1,
             refresh_token: None,
             idp_info: Some(server_info),
@@ -317,9 +342,10 @@ async fn authenticate_machine(
         (callback.f)(cb_context).await?
     };
 
-    // we'll go ahead and update the cache, also,
-    // TODO RUST 1662: Modify this comment to just say we are updating the cache
-    update_oidc_cache(credential, &idp_response, 1).await;
+    // Update the credential and connection caches with the access token and the credential cache
+    // with the refresh token and token_gen_id. In the machine flow, the refresh token will always
+    // be None.
+    update_oidc_caches(conn, credential, &idp_response, 1).await;
 
     let sasl_continue = SaslContinue::new(
         source.to_string(),
