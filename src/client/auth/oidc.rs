@@ -162,32 +162,19 @@ pub struct IdpServerResponse {
 
 /// Constructs the first client message in the OIDC handshake for speculative authentication
 pub(crate) async fn build_speculative_client_first(credential: &Credential) -> Command {
-    self::build_client_first(credential, None).await
-}
-
-/// Constructs the first client message in the OIDC handshake.
-pub(crate) async fn build_client_first(
-    credential: &Credential,
-    server_api: Option<&ServerApi>,
-) -> Command {
     let mut auth_command_doc = doc! {
         "authenticate": 1,
         "mechanism": MONGODB_OIDC_STR,
     };
 
     if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because we are in the build_client_first function which only gets called if oidc_callback is Some
+        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.access_token.clone()
     {
         auth_command_doc.insert("jwt", access_token);
     }
 
-    let mut command = Command::new("authenticate", "$external", auth_command_doc);
-    if let Some(server_api) = server_api {
-        command.set_server_api(server_api);
-    }
-
-    command
+    Command::new("authenticate", "$external", auth_command_doc)
 }
 
 pub(crate) async fn authenticate_stream(
@@ -334,7 +321,7 @@ async fn authenticate_human(
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
     if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
+        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.access_token.clone()
     {
         let response = send_sasl_start_command(
@@ -353,7 +340,7 @@ async fn authenticate_human(
 
     // If the cache has a refresh token, we can avoid asking for the server info.
     if let refresh_token @ Some(_) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
+        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.refresh_token.clone()
     {
         let idp_response = {
@@ -414,7 +401,7 @@ async fn authenticate_machine(
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
     if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because we are in the authenticate_human function which only gets called if oidc_callback is Some
+        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.access_token.clone()
     {
         let response = send_sasl_start_command(
