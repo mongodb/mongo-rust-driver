@@ -241,7 +241,7 @@ async fn invalidate_caches(conn: &Connection, credential: &Credential, access_to
     }
 }
 
-// send_sasl_start_command sends creates and sends a sasl_start command handling either
+// send_sasl_start_command creates and sends a sasl_start command handling either
 // one step or two step sasl based on whether or not the access token is Some.
 async fn send_sasl_start_command(
     source: &str,
