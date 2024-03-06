@@ -116,7 +116,7 @@ pub(crate) struct Connection {
 
     /// The token callback for OIDC authentication.
     #[derivative(Debug = "ignore")]
-    pub(crate) oidc_token_gen_id: std::sync::RwLock<u32>,
+    pub(crate) oidc_access_token: Option<String>,
 }
 
 impl Connection {
@@ -143,7 +143,7 @@ impl Connection {
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
-            oidc_token_gen_id: std::sync::RwLock::new(0),
+            oidc_access_token: None,
         }
     }
 
@@ -432,7 +432,7 @@ impl Connection {
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
             more_to_come: false,
-            oidc_token_gen_id: std::sync::RwLock::new(0),
+            oidc_access_token: self.oidc_access_token.take(),
         }
     }
 

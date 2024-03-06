@@ -195,7 +195,7 @@ impl AuthMechanism {
                     ));
                 }
                 // TODO RUST-1660: Handle specific provider validation, perhaps also do Azure as
-                // part of this ticket. Specific providers will add predefined oidc_callback here
+                // part of this ticket.
                 if credential
                     .source
                     .as_ref()
@@ -279,9 +279,7 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
-            Self::MongoDbOidc => Ok(Some(ClientFirst::Oidc(Box::new(
-                oidc::build_speculative_client_first(credential),
-            )))),
+            Self::MongoDbOidc => Ok(None),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
@@ -334,7 +332,7 @@ impl AuthMechanism {
             }
             .into()),
             AuthMechanism::MongoDbOidc => {
-                oidc::authenticate_stream(stream, credential, server_api, None).await
+                oidc::authenticate_stream(stream, credential, server_api).await
             }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
@@ -461,9 +459,6 @@ impl Credential {
                 FirstRound::X509(server_first) => {
                     x509::authenticate_stream(conn, self, server_api, server_first).await
                 }
-                FirstRound::Oidc(server_first) => {
-                    oidc::authenticate_stream(conn, self, server_api, server_first).await
-                }
             };
         }
 
@@ -522,7 +517,6 @@ impl Debug for Credential {
 pub(crate) enum ClientFirst {
     Scram(ScramVersion, scram::ClientFirst),
     X509(Box<Command>),
-    Oidc(Box<Command>),
 }
 
 impl ClientFirst {
@@ -530,7 +524,6 @@ impl ClientFirst {
         match self {
             Self::Scram(version, client_first) => client_first.to_command(version).body,
             Self::X509(command) => command.body.clone(),
-            Self::Oidc(command) => command.body.clone(),
         }
     }
 
@@ -544,7 +537,6 @@ impl ClientFirst {
                 },
             ),
             Self::X509(..) => FirstRound::X509(server_first),
-            Self::Oidc(..) => FirstRound::Oidc(server_first),
         }
     }
 }
@@ -555,7 +547,6 @@ impl ClientFirst {
 pub(crate) enum FirstRound {
     Scram(ScramVersion, scram::FirstRound),
     X509(Document),
-    Oidc(Document),
 }
 
 pub(crate) fn generate_nonce_bytes() -> [u8; 32] {
