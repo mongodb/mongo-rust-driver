@@ -288,7 +288,8 @@ async fn invalidate_caches(conn: &Connection, credential: &Credential) {
         .write()
         .await,
     );
-    // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in case
+    // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in
+    // case
     if *token_gen_id >= cred_cache.token_gen_id {
         cred_cache.access_token = None;
         *token_gen_id = 0;
