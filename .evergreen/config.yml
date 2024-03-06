@@ -295,9 +295,9 @@ buildvariants:
 
   - name: oidc
     display_name: OIDC
-    patchable: false
+    patchable: true
     run_on:
-      - rhel87-small
+      - ubuntu2204-small
     expansions:
       AUTH: auth
       SSL: ssl
