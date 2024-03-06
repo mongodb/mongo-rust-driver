@@ -176,8 +176,15 @@ pub(crate) async fn build_client_first(
 
     if credential.oidc_callback.is_none() {
         auth_command_doc.insert("jwt", "");
-    } else if let Some(access_token) = credential.oidc_callback.as_ref()
-        .unwrap().cache.read().await.access_token.clone()
+    } else if let Some(access_token) = credential
+        .oidc_callback
+        .as_ref()
+        .unwrap()
+        .cache
+        .read()
+        .await
+        .access_token
+        .clone()
     {
         auth_command_doc.insert("jwt", access_token);
     }
@@ -247,41 +254,44 @@ async fn update_caches(
     response: &IdpServerResponse,
     idp_server_info: Option<IdpServerInfo>,
 ) {
-    {
-        let mut cache = credential
+    let (mut token_gen_id, mut cred_cache) = (
+        conn.oidc_token_gen_id.write().await,
+        credential
             .oidc_callback
             .as_ref()
             // unwrap() is safe here because authenticate_human is only called if oidc_callback is Some
             .unwrap()
             .cache
             .write()
-            .await;
-        if idp_server_info.is_some() {
-            cache.idp_server_info = idp_server_info;
-        }
-        cache.access_token = Some(response.access_token.clone());
-        cache.refresh_token = response.refresh_token.clone();
-        cache.last_call_time = Instant::now();
-        cache.token_gen_id += 1;
+            .await,
+    );
+
+    if idp_server_info.is_some() {
+        cred_cache.idp_server_info = idp_server_info;
     }
-    {
-        let mut cache = conn.oidc_access_token.write().await;
-        *cache = Some(response.access_token.clone());
-    }
+    cred_cache.access_token = Some(response.access_token.clone());
+    cred_cache.refresh_token = response.refresh_token.clone();
+    cred_cache.last_call_time = Instant::now();
+    cred_cache.token_gen_id += 1;
+    *token_gen_id = cred_cache.token_gen_id;
 }
 
-async fn invalidate_caches(conn: &Connection, credential: &Credential, access_token: String) {
-    let mut cache = credential
+async fn invalidate_caches(conn: &Connection, credential: &Credential) {
+    let (mut token_gen_id, mut cache) = (
+        conn.oidc_token_gen_id.write().await,
+        credential
         .oidc_callback
         .as_ref()
         // unwrap() is safe here because authenticate_human/machine is only called if oidc_callback is Some
         .unwrap()
         .cache
         .write()
-        .await;
-    if cache.access_token == Some(access_token) {
+        .await,
+    );
+    // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in case
+    if *token_gen_id >= cache.token_gen_id {
         cache.access_token = None;
-        let _ = conn.oidc_access_token.write().await.take();
+        *token_gen_id = 0;
     }
 }
 
@@ -376,7 +386,7 @@ async fn authenticate_human(
         if response.done {
             return Ok(());
         }
-        invalidate_caches(conn, credential, access_token).await;
+        invalidate_caches(conn, credential).await;
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
@@ -406,7 +416,7 @@ async fn authenticate_human(
         if response.done {
             return Ok(());
         }
-        invalidate_caches(conn, credential, access_token).await;
+        invalidate_caches(conn, credential).await;
     }
 
     do_two_step_auth(
@@ -442,7 +452,7 @@ async fn authenticate_machine(
         if response.done {
             return Ok(());
         }
-        invalidate_caches(conn, credential, access_token).await;
+        invalidate_caches(conn, credential).await;
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 

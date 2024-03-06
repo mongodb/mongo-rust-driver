@@ -22,12 +22,8 @@ use crate::{
     compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventEmitter,
-        ConnectionCheckedInEvent,
-        ConnectionCheckedOutEvent,
-        ConnectionClosedEvent,
-        ConnectionClosedReason,
-        ConnectionCreatedEvent,
+        CmapEventEmitter, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+        ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
     options::ServerAddress,
@@ -123,7 +119,7 @@ pub(crate) struct Connection {
 
     /// The token callback for OIDC authentication.
     #[derivative(Debug = "ignore")]
-    pub(crate) oidc_access_token: tokio::sync::RwLock<Option<String>>,
+    pub(crate) oidc_token_gen_id: tokio::sync::RwLock<u32>,
 }
 
 impl Connection {
@@ -150,7 +146,7 @@ impl Connection {
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
-            oidc_access_token: tokio::sync::RwLock::new(None),
+            oidc_token_gen_id: tokio::sync::RwLock::new(0),
         }
     }
 
@@ -440,7 +436,7 @@ impl Connection {
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
             more_to_come: false,
-            oidc_access_token: tokio::sync::RwLock::new(None),
+            oidc_token_gen_id: tokio::sync::RwLock::new(0),
         }
     }
 
