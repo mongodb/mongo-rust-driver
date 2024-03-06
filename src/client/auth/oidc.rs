@@ -24,7 +24,7 @@ use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
 const HUMAN_CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const MACHINE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
-const INVALIDATE_SLEEP_TIMEOUT: Duration = Duration::from_millis(100);
+const MACHINE_INVALIDATE_SLEEP_TIMEOUT: Duration = Duration::from_millis(100);
 const API_VERSION: u32 = 1;
 
 /// The user-supplied callbacks for OIDC authentication.
@@ -190,6 +190,34 @@ pub(crate) async fn build_client_first(
     command
 }
 
+async fn get_access_token(credential: &Credential) -> Option<String> {
+    credential
+        .oidc_callback
+        .as_ref()
+        .unwrap()
+        .cache
+        .read()
+        .await
+        .access_token
+        .clone()
+}
+
+async fn get_refresh_token_and_idp_info(
+    credential: &Credential,
+) -> (Option<String>, Option<IdpServerInfo>) {
+    let cache = credential
+        .oidc_callback
+        .as_ref()
+        // this unwrap is safe because this function is only called from within authenticate_human
+        .unwrap()
+        .cache
+        .read()
+        .await;
+    let refresh_token = cache.refresh_token.clone();
+    let idp_info = cache.idp_server_info.clone();
+    (refresh_token, idp_info)
+}
+
 pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
@@ -336,10 +364,7 @@ async fn authenticate_human(
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
-    if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
-        .unwrap().cache.read().await.access_token.clone()
-    {
+    if let Some(access_token) = get_access_token(credential).await {
         let response = send_sasl_start_command(
             source,
             conn,
@@ -355,24 +380,13 @@ async fn authenticate_human(
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
-    if let refresh_token @ Some(_) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
-        .unwrap().cache.read().await.refresh_token.clone()
-    {
+    if let (refresh_token @ Some(_), idp_info) = get_refresh_token_and_idp_info(credential).await {
         let idp_response = {
             let cb_context = CallbackContext {
                 timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
                 version: API_VERSION,
                 refresh_token,
-                idp_info: credential
-                    .oidc_callback
-                    .as_ref()
-                    .unwrap()
-                    .cache
-                    .read()
-                    .await
-                    .idp_server_info
-                    .clone(),
+                idp_info,
             };
             (callback.f)(cb_context).await?
         };
@@ -416,10 +430,7 @@ async fn authenticate_machine(
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
-    if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because OIDC authenticate_machine is only allowed if oidc_callback is Some
-        .unwrap().cache.read().await.access_token.clone()
-    {
+    if let Some(access_token) = get_access_token(credential).await {
         let response = send_sasl_start_command(
             source,
             conn,
@@ -432,7 +443,7 @@ async fn authenticate_machine(
             return Ok(());
         }
         invalidate_caches(conn, credential, access_token).await;
-        tokio::time::sleep(INVALIDATE_SLEEP_TIMEOUT).await;
+        tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
     do_two_step_auth(
