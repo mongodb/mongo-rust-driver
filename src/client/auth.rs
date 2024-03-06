@@ -266,7 +266,7 @@ impl AuthMechanism {
 
     /// Constructs the first message to be sent to the server as part of the authentication
     /// handshake, which can be used for speculative authentication.
-    pub(crate) fn build_speculative_client_first(
+    pub(crate) async fn build_speculative_client_first(
         &self,
         credential: &Credential,
     ) -> Result<Option<ClientFirst>> {
@@ -287,10 +287,7 @@ impl AuthMechanism {
             )))),
             Self::Plain => Ok(None),
             Self::MongoDbOidc => Ok(Some(ClientFirst::Oidc(Box::new(
-                tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()?
-                    .block_on(oidc::build_speculative_client_first(credential)),
+                oidc::build_speculative_client_first(credential).await,
             )))),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
