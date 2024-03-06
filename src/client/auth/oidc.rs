@@ -175,16 +175,7 @@ pub(crate) fn build_client_first(
 
     if credential.oidc_callback.is_none() {
         auth_command_doc.insert("jwt", "");
-    } else if let Some(access_token) = credential
-        .oidc_callback
-        .as_ref()
-        .unwrap()
-        .cache
-        .read()
-        .unwrap()
-        .access_token
-        .clone()
-    {
+    } else if let Some(access_token) = get_access_token(credential) {
         auth_command_doc.insert("jwt", access_token);
     }
 
@@ -196,7 +187,7 @@ pub(crate) fn build_client_first(
     command
 }
 
-async fn get_access_token(credential: &Credential) -> Option<String> {
+fn get_access_token(credential: &Credential) -> Option<String> {
     credential
         .oidc_callback
         .as_ref()
@@ -208,7 +199,7 @@ async fn get_access_token(credential: &Credential) -> Option<String> {
         .clone()
 }
 
-async fn get_refresh_token_and_idp_info(
+fn get_refresh_token_and_idp_info(
     credential: &Credential,
 ) -> (Option<String>, Option<IdpServerInfo>) {
     let cache = credential
@@ -370,7 +361,7 @@ async fn authenticate_human(
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
-    if let Some(access_token) = get_access_token(credential).await {
+    if let Some(access_token) = get_access_token(credential) {
         let response = send_sasl_start_command(
             source,
             conn,
@@ -386,7 +377,7 @@ async fn authenticate_human(
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
-    if let (refresh_token @ Some(_), idp_info) = get_refresh_token_and_idp_info(credential).await {
+    if let (refresh_token @ Some(_), idp_info) = get_refresh_token_and_idp_info(credential) {
         let idp_response = {
             let cb_context = CallbackContext {
                 timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
@@ -436,7 +427,7 @@ async fn authenticate_machine(
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
-    if let Some(access_token) = get_access_token(credential).await {
+    if let Some(access_token) = get_access_token(credential) {
         let response = send_sasl_start_command(
             source,
             conn,

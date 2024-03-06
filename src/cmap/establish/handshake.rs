@@ -402,7 +402,7 @@ impl Handshaker {
             command.target_db = cred.resolved_source().to_string();
         }
 
-        let client_first = set_speculative_auth_info(&mut command.body, credential).await?;
+        let client_first = set_speculative_auth_info(&mut command.body, credential)?;
 
         let body = &mut command.body;
         let mut trunc_meta = self.metadata.clone();
@@ -492,7 +492,7 @@ pub(crate) struct HandshakerOptions {
 }
 
 /// Updates the handshake command document with the speculative authenitication info.
-async fn set_speculative_auth_info(
+fn set_speculative_auth_info(
     command: &mut Document,
     credential: Option<&Credential>,
 ) -> Result<Option<ClientFirst>> {
