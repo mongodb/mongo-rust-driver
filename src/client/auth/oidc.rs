@@ -11,7 +11,7 @@ use crate::{
             sasl::{SaslResponse, SaslStart},
             AuthMechanism,
         },
-        options::ServerApi,
+        options::{ServerAddress, ServerApi},
     },
     cmap::{Command, Connection},
     error::{Error, Result},
@@ -25,6 +25,15 @@ const HUMAN_CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const MACHINE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
 const MACHINE_INVALIDATE_SLEEP_TIMEOUT: Duration = Duration::from_millis(100);
 const API_VERSION: u32 = 1;
+const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
+    "*.mongodb.net",
+    "*.mongodb-qa.net",
+    "*.mongodb-dev.net",
+    "*.mongodbgov.net",
+    "localhost",
+    "127.0.0.1",
+    "::1",
+];
 
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
@@ -351,12 +360,54 @@ async fn do_two_step_auth(
     Ok(())
 }
 
+fn get_allows_hosts(mechanism_properties: &Option<Document>) -> Result<Vec<&str>> {
+    if mechanism_properties.is_none() {
+        return Ok(Vec::from(DEFAULT_ALLOWED_HOSTS));
+    }
+    if let Some(allowed_hosts) = mechanism_properties.as_ref().unwrap().get("ALLOWED_HOSTS") {
+        return Ok(allowed_hosts
+            .as_array()
+            .ok_or_else(|| auth_error("allowed_hosts must be an array"))?
+            .iter()
+            .map(|host| {
+                host.as_str()
+                    .ok_or_else(|| auth_error("allowed_hosts must contain only strings"))
+            })
+            .collect::<Result<Vec<&str>>>()?);
+    }
+    Ok(Vec::from(DEFAULT_ALLOWED_HOSTS))
+}
+
+fn validate_address_with_allowed_hosts(
+    mechanism_properties: &Option<Document>,
+    address: &ServerAddress,
+) -> Result<()> {
+    let hostname = if let ServerAddress::Tcp { host, .. } = address {
+        host.as_str()
+    } else {
+        return Err(auth_error("OIDC human flow only supports TCP addresses"));
+    };
+    let allowed_hosts = get_allows_hosts(mechanism_properties)?;
+    for pattern in allowed_hosts.into_iter() {
+        if pattern == hostname {
+            return Ok(());
+        } else if pattern.starts_with("*.") && hostname.ends_with(&pattern[1..]) {
+            return Ok(());
+        }
+    }
+    Err(auth_error(
+        "The Connection address is not in the allowed list of hosts",
+    ))
+}
+
 async fn authenticate_human(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
+    validate_address_with_allowed_hosts(&credential.mechanism_properties, &conn.address)?;
+
     let source = credential.source.as_deref().unwrap_or("$external");
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
