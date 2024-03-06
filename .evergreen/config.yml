@@ -295,7 +295,7 @@ buildvariants:
 
   - name: oidc
     display_name: OIDC
-    patchable: true
+    patchable: false
     run_on:
       - ubuntu2204-small
     expansions:
