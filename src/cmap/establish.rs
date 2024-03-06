@@ -43,6 +43,11 @@ impl EstablisherOptions {
         Self {
             handshake_options: HandshakerOptions {
                 app_name: opts.app_name.clone(),
+                #[cfg(any(
+                    feature = "zstd-compression",
+                    feature = "zlib-compression",
+                    feature = "snappy-compression"
+                ))]
                 compressors: opts.compressors.clone(),
                 driver_info: opts.driver_info.clone(),
                 server_api: opts.server_api.clone(),

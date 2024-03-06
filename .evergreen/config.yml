@@ -167,15 +167,14 @@ buildvariants:
 
   - name: compression
     display_name: "Compression"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel87-small
     expansions:
-      COMPRESSION: true
       AUTH: auth
       SSL: ssl
     tasks:
-      - .rapid .replicaset
+      - .compression
 
   - name: stable-api
     display_name: "Stable API V1"
@@ -872,7 +871,8 @@ tasks:
           TOPOLOGY: sharded_cluster
       - func: "run driver test suite"
 
-  - name: test-compression
+  - name: test-zstd-compression
+    tags: [compression]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -880,7 +880,29 @@ tasks:
           TOPOLOGY: replica_set
       - func: "run driver test suite"
         vars:
-          COMPRESSION: true
+          ZSTD: true
+
+  - name: test-zlib-compression
+    tags: [compression]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+        vars:
+          ZLIB: true
+
+  - name: test-snappy-compression
+    tags: [compression]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+        vars:
+          SNAPPY: true
 
   - name: test-aws-auth-regular-credentials
     tags: [aws-auth]
@@ -1485,10 +1507,12 @@ functions:
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - OPENSSL
-          - COMPRESSION
           - MONGODB_URI
           - MONGODB_API_VERSION
           - PATH
+          - ZSTD
+          - ZLIB
+          - SNAPPY
 
   "run sync tests":
     - command: subprocess.exec

@@ -5,11 +5,16 @@ use std::env;
 
 use once_cell::sync::Lazy;
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use crate::options::Compressor;
 use crate::{
     bson::{doc, Bson, Document},
     client::auth::ClientFirst,
     cmap::{Command, Connection, StreamDescription},
-    compression::Compressor,
     error::Result,
     hello::{hello_command, run_hello, HelloReply},
     options::{AuthMechanism, Credential, DriverInfo, ServerApi},
@@ -315,8 +320,11 @@ pub(crate) struct Handshaker {
     /// given the same pool options, so it can be created at the time the Handshaker is created.
     command: Command,
 
-    // This field is not read without a compression feature flag turned on.
-    #[allow(dead_code)]
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     compressors: Option<Vec<Compressor>>,
 
     server_api: Option<ServerApi>,
@@ -331,7 +339,6 @@ impl Handshaker {
     /// Creates a new Handshaker.
     pub(crate) fn new(options: HandshakerOptions) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
-        let compressors = options.compressors;
 
         let mut command = hello_command(
             options.server_api.as_ref(),
@@ -365,14 +372,17 @@ impl Handshaker {
             command.body.insert("loadBalanced", true);
         }
 
-        // Add compressors to handshake.
-        // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
-        if let Some(ref compressors) = compressors {
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        if let Some(ref compressors) = options.compressors {
             command.body.insert(
                 "compression",
                 compressors
                     .iter()
-                    .map(|x| x.name())
+                    .map(|compressor| compressor.name())
                     .collect::<Vec<&'static str>>(),
             );
         }
@@ -381,7 +391,12 @@ impl Handshaker {
 
         Self {
             command,
-            compressors,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            compressors: options.compressors,
             server_api: options.server_api,
             metadata,
             #[cfg(feature = "aws-auth")]
@@ -428,24 +443,22 @@ impl Handshaker {
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
-        // Check that the hello reply has a compressor list and unpack it
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
         if let (Some(server_compressors), Some(client_compressors)) = (
             hello_reply.command_response.compressors.as_ref(),
             self.compressors.as_ref(),
         ) {
-            // Use the Client's first compressor choice that the server supports (comparing only on
-            // enum variant)
-            if let Some(compressor) = client_compressors
-                .iter()
-                .find(|c| server_compressors.iter().any(|x| c.name() == x))
-            {
-                // Without a feature flag turned on, the Compressor enum is empty which causes an
-                // unreachable code warning.
-                #[allow(unreachable_code)]
-                // zlib compression level is already set
-                {
-                    conn.compressor = Some(compressor.clone());
-                }
+            // Use the first compressor in the user's list that is also supported by the server.
+            if let Some(compressor) = client_compressors.iter().find(|client_compressor| {
+                server_compressors
+                    .iter()
+                    .any(|server_compressor| client_compressor.name() == server_compressor)
+            }) {
+                conn.compressor = Some(compressor.clone());
             }
         }
 
@@ -473,9 +486,13 @@ pub(crate) struct HandshakerOptions {
     /// handshake that each connection makes when it's created.
     pub(crate) app_name: Option<String>,
 
-    /// The compressors that the Client is willing to use in the order they are specified
-    /// in the configuration.  The Client sends this list of compressors to the server.
-    /// The server responds with the intersection of its supported list of compressors.
+    /// The compressors specified by the user. This list is sent to the server and the server
+    /// replies with the subset of the compressors it supports.
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     pub(crate) compressors: Option<Vec<Compressor>>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the

@@ -4,11 +4,16 @@ use bson::UuidRepresentation;
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use crate::options::Compressor;
 use crate::{
     bson::{Bson, Document},
     client::options::{ClientOptions, ConnectionString, ServerAddress},
     error::ErrorKind,
-    options::Compressor,
     test::run_spec_test,
     Client,
 };
@@ -172,9 +177,13 @@ async fn run_test(test_file: TestFile) {
                         .filter(|(ref key, _)| json_options.contains_key(key))
                         .collect();
 
-                    // This is required because compressor is not serialize, but the spec tests
-                    // still expect to see serialized compressors.
-                    // This hardcodes the compressors into the options.
+                    // Compressor does not implement Serialize, so add the compressor names to the
+                    // options manually.
+                    #[cfg(any(
+                        feature = "zstd-compression",
+                        feature = "zlib-compression",
+                        feature = "snappy-compression"
+                    ))]
                     if let Some(compressors) = options.compressors {
                         options_doc.insert(
                             "compressors",

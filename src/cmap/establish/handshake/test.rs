@@ -5,6 +5,11 @@ use crate::{bson::doc, cmap::establish::handshake::HandshakerOptions, options::D
 fn metadata_no_options() {
     let handshaker = Handshaker::new(HandshakerOptions {
         app_name: None,
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
         compressors: None,
         driver_info: None,
         server_api: None,
@@ -38,6 +43,11 @@ fn metadata_with_options() {
                 .version(version.to_string())
                 .build(),
         ),
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
         compressors: None,
         server_api: None,
         load_balanced: false,
