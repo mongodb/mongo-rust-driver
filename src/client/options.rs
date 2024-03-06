@@ -41,8 +41,6 @@ use crate::{
 
 pub use resolver_config::ResolverConfig;
 
-use super::auth::oidc::Callback;
-
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
 const URI_OPTIONS: &[&str] = &[
@@ -1813,20 +1811,6 @@ impl ConnectionString {
                     }
 
                     credential.mechanism_properties = Some(doc);
-                }
-
-                // TODO RUST-1660: Add AWS OIDC callback if AWS is in the auth_mechanism_properties
-                // rather than an empty callback.
-                if *mechanism == AuthMechanism::MongoDbOidc {
-                    credential.oidc_callback = Some(Callback::machine(|_| {
-                        Box::pin(async move {
-                            Ok(crate::client::auth::oidc::IdpServerResponse {
-                                access_token: "".to_string(),
-                                expires: None,
-                                refresh_token: None,
-                            })
-                        })
-                    }));
                 }
 
                 credential.mechanism = Some(mechanism.clone());

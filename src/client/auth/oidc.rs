@@ -174,7 +174,9 @@ pub(crate) async fn build_client_first(
         "mechanism": MONGODB_OIDC_STR,
     };
 
-    if let Some(access_token) = credential.oidc_callback.as_ref()
+    if credential.oidc_callback.is_none() {
+        auth_command_doc.insert("jwt", "");
+    } else if let Some(access_token) = credential.oidc_callback.as_ref()
         // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.access_token.clone()
     {
@@ -416,7 +418,7 @@ async fn authenticate_machine(
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
     if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
+        // this unwrap is safe because OIDC authenticate_machine is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.access_token.clone()
     {
         let response = send_sasl_start_command(
