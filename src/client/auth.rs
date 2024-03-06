@@ -287,7 +287,7 @@ impl AuthMechanism {
             )))),
             Self::Plain => Ok(None),
             Self::MongoDbOidc => Ok(Some(ClientFirst::Oidc(Box::new(
-                tokio::runtime::Builder::new_current_thread()
+                tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
                     .block_on(oidc::build_speculative_client_first(credential)),
