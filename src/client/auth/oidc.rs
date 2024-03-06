@@ -277,7 +277,7 @@ async fn update_caches(
 }
 
 async fn invalidate_caches(conn: &Connection, credential: &Credential) {
-    let (mut token_gen_id, mut cache) = (
+    let (mut token_gen_id, mut cred_cache) = (
         conn.oidc_token_gen_id.write().await,
         credential
         .oidc_callback
@@ -289,8 +289,8 @@ async fn invalidate_caches(conn: &Connection, credential: &Credential) {
         .await,
     );
     // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in case
-    if *token_gen_id >= cache.token_gen_id {
-        cache.access_token = None;
+    if *token_gen_id >= cred_cache.token_gen_id {
+        cred_cache.access_token = None;
         *token_gen_id = 0;
     }
 }
