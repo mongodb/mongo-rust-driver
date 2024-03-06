@@ -247,13 +247,13 @@ pub(crate) async fn authenticate_stream(
     }
 }
 
-async fn update_caches(
+fn update_caches(
     conn: &Connection,
     credential: &Credential,
     response: &IdpServerResponse,
     idp_server_info: Option<IdpServerInfo>,
 ) {
-    let mut token_gen_id = conn.oidc_token_gen_id.write().await;
+    let mut token_gen_id = conn.oidc_token_gen_id.write().unwrap();
     let mut cred_cache = credential
             .oidc_callback
             .as_ref()
@@ -273,8 +273,8 @@ async fn update_caches(
     *token_gen_id = cred_cache.token_gen_id;
 }
 
-async fn invalidate_caches(conn: &Connection, credential: &Credential) {
-    let mut token_gen_id = conn.oidc_token_gen_id.write().await;
+fn invalidate_caches(conn: &Connection, credential: &Credential) {
+    let mut token_gen_id = conn.oidc_token_gen_id.write().unwrap();
     let mut cred_cache = credential
         .oidc_callback
         .as_ref()
@@ -343,7 +343,7 @@ async fn do_two_step_auth(
 
     // Update the credential and connection caches with the access token and the credential cache
     // with the refresh token and token_gen_id
-    update_caches(conn, credential, &idp_response, Some(server_info)).await;
+    update_caches(conn, credential, &idp_response, Some(server_info));
 
     let sasl_continue = SaslContinue::new(
         source.to_string(),
@@ -382,7 +382,7 @@ async fn authenticate_human(
         if response.done {
             return Ok(());
         }
-        invalidate_caches(conn, credential).await;
+        invalidate_caches(conn, credential);
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
@@ -398,7 +398,7 @@ async fn authenticate_human(
         };
         // Update the credential and connection caches with the access token and the credential
         // cache with the refresh token and token_gen_id
-        update_caches(conn, credential, &idp_response, None).await;
+        update_caches(conn, credential, &idp_response, None);
 
         let access_token = idp_response.access_token;
         let response = send_sasl_start_command(
@@ -412,7 +412,7 @@ async fn authenticate_human(
         if response.done {
             return Ok(());
         }
-        invalidate_caches(conn, credential).await;
+        invalidate_caches(conn, credential);
     }
 
     do_two_step_auth(
@@ -448,7 +448,7 @@ async fn authenticate_machine(
         if response.done {
             return Ok(());
         }
-        invalidate_caches(conn, credential).await;
+        invalidate_caches(conn, credential);
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
