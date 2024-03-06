@@ -177,7 +177,6 @@ pub(crate) async fn build_client_first(
     if credential.oidc_callback.is_none() {
         auth_command_doc.insert("jwt", "");
     } else if let Some(access_token) = credential.oidc_callback.as_ref()
-        // this unwrap is safe because OIDC authentication is only allowed if oidc_callback is Some
         .unwrap().cache.read().await.access_token.clone()
     {
         auth_command_doc.insert("jwt", access_token);
