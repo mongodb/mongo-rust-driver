@@ -16,20 +16,20 @@ use super::{action_impl, option_setters};
 
 impl Client {
     pub fn bulk_write(&self, models: impl IntoIterator<Item = WriteModel>) -> BulkWrite {
-        BulkWrite::new(self.clone(), models.into_iter().collect())
+        BulkWrite::new(self, models.into_iter().collect())
     }
 }
 
 #[must_use]
 pub struct BulkWrite<'a> {
-    client: Client,
+    client: &'a Client,
     models: Vec<WriteModel>,
     options: Option<BulkWriteOptions>,
     session: Option<&'a mut ClientSession>,
 }
 
 impl<'a> BulkWrite<'a> {
-    fn new(client: Client, models: Vec<WriteModel>) -> Self {
+    fn new(client: &'a Client, models: Vec<WriteModel>) -> Self {
         Self {
             client,
             models,

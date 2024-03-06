@@ -97,7 +97,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
             let spec = self
                 .inner
                 .handle_response(response, description, session)
-                .get_sync_result()?;
+                .as_sync_result()?;
 
             let mut data = ChangeStreamData {
                 resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),

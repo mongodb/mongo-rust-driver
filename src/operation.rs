@@ -83,7 +83,7 @@ pub(crate) enum OperationResponse<'a, O> {
 impl<'a, O> OperationResponse<'a, O> {
     /// Returns the sync result contained within this `OperationResponse`. Use responsibly, when it
     /// is known that the response is not async.
-    fn get_sync_result(self) -> Result<O> {
+    fn as_sync_result(self) -> Result<O> {
         match self {
             Self::Sync(result) => result,
             Self::Async(_) => Err(Error::internal(

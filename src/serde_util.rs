@@ -221,10 +221,12 @@ where
     use std::str::FromStr;
 
     let string_map: HashMap<String, T> = HashMap::deserialize(deserializer)?;
-    Ok(Some(
-        string_map
-            .into_iter()
-            .map(|(index, t)| (usize::from_str(&index).unwrap(), t))
-            .collect(),
-    ))
+    Ok(Some(string_map.into_iter().try_fold(
+        HashMap::new(),
+        |mut map, (index, t)| {
+            let index = usize::from_str(&index).map_err(serde::de::Error::custom)?;
+            map.insert(index, t);
+            Ok(map)
+        },
+    )?))
 }
