@@ -1,9 +1,8 @@
 use serde::Deserialize;
 use std::{
-    sync::Arc,
+    sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
-use tokio::sync::RwLock;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -160,12 +159,12 @@ pub struct IdpServerResponse {
     pub refresh_token: Option<String>,
 }
 
-pub(crate) async fn build_speculative_client_first(credential: &Credential) -> Command {
-    self::build_client_first(credential, None).await
+pub(crate) fn build_speculative_client_first(credential: &Credential) -> Command {
+    self::build_client_first(credential, None)
 }
 
 /// Constructs the first client message in the OIDC handshake for speculative authentication
-pub(crate) async fn build_client_first(
+pub(crate) fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Command {
@@ -182,7 +181,7 @@ pub(crate) async fn build_client_first(
         .unwrap()
         .cache
         .read()
-        .await
+        .unwrap()
         .access_token
         .clone()
     {
@@ -204,7 +203,7 @@ async fn get_access_token(credential: &Credential) -> Option<String> {
         .unwrap()
         .cache
         .read()
-        .await
+        .unwrap()
         .access_token
         .clone()
 }
@@ -219,7 +218,7 @@ async fn get_refresh_token_and_idp_info(
         .unwrap()
         .cache
         .read()
-        .await;
+        .unwrap();
     let refresh_token = cache.refresh_token.clone();
     let idp_info = cache.idp_server_info.clone();
     (refresh_token, idp_info)
@@ -254,17 +253,15 @@ async fn update_caches(
     response: &IdpServerResponse,
     idp_server_info: Option<IdpServerInfo>,
 ) {
-    let (mut token_gen_id, mut cred_cache) = (
-        conn.oidc_token_gen_id.write().await,
-        credential
+    let mut token_gen_id = conn.oidc_token_gen_id.write().await;
+    let mut cred_cache = credential
             .oidc_callback
             .as_ref()
             // unwrap() is safe here because authenticate_human is only called if oidc_callback is Some
             .unwrap()
             .cache
             .write()
-            .await,
-    );
+            .unwrap();
 
     if idp_server_info.is_some() {
         cred_cache.idp_server_info = idp_server_info;
@@ -277,17 +274,15 @@ async fn update_caches(
 }
 
 async fn invalidate_caches(conn: &Connection, credential: &Credential) {
-    let (mut token_gen_id, mut cred_cache) = (
-        conn.oidc_token_gen_id.write().await,
-        credential
+    let mut token_gen_id = conn.oidc_token_gen_id.write().await;
+    let mut cred_cache = credential
         .oidc_callback
         .as_ref()
         // unwrap() is safe here because authenticate_human/machine is only called if oidc_callback is Some
         .unwrap()
         .cache
         .write()
-        .await,
-    );
+        .unwrap();
     // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in
     // case
     if *token_gen_id >= cred_cache.token_gen_id {

@@ -509,10 +509,7 @@ async fn set_speculative_auth_info(
         .as_ref()
         .unwrap_or(&AuthMechanism::ScramSha256);
 
-    let client_first = match auth_mechanism
-        .build_speculative_client_first(credential)
-        .await?
-    {
+    let client_first = match auth_mechanism.build_speculative_client_first(credential)? {
         Some(client_first) => client_first,
         None => return Ok(None),
     };
