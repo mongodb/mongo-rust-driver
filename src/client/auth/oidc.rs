@@ -364,10 +364,10 @@ fn get_allowed_hosts(mechanism_properties: Option<&Document>) -> Result<Vec<&str
     if mechanism_properties.is_none() {
         return Ok(Vec::from(DEFAULT_ALLOWED_HOSTS));
     }
-    if let Some(allowed_hosts) = mechanism_properties.as_ref().unwrap().get("ALLOWED_HOSTS") {
+    if let Some(allowed_hosts) =
+        mechanism_properties.and_then(|p| p.get_array("ALLOWED_HOSTS").ok())
+    {
         return allowed_hosts
-            .as_array()
-            .unwrap()
             .iter()
             .map(|host| {
                 host.as_str()

@@ -184,13 +184,10 @@ impl AuthMechanism {
                 Ok(())
             }
             AuthMechanism::MongoDbOidc => {
-                let has_mechanism_properties = credential.mechanism_properties.is_some();
-                let is_automatic = has_mechanism_properties
-                    && credential
-                        .mechanism_properties
-                        .as_ref()
-                        .unwrap()
-                        .contains_key("PROVIDER_NAME");
+                let is_automatic = credential
+                    .mechanism_properties
+                    .as_ref()
+                    .map_or(false, |p| p.contains_key("PROVIDER_NAME"));
                 if credential.username.is_some() && is_automatic {
                     return Err(Error::invalid_argument(
                         "username and PROVIDER_NAME cannot both be specified for MONGODB-OIDC \
@@ -213,17 +210,14 @@ impl AuthMechanism {
                         "password must not be set for MONGODB-OIDC authentication",
                     ));
                 }
-                if has_mechanism_properties {
-                    if let Some(allowed_hosts) = credential
-                        .mechanism_properties
-                        .as_ref()
-                        .unwrap()
-                        .get("ALLOWED_HOSTS")
-                    {
-                        allowed_hosts.as_array().ok_or_else(|| {
-                            Error::invalid_argument("ALLOWED_HOSTS must be an array")
-                        })?;
-                    }
+                if let Some(allowed_hosts) = credential
+                    .mechanism_properties
+                    .as_ref()
+                    .and_then(|p| p.get("ALLOWED_HOSTS"))
+                {
+                    allowed_hosts
+                        .as_array()
+                        .ok_or_else(|| Error::invalid_argument("ALLOWED_HOSTS must be an array"))?;
                 }
                 Ok(())
             }
