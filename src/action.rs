@@ -36,6 +36,7 @@ pub use drop::{DropCollection, DropDatabase};
 pub use drop_index::DropIndex;
 pub use find::Find;
 pub use find_and_modify::FindAndModify;
+pub use insert_many::InsertMany;
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
 pub use list_indexes::ListIndexes;

@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashSet};
+use std::{borrow::Borrow, collections::HashSet, ops::Deref};
 
 use bson::{Bson, RawDocumentBuf};
 use serde::Serialize;
@@ -110,8 +110,8 @@ action_impl! {
             let mut n_attempted = 0;
 
             while n_attempted < ds.len() {
-                let docs: Vec<_> = ds.iter().skip(n_attempted).cloned().collect();
-                let insert = Op::raw(
+                let docs: Vec<_> = ds.iter().skip(n_attempted).map(Deref::deref).collect();
+                let insert = Op::new(
                     self.coll.namespace(),
                     docs,
                     self.options.clone(),
