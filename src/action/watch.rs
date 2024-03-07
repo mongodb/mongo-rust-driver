@@ -79,7 +79,10 @@ impl Database {
     }
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in this collection. A
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
@@ -133,7 +136,10 @@ impl crate::sync::Database {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in this collection. A
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system

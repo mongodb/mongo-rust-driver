@@ -117,7 +117,7 @@ impl Database {
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection<T>(&self, name: &str) -> Collection<T> {
+    pub fn collection<T: Send + Sync>(&self, name: &str) -> Collection<T> {
         Collection::new(self.clone(), name, None)
     }
 
@@ -130,7 +130,7 @@ impl Database {
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_options<T>(
+    pub fn collection_with_options<T: Send + Sync>(
         &self,
         name: &str,
         options: CollectionOptions,

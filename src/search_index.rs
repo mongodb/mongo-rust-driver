@@ -12,7 +12,10 @@ use bson::doc;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Convenience method for creating a single search index.
     pub async fn create_search_index(
         &self,

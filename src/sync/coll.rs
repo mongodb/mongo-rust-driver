@@ -62,17 +62,23 @@ use crate::{
 /// ```
 
 #[derive(Clone, Debug)]
-pub struct Collection<T> {
+pub struct Collection<T>
+where
+    T: Send + Sync,
+{
     pub(crate) async_collection: AsyncCollection<T>,
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
     }
 
     /// Gets a clone of the `Collection` with a different type `U`.
-    pub fn clone_with_type<U>(&self) -> Collection<U> {
+    pub fn clone_with_type<U: Send + Sync>(&self) -> Collection<U> {
         Collection::new(self.async_collection.clone_with_type())
     }
 
@@ -168,7 +174,7 @@ where
 
 impl<T> Collection<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Send + Sync,
 {
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
     ///
@@ -256,7 +262,7 @@ where
 
 impl<T> Collection<T>
 where
-    T: Serialize + DeserializeOwned,
+    T: Serialize + DeserializeOwned + Send + Sync,
 {
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
     /// `replacement`.
@@ -305,7 +311,7 @@ where
 
 impl<T> Collection<T>
 where
-    T: Serialize,
+    T: Serialize + Send + Sync,
 {
     /// Inserts the documents in `docs` into the collection.
     ///

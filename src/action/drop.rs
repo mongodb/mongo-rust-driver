@@ -69,7 +69,10 @@ action_impl! {
     }
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
     /// `await` will return `Result<()>`.
@@ -83,7 +86,10 @@ impl<T> Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
     /// [`run`](DropCollection::run) will return `Result<()>`.

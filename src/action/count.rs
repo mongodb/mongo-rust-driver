@@ -9,7 +9,10 @@ use crate::{
 
 use super::{action_impl, option_setters, CollRef};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Estimates the number of documents in the collection using collection metadata.
     ///
     /// Due to an oversight in versions 5.0.0 - 5.0.7 of MongoDB, the `count` server command,
@@ -46,7 +49,10 @@ impl<T> Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Estimates the number of documents in the collection using collection metadata.
     ///
     /// Due to an oversight in versions 5.0.0 - 5.0.7 of MongoDB, the `count` server command,

@@ -174,7 +174,11 @@ impl GridFsBucket {
         Ok(())
     }
 
-    async fn create_index<T>(&self, coll: &Collection<T>, keys: Document) -> Result<()> {
+    async fn create_index<T: Send + Sync>(
+        &self,
+        coll: &Collection<T>,
+        keys: Document,
+    ) -> Result<()> {
         // listIndexes returns an error if the collection has not yet been created.
         // Ignore NamespaceExists errors if the collection has already been created.
         if let Err(error) = self

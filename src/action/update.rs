@@ -13,7 +13,10 @@ use crate::{
 
 use super::{action_impl, option_setters, CollRef};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
@@ -58,8 +61,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
