@@ -196,8 +196,8 @@ impl ClusteredIndex {
         let value_option: Option<ValueUnion> = Deserialize::deserialize(deserializer)?;
         value_option
             .map(|value| match value {
-                ValueUnion::Bool(value) if value == true => Ok(ClusteredIndex::default()),
-                ValueUnion::Bool(_) => Err(serde::de::Error::custom(
+                ValueUnion::Bool(true) => Ok(ClusteredIndex::default()),
+                ValueUnion::Bool(false) => Err(serde::de::Error::custom(
                     "if clusteredIndex is a boolean it must be `true`",
                 )),
                 ValueUnion::ClusteredIndex(value) => Ok(value),
