@@ -97,7 +97,7 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 3
 
     assert_coll_count!(collection, 4);
@@ -162,7 +162,7 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 6
 
     assert_coll_count!(collection, 5);
@@ -295,7 +295,7 @@ async fn query_embedded_documents_examples(collection: &Collection<Document>) ->
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 14
 
     assert_coll_count!(collection, 5);
@@ -396,7 +396,7 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 20
 
     assert_coll_count!(collection, 5);
@@ -533,7 +533,7 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 29
 
     assert_coll_count!(collection, 5);
@@ -657,7 +657,7 @@ async fn query_null_or_missing_fields_examples(collection: &Collection<Document>
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 38
 
     assert_coll_count!(collection, 2);
@@ -782,7 +782,7 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 42
 
     assert_coll_count!(collection, 5);
@@ -1045,7 +1045,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 51
 
     assert_coll_count!(collection, 10);
@@ -1211,7 +1211,7 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 55
 
     assert_coll_count!(collection, 5);
@@ -1324,7 +1324,7 @@ async fn stable_api_examples() -> GenericResult<()> {
         doc! { "_id" : 6, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : iso_date("2021-02-15T12:05:10Z")? },
         doc! { "_id" : 7, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T14:12:12Z")? },
         doc! { "_id" : 8, "item" : "abc", "price" : 10, "quantity" : 5, "date" : iso_date("2021-03-16T20:20:13Z")? }
-    ], None).await?;
+    ]).await?;
     // End Versioned API Example 5
 
     // Start Versioned API Example 6
@@ -1536,46 +1536,40 @@ async fn index_examples() -> Result<()> {
     let db = client.database("index_examples");
     db.drop().await?;
     db.collection::<Document>("records")
-        .insert_many(
-            vec![
-                doc! {
-                    "student": "Marty McFly",
-                    "classYear": 1986,
-                    "school": "Hill Valley High",
-                    "score": 56.5,
-                },
-                doc! {
-                    "student": "Ferris F. Bueller",
-                    "classYear": 1987,
-                    "school": "Glenbrook North High",
-                    "status": "Suspended",
-                    "score": 76.0,
-                },
-            ],
-            None,
-        )
+        .insert_many(vec![
+            doc! {
+                "student": "Marty McFly",
+                "classYear": 1986,
+                "school": "Hill Valley High",
+                "score": 56.5,
+            },
+            doc! {
+                "student": "Ferris F. Bueller",
+                "classYear": 1987,
+                "school": "Glenbrook North High",
+                "status": "Suspended",
+                "score": 76.0,
+            },
+        ])
         .await?;
     db.collection::<Document>("restaurants")
-        .insert_many(
-            vec![
-                doc! {
-                    "name": "Chez Panisse",
-                    "city": "Oakland",
-                    "state": "California",
-                    "country": "United States",
-                    "rating": 4.4,
-                },
-                doc! {
-                    "name": "Eleven Madison Park",
-                    "cuisine": "French",
-                    "city": "New York City",
-                    "state": "New York",
-                    "country": "United States",
-                    "rating": 7.1,
-                },
-            ],
-            None,
-        )
+        .insert_many(vec![
+            doc! {
+                "name": "Chez Panisse",
+                "city": "Oakland",
+                "state": "California",
+                "country": "United States",
+                "rating": 4.4,
+            },
+            doc! {
+                "name": "Eleven Madison Park",
+                "cuisine": "French",
+                "city": "New York City",
+                "state": "New York",
+                "country": "United States",
+                "rating": 7.1,
+            },
+        ])
         .await?;
 
     use crate::IndexModel;

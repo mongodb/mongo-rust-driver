@@ -727,27 +727,17 @@ impl TestOperation for InsertMany {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .insert_many(&self.documents)
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| {
-                        async move {
-                            collection
-                                .insert_many_with_session(
-                                    self.documents.clone(),
-                                    self.options.clone(),
-                                    session,
-                                )
-                                .await
-                        }
-                        .boxed()
+                        async move { action.session(session.deref_mut()).await }.boxed()
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .insert_many(self.documents.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let ids: HashMap<String, Bson> = result
                 .inserted_ids

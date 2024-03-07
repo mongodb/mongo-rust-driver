@@ -33,7 +33,7 @@ async fn tailable_cursor() {
         )
         .await;
 
-    coll.insert_many((0..5).map(|i| doc! { "_id": i }), None)
+    coll.insert_many((0..5).map(|i| doc! { "_id": i }))
         .await
         .unwrap();
 
@@ -89,7 +89,8 @@ async fn session_cursor_next() {
         .create_fresh_collection(function_name!(), function_name!(), None)
         .await;
 
-    coll.insert_many_with_session((0..5).map(|i| doc! { "_id": i }), None, &mut session)
+    coll.insert_many((0..5).map(|i| doc! { "_id": i }))
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -119,17 +120,14 @@ async fn batch_exhaustion() {
             None,
         )
         .await;
-    coll.insert_many(
-        vec![
-            doc! { "foo": 1 },
-            doc! { "foo": 2 },
-            doc! { "foo": 3 },
-            doc! { "foo": 4 },
-            doc! { "foo": 5 },
-            doc! { "foo": 6 },
-        ],
-        None,
-    )
+    coll.insert_many(vec![
+        doc! { "foo": 1 },
+        doc! { "foo": 2 },
+        doc! { "foo": 3 },
+        doc! { "foo": 4 },
+        doc! { "foo": 5 },
+        doc! { "foo": 6 },
+    ])
     .await
     .unwrap();
 
@@ -189,7 +187,7 @@ async fn borrowed_deserialization() {
         Doc { id: 5, foo: "1" },
     ];
 
-    coll.insert_many(&docs, None).await.unwrap();
+    coll.insert_many(&docs).await.unwrap();
 
     let options = FindOptions::builder()
         .batch_size(2)
@@ -233,13 +231,10 @@ async fn session_cursor_with_type() {
     let coll = client.database("db").collection("coll");
     coll.drop().session(&mut session).await.unwrap();
 
-    coll.insert_many_with_session(
-        vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }],
-        None,
-        &mut session,
-    )
-    .await
-    .unwrap();
+    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }])
+        .session(&mut session)
+        .await
+        .unwrap();
 
     let mut cursor: crate::SessionCursor<bson::Document> =
         coll.find(doc! {}).session(&mut session).await.unwrap();
@@ -257,16 +252,13 @@ async fn cursor_final_batch() {
     let coll = client
         .create_fresh_collection("test_cursor_final_batch", "test", None)
         .await;
-    coll.insert_many(
-        vec![
-            doc! { "foo": 1 },
-            doc! { "foo": 2 },
-            doc! { "foo": 3 },
-            doc! { "foo": 4 },
-            doc! { "foo": 5 },
-        ],
-        None,
-    )
+    coll.insert_many(vec![
+        doc! { "foo": 1 },
+        doc! { "foo": 2 },
+        doc! { "foo": 3 },
+        doc! { "foo": 4 },
+        doc! { "foo": 5 },
+    ])
     .await
     .unwrap();
 

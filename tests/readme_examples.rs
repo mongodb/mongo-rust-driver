@@ -56,7 +56,7 @@ async fn _inserting_documents_into_a_collection(db: mongodb::Database) -> Result
     ];
 
     // Insert some documents into the "mydb.books" collection.
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
 
     Ok(())
 }
@@ -84,7 +84,7 @@ async fn _inserting_documents_into_a_typed_collection(db: mongodb::Database) -> 
     ];
 
     // Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
-    typed_collection.insert_many(books, None).await?;
+    typed_collection.insert_many(books).await?;
 
     Ok(())
 }
@@ -132,7 +132,7 @@ async fn _using_the_sync_api() -> Result<()> {
     ];
 
     // Insert some books into the "mydb.books" collection.
-    collection.insert_many(docs, None)?;
+    collection.insert_many(docs).run()?;
 
     let cursor = collection.find(doc! { "author": "George Orwell" }).run()?;
     for result in cursor {

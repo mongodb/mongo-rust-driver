@@ -425,14 +425,11 @@ impl TestOperation for InsertMany {
         let options = self.options.clone();
 
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .insert_many_with_session(documents, options, session)
-                        .await?
-                }
-                None => collection.insert_many(documents, options).await?,
-            };
+            let result = collection
+                .insert_many(documents)
+                .with_options(options)
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let ids: HashMap<String, Bson> = result
                 .inserted_ids
                 .into_iter()

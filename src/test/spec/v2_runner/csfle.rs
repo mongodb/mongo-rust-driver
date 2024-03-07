@@ -22,7 +22,7 @@ pub(crate) async fn populate_key_vault(client: &Client, kv_data: Option<&Vec<Doc
             );
         datakeys.drop().await.unwrap();
         if !kv_data.is_empty() {
-            datakeys.insert_many(kv_data, None).await.unwrap();
+            datakeys.insert_many(kv_data).await.unwrap();
         }
     }
 }

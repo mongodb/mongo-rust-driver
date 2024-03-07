@@ -5,7 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
         ReplaceOptions,
@@ -244,32 +243,24 @@ async fn command_contains_write_concern_insert_many() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(
-        &[doc! { "foo": "bar" }],
-        InsertManyOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.insert_many(
-        &[doc! { "foo": "bar" }],
-        InsertManyOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_many(&[doc! { "foo": "bar" }])
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.insert_many(&[doc! { "foo": "bar" }])
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "insert"),
@@ -335,7 +326,7 @@ async fn command_contains_write_concern_update_many() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.update_many(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
@@ -431,7 +422,7 @@ async fn command_contains_write_concern_delete_one() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_one(doc! { "foo": "bar" })
@@ -475,7 +466,7 @@ async fn command_contains_write_concern_delete_many() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_many(doc! { "foo": "bar" })
@@ -487,7 +478,7 @@ async fn command_contains_write_concern_delete_many() {
         )
         .await
         .unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_many(doc! { "foo": "bar" })
@@ -522,7 +513,7 @@ async fn command_contains_write_concern_find_one_and_delete() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.find_one_and_delete(doc! { "foo": "bar" })
@@ -566,7 +557,7 @@ async fn command_contains_write_concern_find_one_and_replace() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
@@ -610,7 +601,7 @@ async fn command_contains_write_concern_find_one_and_update() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })

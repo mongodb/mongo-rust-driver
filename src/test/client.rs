@@ -810,7 +810,7 @@ async fn manual_shutdown_with_resources() {
     let db = client.database("shutdown_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
-    coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
+    coll.insert_many([doc! {}, doc! {}]).await.unwrap();
     let bucket = db.gridfs_bucket(None);
     // Scope to force drop of resources
     {
@@ -870,7 +870,7 @@ async fn manual_shutdown_immediate_with_resources() {
     let db = client.database("shutdown_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
-    coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
+    coll.insert_many([doc! {}, doc! {}]).await.unwrap();
     let bucket = db.gridfs_bucket(None);
 
     // Resources are scoped to past the `shutdown_immediate`.

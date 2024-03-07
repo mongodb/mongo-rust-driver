@@ -35,7 +35,7 @@ async fn run_count_test(test_file: TestFile) {
             .await;
 
         if !data.is_empty() {
-            coll.insert_many(data.clone(), None)
+            coll.insert_many(data.clone())
                 .await
                 .expect(&test_case.description);
         }

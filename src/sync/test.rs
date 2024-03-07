@@ -378,7 +378,7 @@ fn borrowed_deserialization() {
         Doc { id: 5, foo: "1" },
     ];
 
-    coll.insert_many(&docs, None).unwrap();
+    coll.insert_many(&docs).run().unwrap();
     let options = FindOptions::builder()
         .batch_size(2)
         .sort(doc! { "_id": 1 })

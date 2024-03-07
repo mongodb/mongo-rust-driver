@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use std::{collections::HashMap, convert::TryInto};
 
 use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocument, RawDocumentBuf};

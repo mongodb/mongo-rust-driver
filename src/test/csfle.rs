@@ -581,19 +581,16 @@ async fn bson_size_limits() -> Result<()> {
     // Test operation 3
     let value = "a".repeat(2_097_152);
     events.clear_events(Duration::from_millis(500)).await;
-    coll.insert_many(
-        vec![
-            doc! {
-                "_id": "over_2mib_1",
-                "unencrypted": value.clone(),
-            },
-            doc! {
-                "_id": "over_2mib_2",
-                "unencrypted": value,
-            },
-        ],
-        None,
-    )
+    coll.insert_many(vec![
+        doc! {
+            "_id": "over_2mib_1",
+            "unencrypted": value.clone(),
+        },
+        doc! {
+            "_id": "over_2mib_2",
+            "unencrypted": value,
+        },
+    ])
     .await?;
     let inserts = events
         .collect_events(Duration::from_millis(500), |ev| {
@@ -613,7 +610,7 @@ async fn bson_size_limits() -> Result<()> {
     let mut doc2 = doc.clone();
     doc2.insert("_id", "encryption_exceeds_2mib_2");
     events.clear_events(Duration::from_millis(500)).await;
-    coll.insert_many(vec![doc, doc2], None).await?;
+    coll.insert_many(vec![doc, doc2]).await?;
     let inserts = events
         .collect_events(Duration::from_millis(500), |ev| {
             let ev = match ev.as_command_started_event() {

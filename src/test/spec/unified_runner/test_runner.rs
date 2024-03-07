@@ -386,9 +386,7 @@ impl TestRunner {
                     collection_options,
                 )
                 .await;
-            coll.insert_many(data.documents.clone(), None)
-                .await
-                .unwrap();
+            coll.insert_many(data.documents.clone()).await.unwrap();
         } else {
             let collection_options = CreateCollectionOptions::builder()
                 .write_concern(write_concern)

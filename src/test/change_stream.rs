@@ -430,7 +430,7 @@ async fn batch_mid_resume_token() -> Result<()> {
             }
             // If we're out of events, make some more.
             None => {
-                coll.insert_many((0..3).map(|_| doc! {}), None).await?;
+                coll.insert_many((0..3).map(|_| doc! {})).await?;
             }
         };
 

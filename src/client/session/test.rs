@@ -7,10 +7,10 @@ use futures::stream::StreamExt;
 
 use crate::{
     bson::{doc, Bson},
-    coll::options::{CountOptions, InsertManyOptions},
+    coll::options::CountOptions,
     error::Result,
     event::sdam::SdamEvent,
-    options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
+    options::{FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
@@ -63,11 +63,7 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "insert",
-            collection_op!(
-                $test_name,
-                coll,
-                coll.insert_many(vec![doc! { "x": 1 }], None)
-            ),
+            collection_op!($test_name, coll, coll.insert_many(vec![doc! { "x": 1 }])),
         )
         .await;
         $test_func(
@@ -412,7 +408,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    coll.insert_many(vec![doc! {}, doc! {}], None)
+    coll.insert_many(vec![doc! {}, doc! {}])
         .await
         .expect("insert should succeed");
 
@@ -505,10 +501,10 @@ async fn find_and_getmore_share_session() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    let options = InsertManyOptions::builder()
-        .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-        .build();
-    coll.insert_many(vec![doc! {}; 3], options).await.unwrap();
+    coll.insert_many(vec![doc! {}; 3])
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
 
     let read_preferences: Vec<ReadPreference> = vec![
         ReadPreference::Primary,

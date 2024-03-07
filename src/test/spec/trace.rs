@@ -87,7 +87,7 @@ async fn command_logging_truncation_default_limit() {
     let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
 
     let docs = iter::repeat(doc! { "x": "y" }).take(100);
-    coll.insert_many(docs, None)
+    coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
@@ -178,7 +178,7 @@ async fn command_logging_truncation_mid_codepoint() {
     let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
 
     let docs = iter::repeat(doc! { "🤔": "🤔🤔🤔🤔🤔🤔" }).take(10);
-    coll.insert_many(docs, None)
+    coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 

@@ -3,7 +3,6 @@ use serde::Deserialize;
 use super::{run_crud_v1_test, Outcome, TestFile};
 use crate::{
     bson::{Bson, Document},
-    options::InsertManyOptions,
     test::util::TestClient,
 };
 
@@ -37,7 +36,7 @@ async fn run_insert_many_test(test_file: TestFile) {
         let coll = client
             .init_db_and_coll(function_name!(), &test_case.description)
             .await;
-        coll.insert_many(data.clone(), None)
+        coll.insert_many(data.clone())
             .await
             .expect(&test_case.description);
 
@@ -46,11 +45,11 @@ async fn run_insert_many_test(test_file: TestFile) {
         let outcome: Outcome<ResultDoc> =
             bson::from_bson(Bson::Document(test_case.outcome)).expect(&test_case.description);
 
-        let options = InsertManyOptions::builder()
+        let result = match coll
+            .insert_many(arguments.documents)
             .ordered(arguments.options.ordered)
-            .build();
-
-        let result = match coll.insert_many(arguments.documents, options).await {
+            .await
+        {
             Ok(result) => {
                 assert_ne!(outcome.error, Some(true), "{}", test_case.description);
                 result.inserted_ids

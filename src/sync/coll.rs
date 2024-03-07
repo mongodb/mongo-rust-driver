@@ -6,15 +6,8 @@ use super::ClientSession;
 use crate::{
     bson::Document,
     error::Result,
-    options::{
-        InsertManyOptions,
-        InsertOneOptions,
-        ReadConcern,
-        ReplaceOptions,
-        SelectionCriteria,
-        WriteConcern,
-    },
-    results::{InsertManyResult, InsertOneResult, UpdateResult},
+    options::{InsertOneOptions, ReadConcern, ReplaceOptions, SelectionCriteria, WriteConcern},
+    results::{InsertOneResult, UpdateResult},
     Collection as AsyncCollection,
     Namespace,
 };
@@ -111,39 +104,6 @@ impl<T> Collection<T>
 where
     T: Serialize + Send + Sync,
 {
-    /// Inserts the documents in `docs` into the collection.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_many(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-    ) -> Result<InsertManyResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
-    }
-
-    /// Inserts the documents in `docs` into the collection using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_many_with_session(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<InsertManyResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many_with_session(
-            docs,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
     /// Inserts `doc` into the collection.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support

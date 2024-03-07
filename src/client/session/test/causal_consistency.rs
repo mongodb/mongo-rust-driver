@@ -49,7 +49,7 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     }));
 
     ops.push(op!("insert", false, |coll, session| {
-        coll.insert_many_with_session(vec![doc! { "x": 1 }], None, session)
+        coll.insert_many(vec![doc! { "x": 1 }]).session(session)
     }));
 
     ops.push(op!("find", true, |coll, session| coll

@@ -530,7 +530,7 @@ async fn write_bytes(
         chunks.push(chunk);
     }
 
-    match bucket.chunks().insert_many(chunks, None).await {
+    match bucket.chunks().insert_many(chunks).await {
         Ok(_) => {
             buffer.drain(..(n * chunk_size_bytes).get()?);
             Ok((n.try_into()?, buffer))

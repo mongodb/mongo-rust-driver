@@ -1,7 +1,7 @@
 mod action;
 pub mod options;
 
-use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
+use std::{borrow::Borrow, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
@@ -11,9 +11,9 @@ use crate::{
     client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    error::{convert_bulk_errors, Error, Result},
     operation::{Insert, Update},
-    results::{InsertManyResult, InsertOneResult, UpdateResult},
+    results::{InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -226,150 +226,6 @@ impl<T> Collection<T>
 where
     T: Serialize + Send + Sync,
 {
-    #[allow(clippy::needless_option_as_deref)]
-    async fn insert_many_common(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<InsertManyResult> {
-        let ds: Vec<_> = docs.into_iter().collect();
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        if ds.is_empty() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "No documents provided to insert_many".to_string(),
-            }
-            .into());
-        }
-
-        let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
-
-        let mut cumulative_failure: Option<BulkWriteFailure> = None;
-        let mut error_labels: HashSet<String> = Default::default();
-        let mut cumulative_result: Option<InsertManyResult> = None;
-
-        let mut n_attempted = 0;
-
-        while n_attempted < ds.len() {
-            let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert: Insert = unreachable!();
-
-            match self
-                .client()
-                .execute_operation(insert, session.as_deref_mut())
-                .await
-            {
-                Ok(result) => {
-                    let current_batch_size = result.inserted_ids.len();
-
-                    let cumulative_result =
-                        cumulative_result.get_or_insert_with(InsertManyResult::new);
-                    for (index, id) in result.inserted_ids {
-                        cumulative_result
-                            .inserted_ids
-                            .insert(index + n_attempted, id);
-                    }
-
-                    n_attempted += current_batch_size;
-                }
-                Err(e) => {
-                    let labels = e.labels().clone();
-                    match *e.kind {
-                        ErrorKind::BulkWrite(bw) => {
-                            // for ordered inserts this size will be incorrect, but knowing the
-                            // batch size isn't needed for ordered
-                            // failures since we return immediately from
-                            // them anyways.
-                            let current_batch_size = bw.inserted_ids.len()
-                                + bw.write_errors.as_ref().map(|we| we.len()).unwrap_or(0);
-
-                            let failure_ref =
-                                cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
-                            if let Some(write_errors) = bw.write_errors {
-                                for err in write_errors {
-                                    let index = n_attempted + err.index;
-
-                                    failure_ref
-                                        .write_errors
-                                        .get_or_insert_with(Default::default)
-                                        .push(BulkWriteError { index, ..err });
-                                }
-                            }
-
-                            if let Some(wc_error) = bw.write_concern_error {
-                                failure_ref.write_concern_error = Some(wc_error);
-                            }
-
-                            error_labels.extend(labels);
-
-                            if ordered {
-                                // this will always be true since we invoked get_or_insert_with
-                                // above.
-                                if let Some(failure) = cumulative_failure {
-                                    return Err(Error::new(
-                                        ErrorKind::BulkWrite(failure),
-                                        Some(error_labels),
-                                    ));
-                                }
-                            }
-                            n_attempted += current_batch_size;
-                        }
-                        _ => return Err(e),
-                    }
-                }
-            }
-        }
-
-        match cumulative_failure {
-            Some(failure) => Err(Error::new(
-                ErrorKind::BulkWrite(failure),
-                Some(error_labels),
-            )),
-            None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),
-        }
-    }
-
-    /// Inserts the data in `docs` into the collection.
-    ///
-    /// Note that this method accepts both owned and borrowed values, so the input documents
-    /// do not need to be cloned in order to be passed in.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn insert_many(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-    ) -> Result<InsertManyResult> {
-        self.insert_many_common(docs, options, None).await
-    }
-
-    /// Inserts the data in `docs` into the collection using the provided `ClientSession`.
-    ///
-    /// Note that this method accepts both owned and borrowed values, so the input documents
-    /// do not need to be cloned in order to be passed in.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn insert_many_with_session(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<InsertManyResult> {
-        self.insert_many_common(docs, options, Some(session)).await
-    }
-
     async fn insert_one_common(
         &self,
         doc: &T,

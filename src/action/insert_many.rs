@@ -28,7 +28,7 @@ impl<T: Serialize> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<InsertManyResult>`.
-    pub fn insert_many_2(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
+    pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         let human_readable = self.human_readable_serialization();
         InsertMany {
             coll: CollRef::new(self),
@@ -54,12 +54,13 @@ impl<T: Serialize> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<InsertManyResult>`.
-    pub fn insert_many_2(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
-        self.async_collection.insert_many_2(docs)
+    /// [`run`](InsertMany::run) will return `Result<InsertManyResult>`.
+    pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
+        self.async_collection.insert_many(docs)
     }
 }
 
+/// Inserts documents into a collection.  Construct with [`Collection::insert_many`].
 #[must_use]
 pub struct InsertMany<'a> {
     coll: CollRef<'a>,

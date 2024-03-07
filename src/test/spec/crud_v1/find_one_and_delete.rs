@@ -31,7 +31,7 @@ async fn run_find_one_and_delete_test(test_file: TestFile) {
         let coll = client
             .init_db_and_coll(function_name!(), &test_case.description)
             .await;
-        coll.insert_many(data.clone(), None)
+        coll.insert_many(data.clone())
             .await
             .expect(&test_case.description);
 

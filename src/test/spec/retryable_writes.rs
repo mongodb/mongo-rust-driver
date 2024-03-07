@@ -16,7 +16,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::{ClientOptions, InsertManyOptions},
+    options::ClientOptions,
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     sdam::MIN_HEARTBEAT_FREQUENCY,
@@ -78,7 +78,7 @@ async fn run_legacy() {
             let coll = client.init_db_and_coll(&db_name, coll_name).await;
 
             if !test_file.data.is_empty() {
-                coll.insert_many(test_file.data.clone(), None)
+                coll.insert_many(test_file.data.clone())
                     .await
                     .expect(&test_case.description);
             }
@@ -271,14 +271,14 @@ async fn transaction_ids_included() {
         .unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    let options = InsertManyOptions::builder().ordered(true).build();
-    coll.insert_many(vec![doc! { "x": 1 }], options)
+    coll.insert_many(vec![doc! { "x": 1 }])
+        .ordered(true)
         .await
         .unwrap();
     assert!(includes_txn_number("insert"));
 
-    let options = InsertManyOptions::builder().ordered(false).build();
-    coll.insert_many(vec![doc! { "x": 1 }], options)
+    coll.insert_many(vec![doc! { "x": 1 }])
+        .ordered(false)
         .await
         .unwrap();
     assert!(includes_txn_number("insert"));

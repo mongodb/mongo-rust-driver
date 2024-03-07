@@ -5,7 +5,7 @@ use futures::stream::StreamExt;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{Acknowledgment, ClientOptions, InsertManyOptions, WriteConcern},
+    options::{Acknowledgment, ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, util::EventClient},
     Collection,
@@ -57,16 +57,10 @@ async fn get_more() {
         }
 
         let docs = vec![doc! { "x": 1 }; 5];
-        coll.insert_many(
-            docs,
-            Some(
-                InsertManyOptions::builder()
-                    .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-                    .build(),
-            ),
-        )
-        .await
-        .unwrap();
+        coll.insert_many(docs)
+            .write_concern(WriteConcern::majority())
+            .await
+            .unwrap();
 
         let mut cursor = coll.find(doc! {}).batch_size(2).await.unwrap();
 

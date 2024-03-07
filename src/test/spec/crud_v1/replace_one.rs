@@ -41,7 +41,7 @@ async fn run_replace_one_test(test_file: TestFile) {
                 &test_case.description.replace('$', "%").replace(' ', "_"),
             )
             .await;
-        coll.insert_many(data.clone(), None)
+        coll.insert_many(data.clone())
             .await
             .expect(&test_case.description);
 

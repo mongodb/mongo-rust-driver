@@ -13,7 +13,7 @@ use crate::{
     bson::{doc, from_bson},
     coll::options::DropCollectionOptions,
     concern::WriteConcern,
-    options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
+    options::{ClientOptions, CreateCollectionOptions},
     sdam::{ServerInfo, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::SelectionCriteria,
     test::{
@@ -180,10 +180,10 @@ impl TestContext {
             match data {
                 TestData::Single(data) => {
                     if !data.is_empty() {
-                        let options = InsertManyOptions::builder()
+                        coll.insert_many(data.clone())
                             .write_concern(WriteConcern::majority())
-                            .build();
-                        coll.insert_many(data.clone(), options).await.unwrap();
+                            .await
+                            .unwrap();
                     }
                 }
                 TestData::Many(_) => panic!("{}: invalid data format", &test.description),
