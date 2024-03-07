@@ -7,6 +7,7 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     options::{
+        ClusteredIndex,
         Collation,
         CreateCollectionOptions,
         IndexOptionDefaults,
@@ -337,4 +338,19 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
         Err(_) => None,
     };
     assert_eq!(event_defaults, defaults);
+}
+
+#[test]
+fn deserialize_clustered_index_option_from_bool() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let input = serde_json::json!({ "clusteredIndex": true });
+    let options = serde_json::from_value::<CreateCollectionOptions>(input)?;
+    let clustered_index = options
+        .clustered_index
+        .expect("deserialized options include clustered_index");
+    let default_index = ClusteredIndex::default();
+    assert_eq!(clustered_index.key, default_index.key);
+    assert_eq!(clustered_index.unique, default_index.unique);
+    assert_eq!(clustered_index.name, default_index.name);
+    assert_eq!(clustered_index.v, default_index.v);
+    Ok(())
 }
