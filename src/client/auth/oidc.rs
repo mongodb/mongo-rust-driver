@@ -360,12 +360,12 @@ async fn do_two_step_auth(
     Ok(())
 }
 
-fn get_allows_hosts(mechanism_properties: &Option<Document>) -> Result<Vec<&str>> {
+fn get_allowed_hosts(mechanism_properties: &Option<Document>) -> Result<Vec<&str>> {
     if mechanism_properties.is_none() {
         return Ok(Vec::from(DEFAULT_ALLOWED_HOSTS));
     }
     if let Some(allowed_hosts) = mechanism_properties.as_ref().unwrap().get("ALLOWED_HOSTS") {
-        return Ok(allowed_hosts
+        return allowed_hosts
             .as_array()
             .ok_or_else(|| auth_error("allowed_hosts must be an array"))?
             .iter()
@@ -373,7 +373,7 @@ fn get_allows_hosts(mechanism_properties: &Option<Document>) -> Result<Vec<&str>
                 host.as_str()
                     .ok_or_else(|| auth_error("allowed_hosts must contain only strings"))
             })
-            .collect::<Result<Vec<&str>>>()?);
+            .collect::<Result<Vec<&str>>>();
     }
     Ok(Vec::from(DEFAULT_ALLOWED_HOSTS))
 }
@@ -387,7 +387,7 @@ fn validate_address_with_allowed_hosts(
     } else {
         return Err(auth_error("OIDC human flow only supports TCP addresses"));
     };
-    let allowed_hosts = get_allows_hosts(mechanism_properties)?;
+    let allowed_hosts = get_allowed_hosts(mechanism_properties)?;
     for pattern in allowed_hosts.into_iter() {
         if pattern == hostname {
             return Ok(());
