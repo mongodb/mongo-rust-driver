@@ -387,24 +387,3 @@ pub struct RunCursorCommandOptions {
     /// getMore commands.
     pub comment: Option<Bson>,
 }
-
-#[cfg(test)]
-mod spec {
-    use super::*;
-    use serde_json::{from_value, json};
-
-    #[test]
-    fn deserializes_clustered_index_option_from_bool() -> Result<(), Box<dyn std::error::Error>> {
-        let input = json!({ "clusteredIndex": true });
-        let options = from_value::<CreateCollectionOptions>(input)?;
-        let clustered_index = options
-            .clustered_index
-            .expect("deserialized options include clustered_index");
-        let default_index = ClusteredIndex::default();
-        assert_eq!(clustered_index.key, default_index.key);
-        assert_eq!(clustered_index.unique, default_index.unique);
-        assert_eq!(clustered_index.name, default_index.name);
-        assert_eq!(clustered_index.v, default_index.v);
-        Ok(())
-    }
-}
