@@ -5,8 +5,8 @@ use bson::doc;
 use crate::{
     error::Result,
     event::{
-        cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::{CommandEvent, CommandEventHandler},
+        cmap::{CmapEvent, ConnectionCheckoutFailedReason},
+        command::CommandEvent,
     },
     runtime,
     runtime::AsyncJoinHandle,
@@ -24,22 +24,19 @@ use crate::{
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_legacy() {
     run_v2_tests(&["retryable-reads", "legacy"]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     run_unified_tests(&["retryable-reads", "unified"]).await;
 }
 
 /// Test ensures that the connection used in the first attempt of a retry is released back into the
 /// pool before the second attempt.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_releases_connection() {
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
@@ -70,16 +67,15 @@ async fn retry_releases_connection() {
 }
 
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_read_pool_cleared() {
     let handler = Arc::new(EventHandler::new());
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
-    client_options.command_event_handler = Some(handler.clone() as Arc<dyn CommandEventHandler>);
+    client_options.cmap_event_handler = Some(handler.clone().into());
+    client_options.command_event_handler = Some(handler.clone().into());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -162,8 +158,7 @@ async fn retry_read_pool_cleared() {
 }
 
 // Retryable Reads Are Retried on a Different mongos if One is Available
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_read_different_mongos() {
     let mut client_options = get_client_options().await.clone();
     if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
@@ -224,8 +219,7 @@ async fn retry_read_different_mongos() {
 }
 
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_read_same_mongos() {
     let init_client = Client::test_builder().build().await;
     if !init_client.supports_fail_command() {

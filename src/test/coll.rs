@@ -1,8 +1,14 @@
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
-use crate::Namespace;
+use crate::{
+    event::command::CommandEvent,
+    test::{Event, EventHandler},
+    Client,
+    Namespace,
+};
+use bson::{rawdoc, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -11,7 +17,6 @@ use crate::{
     error::{ErrorKind, Result, WriteFailure},
     options::{
         Acknowledgment,
-        AggregateOptions,
         CollectionOptions,
         DeleteOptions,
         DropCollectionOptions,
@@ -24,11 +29,9 @@ use crate::{
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
-        UpdateOptions,
         WriteConcern,
     },
     results::DeleteResult,
-    runtime,
     test::{
         get_client_options,
         log_uncaptured,
@@ -38,8 +41,7 @@ use crate::{
     IndexModel,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn insert_err_details() {
     let client = TestClient::new().await;
@@ -52,28 +54,25 @@ async fn insert_err_details() {
     }
     client
         .database("admin")
-        .run_command(
-            doc! {
-                "configureFailPoint": "failCommand",
-                "data": {
-                "failCommands": ["insert"],
-                "writeConcernError": {
-                    "code": 100,
-                    "codeName": "UnsatisfiableWriteConcern",
-                    "errmsg": "Not enough data-bearing nodes",
-                    "errInfo": {
-                    "writeConcern": {
-                        "w": 2,
-                        "wtimeout": 0,
-                        "provenance": "clientSupplied"
-                    }
-                    }
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "data": {
+            "failCommands": ["insert"],
+            "writeConcernError": {
+                "code": 100,
+                "codeName": "UnsatisfiableWriteConcern",
+                "errmsg": "Not enough data-bearing nodes",
+                "errInfo": {
+                "writeConcern": {
+                    "w": 2,
+                    "wtimeout": 0,
+                    "provenance": "clientSupplied"
                 }
-                },
-                "mode": { "times": 1 }
+                }
+            }
             },
-            None,
-        )
+            "mode": { "times": 1 }
+        })
         .await
         .unwrap();
 
@@ -97,8 +96,7 @@ async fn insert_err_details() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn count() {
     let client = TestClient::new().await;
@@ -106,21 +104,20 @@ async fn count() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 0);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 0);
 
     let _ = coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 1);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 1);
 
     let result = coll
         .insert_many((1..4).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 3);
-    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 4);
+    assert_eq!(coll.estimated_document_count().await.unwrap(), 4);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find() {
     let client = TestClient::new().await;
@@ -145,8 +142,7 @@ async fn find() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn update() {
     let client = TestClient::new().await;
@@ -161,30 +157,29 @@ async fn update() {
     assert_eq!(result.inserted_ids.len(), 5);
 
     let update_one_results = coll
-        .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }}, None)
+        .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }})
         .await
         .unwrap();
     assert_eq!(update_one_results.modified_count, 1);
     assert!(update_one_results.upserted_id.is_none());
 
     let update_many_results = coll
-        .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}}, None)
+        .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}})
         .await
         .unwrap();
     assert_eq!(update_many_results.modified_count, 4);
     assert!(update_many_results.upserted_id.is_none());
 
-    let options = UpdateOptions::builder().upsert(true).build();
     let upsert_results = coll
-        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, options)
+        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }})
+        .upsert(true)
         .await
         .unwrap();
     assert_eq!(upsert_results.modified_count, 0);
     assert!(upsert_results.upserted_id.is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete() {
     let client = TestClient::new().await;
@@ -198,17 +193,16 @@ async fn delete() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
+    let delete_one_result = coll.delete_one(doc! {"x": 3}).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
-    assert_eq!(coll.count_documents(doc! {"x": 3}, None).await.unwrap(), 4);
-    let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
+    assert_eq!(coll.count_documents(doc! {"x": 3}).await.unwrap(), 4);
+    let delete_many_result = coll.delete_many(doc! {"x": 3}).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
-    assert_eq!(coll.count_documents(doc! {"x": 3 }, None).await.unwrap(), 0);
+    assert_eq!(coll.count_documents(doc! {"x": 3 }).await.unwrap(), 0);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn aggregate_out() {
     let client = TestClient::new().await;
@@ -234,9 +228,9 @@ async fn aggregate_out() {
     ];
     drop_collection(&out_coll).await;
 
-    coll.aggregate(pipeline.clone(), None).await.unwrap();
+    coll.aggregate(pipeline.clone()).await.unwrap();
     assert!(db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .unwrap()
         .into_iter()
@@ -244,11 +238,9 @@ async fn aggregate_out() {
     drop_collection(&out_coll).await;
 
     // check that even with a batch size of 0, a new collection is created.
-    coll.aggregate(pipeline, AggregateOptions::builder().batch_size(0).build())
-        .await
-        .unwrap();
+    coll.aggregate(pipeline).batch_size(0).await.unwrap();
     assert!(db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .unwrap()
         .into_iter()
@@ -261,8 +253,7 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
         .is_empty()
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn kill_cursors_on_drop() {
     let client = TestClient::new().await;
@@ -292,13 +283,12 @@ async fn kill_cursors_on_drop() {
     // The `Drop` implementation for `Cursor' spawns a back tasks that emits certain events. If the
     // task hasn't been scheduled yet, we may not see the event here. To account for this, we wait
     // for a small amount of time before checking.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     assert!(kill_cursors_sent(&event_client));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
     let client = TestClient::new().await;
@@ -326,13 +316,13 @@ async fn no_kill_cursors_on_exhausted() {
     std::mem::drop(cursor);
 
     // wait for any tasks to get spawned from `Cursor`'s `Drop`.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(!kill_cursors_sent(&event_client));
 }
 
-lazy_static! {
-    #[allow(clippy::unreadable_literal)]
-    static ref LARGE_DOC: Document = doc! {
+#[allow(clippy::unreadable_literal)]
+static LARGE_DOC: Lazy<Document> = Lazy::new(|| {
+    doc! {
         "text": "the quick brown fox jumped over the lazy sheep dog",
         "in_reply_to_status_id": 22213321312i64,
         "retweet_count": Bson::Null,
@@ -380,11 +370,10 @@ lazy_static! {
             "listed_count": 1,
             "lang": "en"
         }
-    };
-}
+    }
+});
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn large_insert() {
     if std::env::consts::OS != "linux" {
@@ -431,8 +420,7 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
     docs
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn large_insert_unordered_with_errors() {
     if std::env::consts::OS != "linux" {
@@ -470,8 +458,7 @@ async fn large_insert_unordered_with_errors() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn large_insert_ordered_with_errors() {
     if std::env::consts::OS != "linux" {
@@ -501,7 +488,7 @@ async fn large_insert_ordered_with_errors() {
             assert_eq!(write_errors.len(), 1);
             assert_eq!(write_errors[0].index, 7499);
             assert_eq!(
-                coll.count_documents(None, None)
+                coll.count_documents(doc! {})
                     .await
                     .expect("count should succeed"),
                 7499
@@ -511,8 +498,7 @@ async fn large_insert_ordered_with_errors() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn empty_insert() {
     let client = TestClient::new().await;
@@ -530,22 +516,19 @@ async fn empty_insert() {
     };
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_allow_disk_use() {
     let find_opts = FindOptions::builder().allow_disk_use(true).build();
     allow_disk_use_test(find_opts, Some(true)).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_do_not_allow_disk_use() {
     let find_opts = FindOptions::builder().allow_disk_use(false).build();
     allow_disk_use_test(find_opts, Some(false)).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_allow_disk_use_not_specified() {
     let find_opts = FindOptions::builder().build();
     allow_disk_use_test(find_opts, None).await;
@@ -570,20 +553,22 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     assert_eq!(allow_disk_use, expected_value);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn ns_not_found_suppression() {
     let client = TestClient::new().await;
     let coll = client.get_coll(function_name!(), function_name!());
-    coll.drop(None).await.expect("drop should not fail");
-    coll.drop(None).await.expect("drop should not fail");
+    coll.drop().await.expect("drop should not fail");
+    coll.drop().await.expect("drop should not fail");
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let client = EventClient::new().await;
     let coll = client.database(name).collection::<Document>(name);
-    let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
+    let _: Result<DeleteResult> = coll
+        .delete_many(doc! {})
+        .with_options(options.clone())
+        .await;
 
     let events = client.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
@@ -598,16 +583,14 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     assert_eq!(event_hint, expected_hint);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete_hint_keys_specified() {
     let options = DeleteOptions::builder().hint(Hint::Keys(doc! {})).build();
     delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete_hint_string_specified() {
     let options = DeleteOptions::builder()
@@ -616,8 +599,7 @@ async fn delete_hint_string_specified() {
     delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn delete_hint_not_specified() {
     delete_hint_test(None, function_name!()).await;
@@ -647,8 +629,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     assert_eq!(event_hint, expected_hint);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_keys_specified() {
     let options = FindOneAndDeleteOptions::builder()
@@ -657,8 +638,7 @@ async fn find_one_and_delete_hint_keys_specified() {
     find_one_and_delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_string_specified() {
     let options = FindOneAndDeleteOptions::builder()
@@ -667,15 +647,13 @@ async fn find_one_and_delete_hint_string_specified() {
     find_one_and_delete_hint_test(Some(options), function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_not_specified() {
     find_one_and_delete_hint_test(None, function_name!()).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_server_version() {
     let client = EventClient::new().await;
@@ -701,8 +679,7 @@ async fn find_one_and_delete_hint_server_version() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
     let client = EventClient::new().await;
@@ -738,8 +715,7 @@ struct UserType {
     str: String,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_insert_one() {
     let client = TestClient::new().await;
@@ -784,8 +760,7 @@ where
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_insert_many() {
     let client = TestClient::new().await;
@@ -816,8 +791,7 @@ async fn typed_insert_many() {
     assert_eq!(actual, insert_data);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_find_one_and_replace() {
     let client = TestClient::new().await;
@@ -846,8 +820,7 @@ async fn typed_find_one_and_replace() {
     assert_eq!(result, replacement);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_replace_one() {
     let client = TestClient::new().await;
@@ -872,8 +845,7 @@ async fn typed_replace_one() {
     assert_eq!(result, replacement);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn typed_returns() {
     let client = TestClient::new().await;
@@ -908,8 +880,7 @@ async fn typed_returns() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn count_documents_with_wc() {
     let mut options = get_client_options().await.clone();
@@ -926,13 +897,12 @@ async fn count_documents_with_wc() {
 
     coll.insert_one(doc! {}, None).await.unwrap();
 
-    coll.count_documents(doc! {}, None)
+    coll.count_documents(doc! {})
         .await
         .expect("count_documents should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn collection_options_inherited() {
     let client = EventClient::new().await;
@@ -956,7 +926,7 @@ async fn collection_options_inherited() {
     coll.find_one(None, None).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
-    coll.count_documents(None, None).await.unwrap();
+    coll.count_documents(doc! {}).await.unwrap();
     assert_options_inherited(&client, "aggregate").await;
 }
 
@@ -970,8 +940,7 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn drop_skip_serializing_none() {
     let client = TestClient::new().await;
@@ -979,11 +948,10 @@ async fn drop_skip_serializing_none() {
         .database(function_name!())
         .collection(function_name!());
     let options = DropCollectionOptions::builder().build();
-    assert!(coll.drop(options).await.is_ok());
+    assert!(coll.drop().with_options(options).await.is_ok());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn collection_generic_bounds() {
     #[derive(Deserialize)]
@@ -1009,8 +977,7 @@ async fn collection_generic_bounds() {
 
 /// Verify that a cursor with multiple batches whose last batch isn't full
 /// iterates without errors.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cursor_batch_size() {
     let client = TestClient::new().await;
     let coll = client
@@ -1030,7 +997,7 @@ async fn cursor_batch_size() {
         log_uncaptured("skipping cursor_batch_size due to standalone topology");
         return;
     }
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
         .find_with_session(doc! {}, opts.clone(), &mut session)
         .await
@@ -1051,8 +1018,7 @@ async fn cursor_batch_size() {
 
 /// Test that the driver gracefully handles cases where the server returns invalid UTF-8 in error
 /// messages. See SERVER-24007 and related tickets for details.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn invalid_utf8_response() {
     let client = TestClient::new().await;
     let coll = client
@@ -1063,7 +1029,7 @@ async fn invalid_utf8_response() {
         .keys(doc! {"name": 1})
         .options(IndexOptions::builder().unique(true).build())
         .build();
-    coll.create_index(index_model, None)
+    coll.create_index(index_model)
         .await
         .expect("creating an index should succeed");
 
@@ -1096,7 +1062,7 @@ async fn invalid_utf8_response() {
         .expect("inserting new document should succeed");
 
     let update_err = coll
-        .update_one(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc}, None)
+        .update_one(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc})
         .await
         .expect_err("update setting duplicate key should fail")
         .kind;
@@ -1104,7 +1070,7 @@ async fn invalid_utf8_response() {
 
     // test triggering an invalid error message via an update_many.
     let update_err = coll
-        .update_many(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc}, None)
+        .update_many(doc! {"x": 1}, doc! {"$set": &long_unicode_str_doc})
         .await
         .expect_err("update setting duplicate key should fail")
         .kind;
@@ -1160,8 +1126,7 @@ fn test_namespace_fromstr() {
     assert_eq!(t.coll, "something.else");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn configure_human_readable_serialization() {
     #[derive(Deserialize)]
     struct StringOrBytes(String);
@@ -1194,7 +1159,7 @@ async fn configure_human_readable_serialization() {
     let non_human_readable_collection: Collection<Data> = client
         .database("db")
         .collection_with_options("nonhumanreadable", collection_options);
-    non_human_readable_collection.drop(None).await.unwrap();
+    non_human_readable_collection.drop().await.unwrap();
 
     non_human_readable_collection
         .insert_one(
@@ -1243,7 +1208,7 @@ async fn configure_human_readable_serialization() {
     let human_readable_collection: Collection<Data> = client
         .database("db")
         .collection_with_options("humanreadable", collection_options);
-    human_readable_collection.drop(None).await.unwrap();
+    human_readable_collection.drop().await.unwrap();
 
     human_readable_collection
         .insert_one(
@@ -1279,4 +1244,96 @@ async fn configure_human_readable_serialization() {
         .find_one(doc! { "id": 1 }, None)
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn insert_many_document_sequences() {
+    if cfg!(feature = "in-use-encryption-unstable") {
+        log_uncaptured(
+            "skipping insert_many_document_sequences: auto-encryption does not support document \
+             sequences",
+        );
+        return;
+    }
+
+    let handler = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(handler.clone())
+        .build()
+        .await;
+    let mut subscriber = handler.subscribe();
+
+    let max_object_size = client.server_info.max_bson_object_size;
+    let max_message_size = client.server_info.max_message_size_bytes;
+
+    let collection = client
+        .database("insert_many_document_sequences")
+        .collection::<RawDocumentBuf>("insert_many_document_sequences");
+    collection.drop().await.unwrap();
+
+    // A payload with > max_bson_object_size bytes but < max_message_size bytes should require only
+    // one round trip
+    let docs = vec![
+        rawdoc! { "s": "a".repeat((max_object_size / 2) as usize) },
+        rawdoc! { "s": "b".repeat((max_object_size / 2) as usize) },
+    ];
+    collection.insert_many(docs, None).await.unwrap();
+
+    let event = subscriber
+        .filter_map_event(Duration::from_millis(500), |e| match e {
+            Event::Command(command_event) => match command_event {
+                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
+                    Some(started)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .await
+        .expect("did not observe command started event for insert");
+    let insert_documents = event.command.get_array("documents").unwrap();
+    assert_eq!(insert_documents.len(), 2);
+
+    // Build up a list of documents that exceeds max_message_size
+    let mut docs = Vec::new();
+    let mut size = 0;
+    while size <= max_message_size {
+        // Leave some room for key/metadata bytes in document
+        let string_length = max_object_size - 500;
+        let doc = rawdoc! { "s": "a".repeat(string_length as usize) };
+        size += doc.as_bytes().len() as i32;
+        docs.push(doc);
+    }
+    let total_docs = docs.len();
+    collection.insert_many(docs, None).await.unwrap();
+
+    let first_event = subscriber
+        .filter_map_event(Duration::from_millis(500), |e| match e {
+            Event::Command(command_event) => match command_event {
+                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
+                    Some(started)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .await
+        .expect("did not observe command started event for insert");
+    let first_batch_len = first_event.command.get_array("documents").unwrap().len();
+    assert!(first_batch_len < total_docs);
+
+    let second_event = subscriber
+        .filter_map_event(Duration::from_millis(500), |e| match e {
+            Event::Command(command_event) => match command_event {
+                CommandEvent::Started(started) if started.command_name.as_str() == "insert" => {
+                    Some(started)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .await
+        .expect("did not observe command started event for insert");
+    let second_batch_len = second_event.command.get_array("documents").unwrap().len();
+    assert_eq!(first_batch_len + second_batch_len, total_docs);
 }

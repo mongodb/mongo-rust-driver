@@ -6,7 +6,7 @@ mod subscriber;
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventClient, EventHandler, SdamEvent},
+    event::{Event, EventClient, EventHandler},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
     subscriber::EventSubscriber,
@@ -141,9 +141,9 @@ impl TestClientBuilder {
         };
 
         if let Some(handler) = self.handler {
-            options.command_event_handler = Some(handler.clone());
-            options.cmap_event_handler = Some(handler.clone());
-            options.sdam_event_handler = Some(handler);
+            options.command_event_handler = Some(handler.clone().into());
+            options.cmap_event_handler = Some(handler.clone().into());
+            options.sdam_event_handler = Some(handler.clone().into());
         }
 
         if let Some(freq) = self.min_heartbeat_freq {
@@ -199,14 +199,14 @@ impl TestClient {
         );
         let server_info_doc = client
             .database("admin")
-            .run_command(hello.body, None)
+            .run_command(hello.body)
             .await
             .unwrap();
         let server_info = bson::from_document(server_info_doc).unwrap();
 
         let build_info = client
             .database("test")
-            .run_command(doc! { "buildInfo": 1 }, None)
+            .run_command(doc! { "buildInfo": 1 })
             .await
             .unwrap();
         let mut server_version = Version::parse(build_info.get_str("version").unwrap()).unwrap();
@@ -215,7 +215,7 @@ impl TestClient {
 
         let server_parameters = client
             .database("admin")
-            .run_command(doc! { "getParameter": "*" }, None)
+            .run_command(doc! { "getParameter": "*" })
             .await
             .unwrap_or_default();
 
@@ -254,7 +254,7 @@ impl TestClient {
             cmd.insert("mechanisms", ms);
         }
         self.database(db.into().unwrap_or("admin"))
-            .run_command(cmd, None)
+            .run_command(cmd)
             .await?;
         Ok(())
     }
@@ -315,7 +315,8 @@ impl TestClient {
     ) -> Collection<Document> {
         self.drop_collection(db_name, coll_name).await;
         self.database(db_name)
-            .create_collection(coll_name, options)
+            .create_collection(coll_name)
+            .with_options(options)
             .await
             .unwrap();
 
@@ -505,7 +506,7 @@ pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
 where
     T: Serialize + DeserializeOwned + Unpin + Debug,
 {
-    match coll.drop(None).await.map_err(|e| *e.kind) {
+    match coll.drop().await.map_err(|e| *e.kind) {
         Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();
@@ -528,7 +529,7 @@ pub(crate) fn log_uncaptured<S: AsRef<str>>(text: S) {
     let mut sinks = vec![&mut stderr as &mut dyn Write];
     let mut other;
     let other_path = std::env::var("LOG_UNCAPTURED").unwrap_or("/dev/tty".to_string());
-    if let Ok(f) = std::fs::OpenOptions::new().append(true).open(&other_path) {
+    if let Ok(f) = std::fs::OpenOptions::new().append(true).open(other_path) {
         other = f;
         sinks.push(&mut other);
     }

@@ -2,7 +2,7 @@ use bson::oid::ObjectId;
 
 use crate::{
     event::sdam::{
-        SdamEventHandler,
+        SdamEvent,
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
         ServerHeartbeatFailedEvent,
@@ -51,7 +51,22 @@ impl TopologyTracingEventEmitter {
     }
 }
 
-impl SdamEventHandler for TopologyTracingEventEmitter {
+impl TopologyTracingEventEmitter {
+    pub(crate) fn handle(&self, event: SdamEvent) {
+        use SdamEvent::*;
+        match event {
+            ServerDescriptionChanged(ev) => self.handle_server_description_changed_event(*ev),
+            ServerOpening(ev) => self.handle_server_opening_event(ev),
+            ServerClosed(ev) => self.handle_server_closed_event(ev),
+            TopologyDescriptionChanged(ev) => self.handle_topology_description_changed_event(*ev),
+            TopologyOpening(ev) => self.handle_topology_opening_event(ev),
+            TopologyClosed(ev) => self.handle_topology_closed_event(ev),
+            ServerHeartbeatStarted(ev) => self.handle_server_heartbeat_started_event(ev),
+            ServerHeartbeatSucceeded(ev) => self.handle_server_heartbeat_succeeded_event(ev),
+            ServerHeartbeatFailed(ev) => self.handle_server_heartbeat_failed_event(ev),
+        }
+    }
+
     fn handle_server_description_changed_event(&self, _event: ServerDescriptionChangedEvent) {
         // this is tentatively a no-op based on my proposal to not do separate "topology changed"
         // and "server changed" log messages due to the redundancy, but that could change

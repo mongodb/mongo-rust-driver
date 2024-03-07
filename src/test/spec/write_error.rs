@@ -1,13 +1,11 @@
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, WriteFailure},
-    options::CreateCollectionOptions,
     test::{log_uncaptured, EventClient},
     Collection,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn details() {
     let client = EventClient::new().await;
 
@@ -18,17 +16,13 @@ async fn details() {
     }
 
     let db = client.database("write_error_details");
-    db.drop(None).await.unwrap();
-    db.create_collection(
-        "test",
-        CreateCollectionOptions::builder()
-            .validator(doc! {
-                "x": { "$type": "string" }
-            })
-            .build(),
-    )
-    .await
-    .unwrap();
+    db.drop().await.unwrap();
+    db.create_collection("test")
+        .validator(doc! {
+            "x": { "$type": "string" }
+        })
+        .await
+        .unwrap();
     let coll: Collection<Document> = db.collection("test");
     let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
     let write_err = match *err.kind {
@@ -43,7 +37,7 @@ async fn details() {
             .reply
             .get_array("writeErrors")
             .unwrap()
-            .get(0)
+            .first()
             .unwrap()
             .as_document()
             .unwrap()

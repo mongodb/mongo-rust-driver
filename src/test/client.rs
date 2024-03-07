@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc, time::Duration};
+use std::{borrow::Cow, collections::HashMap, future::IntoFuture, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::{Deserialize, Serialize};
@@ -7,9 +7,9 @@ use crate::{
     bson::{doc, Bson},
     coll::options::FindOptions,
     error::{CommandError, Error, ErrorKind},
-    event::cmap::CmapEvent,
+    event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
-    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
+    options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
@@ -21,7 +21,6 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         SERVER_API,
     },
     Client,
@@ -42,8 +41,7 @@ struct DriverMetadata {
     pub version: String,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn metadata_sent_in_handshake() {
     let client = TestClient::new().await;
 
@@ -55,13 +53,10 @@ async fn metadata_sent_in_handshake() {
 
     let result = client
         .database("admin")
-        .run_command(
-            doc! {
-                "currentOp": 1,
-                "command.currentOp": { "$exists": true }
-            },
-            None,
-        )
+        .run_command(doc! {
+            "currentOp": 1,
+            "command.currentOp": { "$exists": true }
+        })
         .await
         .unwrap();
 
@@ -76,25 +71,13 @@ async fn metadata_sent_in_handshake() {
     assert_eq!(metadata.driver.name, "mongo-rust-driver");
     assert_eq!(metadata.driver.version, env!("CARGO_PKG_VERSION"));
 
-    #[cfg(feature = "tokio-runtime")]
-    {
-        assert!(
-            metadata.platform.contains("tokio"),
-            "platform should contain tokio: {}",
-            metadata.platform
-        );
-    }
+    assert!(
+        metadata.platform.contains("tokio"),
+        "platform should contain tokio: {}",
+        metadata.platform
+    );
 
-    #[cfg(feature = "async-std-runtime")]
-    {
-        assert!(
-            metadata.platform.contains("async-std"),
-            "platform should contain async-std: {}",
-            metadata.platform
-        );
-    }
-
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    #[cfg(feature = "sync")]
     {
         assert!(
             metadata.platform.contains("sync"),
@@ -104,8 +87,7 @@ async fn metadata_sent_in_handshake() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn connection_drop_during_read() {
     let mut options = get_client_options().await.clone();
@@ -121,28 +103,25 @@ async fn connection_drop_during_read() {
 
     let _: Result<_, _> = runtime::timeout(
         Duration::from_millis(50),
-        db.run_command(
-            doc! {
-                "count": function_name!(),
-                "query": {
-                    "$where": "sleep(100) && true"
-                }
-            },
-            None,
-        ),
+        db.run_command(doc! {
+            "count": function_name!(),
+            "query": {
+                "$where": "sleep(100) && true"
+            }
+        })
+        .into_future(),
     )
     .await;
 
-    runtime::delay_for(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let build_info_response = db.run_command(doc! { "buildInfo": 1 }, None).await.unwrap();
+    let build_info_response = db.run_command(doc! { "buildInfo": 1 }).await.unwrap();
 
     // Ensure that the response to `buildInfo` is read, not the response to `count`.
     assert!(build_info_response.get("version").is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn server_selection_timeout_message() {
     if get_client_options().await.repl_set_name.is_none() {
         log_uncaptured("skipping server_selection_timeout_message due to missing replica set name");
@@ -164,10 +143,10 @@ async fn server_selection_timeout_message() {
     let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
     let error = db
-        .run_command(
-            doc! { "ping": 1 },
-            SelectionCriteria::ReadPreference(unsatisfiable_read_preference),
-        )
+        .run_command(doc! { "ping": 1 })
+        .selection_criteria(SelectionCriteria::ReadPreference(
+            unsatisfiable_read_preference,
+        ))
         .await
         .expect_err("should fail with server selection timeout error");
 
@@ -177,8 +156,7 @@ async fn server_selection_timeout_message() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn list_databases() {
     let expected_dbs = &[
@@ -190,10 +168,10 @@ async fn list_databases() {
     let client = TestClient::new().await;
 
     for name in expected_dbs {
-        client.database(name).drop(None).await.unwrap();
+        client.database(name).drop().await.unwrap();
     }
 
-    let prev_dbs = client.list_databases(None, None).await.unwrap();
+    let prev_dbs = client.list_databases().await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|doc| doc.name.as_str() == name));
@@ -206,7 +184,7 @@ async fn list_databases() {
             .unwrap();
     }
 
-    let new_dbs = client.list_databases(None, None).await.unwrap();
+    let new_dbs = client.list_databases().await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|db_spec| expected_dbs.contains(&db_spec.name))
@@ -223,8 +201,7 @@ async fn list_databases() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn list_database_names() {
     let client = TestClient::new().await;
@@ -236,10 +213,10 @@ async fn list_database_names() {
     ];
 
     for name in expected_dbs {
-        client.database(name).drop(None).await.unwrap();
+        client.database(name).drop().await.unwrap();
     }
 
-    let prev_dbs = client.list_database_names(None, None).await.unwrap();
+    let prev_dbs = client.list_database_names().await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|db_name| db_name == name));
@@ -252,15 +229,14 @@ async fn list_database_names() {
             .unwrap();
     }
 
-    let new_dbs = client.list_database_names(None, None).await.unwrap();
+    let new_dbs = client.list_database_names().await.unwrap();
 
     for name in expected_dbs {
         assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn list_authorized_databases() {
     let client = TestClient::new().await;
@@ -277,7 +253,7 @@ async fn list_authorized_databases() {
     for name in dbs {
         client
             .database(name)
-            .create_collection("coll", None)
+            .create_collection("coll")
             .await
             .unwrap();
         client
@@ -301,17 +277,18 @@ async fn list_authorized_databases() {
         options.credential = Some(credential);
         let client = Client::with_options(options).unwrap();
 
-        let options = ListDatabasesOptions::builder()
+        let result = client
+            .list_database_names()
             .authorized_databases(true)
-            .build();
-        let result = client.list_database_names(None, options).await.unwrap();
+            .await
+            .unwrap();
 
         assert_eq!(result.len(), 1);
-        assert_eq!(result.get(0).unwrap(), name);
+        assert_eq!(result.first().unwrap(), name);
     }
 
     for name in dbs {
-        client.database(name).drop(None).await.unwrap();
+        client.database(name).drop().await.unwrap();
     }
 }
 
@@ -322,7 +299,7 @@ fn is_auth_error(error: Error) -> bool {
 /// Performs an operation that requires authentication and verifies that it either succeeded or
 /// failed with an authentication error according to the `should_succeed` parameter.
 async fn auth_test(client: Client, should_succeed: bool) {
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     if should_succeed {
         result.expect("operation should have succeeded");
     } else {
@@ -456,8 +433,7 @@ async fn scram_test(
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_sha1() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -478,8 +454,7 @@ async fn scram_sha1() {
     scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_sha256() {
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -499,8 +474,7 @@ async fn scram_sha256() {
     scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_both() {
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -526,8 +500,7 @@ async fn scram_both() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_missing_user_uri() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -537,8 +510,7 @@ async fn scram_missing_user_uri() {
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn scram_missing_user_options() {
     let client = TestClient::new().await;
     if !client.auth_enabled() {
@@ -548,8 +520,7 @@ async fn scram_missing_user_options() {
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn saslprep() {
     let client = TestClient::new().await;
 
@@ -590,8 +561,7 @@ async fn saslprep() {
     auth_test_uri("%E2%85%A8", "I%C2%ADV", None, true).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn x509_auth() {
     let username = match std::env::var("MONGO_X509_USER") {
@@ -602,7 +572,7 @@ async fn x509_auth() {
     let client = TestClient::new().await;
     let drop_user_result = client
         .database("$external")
-        .run_command(doc! { "dropUser": &username }, None)
+        .run_command(doc! { "dropUser": &username })
         .await;
 
     match drop_user_result.map_err(|e| *e.kind) {
@@ -639,8 +609,7 @@ async fn x509_auth() {
         .unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn plain_auth() {
     if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
         log_uncaptured("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
@@ -685,8 +654,7 @@ async fn plain_auth() {
 
 /// Test verifies that retrying a commitTransaction operation after a checkOut
 /// failure works.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_commit_txn_check_out() {
     let setup_client = TestClient::new().await;
     if !setup_client.is_replica_set() {
@@ -721,13 +689,13 @@ async fn retry_commit_txn_check_out() {
 
     let mut options = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
-    options.cmap_event_handler = Some(handler.clone());
-    options.sdam_event_handler = Some(handler.clone());
+    options.cmap_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.heartbeat_freq = Some(Duration::from_secs(120));
     options.app_name = Some("retry_commit_txn_check_out".to_string());
     let client = Client::with_options(options).unwrap();
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();
     // transition transaction to "in progress" so that the commit
     // actually executes an operation.
@@ -750,7 +718,7 @@ async fn retry_commit_txn_check_out() {
     let mut subscriber = handler.subscribe();
     client
         .database("foo")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap_err();
 
@@ -822,16 +790,14 @@ async fn retry_commit_txn_check_out() {
 }
 
 /// Verifies that `Client::shutdown` succeeds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_with_nothing() {
     let client = Client::test_builder().build().await.into_client();
     client.shutdown().await;
 }
 
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_with_resources() {
     let events = Arc::new(EventHandler::new());
     let client = Client::test_builder()
@@ -843,7 +809,7 @@ async fn manual_shutdown_with_resources() {
         return;
     }
     let db = client.database("shutdown_test");
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
     coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
     let bucket = db.gridfs_bucket(None);
@@ -855,7 +821,7 @@ async fn manual_shutdown_with_resources() {
             .await
             .unwrap();
         // Similarly, sessions need an in-progress transaction to have cleanup.
-        let mut session = client.start_session(None).await.unwrap();
+        let mut session = client.start_session().await.unwrap();
         if session.start_transaction(None).await.is_err() {
             // Transaction start can transiently fail; if so, just bail out of the test.
             log_uncaptured("Skipping manual_shutdown_with_resources: transaction start failed");
@@ -887,16 +853,14 @@ async fn manual_shutdown_with_resources() {
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_immediate_with_nothing() {
     let client = Client::test_builder().build().await.into_client();
-    client.shutdown_immediate().await;
+    client.shutdown().immediate(true).await;
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
     let events = Arc::new(EventHandler::new());
     let client = Client::test_builder()
@@ -908,7 +872,7 @@ async fn manual_shutdown_immediate_with_resources() {
         return;
     }
     let db = client.database("shutdown_test");
-    db.drop(None).await.unwrap();
+    db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
     coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
     let bucket = db.gridfs_bucket(None);
@@ -921,14 +885,14 @@ async fn manual_shutdown_immediate_with_resources() {
         .await
         .unwrap();
     // Similarly, sessions need an in-progress transaction to have cleanup.
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();
     coll.insert_one_with_session(doc! {}, None, &mut session)
         .await
         .unwrap();
     let _stream = bucket.open_upload_stream("test", None);
 
-    client.into_client().shutdown_immediate().await;
+    client.into_client().shutdown().immediate(true).await;
 
     assert!(events
         .get_command_started_events(&["killCursors"])
@@ -939,8 +903,7 @@ async fn manual_shutdown_immediate_with_resources() {
     assert!(events.get_command_started_events(&["delete"]).is_empty());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_one_and_delete_serde_consistency() {
     let client = Client::test_builder().build().await;
 
@@ -973,8 +936,7 @@ async fn find_one_and_delete_serde_consistency() {
 }
 
 // Verifies that `Client::warm_connection_pool` succeeds.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn warm_connection_pool() {
     let client = Client::test_builder()
         .options({
@@ -987,5 +949,5 @@ async fn warm_connection_pool() {
 
     client.warm_connection_pool().await;
     // Validate that a command executes.
-    client.list_database_names(None, None).await.unwrap();
+    client.list_database_names().await.unwrap();
 }

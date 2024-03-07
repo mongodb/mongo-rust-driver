@@ -1,14 +1,13 @@
 //! This crate contains the officially supported MongoDB Rust driver, a
 //! client side library that can be used to interact with MongoDB deployments
 //! in Rust applications. It uses the [`bson`] crate for BSON support.
-//! The driver contains a fully async API that supports either [`tokio`](https://docs.rs/tokio) (default)
-//! or [`async-std`](https://docs.rs/async_std), depending on the feature flags set. The driver also has
-//! a sync API that may be enabled via the `"sync"` or `"tokio-sync"` feature flag.
+//! The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has
+//! a sync API that may be enabled via the `"sync"` feature flag.
 //!
 //! # Installation
 //!
 //! ## Requirements
-//! - Rust 1.61+
+//! - Rust 1.64+
 //! - MongoDB 3.6+
 //!
 //! ## Importing
@@ -19,31 +18,14 @@
 //! mongodb = "2.8.0"
 //! ```
 //!
-//! ### Configuring the async runtime
-//! The driver supports both of the most popular async runtime crates, namely
-//! [`tokio`](https://crates.io/crates/tokio) and [`async-std`](https://crates.io/crates/async-std). By
-//! default, the driver will use [`tokio`](https://crates.io/crates/tokio), but you can explicitly choose
-//! a runtime by specifying one of `"tokio-runtime"` or `"async-std-runtime"` feature flags in your
-//! `Cargo.toml`.
-//!
-//! For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std),
-//! add the following to your `Cargo.toml`:
-//! ```toml
-//! [dependencies.mongodb]
-//! version = "2.8.0"
-//! default-features = false
-//! features = ["async-std-runtime"]
-//! ```
-//!
 //! ### Enabling the sync API
-//! The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"`
+//! The driver also provides a blocking sync API. To enable this, add the `"sync"`
 //! feature to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
 //! version = "2.8.0"
-//! features = ["tokio-sync"]
+//! features = ["sync"]
 //! ```
-//! Using the `"sync"` feature also requires using `default-features = false`.
 //! **Note:** The sync-specific types can be imported from `mongodb::sync` (e.g.
 //! `mongodb::sync::Client`).
 //!
@@ -51,10 +33,7 @@
 //!
 //! | Feature                      | Description                                                                                                                                                             | Default |
 //! |:-----------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------|
-//! | `tokio-runtime`              | Enable support for the `tokio` async runtime.                                                                                                                           | yes     |
-//! | `async-std-runtime`          | Enable support for the `async-std` runtime.                                                                                                                             | no      |
-//! | `sync`                       | Expose the synchronous API (`mongodb::sync`), using an async-std backend. Cannot be used with the `tokio-runtime` feature flag.                                         | no      |
-//! | `tokio-sync`                 | Expose the synchronous API (`mongodb::sync`), using a tokio backend. Cannot be used with the `async-std-runtime` feature flag.                                          | no      |
+//! | `sync`                       | Expose the synchronous API (`mongodb::sync`).                                                                                                                           | no      |
 //! | `aws-auth`                   | Enable support for the MONGODB-AWS authentication mechanism.                                                                                                            | no      |
 //! | `bson-uuid-0_8`              | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                                                      | no      |
 //! | `bson-uuid-1`                | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                                                      | no      |
@@ -72,7 +51,6 @@
 //! ## Using the async API
 //! ### Connecting to a MongoDB deployment
 //! ```no_run
-//! # #[cfg(not(any(feature = "sync", feature = "tokio-sync")))]
 //! # async fn foo() -> mongodb::error::Result<()> {
 //! use mongodb::{Client, options::ClientOptions};
 //!
@@ -86,7 +64,7 @@
 //! let client = Client::with_options(client_options)?;
 //!
 //! // List the names of the databases in that deployment.
-//! for db_name in client.list_database_names(None, None).await? {
+//! for db_name in client.list_database_names().await? {
 //!     println!("{}", db_name);
 //! }
 //! # Ok(()) }
@@ -99,7 +77,7 @@
 //! let db = client.database("mydb");
 //!
 //! // List the names of the collections in that database.
-//! for collection_name in db.list_collection_names(None).await? {
+//! for collection_name in db.list_collection_names().await? {
 //!     println!("{}", collection_name);
 //! }
 //! # Ok(()) }
@@ -206,7 +184,7 @@
 //! crate's top level like in the async API. The sync API calls through to the async API internally
 //! though, so it looks and behaves similarly to it.
 //! ```no_run
-//! # #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+//! # #[cfg(feature = "sync")]
 //! # {
 //! use mongodb::{
 //!     bson::doc,
@@ -273,7 +251,6 @@
 //! #     bson::doc,
 //! # };
 //! #
-//! # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync"), feature = "tokio-runtime"))]
 //! # async fn foo() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! #
 //! # let client = Client::with_uri_str("mongodb://example.com").await?;
@@ -289,7 +266,7 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.61.0. This will be rarely be increased, and if it ever is,
+//! The MSRV for this crate is currently 1.64.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
@@ -308,8 +285,6 @@
 #![cfg_attr(test, type_length_limit = "80000000")]
 #![doc(html_root_url = "https://docs.rs/mongodb/2.8.0")]
 
-#[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
-compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");
 
 #[macro_use]
 pub mod options;
@@ -318,6 +293,7 @@ pub use ::bson;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use ::mongocrypt;
 
+pub mod action;
 mod bson_util;
 pub mod change_stream;
 mod client;
@@ -342,7 +318,7 @@ mod sdam;
 mod selection_criteria;
 mod serde_util;
 mod srv;
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 pub mod sync;
 #[cfg(test)]
 mod test;
@@ -365,25 +341,5 @@ pub use crate::{
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
 
-#[cfg(all(feature = "tokio-runtime", feature = "sync",))]
-compile_error!(
-    "`tokio-runtime` and `sync` can't both be enabled; either switch to using `tokio-sync` or set \
-     `default-features = false` in your Cargo.toml"
-);
-
-#[cfg(all(
-    feature = "tokio-runtime",
-    feature = "async-std-runtime",
-    not(feature = "sync")
-))]
-compile_error!(
-    "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
-     `async-std-runtime` or set `default-features = false` in your Cargo.toml"
-);
-
-#[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
-compile_error!(
-    "one of `tokio-runtime`, `async-std-runtime`, `sync`, or `tokio-sync` must be enabled; \
-     either enable `default-features`, or enable one of those features specifically in your \
-     Cargo.toml"
-);
+/// A boxed future.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;

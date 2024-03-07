@@ -40,8 +40,7 @@ fn get_exe_name() {
     write!(&mut file, "{}", exe_name).expect("Failed to write executable name to file");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn workload_executor() {
     if env::var("ATLAS_PLANNED_MAINTENANCE_TESTING").is_err() {
         // This test should only be run from the workload-executor script.

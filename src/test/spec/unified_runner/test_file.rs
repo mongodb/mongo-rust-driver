@@ -14,7 +14,7 @@ use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 use crate::trace;
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
-    client::options::{ServerApi, ServerApiVersion, SessionOptions},
+    client::options::{ServerApi, ServerApiVersion},
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     gridfs::options::GridFsBucketOptions,
@@ -314,7 +314,7 @@ pub(crate) struct Collection {
 pub(crate) struct Session {
     pub(crate) id: String,
     pub(crate) client: String,
-    pub(crate) session_options: Option<SessionOptions>,
+    pub(crate) session_options: Option<crate::client::options::SessionOptions>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -425,6 +425,7 @@ pub(crate) enum ExpectedEventType {
     // TODO RUST-1055 Remove this when connection usage is serialized.
     #[serde(skip)]
     CmapWithoutConnectionReady,
+    Sdam,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
@@ -571,8 +572,7 @@ impl ExpectError {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn merged_uri_options() {
     let options = doc! {
         "ssl": true,

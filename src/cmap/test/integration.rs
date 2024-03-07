@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{event::EventHandler, EVENT_TIMEOUT};
+use super::{event::TestEventHandler, EVENT_TIMEOUT};
 use crate::{
     bson::{doc, Document},
     cmap::{
@@ -9,7 +9,7 @@ use crate::{
         Command,
         ConnectionPool,
     },
-    event::cmap::{CmapEvent, CmapEventHandler, ConnectionClosedReason},
+    event::cmap::{CmapEvent, ConnectionClosedReason},
     hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
@@ -37,8 +37,7 @@ struct DatabaseEntry {
     name: String,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn acquire_connection_and_send_command() {
     let client_options = get_client_options().await.clone();
     let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
@@ -81,8 +80,7 @@ async fn acquire_connection_and_send_command() {
     assert!(names.iter().any(|name| name == "config"));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn concurrent_connections() {
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
@@ -110,15 +108,14 @@ async fn concurrent_connections() {
     };
     client
         .database("admin")
-        .run_command(failpoint, None)
+        .run_command(failpoint)
         .await
         .expect("failpoint should succeed");
 
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(TestEventHandler::new());
     let client_options = get_client_options().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
-    options.cmap_event_handler =
-        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
+    options.cmap_event_handler = Some(handler.clone().into());
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
@@ -161,16 +158,12 @@ async fn concurrent_connections() {
     // clear the fail point
     client
         .database("admin")
-        .run_command(
-            doc! { "configureFailPoint": "failCommand", "mode": "off" },
-            None,
-        )
+        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
         .await
         .expect("disabling fail point should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 
 async fn connection_error_during_establishment() {
@@ -203,13 +196,12 @@ async fn connection_error_during_establishment() {
     );
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(TestEventHandler::new());
     let mut subscriber = handler.subscribe();
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
-    options.cmap_event_handler =
-        Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
+    options.cmap_event_handler = Some(handler.clone().into());
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
@@ -232,14 +224,13 @@ async fn connection_error_during_establishment() {
         .expect("closed event with error reason should have been seen");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 
 async fn connection_error_during_operation() {
     let mut options = get_client_options().await.clone();
-    let handler = Arc::new(EventHandler::new());
-    options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    let handler = Arc::new(TestEventHandler::new());
+    options.cmap_event_handler = Some(handler.clone().into());
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 
@@ -260,7 +251,7 @@ async fn connection_error_during_operation() {
 
     client
         .database("test")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .expect_err("ping should fail due to fail point");
 

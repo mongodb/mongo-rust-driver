@@ -1,11 +1,9 @@
-#[cfg(test)]
-mod test;
-
 use bson::Document;
 
 use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
+    db::options::DropDatabaseOptions,
     error::Result,
     operation::{
         append_options,
@@ -13,7 +11,7 @@ use crate::{
         OperationWithDefaults,
         WriteConcernOnlyBody,
     },
-    options::{DropDatabaseOptions, WriteConcern},
+    options::WriteConcern,
 };
 
 #[derive(Debug)]
@@ -23,11 +21,6 @@ pub(crate) struct DropDatabase {
 }
 
 impl DropDatabase {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(String::new(), None)
-    }
-
     pub(crate) fn new(target_db: String, options: Option<DropDatabaseOptions>) -> Self {
         Self { target_db, options }
     }

@@ -32,7 +32,7 @@ impl From<TestCredential> for Credential {
                 .mechanism
                 .and_then(|s| AuthMechanism::from_str(s.as_str()).ok()),
             mechanism_properties: test_credential.mechanism_properties,
-            oidc_callbacks: None,
+            oidc_callback: None,
         }
     }
 }
@@ -91,8 +91,7 @@ async fn run_auth_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run() {
     run_spec_test(&["auth"], run_auth_test).await;
 }

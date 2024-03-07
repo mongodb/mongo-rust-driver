@@ -9,7 +9,7 @@ export NVM_DIR="${NODE_ARTIFACTS_PATH}/nvm"
 
 . ${CARGO_HOME}/env
 
-if [[ "$OS" == "Windows_NT" ]]; then
+if [[ "$OSTYPE" == "cygwin" ]]; then
   # Update path for DLLs
   export PATH="${MONGOCRYPT_LIB_DIR}/../bin:$PATH"
 

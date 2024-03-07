@@ -277,7 +277,7 @@ pub enum TimeseriesGranularity {
     Hours,
 }
 
-/// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
+/// Specifies the options to a [`Database::drop`](crate::Database::drop) operation.
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -312,10 +312,18 @@ pub struct ListCollectionsOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// Filters the list operation.
+    pub filter: Option<Document>,
+
+    /// When `true` and used with
+    /// [`list_collection_names`](crate::Database::list_collection_names), the command returns
+    /// only those collections for which the user has privileges.  When used with
+    /// [`list_collections`](crate::Database::list_collections) this option has no effect.
+    pub authorized_collections: Option<bool>,
 }
 
-/// Specifies the options to a
-/// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
+/// Specifies the options to a [`Client::list_databases`](crate::Client::list_databases) operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -331,6 +339,9 @@ pub struct ListDatabasesOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// Filters the query.
+    pub filter: Option<Document>,
 }
 
 /// Specifies how change stream pre- and post-images should be supported.
@@ -344,7 +355,17 @@ pub struct ChangeStreamPreAndPostImages {
 }
 
 /// Specifies the options to a
-/// [`Database::RunCursorCommand`](../struct.Database.html#method.run_cursor_command) operation.
+/// [`Database::run_command`](crate::Database::run_command) operation.
+#[derive(Clone, Debug, Default, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct RunCommandOptions {
+    /// The default read preference for operations.
+    pub selection_criteria: Option<SelectionCriteria>,
+}
+
+/// Specifies the options to a
+/// [`Database::run_cursor_command`](crate::Database::run_cursor_command) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]

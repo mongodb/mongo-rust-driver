@@ -8,7 +8,6 @@ use crate::{
         ChangeStream as AsyncChangeStream,
     },
     error::Result,
-    runtime,
 };
 
 use super::ClientSession;
@@ -22,8 +21,8 @@ use super::ClientSession;
 /// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
 /// a [`ResumeToken`] retrieved from a past event into either the
-/// [`resume_after`](crate::options::ChangeStreamOptions::resume_after) or
-/// [`start_after`](crate::options::ChangeStreamOptions::start_after) (4.2+) options used to create
+/// [`resume_after`](crate::action::Watch::resume_after) or
+/// [`start_after`](crate::action::Watch::start_after) (4.2+) options used to create
 /// the `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
 /// explicitly opt out of resumability.
 ///
@@ -36,7 +35,7 @@ use super::ClientSession;
 /// # fn func() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
-/// let mut change_stream = coll.watch(None, None)?;
+/// let mut change_stream = coll.watch().run()?;
 /// coll.insert_one(doc! { "x": 1 }, None)?;
 /// for event in change_stream {
 ///     let event = event?;
@@ -99,7 +98,7 @@ where
     /// # fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// let mut change_stream = coll.watch(None, None)?;
+    /// let mut change_stream = coll.watch().run()?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any()? {
@@ -112,7 +111,7 @@ where
     /// # }
     /// ```
     pub fn next_if_any(&mut self) -> Result<Option<T>> {
-        runtime::block_on(self.async_stream.next_if_any())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.next_if_any())
     }
 }
 
@@ -123,7 +122,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        runtime::block_on(self.async_stream.next())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.next())
     }
 }
 
@@ -135,10 +134,10 @@ where
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
-/// # let mut session = client.start_session(None)?;
+/// # let mut session = client.start_session().run()?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// #
-/// let mut cs = coll.watch_with_session(None, None, &mut session)?;
+/// let mut cs = coll.watch().session(&mut session).run()?;
 /// while let Some(event) = cs.next(&mut session)? {
 ///     println!("{:?}", event)
 /// }
@@ -189,8 +188,8 @@ where
     /// # let client = Client::with_uri_str("foo")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
-    /// # let mut session = client.start_session(None)?;
-    /// let mut cs = coll.watch_with_session(None, None, &mut session)?;
+    /// # let mut session = client.start_session().run()?;
+    /// let mut cs = coll.watch().session(&mut session).run()?;
     /// while let Some(event) = cs.next(&mut session)? {
     ///     let id = bson::to_bson(&event.id)?;
     ///     other_coll.insert_one_with_session(doc! { "id": id }, None, &mut session)?;
@@ -200,7 +199,8 @@ where
     /// # }
     /// ```
     pub fn next(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        runtime::block_on(self.async_stream.next(&mut session.async_client_session))
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_stream.next(&mut session.async_client_session))
     }
 
     /// Returns whether the change stream will continue to receive events.
@@ -220,8 +220,8 @@ where
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-    /// # let mut session = client.start_session(None)?;
-    /// let mut change_stream = coll.watch_with_session(None, None, &mut session)?;
+    /// # let mut session = client.start_session().run()?;
+    /// let mut change_stream = coll.watch().session(&mut session).run()?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any(&mut session)? {
@@ -234,7 +234,7 @@ where
     /// # }
     /// ```
     pub fn next_if_any(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        runtime::block_on(
+        crate::sync::TOKIO_RUNTIME.block_on(
             self.async_stream
                 .next_if_any(&mut session.async_client_session),
         )

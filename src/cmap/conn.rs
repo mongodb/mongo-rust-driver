@@ -1,6 +1,6 @@
 mod command;
 mod stream_description;
-mod wire;
+pub(crate) mod wire;
 
 use std::{
     sync::Arc,
@@ -33,9 +33,8 @@ use crate::{
     options::ServerAddress,
     runtime::AsyncStream,
 };
-pub(crate) use command::{Command, RawCommand, RawCommandResponse};
+pub(crate) use command::{Command, RawCommandResponse};
 pub(crate) use stream_description::StreamDescription;
-pub(crate) use wire::next_request_id;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug, Serialize)]
@@ -47,14 +46,7 @@ pub struct ConnectionInfo {
 
     /// A server-generated identifier that uniquely identifies the connection. Available on server
     /// versions 4.2+. This may be used to correlate driver connections with server logs.
-    /// If the connection ID sent by the server is too large for an i32, this will be a truncated
-    /// value.
-    pub server_id: Option<i32>,
-
-    /// A server-generated identifier that uniquely identifies the connection. Available on server
-    /// versions 4.2+. This may be used to correlate driver connections with server logs. This
-    /// value will not be truncated and should be used rather than `server_id`.
-    pub server_id_i64: Option<i64>,
+    pub server_id: Option<i64>,
 
     /// The address that the connection is connected to.
     pub address: ServerAddress,
@@ -121,6 +113,10 @@ pub(crate) struct Connection {
     /// monitoring connections as we do not emit events for those.
     #[derivative(Debug = "ignore")]
     event_emitter: Option<CmapEventEmitter>,
+
+    /// The token callback for OIDC authentication.
+    #[derivative(Debug = "ignore")]
+    pub(crate) oidc_token_gen_id: std::sync::RwLock<u32>,
 }
 
 impl Connection {
@@ -147,6 +143,7 @@ impl Connection {
             pinned_sender: None,
             compressor: None,
             more_to_come: false,
+            oidc_token_gen_id: std::sync::RwLock::new(0),
         }
     }
 
@@ -184,8 +181,7 @@ impl Connection {
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
-            server_id: self.server_id.map(|value| value as i32),
-            server_id_i64: self.server_id,
+            server_id: self.server_id,
             address: self.address.clone(),
         }
     }
@@ -273,7 +269,7 @@ impl Connection {
         }
     }
 
-    async fn send_message(
+    pub(crate) async fn send_message(
         &mut self,
         message: Message,
         to_compress: bool,
@@ -318,7 +314,10 @@ impl Connection {
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
 
-        RawCommandResponse::new(self.address.clone(), response_message)
+        Ok(RawCommandResponse::new(
+            self.address.clone(),
+            response_message,
+        ))
     }
 
     /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
@@ -332,23 +331,7 @@ impl Connection {
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
         let to_compress = command.should_compress();
-        let message = Message::with_command(command, request_id.into())?;
-        self.send_message(message, to_compress).await
-    }
-
-    /// Executes a `RawCommand` and returns a `CommandResponse` containing the result from the
-    /// server.
-    ///
-    /// An `Ok(...)` result simply means the server received the command and that the driver
-    /// received the response; it does not imply anything about the success of the command
-    /// itself.
-    pub(crate) async fn send_raw_command(
-        &mut self,
-        command: RawCommand,
-        request_id: impl Into<Option<i32>>,
-    ) -> Result<RawCommandResponse> {
-        let to_compress = command.should_compress();
-        let message = Message::with_raw_command(command, request_id.into());
+        let message = Message::from_command(command, request_id.into())?;
         self.send_message(message, to_compress).await
     }
 
@@ -379,7 +362,10 @@ impl Connection {
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
 
-        RawCommandResponse::new(self.address.clone(), response_message)
+        Ok(RawCommandResponse::new(
+            self.address.clone(),
+            response_message,
+        ))
     }
 
     /// Gets the connection's StreamDescription.
@@ -446,6 +432,7 @@ impl Connection {
             pinned_sender: self.pinned_sender.clone(),
             compressor: self.compressor.clone(),
             more_to_come: false,
+            oidc_token_gen_id: std::sync::RwLock::new(0),
         }
     }
 

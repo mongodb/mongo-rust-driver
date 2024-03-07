@@ -1,15 +1,15 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 use crate::{cmap::StreamDescription, options::AuthMechanism};
 
 use super::sasl::SaslStart;
 
-lazy_static! {
-    static ref MECHS: [String; 2] = [
+static MECHS: Lazy<[String; 2]> = Lazy::new(|| {
+    [
         AuthMechanism::ScramSha1.as_str().to_string(),
-        AuthMechanism::ScramSha256.as_str().to_string()
-    ];
-}
+        AuthMechanism::ScramSha256.as_str().to_string(),
+    ]
+});
 
 #[test]
 fn negotiate_both_scram() {

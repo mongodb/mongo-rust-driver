@@ -15,7 +15,7 @@ use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
-    conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
+    conn::{Command, Connection, RawCommandResponse, StreamDescription},
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
 };
@@ -183,4 +183,8 @@ impl ConnectionPool {
     pub(crate) fn broadcast(&self, msg: BroadcastMessage) -> AcknowledgmentReceiver<()> {
         self.manager.broadcast(msg)
     }
+}
+
+pub(crate) fn is_faas() -> bool {
+    establish::handshake::FaasEnvironmentName::new().is_some()
 }

@@ -75,7 +75,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 16, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 17, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
@@ -96,10 +96,7 @@ impl TestRunner {
     }
 
     pub(crate) async fn new_with_connection_string(connection_string: &str) -> Self {
-        #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
         let options = ClientOptions::parse(connection_string).await.unwrap();
-        #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-        let options = ClientOptions::parse(connection_string).unwrap();
         Self {
             internal_client: TestClient::with_options(Some(options)).await,
             entities: Arc::new(RwLock::new(EntityMap::new())),
@@ -239,11 +236,13 @@ impl TestRunner {
                 // implicit session used in the first operation is returned to the pool before
                 // the second operation is executed.
                 if test_case.description == "Server supports implicit sessions" {
-                    runtime::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
 
             if let Some(ref events) = test_case.expect_events {
+                // Hack: make sure in-flight events are recorded.
+                tokio::time::sleep(Duration::from_millis(500)).await;
                 for expected in events {
                     let entities = self.entities.read().await;
                     let entity = entities.get(&expected.client).unwrap();
@@ -463,9 +462,9 @@ impl TestRunner {
                             });
                     update_options_for_testing(&mut options);
                     let handler = Arc::new(EventHandler::new());
-                    options.command_event_handler = Some(handler.clone());
-                    options.cmap_event_handler = Some(handler.clone());
-                    options.sdam_event_handler = Some(handler.clone());
+                    options.command_event_handler = Some(handler.clone().command_sender().into());
+                    options.cmap_event_handler = Some(handler.clone().cmap_sender().into());
+                    options.sdam_event_handler = Some(handler.clone().sdam_sender().into());
 
                     options.server_api = server_api;
 
@@ -537,7 +536,8 @@ impl TestRunner {
                     let id = session.id.clone();
                     let client = self.get_client(&session.client).await;
                     let client_session = client
-                        .start_session(session.session_options.clone())
+                        .start_session()
+                        .with_options(session.session_options.clone())
                         .await
                         .unwrap();
                     (id, Entity::Session(SessionEntity::new(client_session)))
@@ -554,7 +554,7 @@ impl TestRunner {
                     let (sender, mut receiver) = mpsc::unbounded_channel::<ThreadMessage>();
                     let runner = self.clone();
                     let d = description.as_ref().to_string();
-                    runtime::execute(async move {
+                    runtime::spawn(async move {
                         while let Some(msg) = receiver.recv().await {
                             match msg {
                                 ThreadMessage::ExecuteOperation(op) => {

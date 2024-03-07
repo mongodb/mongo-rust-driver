@@ -1,31 +1,14 @@
 use std::fmt::Debug;
 
-use super::{
-    gridfs::GridFsBucket,
-    ChangeStream,
-    ClientSession,
-    Collection,
-    Cursor,
-    SessionChangeStream,
-    SessionCursor,
-};
+use super::{gridfs::GridFsBucket, Collection};
 use crate::{
-    bson::Document,
-    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
-    error::Result,
     options::{
-        AggregateOptions,
         CollectionOptions,
-        CreateCollectionOptions,
-        DropDatabaseOptions,
         GridFsBucketOptions,
-        ListCollectionsOptions,
         ReadConcern,
         SelectionCriteria,
         WriteConcern,
     },
-    results::CollectionSpecification,
-    runtime,
     Database as AsyncDatabase,
 };
 
@@ -63,7 +46,7 @@ use crate::{
 /// ```
 #[derive(Debug, Clone)]
 pub struct Database {
-    async_database: AsyncDatabase,
+    pub(crate) async_database: AsyncDatabase,
 }
 
 impl Database {
@@ -113,217 +96,6 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T> {
         Collection::new(self.async_database.collection_with_options(name, options))
-    }
-
-    /// Drops the database, deleting all data, collections, users, and indexes stored in it.
-    pub fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
-        runtime::block_on(self.async_database.drop(options.into()))
-    }
-
-    /// Drops the database, deleting all data, collections, users, and indexes stored in it using
-    /// the provided `ClientSession`.
-    pub fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropDatabaseOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_database
-                .drop_with_session(options.into(), &mut session.async_client_session),
-        )
-    }
-
-    /// Gets information about each of the collections in the database. The cursor will yield a
-    /// document pertaining to each collection in the database.
-    pub fn list_collections(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor<CollectionSpecification>> {
-        runtime::block_on(
-            self.async_database
-                .list_collections(filter.into(), options.into()),
-        )
-        .map(Cursor::new)
-    }
-
-    /// Gets information about each of the collections in the database using the provided
-    /// `ClientSession`. The cursor will yield a document pertaining to each collection in the
-    /// database.
-    pub fn list_collections_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListCollectionsOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<CollectionSpecification>> {
-        runtime::block_on(self.async_database.list_collections_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
-    }
-
-    /// Gets the names of the collections in the database.
-    pub fn list_collection_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(self.async_database.list_collection_names(filter.into()))
-    }
-
-    /// Gets the names of the collections in the database using the provided `ClientSession`.
-    pub fn list_collection_names_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_database.list_collection_names_with_session(
-                filter.into(),
-                &mut session.async_client_session,
-            ),
-        )
-    }
-
-    /// Creates a new collection in the database with the given `name` and `options`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub fn create_collection(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-    ) -> Result<()> {
-        runtime::block_on(
-            self.async_database
-                .create_collection(name.as_ref(), options.into()),
-        )
-    }
-
-    /// Creates a new collection in the database with the given `name` and `options` using the
-    /// provided `ClientSession`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub fn create_collection_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<CreateCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        runtime::block_on(self.async_database.create_collection_with_session(
-            name.as_ref(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Runs a database-level command.
-    ///
-    /// Note that no inspection is done on `doc`, so the command will not use the database's default
-    /// read concern or write concern. If specific read concern or write concern is desired, it must
-    /// be specified manually.
-    pub fn run_command(
-        &self,
-        command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-    ) -> Result<Document> {
-        runtime::block_on(
-            self.async_database
-                .run_command(command, selection_criteria.into()),
-        )
-    }
-
-    /// Runs a database-level command using the provided `ClientSession`.
-    ///
-    /// Note that no inspection is done on `doc`, so the command will not use the database's default
-    /// read concern or write concern. If specific read concern or write concern is desired, it must
-    /// be specified manually.
-    pub fn run_command_with_session(
-        &self,
-        command: Document,
-        selection_criteria: impl Into<Option<SelectionCriteria>>,
-        session: &mut ClientSession,
-    ) -> Result<Document> {
-        runtime::block_on(self.async_database.run_command_with_session(
-            command,
-            selection_criteria.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_database.aggregate(pipeline, options.into())).map(Cursor::new)
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        runtime::block_on(self.async_database.aggregate_with_session(
-            pipeline,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-        .map(SessionCursor::new)
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in this database. The stream does not observe changes from system
-    /// collections and cannot be started on "config", "local" or "admin" databases.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_database.watch(pipeline, options)).map(ChangeStream::new)
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
-    /// using the provided [`ClientSession`].  See [`Database::watch`] for more information.
-    pub fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_database.watch_with_session(
-            pipeline,
-            options,
-            &mut session.async_client_session,
-        ))
-        .map(SessionChangeStream::new)
     }
 
     /// Creates a new [`GridFsBucket`] in the database with the given options.

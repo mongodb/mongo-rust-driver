@@ -11,7 +11,7 @@ use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
     error::{Error, ErrorKind},
-    event::{cmap::CmapEvent, sdam::SdamEventHandler},
+    event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     sdam::{ServerDescription, Topology},
     test::{
@@ -23,14 +23,12 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         TestClient,
     },
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn min_heartbeat_frequency() {
     let mut setup_client_options = get_client_options().await.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
@@ -73,7 +71,7 @@ async fn min_heartbeat_frequency() {
     let start = Instant::now();
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .expect("ping should eventually succeed");
 
@@ -90,8 +88,7 @@ async fn min_heartbeat_frequency() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn sdam_pool_management() {
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
@@ -172,8 +169,7 @@ async fn sdam_pool_management() {
         .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn hello_ok_true() {
     let mut setup_client_options = get_client_options().await.clone();
     setup_client_options.hosts.drain(1..);
@@ -201,7 +197,7 @@ async fn hello_ok_true() {
     let mut subscriber = handler.subscribe();
 
     let mut options = setup_client_options.clone();
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.direct_connection = Some(true);
     options.heartbeat_freq = Some(Duration::from_millis(500));
     let _client = Client::with_options(options).expect("client creation should succeed");
@@ -236,8 +232,7 @@ async fn hello_ok_true() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
     let client = TestClient::new().await;
     if !client.is_replica_set() {
@@ -251,7 +246,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
     options.repl_set_name = Some("invalid".to_string());
     options.server_selection_timeout = Some(Duration::from_secs(5));
     let client = Client::with_options(options)?;
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     assert!(
         match result {
             Err(Error { ref kind, .. }) => matches!(**kind, ErrorKind::ServerSelection { .. }),
@@ -266,8 +261,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
 
 /// Test verifying that a server's monitor stops after the server has been removed from the
 /// topology.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let handler = Arc::new(EventHandler::new());
     let options = ClientOptions::builder()
@@ -277,7 +271,7 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
             ServerAddress::parse("localhost:49154")?,
         ])
         .heartbeat_freq(Duration::from_millis(50))
-        .sdam_event_handler(handler.clone() as Arc<dyn SdamEventHandler>)
+        .sdam_event_handler(handler.clone())
         .repl_set_name("foo".to_string())
         .build();
 

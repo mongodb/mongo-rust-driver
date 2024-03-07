@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 
@@ -19,31 +19,29 @@ use crate::{
         ServerAddress,
         WriteConcern,
     },
-    runtime,
     sync::{Client, ClientSession, Collection},
     test::TestClient as AsyncTestClient,
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
     let coll = client.database(db_name).collection(coll_name);
-    coll.drop(None).unwrap();
+    coll.drop().run().unwrap();
     coll
 }
 
 fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T> {
     let coll = client.database(db_name).collection(coll_name);
-    coll.drop(None).unwrap();
+    coll.drop().run().unwrap();
     coll
 }
 
-lazy_static! {
-    static ref CLIENT_OPTIONS: ClientOptions =
-        runtime::block_on(async { crate::test::get_client_options().await.clone() });
-}
+static CLIENT_OPTIONS: Lazy<ClientOptions> = Lazy::new(|| {
+    crate::sync::TOKIO_RUNTIME.block_on(async { crate::test::get_client_options().await.clone() })
+});
 
 #[test]
 fn client_options() {
-    let mut options = ClientOptions::parse("mongodb://localhost:27017/").unwrap();
+    let mut options = ClientOptions::parse_sync("mongodb://localhost:27017/").unwrap();
 
     options.original_uri.take();
 
@@ -71,7 +69,8 @@ fn client() {
         .expect("insert should succeed");
 
     let db_names = client
-        .list_database_names(None, None)
+        .list_database_names()
+        .run()
         .expect("list_database_names should succeed");
     assert!(db_names.contains(&function_name!().to_string()));
 }
@@ -117,7 +116,8 @@ fn database() {
         .expect("insert should succeed");
 
     let coll_names = db
-        .list_collection_names(None)
+        .list_collection_names()
+        .run()
         .expect("list_database_names should succeed");
     assert!(coll_names.contains(&function_name!().to_string()));
 
@@ -129,7 +129,8 @@ fn database() {
         doc! { "$project": { "_id": 0, "dummy": 1 } },
     ];
     let cursor = admin_db
-        .aggregate(pipeline, None)
+        .aggregate(pipeline)
+        .run()
         .expect("aggregate should succeed");
     let results: Vec<Document> = cursor
         .collect::<Result<Vec<Document>>>()
@@ -171,7 +172,8 @@ fn collection() {
         doc! { "$project": { "_id" : 0 } },
     ];
     let cursor = coll
-        .aggregate(pipeline, None)
+        .aggregate(pipeline)
+        .run()
         .expect("aggregate should succeed");
     let results = cursor
         .collect::<Result<Vec<Document>>>()
@@ -221,7 +223,7 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let should_skip = runtime::block_on(async {
+    let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
         !test_client.supports_transactions()
     });
@@ -253,13 +255,15 @@ fn transactions() {
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let mut session = client
-        .start_session(None)
+        .start_session()
+        .run()
         .expect("session creation should succeed");
     let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
 
     client
         .database(function_name!())
-        .create_collection(function_name!(), None)
+        .create_collection(function_name!())
+        .run()
         .expect("create collection should succeed");
 
     session
@@ -384,7 +388,7 @@ fn borrowed_deserialization() {
         i += 1;
     }
 
-    let mut session = client.start_session(None).unwrap();
+    let mut session = client.start_session().run().unwrap();
     let mut cursor = coll.find_with_session(None, options, &mut session).unwrap();
 
     let mut i = 0;
@@ -401,20 +405,21 @@ fn mixed_sync_and_async() -> Result<()> {
     const COLL_NAME: &str = "test";
 
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
-    let async_client = runtime::block_on(async { AsyncTestClient::new().await });
+    let async_client = crate::sync::TOKIO_RUNTIME.block_on(async { AsyncTestClient::new().await });
     let sync_db = sync_client.database(DB_NAME);
-    sync_db.drop(None)?;
+    sync_db.drop().run()?;
     sync_db
         .collection::<Document>(COLL_NAME)
         .insert_one(doc! { "a": 1 }, None)?;
-    let mut found = runtime::block_on(async {
-        async_client
-            .database(DB_NAME)
-            .collection::<Document>(COLL_NAME)
-            .find_one(doc! {}, None)
-            .await
-    })?
-    .unwrap();
+    let mut found = crate::sync::TOKIO_RUNTIME
+        .block_on(async {
+            async_client
+                .database(DB_NAME)
+                .collection::<Document>(COLL_NAME)
+                .find_one(doc! {}, None)
+                .await
+        })?
+        .unwrap();
     found.remove("_id");
     assert_eq!(found, doc! { "a": 1 });
 

@@ -3,8 +3,9 @@ use crate::{
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
         command::CommandEvent,
+        sdam::SdamEvent,
     },
-    test::{Event, SdamEvent},
+    test::Event,
     ServerType,
 };
 use serde::Deserialize;
@@ -84,10 +85,12 @@ pub(crate) enum ExpectedSdamEvent {
     },
     #[serde(rename = "topologyDescriptionChangedEvent")]
     TopologyDescriptionChanged {},
+    #[serde(rename = "serverHeartbeatStartedEvent", rename_all = "camelCase")]
+    ServerHeartbeatStarted { awaited: Option<bool> },
     #[serde(rename = "serverHeartbeatSucceededEvent", rename_all = "camelCase")]
-    ServerHeartbeatSucceeded {},
+    ServerHeartbeatSucceeded { awaited: Option<bool> },
     #[serde(rename = "serverHeartbeatFailedEvent", rename_all = "camelCase")]
-    ServerHeartbeatFailed {},
+    ServerHeartbeatFailed { awaited: Option<bool> },
 }
 
 #[derive(Debug, Deserialize)]

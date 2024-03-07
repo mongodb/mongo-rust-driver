@@ -11,14 +11,14 @@ use hmac::{
     Hmac,
     Mac,
 };
-use lazy_static::lazy_static;
 use md5::Md5;
+use once_cell::sync::Lazy;
 use sha1::Sha1;
 use sha2::Sha256;
 use tokio::sync::RwLock;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{Bson, Document},
     client::{
         auth::{
             self,
@@ -48,12 +48,9 @@ const NO_CHANNEL_BINDING: char = 'n';
 /// The minimum number of iterations of the hash function that we will accept from the server.
 const MIN_ITERATION_COUNT: u32 = 4096;
 
-lazy_static! {
-    /// Cache of pre-computed salted passwords.
-    static ref CREDENTIAL_CACHE: RwLock<HashMap<CacheEntry, Vec<u8>>> = {
-        RwLock::new(HashMap::new())
-    };
-}
+/// Cache of pre-computed salted passwords.
+static CREDENTIAL_CACHE: Lazy<RwLock<HashMap<CacheEntry, Vec<u8>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Hash, Eq, PartialEq)]
 struct CacheEntry {

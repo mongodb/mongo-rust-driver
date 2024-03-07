@@ -5,7 +5,7 @@ use crate::{
     concern::WriteConcern,
     cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{CursorBody, Operation, RunCommand},
+    operation::{run_command::RunCommand, CursorBody, Operation},
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
 };
@@ -36,10 +36,6 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
         self.run_command.build(description)
-    }
-
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        self.run_command.serialize_command(cmd)
     }
 
     fn extract_at_cluster_time(

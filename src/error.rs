@@ -7,11 +7,14 @@ use std::{
     sync::Arc,
 };
 
+use crate::{
+    bson::Document,
+    options::ServerAddress,
+    sdam::{ServerType, TopologyVersion},
+};
 use bson::Bson;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-use crate::{bson::Document, options::ServerAddress, sdam::TopologyVersion};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -177,17 +180,38 @@ impl Error {
         self.contains_label(RETRYABLE_WRITE_ERROR)
     }
 
+    fn is_write_concern_error(&self) -> bool {
+        match *self.kind {
+            ErrorKind::Write(WriteFailure::WriteConcernError(_)) => true,
+            ErrorKind::BulkWrite(ref bulk_write_error)
+                if bulk_write_error.write_concern_error.is_some() =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
     /// indicates a 4.4+ server, a label should only be added if the error is a network error.
     /// Otherwise, a label should be added if the error is a network error or the error code
     /// matches one of the retryable write codes.
-    pub(crate) fn should_add_retryable_write_label(&self, max_wire_version: i32) -> bool {
+    pub(crate) fn should_add_retryable_write_label(
+        &self,
+        max_wire_version: i32,
+        server_type: Option<ServerType>,
+    ) -> bool {
         if max_wire_version > 8 {
             return self.is_network_error();
         }
         if self.is_network_error() {
             return true;
         }
+
+        if server_type == Some(ServerType::Mongos) && self.is_write_concern_error() {
+            return false;
+        }
+
         match &self.sdam_code() {
             Some(code) => RETRYABLE_WRITE_CODES.contains(code),
             None => false,

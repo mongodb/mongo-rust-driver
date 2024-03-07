@@ -11,10 +11,9 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
-    coll::options::{DistinctOptions, DropCollectionOptions},
+    coll::options::DropCollectionOptions,
     concern::WriteConcern,
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
-    runtime,
     sdam::{ServerInfo, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::SelectionCriteria,
     test::{
@@ -142,7 +141,7 @@ impl TestContext {
         // Reset the test collection as needed
         #[allow(unused_mut)]
         let mut options = DropCollectionOptions::builder()
-            .write_concern(WriteConcern::MAJORITY)
+            .write_concern(WriteConcern::majority())
             .build();
         #[cfg(feature = "in-use-encryption-unstable")]
         if let Some(enc_fields) = &test_file.encrypted_fields {
@@ -153,12 +152,12 @@ impl TestContext {
             && internal_client.is_sharded()
             && req.matches(&internal_client.server_version))
         {
-            coll.drop(options).await.unwrap();
+            coll.drop().with_options(options).await.unwrap();
         }
 
         #[allow(unused_mut)]
         let mut options = CreateCollectionOptions::builder()
-            .write_concern(WriteConcern::MAJORITY)
+            .write_concern(WriteConcern::majority())
             .build();
         #[cfg(feature = "in-use-encryption-unstable")]
         {
@@ -171,7 +170,8 @@ impl TestContext {
         }
         internal_client
             .database(&db_name)
-            .create_collection(&coll_name, options)
+            .create_collection(&coll_name)
+            .with_options(options)
             .await
             .unwrap();
 
@@ -181,7 +181,7 @@ impl TestContext {
                 TestData::Single(data) => {
                     if !data.is_empty() {
                         let options = InsertManyOptions::builder()
-                            .write_concern(WriteConcern::MAJORITY)
+                            .write_concern(WriteConcern::majority())
                             .build();
                         coll.insert_many(data.clone(), options).await.unwrap();
                     }
@@ -217,12 +217,12 @@ impl TestContext {
             && test.operations.iter().any(|op| op.name == "distinct")
         {
             for server_address in internal_client.options().hosts.clone() {
-                let options = DistinctOptions::builder()
-                    .selection_criteria(Some(SelectionCriteria::Predicate(Arc::new(
+                coll.distinct("_id", doc! {})
+                    .selection_criteria(SelectionCriteria::Predicate(Arc::new(
                         move |server_info: &ServerInfo| *server_info.address() == server_address,
-                    ))))
-                    .build();
-                coll.distinct("_id", None, options).await.unwrap();
+                    )))
+                    .await
+                    .unwrap();
             }
         }
 
@@ -237,13 +237,13 @@ impl TestContext {
             Some(ref options) => options.get("session0").cloned(),
             None => None,
         };
-        let session0 = Some(client.start_session(options).await.unwrap());
+        let session0 = Some(client.start_session().with_options(options).await.unwrap());
 
         let options = match test.session_options {
             Some(ref options) => options.get("session1").cloned(),
             None => None,
         };
-        let session1 = Some(client.start_session(options).await.unwrap());
+        let session1 = Some(client.start_session().with_options(options).await.unwrap());
 
         Self {
             description: test.description.clone(),
@@ -270,7 +270,7 @@ impl TestContext {
                 other => panic!("invalid object for `endSession`: {:?}", other),
             };
             drop(session.take());
-            runtime::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             return None;
         }
 
@@ -344,7 +344,7 @@ impl<'a> OpRunner<'a> {
                 // implicit session used in the first operation is returned to the pool before
                 // the second operation is executed.
                 if self.description == "Server supports implicit sessions" {
-                    runtime::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
                 result
             }
@@ -463,7 +463,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             match file_ctx
                 .internal_client
                 .database("admin")
-                .run_command(doc! { "killAllSessions": [] }, None)
+                .run_command(doc! { "killAllSessions": [] })
                 .await
             {
                 Ok(_) => {}
@@ -496,7 +496,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
 
         // wait for the transaction in progress to be aborted implicitly when the session is dropped
         if test.description.as_str() == "implicit abort" {
-            runtime::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
         if let Some(expectations) = &test.expectations {

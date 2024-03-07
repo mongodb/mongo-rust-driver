@@ -7,7 +7,6 @@ use std::{
 };
 
 use derive_more::From;
-use serde::Serialize;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::error::SendError;
 
@@ -17,7 +16,6 @@ use crate::{
     event::{
         cmap::{
             CmapEvent,
-            CmapEventHandler,
             ConnectionCheckedInEvent,
             ConnectionCheckedOutEvent,
             ConnectionCheckoutFailedEvent,
@@ -30,15 +28,9 @@ use crate::{
             PoolCreatedEvent,
             PoolReadyEvent,
         },
-        command::{
-            CommandEvent,
-            CommandEventHandler,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
-        },
+        command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::{
-            SdamEventHandler,
+            SdamEvent,
             ServerClosedEvent,
             ServerDescriptionChangedEvent,
             ServerHeartbeatFailedEvent,
@@ -97,20 +89,6 @@ impl Event {
             _ => None,
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(untagged)]
-pub(crate) enum SdamEvent {
-    ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
-    ServerOpening(ServerOpeningEvent),
-    ServerClosed(ServerClosedEvent),
-    TopologyDescriptionChanged(Box<TopologyDescriptionChangedEvent>),
-    TopologyOpening(TopologyOpeningEvent),
-    TopologyClosed(TopologyClosedEvent),
-    ServerHeartbeatStarted(ServerHeartbeatStartedEvent),
-    ServerHeartbeatSucceeded(ServerHeartbeatSucceededEvent),
-    ServerHeartbeatFailed(ServerHeartbeatFailedEvent),
 }
 
 impl SdamEvent {
@@ -188,6 +166,48 @@ impl EventHandler {
             event_broadcaster,
             connections_checked_out: Arc::new(Mutex::new(0)),
         }
+    }
+
+    pub(crate) fn command_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CommandEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<CommandEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                self.handle(ev.clone());
+                add_event_to_queue(&self.command_events, ev);
+            }
+        });
+        tx
+    }
+
+    pub(crate) fn cmap_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CmapEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<CmapEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                match &ev {
+                    CmapEvent::ConnectionCheckedOut(_) => {
+                        *self.connections_checked_out.lock().unwrap() += 1
+                    }
+                    CmapEvent::ConnectionCheckedIn(_) => {
+                        *self.connections_checked_out.lock().unwrap() -= 1
+                    }
+                    _ => (),
+                }
+                self.handle(ev.clone());
+                add_event_to_queue(&self.cmap_events, ev);
+            }
+        });
+        tx
+    }
+
+    pub(crate) fn sdam_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<SdamEvent> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<SdamEvent>(100);
+        crate::runtime::spawn(async move {
+            while let Some(ev) = rx.recv().await {
+                self.handle(ev.clone());
+                add_event_to_queue(&self.sdam_events, ev);
+            }
+        });
+        tx
     }
 
     fn handle(&self, event: impl Into<Event>) {
@@ -271,6 +291,15 @@ impl EventHandler {
                 events.retain(|ev| !matches!(ev, Event::Cmap(CmapEvent::ConnectionReady(_))));
                 events
             }
+            ExpectedEventType::Sdam => {
+                let events = self.sdam_events.read().unwrap();
+                events
+                    .iter()
+                    .cloned()
+                    .map(|(event, _)| Event::Sdam(event))
+                    .filter(filter)
+                    .collect()
+            }
         }
     }
 
@@ -322,7 +351,8 @@ impl EventHandler {
     }
 }
 
-impl CmapEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::cmap::CmapEventHandler for EventHandler {
     fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
         *self.connections_checked_out.lock().unwrap() += 1;
         let event = CmapEvent::ConnectionCheckedOut(event);
@@ -392,7 +422,8 @@ impl CmapEventHandler for EventHandler {
     }
 }
 
-impl SdamEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::sdam::SdamEventHandler for EventHandler {
     fn handle_server_description_changed_event(&self, event: ServerDescriptionChangedEvent) {
         let event = SdamEvent::ServerDescriptionChanged(Box::new(event));
         self.handle(event.clone());
@@ -448,7 +479,8 @@ impl SdamEventHandler for EventHandler {
     }
 }
 
-impl CommandEventHandler for EventHandler {
+#[allow(deprecated)]
+impl crate::event::command::CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
         let event = CommandEvent::Started(event);
         self.handle(event.clone());
@@ -690,8 +722,7 @@ impl EventClient {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn command_started_event_count() {
     let client = EventClient::new().await;
     let coll = client.database("foo").collection("bar");

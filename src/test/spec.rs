@@ -1,4 +1,3 @@
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod auth;
 mod change_streams;
 #[cfg(feature = "in-use-encryption-unstable")]
@@ -11,18 +10,15 @@ mod crud_v1;
 mod faas;
 mod gridfs;
 mod index_management;
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 mod ocsp;
 mod oidc;
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
 mod run_command;
 mod sdam;
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod sessions;
 #[cfg(feature = "tracing-unstable")]
 mod trace;

@@ -10,6 +10,7 @@ use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
 };
+use serde::Serialize;
 use tokio::sync::{
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
@@ -26,7 +27,6 @@ use crate::{
     },
     error::{load_balanced_mode_mismatch, Error, Result},
     event::sdam::{
-        handle_sdam_event,
         SdamEvent,
         ServerClosedEvent,
         ServerDescriptionChangedEvent,
@@ -80,18 +80,18 @@ impl Topology {
                 let tracing_emitter =
                     TopologyTracingEventEmitter::new(options.tracing_max_document_length_bytes, id);
                 let (tx, mut rx) = mpsc::unbounded_channel::<AcknowledgedMessage<SdamEvent>>();
-                runtime::execute(async move {
+                runtime::spawn(async move {
                     while let Some(event) = rx.recv().await {
                         let (event, ack) = event.into_parts();
 
                         if let Some(ref user_handler) = user_handler {
                             #[cfg(feature = "tracing-unstable")]
-                            handle_sdam_event(user_handler.as_ref(), event.clone());
+                            user_handler.handle(event.clone());
                             #[cfg(not(feature = "tracing-unstable"))]
-                            handle_sdam_event(user_handler.as_ref(), event);
+                            user_handler.handle(event);
                         }
                         #[cfg(feature = "tracing-unstable")]
-                        handle_sdam_event(&tracing_emitter, event);
+                        tracing_emitter.handle(event);
 
                         ack.acknowledge(());
                     }
@@ -198,7 +198,7 @@ impl Topology {
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
-    pub(crate) fn update_command_with_read_pref<T>(
+    pub(crate) fn update_command_with_read_pref<T: Serialize>(
         &self,
         server_address: &ServerAddress,
         command: &mut Command<T>,
@@ -359,7 +359,7 @@ impl TopologyWorker {
     }
 
     fn start(mut self) {
-        runtime::execute(async move {
+        runtime::spawn(async move {
             self.initialize().await;
             let mut shutdown_ack = None;
 

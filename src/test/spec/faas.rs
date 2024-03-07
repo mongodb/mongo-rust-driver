@@ -1,7 +1,5 @@
 use std::env;
 
-use bson::doc;
-
 use crate::Client;
 
 type Result<T> = anyhow::Result<T>;
@@ -39,13 +37,12 @@ async fn check_faas_handshake(vars: &[(&'static str, &str)]) -> Result<()> {
     let _tv = TempVars::set(vars);
 
     let client = Client::test_builder().build().await;
-    client.list_database_names(doc! {}, None).await?;
+    client.list_database_names().await?;
 
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn valid_aws() -> Result<()> {
     check_faas_handshake(&[
         ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
@@ -55,14 +52,12 @@ async fn valid_aws() -> Result<()> {
     .await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn valid_azure() -> Result<()> {
     check_faas_handshake(&[("FUNCTIONS_WORKER_RUNTIME", "node")]).await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn valid_gcp() -> Result<()> {
     check_faas_handshake(&[
         ("K_SERVICE", "servicename"),
@@ -73,8 +68,7 @@ async fn valid_gcp() -> Result<()> {
     .await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn valid_vercel() -> Result<()> {
     check_faas_handshake(&[
         ("VERCEL", "1"),
@@ -84,8 +78,7 @@ async fn valid_vercel() -> Result<()> {
     .await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn invalid_multiple_providers() -> Result<()> {
     check_faas_handshake(&[
         ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
@@ -94,8 +87,7 @@ async fn invalid_multiple_providers() -> Result<()> {
     .await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn invalid_long_string() -> Result<()> {
     check_faas_handshake(&[
         ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
@@ -104,8 +96,7 @@ async fn invalid_long_string() -> Result<()> {
     .await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn invalid_wrong_type() -> Result<()> {
     check_faas_handshake(&[
         ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
@@ -114,8 +105,7 @@ async fn invalid_wrong_type() -> Result<()> {
     .await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn invalid_aws_not_lambda() -> Result<()> {
     check_faas_handshake(&[("AWS_EXECUTION_ENV", "EC2")]).await
 }

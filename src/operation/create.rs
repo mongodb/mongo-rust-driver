@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::Document;
 
 use crate::{
@@ -24,17 +21,6 @@ pub(crate) struct Create {
 }
 
 impl Create {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            None,
-        )
-    }
-
     pub(crate) fn new(ns: Namespace, options: Option<CreateCollectionOptions>) -> Self {
         Self { ns, options }
     }

@@ -87,7 +87,7 @@ impl Update<'_> {
             ns,
             filter,
             update: update.into(),
-            multi: multi.then(|| true),
+            multi: multi.then_some(true),
             options,
             human_readable_serialization,
         }
@@ -107,7 +107,7 @@ impl<'a, T: Serialize> Update<'a, T> {
             ns,
             filter,
             update: update.into(),
-            multi: multi.then(|| true),
+            multi: multi.then_some(true),
             options,
             human_readable_serialization,
         }
@@ -182,10 +182,6 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
         ))
     }
 
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        cmd.into_bson_bytes()
-    }
-
     fn handle_response(
         &self,
         raw_response: RawCommandResponse,
@@ -200,7 +196,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Update<'a, T> {
             .as_ref()
             .and_then(|v| v.first())
             .and_then(|doc| doc.get("_id"))
-            .map(Clone::clone);
+            .cloned();
 
         let matched_count = if upserted_id.is_some() { 0 } else { response.n };
 

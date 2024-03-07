@@ -9,19 +9,11 @@ use crate::{
     bson::{doc, Bson},
     coll::options::{CountOptions, InsertManyOptions},
     error::Result,
+    event::sdam::SdamEvent,
     options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
-    runtime,
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{
-        get_client_options,
-        log_uncaptured,
-        Event,
-        EventClient,
-        EventHandler,
-        SdamEvent,
-        TestClient,
-    },
+    test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
     Client,
     Collection,
 };
@@ -92,7 +84,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.update_one(doc! {}, doc! { "$inc": {"x": 5 } }, None)
+                coll.update_one(doc! {}, doc! { "$inc": {"x": 5 } })
             ),
         )
         .await;
@@ -101,18 +93,18 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.update_many(doc! {}, doc! { "$inc": {"x": 5 } }, None)
+                coll.update_many(doc! {}, doc! { "$inc": {"x": 5 } })
             ),
         )
         .await;
         $test_func(
             "delete",
-            collection_op!($test_name, coll, coll.delete_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.delete_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
             "delete",
-            collection_op!($test_name, coll, coll.delete_many(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.delete_many(doc! { "x": 1 })),
         )
         .await;
         $test_func(
@@ -147,7 +139,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.aggregate(vec![doc! { "$match": { "x": 1 } }], None)
+                coll.aggregate(vec![doc! { "$match": { "x": 1 } }])
             ),
         )
         .await;
@@ -163,43 +155,39 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "distinct",
-            collection_op!($test_name, coll, coll.distinct("x", None, None)),
+            collection_op!($test_name, coll, coll.distinct("x", doc! {})),
         )
         .await;
         $test_func(
             "aggregate",
-            collection_op!($test_name, coll, coll.count_documents(None, None)),
+            collection_op!($test_name, coll, coll.count_documents(doc! {})),
         )
         .await;
-        $test_func("drop", collection_op!($test_name, coll, coll.drop(None))).await;
+        $test_func("drop", collection_op!($test_name, coll, coll.drop())).await;
 
         // db operations
         $test_func(
             "listCollections",
-            db_op!($test_name, db, db.list_collections(None, None)),
+            db_op!($test_name, db, db.list_collections()),
         )
         .await;
         $test_func(
             "ping",
-            db_op!($test_name, db, db.run_command(doc! { "ping":  1 }, None)),
+            db_op!($test_name, db, db.run_command(doc! { "ping":  1 })),
         )
         .await;
         $test_func(
             "create",
-            db_op!($test_name, db, db.create_collection("sessionopcoll", None)),
+            db_op!($test_name, db, db.create_collection("sessionopcoll")),
         )
         .await;
-        $test_func("dropDatabase", db_op!($test_name, db, db.drop(None))).await;
+        $test_func("dropDatabase", db_op!($test_name, db, db.drop())).await;
 
         // client operations
+        $test_func("listDatabases", client_op!(client, client.list_databases())).await;
         $test_func(
             "listDatabases",
-            client_op!(client, client.list_databases(None, None)),
-        )
-        .await;
-        $test_func(
-            "listDatabases",
-            client_op!(client, client.list_database_names(None, None)),
+            client_op!(client, client.list_database_names()),
         )
         .await;
     }};
@@ -207,19 +195,18 @@ macro_rules! for_each_op {
 
 /// Prose test 1 from sessions spec.
 /// This test also satisifies the `endSession` testing requirement of prose test 5.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn pool_is_lifo() {
     let client = TestClient::new().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
-    runtime::delay_for(Duration::from_millis(500)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     if client.is_standalone() {
         return;
     }
 
-    let a = client.start_session(None).await.unwrap();
-    let b = client.start_session(None).await.unwrap();
+    let a = client.start_session().await.unwrap();
+    let b = client.start_session().await.unwrap();
 
     let a_id = a.id().clone();
     let b_id = b.id().clone();
@@ -227,21 +214,20 @@ async fn pool_is_lifo() {
     // End both sessions, waiting after each to ensure the background task got scheduled
     // in the Drop impls.
     drop(a);
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     drop(b);
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
-    let s1 = client.start_session(None).await.unwrap();
+    let s1 = client.start_session().await.unwrap();
     assert_eq!(s1.id(), &b_id);
 
-    let s2 = client.start_session(None).await.unwrap();
+    let s2 = client.start_session().await.unwrap();
     assert_eq!(s2.id(), &a_id);
 }
 
 /// Prose test 2 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn cluster_time_in_commands() {
     let test_client = TestClient::new().await;
@@ -309,8 +295,8 @@ async fn cluster_time_in_commands() {
     let handler = Arc::new(EventHandler::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
-    options.command_event_handler = Some(handler.clone());
-    options.sdam_event_handler = Some(handler.clone());
+    options.command_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(handler.clone().into());
 
     // Ensure we only connect to one server so the monitor checks from other servers
     // don't affect the TopologyDescription's clusterTime value between commands.
@@ -346,14 +332,14 @@ async fn cluster_time_in_commands() {
     // a command invocation.
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
 
     cluster_time_test("ping", &client, handler.as_ref(), |client| async move {
         client
             .database(function_name!())
-            .run_command(doc! { "ping": 1 }, None)
+            .run_command(doc! { "ping": 1 })
             .await
     })
     .await;
@@ -366,7 +352,7 @@ async fn cluster_time_in_commands() {
             client
                 .database(function_name!())
                 .collection::<Document>(function_name!())
-                .aggregate(vec![doc! { "$match": { "x": 1 } }], None)
+                .aggregate(vec![doc! { "$match": { "x": 1 } }])
                 .await
         },
     )
@@ -392,8 +378,7 @@ async fn cluster_time_in_commands() {
 }
 
 /// Prose test 3 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn session_usage() {
     let client = TestClient::new().await;
@@ -420,8 +405,7 @@ async fn session_usage() {
 }
 
 /// Prose test 7 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
     let client = EventClient::new().await;
@@ -437,7 +421,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
         .expect("insert should succeed");
 
     // wait for sessions to be returned to the pool and clear them out.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
     let mut cursor = coll.find(doc! {}, None).await.expect("find should succeed");
@@ -451,7 +435,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
         .as_document()
         .expect("session id should be a document");
 
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(
         client.is_session_checked_in(session_id).await,
         "session not checked back in"
@@ -461,8 +445,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 }
 
 /// Prose test 8 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
     let client = EventClient::new().await;
@@ -480,7 +463,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
     }
 
     // wait for sessions to be returned to the pool and clear them out.
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
     let options = FindOptions::builder().batch_size(3).build();
@@ -501,7 +484,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         .as_document()
         .expect("session id should be a document");
 
-    runtime::delay_for(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(
         client.is_session_checked_in(session_id).await,
         "session not checked back in"
@@ -511,8 +494,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 }
 
 /// Prose test 10 from sessions spec.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
     let client = EventClient::new().await;
@@ -617,7 +599,13 @@ async fn find_and_getmore_share_session() {
             .read_concern(ReadConcern::local())
             .build();
 
-        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
+        while coll
+            .count_documents(doc! {})
+            .with_options(options.clone())
+            .await
+            .unwrap()
+            != 3
+        {}
     }
 
     for read_pref in read_preferences {

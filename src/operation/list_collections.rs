@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -13,26 +10,18 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct ListCollections {
     db: String,
-    filter: Option<Document>,
     name_only: bool,
     options: Option<ListCollectionsOptions>,
 }
 
 impl ListCollections {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(String::new(), None, false, None)
-    }
-
     pub(crate) fn new(
         db: String,
-        filter: Option<Document>,
         name_only: bool,
         options: Option<ListCollectionsOptions>,
     ) -> Self {
         Self {
             db,
-            filter,
             name_only,
             options,
         }
@@ -51,9 +40,7 @@ impl OperationWithDefaults for ListCollections {
         };
 
         let mut name_only = self.name_only;
-        if let Some(ref filter) = self.filter {
-            body.insert("filter", filter.clone());
-
+        if let Some(filter) = self.options.as_ref().and_then(|o| o.filter.as_ref()) {
             if name_only && filter.keys().any(|k| k != "name") {
                 name_only = false;
             }

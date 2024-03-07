@@ -10,8 +10,6 @@ use std::{
 };
 
 use anyhow::Context;
-#[cfg(not(feature = "tokio-runtime"))]
-use async_std::net::TcpListener;
 use bson::{
     doc,
     rawdoc,
@@ -24,26 +22,21 @@ use bson::{
     RawDocumentBuf,
 };
 use futures_util::TryStreamExt;
-use lazy_static::lazy_static;
 use mongocrypt::ctx::{Algorithm, KmsProvider};
-#[cfg(feature = "tokio-runtime")]
+use once_cell::sync::Lazy;
 use tokio::net::TcpListener;
 
 use crate::{
+    action::Action,
     client_encryption::{ClientEncryption, EncryptKey, MasterKey, RangeOptions},
     error::{ErrorKind, WriteError, WriteFailure},
-    event::command::{
-        CommandEventHandler,
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
+    event::{
+        command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+        sdam::SdamEvent,
     },
     options::{
         CollectionOptions,
-        CreateCollectionOptions,
-        CreateIndexOptions,
         Credential,
-        DropCollectionOptions,
         FindOptions,
         IndexOptions,
         InsertOneOptions,
@@ -52,7 +45,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{Event, EventHandler, SdamEvent},
+    test::{Event, EventHandler},
     Client,
     Collection,
     IndexModel,
@@ -78,100 +71,103 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
         .collection_with_options::<Document>(
             "datakeys",
             CollectionOptions::builder()
-                .read_concern(ReadConcern::MAJORITY)
-                .write_concern(WriteConcern::MAJORITY)
+                .read_concern(ReadConcern::majority())
+                .write_concern(WriteConcern::majority())
                 .build(),
         );
-    datakeys.drop(None).await?;
+    datakeys.drop().await?;
     client
         .database("db")
         .collection::<Document>("coll")
-        .drop(None)
+        .drop()
         .await?;
     Ok((client, datakeys))
 }
 
 pub(crate) type KmsProviderList = Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>;
 
-lazy_static! {
-    static ref KMS_PROVIDERS: KmsProviderList = {
-        fn env(name: &str) -> String {
-            std::env::var(name).unwrap()
-        }
-        vec![
-            (
-                KmsProvider::Aws,
-                doc! {
-                    "accessKeyId": env("AWS_ACCESS_KEY_ID"),
-                    "secretAccessKey": env("AWS_SECRET_ACCESS_KEY"),
+static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
+    fn env(name: &str) -> String {
+        std::env::var(name).unwrap()
+    }
+    vec![
+        (
+            KmsProvider::Aws,
+            doc! {
+                "accessKeyId": env("AWS_ACCESS_KEY_ID"),
+                "secretAccessKey": env("AWS_SECRET_ACCESS_KEY"),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Azure,
+            doc! {
+                "tenantId": env("AZURE_TENANT_ID"),
+                "clientId": env("AZURE_CLIENT_ID"),
+                "clientSecret": env("AZURE_CLIENT_SECRET"),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Gcp,
+            doc! {
+                "email": env("GCP_EMAIL"),
+                "privateKey": env("GCP_PRIVATE_KEY"),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Local,
+            doc! {
+                "key": bson::Binary {
+                    subtype: bson::spec::BinarySubtype::Generic,
+                    bytes: base64::decode(env("CSFLE_LOCAL_KEY")).unwrap(),
                 },
-                None,
-            ),
-            (
-                KmsProvider::Azure,
-                doc! {
-                    "tenantId": env("AZURE_TENANT_ID"),
-                    "clientId": env("AZURE_CLIENT_ID"),
-                    "clientSecret": env("AZURE_CLIENT_SECRET"),
-                },
-                None,
-            ),
-            (
-                KmsProvider::Gcp,
-                doc! {
-                    "email": env("GCP_EMAIL"),
-                    "privateKey": env("GCP_PRIVATE_KEY"),
-                },
-                None,
-            ),
-            (
-                KmsProvider::Local,
-                doc! {
-                    "key": bson::Binary {
-                        subtype: bson::spec::BinarySubtype::Generic,
-                        bytes: base64::decode(env("CSFLE_LOCAL_KEY")).unwrap(),
-                    },
-                },
-                None,
-            ),
-            (
-                KmsProvider::Kmip,
-                doc! {
-                    "endpoint": "localhost:5698",
-                },
-                {
-                    let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
-                    Some(
-                        TlsOptions::builder()
-                            .ca_file_path(cert_dir.join("ca.pem"))
-                            .cert_key_file_path(cert_dir.join("client.pem"))
-                            .build(),
-                    )
-                },
-            ),
-        ]
-    };
-    static ref LOCAL_KMS: KmsProviderList = KMS_PROVIDERS
+            },
+            None,
+        ),
+        (
+            KmsProvider::Kmip,
+            doc! {
+                "endpoint": "localhost:5698",
+            },
+            {
+                let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
+                Some(
+                    TlsOptions::builder()
+                        .ca_file_path(cert_dir.join("ca.pem"))
+                        .cert_key_file_path(cert_dir.join("client.pem"))
+                        .build(),
+                )
+            },
+        ),
+    ]
+});
+static LOCAL_KMS: Lazy<KmsProviderList> = Lazy::new(|| {
+    KMS_PROVIDERS
         .iter()
         .filter(|(p, ..)| p == &KmsProvider::Local)
         .cloned()
-        .collect();
-    pub(crate) static ref KMS_PROVIDERS_MAP: HashMap<
+        .collect()
+});
+pub(crate) static KMS_PROVIDERS_MAP: Lazy<
+    HashMap<
         mongocrypt::ctx::KmsProvider,
         (bson::Document, Option<crate::client::options::TlsOptions>),
-    > = {
-        let mut map = HashMap::new();
-        for (prov, conf, tls) in KMS_PROVIDERS.clone() {
-            map.insert(prov, (conf, tls));
-        }
-        map
-    };
-    static ref EXTRA_OPTIONS: Document =
-        doc! { "cryptSharedLibPath": std::env::var("CRYPT_SHARED_LIB_PATH").unwrap() };
-    static ref KV_NAMESPACE: Namespace = Namespace::from_str("keyvault.datakeys").unwrap();
-    static ref DISABLE_CRYPT_SHARED: bool =
-        std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true");
-}
+    >,
+> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    for (prov, conf, tls) in KMS_PROVIDERS.clone() {
+        map.insert(prov, (conf, tls));
+    }
+    map
+});
+static EXTRA_OPTIONS: Lazy<Document> =
+    Lazy::new(|| doc! { "cryptSharedLibPath": std::env::var("CRYPT_SHARED_LIB_PATH").unwrap() });
+static KV_NAMESPACE: Lazy<Namespace> =
+    Lazy::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
+static DISABLE_CRYPT_SHARED: Lazy<bool> =
+    Lazy::new(|| std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true"));
 
 fn check_env(name: &str, kmip: bool) -> bool {
     if std::env::var("CSFLE_LOCAL_KEY").is_err() {
@@ -193,8 +189,7 @@ fn check_env(name: &str, kmip: bool) -> bool {
 }
 
 // Prose test 1. Custom Key Material Test
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_key_material() -> Result<()> {
     if !check_env("custom_key_material", false) {
         return Ok(());
@@ -215,13 +210,12 @@ async fn custom_key_material() -> Result<()> {
     let id = enc
         .create_data_key(MasterKey::Local)
         .key_material(key)
-        .run()
         .await?;
     let mut key_doc = datakeys
         .find_one(doc! { "_id": id.clone() }, None)
         .await?
         .unwrap();
-    datakeys.delete_one(doc! { "_id": id}, None).await?;
+    datakeys.delete_one(doc! { "_id": id}).await?;
     let new_key_id = bson::Binary::from_uuid(bson::Uuid::from_bytes([0; 16]));
     key_doc.insert("_id", new_key_id.clone());
     datakeys.insert_one(key_doc, None).await?;
@@ -232,7 +226,6 @@ async fn custom_key_material() -> Result<()> {
             EncryptKey::Id(new_key_id),
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
-        .run()
         .await?;
     let expected = base64::decode(
         "AQAAAAAAAAAAAAAAAAAAAAACz0ZOLuuhEYi807ZXTdhbqhLaS2/t9wLifJnnNYwiw79d75QYIZ6M/\
@@ -245,8 +238,7 @@ async fn custom_key_material() -> Result<()> {
 }
 
 // Prose test 2. Data Key and Double Encryption
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn data_key_double_encryption() -> Result<()> {
     if !check_env("data_key_double_encryption", true) {
         return Ok(());
@@ -334,7 +326,6 @@ async fn data_key_double_encryption() -> Result<()> {
         let datakey_id = client_encryption
             .create_data_key(master_key)
             .key_alt_names([format!("{}_altname", provider.name())])
-            .run()
             .await?;
         assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
         let docs: Vec<_> = client
@@ -382,7 +373,6 @@ async fn data_key_double_encryption() -> Result<()> {
                 EncryptKey::Id(datakey_id),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
         assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
         let coll = client_encrypted
@@ -406,7 +396,6 @@ async fn data_key_double_encryption() -> Result<()> {
                 EncryptKey::AltName(format!("{}_altname", provider.name())),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
         assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
         assert_eq!(other_encrypted.bytes, encrypted.bytes);
@@ -439,8 +428,7 @@ fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
 }
 
 // Prose test 3. External Key Vault Test
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn external_key_vault() -> Result<()> {
     if !check_env("external_key_vault", true) {
         return Ok(());
@@ -509,7 +497,6 @@ async fn external_key_vault() -> Result<()> {
                 EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
@@ -542,8 +529,7 @@ fn load_testdata(name: &str) -> Result<Document> {
 }
 
 // Prose test 4. BSON Size Limits and Batch Splitting
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bson_size_limits() -> Result<()> {
     if !check_env("bson_size_limits", false) {
         return Ok(());
@@ -553,12 +539,8 @@ async fn bson_size_limits() -> Result<()> {
     let (client, datakeys) = init_client().await?;
     client
         .database("db")
-        .create_collection(
-            "coll",
-            CreateCollectionOptions::builder()
-                .validator(doc! { "$jsonSchema": load_testdata("limits/limits-schema.json")? })
-                .build(),
-        )
+        .create_collection("coll")
+        .validator(doc! { "$jsonSchema": load_testdata("limits/limits-schema.json")? })
         .await?;
     datakeys
         .insert_one(load_testdata("limits/limits-key.json")?, None)
@@ -568,7 +550,7 @@ async fn bson_size_limits() -> Result<()> {
     let mut opts = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
     let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.clone());
+    opts.command_event_handler = Some(handler.clone().into());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
             .extra_options(EXTRA_OPTIONS.clone())
@@ -666,8 +648,7 @@ async fn bson_size_limits() -> Result<()> {
 }
 
 // Prose test 5. Views Are Prohibited
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn views_prohibited() -> Result<()> {
     if !check_env("views_prohibited", false) {
         return Ok(());
@@ -678,16 +659,12 @@ async fn views_prohibited() -> Result<()> {
     client
         .database("db")
         .collection::<Document>("view")
-        .drop(None)
+        .drop()
         .await?;
     client
         .database("db")
-        .create_collection(
-            "view",
-            CreateCollectionOptions::builder()
-                .view_on("coll".to_string())
-                .build(),
-        )
+        .create_collection("view")
+        .view_on("coll".to_string())
         .await?;
 
     // Setup: encrypted client.
@@ -742,8 +719,7 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
 }
 
 // Prose test 6. Corpus Test (collection schema)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn corpus_coll_schema() -> Result<()> {
     if !check_env("corpus_coll_schema", true) {
         return Ok(());
@@ -753,8 +729,7 @@ async fn corpus_coll_schema() -> Result<()> {
 }
 
 // Prose test 6. Corpus Test (local schema)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn corpus_local_schema() -> Result<()> {
     if !check_env("corpus_local_schema", true) {
         return Ok(());
@@ -767,18 +742,15 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
     let schema = load_testdata("corpus/corpus-schema.json")?;
-    let coll_opts = if local_schema {
+    let validator = if local_schema {
         None
     } else {
-        Some(
-            CreateCollectionOptions::builder()
-                .validator(doc! { "$jsonSchema": schema.clone() })
-                .build(),
-        )
+        Some(doc! { "$jsonSchema": schema.clone() })
     };
     client
         .database("db")
-        .create_collection("coll", coll_opts)
+        .create_collection("coll")
+        .optional(validator, |b, v| b.validator(v))
         .await?;
     for f in [
         "corpus/corpus-key-local.json",
@@ -870,7 +842,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             .expect("no value to encrypt")
             .clone()
             .try_into()?;
-        let result = client_encryption.encrypt(value, key, algo).run().await;
+        let result = client_encryption.encrypt(value, key, algo).await;
         let mut subdoc_copied = subdoc.clone();
         if subdoc.get_bool("allowed")? {
             subdoc_copied.insert("value", result?);
@@ -1012,7 +984,6 @@ async fn validate_roundtrip(
             EncryptKey::Id(key_id),
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
-        .run()
         .await?;
     let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
     assert_eq!(value, decrypted);
@@ -1029,7 +1000,6 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
                 .to_string(),
             endpoint,
         })
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
@@ -1037,8 +1007,7 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 1. aws, no endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_aws_no_endpoint", false) {
         return Ok(());
@@ -1048,8 +1017,7 @@ async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 2. aws, endpoint without port)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_no_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_no_port", false) {
         return Ok(());
@@ -1059,8 +1027,7 @@ async fn custom_endpoint_aws_no_port() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 3. aws, endpoint with port)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_with_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_with_port", false) {
         return Ok(());
@@ -1070,8 +1037,7 @@ async fn custom_endpoint_aws_with_port() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 4. aws, endpoint with invalid port)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_invalid_port() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_port", false) {
         return Ok(());
@@ -1086,7 +1052,6 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
                 .to_string(),
             endpoint: Some("kms.us-east-1.amazonaws.com:12345".to_string()),
         })
-        .run()
         .await;
     assert!(result.unwrap_err().is_network_error());
 
@@ -1094,8 +1059,7 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 5. aws, invalid region)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_invalid_region() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_region", false) {
         return Ok(());
@@ -1110,7 +1074,6 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
                 .to_string(),
             endpoint: Some("kms.us-east-2.amazonaws.com".to_string()),
         })
-        .run()
         .await;
     assert!(result.unwrap_err().is_csfle_error());
 
@@ -1118,8 +1081,7 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 6. aws, invalid domain)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
     if !check_env("custom_endpoint_aws_invalid_domain", false) {
         return Ok(());
@@ -1134,7 +1096,6 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
                 .to_string(),
             endpoint: Some("doesnotexist.invalid".to_string()),
         })
-        .run()
         .await;
     assert!(result.unwrap_err().is_network_error());
 
@@ -1142,8 +1103,7 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 7. azure)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_azure() -> Result<()> {
     if !check_env("custom_endpoint_azure", false) {
         return Ok(());
@@ -1158,23 +1118,18 @@ async fn custom_endpoint_azure() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let key_id = client_encryption
         .create_data_key(master_key.clone())
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid
-        .create_data_key(master_key)
-        .run()
-        .await;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
 }
 
 // Prose test 7. Custom Endpoint Test (case 8. gcp)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_gcp_valid() -> Result<()> {
     if !check_env("custom_endpoint_gcp_valid", false) {
         return Ok(());
@@ -1192,23 +1147,18 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let key_id = client_encryption
         .create_data_key(master_key.clone())
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid
-        .create_data_key(master_key)
-        .run()
-        .await;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
 }
 
 // Prose test 7. Custom Endpoint Test (case 9. gcp, invalid endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_gcp_invalid() -> Result<()> {
     if !check_env("custom_endpoint_gcp_invalid", false) {
         return Ok(());
@@ -1224,7 +1174,7 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
     };
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let result = client_encryption.create_data_key(master_key).run().await;
+    let result = client_encryption.create_data_key(master_key).await;
     let err = result.unwrap_err();
     assert!(err.is_csfle_error());
     assert!(
@@ -1237,8 +1187,7 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
 }
 
 // Prose test 7. Custom Endpoint Test (case 10. kmip, no endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_no_endpoint", true) {
         return Ok(());
@@ -1252,23 +1201,18 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
     let client_encryption = custom_endpoint_setup(true).await?;
     let key_id = client_encryption
         .create_data_key(master_key.clone())
-        .run()
         .await?;
     validate_roundtrip(&client_encryption, key_id).await?;
 
     let client_encryption_invalid = custom_endpoint_setup(false).await?;
-    let result = client_encryption_invalid
-        .create_data_key(master_key)
-        .run()
-        .await;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
 }
 
 // Prose test 7. Custom Endpoint Test (case 11. kmip, valid endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_valid_endpoint", true) {
         return Ok(());
@@ -1280,13 +1224,12 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
     };
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let key_id = client_encryption.create_data_key(master_key).run().await?;
+    let key_id = client_encryption.create_data_key(master_key).await?;
     validate_roundtrip(&client_encryption, key_id).await
 }
 
 // Prose test 7. Custom Endpoint Test (case 12. kmip, invalid endpoint)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     if !check_env("custom_endpoint_kmip_invalid_endpoint", true) {
         return Ok(());
@@ -1298,15 +1241,14 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
     };
 
     let client_encryption = custom_endpoint_setup(true).await?;
-    let result = client_encryption.create_data_key(master_key).run().await;
+    let result = client_encryption.create_data_key(master_key).await;
     assert!(result.unwrap_err().is_network_error());
 
     Ok(())
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via loading shared library)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_shared_library", false) {
         return Ok(());
@@ -1346,15 +1288,14 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     // Test: attempting to connect fails.
     let client =
         Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via mongocryptdBypassSpawn)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_spawn", false) {
         return Ok(());
@@ -1423,15 +1364,14 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
     // Test: attempting to connect fails.
     let client =
         Client::with_uri_str("mongodb://localhost:27021/?serverSelectionTimeoutMS=1000").await?;
-    let result = client.list_database_names(None, None).await;
+    let result = client.list_database_names().await;
     assert!(result.unwrap_err().is_server_selection_error());
 
     Ok(())
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassAutoEncryption)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
         return Ok(());
@@ -1440,8 +1380,7 @@ async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassQueryAnalysis)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
     if !check_env("bypass_mongocryptd_via_bypass_query_analysis", false) {
         return Ok(());
@@ -1450,8 +1389,7 @@ async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
 }
 
 // Prose test 9. Deadlock Tests
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn deadlock() -> Result<()> {
     if !check_env("deadlock", false) {
         return Ok(());
@@ -1580,12 +1518,12 @@ impl DeadlockTestCase {
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
-            .drop(None)
+            .drop()
             .await?;
         client_test
             .database("db")
             .collection::<Document>("coll")
-            .drop(None)
+            .drop()
             .await?;
         client_keyvault
             .database("keyvault")
@@ -1593,20 +1531,14 @@ impl DeadlockTestCase {
             .insert_one(
                 load_testdata("external/external-key.json")?,
                 InsertOneOptions::builder()
-                    .write_concern(WriteConcern::MAJORITY)
+                    .write_concern(WriteConcern::majority())
                     .build(),
             )
             .await?;
         client_test
             .database("db")
-            .create_collection(
-                "coll",
-                CreateCollectionOptions::builder()
-                    .validator(
-                        doc! { "$jsonSchema": load_testdata("external/external-schema.json")? },
-                    )
-                    .build(),
-            )
+            .create_collection("coll")
+            .validator(doc! { "$jsonSchema": load_testdata("external/external-schema.json")? })
             .await?;
         let client_encryption = ClientEncryption::new(
             client_test.clone().into_client(),
@@ -1619,7 +1551,6 @@ impl DeadlockTestCase {
                 EncryptKey::AltName("local".to_string()),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
 
         // Run test case
@@ -1627,8 +1558,8 @@ impl DeadlockTestCase {
         let mut encrypted_events = event_handler.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.clone());
-        opts.sdam_event_handler = Some(event_handler.clone());
+        opts.command_event_handler = Some(event_handler.clone().into());
+        opts.sdam_event_handler = Some(event_handler.clone().into());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)
@@ -1720,8 +1651,7 @@ impl DeadlockExpectation {
 }
 
 // Prose test 10. KMS TLS Tests
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn kms_tls() -> Result<()> {
     if !check_env("kms_tls", true) {
         return Ok(());
@@ -1763,14 +1693,12 @@ async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<(
                 .to_string(),
             endpoint: Some(endpoint.into()),
         })
-        .run()
         .await
         .map(|_| ())
 }
 
 // Prose test 11. KMS TLS Options Tests
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn kms_tls_options() -> Result<()> {
     if !check_env("kms_tls_options", true) {
         return Ok(());
@@ -1892,7 +1820,6 @@ async fn kms_tls_options() -> Result<()> {
     ) -> Result<()> {
         let err = client_encryption
             .create_data_key(master_key)
-            .run()
             .await
             .unwrap_err();
         let err_str = err.to_string();
@@ -2019,7 +1946,6 @@ async fn kms_tls_options() -> Result<()> {
     // This one succeeds!
     client_encryption_with_tls
         .create_data_key(kmip_key.clone())
-        .run()
         .await?;
     provider_test(
         &client_encryption_expired,
@@ -2051,8 +1977,7 @@ async fn fle2v2_ok(name: &str) -> bool {
 }
 
 // Prose test 12. Explicit Encryption (Case 1: can insert encrypted indexed and find)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_1() -> Result<()> {
     if !check_env("explicit_encryption_case_1", false) {
         return Ok(());
@@ -2078,7 +2003,6 @@ async fn explicit_encryption_case_1() -> Result<()> {
             Algorithm::Indexed,
         )
         .contention_factor(0)
-        .run()
         .await?;
     enc_coll
         .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
@@ -2093,7 +2017,6 @@ async fn explicit_encryption_case_1() -> Result<()> {
         )
         .query_type("equality".to_string())
         .contention_factor(0)
-        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload }, None)
@@ -2111,8 +2034,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
 
 // Prose test 12. Explicit Encryption (Case 2: can insert encrypted indexed and find with non-zero
 // contention)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_2() -> Result<()> {
     if !check_env("explicit_encryption_case_2", false) {
         return Ok(());
@@ -2139,7 +2061,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
                 Algorithm::Indexed,
             )
             .contention_factor(10)
-            .run()
             .await?;
         enc_coll
             .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
@@ -2155,7 +2076,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
         )
         .query_type("equality".to_string())
         .contention_factor(0)
-        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload }, None)
@@ -2176,7 +2096,6 @@ async fn explicit_encryption_case_2() -> Result<()> {
         )
         .query_type("equality")
         .contention_factor(10)
-        .run()
         .await?;
     let found: Vec<_> = enc_coll
         .find(doc! { "encryptedIndexed": find_payload2 }, None)
@@ -2192,8 +2111,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
 }
 
 // Prose test 12. Explicit Encryption (Case 3: can insert encrypted unindexed)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_3() -> Result<()> {
     if !check_env("explicit_encryption_case_3", false) {
         return Ok(());
@@ -2218,7 +2136,6 @@ async fn explicit_encryption_case_3() -> Result<()> {
             EncryptKey::Id(testdata.key1_id.clone()),
             Algorithm::Unindexed,
         )
-        .run()
         .await?;
     enc_coll
         .insert_one(
@@ -2242,8 +2159,7 @@ async fn explicit_encryption_case_3() -> Result<()> {
 }
 
 // Prose test 12. Explicit Encryption (Case 4: can roundtrip encrypted indexed)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_4() -> Result<()> {
     if !check_env("explicit_encryption_case_4", false) {
         return Ok(());
@@ -2266,7 +2182,6 @@ async fn explicit_encryption_case_4() -> Result<()> {
             Algorithm::Indexed,
         )
         .contention_factor(0)
-        .run()
         .await?;
     let roundtrip = testdata
         .client_encryption
@@ -2278,8 +2193,7 @@ async fn explicit_encryption_case_4() -> Result<()> {
 }
 
 // Prose test 12. Explicit Encryption (Case 5: can roundtrip encrypted unindexed)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn explicit_encryption_case_5() -> Result<()> {
     if !check_env("explicit_encryption_case_5", false) {
         return Ok(());
@@ -2301,7 +2215,6 @@ async fn explicit_encryption_case_5() -> Result<()> {
             EncryptKey::Id(testdata.key1_id.clone()),
             Algorithm::Unindexed,
         )
-        .run()
         .await?;
     let roundtrip = testdata
         .client_encryption
@@ -2338,31 +2251,21 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
 
     let db = key_vault_client.database("db");
     db.collection::<Document>("explicit_encryption")
-        .drop(
-            DropCollectionOptions::builder()
-                .encrypted_fields(encrypted_fields.clone())
-                .build(),
-        )
+        .drop()
+        .encrypted_fields(encrypted_fields.clone())
         .await?;
-    db.create_collection(
-        "explicit_encryption",
-        CreateCollectionOptions::builder()
-            .encrypted_fields(encrypted_fields)
-            .build(),
-    )
-    .await?;
+    db.create_collection("explicit_encryption")
+        .encrypted_fields(encrypted_fields)
+        .await?;
     let keyvault = key_vault_client.database("keyvault");
-    keyvault
-        .collection::<Document>("datakeys")
-        .drop(None)
-        .await?;
-    keyvault.create_collection("datakeys", None).await?;
+    keyvault.collection::<Document>("datakeys").drop().await?;
+    keyvault.create_collection("datakeys").await?;
     keyvault
         .collection::<Document>("datakeys")
         .insert_one(
             key1_document,
             InsertOneOptions::builder()
-                .write_concern(WriteConcern::MAJORITY)
+                .write_concern(WriteConcern::majority())
                 .build(),
         )
         .await?;
@@ -2391,8 +2294,7 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
 }
 
 // Prose test 13. Unique Index on keyAltNames (Case 1: createDataKey())
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     if !check_env("unique_index_keyaltnames_create_data_key", false) {
         return Ok(());
@@ -2404,13 +2306,11 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["abc".to_string()])
-        .run()
         .await?;
     // Fails: duplicate key
     let err = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["abc".to_string()])
-        .run()
         .await
         .unwrap_err();
     assert_eq!(
@@ -2423,7 +2323,6 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
     let err = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["def".to_string()])
-        .run()
         .await
         .unwrap_err();
     assert_eq!(
@@ -2437,8 +2336,7 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
 }
 
 // Prose test 13. Unique Index on keyAltNames (Case 2: addKeyAltName())
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
     if !check_env("unique_index_keyaltnames_add_key_alt_name", false) {
         return Ok(());
@@ -2447,10 +2345,7 @@ async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
     let (client_encryption, key) = unique_index_keyaltnames_setup().await?;
 
     // Succeeds
-    let new_key = client_encryption
-        .create_data_key(MasterKey::Local)
-        .run()
-        .await?;
+    let new_key = client_encryption.create_data_key(MasterKey::Local).await?;
     client_encryption.add_key_alt_name(&new_key, "abc").await?;
     // Still succeeds, has alt name
     let prev_key = client_encryption
@@ -2495,23 +2390,19 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
     let datakeys = client
         .database("keyvault")
         .collection::<Document>("datakeys");
-    datakeys.drop(None).await?;
+    datakeys.drop().await?;
     datakeys
-        .create_index(
-            IndexModel {
-                keys: doc! { "keyAltNames": 1 },
-                options: Some(
-                    IndexOptions::builder()
-                        .name("keyAltNames_1".to_string())
-                        .unique(true)
-                        .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
-                        .build(),
-                ),
-            },
-            CreateIndexOptions::builder()
-                .write_concern(WriteConcern::MAJORITY)
-                .build(),
-        )
+        .create_index(IndexModel {
+            keys: doc! { "keyAltNames": 1 },
+            options: Some(
+                IndexOptions::builder()
+                    .name("keyAltNames_1".to_string())
+                    .unique(true)
+                    .partial_filter_expression(doc! { "keyAltNames": { "$exists": true } })
+                    .build(),
+            ),
+        })
+        .write_concern(WriteConcern::majority())
         .await?;
     let client_encryption = ClientEncryption::new(
         client.into_client(),
@@ -2521,14 +2412,12 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
     let key = client_encryption
         .create_data_key(MasterKey::Local)
         .key_alt_names(vec!["def".to_string()])
-        .run()
         .await?;
     Ok((client_encryption, key))
 }
 
 // Prose test 14. Decryption Events (Case 1: Command Error)
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn decryption_events_command_error() -> Result<()> {
     if !check_env("decryption_events_command_error", false) {
         return Ok(());
@@ -2547,7 +2436,7 @@ async fn decryption_events_command_error() -> Result<()> {
     let _guard = fp.enable(&td.setup_client, None).await?;
     let err = td
         .decryption_events
-        .aggregate(vec![doc! { "$count": "total" }], None)
+        .aggregate(vec![doc! { "$count": "total" }])
         .await
         .unwrap_err();
     assert_eq!(Some(123), err.sdam_code());
@@ -2557,8 +2446,7 @@ async fn decryption_events_command_error() -> Result<()> {
 }
 
 // Prose test 14. Decryption Events (Case 2: Network Error)
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn decryption_events_network_error() -> Result<()> {
     if !check_env("decryption_events_network_error", false) {
         return Ok(());
@@ -2580,7 +2468,7 @@ async fn decryption_events_network_error() -> Result<()> {
     let _guard = fp.enable(&td.setup_client, None).await?;
     let err = td
         .decryption_events
-        .aggregate(vec![doc! { "$count": "total" }], None)
+        .aggregate(vec![doc! { "$count": "total" }])
         .await
         .unwrap_err();
     assert!(err.is_network_error(), "unexpected error: {}", err);
@@ -2590,8 +2478,7 @@ async fn decryption_events_network_error() -> Result<()> {
 }
 
 // Prose test 14. Decryption Events (Case 3: Decrypt Error)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn decryption_events_decrypt_error() -> Result<()> {
     if !check_env("decryption_events_decrypt_error", false) {
         return Ok(());
@@ -2604,11 +2491,7 @@ async fn decryption_events_decrypt_error() -> Result<()> {
     td.decryption_events
         .insert_one(doc! { "encrypted": td.malformed_ciphertext }, None)
         .await?;
-    let err = td
-        .decryption_events
-        .aggregate(vec![], None)
-        .await
-        .unwrap_err();
+    let err = td.decryption_events.aggregate(vec![]).await.unwrap_err();
     assert!(err.is_csfle_error());
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
@@ -2626,8 +2509,7 @@ async fn decryption_events_decrypt_error() -> Result<()> {
 }
 
 // Prose test 14. Decryption Events (Case 4: Decrypt Success)
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn decryption_events_decrypt_success() -> Result<()> {
     if !check_env("decryption_events_decrypt_success", false) {
         return Ok(());
@@ -2640,7 +2522,7 @@ async fn decryption_events_decrypt_success() -> Result<()> {
     td.decryption_events
         .insert_one(doc! { "encrypted": td.ciphertext }, None)
         .await?;
-    td.decryption_events.aggregate(vec![], None).await?;
+    td.decryption_events.aggregate(vec![]).await?;
     let guard = td.ev_handler.succeeded.lock().unwrap();
     let ev = guard.as_ref().unwrap();
     assert_eq!(
@@ -2673,26 +2555,22 @@ impl DecryptionEventsTestdata {
         }
         let db = setup_client.database("db");
         db.collection::<Document>("decryption_events")
-            .drop(None)
+            .drop()
             .await?;
-        db.create_collection("decryption_events", None).await?;
+        db.create_collection("decryption_events").await?;
 
         let client_encryption = ClientEncryption::new(
             setup_client.clone().into_client(),
             KV_NAMESPACE.clone(),
             LOCAL_KMS.clone(),
         )?;
-        let key_id = client_encryption
-            .create_data_key(MasterKey::Local)
-            .run()
-            .await?;
+        let key_id = client_encryption.create_data_key(MasterKey::Local).await?;
         let ciphertext = client_encryption
             .encrypt(
                 "hello",
                 EncryptKey::Id(key_id),
                 Algorithm::AeadAes256CbcHmacSha512Deterministic,
             )
-            .run()
             .await?;
         let mut malformed_ciphertext = ciphertext.clone();
         let last = malformed_ciphertext.bytes.last_mut().unwrap();
@@ -2701,7 +2579,7 @@ impl DecryptionEventsTestdata {
         let ev_handler = DecryptionEventsHandler::new();
         let mut opts = get_client_options().await.clone();
         opts.retry_reads = Some(false);
-        opts.command_event_handler = Some(ev_handler.clone());
+        opts.command_event_handler = Some(ev_handler.clone().into());
         let encrypted_client =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .extra_options(EXTRA_OPTIONS.clone())
@@ -2737,7 +2615,8 @@ impl DecryptionEventsHandler {
     }
 }
 
-impl CommandEventHandler for DecryptionEventsHandler {
+#[allow(deprecated)]
+impl crate::event::command::CommandEventHandler for DecryptionEventsHandler {
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
         if event.command_name == "aggregate" {
             *self.succeeded.lock().unwrap() = Some(event);
@@ -2753,8 +2632,7 @@ impl CommandEventHandler for DecryptionEventsHandler {
 
 // Prose test 15. On-demand AWS Credentials (failure)
 #[cfg(feature = "aws-auth")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn on_demand_aws_failure() -> Result<()> {
     if !check_env("on_demand_aws_failure", false) {
         return Ok(());
@@ -2777,7 +2655,6 @@ async fn on_demand_aws_failure() -> Result<()> {
                 .to_string(),
             endpoint: None,
         })
-        .run()
         .await;
     assert!(result.is_err(), "Expected error, got {:?}", result);
 
@@ -2786,8 +2663,7 @@ async fn on_demand_aws_failure() -> Result<()> {
 
 // Prose test 15. On-demand AWS Credentials (success)
 #[cfg(feature = "aws-auth")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn on_demand_aws_success() -> Result<()> {
     if !check_env("on_demand_aws_success", false) {
         return Ok(());
@@ -2804,7 +2680,6 @@ async fn on_demand_aws_success() -> Result<()> {
             .to_string(),
         endpoint: None,
     })
-    .run()
     .await?;
 
     Ok(())
@@ -2814,8 +2689,7 @@ async fn on_demand_aws_success() -> Result<()> {
 
 // Prose test 17. On-demand GCP Credentials
 #[cfg(feature = "gcp-kms")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn on_demand_gcp_credentials() -> Result<()> {
     let util_client = TestClient::new().await.into_client();
     let client_encryption = ClientEncryption::new(
@@ -2833,7 +2707,6 @@ async fn on_demand_gcp_credentials() -> Result<()> {
             key_version: None,
             endpoint: None,
         })
-        .run()
         .await;
 
     if std::env::var("ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED").is_ok() {
@@ -2854,8 +2727,7 @@ async fn on_demand_gcp_credentials() -> Result<()> {
 
 // Prose test 18. Azure IMDS Credentials
 #[cfg(feature = "azure-kms")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn azure_imds() -> Result<()> {
     if !check_env("azure_imds", false) {
         return Ok(());
@@ -2926,8 +2798,7 @@ async fn azure_imds() -> Result<()> {
 
 // Prose test 19. Azure IMDS Credentials Integration Test (case 1: failure)
 #[cfg(feature = "azure-kms")]
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn azure_imds_integration_failure() -> Result<()> {
     if !check_env("azure_imds_integration_failure", false) {
         return Ok(());
@@ -2945,7 +2816,6 @@ async fn azure_imds_integration_failure() -> Result<()> {
             key_name: "KEY-NAME".to_string(),
             key_version: None,
         })
-        .run()
         .await;
 
     assert!(result.is_err(), "expected error, got {:?}", result);
@@ -2955,8 +2825,7 @@ async fn azure_imds_integration_failure() -> Result<()> {
 }
 
 // Prose test 20. Bypass creating mongocryptd client when shared library is loaded
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn bypass_mongocryptd_client() -> Result<()> {
     if !check_env("bypass_mongocryptd_client", false) {
         return Ok(());
@@ -3003,14 +2872,12 @@ async fn bypass_mongocryptd_client() -> Result<()> {
 }
 
 // Prost test 21. Automatic Data Encryption Keys
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn auto_encryption_keys_local() -> Result<()> {
     auto_encryption_keys(MasterKey::Local).await
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn auto_encryption_keys_aws() -> Result<()> {
     auto_encryption_keys(MasterKey::Aws {
         region: "us-east-1".to_string(),
@@ -3039,7 +2906,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         return Ok(());
     }
     let db = client.database("test_auto_encryption_keys");
-    db.drop(None).await?;
+    db.drop().await?;
     let ce = ClientEncryption::new(
         client.into_client(),
         KV_NAMESPACE.clone(),
@@ -3051,7 +2918,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     )?;
 
     // Case 1: Simple Creation and Validation
-    let options = CreateCollectionOptions::builder()
+    ce.create_encrypted_collection(&db, "case_1", master_key.clone())
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -3059,8 +2926,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": Bson::Null,
             }],
         })
-        .build();
-    ce.create_encrypted_collection(&db, "case_1", master_key.clone(), options)
         .await
         .1?;
     let coll = db.collection::<Document>("case_1");
@@ -3073,12 +2938,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
 
     // Case 2: Missing encryptedFields
     let result = ce
-        .create_encrypted_collection(
-            &db,
-            "case_2",
-            master_key.clone(),
-            CreateCollectionOptions::default(),
-        )
+        .create_encrypted_collection(&db, "case_2", master_key.clone())
         .await
         .1;
     assert!(
@@ -3088,7 +2948,8 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     );
 
     // Case 3: Invalid keyId
-    let options = CreateCollectionOptions::builder()
+    let result = ce
+        .create_encrypted_collection(&db, "case_1", master_key.clone())
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -3096,9 +2957,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": false,
             }],
         })
-        .build();
-    let result = ce
-        .create_encrypted_collection(&db, "case_1", master_key.clone(), options)
         .await
         .1;
     assert!(
@@ -3108,7 +2966,8 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     );
 
     // Case 4: Insert encrypted value
-    let options = CreateCollectionOptions::builder()
+    let (ef, result) = ce
+        .create_encrypted_collection(&db, "case_4", master_key.clone())
         .encrypted_fields(doc! {
             "fields": [{
                 "path": "ssn",
@@ -3116,9 +2975,6 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
                 "keyId": Bson::Null,
             }],
         })
-        .build();
-    let (ef, result) = ce
-        .create_encrypted_collection(&db, "case_4", master_key.clone(), options)
         .await;
     result?;
     let key = match ef.get_array("fields")?[0]
@@ -3130,10 +2986,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         Bson::Binary(bin) => bin.clone(),
         v => panic!("invalid keyId {:?}", v),
     };
-    let encrypted_payload = ce
-        .encrypt("123-45-6789", key, Algorithm::Unindexed)
-        .run()
-        .await?;
+    let encrypted_payload = ce.encrypt("123-45-6789", key, Algorithm::Unindexed).await?;
     let coll = db.collection::<Document>("case_1");
     coll.insert_one(doc! { "ssn": encrypted_payload }, None)
         .await?;
@@ -3142,8 +2995,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
 }
 
 // Prose test 22. Range explicit encryption
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn range_explicit_encryption() -> Result<()> {
     if !fle2v2_ok("range_explicit_encryption").await {
         return Ok(());
@@ -3235,36 +3087,29 @@ async fn range_explicit_encryption_test(
         .database("db")
         .collection::<Document>("explicit_encryption");
     explicit_encryption_collection
-        .drop(
-            DropCollectionOptions::builder()
-                .encrypted_fields(encrypted_fields.clone())
-                .build(),
-        )
+        .drop()
+        .encrypted_fields(encrypted_fields.clone())
         .await?;
     util_client
         .database("db")
-        .create_collection(
-            "explicit_encryption",
-            CreateCollectionOptions::builder()
-                .encrypted_fields(encrypted_fields.clone())
-                .build(),
-        )
+        .create_collection("explicit_encryption")
+        .encrypted_fields(encrypted_fields.clone())
         .await?;
 
     let datakeys_collection = util_client
         .database("keyvault")
         .collection::<Document>("datakeys");
-    datakeys_collection.drop(None).await?;
+    datakeys_collection.drop().await?;
     util_client
         .database("keyvault")
-        .create_collection("datakeys", None)
+        .create_collection("datakeys")
         .await?;
 
     datakeys_collection
         .insert_one(
             key1_document,
             InsertOneOptions::builder()
-                .write_concern(WriteConcern::MAJORITY)
+                .write_concern(WriteConcern::majority())
                 .build(),
         )
         .await?;
@@ -3304,7 +3149,6 @@ async fn range_explicit_encryption_test(
             )
             .contention_factor(0)
             .range_options(range_options.clone())
-            .run()
             .await?;
 
         explicit_encryption_collection
@@ -3327,7 +3171,6 @@ async fn range_explicit_encryption_test(
         )
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let decrypted = client_encryption
@@ -3360,7 +3203,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = explicit_encryption_collection
@@ -3381,7 +3223,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = encrypted_client
@@ -3403,7 +3244,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = encrypted_client
@@ -3421,7 +3261,6 @@ async fn range_explicit_encryption_test(
         .encrypt_expression(query, key1_id.clone())
         .contention_factor(0)
         .range_options(range_options.clone())
-        .run()
         .await?;
 
     let docs: Vec<RawDocumentBuf> = encrypted_client
@@ -3440,7 +3279,6 @@ async fn range_explicit_encryption_test(
             .encrypt(num, key1_id.clone(), Algorithm::RangePreview)
             .contention_factor(0)
             .range_options(range_options.clone())
-            .run()
             .await
             .unwrap_err();
         assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
@@ -3457,7 +3295,6 @@ async fn range_explicit_encryption_test(
             .encrypt(value, key1_id.clone(), Algorithm::RangePreview)
             .contention_factor(0)
             .range_options(range_options.clone())
-            .run()
             .await
             .unwrap_err();
         assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
@@ -3479,7 +3316,6 @@ async fn range_explicit_encryption_test(
             )
             .contention_factor(0)
             .range_options(range_options)
-            .run()
             .await
             .unwrap_err();
         assert!(matches!(*error.kind, ErrorKind::Encryption(_)));
@@ -3515,19 +3351,11 @@ fn get_raw_bson_from_num(bson_type: &str, num: i32) -> RawBson {
 }
 
 async fn bind(addr: &str) -> Result<TcpListener> {
-    #[cfg(feature = "tokio-runtime")]
-    {
-        Ok(TcpListener::bind(addr.parse::<std::net::SocketAddr>()?).await?)
-    }
-    #[cfg(not(feature = "tokio-runtime"))]
-    {
-        Ok(TcpListener::bind(addr).await?)
-    }
+    Ok(TcpListener::bind(addr.parse::<std::net::SocketAddr>()?).await?)
 }
 
 // FLE 2.0 Documentation Example
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn fle2_example() -> Result<()> {
     if !check_env("fle2_example", false) {
         return Ok(());
@@ -3548,9 +3376,9 @@ async fn fle2_example() -> Result<()> {
     test_client
         .database("keyvault")
         .collection::<Document>("datakeys")
-        .drop(None)
+        .drop()
         .await?;
-    test_client.database("docsExamples").drop(None).await?;
+    test_client.database("docsExamples").drop().await?;
 
     // Create two data keys.
     let ce = ClientEncryption::new(
@@ -3558,8 +3386,8 @@ async fn fle2_example() -> Result<()> {
         KV_NAMESPACE.clone(),
         LOCAL_KMS.clone(),
     )?;
-    let key1_id = ce.create_data_key(MasterKey::Local).run().await?;
-    let key2_id = ce.create_data_key(MasterKey::Local).run().await?;
+    let key1_id = ce.create_data_key(MasterKey::Local).await?;
+    let key2_id = ce.create_data_key(MasterKey::Local).await?;
 
     // Create an encryptedFieldsMap.
     let encrypted_fields_map = [(
@@ -3591,7 +3419,7 @@ async fn fle2_example() -> Result<()> {
     .build()
     .await?;
     let db = encrypted_client.database("docsExamples");
-    db.create_collection("encrypted", None).await?;
+    db.create_collection("encrypted").await?;
     let encrypted_coll = db.collection::<Document>("encrypted");
 
     // Auto encrypt an insert and find.

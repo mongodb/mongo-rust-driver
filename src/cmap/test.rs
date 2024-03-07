@@ -7,7 +7,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::sync::{Mutex, RwLock};
 
 use self::{
-    event::EventHandler,
+    event::TestEventHandler,
     file::{Operation, TestFile, ThreadedOperation},
 };
 
@@ -70,7 +70,7 @@ struct Executor {
 
 #[derive(Debug)]
 struct State {
-    handler: Arc<EventHandler>,
+    handler: Arc<TestEventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
     unlabeled_connections: Mutex<Vec<Connection>>,
     threads: RwLock<HashMap<String, CmapThread>>,
@@ -126,11 +126,11 @@ impl CmapThread {
 
 impl Executor {
     async fn new(test_file: TestFile) -> Self {
-        let handler = Arc::new(EventHandler::new());
+        let handler = Arc::new(TestEventHandler::new());
         let error = test_file.error;
 
         let mut pool_options = test_file.pool_options.unwrap_or_default();
-        pool_options.cmap_event_handler = Some(handler.clone());
+        pool_options.cmap_event_handler = Some(handler.clone().into());
 
         let state = State {
             handler,
@@ -169,7 +169,7 @@ impl Executor {
 
         // Mock a monitoring task responding to errors reported by the pool.
         let manager = pool.manager.clone();
-        runtime::execute(async move {
+        runtime::spawn(async move {
             while let Some(update) = receiver.recv().await {
                 let (update, ack) = update.into_parts();
                 if let UpdateMessage::ApplicationError { error, .. } = update {
@@ -228,7 +228,7 @@ impl Operation {
     /// Execute this operation.
     async fn execute(self, state: Arc<State>) -> Result<()> {
         match self {
-            Operation::Wait { ms } => runtime::delay_for(Duration::from_millis(ms)).await,
+            Operation::Wait { ms } => tokio::time::sleep(Duration::from_millis(ms)).await,
             Operation::WaitForThread { target } => {
                 state
                     .threads
@@ -247,7 +247,7 @@ impl Operation {
                 let event_name = event.clone();
                 let task = async move {
                     while state.count_events(&event) < count {
-                        runtime::delay_for(Duration::from_millis(100)).await;
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 };
                 runtime::timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
@@ -425,8 +425,7 @@ impl Matchable for CmapEvent {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cmap_spec_tests() {
     async fn run_cmap_spec_tests(test_file: TestFile) {
         if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
@@ -456,7 +455,7 @@ async fn cmap_spec_tests() {
         if let Some(ref fail_point) = test_file.fail_point {
             client
                 .database("admin")
-                .run_command(fail_point.clone(), None)
+                .run_command(fail_point.clone())
                 .await
                 .unwrap();
         }
@@ -467,13 +466,10 @@ async fn cmap_spec_tests() {
         if should_disable_fp {
             client
                 .database("admin")
-                .run_command(
-                    doc! {
-                        "configureFailPoint": "failCommand",
-                        "mode": "off"
-                    },
-                    None,
-                )
+                .run_command(doc! {
+                    "configureFailPoint": "failCommand",
+                    "mode": "off"
+                })
                 .await
                 .unwrap();
         }

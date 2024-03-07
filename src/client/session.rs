@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 use crate::{
@@ -20,6 +20,7 @@ use crate::{
     options::{SessionOptions, TransactionOptions},
     sdam::{ServerInfo, TransactionSupportStatus},
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     Client,
 };
 pub use cluster_time::ClusterTime;
@@ -27,14 +28,12 @@ pub(super) use pool::ServerSessionPool;
 
 use super::{options::ServerAddress, AsyncDropToken};
 
-lazy_static! {
-    pub(crate) static ref SESSIONS_UNSUPPORTED_COMMANDS: HashSet<&'static str> = {
-        let mut hash_set = HashSet::new();
-        hash_set.insert("killcursors");
-        hash_set.insert("parallelcollectionscan");
-        hash_set
-    };
-}
+pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut hash_set = HashSet::new();
+    hash_set.insert("killcursors");
+    hash_set.insert("parallelcollectionscan");
+    hash_set
+});
 
 /// A MongoDB client session. This struct represents a logical session used for ordering sequential
 /// operations. To create a `ClientSession`, call `start_session` on a `Client`.
@@ -65,7 +64,7 @@ lazy_static! {
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll: Collection<Document> = client.database("foo").collection("bar");
-/// let mut session = client.start_session(None).await?;
+/// let mut session = client.start_session().await?;
 /// let options = TransactionOptions::builder()
 ///     .read_concern(ReadConcern::majority())
 ///     .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
@@ -83,7 +82,7 @@ lazy_static! {
 ///
 /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
 ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
-///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
+///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).await?;
 ///     // An "UnknownTransactionCommitResult" label indicates that it is unknown whether the
 ///     // commit has satisfied the write concern associated with the transaction. If an error
 ///     // with this label is returned, it is safe to retry the commit until the write concern is
@@ -254,7 +253,7 @@ impl ClientSession {
     }
 
     /// The options used to create this session.
-    pub fn options(&self) -> Option<&SessionOptions> {
+    pub(crate) fn options(&self) -> Option<&SessionOptions> {
         self.options.as_ref()
     }
 
@@ -354,7 +353,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
     /// session.commit_transaction().await?;
@@ -455,7 +454,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
     /// session.commit_transaction().await?;
@@ -515,7 +514,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
     /// match execute_transaction(&coll, &mut session).await {
     ///     Ok(_) => session.commit_transaction().await?,
@@ -526,7 +525,7 @@ impl ClientSession {
     ///
     /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
-    ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
+    ///     coll.delete_one(doc! { "y": 2 }).session(session).await?;
     ///     Ok(())
     /// }
     /// ```
@@ -599,7 +598,7 @@ impl ClientSession {
     /// # use futures::FutureExt;
     /// # async fn wrapper() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let mut session = client.start_session(None).await?;
+    /// # let mut session = client.start_session().await?;
     /// let coll = client.database("mydb").collection::<Document>("mycoll");
     /// let my_data = "my data".to_string();
     /// // This works:
@@ -690,8 +689,6 @@ impl ClientSession {
             .and_then(|options| options.default_transaction_options.as_ref())
     }
 }
-
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 struct DroppedClientSession {
     cluster_time: Option<ClusterTime>,

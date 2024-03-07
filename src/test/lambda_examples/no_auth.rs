@@ -26,7 +26,7 @@ async fn handler(_: LambdaEvent<Value>) -> Result<Value, lambda_runtime::Error> 
     let client = get_mongodb_client().await;
     let response = client
         .database("db")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await?;
     let json = serde_json::to_value(response)?;
     Ok(json)
@@ -40,8 +40,7 @@ async fn main() -> Result<(), lambda_runtime::Error> {
 }
 // end lambda connection example 1
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_handler() {
     if std::env::var("MONGODB_API_VERSION").is_ok() {
         return;

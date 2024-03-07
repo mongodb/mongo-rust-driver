@@ -3,7 +3,7 @@ use bson::RawDocumentBuf;
 use bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption-unstable")]
 use futures_core::future::BoxFuture;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 
 use std::{
@@ -23,10 +23,12 @@ use crate::{
         WatchArgs,
     },
     cmap::{
-        conn::PinnedConnectionHandle,
+        conn::{
+            wire::{next_request_id, Message},
+            PinnedConnectionHandle,
+        },
         Connection,
         ConnectionPool,
-        RawCommand,
         RawCommandResponse,
     },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
@@ -46,9 +48,8 @@ use crate::{
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
+        aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
         AbortTransaction,
-        AggregateTarget,
-        ChangeStreamAggregate,
         CommandErrorBody,
         CommitTransaction,
         Operation,
@@ -61,27 +62,25 @@ use crate::{
     ClusterTime,
 };
 
-lazy_static! {
-    pub(crate) static ref REDACTED_COMMANDS: HashSet<&'static str> = {
-        let mut hash_set = HashSet::new();
-        hash_set.insert("authenticate");
-        hash_set.insert("saslstart");
-        hash_set.insert("saslcontinue");
-        hash_set.insert("getnonce");
-        hash_set.insert("createuser");
-        hash_set.insert("updateuser");
-        hash_set.insert("copydbgetnonce");
-        hash_set.insert("copydbsaslstart");
-        hash_set.insert("copydb");
-        hash_set
-    };
-    pub(crate) static ref HELLO_COMMAND_NAMES: HashSet<&'static str> = {
-        let mut hash_set = HashSet::new();
-        hash_set.insert("hello");
-        hash_set.insert(LEGACY_HELLO_COMMAND_NAME_LOWERCASE);
-        hash_set
-    };
-}
+pub(crate) static REDACTED_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut hash_set = HashSet::new();
+    hash_set.insert("authenticate");
+    hash_set.insert("saslstart");
+    hash_set.insert("saslcontinue");
+    hash_set.insert("getnonce");
+    hash_set.insert("createuser");
+    hash_set.insert("updateuser");
+    hash_set.insert("copydbgetnonce");
+    hash_set.insert("copydbsaslstart");
+    hash_set.insert("copydb");
+    hash_set
+});
+pub(crate) static HELLO_COMMAND_NAMES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut hash_set = HashSet::new();
+    hash_set.insert("hello");
+    hash_set.insert(LEGACY_HELLO_COMMAND_NAME_LOWERCASE);
+    hash_set
+});
 
 impl Client {
     /// Execute the given operation.
@@ -573,51 +572,43 @@ impl Client {
 
         let connection_info = connection.info();
         let service_id = connection.service_id();
-        let request_id = crate::cmap::conn::next_request_id();
+        let request_id = next_request_id();
 
         if let Some(ref server_api) = self.inner.options.server_api {
             cmd.set_server_api(server_api);
         }
 
         let should_redact = cmd.should_redact();
+        let should_compress = cmd.should_compress();
 
         let cmd_name = cmd.name.clone();
         let target_db = cmd.target_db.clone();
 
-        let serialized = op.serialize_command(cmd)?;
+        #[allow(unused_mut)]
+        let mut message = Message::from_command(cmd, Some(request_id))?;
         #[cfg(feature = "in-use-encryption-unstable")]
-        let serialized = {
+        {
             let guard = self.inner.csfle.read().await;
             if let Some(ref csfle) = *guard {
                 if csfle.opts().bypass_auto_encryption != Some(true) {
-                    self.auto_encrypt(csfle, RawDocument::from_bytes(&serialized)?, &target_db)
-                        .await?
-                        .into_bytes()
-                } else {
-                    serialized
+                    let encrypted_payload = self
+                        .auto_encrypt(csfle, &message.document_payload, &target_db)
+                        .await?;
+                    message.document_payload = encrypted_payload;
                 }
-            } else {
-                serialized
             }
-        };
-        let raw_cmd = RawCommand {
-            name: cmd_name.clone(),
-            target_db,
-            exhaust_allowed: false,
-            bytes: serialized,
-        };
+        }
 
         self.emit_command_event(|| {
             let command_body = if should_redact {
                 Document::new()
             } else {
-                Document::from_reader(raw_cmd.bytes.as_slice())
-                    .unwrap_or_else(|e| doc! { "serialization error": e.to_string() })
+                message.get_command_document()
             };
             CommandEvent::Started(CommandStartedEvent {
                 command: command_body,
-                db: raw_cmd.target_db.clone(),
-                command_name: raw_cmd.name.clone(),
+                db: target_db.clone(),
+                command_name: cmd_name.clone(),
                 request_id,
                 connection: connection_info.clone(),
                 service_id,
@@ -626,7 +617,7 @@ impl Client {
         .await;
 
         let start_time = Instant::now();
-        let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
+        let command_result = match connection.send_message(message, should_compress).await {
             Ok(response) => {
                 async fn handle_response<T: Operation>(
                     client: &Client,
@@ -976,6 +967,11 @@ impl Error {
         } else {
             None
         };
+
+        let server_type = match conn {
+            Some(c) => Some(c.stream_description()?.initial_server_type),
+            None => None,
+        };
         match transaction_state {
             TransactionState::Starting | TransactionState::InProgress => {
                 if self.is_network_error() || self.is_server_selection_error() {
@@ -984,7 +980,7 @@ impl Error {
             }
             TransactionState::Committed { .. } => {
                 if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version) {
+                    if self.should_add_retryable_write_label(max_wire_version, server_type) {
                         self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
@@ -994,7 +990,7 @@ impl Error {
             }
             TransactionState::Aborted => {
                 if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version) {
+                    if self.should_add_retryable_write_label(max_wire_version, server_type) {
                         self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
@@ -1002,7 +998,7 @@ impl Error {
             TransactionState::None => {
                 if retryability == Some(Retryability::Write) {
                     if let Some(max_wire_version) = max_wire_version {
-                        if self.should_add_retryable_write_label(max_wire_version) {
+                        if self.should_add_retryable_write_label(max_wire_version, server_type) {
                             self.add_label(RETRYABLE_WRITE_ERROR);
                         }
                     }

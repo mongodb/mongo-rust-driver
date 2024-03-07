@@ -5,7 +5,6 @@ use super::ClientSession;
 use crate::{
     bson::{Document, RawDocument},
     error::Result,
-    runtime,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
     SessionCursorStream,
@@ -105,7 +104,7 @@ impl<T> Cursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self) -> Result<bool> {
-        runtime::block_on(self.async_cursor.advance())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_cursor.advance())
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -174,7 +173,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        runtime::block_on(self.async_cursor.next())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_cursor.next())
     }
 }
 
@@ -186,7 +185,7 @@ where
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
-/// # let mut session = client.start_session(None)?;
+/// # let mut session = client.start_session().run()?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find_with_session(None, None, &mut session)?;
 /// #
@@ -224,7 +223,7 @@ impl<T> SessionCursor<T> {
     /// # use mongodb::{sync::Client, bson::Document, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
     /// while cursor.advance(&mut session)? {
@@ -234,7 +233,8 @@ impl<T> SessionCursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
-        runtime::block_on(self.async_cursor.advance(&mut session.async_client_session))
+        crate::sync::TOKIO_RUNTIME
+            .block_on(self.async_cursor.advance(&mut session.async_client_session))
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -248,7 +248,7 @@ impl<T> SessionCursor<T> {
     /// # use mongodb::{sync::Client, bson::Document, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
     /// while cursor.advance(&mut session)? {
@@ -272,7 +272,7 @@ impl<T> SessionCursor<T> {
     /// # use mongodb::{sync::Client, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// # let db = client.database("foo");
     /// use serde::Deserialize;
     ///
@@ -326,7 +326,7 @@ where
     /// # let client = Client::with_uri_str("foo")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session)?;
     /// while let Some(doc) = cursor.next(&mut session).transpose()? {
     ///     other_coll.insert_one_with_session(doc, None, &mut session)?;
@@ -357,6 +357,6 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        runtime::block_on(self.async_stream.next())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.next())
     }
 }

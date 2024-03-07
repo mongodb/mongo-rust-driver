@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use std::convert::TryInto;
 
 use serde::Deserialize;
@@ -23,11 +20,11 @@ pub(crate) struct CountDocuments {
 impl CountDocuments {
     pub(crate) fn new(
         namespace: Namespace,
-        filter: Option<Document>,
+        filter: Document,
         options: Option<CountOptions>,
     ) -> Result<Self> {
         let mut pipeline = vec![doc! {
-            "$match": filter.unwrap_or_default(),
+            "$match": filter,
         }];
 
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
@@ -66,7 +63,7 @@ impl CountDocuments {
                 .collation(opts.collation)
                 .selection_criteria(opts.selection_criteria)
                 .read_concern(opts.read_concern)
-                .comment_bson(opts.comment)
+                .comment(opts.comment)
                 .build()
         });
 

@@ -57,7 +57,7 @@ impl SrvPollingMonitor {
         client_options: ClientOptions,
     ) {
         if let Some(monitor) = Self::new(topology, topology_watcher, client_options) {
-            runtime::execute(monitor.execute());
+            runtime::spawn(monitor.execute());
         }
     }
 
@@ -71,7 +71,7 @@ impl SrvPollingMonitor {
         }
 
         while self.topology_watcher.is_alive() {
-            runtime::delay_for(self.rescan_interval()).await;
+            tokio::time::sleep(self.rescan_interval()).await;
 
             if should_poll(self.topology_watcher.topology_type()) {
                 let hosts = self.lookup_hosts().await;

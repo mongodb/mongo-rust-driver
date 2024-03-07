@@ -21,34 +21,41 @@ use std::{
 use anyhow::{bail, Result};
 use futures::stream::TryStreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
-use lazy_static::lazy_static;
 use mongodb::{
     bson::{doc, Bson, Document},
     options::{Acknowledgment, ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
+use once_cell::sync::Lazy;
 use serde_json::Value;
 
 use crate::fs::{BufReader, File};
 
-lazy_static! {
-    static ref DATABASE_NAME: String = option_env!("DATABASE_NAME")
+static DATABASE_NAME: Lazy<String> = Lazy::new(|| {
+    option_env!("DATABASE_NAME")
         .unwrap_or("perftest")
-        .to_string();
-    static ref COLL_NAME: String = option_env!("COLL_NAME").unwrap_or("corpus").to_string();
-    static ref MAX_EXECUTION_TIME: u64 = option_env!("MAX_EXECUTION_TIME")
+        .to_string()
+});
+static COLL_NAME: Lazy<String> =
+    Lazy::new(|| option_env!("COLL_NAME").unwrap_or("corpus").to_string());
+static MAX_EXECUTION_TIME: Lazy<u64> = Lazy::new(|| {
+    option_env!("MAX_EXECUTION_TIME")
         .unwrap_or("300")
         .parse::<u64>()
-        .expect("invalid MAX_EXECUTION_TIME");
-    static ref MIN_EXECUTION_TIME: u64 = option_env!("MIN_EXECUTION_TIME")
+        .expect("invalid MAX_EXECUTION_TIME")
+});
+static MIN_EXECUTION_TIME: Lazy<u64> = Lazy::new(|| {
+    option_env!("MIN_EXECUTION_TIME")
         .unwrap_or("60")
         .parse::<u64>()
-        .expect("invalid MIN_EXECUTION_TIME");
-    pub static ref TARGET_ITERATION_COUNT: usize = option_env!("TARGET_ITERATION_COUNT")
+        .expect("invalid MIN_EXECUTION_TIME")
+});
+pub static TARGET_ITERATION_COUNT: Lazy<usize> = Lazy::new(|| {
+    option_env!("TARGET_ITERATION_COUNT")
         .unwrap_or("100")
         .parse::<usize>()
-        .expect("invalid TARGET_ITERATION_COUNT");
-}
+        .expect("invalid TARGET_ITERATION_COUNT")
+});
 
 #[async_trait::async_trait]
 pub trait Benchmark: Sized {
@@ -145,13 +152,13 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
         .run_command(doc! { "hello": true }, None)
         .await?;
 
-    client.database(&database).drop(None).await?;
+    client.database(&database).drop().await?;
 
     // in sharded clusters, take additional steps to ensure database is dropped completely.
     // see: https://www.mongodb.com/docs/manual/reference/method/db.dropDatabase/#replica-set-and-sharded-clusters
     let is_sharded = hello.get_str("msg").ok() == Some("isdbgrid");
     if is_sharded {
-        client.database(&database).drop(None).await?;
+        client.database(&database).drop().await?;
         for host in options.hosts {
             client
                 .database("admin")

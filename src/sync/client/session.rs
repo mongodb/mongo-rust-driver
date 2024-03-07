@@ -3,8 +3,7 @@ use crate::{
     bson::Document,
     client::session::ClusterTime,
     error::Result,
-    options::{SessionOptions, TransactionOptions},
-    runtime,
+    options::TransactionOptions,
     ClientSession as AsyncClientSession,
 };
 
@@ -26,6 +25,12 @@ impl From<AsyncClientSession> for ClientSession {
     }
 }
 
+impl<'a> From<&'a mut ClientSession> for &'a mut AsyncClientSession {
+    fn from(value: &'a mut ClientSession) -> &'a mut AsyncClientSession {
+        &mut value.async_client_session
+    }
+}
+
 impl ClientSession {
     /// The client used to create this session.
     pub fn client(&self) -> Client {
@@ -41,11 +46,6 @@ impl ClientSession {
     /// This will be `None` if this session has not been used in an operation yet.
     pub fn cluster_time(&self) -> Option<&ClusterTime> {
         self.async_client_session.cluster_time()
-    }
-
-    /// The options used to create this session.
-    pub fn options(&self) -> Option<&SessionOptions> {
-        self.async_client_session.options()
     }
 
     /// Set the cluster time to the provided one if it is greater than this session's highest seen
@@ -65,7 +65,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)?;
     /// session.commit_transaction()?;
@@ -76,7 +76,7 @@ impl ClientSession {
         &mut self,
         options: impl Into<Option<TransactionOptions>>,
     ) -> Result<()> {
-        runtime::block_on(self.async_client_session.start_transaction(options))
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_client_session.start_transaction(options))
     }
 
     /// Commits the transaction that is currently active on this session.
@@ -87,7 +87,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
     /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)?;
     /// session.commit_transaction()?;
@@ -100,7 +100,7 @@ impl ClientSession {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub fn commit_transaction(&mut self) -> Result<()> {
-        runtime::block_on(self.async_client_session.commit_transaction())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_client_session.commit_transaction())
     }
 
     /// Aborts the transaction that is currently active on this session. Any open transaction will
@@ -112,7 +112,7 @@ impl ClientSession {
     /// # async fn do_stuff() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session(None)?;
+    /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
     /// match execute_transaction(coll, &mut session) {
     ///     Ok(_) => session.commit_transaction()?,
@@ -123,7 +123,7 @@ impl ClientSession {
     ///
     /// fn execute_transaction(coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session)?;
-    ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session)?;
+    ///     coll.delete_one(doc! { "y": 2 }).session(session).run()?;
     ///     Ok(())   
     /// }
     /// ```
@@ -133,7 +133,7 @@ impl ClientSession {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub fn abort_transaction(&mut self) -> Result<()> {
-        runtime::block_on(self.async_client_session.abort_transaction())
+        crate::sync::TOKIO_RUNTIME.block_on(self.async_client_session.abort_transaction())
     }
 
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.

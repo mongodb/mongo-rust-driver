@@ -1,5 +1,3 @@
-#![cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
-
 // START TRANSACTIONS EXAMPLE
 use mongodb::{
     bson::{doc, Document},
@@ -21,7 +19,7 @@ async fn main() -> Result<()> {
     let uri = std::env::var("MONGODB_URI").expect("MONGODB_URI must be set");
     let client = Client::with_uri_str(uri).await?;
 
-    let mut session = client.start_session(None).await?;
+    let mut session = client.start_session().await?;
     run_transaction_with_retry(&mut session).await
 }
 
@@ -58,12 +56,11 @@ async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
     let events = client.database("reporting").collection("events");
 
     employees
-        .update_one_with_session(
+        .update_one(
             doc! { "employee": 3 },
-            doc! { "$set": { "status": "Inactive" } },
-            None,
-            session,
+            doc! { "$set": { "status": "Inactive" } }
         )
+        .session(&mut *session)
         .await?;
 
     events

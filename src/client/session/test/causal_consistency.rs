@@ -2,7 +2,6 @@ use bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
 
 use crate::{
-    client::options::SessionOptions,
     coll::options::CollectionOptions,
     error::Result,
     event::command::CommandEvent,
@@ -63,20 +62,12 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     )));
 
     ops.push(op!("update", false, |coll, s| coll
-        .update_one_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .update_one(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
-        .update_many_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .update_many(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
         .replace_one_with_session(
@@ -87,10 +78,12 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         )));
 
     ops.push(op!("delete", false, |coll, s| coll
-        .delete_one_with_session(doc! { "x": 1 }, None, s,)));
+        .delete_one(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("delete", false, |coll, s| coll
-        .delete_many_with_session(doc! { "x": 1 }, None, s,)));
+        .delete_many(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
         .find_one_and_update_with_session(
@@ -112,38 +105,29 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .find_one_and_delete_with_session(doc! { "x": 1 }, None, s,)));
 
     ops.push(op!("aggregate", true, |coll, s| coll
-        .count_documents_with_session(doc! { "x": 1 }, None, s,)));
+        .count_documents(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("aggregate", true, |coll, s| coll
-        .aggregate_with_session(
-            vec![doc! { "$match": { "x": 1 } }],
-            None,
-            s,
-        )));
+        .aggregate(vec![doc! { "$match": { "x": 1 } }])
+        .session(s)));
 
     ops.push(op!("aggregate", false, |coll, s| coll
-        .aggregate_with_session(
-            vec![
-                doc! { "$match": { "x": 1 } },
-                doc! { "$out": "some_other_coll" },
-            ],
-            None,
-            s,
-        )));
+        .aggregate(vec![
+            doc! { "$match": { "x": 1 } },
+            doc! { "$out": "some_other_coll" },
+        ])
+        .session(s)));
 
-    ops.push(op!("distinct", true, |coll, s| coll.distinct_with_session(
-        "x",
-        doc! {},
-        None,
-        s,
-    )));
+    ops.push(op!("distinct", true, |coll, s| coll
+        .distinct("x", doc! {},)
+        .session(s)));
 
     ops.into_iter()
 }
 
 /// Test 1 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn new_session_operation_time_null() {
     let client = EventClient::new().await;
 
@@ -154,13 +138,12 @@ async fn new_session_operation_time_null() {
         return;
     }
 
-    let session = client.start_session(None).await.unwrap();
+    let session = client.start_session().await.unwrap();
     assert!(session.operation_time().is_none());
 }
 
 /// Test 2 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn first_read_no_after_cluser_time() {
     let client = EventClient::new().await;
 
@@ -173,9 +156,8 @@ async fn first_read_no_after_cluser_time() {
 
     for op in all_session_ops().filter(|o| o.is_read) {
         let mut session = client
-            .start_session(Some(
-                SessionOptions::builder().causal_consistency(true).build(),
-            ))
+            .start_session()
+            .causal_consistency(true)
             .await
             .unwrap();
         assert!(session.operation_time().is_none());
@@ -196,8 +178,7 @@ async fn first_read_no_after_cluser_time() {
 }
 
 /// Test 3 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn first_op_update_op_time() {
     let client = EventClient::new().await;
 
@@ -208,9 +189,8 @@ async fn first_op_update_op_time() {
 
     for op in all_session_ops() {
         let mut session = client
-            .start_session(Some(
-                SessionOptions::builder().causal_consistency(true).build(),
-            ))
+            .start_session()
+            .causal_consistency(true)
             .await
             .unwrap();
         assert!(session.operation_time().is_none());
@@ -244,8 +224,7 @@ async fn first_op_update_op_time() {
 }
 
 /// Test 4 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn read_includes_after_cluster_time() {
     let client = EventClient::new().await;
 
@@ -262,7 +241,7 @@ async fn read_includes_after_cluster_time() {
 
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
-        let mut session = client.start_session(None).await.unwrap();
+        let mut session = client.start_session().await.unwrap();
         coll.find_one_with_session(None, None, &mut session)
             .await
             .unwrap();
@@ -287,8 +266,7 @@ async fn read_includes_after_cluster_time() {
 }
 
 /// Test 5 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn find_after_write_includes_after_cluster_time() {
     let client = EventClient::new().await;
 
@@ -305,8 +283,11 @@ async fn find_after_write_includes_after_cluster_time() {
         .await;
 
     for op in all_session_ops().filter(|o| !o.is_read) {
-        let session_options = SessionOptions::builder().causal_consistency(true).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client
+            .start_session()
+            .causal_consistency(true)
+            .await
+            .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         coll.find_one_with_session(None, None, &mut session)
@@ -327,8 +308,7 @@ async fn find_after_write_includes_after_cluster_time() {
 }
 
 /// Test 6 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn not_causally_consistent_omits_after_cluster_time() {
     let client = EventClient::new().await;
 
@@ -347,8 +327,11 @@ async fn not_causally_consistent_omits_after_cluster_time() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
-        let session_options = SessionOptions::builder().causal_consistency(false).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client
+            .start_session()
+            .causal_consistency(false)
+            .await
+            .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
@@ -363,8 +346,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
 }
 
 /// Test 7 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn omit_after_cluster_time_standalone() {
     let client = EventClient::new().await;
 
@@ -380,8 +362,11 @@ async fn omit_after_cluster_time_standalone() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
-        let session_options = SessionOptions::builder().causal_consistency(true).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client
+            .start_session()
+            .causal_consistency(true)
+            .await
+            .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
@@ -396,8 +381,7 @@ async fn omit_after_cluster_time_standalone() {
 }
 
 /// Test 8 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn omit_default_read_concern_level() {
     let client = EventClient::new().await;
 
@@ -415,8 +399,11 @@ async fn omit_default_read_concern_level() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
-        let session_options = SessionOptions::builder().causal_consistency(true).build();
-        let mut session = client.start_session(Some(session_options)).await.unwrap();
+        let mut session = client
+            .start_session()
+            .causal_consistency(true)
+            .await
+            .unwrap();
         coll.find_one_with_session(None, None, &mut session)
             .await
             .unwrap();
@@ -435,8 +422,7 @@ async fn omit_default_read_concern_level() {
 }
 
 /// Test 9 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn test_causal_consistency_read_concern_merge() {
     let client = EventClient::new().await;
     if client.is_standalone() {
@@ -447,8 +433,11 @@ async fn test_causal_consistency_read_concern_merge() {
         return;
     }
 
-    let session_options = SessionOptions::builder().causal_consistency(true).build();
-    let mut session = client.start_session(Some(session_options)).await.unwrap();
+    let mut session = client
+        .start_session()
+        .causal_consistency(true)
+        .await
+        .unwrap();
 
     let coll_options = CollectionOptions::builder()
         .read_concern(ReadConcern::majority())
@@ -483,8 +472,7 @@ async fn test_causal_consistency_read_concern_merge() {
 }
 
 /// Test 11 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn omit_cluster_time_standalone() {
     let client = EventClient::new().await;
     if !client.is_standalone() {
@@ -503,8 +491,7 @@ async fn omit_cluster_time_standalone() {
 }
 
 /// Test 12 from the causal consistency specification.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cluster_time_sent_in_commands() {
     let client = EventClient::new().await;
     if client.is_standalone() {

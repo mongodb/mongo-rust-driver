@@ -9,7 +9,7 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -42,16 +42,17 @@ use super::{
 };
 
 use crate::{
+    action::Action,
     bson::{doc, to_bson, Bson, Document},
-    change_stream::options::ChangeStreamOptions,
     client::session::TransactionState,
     coll::options::Hint,
     collation::Collation,
-    db::options::RunCursorCommandOptions,
+    db::options::{ListCollectionsOptions, RunCursorCommandOptions},
     error::{ErrorKind, Result},
     gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{
         AggregateOptions,
+        ChangeStreamOptions,
         CountOptions,
         CreateCollectionOptions,
         DeleteOptions,
@@ -66,8 +67,6 @@ use crate::{
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListCollectionsOptions,
-        ListDatabasesOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -465,7 +464,8 @@ impl TestOperation for DeleteMany {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .delete_many(self.filter.clone(), self.options.clone())
+                .delete_many(self.filter.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -491,24 +491,17 @@ impl TestOperation for DeleteOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .delete_one(self.filter.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .delete_one_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .delete_one(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -830,11 +823,8 @@ impl TestOperation for UpdateMany {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .update_many(
-                    self.filter.clone(),
-                    self.update.clone(),
-                    self.options.clone(),
-                )
+                .update_many(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -861,29 +851,17 @@ impl TestOperation for UpdateOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .update_one(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .update_one_with_session(
-                                self.filter.clone(),
-                                self.update.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .update_one(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -892,42 +870,12 @@ impl TestOperation for UpdateOne {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     session: Option<String>,
+    #[serde(flatten)]
     options: AggregateOptions,
-}
-
-// TODO RUST-1364: remove this impl and derive Deserialize instead
-impl<'de> Deserialize<'de> for Aggregate {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        struct Helper {
-            pipeline: Vec<Document>,
-            session: Option<String>,
-            comment: Option<Bson>,
-            #[serde(flatten)]
-            options: AggregateOptions,
-        }
-
-        let mut helper = Helper::deserialize(deserializer)?;
-        match helper.comment {
-            Some(Bson::String(string)) => {
-                helper.options.comment = Some(string);
-            }
-            Some(bson) => {
-                helper.options.comment_bson = Some(bson);
-            }
-            _ => {}
-        }
-
-        Ok(Self {
-            pipeline: helper.pipeline,
-            session: helper.session,
-            options: helper.options,
-        })
-    }
 }
 
 impl TestOperation for Aggregate {
@@ -953,20 +901,16 @@ impl TestOperation for Aggregate {
                         let mut cursor = match entity {
                             AggregateEntity::Collection(collection) => {
                                 collection
-                                    .aggregate_with_session(
-                                        self.pipeline.clone(),
-                                        self.options.clone(),
-                                        session,
-                                    )
+                                    .aggregate(self.pipeline.clone())
+                                    .with_options(self.options.clone())
+                                    .session(session.deref_mut())
                                     .await?
                             }
                             AggregateEntity::Database(db) => {
-                                db.aggregate_with_session(
-                                    self.pipeline.clone(),
-                                    self.options.clone(),
-                                    session,
-                                )
-                                .await?
+                                db.aggregate(self.pipeline.clone())
+                                    .with_options(self.options.clone())
+                                    .session(session.deref_mut())
+                                    .await?
                             }
                             AggregateEntity::Other(debug) => {
                                 panic!("Cannot execute aggregate on {}", &debug)
@@ -981,11 +925,13 @@ impl TestOperation for Aggregate {
                     let cursor = match entities.get(id).unwrap() {
                         Entity::Collection(collection) => {
                             collection
-                                .aggregate(self.pipeline.clone(), self.options.clone())
+                                .aggregate(self.pipeline.clone())
+                                .with_options(self.options.clone())
                                 .await?
                         }
                         Entity::Database(db) => {
-                            db.aggregate(self.pipeline.clone(), self.options.clone())
+                            db.aggregate(self.pipeline.clone())
+                                .with_options(self.options.clone())
                                 .await?
                         }
                         other => panic!("Cannot execute aggregate on {:?}", &other),
@@ -1021,25 +967,17 @@ impl TestOperation for Distinct {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .distinct(&self.field_name, self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .distinct_with_session(
-                                &self.field_name,
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => act.await?,
             };
             Ok(Some(Bson::Array(result).into()))
         }
@@ -1050,8 +988,8 @@ impl TestOperation for Distinct {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CountDocuments {
-    filter: Document,
     session: Option<String>,
+    filter: Option<Document>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -1064,24 +1002,17 @@ impl TestOperation for CountDocuments {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .count_documents(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .count_documents_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .count_documents(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             Ok(Some(Bson::Int64(result.try_into().unwrap()).into()))
         }
@@ -1105,7 +1036,8 @@ impl TestOperation for EstimatedDocumentCount {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .estimated_document_count(self.options.clone())
+                .estimated_document_count()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap()).into()))
         }
@@ -1171,10 +1103,9 @@ impl TestOperation for FindOne {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabases {
-    filter: Option<Document>,
     session: Option<String>,
     #[serde(flatten)]
-    options: ListDatabasesOptions,
+    options: crate::db::options::ListDatabasesOptions,
 }
 
 impl TestOperation for ListDatabases {
@@ -1188,19 +1119,19 @@ impl TestOperation for ListDatabases {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
+                        let session: &mut crate::ClientSession = &mut *session;
                         client
-                            .list_databases_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
+                            .list_databases()
+                            .with_options(self.options.clone())
+                            .session(session)
                             .await
                     })
                     .await?
                 }
                 None => {
                     client
-                        .list_databases(self.filter.clone(), self.options.clone())
+                        .list_databases()
+                        .with_options(self.options.clone())
                         .await?
                 }
             };
@@ -1213,9 +1144,8 @@ impl TestOperation for ListDatabases {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabaseNames {
-    filter: Option<Document>,
     #[serde(flatten)]
-    options: ListDatabasesOptions,
+    options: crate::db::options::ListDatabasesOptions,
 }
 
 impl TestOperation for ListDatabaseNames {
@@ -1227,7 +1157,8 @@ impl TestOperation for ListDatabaseNames {
         async move {
             let client = test_runner.get_client(id).await;
             let result = client
-                .list_database_names(self.filter.clone(), self.options.clone())
+                .list_database_names()
+                .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::Array(result).into()))
@@ -1239,7 +1170,6 @@ impl TestOperation for ListDatabaseNames {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListCollections {
-    filter: Option<Document>,
     session: Option<String>,
     #[serde(flatten)]
     options: ListCollectionsOptions,
@@ -1257,11 +1187,9 @@ impl TestOperation for ListCollections {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
                         let mut cursor = db
-                            .list_collections_with_session(
-                                self.filter.clone(),
-                                self.options.clone(),
-                                session,
-                            )
+                            .list_collections()
+                            .with_options(self.options.clone())
+                            .session(session.deref_mut())
                             .await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
@@ -1269,7 +1197,8 @@ impl TestOperation for ListCollections {
                 }
                 None => {
                     let cursor = db
-                        .list_collections(self.filter.clone(), self.options.clone())
+                        .list_collections()
+                        .with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -1298,7 +1227,10 @@ impl TestOperation for ListCollectionNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let db = test_runner.get_database(id).await;
-            let result = db.list_collection_names(self.filter.clone()).await?;
+            let result = db
+                .list_collection_names()
+                .optional(self.filter.clone(), |b, f| b.filter(f))
+                .await?;
             let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
             Ok(Some(Bson::from(result).into()))
         }
@@ -1520,7 +1452,7 @@ impl TestOperation for AssertCollectionExists {
     ) -> BoxFuture<'a, ()> {
         async move {
             let db = test_runner.internal_client.database(&self.database_name);
-            let names = db.list_collection_names(None).await.unwrap();
+            let names = db.list_collection_names().await.unwrap();
             assert!(names.contains(&self.collection_name));
         }
         .boxed()
@@ -1541,7 +1473,7 @@ impl TestOperation for AssertCollectionNotExists {
     ) -> BoxFuture<'a, ()> {
         async move {
             let db = test_runner.internal_client.database(&self.database_name);
-            let names = db.list_collection_names(None).await.unwrap();
+            let names = db.list_collection_names().await.unwrap();
             assert!(!names.contains(&self.collection_name));
         }
         .boxed()
@@ -1569,17 +1501,16 @@ impl TestOperation for CreateCollection {
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
                     database
-                        .create_collection_with_session(
-                            &self.collection,
-                            self.options.clone(),
-                            session,
-                        )
+                        .create_collection(&self.collection)
+                        .with_options(self.options.clone())
+                        .session(session.deref_mut())
                         .await
                 })
                 .await?;
             } else {
                 database
-                    .create_collection(&self.collection, self.options.clone())
+                    .create_collection(&self.collection)
+                    .with_options(self.options.clone())
                     .await?;
             }
             Ok(Some(Entity::Collection(
@@ -1609,15 +1540,14 @@ impl TestOperation for DropCollection {
             let database = test_runner.get_database(id).await;
             let collection = database.collection::<Document>(&self.collection).clone();
 
+            let act = collection.drop().with_options(self.options.clone());
             if let Some(session_id) = &self.session {
                 with_mut_session!(test_runner, session_id, |session| async {
-                    collection
-                        .drop_with_session(self.options.clone(), session)
-                        .await
+                    act.session(session.deref_mut()).await
                 })
                 .await?;
             } else {
-                collection.drop(self.options.clone()).await?;
+                act.await?;
             }
             Ok(None)
         }
@@ -1647,18 +1577,19 @@ impl TestOperation for RunCommand {
             let command = self.command.clone();
 
             let db = test_runner.get_database(id).await;
+            let action = db
+                .run_command(command)
+                .optional(self.read_preference.clone(), |a, rp| {
+                    a.selection_criteria(rp)
+                });
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        db.run_command_with_session(command, self.read_preference.clone(), session)
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    db.run_command(command, self.read_preference.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1692,18 +1623,17 @@ impl TestOperation for RunCursorCommand {
             let db = test_runner.get_database(id).await;
             let options = self.options.clone();
 
+            let action = db.run_cursor_command(command).with_options(options);
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        let mut cursor = db
-                            .run_cursor_command_with_session(command, options, session)
-                            .await?;
+                        let mut cursor = action.session(session.deref_mut()).await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
                     .await?
                 }
                 None => {
-                    let cursor = db.run_cursor_command(command, options).await?;
+                    let cursor = action.await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
@@ -1739,14 +1669,12 @@ impl TestOperation for CreateCommandCursor {
             let db = test_runner.get_database(id).await;
             let options = self.options.clone();
 
+            let action = db.run_cursor_command(command).with_options(options);
             match &self.session {
                 Some(session_id) => {
                     let mut ses_cursor = None;
                     with_mut_session!(test_runner, session_id, |session| async {
-                        ses_cursor = Some(
-                            db.run_cursor_command_with_session(command, options, session)
-                                .await,
-                        );
+                        ses_cursor = Some(action.session(session.deref_mut()).await);
                     })
                     .await;
                     let test_cursor = TestCursor::Session {
@@ -1756,7 +1684,7 @@ impl TestOperation for CreateCommandCursor {
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
                 None => {
-                    let doc_cursor = db.run_cursor_command(command, options).await?;
+                    let doc_cursor = action.await?;
                     let test_cursor = TestCursor::Normal(Mutex::new(doc_cursor));
                     Ok(Some(Entity::Cursor(test_cursor)))
                 }
@@ -1785,7 +1713,7 @@ impl TestOperation for EndSession {
                 session.client_session.take();
             })
             .await;
-            runtime::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             Ok(None)
         }
         .boxed()
@@ -2045,19 +1973,19 @@ impl TestOperation for CreateIndex {
                 .build();
 
             let collection = test_runner.get_collection(id).await;
+            let act = collection.create_index(index);
             let name = match self.session {
                 Some(ref session_id) => {
                     with_mut_session!(test_runner, session_id, |session| {
                         async move {
-                            collection
-                                .create_index_with_session(index, None, session)
+                            act.session(session.deref_mut())
                                 .await
                                 .map(|model| model.index_name)
                         }
                     })
                     .await?
                 }
-                None => collection.create_index(index, None).await?.index_name,
+                None => act.await?.index_name,
             };
             Ok(Some(Bson::String(name).into()))
         }
@@ -2080,12 +2008,12 @@ impl TestOperation for ListIndexes {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection.list_indexes().with_options(self.options.clone());
             let indexes: Vec<IndexModel> = match self.session {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session, |session| {
                         async {
-                            collection
-                                .list_indexes_with_session(self.options.clone(), session)
+                            act.session(session.deref_mut())
                                 .await?
                                 .stream(session)
                                 .try_collect()
@@ -2094,13 +2022,7 @@ impl TestOperation for ListIndexes {
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .list_indexes(self.options.clone())
-                        .await?
-                        .try_collect()
-                        .await?
-                }
+                None => act.await?.try_collect().await?,
             };
             let indexes: Vec<Document> = indexes
                 .iter()
@@ -2125,14 +2047,15 @@ impl TestOperation for ListIndexNames {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection.list_index_names();
             let names = match self.session {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session.as_str(), |s| {
-                        async move { collection.list_index_names_with_session(s).await }
+                        async move { act.session(s.deref_mut()).await }
                     })
                     .await?
                 }
-                None => collection.list_index_names().await?,
+                None => act.await?,
             };
             Ok(Some(Bson::from(names).into()))
         }
@@ -2347,15 +2270,21 @@ impl TestOperation for CreateChangeStream {
             let target = entities.get(id).unwrap();
             let stream = match target {
                 Entity::Client(ce) => {
-                    ce.watch(self.pipeline.clone(), self.options.clone())
+                    ce.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Database(db) => {
-                    db.watch(self.pipeline.clone(), self.options.clone())
+                    db.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 Entity::Collection(coll) => {
-                    coll.watch(self.pipeline.clone(), self.options.clone())
+                    coll.watch()
+                        .pipeline(self.pipeline.clone())
+                        .with_options(self.options.clone())
                         .await?
                 }
                 _ => panic!("Invalid entity for createChangeStream"),
@@ -2390,7 +2319,7 @@ impl TestOperation for RenameCollection {
                 "to": crate::bson::to_bson(&to_ns)?,
             };
             let admin = test_runner.internal_client.database("admin");
-            admin.run_command(cmd, None).await?;
+            admin.run_command(cmd).await?;
             Ok(None)
         }
         .boxed()
@@ -2806,7 +2735,7 @@ impl TestOperation for Wait {
         &'a self,
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
-        runtime::delay_for(Duration::from_millis(self.ms)).boxed()
+        tokio::time::sleep(Duration::from_millis(self.ms)).boxed()
     }
 }
 

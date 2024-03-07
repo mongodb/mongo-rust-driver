@@ -1,16 +1,11 @@
 use bson::doc;
 use futures::TryStreamExt;
 
-use crate::{
-    db::options::{CreateCollectionOptions, TimeseriesOptions},
-    test::log_uncaptured,
-    Client,
-};
+use crate::{db::options::TimeseriesOptions, test::log_uncaptured, Client};
 
 type Result<T> = anyhow::Result<T>;
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn list_collections_timeseries() -> Result<()> {
     let client = Client::test_builder().build().await;
     if client.server_version_lt(5, 0) {
@@ -18,22 +13,19 @@ async fn list_collections_timeseries() -> Result<()> {
         return Ok(());
     }
     let db = client.database("list_collections_timeseries");
-    db.drop(None).await?;
-    db.create_collection(
-        "test",
-        CreateCollectionOptions::builder()
-            .timeseries(
-                TimeseriesOptions::builder()
-                    .time_field("timestamp".to_string())
-                    .meta_field(None)
-                    .granularity(None)
-                    .build(),
-            )
-            .build(),
-    )
-    .await?;
+    db.drop().await?;
+    db.create_collection("test")
+        .timeseries(
+            TimeseriesOptions::builder()
+                .time_field("timestamp".to_string())
+                .meta_field(None)
+                .granularity(None)
+                .build(),
+        )
+        .await?;
     let results: Vec<_> = db
-        .list_collections(doc! { "name": "test" }, None)
+        .list_collections()
+        .filter(doc! { "name": "test" })
         .await?
         .try_collect()
         .await?;

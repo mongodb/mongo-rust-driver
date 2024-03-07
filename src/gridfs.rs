@@ -13,7 +13,14 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     cursor::Cursor,
     error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    options::{CollectionOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
+    options::{
+        CollectionOptions,
+        FindOneOptions,
+        FindOptions,
+        ReadConcern,
+        SelectionCriteria,
+        WriteConcern,
+    },
     Collection,
     Database,
 };
@@ -201,14 +208,11 @@ impl GridFsBucket {
     /// this bucket. This method returns an error if the `id` does not match any files in the
     /// bucket.
     pub async fn delete(&self, id: Bson) -> Result<()> {
-        let delete_result = self
-            .files()
-            .delete_one(doc! { "_id": id.clone() }, None)
-            .await?;
+        let delete_result = self.files().delete_one(doc! { "_id": id.clone() }).await?;
         // Delete chunks regardless of whether a file was found. This will remove any possibly
         // orphaned chunks.
         self.chunks()
-            .delete_many(doc! { "files_id": id.clone() }, None)
+            .delete_many(doc! { "files_id": id.clone() })
             .await?;
 
         if delete_result.deleted_count == 0 {
@@ -232,6 +236,17 @@ impl GridFsBucket {
         self.files().find(filter, find_options).await
     }
 
+    /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
+    /// given filter.
+    pub async fn find_one(
+        &self,
+        filter: Document,
+        options: impl Into<Option<GridFsFindOneOptions>>,
+    ) -> Result<Option<FilesCollectionDocument>> {
+        let find_options = options.into().map(FindOneOptions::from);
+        self.files().find_one(filter, find_options).await
+    }
+
     /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
     /// error if the `id` does not match any files in the bucket.
     pub async fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
@@ -239,7 +254,6 @@ impl GridFsBucket {
             .update_one(
                 doc! { "_id": id },
                 doc! { "$set": { "filename": new_filename.as_ref() } },
-                None,
             )
             .await?;
 
@@ -248,8 +262,8 @@ impl GridFsBucket {
 
     /// Removes all of the files and their associated chunks from this bucket.
     pub async fn drop(&self) -> Result<()> {
-        self.files().drop(None).await?;
-        self.chunks().drop(None).await?;
+        self.files().drop().await?;
+        self.chunks().drop().await?;
 
         Ok(())
     }

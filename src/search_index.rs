@@ -76,12 +76,10 @@ impl<T> Collection<T> {
             inner.insert("name", name.to_string());
         }
         self.clone_unconcerned()
-            .aggregate(
-                vec![doc! {
-                    "$listSearchIndexes": inner,
-                }],
-                aggregation_options,
-            )
+            .aggregate(vec![doc! {
+                "$listSearchIndexes": inner,
+            }])
+            .with_options(aggregation_options)
             .await
     }
 }

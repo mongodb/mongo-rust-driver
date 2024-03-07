@@ -1,20 +1,10 @@
 pub mod session;
 
-use super::{ChangeStream, ClientSession, Database, SessionChangeStream};
+use super::Database;
 use crate::{
-    bson::Document,
-    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     concern::{ReadConcern, WriteConcern},
     error::Result,
-    options::{
-        ClientOptions,
-        DatabaseOptions,
-        ListDatabasesOptions,
-        SelectionCriteria,
-        SessionOptions,
-    },
-    results::DatabaseSpecification,
-    runtime,
+    options::{ClientOptions, DatabaseOptions, SelectionCriteria},
     Client as AsyncClient,
 };
 
@@ -23,7 +13,7 @@ use crate::{
 /// such as servers being added or removed.
 ///
 /// `Client` is a wrapper around the asynchronous [`mongodb::Client`](../struct.Client.html), and it
-/// starts up an async-std runtime internally to run that wrapped client on.
+/// starts up a tokio runtime internally to run that wrapped client on.
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
@@ -75,7 +65,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Client {
-    async_client: AsyncClient,
+    pub(crate) async_client: AsyncClient,
 }
 
 impl From<AsyncClient> for Client {
@@ -92,7 +82,8 @@ impl Client {
     /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more
     /// details.
     pub fn with_uri_str(uri: impl AsRef<str>) -> Result<Self> {
-        let async_client = runtime::block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
+        let async_client =
+            crate::sync::TOKIO_RUNTIME.block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
         Ok(Self { async_client })
     }
 
@@ -143,148 +134,5 @@ impl Client {
     /// If no default database was specified, `None` will be returned.
     pub fn default_database(&self) -> Option<Database> {
         self.async_client.default_database().map(Database::new)
-    }
-
-    /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<DatabaseSpecification>> {
-        runtime::block_on(
-            self.async_client
-                .list_databases(filter.into(), options.into()),
-        )
-    }
-
-    /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<String>> {
-        runtime::block_on(
-            self.async_client
-                .list_database_names(filter.into(), options.into()),
-        )
-    }
-
-    /// Starts a new `ClientSession`.
-    pub fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
-        runtime::block_on(self.async_client.start_session(options)).map(Into::into)
-    }
-
-    /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
-    /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    ///
-    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
-    /// will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_client.watch(pipeline, options)).map(ChangeStream::new)
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
-    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    pub fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        runtime::block_on(self.async_client.watch_with_session(
-            pipeline,
-            options,
-            &mut session.async_client_session,
-        ))
-        .map(SessionChangeStream::new)
-    }
-
-    /// Shut down this `Client`, terminating background thread workers and closing connections.
-    /// This will wait for any live handles to server-side resources (see below) to be
-    /// dropped and any associated server-side operations to finish.
-    ///
-    /// IMPORTANT: Any live resource handles that are not dropped will cause this method to wait
-    /// indefinitely.  It's strongly recommended to structure your usage to avoid this, e.g. by
-    /// only using those types in shorter-lived scopes than the `Client`.  If this is not possible,
-    /// see [`shutdown_immediate`](Client::shutdown_immediate).  For example:
-    ///
-    /// ```rust
-    /// # use mongodb::{sync::{Client, gridfs::GridFsBucket}, error::Result};
-    /// fn upload_data(bucket: &GridFsBucket) {
-    ///   let stream = bucket.open_upload_stream("test", None);
-    ///    // .. write to the stream ..
-    /// }
-    ///
-    /// # fn run() -> Result<()> {
-    /// let client = Client::with_uri_str("mongodb://example.com")?;
-    /// let bucket = client.database("test").gridfs_bucket(None);
-    /// upload_data(&bucket);
-    /// client.shutdown();
-    /// // Background cleanup work from `upload_data` is guaranteed to have run.
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// If the handle is used in the same scope as `shutdown`, explicit `drop` may be needed:
-    ///
-    /// ```rust
-    /// # use mongodb::{sync::Client, error::Result};
-    /// # fn run() -> Result<()> {
-    /// let client = Client::with_uri_str("mongodb://example.com")?;
-    /// let bucket = client.database("test").gridfs_bucket(None);
-    /// let stream = bucket.open_upload_stream("test", None);
-    /// // .. write to the stream ..
-    /// drop(stream);
-    /// client.shutdown();
-    /// // Background cleanup work for `stream` is guaranteed to have run.
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// Calling any methods on  clones of this `Client` or derived handles after this will return
-    /// errors.
-    ///
-    /// Handles to server-side resources are `Cursor`, `SessionCursor`, `Session`, or
-    /// `GridFsUploadStream`.
-    pub fn shutdown(self) {
-        runtime::block_on(self.async_client.shutdown());
-    }
-
-    /// Shut down this `Client`, terminating background thread workers and closing connections.
-    /// This does *not* wait for other pending resources to be cleaned up, which may cause both
-    /// client-side errors and server-side resource leaks. Calling any methods on clones of this
-    /// `Client` or derived handles after this will return errors.
-    ///
-    /// ```rust
-    /// # use mongodb::{sync::Client, error::Result};
-    /// # fn run() -> Result<()> {
-    /// let client = Client::with_uri_str("mongodb://example.com")?;
-    /// let bucket = client.database("test").gridfs_bucket(None);
-    /// let stream = bucket.open_upload_stream("test", None);
-    /// // .. write to the stream ..
-    /// client.shutdown_immediate();
-    /// // Background cleanup work for `stream` may or may not have run.
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn shutdown_immediate(self) {
-        runtime::block_on(self.async_client.shutdown_immediate());
     }
 }

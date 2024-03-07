@@ -11,7 +11,6 @@ impl From<mongodb::error::Error> for Err {
 #[allow(dead_code)]
 type Result<T> = std::result::Result<T, Err>;
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn _connecting() -> Result<()> {
     use mongodb::{options::ClientOptions, Client};
 
@@ -25,27 +24,25 @@ async fn _connecting() -> Result<()> {
     let client = Client::with_options(client_options)?;
 
     // List the names of the databases in that deployment.
-    for db_name in client.list_database_names(None, None).await? {
+    for db_name in client.list_database_names().await? {
         println!("{}", db_name);
     }
 
     Ok(())
 }
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn _getting_handle_to_database(client: mongodb::Client) -> Result<()> {
     // Get a handle to a database.
     let db = client.database("mydb");
 
     // List the names of the collections in that database.
-    for collection_name in db.list_collection_names(None).await? {
+    for collection_name in db.list_collection_names().await? {
         println!("{}", collection_name);
     }
 
     Ok(())
 }
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn _inserting_documents_into_a_collection(db: mongodb::Database) -> Result<()> {
     use mongodb::bson::{doc, Document};
 
@@ -71,7 +68,6 @@ struct Book {
     author: String,
 }
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn _inserting_documents_into_a_typed_collection(db: mongodb::Database) -> Result<()> {
     // Get a handle to a collection of `Book`.
     let typed_collection = db.collection::<Book>("books");
@@ -93,7 +89,6 @@ async fn _inserting_documents_into_a_typed_collection(db: mongodb::Database) -> 
     Ok(())
 }
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn _finding_documents_into_a_collection(
     typed_collection: mongodb::Collection<Book>,
 ) -> Result<()> {
@@ -114,7 +109,7 @@ async fn _finding_documents_into_a_collection(
     Ok(())
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+#[cfg(feature = "sync")]
 async fn _using_the_sync_api() -> Result<()> {
     use mongodb::{bson::doc, sync::Client};
 
@@ -148,7 +143,6 @@ async fn _using_the_sync_api() -> Result<()> {
     Ok(())
 }
 
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn _windows_dns_note() -> Result<()> {
     use mongodb::{
         options::{ClientOptions, ResolverConfig},

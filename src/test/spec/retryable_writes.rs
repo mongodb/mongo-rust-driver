@@ -13,8 +13,8 @@ use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
-        cmap::{CmapEvent, CmapEventHandler, ConnectionCheckoutFailedReason},
-        command::{CommandEvent, CommandEventHandler},
+        cmap::{CmapEvent, ConnectionCheckoutFailedReason},
+        command::CommandEvent,
     },
     options::{ClientOptions, FindOptions, InsertManyOptions},
     runtime,
@@ -38,14 +38,12 @@ use crate::{
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     run_unified_tests(&["retryable-writes", "unified"]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_legacy() {
     async fn run_test(test_file: TestFile) {
         for mut test_case in test_file.tests {
@@ -175,15 +173,14 @@ async fn run_legacy() {
                 .unwrap();
             assert_eq!(test_case.outcome.collection.data, actual_data);
 
-            client.database(&db_name).drop(None).await.unwrap();
+            client.database(&db_name).drop().await.unwrap();
         }
     }
 
     run_spec_test(&["retryable-writes", "legacy"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
     let client = EventClient::new().await;
@@ -200,42 +197,35 @@ async fn transaction_ids_excluded() {
         !started.command.contains_key("txnNumber")
     };
 
-    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(excludes_txn_number("update"));
 
-    coll.delete_many(doc! {}, None).await.unwrap();
+    coll.delete_many(doc! {}).await.unwrap();
     assert!(excludes_txn_number("delete"));
 
-    coll.aggregate(
-        vec![
-            doc! { "$match": doc! { "x": 1 } },
-            doc! { "$out": "other_coll" },
-        ],
-        None,
-    )
+    coll.aggregate(vec![
+        doc! { "$match": doc! { "x": 1 } },
+        doc! { "$out": "other_coll" },
+    ])
     .await
     .unwrap();
     assert!(excludes_txn_number("aggregate"));
 
     let req = semver::VersionReq::parse(">=4.2").unwrap();
     if req.matches(&client.server_version) {
-        coll.aggregate(
-            vec![
-                doc! { "$match": doc! { "x": 1 } },
-                doc! { "$merge": "other_coll" },
-            ],
-            None,
-        )
+        coll.aggregate(vec![
+            doc! { "$match": doc! { "x": 1 } },
+            doc! { "$merge": "other_coll" },
+        ])
         .await
         .unwrap();
         assert!(excludes_txn_number("aggregate"));
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
     let client = EventClient::new().await;
@@ -255,7 +245,7 @@ async fn transaction_ids_included() {
     coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
     assert!(includes_txn_number("insert"));
 
-    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(includes_txn_number("update"));
@@ -265,7 +255,7 @@ async fn transaction_ids_included() {
         .unwrap();
     assert!(includes_txn_number("update"));
 
-    coll.delete_one(doc! {}, None).await.unwrap();
+    coll.delete_one(doc! {}).await.unwrap();
     assert!(includes_txn_number("delete"));
 
     coll.find_one_and_delete(doc! {}, None).await.unwrap();
@@ -294,8 +284,7 @@ async fn transaction_ids_included() {
     assert!(includes_txn_number("insert"));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn mmapv1_error_raised() {
     let client = TestClient::new().await;
@@ -310,7 +299,7 @@ async fn mmapv1_error_raised() {
 
     let server_status = client
         .database(function_name!())
-        .run_command(doc! { "serverStatus": 1 }, None)
+        .run_command(doc! { "serverStatus": 1 })
         .await
         .unwrap();
     let name = server_status
@@ -336,14 +325,12 @@ async fn mmapv1_error_raised() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn label_not_added_first_read_error() {
     label_not_added(false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn label_not_added_second_read_error() {
     label_not_added(true).await;
 }
@@ -382,7 +369,7 @@ async fn label_not_added(retry_reads: bool) {
     };
     client
         .database("admin")
-        .run_command(failpoint, None)
+        .run_command(failpoint)
         .await
         .unwrap();
 
@@ -392,16 +379,15 @@ async fn label_not_added(retry_reads: bool) {
 }
 
 /// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
     let handler = Arc::new(EventHandler::new());
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
-    client_options.command_event_handler = Some(handler.clone() as Arc<dyn CommandEventHandler>);
+    client_options.cmap_event_handler = Some(handler.clone().into());
+    client_options.command_event_handler = Some(handler.clone().into());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -491,8 +477,7 @@ async fn retry_write_pool_cleared() {
 
 /// Prose test from retryable writes spec verifying that the original error is returned after
 /// encountering a WriteConcernError with a RetryableWriteError label.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_write_retryable_write_error() {
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
@@ -580,8 +565,7 @@ async fn retry_write_retryable_write_error() {
 }
 
 // Test that in a sharded cluster writes are retried on a different mongos if one available
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_write_different_mongos() {
     let mut client_options = get_client_options().await.clone();
     if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
@@ -643,8 +627,7 @@ async fn retry_write_different_mongos() {
 }
 
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_write_same_mongos() {
     let init_client = Client::test_builder().build().await;
     if !init_client.supports_fail_command() {

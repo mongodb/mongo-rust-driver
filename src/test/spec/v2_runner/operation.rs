@@ -4,8 +4,10 @@ use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
 
 use crate::{
+    action::Action,
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
+    db::options::ListCollectionsOptions,
     error::Result,
     options::{
         AggregateOptions,
@@ -26,8 +28,6 @@ use crate::{
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListCollectionsOptions,
-        ListDatabasesOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
@@ -334,22 +334,11 @@ impl TestOperation for DeleteMany {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .delete_many_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .delete_many(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .delete_many(self.filter.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -371,18 +360,11 @@ impl TestOperation for DeleteOne {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .delete_one_with_session(self.filter.clone(), self.options.clone(), session)
-                        .await?
-                }
-                None => {
-                    collection
-                        .delete_one(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .delete_one(self.filter.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -510,27 +492,11 @@ impl TestOperation for UpdateMany {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .update_many_with_session(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .update_many(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
-            };
+            let result = collection
+                .update_many(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -553,27 +519,11 @@ impl TestOperation for UpdateOne {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .update_one_with_session(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .update_one(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
-            };
+            let result = collection
+                .update_one(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -596,24 +546,19 @@ impl TestOperation for Aggregate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection
+                .aggregate(self.pipeline.clone())
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => {
-                    let mut cursor = collection
-                        .aggregate_with_session(
-                            self.pipeline.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?;
+                    let mut cursor = act.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = collection
-                        .aggregate(self.pipeline.clone(), self.options.clone())
-                        .await?;
+                    let cursor = act.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
@@ -628,24 +573,19 @@ impl TestOperation for Aggregate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = database
+                .aggregate(self.pipeline.clone())
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => {
-                    let mut cursor = database
-                        .aggregate_with_session(
-                            self.pipeline.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?;
+                    let mut cursor = action.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = database
-                        .aggregate(self.pipeline.clone(), self.options.clone())
-                        .await?;
+                    let cursor = action.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
@@ -672,23 +612,11 @@ impl TestOperation for Distinct {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .distinct_with_session(
-                            &self.field_name,
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .distinct(&self.field_name, self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             Ok(Some(Bson::Array(result)))
         }
         .boxed()
@@ -697,7 +625,7 @@ impl TestOperation for Distinct {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct CountDocuments {
-    filter: Document,
+    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<CountOptions>,
 }
@@ -709,22 +637,11 @@ impl TestOperation for CountDocuments {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .count_documents_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .count_documents(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .count_documents(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone())
+                .optional(session, |a, v| a.session(v))
+                .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap())))
         }
         .boxed()
@@ -745,7 +662,8 @@ impl TestOperation for EstimatedDocumentCount {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = collection
-                .estimated_document_count(self.options.clone())
+                .estimated_document_count()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::Int64(result.try_into().unwrap())))
         }
@@ -790,7 +708,6 @@ impl TestOperation for FindOne {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListCollections {
-    filter: Option<Document>,
     #[serde(flatten)]
     options: Option<ListCollectionsOptions>,
 }
@@ -805,17 +722,16 @@ impl TestOperation for ListCollections {
             let result = match session {
                 Some(session) => {
                     let mut cursor = database
-                        .list_collections_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
+                        .list_collections()
+                        .with_options(self.options.clone())
+                        .session(&mut *session)
                         .await?;
                     cursor.stream(session).try_collect::<Vec<_>>().await?
                 }
                 None => {
                     let cursor = database
-                        .list_collections(self.filter.clone(), self.options.clone())
+                        .list_collections()
+                        .with_options(self.options.clone())
                         .await?;
                     cursor.try_collect::<Vec<_>>().await?
                 }
@@ -838,13 +754,12 @@ impl TestOperation for ListCollectionNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = database
+                .list_collection_names()
+                .optional(self.filter.clone(), |b, f| b.filter(f));
             let result = match session {
-                Some(session) => {
-                    database
-                        .list_collection_names_with_session(self.filter.clone(), session)
-                        .await?
-                }
-                None => database.list_collection_names(self.filter.clone()).await?,
+                Some(session) => action.session(session).await?,
+                None => action.await?,
             };
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))
@@ -1065,9 +980,8 @@ impl TestOperation for AssertSessionUnpinned {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabases {
-    filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: Option<crate::db::options::ListDatabasesOptions>,
 }
 
 impl TestOperation for ListDatabases {
@@ -1077,7 +991,8 @@ impl TestOperation for ListDatabases {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = client
-                .list_databases(self.filter.clone(), self.options.clone())
+                .list_databases()
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(bson::to_bson(&result)?))
         }
@@ -1087,9 +1002,8 @@ impl TestOperation for ListDatabases {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ListDatabaseNames {
-    filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: Option<crate::db::options::ListDatabasesOptions>,
 }
 
 impl TestOperation for ListDatabaseNames {
@@ -1099,7 +1013,8 @@ impl TestOperation for ListDatabaseNames {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let result = client
-                .list_database_names(self.filter.clone(), self.options.clone())
+                .list_database_names()
+                .with_options(self.options.clone())
                 .await?;
             let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
             Ok(Some(result.into()))
@@ -1207,14 +1122,11 @@ impl TestOperation for RunCommand {
                 .read_preference
                 .as_ref()
                 .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
-            let result = match session {
-                Some(session) => {
-                    database
-                        .run_command_with_session(self.command.clone(), selection_criteria, session)
-                        .await
-                }
-                None => database.run_command(self.command.clone(), None).await,
-            };
+            let result = database
+                .run_command(self.command.clone())
+                .optional(selection_criteria, |a, s| a.selection_criteria(s))
+                .optional(session, |a, s| a.session(s))
+                .await;
             result.map(|doc| Some(Bson::Document(doc)))
         }
         .boxed()
@@ -1235,20 +1147,12 @@ impl TestOperation for DropCollection {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    database
-                        .collection::<Document>(&self.collection)
-                        .drop_with_session(self.options.clone(), session)
-                        .await
-                }
-                None => {
-                    database
-                        .collection::<Document>(&self.collection)
-                        .drop(self.options.clone())
-                        .await
-                }
-            };
+            let result = database
+                .collection::<Document>(&self.collection)
+                .drop()
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await;
             result.map(|_| None)
         }
         .boxed()
@@ -1269,22 +1173,11 @@ impl TestOperation for CreateCollection {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    database
-                        .create_collection_with_session(
-                            &self.collection,
-                            self.options.clone(),
-                            session,
-                        )
-                        .await
-                }
-                None => {
-                    database
-                        .create_collection(&self.collection, self.options.clone())
-                        .await
-                }
-            };
+            let result = database
+                .create_collection(&self.collection)
+                .with_options(self.options.clone())
+                .optional(session, |b, s| b.session(s))
+                .await;
             result.map(|_| None)
         }
         .boxed()
@@ -1307,10 +1200,10 @@ impl TestOperation for AssertCollectionExists {
                 .database_with_options(
                     &self.database,
                     DatabaseOptions::builder()
-                        .read_concern(ReadConcern::MAJORITY)
+                        .read_concern(ReadConcern::majority())
                         .build(),
                 )
-                .list_collection_names(None)
+                .list_collection_names()
                 .await
                 .unwrap();
             assert!(
@@ -1340,7 +1233,7 @@ impl TestOperation for AssertCollectionNotExists {
         async move {
             let collections = client
                 .database(&self.database)
-                .list_collection_names(None)
+                .list_collection_names()
                 .await
                 .unwrap();
             assert!(!collections.contains(&self.collection));
@@ -1370,15 +1263,11 @@ impl TestOperation for CreateIndex {
                 .options(options)
                 .build();
 
-            let name = match session {
-                Some(session) => {
-                    collection
-                        .create_index_with_session(index, None, session)
-                        .await?
-                        .index_name
-                }
-                None => collection.create_index(index, None).await?.index_name,
-            };
+            let name = collection
+                .create_index(index)
+                .optional(session, |a, s| a.session(s))
+                .await?
+                .index_name;
             Ok(Some(name.into()))
         }
         .boxed()
@@ -1399,18 +1288,11 @@ impl TestOperation for DropIndex {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            match session {
-                Some(session) => {
-                    collection
-                        .drop_index_with_session(self.name.clone(), self.options.clone(), session)
-                        .await?
-                }
-                None => {
-                    collection
-                        .drop_index(self.name.clone(), self.options.clone())
-                        .await?
-                }
-            }
+            collection
+                .drop_index(self.name.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             Ok(None)
         }
         .boxed()
@@ -1430,22 +1312,16 @@ impl TestOperation for ListIndexes {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection.list_indexes().with_options(self.options.clone());
             let indexes: Vec<IndexModel> = match session {
                 Some(session) => {
-                    collection
-                        .list_indexes_with_session(self.options.clone(), session)
+                    act.session(&mut *session)
                         .await?
                         .stream(session)
                         .try_collect()
                         .await?
                 }
-                None => {
-                    collection
-                        .list_indexes(self.options.clone())
-                        .await?
-                        .try_collect()
-                        .await?
-                }
+                None => act.await?.try_collect().await?,
             };
             let indexes: Vec<Document> = indexes
                 .iter()
@@ -1467,9 +1343,10 @@ impl TestOperation for ListIndexNames {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection.list_index_names();
             let names = match session {
-                Some(session) => collection.list_index_names_with_session(session).await?,
-                None => collection.list_index_names().await?,
+                Some(session) => act.session(session).await?,
+                None => act.await?,
             };
             Ok(Some(names.into()))
         }
@@ -1489,10 +1366,10 @@ impl TestOperation for Watch {
         async move {
             match session {
                 None => {
-                    collection.watch(None, None).await?;
+                    collection.watch().await?;
                 }
                 Some(s) => {
-                    collection.watch_with_session(None, None, s).await?;
+                    collection.watch().session(s).await?;
                 }
             }
             Ok(None)
@@ -1508,10 +1385,10 @@ impl TestOperation for Watch {
         async move {
             match session {
                 None => {
-                    database.watch(None, None).await?;
+                    database.watch().await?;
                 }
                 Some(s) => {
-                    database.watch_with_session(None, None, s).await?;
+                    database.watch().session(s).await?;
                 }
             }
             Ok(None)
@@ -1524,7 +1401,7 @@ impl TestOperation for Watch {
         client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            client.watch(None, None).await?;
+            client.watch().await?;
             Ok(None)
         }
         .boxed()

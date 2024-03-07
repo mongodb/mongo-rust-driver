@@ -112,7 +112,7 @@ impl ChangeStreamOptions {
             .max_await_time(self.max_await_time)
             .read_concern(self.read_concern.clone())
             .selection_criteria(self.selection_criteria.clone())
-            .comment_bson(self.comment.clone())
+            .comment(self.comment.clone())
             .build()
     }
 }

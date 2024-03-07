@@ -1,25 +1,25 @@
 mod abort_transaction;
-mod aggregate;
+pub(crate) mod aggregate;
 mod commit_transaction;
-mod count;
-mod count_documents;
-mod create;
+pub(crate) mod count;
+pub(crate) mod count_documents;
+pub(crate) mod create;
 mod create_indexes;
 mod delete;
 mod distinct;
-mod drop_collection;
-mod drop_database;
+pub(crate) mod drop_collection;
+pub(crate) mod drop_database;
 mod drop_indexes;
 mod find;
 mod find_and_modify;
 mod get_more;
 mod insert;
-mod list_collections;
-mod list_databases;
+pub(crate) mod list_collections;
+pub(crate) mod list_databases;
 mod list_indexes;
 mod raw_output;
-mod run_command;
-mod run_cursor_command;
+pub(crate) mod run_command;
+pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
@@ -52,33 +52,28 @@ use crate::{
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
-pub(crate) use aggregate::{Aggregate, AggregateTarget, ChangeStreamAggregate};
 pub(crate) use commit_transaction::CommitTransaction;
-pub(crate) use count::Count;
-pub(crate) use count_documents::CountDocuments;
-pub(crate) use create::Create;
 pub(crate) use create_indexes::CreateIndexes;
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
-pub(crate) use drop_collection::DropCollection;
-pub(crate) use drop_database::DropDatabase;
 pub(crate) use drop_indexes::DropIndexes;
 pub(crate) use find::Find;
 pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
-pub(crate) use list_collections::ListCollections;
-pub(crate) use list_databases::ListDatabases;
 pub(crate) use list_indexes::ListIndexes;
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use raw_output::RawOutput;
-pub(crate) use run_command::RunCommand;
-pub(crate) use run_cursor_command::RunCursorCommand;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
+// The maximum number of bytes that may be included in a write payload when auto-encryption is
+// enabled.
+const MAX_ENCRYPTED_WRITE_SIZE: u64 = 2_097_152;
+// The amount of overhead bytes to account for when building a document sequence.
+const COMMAND_OVERHEAD_SIZE: u64 = 16_000;
 
 /// A trait modeling the behavior of a server side operation.
 ///
@@ -97,10 +92,6 @@ pub(crate) trait Operation {
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
-
-    /// Perform custom serialization of the built command.
-    /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>>;
 
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
@@ -413,12 +404,6 @@ pub(crate) trait OperationWithDefaults {
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
 
-    /// Perform custom serialization of the built command.
-    /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        Ok(bson::to_vec(&cmd)?)
-    }
-
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
     fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>> {
@@ -488,9 +473,6 @@ impl<T: OperationWithDefaults> Operation for T {
     const NAME: &'static str = T::NAME;
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
         self.build(description)
-    }
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        self.serialize_command(cmd)
     }
     fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
         self.extract_at_cluster_time(response)

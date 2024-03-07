@@ -151,8 +151,7 @@ functions:
           export SSL="${SSL}"
           . .evergreen/generate-uri.sh
 
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} \
-            .evergreen/run-driver-benchmarks.sh
+          .evergreen/run-driver-benchmarks.sh
 
   "run bson benchmarks":
     - command: shell.exec
@@ -173,7 +172,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-compile-benchmarks.sh
+          .evergreen/run-compile-benchmarks.sh
 
   "upload-mo-artifacts":
     - command: shell.exec
@@ -319,18 +318,6 @@ axes:
         variables:
            TOPOLOGY: "sharded_cluster"
 
-  - id: "async-runtime"
-    display_name: Async Runtime
-    values:
-      - id: "tokio"
-        display_name: "tokio"
-        variables:
-          ASYNC_RUNTIME: "tokio"
-      - id: "async-std"
-        display_name: "async-std"
-        variables:
-          ASYNC_RUNTIME: "async-std"
-
   - id: "os"
     display_name: OS
     values:
@@ -347,9 +334,8 @@ buildvariants:
   matrix_spec:
     os:
       - rhel90-dbx-perf-large
-    async-runtime: "*"
     topology: "*"
-  display_name: "Benchmark ${topology} with ${async-runtime}"
+  display_name: "Benchmark ${topology}"
   tasks:
      - ".driver"
 -
@@ -365,8 +351,7 @@ buildvariants:
   matrix_spec:
     os:
       - rhel90-dbx-perf-large
-    async-runtime: "*"
-  display_name: "Compile with ${async-runtime}"
+  display_name: "Compile"
   tasks:
     - "benchmark-compile"
 

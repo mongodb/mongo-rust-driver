@@ -5,16 +5,7 @@ use futures::stream::StreamExt;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{
-        Acknowledgment,
-        ClientOptions,
-        CreateCollectionOptions,
-        DropCollectionOptions,
-        FindOptions,
-        InsertManyOptions,
-        WriteConcern,
-    },
-    runtime,
+    options::{Acknowledgment, ClientOptions, FindOptions, InsertManyOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, util::EventClient},
     Collection,
@@ -46,30 +37,17 @@ async fn run_test<F: Future>(
 
     let wc_majority = WriteConcern::builder().w(Acknowledgment::Majority).build();
 
-    let _: Result<_, _> = coll
-        .drop(Some(
-            DropCollectionOptions::builder()
-                .write_concern(wc_majority.clone())
-                .build(),
-        ))
-        .await;
+    let _: Result<_, _> = coll.drop().write_concern(wc_majority.clone()).await;
 
-    db.create_collection(
-        &name,
-        Some(
-            CreateCollectionOptions::builder()
-                .write_concern(wc_majority)
-                .build(),
-        ),
-    )
-    .await
-    .unwrap();
+    db.create_collection(&name)
+        .write_concern(wc_majority)
+        .await
+        .unwrap();
 
     test(client, db, coll).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn get_more() {
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
@@ -97,20 +75,18 @@ async fn get_more() {
 
         let db = client.database("admin");
 
-        db.run_command(
-            doc! { "replSetFreeze": 0 },
-            SelectionCriteria::ReadPreference(
+        db.run_command(doc! { "replSetFreeze": 0 })
+            .selection_criteria(SelectionCriteria::ReadPreference(
                 crate::selection_criteria::ReadPreference::Secondary {
                     options: Default::default(),
                 },
-            ),
-        )
-        .await
-        .expect("replSetFreeze should have succeeded");
+            ))
+            .await
+            .expect("replSetFreeze should have succeeded");
 
         client
             .database("admin")
-            .run_command(doc! { "replSetStepDown": 30, "force": true }, None)
+            .run_command(doc! { "replSetStepDown": 30, "force": true })
             .await
             .expect("stepdown should have succeeded");
 
@@ -122,15 +98,14 @@ async fn get_more() {
                 .expect("cursor iteration should have succeeded");
         }
 
-        runtime::delay_for(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
     run_test("get_more", get_more_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn notwritableprimary_keep_pool() {
     async fn notwritableprimary_keep_pool_test(
         client: EventClient,
@@ -145,17 +120,14 @@ async fn notwritableprimary_keep_pool() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 10107
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 10107
+                }
+            })
             .await
             .unwrap();
 
@@ -172,7 +144,7 @@ async fn notwritableprimary_keep_pool() {
             .await
             .expect("insert should have succeeded");
 
-        runtime::delay_for(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
@@ -183,8 +155,7 @@ async fn notwritableprimary_keep_pool() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn notwritableprimary_reset_pool() {
     async fn notwritableprimary_reset_pool_test(
         client: EventClient,
@@ -201,17 +172,14 @@ async fn notwritableprimary_reset_pool() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 10107
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 10107
+                }
+            })
             .await
             .unwrap();
 
@@ -224,7 +192,7 @@ async fn notwritableprimary_reset_pool() {
             "insert should have failed"
         );
 
-        runtime::delay_for(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
@@ -239,8 +207,7 @@ async fn notwritableprimary_reset_pool() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn shutdown_in_progress() {
     async fn shutdown_in_progress_test(
         client: EventClient,
@@ -254,17 +221,14 @@ async fn shutdown_in_progress() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 91
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 91
+                }
+            })
             .await
             .unwrap();
 
@@ -277,7 +241,7 @@ async fn shutdown_in_progress() {
             "insert should have failed"
         );
 
-        runtime::delay_for(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
@@ -288,8 +252,7 @@ async fn shutdown_in_progress() {
     run_test("shutdown_in_progress", shutdown_in_progress_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn interrupted_at_shutdown() {
     async fn interrupted_at_shutdown_test(
         client: EventClient,
@@ -303,17 +266,14 @@ async fn interrupted_at_shutdown() {
 
         client
             .database("admin")
-            .run_command(
-                doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": { "times": 1 },
-                    "data": {
-                        "failCommands": ["insert"],
-                        "errorCode": 11600
-                    }
-                },
-                None,
-            )
+            .run_command(doc! {
+                "configureFailPoint": "failCommand",
+                "mode": { "times": 1 },
+                "data": {
+                    "failCommands": ["insert"],
+                    "errorCode": 11600
+                }
+            })
             .await
             .unwrap();
 
@@ -326,14 +286,14 @@ async fn interrupted_at_shutdown() {
             "insert should have failed"
         );
 
-        runtime::delay_for(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
             .await
             .expect("insert should have succeeded");
 
-        runtime::delay_for(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 
     run_test("interrupted_at_shutdown", interrupted_at_shutdown_test).await;

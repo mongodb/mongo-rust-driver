@@ -30,13 +30,13 @@ pub async fn example() -> Result<()> {
     let client = Client::with_uri_str(URI).await?;
     let coll = client.database("test").collection::<Document>("coll");
     // Clear old data
-    coll.drop(None).await?;
+    coll.drop().await?;
 
     // Set up the key vault (key_vault_namespace) for this example.
     let key_vault = client
         .database(&key_vault_namespace.db)
         .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
+    key_vault.drop().await?;
 
     let client_encryption = ClientEncryption::new(
         // The MongoClient to use for reading/writing to the key vault.

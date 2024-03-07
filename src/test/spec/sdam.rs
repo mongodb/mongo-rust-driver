@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use bson::{doc, Document};
 
 use crate::{
+    event::sdam::SdamEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
@@ -14,14 +15,12 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
-        SdamEvent,
         TestClient,
     },
     Client,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     // TODO RUST-1222: Unskip this file
     let mut skipped_files = vec!["interruptInUse-pool-clear.json"];
@@ -45,8 +44,7 @@ async fn run_unified() {
 }
 
 /// Streaming protocol prose test 1 from SDAM spec tests.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn streaming_min_heartbeat_frequency() {
     let test_client = TestClient::new().await;
     if test_client.is_load_balanced() {
@@ -57,7 +55,7 @@ async fn streaming_min_heartbeat_frequency() {
     let handler = Arc::new(EventHandler::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
 
     let hosts = options.hosts.clone();
 
@@ -65,7 +63,7 @@ async fn streaming_min_heartbeat_frequency() {
     // discover a server
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
 
@@ -96,8 +94,7 @@ async fn streaming_min_heartbeat_frequency() {
 }
 
 /// Variant of the previous prose test that checks for a non-minHeartbeatFrequencyMS value.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_frequency_is_respected() {
     let test_client = TestClient::new().await;
     if test_client.is_load_balanced() {
@@ -108,7 +105,7 @@ async fn heartbeat_frequency_is_respected() {
     let handler = Arc::new(EventHandler::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(1000));
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
 
     let hosts = options.hosts.clone();
 
@@ -116,7 +113,7 @@ async fn heartbeat_frequency_is_respected() {
     // discover a server
     client
         .database("admin")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
 
@@ -147,8 +144,7 @@ async fn heartbeat_frequency_is_respected() {
 }
 
 /// RTT prose test 1 from SDAM spec tests.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn rtt_is_updated() {
     let test_client = TestClient::new().await;
     if !test_client.supports_streaming_monitoring_protocol() {
@@ -174,7 +170,7 @@ async fn rtt_is_updated() {
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
     options.app_name = Some(app_name.to_string());
-    options.sdam_event_handler = Some(handler.clone());
+    options.sdam_event_handler = Some(handler.clone().into());
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
 

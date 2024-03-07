@@ -37,7 +37,7 @@ async fn handler(_: LambdaEvent<Value>) -> Result<Value, lambda_runtime::Error> 
     let client = get_mongodb_client().await;
     let response = client
         .database("db")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await?;
     let json = serde_json::to_value(response)?;
     Ok(json)
@@ -57,14 +57,13 @@ async fn handler_create_client(_: LambdaEvent<Value>) -> Result<Value, lambda_ru
     let client = Client::with_uri_str(uri).await.unwrap();
     let response = client
         .database("db")
-        .run_command(doc! { "ping": 1 }, None)
+        .run_command(doc! { "ping": 1 })
         .await?;
     let json = serde_json::to_value(response)?;
     Ok(json)
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_handler() {
     let event = LambdaEvent::new(Value::Null, Default::default());
     handler_create_client(event).await.unwrap();

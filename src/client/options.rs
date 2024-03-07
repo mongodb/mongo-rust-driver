@@ -1,4 +1,4 @@
-#[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+#[cfg(test)]
 mod test;
 
 mod resolver_config;
@@ -12,13 +12,12 @@ use std::{
     hash::{Hash, Hasher},
     path::PathBuf,
     str::FromStr,
-    sync::Arc,
     time::Duration,
 };
 
 use bson::UuidRepresentation;
 use derivative::Derivative;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
@@ -32,16 +31,13 @@ use crate::{
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
-    event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
+    event::EventHandler,
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     serde_util,
     srv::{OriginalSrvInfo, SrvResolver},
 };
-
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-use crate::runtime;
 
 pub use resolver_config::ResolverConfig;
 
@@ -69,6 +65,7 @@ const URI_OPTIONS: &[&str] = &[
     "replicaset",
     "retrywrites",
     "retryreads",
+    "servermonitoringmode",
     "serverselectiontimeoutms",
     "sockettimeoutms",
     "tls",
@@ -84,18 +81,14 @@ const URI_OPTIONS: &[&str] = &[
     "zlibcompressionlevel",
 ];
 
-lazy_static! {
-    /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
-    /// Usernames / passwords that contain these characters must instead include the URL encoded version of them when included
-    /// as part of the connection string.
-    static ref USERINFO_RESERVED_CHARACTERS: HashSet<&'static char> = {
-        [':', '/', '?', '#', '[', ']', '@'].iter().collect()
-    };
+/// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
+/// Usernames / passwords that contain these characters must instead include the URL encoded version
+/// of them when included as part of the connection string.
+static USERINFO_RESERVED_CHARACTERS: Lazy<HashSet<&'static char>> =
+    Lazy::new(|| [':', '/', '?', '#', '[', ']', '@'].iter().collect());
 
-    static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
-        ['/', '\\', ' ', '"', '$'].iter().collect()
-    };
-}
+static ILLEGAL_DATABASE_CHARACTERS: Lazy<HashSet<&'static char>> =
+    Lazy::new(|| ['/', '\\', ' ', '"', '$'].iter().collect());
 
 /// An enum representing the address of a MongoDB server.
 #[derive(Clone, Debug, Eq, Serialize)]
@@ -254,7 +247,7 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+    #[cfg(test)]
     pub(crate) fn into_document(self) -> Document {
         match self {
             Self::Tcp { host, port } => {
@@ -404,21 +397,19 @@ pub struct ClientOptions {
     #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
 
-    /// The handler that should process all Connection Monitoring and Pooling events. See the
-    /// CmapEventHandler type documentation for more details.
+    /// The handler that should process all Connection Monitoring and Pooling events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
-    pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
+    pub cmap_event_handler: Option<EventHandler<crate::event::cmap::CmapEvent>>,
 
-    /// The handler that should process all command-related events. See the CommandEventHandler
-    /// type documentation for more details.
+    /// The handler that should process all command-related events.
     ///
     /// Note that monitoring command events may incur a performance penalty.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
-    pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
+    pub command_event_handler: Option<EventHandler<crate::event::command::CommandEvent>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.
@@ -519,12 +510,17 @@ pub struct ClientOptions {
     #[builder(default)]
     pub retry_writes: Option<bool>,
 
-    /// The handler that should process all Server Discovery and Monitoring events. See the
-    /// [`SdamEventHandler`] type documentation for more details.
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    /// Configures which server monitoring protocol to use.
+    ///
+    /// The default is [`Auto`](ServerMonitoringMode::Auto).
     #[builder(default)]
+    pub server_monitoring_mode: Option<ServerMonitoringMode>,
+
+    /// The handler that should process all Server Discovery and Monitoring events.
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
-    pub sdam_event_handler: Option<Arc<dyn SdamEventHandler>>,
+    pub sdam_event_handler: Option<EventHandler<crate::event::sdam::SdamEvent>>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
@@ -691,6 +687,8 @@ impl Serialize for ClientOptions {
 
             retrywrites: &'a Option<bool>,
 
+            servermonitoringmode: Option<String>,
+
             #[serde(
                 flatten,
                 serialize_with = "SelectionCriteria::serialize_for_client_options"
@@ -731,6 +729,10 @@ impl Serialize for ClientOptions {
             replicaset: &self.repl_set_name,
             retryreads: &self.retry_reads,
             retrywrites: &self.retry_writes,
+            servermonitoringmode: self
+                .server_monitoring_mode
+                .as_ref()
+                .map(|m| format!("{:?}", m).to_lowercase()),
             selectioncriteria: &self.selection_criteria,
             serverselectiontimeoutms: &self.server_selection_timeout,
             sockettimeoutms: &self.socket_timeout,
@@ -851,6 +853,11 @@ pub struct ConnectionString {
     ///
     /// The default value is true.
     pub retry_writes: Option<bool>,
+
+    /// Configures which server monitoring protocol to use.
+    ///
+    /// The default is [`Auto`](ServerMonitoringMode::Auto).
+    pub server_monitoring_mode: Option<ServerMonitoringMode>,
 
     /// Specifies whether the Client should directly connect to a single host rather than
     /// autodiscover all servers in the cluster.
@@ -1132,25 +1139,15 @@ impl ClientOptions {
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: maps to the `level` field of the `Compressor::Zlib` variant
     ///     (which requires the `zlib-compression` feature flag) of the [`Compressor`] enum
-    ///
-    /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
-    /// version](#method.parse-1).
-    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub async fn parse(s: impl AsRef<str>) -> Result<Self> {
         Self::parse_uri(s, None).await
     }
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse)
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-    pub fn parse(s: impl AsRef<str>) -> Result<Self> {
-        runtime::block_on(Self::parse_uri(s.as_ref(), None))
-    }
-
-    /// This method is the same as `parse`, but is provided to make the async version available when
-    /// the `sync` feature is enabled.
-    pub async fn parse_async(s: impl AsRef<str>) -> Result<Self> {
-        Self::parse_uri(s, None).await
+    #[cfg(feature = "sync")]
+    pub fn parse_sync(s: impl AsRef<str>) -> Result<Self> {
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -1164,10 +1161,6 @@ impl ClientOptions {
     ///
     /// See the docstring on `ClientOptions::parse` for information on how the various URI options
     /// map to fields on `ClientOptions`.
-    ///
-    /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
-    /// version](#method.parse_with_resolver_config-1).
-    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub async fn parse_with_resolver_config(
         uri: impl AsRef<str>,
         resolver_config: ResolverConfig,
@@ -1177,9 +1170,12 @@ impl ClientOptions {
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse_with_resolver_config)
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
-    pub fn parse_with_resolver_config(uri: &str, resolver_config: ResolverConfig) -> Result<Self> {
-        runtime::block_on(Self::parse_uri(uri, Some(resolver_config)))
+    #[cfg(feature = "sync")]
+    pub fn parse_sync_with_resolver_config(
+        uri: &str,
+        resolver_config: ResolverConfig,
+    ) -> Result<Self> {
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
     }
 
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
@@ -1290,21 +1286,21 @@ impl ClientOptions {
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    #[cfg(feature = "sync")]
     pub fn parse_connection_string_sync(conn_str: ConnectionString) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string_internal(conn_str, None))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(conn_str, None))
     }
 
     /// Creates a `ClientOptions` from the given `ConnectionString`.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
-    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    #[cfg(feature = "sync")]
     pub fn parse_connection_string_with_resolver_config_sync(
         conn_str: ConnectionString,
         resolver_config: ResolverConfig,
     ) -> Result<Self> {
-        crate::runtime::block_on(Self::parse_connection_string_internal(
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(
             conn_str,
             Some(resolver_config),
         ))
@@ -1348,6 +1344,7 @@ impl ClientOptions {
             connect_timeout: conn_str.connect_timeout,
             retry_reads: conn_str.retry_reads,
             retry_writes: conn_str.retry_writes,
+            server_monitoring_mode: conn_str.server_monitoring_mode,
             socket_timeout: conn_str.socket_timeout,
             direct_connection: conn_str.direct_connection,
             default_database: conn_str.default_database,
@@ -2048,10 +2045,26 @@ impl ConnectionString {
                         Some(index) => {
                             let (k, v) = exclusive_split_at(kvp, index);
                             let key = k.ok_or_else(err_func)?;
-                            if key == "ALLOWED_HOSTS" {
-                                return Err(Error::invalid_argument(
-                                    "ALLOWED_HOSTS must only be specified through client options",
-                                ));
+                            match key {
+                                "ALLOWED_HOSTS" => {
+                                    return Err(Error::invalid_argument(
+                                        "ALLOWED_HOSTS must only be specified through client \
+                                         options",
+                                    ));
+                                }
+                                "OIDC_CALLBACK" => {
+                                    return Err(Error::invalid_argument(
+                                        "OIDC_CALLBACK must only be specified through client \
+                                         options",
+                                    ));
+                                }
+                                "OIDC_HUMAN_CALLBACK" => {
+                                    return Err(Error::invalid_argument(
+                                        "OIDC_HUMAN_CALLBACK must only be specified through \
+                                         client options",
+                                    ));
+                                }
+                                _ => {}
                             }
                             let value = v.ok_or_else(err_func)?;
                             doc.insert(key, value);
@@ -2189,6 +2202,19 @@ impl ConnectionString {
             }
             k @ "retryreads" => {
                 self.retry_reads = Some(get_bool!(value, k));
+            }
+            "servermonitoringmode" => {
+                self.server_monitoring_mode = Some(match value.to_lowercase().as_str() {
+                    "stream" => ServerMonitoringMode::Stream,
+                    "poll" => ServerMonitoringMode::Poll,
+                    "auto" => ServerMonitoringMode::Auto,
+                    other => {
+                        return Err(Error::invalid_argument(format!(
+                            "{:?} is not a valid server monitoring mode",
+                            other
+                        )));
+                    }
+                });
             }
             k @ "serverselectiontimeoutms" => {
                 self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
@@ -2417,7 +2443,7 @@ impl<'de> serde::de::Visitor<'de> for ConnectionStringVisitor {
     }
 }
 
-#[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
+#[cfg(test)]
 mod tests {
     use std::time::Duration;
 
@@ -2491,40 +2517,34 @@ mod tests {
         }
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_without_scheme() {
         assert!(ClientOptions::parse("localhost:27017").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_invalid_scheme() {
         assert!(ClientOptions::parse("mangodb://localhost:27017")
             .await
             .is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_nothing_after_scheme() {
         assert!(ClientOptions::parse("mongodb://").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_only_slash_after_scheme() {
         assert!(ClientOptions::parse("mongodb:///").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn fails_with_no_host() {
         assert!(ClientOptions::parse("mongodb://:27017").await.is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn no_port() {
         let uri = "mongodb://localhost";
 
@@ -2538,8 +2558,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn no_port_trailing_slash() {
         let uri = "mongodb://localhost/";
 
@@ -2553,8 +2572,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_port() {
         let uri = "mongodb://localhost/";
 
@@ -2571,8 +2589,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_port_and_trailing_slash() {
         let uri = "mongodb://localhost:27017/";
 
@@ -2589,8 +2606,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_read_concern() {
         let uri = "mongodb://localhost:27017/?readConcernLevel=foo";
 
@@ -2608,16 +2624,14 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_w_negative_int() {
         assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1")
             .await
             .is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_w_non_negative_int() {
         let uri = "mongodb://localhost:27017/?w=1";
         let write_concern = WriteConcern::builder().w(Acknowledgment::from(1)).build();
@@ -2636,8 +2650,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_w_string() {
         let uri = "mongodb://localhost:27017/?w=foo";
         let write_concern = WriteConcern::builder()
@@ -2658,8 +2671,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_invalid_j() {
         assert!(
             ClientOptions::parse("mongodb://localhost:27017/?journal=foo")
@@ -2668,8 +2680,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_j() {
         let uri = "mongodb://localhost:27017/?journal=true";
         let write_concern = WriteConcern::builder().journal(true).build();
@@ -2688,8 +2699,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_wtimeout_non_int() {
         assert!(
             ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo")
@@ -2698,8 +2708,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_wtimeout_negative_int() {
         assert!(
             ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1")
@@ -2708,8 +2717,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_wtimeout() {
         let uri = "mongodb://localhost:27017/?wtimeoutMS=27";
         let write_concern = WriteConcern::builder()
@@ -2730,8 +2738,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_all_write_concern_options() {
         let uri = "mongodb://localhost:27017/?w=majority&journal=false&wtimeoutMS=27";
         let write_concern = WriteConcern::builder()
@@ -2754,8 +2761,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    #[tokio::test]
     async fn with_mixed_options() {
         let uri = "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\
                    journal=false&wtimeoutMS=27&replicaSet=foo&heartbeatFrequencyMS=1000&\
@@ -2811,9 +2817,8 @@ mod tests {
     }
 }
 
-/// Contains the options that can be used to create a new
-/// [`ClientSession`](../struct.ClientSession.html).
-#[derive(Clone, Debug, Deserialize, TypedBuilder)]
+/// Contains the options that can be used to create a new [`ClientSession`](crate::ClientSession).
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2883,4 +2888,18 @@ pub struct TransactionOptions {
         default
     )]
     pub max_commit_time: Option<Duration>,
+}
+
+/// Which server monitoring protocol to use.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum ServerMonitoringMode {
+    /// The client will use the streaming protocol when the server supports it and fall back to the
+    /// polling protocol otherwise.
+    Stream,
+    /// The client will use the polling protocol.
+    Poll,
+    /// The client will use the polling protocol when running on a FaaS platform and behave the
+    /// same as `Stream` otherwise.
+    Auto,
 }

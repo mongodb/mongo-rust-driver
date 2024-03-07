@@ -67,6 +67,10 @@ for arg; do
     if [ "Windows_NT" == "$OS" ]; then
       chmod +x ${MONGOCRYPT_LIB_DIR}/../bin/*.dll
     fi
+  elif [ $arg == "cargo-lambda" ]; then
+    source ${CARGO_HOME}/env
+    cargo install cargo-binstall
+    cargo binstall cargo-lambda -y
   else
     echo Missing/unknown install option: "$arg"
     exit 1

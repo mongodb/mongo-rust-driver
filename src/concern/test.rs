@@ -5,10 +5,6 @@ use crate::{
     error::ErrorKind,
     options::{
         Acknowledgment,
-        AggregateOptions,
-        CreateCollectionOptions,
-        DeleteOptions,
-        DropCollectionOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
@@ -18,7 +14,6 @@ use crate::{
         ReadConcern,
         ReplaceOptions,
         TransactionOptions,
-        UpdateOptions,
         WriteConcern,
     },
     test::{EventClient, TestClient},
@@ -105,8 +100,7 @@ fn write_concern_deserialize() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn inconsistent_write_concern_rejected() {
     let client = TestClient::new().await;
@@ -126,8 +120,7 @@ async fn inconsistent_write_concern_rejected() {
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
     let client = TestClient::new().await;
@@ -146,8 +139,7 @@ async fn unacknowledged_write_concern_rejected() {
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
     let client = EventClient::new().await;
@@ -161,7 +153,7 @@ async fn snapshot_read_concern() {
         .collection::<Document>(function_name!());
 
     if client.supports_transactions() {
-        let mut session = client.start_session(None).await.unwrap();
+        let mut session = client.start_session().await.unwrap();
         let options = TransactionOptions::builder()
             .read_concern(ReadConcern::snapshot())
             .build();
@@ -202,14 +194,13 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(
         doc! { "foo": "bar" },
         InsertOneOptions::builder()
@@ -252,14 +243,13 @@ async fn command_contains_write_concern_insert_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(
         &[doc! { "foo": "bar" }],
         InsertManyOptions::builder()
@@ -302,43 +292,32 @@ async fn command_contains_write_concern_insert_many() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.update_one(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "baz" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.update_one(
-        doc! { "foo": "baz" },
-        doc! { "$set": { "foo": "quux" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.update_one(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.update_one(doc! { "foo": "baz" }, doc! { "$set": { "foo": "quux" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -355,45 +334,34 @@ async fn command_contains_write_concern_update_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.update_many(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "baz" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.update_many(
-        doc! { "foo": "baz" },
-        doc! { "$set": { "foo": "quux" } },
-        UpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.update_many(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.update_many(doc! { "foo": "baz" }, doc! { "$set": { "foo": "quux" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -410,14 +378,13 @@ async fn command_contains_write_concern_update_many() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_replace_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
     coll.replace_one(
         doc! { "foo": "bar" },
@@ -463,43 +430,34 @@ async fn command_contains_write_concern_replace_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_one() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_one(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.delete_one(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.delete_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "delete"),
@@ -516,46 +474,37 @@ async fn command_contains_write_concern_delete_one() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_many() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_many(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_many(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
-    coll.delete_many(
-        doc! { "foo": "bar" },
-        DeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.delete_many(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "delete"),
@@ -572,14 +521,13 @@ async fn command_contains_write_concern_delete_many() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -625,14 +573,13 @@ async fn command_contains_write_concern_find_one_and_delete() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -680,14 +627,13 @@ async fn command_contains_write_concern_find_one_and_replace() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -735,45 +681,36 @@ async fn command_contains_write_concern_find_one_and_update() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_aggregate() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.aggregate(
-        vec![
-            doc! { "$match": { "foo": "bar" } },
-            doc! { "$addFields": { "foo": "baz" } },
-            doc! { "$out": format!("{}-out", function_name!()) },
-        ],
-        AggregateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
+    coll.aggregate(vec![
+        doc! { "$match": { "foo": "bar" } },
+        doc! { "$addFields": { "foo": "baz" } },
+        doc! { "$out": format!("{}-out", function_name!()) },
+    ])
+    .write_concern(
+        WriteConcern::builder()
+            .w(Acknowledgment::Nodes(1))
+            .journal(true)
             .build(),
     )
     .await
     .unwrap();
-    coll.aggregate(
-        vec![
-            doc! { "$match": { "foo": "bar" } },
-            doc! { "$addFields": { "foo": "baz" } },
-            doc! { "$out": format!("{}-out", function_name!()) },
-        ],
-        AggregateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
+    coll.aggregate(vec![
+        doc! { "$match": { "foo": "bar" } },
+        doc! { "$addFields": { "foo": "baz" } },
+        doc! { "$out": format!("{}-out", function_name!()) },
+    ])
+    .write_concern(
+        WriteConcern::builder()
+            .w(Acknowledgment::Nodes(1))
+            .journal(false)
             .build(),
     )
     .await
@@ -794,41 +731,34 @@ async fn command_contains_write_concern_aggregate() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
-    coll.drop(None).await.unwrap();
+    coll.drop().await.unwrap();
     client.clear_cached_events();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.drop(
-        DropCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.drop()
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.drop(
-        DropCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.drop()
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "drop"),
@@ -845,42 +775,33 @@ async fn command_contains_write_concern_drop() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_create_collection() {
     let client = EventClient::new().await;
     let db = client.database("test");
     let coll: Collection<Document> = db.collection(function_name!());
 
-    coll.drop(None).await.unwrap();
-    db.create_collection(
-        function_name!(),
-        CreateCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.drop(None).await.unwrap();
-    db.create_collection(
-        function_name!(),
-        CreateCollectionOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.drop().await.unwrap();
+    db.create_collection(function_name!())
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.drop().await.unwrap();
+    db.create_collection(function_name!())
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "create"),

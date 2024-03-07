@@ -9,12 +9,12 @@ use crate::{event::cmap::*, options::ServerAddress, test::util::EventSubscriber}
 use tokio::sync::broadcast::error::SendError;
 
 #[derive(Clone, Debug)]
-pub struct EventHandler {
+pub struct TestEventHandler {
     pub(crate) events: Arc<RwLock<Vec<CmapEvent>>>,
     channel_sender: tokio::sync::broadcast::Sender<CmapEvent>,
 }
 
-impl EventHandler {
+impl TestEventHandler {
     pub fn new() -> Self {
         let (channel_sender, _) = tokio::sync::broadcast::channel(500);
         Self {
@@ -31,12 +31,13 @@ impl EventHandler {
         self.events.write().unwrap().push(event);
     }
 
-    pub(crate) fn subscribe(&self) -> EventSubscriber<'_, EventHandler, CmapEvent> {
+    pub(crate) fn subscribe(&self) -> EventSubscriber<'_, TestEventHandler, CmapEvent> {
         EventSubscriber::new(self, self.channel_sender.subscribe())
     }
 }
 
-impl CmapEventHandler for EventHandler {
+#[allow(deprecated)]
+impl CmapEventHandler for TestEventHandler {
     fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
         self.handle(event);
     }

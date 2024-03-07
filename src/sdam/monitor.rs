@@ -7,7 +7,6 @@ use std::{
 };
 
 use bson::doc;
-use lazy_static::lazy_static;
 use tokio::sync::watch;
 
 use super::{
@@ -17,6 +16,7 @@ use super::{
     TopologyWatcher,
 };
 use crate::{
+    client::options::ServerMonitoringMode,
     cmap::{establish::ConnectionEstablisher, Connection},
     error::{Error, Result},
     event::sdam::{
@@ -31,9 +31,8 @@ use crate::{
 };
 
 fn next_monitoring_connection_id() -> u32 {
-    lazy_static! {
-        static ref MONITORING_CONNECTION_ID: AtomicU32 = AtomicU32::new(0);
-    }
+    static MONITORING_CONNECTION_ID: AtomicU32 = AtomicU32::new(0);
+
     MONITORING_CONNECTION_ID.fetch_add(1, Ordering::SeqCst)
 }
 
@@ -50,10 +49,14 @@ pub(crate) struct Monitor {
     sdam_event_emitter: Option<SdamEventEmitter>,
     client_options: ClientOptions,
 
+    /// Whether this monitor is allowed to use the streaming protocol.
+    allow_streaming: bool,
+
     /// The most recent topology version returned by the server in a hello response.
-    /// If some, indicates that this monitor should use the streaming protocol. If none, it should
-    /// use the polling protocol.
     topology_version: Option<TopologyVersion>,
+
+    /// The RTT monitor; once it's started this is None.
+    pending_rtt_monitor: Option<RttMonitor>,
 
     /// Handle to the RTT monitor, used to get the latest known round trip time for a given server
     /// and to reset the RTT when the monitor disconnects from the server.
@@ -81,6 +84,15 @@ impl Monitor {
             connection_establisher.clone(),
             client_options.clone(),
         );
+        let allow_streaming = match client_options
+            .server_monitoring_mode
+            .clone()
+            .unwrap_or(ServerMonitoringMode::Auto)
+        {
+            ServerMonitoringMode::Stream => true,
+            ServerMonitoringMode::Poll => false,
+            ServerMonitoringMode::Auto => !crate::cmap::is_faas(),
+        };
         let monitor = Self {
             address,
             client_options,
@@ -88,14 +100,15 @@ impl Monitor {
             topology_updater,
             topology_watcher,
             sdam_event_emitter,
+            pending_rtt_monitor: Some(rtt_monitor),
             rtt_monitor_handle,
             request_receiver: manager_receiver,
             connection: None,
+            allow_streaming,
             topology_version: None,
         };
 
-        runtime::execute(monitor.execute());
-        runtime::execute(rtt_monitor.execute());
+        runtime::spawn(monitor.execute());
     }
 
     async fn execute(mut self) {
@@ -104,13 +117,19 @@ impl Monitor {
         while self.is_alive() {
             let check_succeeded = self.check_server().await;
 
+            if self.topology_version.is_some() && self.allow_streaming {
+                if let Some(rtt_monitor) = self.pending_rtt_monitor.take() {
+                    runtime::spawn(rtt_monitor.execute());
+                }
+            }
+
             // In the streaming protocol, we read from the socket continuously
             // rather than polling at specific intervals, unless the most recent check
             // failed.
             //
             // We only go to sleep when using the polling protocol (i.e. server never returned a
             // topologyVersion) or when the most recent check failed.
-            if self.topology_version.is_none() || !check_succeeded {
+            if self.topology_version.is_none() || !check_succeeded || !self.allow_streaming {
                 self.request_receiver
                     .wait_for_check_request(
                         self.client_options.min_heartbeat_frequency(),
@@ -182,7 +201,7 @@ impl Monitor {
         self.emit_event(|| {
             SdamEvent::ServerHeartbeatStarted(ServerHeartbeatStartedEvent {
                 server_address: self.address.clone(),
-                awaited: self.topology_version.is_some(),
+                awaited: self.topology_version.is_some() && self.allow_streaming,
                 driver_connection_id,
                 server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
             })
@@ -215,10 +234,14 @@ impl Monitor {
                     } else {
                         // If the initial handshake returned a topology version, send it back to the
                         // server to begin streaming responses.
-                        let opts = self.topology_version.map(|tv| AwaitableHelloOptions {
-                            topology_version: tv,
-                            max_await_time: heartbeat_frequency,
-                        });
+                        let opts = if self.allow_streaming {
+                            self.topology_version.map(|tv| AwaitableHelloOptions {
+                                topology_version: tv,
+                                max_await_time: heartbeat_frequency,
+                            })
+                        } else {
+                            None
+                        };
 
                         let command = hello_command(
                             self.client_options.server_api.as_ref(),
@@ -262,14 +285,18 @@ impl Monitor {
                 };
                 HelloResult::Cancelled { reason: reason_error }
             }
-            _ = runtime::delay_for(timeout) => {
+            _ = tokio::time::sleep(timeout) => {
                 HelloResult::Err(Error::network_timeout())
             }
         };
         let duration = start.elapsed();
 
+        let awaited = self.topology_version.is_some() && self.allow_streaming;
         match result {
             HelloResult::Ok(ref r) => {
+                if !awaited {
+                    self.rtt_monitor_handle.add_sample(duration);
+                }
                 self.emit_event(|| {
                     let mut reply = r
                         .raw_command_response
@@ -282,7 +309,7 @@ impl Monitor {
                         duration,
                         reply,
                         server_address: self.address.clone(),
-                        awaited: self.topology_version.is_some(),
+                        awaited,
                         driver_connection_id,
                         server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
@@ -298,7 +325,7 @@ impl Monitor {
                         duration,
                         failure: e.clone(),
                         server_address: self.address.clone(),
-                        awaited: self.topology_version.is_some(),
+                        awaited,
                         driver_connection_id,
                         server_connection_id: self.connection.as_ref().and_then(|c| c.server_id),
                     })
@@ -441,7 +468,7 @@ impl RttMonitor {
             let start = Instant::now();
             let check_succeded = tokio::select! {
                 r = perform_check => r.is_ok(),
-                _ = runtime::delay_for(timeout) => {
+                _ = tokio::time::sleep(timeout) => {
                     false
                 }
             };
@@ -458,7 +485,7 @@ impl RttMonitor {
                 // responsible for resetting the average RTT."
             }
 
-            runtime::delay_for(
+            tokio::time::sleep(
                 self.client_options
                     .heartbeat_freq
                     .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
@@ -619,26 +646,18 @@ impl MonitorRequestReceiver {
     async fn wait_for_check_request(&mut self, delay: Duration, timeout: Duration) {
         let _ = runtime::timeout(timeout, async {
             let wait_for_check_request = async {
-                runtime::delay_for(delay).await;
+                tokio::time::sleep(delay).await;
                 self.topology_check_request_receiver
                     .wait_for_check_request()
                     .await;
             };
             tokio::pin!(wait_for_check_request);
 
-            loop {
-                tokio::select! {
-                    _ = self.individual_check_request_receiver.changed() => {
-                        break;
-                    }
-                    _ = &mut wait_for_check_request => {
-                        break;
-                    }
-                    _ = self.handle_listener.wait_for_all_handle_drops() => {
-                        // Don't continue waiting after server has been removed from the topology.
-                        break;
-                    }
-                }
+            tokio::select! {
+                _ = self.individual_check_request_receiver.changed() => (),
+                _ = &mut wait_for_check_request => (),
+                // Don't continue waiting after server has been removed from the topology.
+                _ = self.handle_listener.wait_for_all_handle_drops() => (),
             }
         })
         .await;

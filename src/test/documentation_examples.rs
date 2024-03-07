@@ -15,7 +15,7 @@ use crate::{
 
 macro_rules! assert_coll_count {
     ($coll:expr, $expected:expr) => {
-        assert_eq!($coll.count_documents(None, None).await.unwrap(), $expected);
+        assert_eq!($coll.count_documents(doc! {}).await.unwrap(), $expected);
     };
 }
 
@@ -35,7 +35,7 @@ macro_rules! run_on_each_doc {
 }
 
 async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 1
     collection
@@ -106,7 +106,7 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn query_top_level_fields_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 6
     let docs = vec![
@@ -251,7 +251,7 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
 }
 
 async fn query_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 14
     let docs = vec![
@@ -384,7 +384,7 @@ async fn query_embedded_documents_examples(collection: &Collection<Document>) ->
 }
 
 async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 20
     let docs = vec![
@@ -543,7 +543,7 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 }
 
 async fn query_array_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 29
     let docs = vec![
@@ -716,7 +716,7 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 }
 
 async fn query_null_or_missing_fields_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 38
     let docs = vec![
@@ -777,7 +777,7 @@ async fn query_null_or_missing_fields_examples(collection: &Collection<Document>
 }
 
 async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 42
     let docs = vec![
@@ -1059,7 +1059,7 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn update_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 51
     let docs = vec![
@@ -1181,7 +1181,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                 },
                 "$currentDate": { "lastModified": true },
             },
-            None,
         )
         .await?;
     // End Example 52
@@ -1216,7 +1215,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                 },
                 "$currentDate": { "lastModified": true },
             },
-            None,
         )
         .await?;
     // End Example 53
@@ -1286,7 +1284,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await?;
+    collection.drop().await?;
 
     // Start Example 55
     let docs = vec![
@@ -1348,19 +1346,19 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
     assert_coll_count!(collection, 5);
 
     // Start Example 57
-    collection.delete_many(doc! { "status": "A" }, None).await?;
+    collection.delete_many(doc! { "status": "A" }).await?;
     // End Example 57
 
     assert_coll_count!(collection, 3);
 
     // Start Example 58
-    collection.delete_one(doc! { "status": "D" }, None).await?;
+    collection.delete_one(doc! { "status": "D" }).await?;
     // End Example 58
 
     assert_coll_count!(collection, 2);
 
     // Start Example 56
-    collection.delete_many(doc! {}, None).await?;
+    collection.delete_many(doc! {}).await?;
     // End Example 56
 
     assert_coll_count!(collection, 0);
@@ -1371,7 +1369,6 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
 type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
-#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn stable_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
@@ -1436,7 +1433,7 @@ async fn stable_api_examples() -> GenericResult<()> {
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
     let db = client.database("stable-api-migration-examples");
-    db.collection::<Document>("sales").drop(None).await?;
+    db.collection::<Document>("sales").drop().await?;
 
     use std::{error::Error, result::Result};
 
@@ -1461,12 +1458,9 @@ async fn stable_api_examples() -> GenericResult<()> {
 
     // Start Versioned API Example 6
     let result = db
-        .run_command(
-            doc! {
-                "count": "sales"
-            },
-            None,
-        )
+        .run_command(doc! {
+            "count": "sales"
+        })
         .await;
     if let Err(err) = &result {
         println!("{:#?}", err.kind);
@@ -1492,7 +1486,7 @@ async fn stable_api_examples() -> GenericResult<()> {
     // Start Versioned API Example 7
     let count = db
         .collection::<Document>("sales")
-        .count_documents(None, None)
+        .count_documents(doc! {})
         .await?;
     // End Versioned API Example 7
 
@@ -1507,7 +1501,7 @@ async fn stable_api_examples() -> GenericResult<()> {
 async fn aggregation_examples() -> GenericResult<()> {
     let client = TestClient::new().await;
     let db = client.database("aggregation_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     aggregation_data::populate(&db).await?;
 
     // Each example is within its own scope to allow the example to include
@@ -1518,13 +1512,10 @@ async fn aggregation_examples() -> GenericResult<()> {
         use futures::TryStreamExt;
         let cursor = db
             .collection::<Document>("sales")
-            .aggregate(
-                vec![
-                    doc! { "$match": { "items.fruit": "banana" } },
-                    doc! { "$sort": { "date": 1 } },
-                ],
-                None,
-            )
+            .aggregate(vec![
+                doc! { "$match": { "items.fruit": "banana" } },
+                doc! { "$sort": { "date": 1 } },
+            ])
             .await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 1
@@ -1536,33 +1527,30 @@ async fn aggregation_examples() -> GenericResult<()> {
         use futures::TryStreamExt;
         let cursor = db
             .collection::<Document>("sales")
-            .aggregate(
-                vec![
-                    doc! {
-                        "$unwind": "$items"
-                    },
-                    doc! { "$match": {
-                        "items.fruit": "banana",
-                    }},
-                    doc! {
-                        "$group": {
-                            "_id": { "day": { "$dayOfWeek": "$date" } },
-                            "count": { "$sum": "$items.quantity" }
-                        }
-                    },
-                    doc! {
-                        "$project": {
-                            "dayOfWeek": "$_id.day",
-                            "numberSold": "$count",
-                            "_id": 0
-                        }
-                    },
-                    doc! {
-                        "$sort": { "numberSold": 1 }
-                    },
-                ],
-                None,
-            )
+            .aggregate(vec![
+                doc! {
+                    "$unwind": "$items"
+                },
+                doc! { "$match": {
+                    "items.fruit": "banana",
+                }},
+                doc! {
+                    "$group": {
+                        "_id": { "day": { "$dayOfWeek": "$date" } },
+                        "count": { "$sum": "$items.quantity" }
+                    }
+                },
+                doc! {
+                    "$project": {
+                        "dayOfWeek": "$_id.day",
+                        "numberSold": "$count",
+                        "_id": 0
+                    }
+                },
+                doc! {
+                    "$sort": { "numberSold": 1 }
+                },
+            ])
             .await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 2
@@ -1594,8 +1582,7 @@ async fn aggregation_examples() -> GenericResult<()> {
                         }
                     }
                 },
-            ],
-            None,
+            ]
         ).await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 3
@@ -1607,36 +1594,33 @@ async fn aggregation_examples() -> GenericResult<()> {
         use futures::TryStreamExt;
         let cursor = db
             .collection::<Document>("air_alliances")
-            .aggregate(
-                vec![
-                    doc! {
-                        "$lookup": {
-                            "from": "air_airlines",
-                            "let": { "constituents": "$airlines" },
-                            "pipeline": [
-                                {
-                                    "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
-                                }
-                            ],
-                            "as": "airlines"
-                        }
-                    },
-                    doc! {
-                        "$project": {
-                            "_id": 0,
-                            "name": 1,
-                            "airlines": {
-                                "$filter": {
-                                    "input": "$airlines",
-                                    "as": "airline",
-                                    "cond": { "$eq": ["$$airline.country", "Canada"] }
-                                }
+            .aggregate(vec![
+                doc! {
+                    "$lookup": {
+                        "from": "air_airlines",
+                        "let": { "constituents": "$airlines" },
+                        "pipeline": [
+                            {
+                                "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
+                            }
+                        ],
+                        "as": "airlines"
+                    }
+                },
+                doc! {
+                    "$project": {
+                        "_id": 0,
+                        "name": 1,
+                        "airlines": {
+                            "$filter": {
+                                "input": "$airlines",
+                                "as": "airline",
+                                "cond": { "$eq": ["$$airline.country", "Canada"] }
                             }
                         }
-                    },
-                ],
-                None,
-            )
+                    }
+                },
+            ])
             .await?;
         let values: Vec<_> = cursor.try_collect().await?;
         // End Aggregation Example 4
@@ -1649,7 +1633,7 @@ async fn aggregation_examples() -> GenericResult<()> {
 async fn run_command_examples() -> Result<()> {
     let client = TestClient::new().await;
     let db = client.database("run_command_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     db.collection::<Document>("restaurants")
         .insert_one(
             doc! {
@@ -1665,14 +1649,12 @@ async fn run_command_examples() -> Result<()> {
 
     #[allow(unused)]
     // Start runCommand Example 1
-    let info = db.run_command(doc! {"buildInfo": 1}, None).await?;
+    let info = db.run_command(doc! {"buildInfo": 1}).await?;
     // End runCommand Example 1
 
     #[allow(unused)]
     // Start runCommand Example 2
-    let stats = db
-        .run_command(doc! {"collStats": "restaurants"}, None)
-        .await?;
+    let stats = db.run_command(doc! {"collStats": "restaurants"}).await?;
     // End runCommand Example 2
 
     Ok(())
@@ -1681,7 +1663,7 @@ async fn run_command_examples() -> Result<()> {
 async fn index_examples() -> Result<()> {
     let client = TestClient::new().await;
     let db = client.database("index_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     db.collection::<Document>("records")
         .insert_many(
             vec![
@@ -1728,10 +1710,7 @@ async fn index_examples() -> Result<()> {
     use crate::IndexModel;
     // Start Index Example 1
     db.collection::<Document>("records")
-        .create_index(
-            IndexModel::builder().keys(doc! { "score": 1 }).build(),
-            None,
-        )
+        .create_index(IndexModel::builder().keys(doc! { "score": 1 }).build())
         .await?;
     // End Index Example 1
 
@@ -1747,7 +1726,6 @@ async fn index_examples() -> Result<()> {
                         .build(),
                 )
                 .build(),
-            None,
         )
         .await?;
     // End Index Example 2
@@ -1755,8 +1733,9 @@ async fn index_examples() -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_variables)]
 async fn change_streams_examples() -> Result<()> {
-    use crate::{change_stream::options::FullDocumentType, options::ChangeStreamOptions, runtime};
+    use crate::{options::FullDocumentType, runtime};
     use std::time::Duration;
 
     let client = TestClient::new().await;
@@ -1765,7 +1744,7 @@ async fn change_streams_examples() -> Result<()> {
         return Ok(());
     }
     let db = client.database("change_streams_examples");
-    db.drop(None).await?;
+    db.drop().await?;
     let inventory = db.collection::<Document>("inventory");
     // Populate an item so the collection exists for the change stream to watch.
     inventory.insert_one(doc! {}, None).await?;
@@ -1774,7 +1753,7 @@ async fn change_streams_examples() -> Result<()> {
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let writer_inventory = inventory.clone();
     let handle = runtime::spawn(async move {
-        let mut interval = runtime::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
                 _ = interval.tick() => {
@@ -1791,7 +1770,8 @@ async fn change_streams_examples() -> Result<()> {
         {
             // Start Changestream Example 1
             use futures::stream::TryStreamExt;
-            let mut stream = inventory.watch(None, None).await?;
+
+            let mut stream = inventory.watch().await?;
             let next = stream.try_next().await?;
             // End Changestream Example 1
         }
@@ -1799,23 +1779,20 @@ async fn change_streams_examples() -> Result<()> {
         {
             // Start Changestream Example 2
             use futures::stream::TryStreamExt;
-            let options = ChangeStreamOptions::builder()
-                .full_document(Some(FullDocumentType::UpdateLookup))
-                .build();
-            let mut stream = inventory.watch(None, options).await?;
+            let mut stream = inventory
+                .watch()
+                .full_document(FullDocumentType::UpdateLookup)
+                .await?;
             let next = stream.try_next().await?;
             // End Changestream Example 2
         }
 
         {
-            let stream = inventory.watch(None, None).await?;
+            let stream = inventory.watch().await?;
             // Start Changestream Example 3
             use futures::stream::TryStreamExt;
             let resume_token = stream.resume_token();
-            let options = ChangeStreamOptions::builder()
-                .resume_after(resume_token)
-                .build();
-            let mut stream = inventory.watch(None, options).await?;
+            let mut stream = inventory.watch().resume_after(resume_token).await?;
             stream.try_next().await?;
             // End Changestream Example 3
         }
@@ -1887,7 +1864,7 @@ async fn convenient_transaction_examples() -> Result<()> {
     }
 
     // Step 2: Start a client session.
-    let mut session = client.start_session(None).await?;
+    let mut session = client.start_session().await?;
 
     // Step 3: Use with_transaction to start a transaction, execute the callback, and commit (or
     // abort on error).
@@ -1900,8 +1877,7 @@ async fn convenient_transaction_examples() -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn test() {
     let client = TestClient::new().await;
     let coll = client

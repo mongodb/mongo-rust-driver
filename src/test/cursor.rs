@@ -10,8 +10,7 @@ use crate::{
     test::{log_uncaptured, util::EventClient, TestClient, SERVERLESS},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn tailable_cursor() {
     if *SERVERLESS {
@@ -58,7 +57,7 @@ async fn tailable_cursor() {
         );
     }
 
-    let delay = runtime::delay_for(await_time);
+    let delay = tokio::time::sleep(await_time);
     let next_doc = cursor.next();
 
     let next_doc = match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
@@ -70,11 +69,11 @@ async fn tailable_cursor() {
         ),
     };
 
-    runtime::execute(async move {
+    runtime::spawn(async move {
         coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
     });
 
-    let delay = runtime::delay_for(await_time);
+    let delay = tokio::time::sleep(await_time);
 
     match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
         Either::Left((..)) => panic!("should have gotten next document, but instead timed"),
@@ -84,12 +83,11 @@ async fn tailable_cursor() {
     };
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 #[function_name::named]
 async fn session_cursor_next() {
     let client = TestClient::new().await;
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
 
     let coll = client
         .create_fresh_collection(function_name!(), function_name!(), None)
@@ -113,8 +111,7 @@ async fn session_cursor_next() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn batch_exhaustion() {
     let client = EventClient::new().await;
 
@@ -159,8 +156,7 @@ async fn batch_exhaustion() {
     assert_eq!(0, id);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn borrowed_deserialization() {
     let client = EventClient::new().await;
 
@@ -215,7 +211,7 @@ async fn borrowed_deserialization() {
         i += 1;
     }
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
         .find_with_session(None, options.clone(), &mut session)
         .await
@@ -229,14 +225,13 @@ async fn borrowed_deserialization() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn session_cursor_with_type() {
     let client = TestClient::new().await;
 
-    let mut session = client.start_session(None).await.unwrap();
+    let mut session = client.start_session().await.unwrap();
     let coll = client.database("db").collection("coll");
-    coll.drop_with_session(None, &mut session).await.unwrap();
+    coll.drop().session(&mut session).await.unwrap();
 
     coll.insert_many_with_session(
         vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }],
@@ -258,8 +253,7 @@ async fn session_cursor_with_type() {
     let _ = cursor_with_type.next(&mut session).await.unwrap().unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn cursor_final_batch() {
     let client = TestClient::new().await;
     let coll = client

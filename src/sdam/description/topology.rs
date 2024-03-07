@@ -25,7 +25,9 @@ use crate::{
 use self::server_selection::IDLE_WRITE_PERIOD;
 
 /// The possible types for a topology.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, derive_more::Display)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, Default, derive_more::Display,
+)]
 #[non_exhaustive]
 pub enum TopologyType {
     /// A single mongod server.
@@ -44,6 +46,7 @@ pub enum TopologyType {
     LoadBalanced,
 
     /// A topology whose type is not known.
+    #[default]
     Unknown,
 }
 
@@ -58,12 +61,6 @@ impl TopologyType {
             Self::LoadBalanced => "LoadBalanced",
             Self::Unknown => "Unknown",
         }
-    }
-}
-
-impl Default for TopologyType {
-    fn default() -> Self {
-        TopologyType::Unknown
     }
 }
 
@@ -204,7 +201,7 @@ impl TopologyDescription {
         self.servers.get(address)
     }
 
-    pub(crate) fn update_command_with_read_pref<T>(
+    pub(crate) fn update_command_with_read_pref<T: Serialize>(
         &self,
         address: &ServerAddress,
         command: &mut Command<T>,
@@ -223,9 +220,8 @@ impl TopologyDescription {
             }
             (TopologyType::Single, ServerType::Standalone) => {}
             (TopologyType::Single, _) => {
-                let specified_read_pref = criteria
-                    .and_then(SelectionCriteria::as_read_pref)
-                    .map(Clone::clone);
+                let specified_read_pref =
+                    criteria.and_then(SelectionCriteria::as_read_pref).cloned();
 
                 let resolved_read_pref = match specified_read_pref {
                     Some(ReadPreference::Primary) | None => ReadPreference::PrimaryPreferred {
@@ -252,7 +248,7 @@ impl TopologyDescription {
         }
     }
 
-    fn update_command_read_pref_for_mongos<T>(
+    fn update_command_read_pref_for_mongos<T: Serialize>(
         &self,
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,

@@ -3,8 +3,12 @@ use std::fmt::Debug;
 use crate::{
     bson::{doc, spec::ElementType, Bson, Document},
     bson_util::get_int,
-    event::{cmap::CmapEvent, command::CommandEvent, sdam::ServerDescription},
-    test::{Event, SdamEvent},
+    event::{
+        cmap::CmapEvent,
+        command::CommandEvent,
+        sdam::{SdamEvent, ServerDescription},
+    },
+    test::Event,
 };
 
 use super::{
@@ -78,7 +82,7 @@ pub(crate) fn tracing_events_match(
         }
     }
 
-    use lazy_static::lazy_static;
+    use once_cell::sync::Lazy;
     use regex::Regex;
 
     if let Some(failure_should_be_redacted) = expected.failure_is_redacted {
@@ -86,17 +90,21 @@ pub(crate) fn tracing_events_match(
             Some(failure) => {
                 match failure {
                     TracingEventValue::String(failure_str) => {
-                        // lazy_static saves us having to recompile this regex every time this
+                        // `Lazy` saves us having to recompile this regex every time this
                         // function is called.
-                        lazy_static! {
-                            static ref COMMAND_FAILED_REGEX: Regex = Regex::new(
-                                r"^Kind: Command failed: Error code (?P<code>\d+) \((?P<codename>.+)\): (?P<message>.+)+, labels: (?P<labels>.+)$"
-                            ).unwrap();
 
-                            static ref IO_ERROR_REGEX: Regex = Regex::new(
-                                r"^Kind: I/O error: (?P<message>.+), labels: (?P<labels>.+)$"
-                            ).unwrap();
-                        }
+                        static COMMAND_FAILED_REGEX: Lazy<Regex> = Lazy::new(|| {
+                            Regex::new(
+                                r"^Kind: Command failed: Error code (?P<code>\d+) \((?P<codename>.+)\): (?P<message>.+)+, labels: (?P<labels>.+)$"
+                            ).unwrap()
+                        });
+
+                        static IO_ERROR_REGEX: Lazy<Regex> = Lazy::new(|| {
+                            Regex::new(
+                                r"^Kind: I/O error: (?P<message>.+), labels: (?P<labels>.+)$",
+                            )
+                            .unwrap()
+                        });
 
                         // We redact all server-returned errors, however at this time the only types
                         // of errors that show up in tracing redaction tests
@@ -348,10 +356,24 @@ fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result
             ExpectedSdamEvent::TopologyDescriptionChanged {},
         ) => Ok(()),
         (
-            SdamEvent::ServerHeartbeatSucceeded(_),
-            ExpectedSdamEvent::ServerHeartbeatSucceeded {},
-        ) => Ok(()),
-        (SdamEvent::ServerHeartbeatFailed(_), ExpectedSdamEvent::ServerHeartbeatFailed {}) => {
+            SdamEvent::ServerHeartbeatStarted(actual),
+            ExpectedSdamEvent::ServerHeartbeatStarted { awaited },
+        ) => {
+            match_opt(&actual.awaited, awaited)?;
+            Ok(())
+        }
+        (
+            SdamEvent::ServerHeartbeatSucceeded(actual),
+            ExpectedSdamEvent::ServerHeartbeatSucceeded { awaited },
+        ) => {
+            match_opt(&actual.awaited, awaited)?;
+            Ok(())
+        }
+        (
+            SdamEvent::ServerHeartbeatFailed(actual),
+            ExpectedSdamEvent::ServerHeartbeatFailed { awaited },
+        ) => {
+            match_opt(&actual.awaited, awaited)?;
             Ok(())
         }
         _ => expected_err(actual, expected),

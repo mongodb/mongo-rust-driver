@@ -1,11 +1,9 @@
+mod action;
 pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
-use futures_util::{
-    future,
-    stream::{StreamExt, TryStreamExt},
-};
+use futures_util::stream::StreamExt;
 use serde::{
     de::{DeserializeOwned, Error as DeError},
     Deserialize,
@@ -15,42 +13,13 @@ use serde::{
 
 use self::options::*;
 use crate::{
-    bson::{doc, Bson, Document},
-    bson_util,
-    change_stream::{
-        event::ChangeStreamEvent,
-        options::ChangeStreamOptions,
-        session::SessionChangeStream,
-        ChangeStream,
-    },
+    bson::{doc, Document},
     client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    index::IndexModel,
-    operation::{
-        Aggregate,
-        Count,
-        CountDocuments,
-        CreateIndexes,
-        Delete,
-        Distinct,
-        DropCollection,
-        DropIndexes,
-        Find,
-        FindAndModify,
-        Insert,
-        ListIndexes,
-        Update,
-    },
-    results::{
-        CreateIndexResult,
-        CreateIndexesResult,
-        DeleteResult,
-        InsertManyResult,
-        InsertOneResult,
-        UpdateResult,
-    },
+    operation::{Find, FindAndModify, Insert, Update},
+    results::{InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -83,12 +52,7 @@ use crate::{
 /// #     bson::doc,
 /// #     error::Result,
 /// # };
-/// # #[cfg(feature = "async-std-runtime")]
-/// # use async_std::task;
-/// # #[cfg(feature = "tokio-runtime")]
-/// # use tokio::task;
 /// #
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// # use mongodb::Client;
 /// #
@@ -108,7 +72,7 @@ use crate::{
 ///     let coll_ref = coll.clone();
 ///
 ///     // Spawn several tasks that operate on the same collection concurrently.
-///     task::spawn(async move {
+///     tokio::task::spawn(async move {
 ///         // Perform operations with `coll_ref` that work with directly our model.
 ///         coll_ref.insert_one(Item { id: i }, None).await;
 ///     });
@@ -117,11 +81,10 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
-
 #[derive(Debug)]
 pub struct Collection<T> {
     inner: Arc<CollectionInner>,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: std::marker::PhantomData<fn() -> T>,
 }
 
 // Because derive is too conservative, derive only implements Clone if T is Clone.
@@ -231,651 +194,6 @@ impl<T> Collection<T> {
         self.inner.write_concern.as_ref()
     }
 
-    #[allow(clippy::needless_option_as_deref)]
-    async fn drop_common(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let mut session = session.into();
-
-        let mut options: Option<DropCollectionOptions> = options.into();
-        resolve_options!(self, options, [write_concern]);
-
-        #[cfg(feature = "in-use-encryption-unstable")]
-        self.drop_aux_collections(options.as_ref(), session.as_deref_mut())
-            .await?;
-
-        let drop = DropCollection::new(self.namespace(), options);
-        self.client()
-            .execute_operation(drop, session.as_deref_mut())
-            .await
-    }
-
-    /// Drops the collection, deleting all data and indexes stored in it.
-    pub async fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
-        self.drop_common(options, None).await
-    }
-
-    /// Drops the collection, deleting all data and indexes stored in it using the provided
-    /// `ClientSession`.
-    pub async fn drop_with_session(
-        &self,
-        options: impl Into<Option<DropCollectionOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_common(options, session).await
-    }
-
-    #[cfg(feature = "in-use-encryption-unstable")]
-    #[allow(clippy::needless_option_as_deref)]
-    async fn drop_aux_collections(
-        &self,
-        options: Option<&DropCollectionOptions>,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<()> {
-        // Find associated `encrypted_fields`:
-        // * from options to this call
-        let mut enc_fields = options.and_then(|o| o.encrypted_fields.as_ref());
-        let enc_opts = self.client().auto_encryption_opts().await;
-        // * from client-wide `encrypted_fields_map`:
-        let client_enc_fields = enc_opts
-            .as_ref()
-            .and_then(|eo| eo.encrypted_fields_map.as_ref());
-        if enc_fields.is_none() {
-            enc_fields =
-                client_enc_fields.and_then(|efm| efm.get(&format!("{}", self.namespace())));
-        }
-        // * from a `list_collections` call:
-        let found;
-        if enc_fields.is_none() && client_enc_fields.is_some() {
-            let filter = doc! { "name": self.name() };
-            let mut specs: Vec<_> = match session.as_deref_mut() {
-                Some(s) => {
-                    let mut cursor = self
-                        .inner
-                        .db
-                        .list_collections_with_session(filter, None, s)
-                        .await?;
-                    cursor.stream(s).try_collect().await?
-                }
-                None => {
-                    self.inner
-                        .db
-                        .list_collections(filter, None)
-                        .await?
-                        .try_collect()
-                        .await?
-                }
-            };
-            if let Some(spec) = specs.pop() {
-                if let Some(enc) = spec.options.encrypted_fields {
-                    found = enc;
-                    enc_fields = Some(&found);
-                }
-            }
-        }
-
-        // Drop the collections.
-        if let Some(enc_fields) = enc_fields {
-            for ns in crate::client::csfle::aux_collections(&self.namespace(), enc_fields)? {
-                let drop = DropCollection::new(ns, options.cloned());
-                self.client()
-                    .execute_operation(drop, session.as_deref_mut())
-                    .await?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor<Document>> {
-        let mut options = options.into();
-        resolve_options!(
-            self,
-            options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
-        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
-        let client = self.client();
-        client.execute_cursor_operation(aggregate).await
-    }
-
-    /// Runs an aggregation operation using the provided `ClientSession`.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
-    /// information on aggregations.
-    pub async fn aggregate_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<AggregateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_write_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-
-        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(aggregate, session)
-            .await
-    }
-
-    /// Estimates the number of documents in the collection using collection metadata.
-    ///
-    /// Due to an oversight in versions 5.0.0 - 5.0.7 of MongoDB, the `count` server command,
-    /// which `estimatedDocumentCount` uses in its implementation, was not included in v1 of the
-    /// Stable API. Users of the Stable API with `estimatedDocumentCount` are recommended to
-    /// upgrade their cluster to 5.0.8+ or set
-    /// [`ServerApi::strict`](crate::options::ServerApi::strict) to false to avoid encountering
-    /// errors.
-    ///
-    /// For more information on the behavior of the `count` server command, see
-    /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
-    pub async fn estimated_document_count(
-        &self,
-        options: impl Into<Option<EstimatedDocumentCountOptions>>,
-    ) -> Result<u64> {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-
-        let op = Count::new(self.namespace(), options);
-
-        self.client().execute_operation(op, None).await
-    }
-
-    async fn count_documents_common(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<u64> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, session.as_ref())?;
-        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
-
-        let op = CountDocuments::new(self.namespace(), filter.into(), options)?;
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Gets the number of documents matching `filter`.
-    ///
-    /// Note that this method returns an accurate count.
-    pub async fn count_documents(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-    ) -> Result<u64> {
-        self.count_documents_common(filter, options, None).await
-    }
-
-    /// Gets the number of documents matching `filter` using the provided `ClientSession`.
-    ///
-    /// Note that this method returns an accurate count.
-    pub async fn count_documents_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<CountOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<u64> {
-        self.count_documents_common(filter, options, session).await
-    }
-
-    async fn delete_many_common(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<DeleteResult> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let delete = Delete::new(self.namespace(), query, None, options);
-        self.client().execute_operation(delete, session).await
-    }
-
-    async fn create_indexes_common(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<CreateIndexesResult> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let indexes: Vec<IndexModel> = indexes.into_iter().collect();
-
-        let create_indexes = CreateIndexes::new(self.namespace(), indexes, options);
-        self.client()
-            .execute_operation(create_indexes, session)
-            .await
-    }
-
-    pub(crate) async fn create_index_common(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<CreateIndexResult> {
-        let response = self
-            .create_indexes_common(vec![index], options, session)
-            .await?;
-        Ok(response.into_create_index_result())
-    }
-
-    /// Creates the given index on this collection.
-    pub async fn create_index(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexResult> {
-        self.create_index_common(index, options, None).await
-    }
-
-    /// Creates the given index on this collection using the provided `ClientSession`.
-    pub async fn create_index_with_session(
-        &self,
-        index: IndexModel,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexResult> {
-        self.create_index_common(index, options, session).await
-    }
-
-    /// Creates the given indexes on this collection.
-    pub async fn create_indexes(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<CreateIndexesResult> {
-        self.create_indexes_common(indexes, options, None).await
-    }
-
-    /// Creates the given indexes on this collection using the provided `ClientSession`.
-    pub async fn create_indexes_with_session(
-        &self,
-        indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<CreateIndexesResult> {
-        self.create_indexes_common(indexes, options, session).await
-    }
-
-    /// Deletes all documents stored in the collection matching `query`.
-    pub async fn delete_many(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        self.delete_many_common(query, options, None).await
-    }
-
-    /// Deletes all documents stored in the collection matching `query` using the provided
-    /// `ClientSession`.
-    pub async fn delete_many_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        self.delete_many_common(query, options, session).await
-    }
-
-    async fn delete_one_common(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<DeleteResult> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let delete = Delete::new(self.namespace(), query, Some(1), options);
-        self.client().execute_operation(delete, session).await
-    }
-
-    /// Deletes up to one document found matching `query`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn delete_one(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-    ) -> Result<DeleteResult> {
-        self.delete_one_common(query, options, None).await
-    }
-
-    /// Deletes up to one document found matching `query` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn delete_one_with_session(
-        &self,
-        query: Document,
-        options: impl Into<Option<DeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<DeleteResult> {
-        self.delete_one_common(query, options, session).await
-    }
-
-    async fn distinct_common(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Vec<Bson>> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, session.as_ref())?;
-        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
-
-        let op = Distinct::new(
-            self.namespace(),
-            field_name.as_ref().to_string(),
-            filter.into(),
-            options,
-        );
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection.
-    pub async fn distinct(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-    ) -> Result<Vec<Bson>> {
-        self.distinct_common(field_name, filter, options, None)
-            .await
-    }
-
-    /// Finds the distinct values of the field specified by `field_name` across the collection using
-    /// the provided `ClientSession`.
-    pub async fn distinct_with_session(
-        &self,
-        field_name: impl AsRef<str>,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<DistinctOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Vec<Bson>> {
-        self.distinct_common(field_name, filter, options, session)
-            .await
-    }
-
-    async fn drop_indexes_common(
-        &self,
-        name: impl Into<Option<&str>>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        // If there is no provided name, that means we should drop all indexes.
-        let index_name = name.into().unwrap_or("*").to_string();
-
-        let drop_index = DropIndexes::new(self.namespace(), index_name, options);
-        self.client().execute_operation(drop_index, session).await
-    }
-
-    async fn drop_index_common(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<()> {
-        let name = name.as_ref();
-        if name == "*" {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Cannot pass name \"*\" to drop_index since more than one index would be \
-                          dropped."
-                    .to_string(),
-            }
-            .into());
-        }
-        self.drop_indexes_common(name, options, session).await
-    }
-
-    /// Drops the index specified by `name` from this collection.
-    pub async fn drop_index(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-    ) -> Result<()> {
-        self.drop_index_common(name, options, None).await
-    }
-
-    /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
-    pub async fn drop_index_with_session(
-        &self,
-        name: impl AsRef<str>,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_index_common(name, options, session).await
-    }
-
-    /// Drops all indexes associated with this collection.
-    pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
-        self.drop_indexes_common(None, options, None).await
-    }
-
-    /// Drops all indexes associated with this collection using the provided `ClientSession`.
-    pub async fn drop_indexes_with_session(
-        &self,
-        options: impl Into<Option<DropIndexOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<()> {
-        self.drop_indexes_common(None, options, session).await
-    }
-
-    /// Lists all indexes on this collection.
-    pub async fn list_indexes(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-    ) -> Result<Cursor<IndexModel>> {
-        let list_indexes = ListIndexes::new(self.namespace(), options.into());
-        let client = self.client();
-        client.execute_cursor_operation(list_indexes).await
-    }
-
-    /// Lists all indexes on this collection using the provided `ClientSession`.
-    pub async fn list_indexes_with_session(
-        &self,
-        options: impl Into<Option<ListIndexesOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<IndexModel>> {
-        let list_indexes = ListIndexes::new(self.namespace(), options.into());
-        let client = self.client();
-        client
-            .execute_session_cursor_operation(list_indexes, session)
-            .await
-    }
-
-    async fn list_index_names_common(
-        &self,
-        cursor: impl TryStreamExt<Ok = IndexModel, Error = Error>,
-    ) -> Result<Vec<String>> {
-        cursor
-            .try_filter_map(|index| future::ok(index.get_name()))
-            .try_collect()
-            .await
-    }
-
-    /// Gets the names of all indexes on the collection.
-    pub async fn list_index_names(&self) -> Result<Vec<String>> {
-        let cursor = self.list_indexes(None).await?;
-        self.list_index_names_common(cursor).await
-    }
-
-    /// Gets the names of all indexes on the collection using the provided `ClientSession`.
-    pub async fn list_index_names_with_session(
-        &self,
-        session: &mut ClientSession,
-    ) -> Result<Vec<String>> {
-        let mut cursor = self.list_indexes_with_session(None, session).await?;
-        self.list_index_names_common(cursor.stream(session)).await
-    }
-
-    async fn update_many_common(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<UpdateResult> {
-        let update = update.into();
-
-        if let UpdateModifications::Document(ref d) = update {
-            bson_util::update_document_check(d)?;
-        }
-
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let update = Update::with_update(
-            self.namespace(),
-            query,
-            update,
-            true,
-            options,
-            self.inner.human_readable_serialization,
-        );
-        self.client().execute_operation(update, session).await
-    }
-
-    /// Updates all documents matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub async fn update_many(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        self.update_many_common(query, update, options, None).await
-    }
-
-    /// Updates all documents matching `query` in the collection using the provided `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub async fn update_many_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        self.update_many_common(query, update, options, session)
-            .await
-    }
-
-    async fn update_one_common(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<UpdateResult> {
-        let update = update.into();
-        if let UpdateModifications::Document(ref d) = update {
-            bson_util::update_document_check(d)?;
-        }
-
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let update = Update::with_update(
-            self.namespace(),
-            query,
-            update,
-            false,
-            options,
-            self.inner.human_readable_serialization,
-        );
-        self.client().execute_operation(update, session).await
-    }
-
-    /// Updates up to one document matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn update_one(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        self.update_one_common(query, update, options, None).await
-    }
-
-    /// Updates up to one document matching `query` in the collection using the provided
-    /// `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn update_one_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        self.update_one_common(query, update, options, session)
-            .await
-    }
-
     /// Kill the server side cursor that id corresponds to.
     pub(super) async fn kill_cursor(
         &self,
@@ -885,73 +203,17 @@ impl<T> Collection<T> {
     ) -> Result<()> {
         let ns = self.namespace();
 
-        self.client()
-            .database(ns.db.as_str())
-            .run_command_common(
-                doc! {
-                    "killCursors": ns.coll.as_str(),
-                    "cursors": [cursor_id]
-                },
-                drop_address.map(SelectionCriteria::from_address),
-                None,
-                pinned_connection,
-            )
-            .await?;
+        let op = crate::operation::run_command::RunCommand::new(
+            ns.db,
+            doc! {
+                "killCursors": ns.coll.as_str(),
+                "cursors": [cursor_id]
+            },
+            drop_address.map(SelectionCriteria::from_address),
+            pinned_connection,
+        )?;
+        self.client().execute_operation(op, None).await?;
         Ok(())
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in this collection. A
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
-    /// collections.
-    ///
-    /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read concern. Anything else
-    /// will cause a server error.
-    ///
-    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
-    /// fields will cause an error. The driver requires these fields to support resumability. For
-    /// more information on resumability, see the documentation for
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
-    ///
-    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
-    /// changed via [`ChangeStream::with_type`].
-    pub async fn watch(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
-        let target = self.namespace().into();
-        self.client()
-            .execute_watch(pipeline, options, target, None)
-            .await
-    }
-
-    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
-    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    pub async fn watch_with_session(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        let mut options = options.into();
-        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-        let target = self.namespace().into();
-        self.client()
-            .execute_watch_with_session(pipeline, options, target, None, session)
-            .await
     }
 
     /// Finds the documents in the collection matching `filter`.
@@ -984,6 +246,10 @@ impl<T> Collection<T> {
         let client = self.client();
 
         client.execute_session_cursor_operation(find, session).await
+    }
+
+    pub(crate) fn human_readable_serialization(&self) -> bool {
+        self.inner.human_readable_serialization
     }
 }
 
@@ -1231,7 +497,7 @@ where
 
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert = Insert::new_encrypted(
+            let insert = Insert::new(
                 self.namespace(),
                 docs,
                 options.clone(),
@@ -1360,10 +626,16 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
+        #[cfg(feature = "in-use-encryption-unstable")]
+        let encrypted = self.client().auto_encryption_opts().await.is_some();
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
+        let encrypted = false;
+
         let insert = Insert::new(
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
+            encrypted,
             self.inner.human_readable_serialization,
         );
         self.client()

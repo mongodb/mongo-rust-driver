@@ -198,3 +198,26 @@ Case 5: ``dropSearchIndex`` suppresses namespace not found errors
 
 #. Create a driver-side collection object for a randomly generated collection name.  Do not create this collection on the server.
 #. Run a ``dropSearchIndex`` command and assert that no error is thrown.
+
+Case 6: Driver can successfully create and list search indexes with non-default readConcern and writeConcern
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#. Create a collection with the "create" command using a randomly generated name (referred to as ``coll0``).
+#. Apply a write concern ``WriteConcern(w=1)`` and a read concern with ``ReadConcern(level="majority")`` to ``coll0``.
+#. Create a new search index on ``coll0`` with the ``createSearchIndex`` helper.  Use the following definition:
+
+   .. code:: typescript
+
+     {
+       name: 'test-search-index-case6',
+       definition: {
+         mappings: { dynamic: false }
+       }
+     }
+
+#. Assert that the command returns the name of the index: ``"test-search-index-case6"``.
+#. Run ``coll0.listSearchIndexes()`` repeatedly every 5 seconds until the following condition is satisfied and store the value in a variable ``index``:
+
+   - An index with the ``name`` of ``test-search-index-case6`` is present and the index has a field ``queryable`` with a value of ``true``.
+
+#. Assert that ``index`` has a property ``latestDefinition`` whose value is ``{ 'mappings': { 'dynamic': false } }``
