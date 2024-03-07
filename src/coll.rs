@@ -264,7 +264,7 @@ where
                 options.clone(),
                 encrypted,
                 self.inner.human_readable_serialization,
-            );
+            )?;
 
             match self
                 .client()
@@ -398,7 +398,7 @@ where
             options.map(InsertManyOptions::from_insert_one_options),
             encrypted,
             self.inner.human_readable_serialization,
-        );
+        )?;
         self.client()
             .execute_operation(insert, session)
             .await

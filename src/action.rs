@@ -12,6 +12,7 @@ mod drop;
 mod drop_index;
 mod find;
 mod find_and_modify;
+mod insert_many;
 mod list_collections;
 mod list_databases;
 mod list_indexes;

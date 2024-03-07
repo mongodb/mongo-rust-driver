@@ -22,22 +22,34 @@ use crate::{
 use super::{COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
 
 #[derive(Debug)]
-pub(crate) struct Insert<'a, T> {
+pub(crate) struct Insert {
     ns: Namespace,
-    documents: Vec<&'a T>,
+    documents: Vec<RawDocumentBuf>,
     inserted_ids: Vec<Bson>,
     options: InsertManyOptions,
     encrypted: bool,
-    human_readable_serialization: bool,
 }
 
-impl<'a, T> Insert<'a, T> {
-    pub(crate) fn new(
+impl Insert {
+    pub(crate) fn new<T: Serialize>(
         ns: Namespace,
-        documents: Vec<&'a T>,
+        documents: Vec<&T>,
         options: Option<InsertManyOptions>,
         encrypted: bool,
         human_readable_serialization: bool,
+    ) -> Result<Self> {
+        let documents = documents
+            .into_iter()
+            .map(|v| serde_util::to_raw_document_buf_with_options(v, human_readable_serialization))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Self::raw(ns, documents, options, encrypted))
+    }
+
+    pub(crate) fn raw(
+        ns: Namespace,
+        documents: Vec<RawDocumentBuf>,
+        options: Option<InsertManyOptions>,
+        encrypted: bool,
     ) -> Self {
         let mut options = options.unwrap_or_default();
         if options.ordered.is_none() {
@@ -50,12 +62,11 @@ impl<'a, T> Insert<'a, T> {
             documents,
             inserted_ids: vec![],
             encrypted,
-            human_readable_serialization,
         }
     }
 }
 
-impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
+impl OperationWithDefaults for Insert {
     type O = InsertManyResult;
     type Command = RawDocumentBuf;
 
@@ -75,8 +86,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
             .take(Checked::new(description.max_write_batch_size).try_into()?)
             .enumerate()
         {
-            let mut doc =
-                serde_util::to_raw_document_buf_with_options(d, self.human_readable_serialization)?;
+            let mut doc = d.clone();
             let id = match doc.get("_id")? {
                 Some(b) => b.try_into()?,
                 None => {
