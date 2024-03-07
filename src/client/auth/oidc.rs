@@ -360,23 +360,26 @@ async fn do_two_step_auth(
     Ok(())
 }
 
-fn get_allowed_hosts<'a>(
-    mechanism_properties: &'a Option<Document>,
-) -> Box<dyn Iterator<Item = Result<&'a str>> + 'a> {
+fn get_allowed_hosts(mechanism_properties: Option<&Document>) -> Result<Vec<&str>> {
     if mechanism_properties.is_none() {
-        return Box::new(DEFAULT_ALLOWED_HOSTS.iter().map(|h| Ok(*h)));
+        return Ok(Vec::from(DEFAULT_ALLOWED_HOSTS));
     }
     if let Some(allowed_hosts) = mechanism_properties.as_ref().unwrap().get("ALLOWED_HOSTS") {
-        return Box::new(allowed_hosts.as_array().unwrap().iter().map(|host| {
-            host.as_str()
-                .ok_or_else(|| auth_error("ALLOWED_HOSTS must contain only strings"))
-        }));
+        return allowed_hosts
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|host| {
+                host.as_str()
+                    .ok_or_else(|| auth_error("ALLOWED_HOSTS must contain only strings"))
+            })
+            .collect::<Result<Vec<_>>>();
     }
-    Box::new(DEFAULT_ALLOWED_HOSTS.iter().map(|h| Ok(*h)))
+    Ok(Vec::from(DEFAULT_ALLOWED_HOSTS))
 }
 
 fn validate_address_with_allowed_hosts(
-    mechanism_properties: &Option<Document>,
+    mechanism_properties: Option<&Document>,
     address: &ServerAddress,
 ) -> Result<()> {
     let hostname = if let ServerAddress::Tcp { host, .. } = address {
@@ -384,8 +387,7 @@ fn validate_address_with_allowed_hosts(
     } else {
         return Err(auth_error("OIDC human flow only supports TCP addresses"));
     };
-    for pattern in get_allowed_hosts(mechanism_properties) {
-        let pattern = pattern?;
+    for pattern in get_allowed_hosts(mechanism_properties)? {
         if pattern == hostname {
             return Ok(());
         }
@@ -404,7 +406,7 @@ async fn authenticate_human(
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
-    validate_address_with_allowed_hosts(&credential.mechanism_properties, &conn.address)?;
+    validate_address_with_allowed_hosts(credential.mechanism_properties.as_ref(), &conn.address)?;
 
     let source = credential.source.as_deref().unwrap_or("$external");
 
