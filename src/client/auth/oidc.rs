@@ -391,7 +391,8 @@ fn validate_address_with_allowed_hosts(
     for pattern in allowed_hosts.into_iter() {
         if pattern == hostname {
             return Ok(());
-        } else if pattern.starts_with("*.") && hostname.ends_with(&pattern[1..]) {
+        }
+        if pattern.starts_with("*.") && hostname.ends_with(&pattern[1..]) {
             return Ok(());
         }
     }
