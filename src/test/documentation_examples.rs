@@ -39,19 +39,16 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
 
     // Start Example 1
     collection
-        .insert_one(
-            doc! {
-                "item": "canvas",
-                "qty": 100,
-                "tags": ["cotton"],
-                "size": {
-                    "h": 28,
-                    "w": 35.5,
-                    "uom": "cm",
-                }
-            },
-            None,
-        )
+        .insert_one(doc! {
+            "item": "canvas",
+            "qty": 100,
+            "tags": ["cotton"],
+            "size": {
+                "h": 28,
+                "w": 35.5,
+                "uom": "cm",
+            }
+        })
         .await?;
     // End Example 1
 
@@ -1506,16 +1503,13 @@ async fn run_command_examples() -> Result<()> {
     let db = client.database("run_command_examples");
     db.drop().await?;
     db.collection::<Document>("restaurants")
-        .insert_one(
-            doc! {
-                "name": "Chez Panisse",
-                "city": "Oakland",
-                "state": "California",
-                "country": "United States",
-                "rating": 4.4,
-            },
-            None,
-        )
+        .insert_one(doc! {
+            "name": "Chez Panisse",
+            "city": "Oakland",
+            "state": "California",
+            "country": "United States",
+            "rating": 4.4,
+        })
         .await?;
 
     #[allow(unused)]
@@ -1612,7 +1606,7 @@ async fn change_streams_examples() -> Result<()> {
     db.drop().await?;
     let inventory = db.collection::<Document>("inventory");
     // Populate an item so the collection exists for the change stream to watch.
-    inventory.insert_one(doc! {}, None).await?;
+    inventory.insert_one(doc! {}).await?;
 
     // Background writer thread so that the `stream.next()` calls return something.
     let (tx, mut rx) = tokio::sync::oneshot::channel();
@@ -1622,7 +1616,7 @@ async fn change_streams_examples() -> Result<()> {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    writer_inventory.insert_one(doc! {}, None).await?;
+                    writer_inventory.insert_one(doc! {}).await?;
                 }
                 _ = &mut rx => break,
             }
@@ -1697,12 +1691,12 @@ async fn convenient_transaction_examples() -> Result<()> {
     client
         .database("mydb1")
         .collection::<Document>("foo")
-        .insert_one(doc! { "abc": 0}, None)
+        .insert_one(doc! { "abc": 0})
         .await?;
     client
         .database("mydb2")
         .collection::<Document>("bar")
-        .insert_one(doc! { "xyz": 0}, None)
+        .insert_one(doc! { "xyz": 0})
         .await?;
 
     // Step 1: Define the callback that specifies the sequence of operations to perform inside the
@@ -1719,10 +1713,12 @@ async fn convenient_transaction_examples() -> Result<()> {
 
         // Important: You must pass the session to the operations.
         collection_one
-            .insert_one_with_session(doc! { "abc": 1 }, None, session)
+            .insert_one(doc! { "abc": 1 })
+            .session(&mut *session)
             .await?;
         collection_two
-            .insert_one_with_session(doc! { "xyz": 999 }, None, session)
+            .insert_one(doc! { "xyz": 999 })
+            .session(session)
             .await?;
 
         Ok(())

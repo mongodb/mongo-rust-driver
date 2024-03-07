@@ -96,7 +96,7 @@ async fn connection_drop_during_read() {
     let db = client.database("test");
 
     db.collection(function_name!())
-        .insert_one(doc! { "x": 1 }, None)
+        .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
 
@@ -178,7 +178,7 @@ async fn list_databases() {
         let db = client.database(name);
 
         db.collection("foo")
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -223,7 +223,7 @@ async fn list_database_names() {
         let db = client.database(name);
 
         db.collection("foo")
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -682,7 +682,7 @@ async fn retry_commit_txn_check_out() {
     setup_client
         .database("retry_commit_txn_check_out")
         .collection("retry_commit_txn_check_out")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .unwrap();
 
@@ -701,7 +701,8 @@ async fn retry_commit_txn_check_out() {
     client
         .database("retry_commit_txn_check_out")
         .collection("retry_commit_txn_check_out")
-        .insert_one_with_session(doc! {}, None, &mut session)
+        .insert_one(doc! {})
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -824,7 +825,8 @@ async fn manual_shutdown_with_resources() {
             return;
         }
         if coll
-            .insert_one_with_session(doc! {}, None, &mut session)
+            .insert_one(doc! {})
+            .session(&mut session)
             .await
             .is_err()
         {
@@ -880,7 +882,8 @@ async fn manual_shutdown_immediate_with_resources() {
     // Similarly, sessions need an in-progress transaction to have cleanup.
     let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();
-    coll.insert_one_with_session(doc! {}, None, &mut session)
+    coll.insert_one(doc! {})
+        .session(&mut session)
         .await
         .unwrap();
     let _stream = bucket.open_upload_stream("test", None);
@@ -914,7 +917,7 @@ async fn find_one_and_delete_serde_consistency() {
         problematic: vec![0, 1, 2, 3, 4, 5, 6, 7],
     };
 
-    coll.insert_one(&doc, None).await.unwrap();
+    coll.insert_one(&doc).await.unwrap();
     let rec: Foo = coll.find_one(doc! {}).await.unwrap().unwrap();
     assert_eq!(doc.problematic, rec.problematic);
     let rec: Foo = coll.find_one_and_delete(doc! {}).await.unwrap().unwrap();

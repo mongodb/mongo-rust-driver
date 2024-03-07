@@ -52,7 +52,7 @@ async fn retry_releases_connection() {
     let collection = client
         .database("retry_releases_connection")
         .collection("retry_releases_connection");
-    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     // Use a connection error to ensure streaming monitor checks get cancelled. Otherwise, we'd have
     // to wait for the entire heartbeatFrequencyMS before the find succeeds.
@@ -99,7 +99,7 @@ async fn retry_read_pool_cleared() {
     let collection = client
         .database("retry_read_pool_cleared")
         .collection("retry_read_pool_cleared");
-    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     let options = FailCommandOptions::builder()
         .error_code(91)

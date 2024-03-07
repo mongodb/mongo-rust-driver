@@ -728,7 +728,7 @@ async fn command_started_event_count() {
     let coll = client.database("foo").collection("bar");
 
     for i in 0..10 {
-        coll.insert_one(doc! { "x": i }, None).await.unwrap();
+        coll.insert_one(doc! { "x": i }).await.unwrap();
     }
 
     assert_eq!(client.get_command_started_events(&["insert"]).len(), 10);

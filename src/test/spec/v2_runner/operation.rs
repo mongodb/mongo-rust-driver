@@ -458,14 +458,11 @@ impl TestOperation for InsertOne {
         let document = self.document.clone();
         let options = self.options.clone();
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .insert_one_with_session(document, options, session)
-                        .await?
-                }
-                None => collection.insert_one(document, options).await?,
-            };
+            let result = collection
+                .insert_one(document)
+                .with_options(options)
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }

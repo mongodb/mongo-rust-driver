@@ -24,7 +24,7 @@ async fn details() {
         .await
         .unwrap();
     let coll: Collection<Document> = db.collection("test");
-    let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
+    let err = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
     let write_err = match *err.kind {
         ErrorKind::Write(WriteFailure::WriteError(e)) => e,
         _ => panic!("expected WriteError, got {:?}", err.kind),

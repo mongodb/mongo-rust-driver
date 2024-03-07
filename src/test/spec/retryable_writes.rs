@@ -242,7 +242,7 @@ async fn transaction_ids_included() {
         started.command.contains_key("txnNumber")
     };
 
-    coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    coll.insert_one(doc! { "x": 1 }).await.unwrap();
     assert!(includes_txn_number("insert"));
 
     coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } })
@@ -312,7 +312,7 @@ async fn mmapv1_error_raised() {
         return;
     }
 
-    let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
+    let err = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
     match *err.kind {
         ErrorKind::Command(err) => {
             assert_eq!(
@@ -428,7 +428,7 @@ async fn retry_write_pool_cleared() {
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = runtime::spawn(async move { coll.insert_one(doc! {}, None).await });
+        let task = runtime::spawn(async move { coll.insert_one(doc! {}).await });
         tasks.push(task);
     }
 
@@ -556,7 +556,7 @@ async fn retry_write_retryable_write_error() {
     let result = client
         .database("test")
         .collection::<Document>("test")
-        .insert_one(doc! { "hello": "there" }, None)
+        .insert_one(doc! { "hello": "there" })
         .await;
     assert_eq!(result.unwrap_err().code(), Some(91));
 
@@ -605,7 +605,7 @@ async fn retry_write_different_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_write_different_mongos")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     assert!(result.is_err());
     let events = client.get_command_events(&["insert"]);
@@ -663,7 +663,7 @@ async fn retry_write_same_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_write_same_mongos")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
     let events = client.get_command_events(&["insert"]);

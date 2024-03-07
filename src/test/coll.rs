@@ -74,7 +74,7 @@ async fn insert_err_details() {
         .await
         .unwrap();
 
-    let wc_error_result = coll.insert_one(doc! { "test": 1 }, None).await;
+    let wc_error_result = coll.insert_one(doc! { "test": 1 }).await;
     match *wc_error_result.unwrap_err().kind {
         ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_error)) => {
             match &wc_error.details {
@@ -104,7 +104,7 @@ async fn count() {
 
     assert_eq!(coll.estimated_document_count().await.unwrap(), 0);
 
-    let _ = coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    let _ = coll.insert_one(doc! { "x": 1 }).await.unwrap();
     assert_eq!(coll.estimated_document_count().await.unwrap(), 1);
 
     let result = coll
@@ -735,7 +735,7 @@ async fn insert_one_and_find<T>(coll: &Collection<T>, insert_data: T)
 where
     T: Serialize + DeserializeOwned + Clone + PartialEq + Debug + Unpin + Send + Sync,
 {
-    coll.insert_one(insert_data.clone(), None).await.unwrap();
+    coll.insert_one(insert_data.clone()).await.unwrap();
     let result = coll
         .find_one(to_document(&insert_data).unwrap())
         .await
@@ -791,7 +791,7 @@ async fn typed_find_one_and_replace() {
         x: 1,
         str: "a".into(),
     };
-    coll.insert_one(insert_data.clone(), None).await.unwrap();
+    coll.insert_one(insert_data.clone()).await.unwrap();
 
     let replacement = UserType {
         x: 2,
@@ -824,7 +824,7 @@ async fn typed_replace_one() {
         x: 2,
         str: "b".into(),
     };
-    coll.insert_one(insert_data, None).await.unwrap();
+    coll.insert_one(insert_data).await.unwrap();
     coll.replace_one(doc! { "x": 1 }, replacement.clone(), None)
         .await
         .unwrap();
@@ -845,7 +845,7 @@ async fn typed_returns() {
         x: 1,
         str: "a".into(),
     };
-    coll.insert_one(insert_data.clone(), None).await.unwrap();
+    coll.insert_one(insert_data.clone()).await.unwrap();
 
     let result = coll
         .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } })
@@ -883,7 +883,7 @@ async fn count_documents_with_wc() {
         .database(function_name!())
         .collection(function_name!());
 
-    coll.insert_one(doc! {}, None).await.unwrap();
+    coll.insert_one(doc! {}).await.unwrap();
 
     coll.count_documents(doc! {})
         .await
@@ -960,7 +960,7 @@ async fn collection_generic_bounds() {
     let coll: Collection<Bar> = client
         .database(function_name!())
         .collection(function_name!());
-    let _result = coll.insert_one(Bar {}, None).await;
+    let _result = coll.insert_one(Bar {}).await;
 }
 
 /// Verify that a cursor with multiple batches whose last batch isn't full
@@ -1028,13 +1028,13 @@ async fn invalid_utf8_response() {
     // a document containing a long string with multi-byte unicode characters. taken from a user
     // repro in RUBY-2560.
     let long_unicode_str_doc = doc! {"name":  "(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻"};
-    coll.insert_one(&long_unicode_str_doc, None)
+    coll.insert_one(&long_unicode_str_doc)
         .await
         .expect("first insert of document should succeed");
 
     // test triggering an invalid error message via an insert_one.
     let insert_err = coll
-        .insert_one(&long_unicode_str_doc, None)
+        .insert_one(&long_unicode_str_doc)
         .await
         .expect_err("second insert of document should fail")
         .kind;
@@ -1049,7 +1049,7 @@ async fn invalid_utf8_response() {
     assert_duplicate_key_error_with_utf8_replacement(&insert_err);
 
     // test triggering an invalid error message via an update_one.
-    coll.insert_one(doc! {"x": 1}, None)
+    coll.insert_one(doc! {"x": 1})
         .await
         .expect("inserting new document should succeed");
 
@@ -1154,13 +1154,10 @@ async fn configure_human_readable_serialization() {
     non_human_readable_collection.drop().await.unwrap();
 
     non_human_readable_collection
-        .insert_one(
-            Data {
-                id: 0,
-                s: StringOrBytes("non human readable!".into()),
-            },
-            None,
-        )
+        .insert_one(Data {
+            id: 0,
+            s: StringOrBytes("non human readable!".into()),
+        })
         .await
         .unwrap();
 
@@ -1203,13 +1200,10 @@ async fn configure_human_readable_serialization() {
     human_readable_collection.drop().await.unwrap();
 
     human_readable_collection
-        .insert_one(
-            Data {
-                id: 0,
-                s: StringOrBytes("human readable!".into()),
-            },
-            None,
-        )
+        .insert_one(Data {
+            id: 0,
+            s: StringOrBytes("human readable!".into()),
+        })
         .await
         .unwrap();
 

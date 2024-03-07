@@ -74,7 +74,8 @@ async fn explicit_session_created_on_same_client() {
         .database(function_name!())
         .collection(function_name!());
     let err = coll
-        .insert_one_with_session(doc! {}, None, &mut session0)
+        .insert_one(doc! {})
+        .session(&mut session0)
         .await
         .unwrap_err();
     match *err.kind {
@@ -124,7 +125,12 @@ async fn implicit_session_after_connection() {
         fn ignore_val<T>(r: Result<T>) -> Result<()> {
             r.map(|_| ())
         }
-        ops.push(coll.insert_one(doc! {}, None).map(ignore_val).boxed());
+        ops.push(
+            coll.insert_one(doc! {})
+                .into_future()
+                .map(ignore_val)
+                .boxed(),
+        );
         ops.push(
             coll.delete_one(doc! {})
                 .into_future()
@@ -258,7 +264,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
         .expect("Did not observe a command started event for find operation");
     assert!(!event.command.contains_key("lsid"));
 
-    let _ = coll.insert_one(doc! { "x": 1 }, None).await;
+    let _ = coll.insert_one(doc! { "x": 1 }).await;
     let event = subscriber
         .filter_map_event(Duration::from_millis(500), |event| match event {
             Event::Command(CommandEvent::Started(command_started_event))
@@ -295,7 +301,8 @@ async fn sessions_not_supported_explicit_session_error() {
     assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));
 
     let error = coll
-        .insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .insert_one(doc! { "x": 1 })
+        .session(&mut session)
         .await
         .unwrap_err();
     assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));

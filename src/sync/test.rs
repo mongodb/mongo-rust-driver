@@ -69,7 +69,8 @@ fn client() {
     client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(Document::new(), None)
+        .insert_one(Document::new())
+        .run()
         .expect("insert should succeed");
 
     let db_names = client
@@ -116,7 +117,8 @@ fn database() {
 
     let coll = init_db_and_coll(&client, function_name!(), function_name!());
 
-    coll.insert_one(doc! { "x": 1 }, None)
+    coll.insert_one(doc! { "x": 1 })
+        .run()
         .expect("insert should succeed");
 
     let coll_names = db
@@ -159,7 +161,8 @@ fn collection() {
     let client = Client::with_options(options).expect("client creation should succeed");
     let coll = init_db_and_coll(&client, function_name!(), function_name!());
 
-    coll.insert_one(doc! { "x": 1 }, None)
+    coll.insert_one(doc! { "x": 1 })
+        .run()
         .expect("insert should succeed");
 
     let cursor = coll
@@ -222,7 +225,7 @@ fn typed_collection() {
         str: "hello".into(),
     };
 
-    assert!(coll.insert_one(my_type, None).is_ok());
+    assert!(coll.insert_one(my_type).run().is_ok());
 }
 
 #[test]
@@ -276,7 +279,7 @@ fn transactions() {
         .expect("start transaction should succeed");
 
     run_transaction_with_retry(&mut session, |s| {
-        coll.insert_one_with_session(doc! { "x": 1 }, None, s)?;
+        coll.insert_one(doc! { "x": 1 }).session(s).run()?;
         Ok(())
     })
     .unwrap();
@@ -300,7 +303,7 @@ fn transactions() {
         .start_transaction(None)
         .expect("start transaction should succeed");
     run_transaction_with_retry(&mut session, |s| {
-        coll.insert_one_with_session(doc! { "x": 1 }, None, s)?;
+        coll.insert_one(doc! { "x": 1 }).session(s).run()?;
         Ok(())
     })
     .unwrap();
@@ -334,7 +337,7 @@ fn collection_generic_bounds() {
     let coll: Collection<Bar> = client
         .database(function_name!())
         .collection(function_name!());
-    let _result = coll.insert_one(Bar {}, None);
+    let _result = coll.insert_one(Bar {});
 }
 
 #[test]
@@ -424,7 +427,8 @@ fn mixed_sync_and_async() -> Result<()> {
     sync_db.drop().run()?;
     sync_db
         .collection::<Document>(COLL_NAME)
-        .insert_one(doc! { "a": 1 }, None)?;
+        .insert_one(doc! { "a": 1 })
+        .run()?;
     let mut found = crate::sync::TOKIO_RUNTIME
         .block_on(async {
             async_client

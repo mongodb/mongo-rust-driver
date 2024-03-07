@@ -58,7 +58,7 @@ macro_rules! for_each_op {
         // collection operations
         $test_func(
             "insert",
-            collection_op!($test_name, coll, coll.insert_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.insert_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
@@ -363,7 +363,7 @@ async fn cluster_time_in_commands() {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
-            .insert_one(doc! {}, None)
+            .insert_one(doc! {})
             .await
     })
     .await;
@@ -449,7 +449,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
     for _ in 0..5 {
-        coll.insert_one(doc! {}, None)
+        coll.insert_one(doc! {})
             .await
             .expect("insert should succeed");
     }

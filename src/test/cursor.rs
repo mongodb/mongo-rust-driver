@@ -66,7 +66,7 @@ async fn tailable_cursor() {
     };
 
     runtime::spawn(async move {
-        coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
+        coll.insert_one(doc! { "_id": 5 }).await.unwrap();
     });
 
     let delay = tokio::time::sleep(await_time);

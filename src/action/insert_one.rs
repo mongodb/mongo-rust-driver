@@ -28,7 +28,7 @@ impl<T: Serialize> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<InsertOneResult>`.
-    pub fn insert_one_2(&self, doc: impl Borrow<T>) -> InsertOne {
+    pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
             doc: serde_util::to_raw_document_buf_with_options(
@@ -54,8 +54,8 @@ impl<T: Serialize> crate::sync::Collection<T> {
     /// retryable writes.
     ///
     /// [`run`](InsertOne::run) will return `Result<InsertOneResult>`.
-    pub fn insert_one_2(&self, doc: impl Borrow<T>) -> InsertOne {
-        self.async_collection.insert_one_2(doc)
+    pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
+        self.async_collection.insert_one(doc)
     }
 }
 

@@ -768,24 +768,17 @@ impl TestOperation for InsertOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .insert_one(self.document.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .insert_one_with_session(
-                                self.document.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .insert_one(self.document.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))

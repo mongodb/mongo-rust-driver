@@ -78,7 +78,7 @@ async fn deserialize_recovery_token() {
     let coll = client
         .database(function_name!())
         .collection(function_name!());
-    coll.insert_one(A { num: 4 }, None).await.unwrap();
+    coll.insert_one(A { num: 4 }).await.unwrap();
 
     // Attempt to execute Find on a document with schema B.
     let coll: Collection<B> = client

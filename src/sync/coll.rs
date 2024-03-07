@@ -6,8 +6,8 @@ use super::ClientSession;
 use crate::{
     bson::Document,
     error::Result,
-    options::{InsertOneOptions, ReadConcern, ReplaceOptions, SelectionCriteria, WriteConcern},
-    results::{InsertOneResult, UpdateResult},
+    options::{ReadConcern, ReplaceOptions, SelectionCriteria, WriteConcern},
+    results::UpdateResult,
     Collection as AsyncCollection,
     Namespace,
 };
@@ -104,42 +104,6 @@ impl<T> Collection<T>
 where
     T: Serialize + Send + Sync,
 {
-    /// Inserts `doc` into the collection.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_one(
-        &self,
-        doc: impl Borrow<T>,
-        options: impl Into<Option<InsertOneOptions>>,
-    ) -> Result<InsertOneResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection
-                .insert_one(doc.borrow(), options.into()),
-        )
-    }
-
-    /// Inserts `doc` into the collection using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_one_with_session(
-        &self,
-        doc: impl Borrow<T>,
-        options: impl Into<Option<InsertOneOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<InsertOneResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_one_with_session(
-            doc.borrow(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
     /// Replaces up to one document matching `query` in the collection with `replacement`.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support

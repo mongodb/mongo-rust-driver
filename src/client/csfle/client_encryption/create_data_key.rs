@@ -24,7 +24,7 @@ action_impl! {
             }
             let ctx = self.client_enc.create_data_key_ctx(provider, self.master_key, self.options)?;
             let data_key = self.client_enc.exec.run_ctx(ctx, None).await?;
-            self.client_enc.key_vault.insert_one(&data_key, None).await?;
+            self.client_enc.key_vault.insert_one(&data_key).await?;
             let bin_ref = data_key
                 .get_binary("_id")
                 .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;

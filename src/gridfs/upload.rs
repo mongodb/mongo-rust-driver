@@ -132,7 +132,7 @@ impl GridFsBucket {
                     bytes: &buf[..bytes_read],
                 },
             };
-            self.chunks().insert_one(chunk, None).await?;
+            self.chunks().insert_one(chunk).await?;
 
             length += bytes_read as u64;
             n += 1;
@@ -146,7 +146,7 @@ impl GridFsBucket {
             filename: Some(filename.as_ref().to_string()),
             metadata: options.and_then(|opts| opts.metadata),
         };
-        self.files().insert_one(file, None).await?;
+        self.files().insert_one(file).await?;
 
         Ok(())
     }
@@ -557,9 +557,9 @@ async fn close(bucket: GridFsBucket, buffer: Vec<u8>, file: FilesCollectionDocum
                     bytes: &buffer[..],
                 },
             };
-            bucket.chunks().insert_one(final_chunk, None).await?;
+            bucket.chunks().insert_one(final_chunk).await?;
         }
-        bucket.files().insert_one(&file, None).await?;
+        bucket.files().insert_one(&file).await?;
         Ok(())
     }
     .await;

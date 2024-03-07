@@ -48,7 +48,7 @@ async fn run_insert_one_test(test_file: TestFile) {
         }
 
         let result = coll
-            .insert_one(arguments.document, None)
+            .insert_one(arguments.document)
             .await
             .expect(&test_case.description);
         assert_eq!(

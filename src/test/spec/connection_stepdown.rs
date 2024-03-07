@@ -122,7 +122,7 @@ async fn notwritableprimary_keep_pool() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -131,7 +131,7 @@ async fn notwritableprimary_keep_pool() {
             "insert should have failed"
         );
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 
@@ -174,7 +174,7 @@ async fn notwritableprimary_reset_pool() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -186,7 +186,7 @@ async fn notwritableprimary_reset_pool() {
         tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
     }
@@ -223,7 +223,7 @@ async fn shutdown_in_progress() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -235,7 +235,7 @@ async fn shutdown_in_progress() {
         tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
     }
@@ -268,7 +268,7 @@ async fn interrupted_at_shutdown() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -280,7 +280,7 @@ async fn interrupted_at_shutdown() {
         tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 

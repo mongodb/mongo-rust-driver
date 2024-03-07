@@ -155,7 +155,7 @@ async fn load_balancing_test() {
     setup_client
         .database("load_balancing_test")
         .collection("load_balancing_test")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .unwrap();
 

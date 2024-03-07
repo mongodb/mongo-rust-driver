@@ -45,7 +45,7 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     let mut ops = vec![];
 
     ops.push(op!("insert", false, |coll, session| {
-        coll.insert_one_with_session(doc! { "x": 1 }, None, session)
+        coll.insert_one(doc! { "x": 1 }).session(session)
     }));
 
     ops.push(op!("insert", false, |coll, session| {
