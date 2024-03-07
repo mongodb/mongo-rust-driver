@@ -210,16 +210,15 @@ impl AuthMechanism {
                         "password must not be set for MONGODB-OIDC authentication",
                     ));
                 }
-                // TODO RUST-1670: handle ALLOWED_HOSTS
-                // let default_allowed = vec![
-                //     "*.mongodb.net",
-                //     "*.mongodb-dev.net",
-                //     "*.mongodb-qa.net",
-                //     "*.mongodbgov.net",
-                //     "localhost",
-                //     "127.0.0.1",
-                //     "::1",
-                // ]
+                if let Some(allowed_hosts) = credential
+                    .mechanism_properties
+                    .as_ref()
+                    .and_then(|p| p.get("ALLOWED_HOSTS"))
+                {
+                    allowed_hosts
+                        .as_array()
+                        .ok_or_else(|| Error::invalid_argument("ALLOWED_HOSTS must be an array"))?;
+                }
                 Ok(())
             }
             _ => Ok(()),
