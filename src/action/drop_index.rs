@@ -12,7 +12,10 @@ use crate::{
     Collection,
 };
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the index specified by `name` from this collection.
     ///
     /// `await` will return `Result<()>`.
@@ -38,8 +41,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the index specified by `name` from this collection.
     ///
     /// [`run`](DropIndex::run) will return `Result<()>`.

@@ -279,7 +279,7 @@ impl TestClient {
         coll_name: &str,
     ) -> Collection<T>
     where
-        T: Serialize + DeserializeOwned + Unpin + Debug,
+        T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         let coll = self.database(db_name).collection(coll_name);
         drop_collection(&coll).await;
@@ -504,7 +504,7 @@ impl TestClient {
 
 pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
+    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
     match coll.drop().await.map_err(|e| *e.kind) {
         Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}

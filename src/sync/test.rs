@@ -29,7 +29,11 @@ fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collecti
     coll
 }
 
-fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T> {
+fn init_db_and_typed_coll<T: Send + Sync>(
+    client: &Client,
+    db_name: &str,
+    coll_name: &str,
+) -> Collection<T> {
     let coll = client.database(db_name).collection(coll_name);
     coll.drop().run().unwrap();
     coll

@@ -202,7 +202,7 @@ pub(crate) struct CollRef<'a> {
 }
 
 impl<'a> CollRef<'a> {
-    fn new<T>(coll: &'a Collection<T>) -> Self {
+    fn new<T: Send + Sync>(coll: &'a Collection<T>) -> Self {
         Self {
             inner: coll.clone_with_type(),
             _ref: PhantomData,

@@ -15,7 +15,10 @@ use crate::{
 
 use super::{action_impl, option_setters, CollRef};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
     /// `await` will return `Result<Vec<Bson>>`.
@@ -30,8 +33,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
     /// [`run`](Distinct::run) will return `Result<Vec<Bson>>`.

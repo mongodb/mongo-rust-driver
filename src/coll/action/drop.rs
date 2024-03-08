@@ -24,7 +24,10 @@ action_impl! {
 }
 
 #[cfg(feature = "in-use-encryption-unstable")]
-impl<T> crate::Collection<T> {
+impl<T> crate::Collection<T>
+where
+    T: Send + Sync,
+{
     #[allow(clippy::needless_option_as_deref)]
     async fn drop_aux_collections(
         &self,

@@ -15,7 +15,10 @@ use crate::{
 
 use super::{action_impl, option_setters, CollRef, Multiple, Single};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Creates the given index on this collection.
     ///
     /// `await` will return `Result<CreateIndexResult>`.
@@ -46,8 +49,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Creates the given index on this collection.
     ///
     /// [`run`](CreateIndex::run) will return `Result<CreateIndexResult>`.

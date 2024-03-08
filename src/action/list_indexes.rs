@@ -24,7 +24,10 @@ use super::{
     ListSpecifications,
 };
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Lists all indexes on this collection.
     ///
     /// `await` will return `Result<Cursor<IndexModel>>` (or `Result<SessionCursor<IndexModel>>` if
@@ -51,8 +54,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Lists all indexes on this collection.
     ///
     /// [`run`](ListIndexes::run) will return `Result<Cursor<IndexModel>>` (or

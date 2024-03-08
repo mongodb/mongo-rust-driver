@@ -82,14 +82,20 @@ use crate::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Collection<T> {
+pub struct Collection<T>
+where
+    T: Send + Sync,
+{
     inner: Arc<CollectionInner>,
     _phantom: std::marker::PhantomData<fn() -> T>,
 }
 
 // Because derive is too conservative, derive only implements Clone if T is Clone.
 // Collection<T> does not actually store any value of type T (so T does not need to be clone).
-impl<T> Clone for Collection<T> {
+impl<T> Clone for Collection<T>
+where
+    T: Send + Sync,
+{
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -109,7 +115,10 @@ struct CollectionInner {
     human_readable_serialization: bool,
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
         let options = options.unwrap_or_default();
         let selection_criteria = options
@@ -139,7 +148,7 @@ impl<T> Collection<T> {
     }
 
     /// Gets a clone of the `Collection` with a different type `U`.
-    pub fn clone_with_type<U>(&self) -> Collection<U> {
+    pub fn clone_with_type<U: Send + Sync>(&self) -> Collection<U> {
         Collection {
             inner: self.inner.clone(),
             _phantom: Default::default(),
@@ -294,7 +303,7 @@ where
 
 impl<T> Collection<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Send + Sync,
 {
     async fn find_one_and_delete_common(
         &self,
@@ -402,7 +411,7 @@ where
 
 impl<T> Collection<T>
 where
-    T: Serialize + DeserializeOwned,
+    T: Serialize + DeserializeOwned + Send + Sync,
 {
     async fn find_one_and_replace_common(
         &self,
@@ -463,7 +472,7 @@ where
 
 impl<T> Collection<T>
 where
-    T: Serialize,
+    T: Serialize + Send + Sync,
 {
     #[allow(clippy::needless_option_as_deref)]
     async fn insert_many_common(

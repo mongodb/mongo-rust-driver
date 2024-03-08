@@ -36,7 +36,10 @@ impl Database {
     }
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
@@ -69,7 +72,10 @@ impl crate::sync::Database {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
