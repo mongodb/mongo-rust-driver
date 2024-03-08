@@ -412,7 +412,7 @@ impl Client {
 
                         credential
                             .mechanism
-                            .clone()
+                            .as_ref()
                             .ok_or(ErrorKind::Authentication {
                                 message: "No AuthMechanism when reauthentication required error \
                                           occured"
