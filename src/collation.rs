@@ -128,7 +128,7 @@ impl Serialize for CollationStrength {
         S: serde::Serializer,
     {
         let level = u32::from(*self);
-        serializer.serialize_i32(level as i32)
+        serializer.serialize_i32(level.try_into().map_err(serde::ser::Error::custom)?)
     }
 }
 

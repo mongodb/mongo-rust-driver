@@ -291,7 +291,7 @@ impl TopologyDescription {
         primary: &ServerDescription,
         max_staleness: Duration,
     ) {
-        let max_staleness_ms = max_staleness.as_millis() as i64;
+        let max_staleness_ms = max_staleness.as_millis().try_into().unwrap_or(i64::MAX);
 
         servers.retain(|server| {
             let server_staleness = self.calculate_secondary_staleness_with_primary(server, primary);
@@ -307,7 +307,7 @@ impl TopologyDescription {
         servers: &mut Vec<&ServerDescription>,
         max_staleness: Duration,
     ) {
-        let max_staleness = max_staleness.as_millis() as i64;
+        let max_staleness = max_staleness.as_millis().try_into().unwrap_or(i64::MAX);
         let max_write_date = self
             .servers
             .values()
@@ -347,7 +347,11 @@ impl TopologyDescription {
         let secondary_last_update = secondary.last_update_time?.timestamp_millis();
         let secondary_last_write = secondary.last_write_date().ok()??.timestamp_millis();
 
-        let heartbeat_frequency = self.heartbeat_frequency().as_millis() as i64;
+        let heartbeat_frequency = self
+            .heartbeat_frequency()
+            .as_millis()
+            .try_into()
+            .unwrap_or(i64::MAX);
 
         let staleness = (secondary_last_update - secondary_last_write)
             - (primary_last_update - primary_last_write)
@@ -362,7 +366,11 @@ impl TopologyDescription {
         max_last_write_date: i64,
     ) -> Option<i64> {
         let secondary_last_write = secondary.last_write_date().ok()??.timestamp_millis();
-        let heartbeat_frequency = self.heartbeat_frequency().as_millis() as i64;
+        let heartbeat_frequency = self
+            .heartbeat_frequency()
+            .as_millis()
+            .try_into()
+            .unwrap_or(i64::MAX);
 
         let staleness = max_last_write_date - secondary_last_write + heartbeat_frequency;
         Some(staleness)

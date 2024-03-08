@@ -12,6 +12,7 @@ use super::{
 use crate::{
     bson::RawDocumentBuf,
     bson_util,
+    checked::Checked,
     cmap::{conn::wire::util::SyncCountReader, Command},
     compression::{Compressor, Decoder},
     error::{Error, ErrorKind, Result},
@@ -121,21 +122,22 @@ impl Message {
         mut reader: T,
         header: &Header,
     ) -> Result<Self> {
-        // TODO: RUST-616 ensure length is < maxMessageSizeBytes
-        let length_remaining = header.length - Header::LENGTH as i32;
-        let mut buf = vec![0u8; length_remaining as usize];
+        let length = Checked::<usize>::try_from(header.length)?;
+        let length_remaining = length - Header::LENGTH;
+        let mut buf = vec![0u8; length_remaining.get()?];
         reader.read_exact(&mut buf).await?;
         let reader = buf.as_slice();
 
-        Self::read_op_common(reader, length_remaining, header)
+        Self::read_op_common(reader, length_remaining.get()?, header)
     }
 
     async fn read_from_op_compressed<T: AsyncRead + Unpin + Send>(
         mut reader: T,
         header: &Header,
     ) -> Result<Self> {
-        let length_remaining = header.length - Header::LENGTH as i32;
-        let mut buf = vec![0u8; length_remaining as usize];
+        let length = Checked::<usize>::try_from(header.length)?;
+        let length_remaining = length - Header::LENGTH;
+        let mut buf = vec![0u8; length_remaining.get()?];
         reader.read_exact(&mut buf).await?;
         let mut reader = buf.as_slice();
 
@@ -153,7 +155,7 @@ impl Message {
         }
 
         // Read uncompressed size
-        let uncompressed_size = reader.read_i32_sync()?;
+        let uncompressed_size = Checked::<usize>::try_from(reader.read_i32_sync()?)?;
 
         // Read compressor id
         let compressor_id: u8 = reader.read_u8_sync()?;
@@ -165,7 +167,7 @@ impl Message {
         let decoded_message = decoder.decode(reader)?;
 
         // Check that claimed length matches original length
-        if decoded_message.len() as i32 != uncompressed_size {
+        if decoded_message.len() != uncompressed_size.get()? {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "The server's message claims that the uncompressed length is {}, but was \
@@ -181,21 +183,18 @@ impl Message {
         let reader = decoded_message.as_slice();
         let length_remaining = decoded_message.len();
 
-        Self::read_op_common(reader, length_remaining as i32, header)
+        Self::read_op_common(reader, length_remaining, header)
     }
 
-    fn read_op_common(
-        mut reader: &[u8],
-        mut length_remaining: i32,
-        header: &Header,
-    ) -> Result<Self> {
+    fn read_op_common(mut reader: &[u8], length_remaining: usize, header: &Header) -> Result<Self> {
+        let mut length_remaining = Checked::new(length_remaining);
         let flags = MessageFlags::from_bits_truncate(reader.read_u32_sync()?);
-        length_remaining -= std::mem::size_of::<u32>() as i32;
+        length_remaining -= std::mem::size_of::<u32>();
 
         let mut count_reader = SyncCountReader::new(&mut reader);
         let mut document_payload = None;
         let mut document_sequences = Vec::new();
-        while length_remaining - count_reader.bytes_read() as i32 > 4 {
+        while (length_remaining - count_reader.bytes_read()).get()? > 4 {
             let next_section = MessageSection::read(&mut count_reader)?;
             match next_section {
                 MessageSection::Document(document) => {
@@ -216,22 +215,19 @@ impl Message {
             }
         }
 
-        length_remaining -= count_reader.bytes_read() as i32;
+        length_remaining -= count_reader.bytes_read();
 
         let mut checksum = None;
 
-        if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
+        if length_remaining.get()? == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
             checksum = Some(reader.read_u32_sync()?);
-        } else if length_remaining != 0 {
-            return Err(ErrorKind::InvalidResponse {
-                message: format!(
-                    "The server indicated that the reply would be {} bytes long, but it instead \
-                     was {}",
-                    header.length,
-                    header.length - length_remaining + count_reader.bytes_read() as i32,
-                ),
-            }
-            .into());
+        } else if length_remaining.get()? != 0 {
+            let header_len = Checked::<usize>::try_from(header.length)?;
+            return Err(Error::invalid_response(format!(
+                "The server indicated that the reply would be {} bytes long, but it instead was {}",
+                header.length,
+                header_len - length_remaining + count_reader.bytes_read(),
+            )));
         }
 
         Ok(Self {
@@ -249,9 +245,9 @@ impl Message {
 
     /// Serializes the Message to bytes and writes them to `writer`.
     pub(crate) async fn write_to<T: AsyncWrite + Send + Unpin>(&self, mut writer: T) -> Result<()> {
-        let sections = self.get_sections_bytes();
+        let sections = self.get_sections_bytes()?;
 
-        let total_length = Header::LENGTH
+        let total_length = Checked::new(Header::LENGTH)
             + std::mem::size_of::<u32>()
             + sections.len()
             + self
@@ -261,7 +257,7 @@ impl Message {
                 .unwrap_or(0);
 
         let header = Header {
-            length: total_length as i32,
+            length: total_length.try_into()?,
             request_id: self.request_id.unwrap_or_else(next_request_id),
             response_to: self.response_to,
             op_code: OpCode::Message,
@@ -289,24 +285,24 @@ impl Message {
         let mut encoder = compressor.to_encoder()?;
         let compressor_id = compressor.id() as u8;
 
-        let sections = self.get_sections_bytes();
+        let sections = self.get_sections_bytes()?;
 
         let flag_bytes = &self.flags.bits().to_le_bytes();
-        let uncompressed_len = sections.len() + flag_bytes.len();
+        let uncompressed_len = Checked::new(sections.len()) + flag_bytes.len();
         // Compress the flags and sections.  Depending on the handshake
         // this could use zlib, zstd or snappy
         encoder.write_all(flag_bytes)?;
         encoder.write_all(sections.as_slice())?;
         let compressed_bytes = encoder.finish()?;
 
-        let total_length = Header::LENGTH
+        let total_length = Checked::new(Header::LENGTH)
             + std::mem::size_of::<i32>()
             + std::mem::size_of::<i32>()
             + std::mem::size_of::<u8>()
             + compressed_bytes.len();
 
         let header = Header {
-            length: total_length as i32,
+            length: total_length.try_into()?,
             request_id: self.request_id.unwrap_or_else(next_request_id),
             response_to: self.response_to,
             op_code: OpCode::Compressed,
@@ -317,7 +313,7 @@ impl Message {
         // Write original (pre-compressed) opcode (always OP_MSG)
         writer.write_i32_le(OpCode::Message as i32).await?;
         // Write uncompressed size
-        writer.write_i32_le(uncompressed_len as i32).await?;
+        writer.write_i32_le(uncompressed_len.try_into()?).await?;
         // Write compressor id
         writer.write_u8(compressor_id).await?;
         // Write compressed message
@@ -328,7 +324,7 @@ impl Message {
         Ok(())
     }
 
-    fn get_sections_bytes(&self) -> Vec<u8> {
+    fn get_sections_bytes(&self) -> Result<Vec<u8>> {
         let mut sections = Vec::new();
 
         // Payload type 0
@@ -349,8 +345,8 @@ impl Message {
                 });
 
             // Size bytes + identifier bytes + null-terminator byte + document bytes
-            let size = 4 + identifier_bytes.len() + 1 + documents_size;
-            sections.extend((size as i32).to_le_bytes());
+            let size = Checked::new(4) + identifier_bytes.len() + 1 + documents_size;
+            sections.extend(size.try_into::<i32>()?.to_le_bytes());
 
             sections.extend(identifier_bytes);
             sections.push(0);
@@ -360,7 +356,7 @@ impl Message {
             }
         }
 
-        sections
+        Ok(sections)
     }
 }
 
@@ -393,28 +389,28 @@ impl MessageSection {
             return Ok(MessageSection::Document(document));
         }
 
-        let size = reader.read_i32_sync()?;
-        let mut length_remaining = size - std::mem::size_of::<i32>() as i32;
+        let size = Checked::<usize>::try_from(reader.read_i32_sync()?)?;
+        let mut length_remaining = size - std::mem::size_of::<i32>();
 
         let mut identifier = String::new();
-        length_remaining -= reader.read_to_string(&mut identifier)? as i32;
+        length_remaining -= reader.read_to_string(&mut identifier)?;
 
         let mut documents = Vec::new();
         let mut count_reader = SyncCountReader::new(reader);
 
-        while length_remaining > count_reader.bytes_read() as i32 {
+        while length_remaining.get()? > count_reader.bytes_read() {
             let bytes = bson_util::read_document_bytes(&mut count_reader)?;
             let document = RawDocumentBuf::from_bytes(bytes)?;
             documents.push(document);
         }
 
-        if length_remaining != count_reader.bytes_read() as i32 {
+        if length_remaining.get()? != count_reader.bytes_read() {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "The server indicated that the reply would be {} bytes long, but it instead \
                      was {}",
                     size,
-                    length_remaining + count_reader.bytes_read() as i32,
+                    length_remaining + count_reader.bytes_read(),
                 ),
             }
             .into());

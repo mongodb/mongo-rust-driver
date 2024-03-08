@@ -15,6 +15,7 @@ use crate::{
     action::Action,
     bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
     bson_util::get_int,
+    checked::Checked,
     client::AsyncDropToken,
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
@@ -505,21 +506,22 @@ async fn write_bytes(
     chunk_size_bytes: u32,
     files_id: Bson,
 ) -> Result<(u32, Vec<u8>)> {
+    let chunk_size_bytes: usize = Checked::new(chunk_size_bytes).try_into()?;
     bucket.create_indexes().await?;
 
-    let mut n = 0;
+    let mut n = Checked::new(0);
     let mut chunks = vec![];
 
-    while buffer.len() as u32 - (n * chunk_size_bytes) >= chunk_size_bytes {
+    while (Checked::new(buffer.len()) - (n * chunk_size_bytes)).get()? >= chunk_size_bytes {
         let start = n * chunk_size_bytes;
         let end = (n + 1) * chunk_size_bytes;
         let chunk = Chunk {
             id: ObjectId::new(),
             files_id: files_id.clone(),
-            n: starting_n + n,
+            n: starting_n + n.try_into::<u32>()?,
             data: RawBinaryRef {
                 subtype: BinarySubtype::Generic,
-                bytes: &buffer[(start as usize)..(end as usize)],
+                bytes: &buffer[start.get()?..end.get()?],
             },
         };
         n += 1;
@@ -528,8 +530,8 @@ async fn write_bytes(
 
     match bucket.chunks().insert_many(chunks, None).await {
         Ok(_) => {
-            buffer.drain(..(n * chunk_size_bytes) as usize);
-            Ok((n, buffer))
+            buffer.drain(..(n * chunk_size_bytes).get()?);
+            Ok((n.try_into()?, buffer))
         }
         Err(error) => match clean_up_chunks(files_id, bucket.chunks().clone(), Some(error)).await {
             // clean_up_chunks will always return an error if one is passed in, so this case is
