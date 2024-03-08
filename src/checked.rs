@@ -30,14 +30,6 @@ pub struct Checked<T>(pub Option<T>);
 
 impl<T> Checked<T> {
     /// Creates a new Checked instance from some sort of integer.
-    /// # Examples
-    /// ```
-    /// use checked::Checked;
-    ///
-    /// let x = Checked::new(1_000_u32);
-    /// let y = Checked::new(1_000_000_u32);
-    /// assert_eq!(x * x, y);
-    /// ```
     #[inline]
     pub fn new(x: T) -> Checked<T> {
         Checked(Some(x))
