@@ -26,6 +26,7 @@ const RETRYABLE_WRITE_CODES: [i32; 12] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
 ];
 const UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES: [i32; 3] = [50, 64, 91];
+const REAUTHENTICATION_REQUIRED_CODE: i32 = 391;
 
 /// Retryable write error label. This label will be added to an error when the error is
 /// write-retryable.
@@ -376,6 +377,11 @@ impl Error {
         self.sdam_code()
             .map(|code| NOTWRITABLEPRIMARY_CODES.contains(&code))
             .unwrap_or(false)
+    }
+
+    /// If this error corresponds to a "reauthentication required" error.
+    pub(crate) fn is_reauthentication_required(&self) -> bool {
+        self.sdam_code() == Some(REAUTHENTICATION_REQUIRED_CODE)
     }
 
     /// If this error corresponds to a "node is recovering" error as per the SDAM spec.

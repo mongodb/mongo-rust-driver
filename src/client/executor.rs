@@ -16,10 +16,7 @@ use super::{options::ServerAddress, session::TransactionState, Client, ClientSes
 use crate::{
     bson::Document,
     change_stream::{
-        event::ChangeStreamEvent,
-        session::SessionChangeStream,
-        ChangeStream,
-        ChangeStreamData,
+        event::ChangeStreamEvent, session::SessionChangeStream, ChangeStream, ChangeStreamData,
         WatchArgs,
     },
     cmap::{
@@ -27,33 +24,20 @@ use crate::{
             wire::{next_request_id, Message},
             PinnedConnectionHandle,
         },
-        Connection,
-        ConnectionPool,
-        RawCommandResponse,
+        Connection, ConnectionPool, RawCommandResponse,
     },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
-        Error,
-        ErrorKind,
-        Result,
-        RETRYABLE_WRITE_ERROR,
-        TRANSIENT_TRANSACTION_ERROR,
+        Error, ErrorKind, Result, RETRYABLE_WRITE_ERROR, TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{
-        CommandEvent,
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
+        CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
-        AbortTransaction,
-        CommandErrorBody,
-        CommitTransaction,
-        Operation,
-        Retryability,
+        AbortTransaction, CommandErrorBody, CommitTransaction, Operation, Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
@@ -280,7 +264,8 @@ impl Client {
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided
-    /// session. Retries the operation upon failure if retryability is supported.
+    /// session. Retries the operation upon failure if retryability is supported or after reauthenticating
+    /// if reauthentication is required.
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         mut op: T,
@@ -397,6 +382,29 @@ impl Client {
                     implicit_session,
                 },
                 Err(mut err) => {
+                    // If the error is a reauthentication required error, we reauthenticate and retry the operation.
+                    if err.is_reauthentication_required() {
+                        let credential = self.inner.options.credential.as_ref().ok_or(
+                            ErrorKind::Authentication {
+                                message:
+                                    "No Credential when reauthentication required error occured"
+                                        .to_string(),
+                            },
+                        )?;
+                        let server_api = self.inner.options.server_api.as_ref();
+
+                        credential
+                            .mechanism
+                            .clone()
+                            .ok_or(ErrorKind::Authentication {
+                                message:
+                                    "No AuthMechanism when reauthentication required error occured"
+                                        .to_string(),
+                            })?
+                            .reauthenticate_stream(&mut conn, credential, server_api)
+                            .await?;
+                        continue;
+                    }
                     err.wire_version = conn.stream_description()?.max_wire_version;
 
                     // Retryable writes are only supported by storage engines with document-level
