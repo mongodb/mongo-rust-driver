@@ -1,14 +1,27 @@
+use crate::{
+    client::{
+        auth::{oidc, AuthMechanism, Credential},
+        options::ClientOptions,
+    },
+    test::log_uncaptured,
+    Client,
+};
+use std::sync::{Arc, Mutex};
+
+// simple_cb is a simple callback that increments the passed atomic integer and returns a static IdpServerResponse
+async fn simple_cb(call_count: Arc<Mutex<u32>>) -> crate::error::Result<oidc::IdpServerResponse> {
+    *call_count.lock().unwrap() += 1;
+    Ok(oidc::IdpServerResponse {
+        access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
+        expires: None,
+        refresh_token: None,
+    })
+}
+
+// Machine Callback tests
 // Prose test 1.1 Single Principal Implicit Username
 #[tokio::test]
-async fn single_principal_implicit_username() -> anyhow::Result<()> {
-    use crate::{
-        client::{
-            auth::{oidc, AuthMechanism, Credential},
-            options::ClientOptions,
-        },
-        test::log_uncaptured,
-        Client,
-    };
+async fn machine_single_principal_implicit_username() -> anyhow::Result<()> {
     use bson::Document;
     use futures_util::FutureExt;
 
@@ -17,18 +30,14 @@ async fn single_principal_implicit_username() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let call_count = Arc::new(Mutex::new(0));
+    let cb_call_count = call_count.clone();
+
     let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.credential = Credential::builder()
         .mechanism(AuthMechanism::MongoDbOidc)
-        .oidc_callback(oidc::Callback::machine(|_| {
-            async move {
-                Ok(oidc::IdpServerResponse {
-                    access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
-                    expires: None,
-                    refresh_token: None,
-                })
-            }
-            .boxed()
+        .oidc_callback(oidc::Callback::machine(move |_| {
+            { simple_cb(cb_call_count.clone()) }.boxed()
         }))
         .build()
         .into();
@@ -38,14 +47,14 @@ async fn single_principal_implicit_username() -> anyhow::Result<()> {
         .collection::<Document>("test")
         .find_one(None, None)
         .await?;
+    assert_eq!(1, *(*call_count).lock().unwrap());
     Ok(())
 }
 
-// TODO RUST-1497: The following test will be removed because it is not an actual test in the spec,
-// but just showing that the human flow is still working for two_step (nothing in caching is
-// correctly exercised here)
+// Human Callback tests
+// Prose test 1.1 Single Principal Implicit Username
 #[tokio::test]
-async fn human_flow() -> anyhow::Result<()> {
+async fn human_single_principal_implicit_username() -> anyhow::Result<()> {
     use crate::{
         client::{
             auth::{oidc, AuthMechanism, Credential},
@@ -62,18 +71,14 @@ async fn human_flow() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let call_count = Arc::new(Mutex::new(0));
+    let cb_call_count = call_count.clone();
+
     let mut opts = ClientOptions::parse("mongodb://localhost/?authMechanism=MONGODB-OIDC").await?;
     opts.credential = Credential::builder()
         .mechanism(AuthMechanism::MongoDbOidc)
-        .oidc_callback(oidc::Callback::human(|_| {
-            async move {
-                Ok(oidc::IdpServerResponse {
-                    access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
-                    expires: None,
-                    refresh_token: None,
-                })
-            }
-            .boxed()
+        .oidc_callback(oidc::Callback::human(move |_| {
+            { simple_cb(cb_call_count.clone()) }.boxed()
         }))
         .build()
         .into();
@@ -83,5 +88,6 @@ async fn human_flow() -> anyhow::Result<()> {
         .collection::<Document>("test")
         .find_one(None, None)
         .await?;
+    assert_eq!(1, *(*call_count).lock().unwrap());
     Ok(())
 }
