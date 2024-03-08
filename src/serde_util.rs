@@ -150,6 +150,7 @@ where
     }
 
     let date_time = match AwsDateTime::deserialize(deserializer)? {
+        #[allow(clippy::cast_possible_truncation)]
         AwsDateTime::Double(seconds) => {
             let millis = seconds * 1000.0;
             bson::DateTime::from_millis(millis as i64)
