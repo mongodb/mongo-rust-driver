@@ -30,6 +30,7 @@ async fn machine_single_principal_implicit_username() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // we need to assert that the callback is only called once
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
 
@@ -71,6 +72,7 @@ async fn human_single_principal_implicit_username() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // we need to assert that the callback is only called once
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
 
