@@ -29,7 +29,7 @@ use crate::{
 ///
 ///     std::thread::spawn(move || {
 ///         // Perform operations with `coll_ref`. For example:
-///         coll_ref.insert_one(doc! { "x": i }, None);
+///         coll_ref.insert_one(doc! { "x": i });
 ///     });
 /// }
 /// #

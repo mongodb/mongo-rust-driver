@@ -41,7 +41,7 @@ impl UpdateOrReplace {
                 UpdateModifications::Pipeline(pipeline) => bson_util::to_raw_bson_array(pipeline),
             },
             Self::Replacement(replacement_doc) => {
-                bson_util::replacement_raw_document_check(&replacement_doc)?;
+                bson_util::replacement_raw_document_check(replacement_doc)?;
                 Ok(replacement_doc.clone().into())
             }
         }

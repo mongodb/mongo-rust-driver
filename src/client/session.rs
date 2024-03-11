@@ -81,7 +81,7 @@ pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: Lazy<HashSet<&'static str>> = L
 /// # }
 ///
 /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
-///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
+///     coll.insert_one(doc! { "x": 1 }).session(&mut *session).await?;
 ///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).await?;
 ///     // An "UnknownTransactionCommitResult" label indicates that it is unknown whether the
 ///     // commit has satisfied the write concern associated with the transaction. If an error
@@ -355,7 +355,7 @@ impl ClientSession {
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
-    /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).await?;
     /// session.commit_transaction().await?;
     /// # Ok(())
     /// # }
@@ -456,7 +456,7 @@ impl ClientSession {
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().await?;
     /// session.start_transaction(None).await?;
-    /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).await?;
     /// session.commit_transaction().await?;
     /// # Ok(())
     /// # }
@@ -524,8 +524,8 @@ impl ClientSession {
     /// # }
     ///
     /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
-    ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
-    ///     coll.delete_one(doc! { "y": 2 }).session(session).await?;
+    ///     coll.insert_one(doc! { "x": 1 }).session(&mut *session).await?;
+    ///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).await?;
     ///     Ok(())
     /// }
     /// ```
@@ -605,7 +605,7 @@ impl ClientSession {
     /// session.with_transaction(
     ///     (&coll, &my_data),
     ///     |session, (coll, my_data)| async move {
-    ///         coll.insert_one_with_session(doc! { "data": *my_data }, None, session).await
+    ///         coll.insert_one(doc! { "data": *my_data }).session(session).await
     ///     }.boxed(),
     ///     None,
     /// ).await?;
@@ -613,7 +613,7 @@ impl ClientSession {
     /// session.with_transaction(
     ///     (),
     ///     |session, _| async move {
-    ///         coll.insert_one_with_session(doc! { "data": my_data }, None, session).await
+    ///         coll.insert_one(doc! { "data": my_data }).session(session).await
     ///     }.boxed(),
     ///     None,
     /// ).await?;

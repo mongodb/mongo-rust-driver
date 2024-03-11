@@ -63,7 +63,7 @@ use crate::{
 ///     // Spawn several tasks that operate on the same collection concurrently.
 ///     tokio::task::spawn(async move {
 ///         // Perform operations with `coll_ref` that work with directly our model.
-///         coll_ref.insert_one(Item { id: i }, None).await;
+///         coll_ref.insert_one(Item { id: i }).await;
 ///     });
 /// }
 /// #
