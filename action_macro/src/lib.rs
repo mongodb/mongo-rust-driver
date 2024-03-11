@@ -56,10 +56,9 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     });
 
     quote! {
-        impl #generics crate::action::private::Sealed for #action {}
-        impl #generics crate::action::Action for #action {
-            type Output = #exec_output;
-        }
+        impl #generics crate::action::private::Sealed for #action { }
+
+        impl #generics crate::action::Action for #action { }
 
         impl #generics std::future::IntoFuture for #action {
             type Output = #exec_output;

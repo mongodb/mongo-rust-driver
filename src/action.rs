@@ -25,7 +25,7 @@ mod shutdown;
 mod update;
 mod watch;
 
-use std::{marker::PhantomData, ops::Deref};
+use std::{future::IntoFuture, marker::PhantomData, ops::Deref};
 
 pub use aggregate::Aggregate;
 use bson::Document;
@@ -118,10 +118,7 @@ pub(crate) mod private {
 
 /// A pending action to execute on the server.  The action can be configured via chained methods and
 /// executed via `await` (or `run` if using the sync client).
-pub trait Action: private::Sealed {
-    /// The type of the value produced by execution.
-    type Output;
-
+pub trait Action: private::Sealed + IntoFuture {
     /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
     /// updates with values that need to be set conditionally.  For example:
     /// ```rust
