@@ -91,7 +91,7 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 // impl<generics> Action for ActionType {
-// type Future = FutureName<optional generics>;
+// type Future = FutureName;
 // async fn execute([mut] self) -> OutType { <exec body> }
 // [SyncWrap]
 // }

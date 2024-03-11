@@ -116,7 +116,7 @@ impl<'a, T: Send + Sync, Session> Find<'a, T, Multiple, Session> {
 }
 
 impl<'a, T: Send + Sync, Mode> Find<'a, T, Mode, ImplicitSession> {
-    /// Runs the query using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session<'s>(
         self,
         value: impl Into<&'s mut ClientSession>,
