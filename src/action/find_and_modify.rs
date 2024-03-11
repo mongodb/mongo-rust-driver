@@ -119,7 +119,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
+    /// [`run`](FindOneAndDelete::run) will return `Result<Option<T>>`.
     pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
         self.async_collection.find_one_and_delete(filter)
     }
@@ -134,7 +134,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
+    /// [`run`](FindOneAndDelete::run) will return `Result<Option<T>>`.
     pub fn find_one_and_update(
         &self,
         filter: Document,
@@ -153,6 +153,8 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// retryability. See the documentation
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
+    ///
+    /// [`run`](FindOneAndReplace::run) will return `Result<Option<T>>`.
     pub fn find_one_and_replace(
         &self,
         filter: Document,
