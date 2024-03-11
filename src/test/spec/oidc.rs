@@ -29,8 +29,8 @@ async fn machine_single_principal_implicit_username() -> anyhow::Result<()> {
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::machine(move |_| {
             let call_count = cb_call_count.clone();
+            *call_count.lock().unwrap() += 1;
             async move {
-                *call_count.lock().unwrap() += 1;
                 Ok(oidc::IdpServerResponse {
                     access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
                     expires: None,
@@ -80,8 +80,8 @@ async fn human_single_principal_implicit_username() -> anyhow::Result<()> {
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::human(move |_| {
             let call_count = cb_call_count.clone();
+            *call_count.lock().unwrap() += 1;
             async move {
-                *call_count.lock().unwrap() += 1;
                 Ok(oidc::IdpServerResponse {
                     access_token: tokio::fs::read_to_string("/tmp/tokens/test_user1").await?,
                     expires: None,
