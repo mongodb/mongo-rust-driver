@@ -30,15 +30,13 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         lifetime,
         action,
         future_name,
-        future_generics,
         exec_self_mut,
         exec_output,
         exec_body,
         sync_wrap,
     } = parse_macro_input!(input as ActionImpl);
 
-    let future_generics = future_generics.unwrap_or_else(|| generics.clone());
-    let mut unbounded_generics = future_generics.clone();
+    let mut unbounded_generics = generics.clone();
     for lt in unbounded_generics.lifetimes_mut() {
         lt.bounds.clear();
     }
@@ -71,9 +69,9 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
         }
 
-        pub struct #future_name #future_generics (crate::BoxFuture<#lifetime, #exec_output>);
+        pub struct #future_name #generics (crate::BoxFuture<#lifetime, #exec_output>);
 
-        impl #future_generics std::future::Future for #future_name #unbounded_generics {
+        impl #generics std::future::Future for #future_name #unbounded_generics {
             type Output = #exec_output;
 
             fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
@@ -102,7 +100,6 @@ struct ActionImpl {
     lifetime: Lifetime,
     action: Type,
     future_name: Ident,
-    future_generics: Option<Generics>,
     exec_self_mut: Option<Token![mut]>,
     exec_output: Type,
     exec_body: Block,
@@ -132,16 +129,11 @@ impl Parse for ActionImpl {
         let impl_body;
         braced!(impl_body in input);
 
-        // type Future = FutureName<optional generics>;
+        // type Future = FutureName;
         impl_body.parse::<Token![type]>()?;
         parse_name(&impl_body, "Future")?;
         impl_body.parse::<Token![=]>()?;
         let future_name = impl_body.parse()?;
-        let future_generics = if impl_body.peek(Token![<]) {
-            Some(impl_body.parse()?)
-        } else {
-            None
-        };
         impl_body.parse::<Token![;]>()?;
 
         // async fn execute([mut] self) -> OutType { <exec body> }
@@ -175,7 +167,6 @@ impl Parse for ActionImpl {
             lifetime,
             action,
             future_name,
-            future_generics,
             exec_self_mut,
             exec_output,
             exec_body,

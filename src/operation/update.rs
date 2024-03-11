@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{
     bson::{doc, rawdoc, Document, RawArrayBuf, RawBson, RawDocumentBuf},
@@ -11,7 +11,6 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
-    serde_util::to_raw_document_buf_with_options,
     Namespace,
 };
 
@@ -22,16 +21,6 @@ pub(crate) enum UpdateOrReplace {
 }
 
 impl UpdateOrReplace {
-    pub(crate) fn replacement<T: Serialize>(
-        update: &T,
-        human_readable_serialization: bool,
-    ) -> Result<Self> {
-        Ok(Self::Replacement(to_raw_document_buf_with_options(
-            update,
-            human_readable_serialization,
-        )?))
-    }
-
     pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
         match self {
             Self::UpdateModifications(update_modifications) => match update_modifications {

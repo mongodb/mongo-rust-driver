@@ -1,6 +1,6 @@
-use std::{borrow::Borrow, marker::PhantomData, time::Duration};
+use std::{borrow::Borrow, time::Duration};
 
-use bson::{Bson, Document};
+use bson::{Bson, Document, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -20,6 +20,7 @@ use crate::{
         UpdateOrReplace,
     },
     options::WriteConcern,
+    serde_util,
     ClientSession,
     Collection,
 };
@@ -27,6 +28,19 @@ use crate::{
 use super::{action_impl, option_setters};
 
 impl<T: DeserializeOwned + Send + Sync> Collection<T> {
+    async fn find_and_modify<'a>(
+        &self,
+        filter: Document,
+        modification: Modification,
+        mut options: Option<FindAndModifyOptions>,
+        session: Option<&'a mut ClientSession>,
+    ) -> Result<Option<T>> {
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        let op = Op::<T>::with_modification(self.namespace(), filter, modification, options)?;
+        self.client().execute_operation(op, session).await
+    }
+
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -35,14 +49,12 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<Option<T>>`.
-    pub fn find_one_and_delete(&self, filter: Document) -> FindAndModify<'_, T, Delete> {
-        FindAndModify {
+    pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
+        FindOneAndDelete {
             coll: self,
             filter,
-            modification: Ok(Modification::Delete),
             options: None,
             session: None,
-            _mode: PhantomData,
         }
     }
 
@@ -61,15 +73,13 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
         &self,
         filter: Document,
         update: impl Into<UpdateModifications>,
-    ) -> FindAndModify<'_, T, Update> {
-        let update = update.into();
-        FindAndModify {
+    ) -> FindOneAndUpdate<'_, T> {
+        FindOneAndUpdate {
             coll: self,
             filter,
-            modification: Ok(Modification::Update(update.into())),
+            update: update.into(),
             options: None,
             session: None,
-            _mode: PhantomData,
         }
     }
 }
@@ -86,19 +96,16 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> Collection<T> {
         &self,
         filter: Document,
         replacement: impl Borrow<T>,
-    ) -> FindAndModify<'_, T, Replace> {
-        let human_readable_serialization = self.human_readable_serialization();
-        FindAndModify {
+    ) -> FindOneAndReplace<'_, T> {
+        FindOneAndReplace {
             coll: self,
             filter,
-            modification: UpdateOrReplace::replacement(
+            replacement: serde_util::to_raw_document_buf_with_options(
                 replacement.borrow(),
-                human_readable_serialization,
-            )
-            .map(Modification::Update),
+                self.human_readable_serialization(),
+            ),
             options: None,
             session: None,
-            _mode: PhantomData,
         }
     }
 }
@@ -113,7 +120,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// retryable writes.
     ///
     /// [`run`](FindAndModify::run) will return `Result<Option<T>>`.
-    pub fn find_one_and_delete(&self, filter: Document) -> FindAndModify<'_, T, Delete> {
+    pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
         self.async_collection.find_one_and_delete(filter)
     }
 
@@ -132,7 +139,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
         &self,
         filter: Document,
         update: impl Into<UpdateModifications>,
-    ) -> FindAndModify<'_, T, Update> {
+    ) -> FindOneAndUpdate<'_, T> {
         self.async_collection.find_one_and_update(filter, update)
     }
 }
@@ -150,32 +157,32 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
         &self,
         filter: Document,
         replacement: impl Borrow<T>,
-    ) -> FindAndModify<'_, T, Replace> {
+    ) -> FindOneAndReplace<'_, T> {
         self.async_collection
             .find_one_and_replace(filter, replacement)
     }
 }
 
-/// Atomically find up to one document in the collection matching a filter and modify it.  Construct
-/// with [`Collection::find_one_and_delete`].
+/// Atomically finds up to one document in the collection matching a filter and deletes it.
+/// Construct with [`Collection::find_one_and_delete`].
 #[must_use]
-pub struct FindAndModify<'a, T: Send + Sync, Mode> {
+pub struct FindOneAndDelete<'a, T: Send + Sync> {
     coll: &'a Collection<T>,
     filter: Document,
-    modification: Result<Modification>,
-    options: Option<FindAndModifyOptions>,
+    options: Option<FindOneAndDeleteOptions>,
     session: Option<&'a mut ClientSession>,
-    _mode: PhantomData<Mode>,
 }
 
-pub struct Delete;
-pub struct Update;
-pub struct Replace;
-
-impl<'a, T: Send + Sync, Mode> FindAndModify<'a, T, Mode> {
-    fn options(&mut self) -> &mut FindAndModifyOptions {
-        self.options
-            .get_or_insert_with(<FindAndModifyOptions>::default)
+impl<'a, T: Send + Sync> FindOneAndDelete<'a, T> {
+    option_setters! { options: FindOneAndDeleteOptions;
+        max_time: Duration,
+        projection: Document,
+        sort: Document,
+        write_concern: WriteConcern,
+        collation: Collation,
+        hint: Hint,
+        let_vars: Document,
+        comment: Bson,
     }
 
     /// Use the provided session when running the operation.
@@ -185,37 +192,39 @@ impl<'a, T: Send + Sync, Mode> FindAndModify<'a, T, Mode> {
     }
 }
 
-impl<'a, T: Send + Sync> FindAndModify<'a, T, Delete> {
-    /// Set all options.  Note that this will replace all previous values set.
-    pub fn with_options(mut self, value: impl Into<Option<FindOneAndDeleteOptions>>) -> Self {
-        self.options = value.into().map(FindAndModifyOptions::from);
-        self
-    }
+action_impl! {
+    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndDelete<'a, T> {
+        type Future = FindOneAndDeleteFuture;
 
-    option_setters! { FindOneAndDeleteOptions;
-        max_time: Duration,
-        projection: Document,
-        sort: Document,
-        write_concern: WriteConcern,
-        collation: Collation,
-        hint: Hint,
-        let_vars: Document,
-        comment: Bson,
+        async fn execute(self) -> Result<Option<T>> {
+            self.coll.find_and_modify(
+                self.filter,
+                Modification::Delete,
+                self.options.map(FindAndModifyOptions::from),
+                self.session,
+            ).await
+        }
     }
 }
 
-impl<'a, T: Send + Sync> FindAndModify<'a, T, Update> {
-    /// Set all options.  Note that this will replace all previous values set.
-    pub fn with_options(mut self, value: impl Into<Option<FindOneAndUpdateOptions>>) -> Self {
-        self.options = value.into().map(FindAndModifyOptions::from);
-        self
-    }
+/// Atomically finds up to one document in the collection matching a filter and updates it.
+/// Construct with [`Collection::find_one_and_update`].
+#[must_use]
+pub struct FindOneAndUpdate<'a, T: Send + Sync> {
+    coll: &'a Collection<T>,
+    filter: Document,
+    update: UpdateModifications,
+    options: Option<FindOneAndUpdateOptions>,
+    session: Option<&'a mut ClientSession>,
+}
 
-    option_setters! { FindOneAndUpdateOptions;
+impl<'a, T: Send + Sync> FindOneAndUpdate<'a, T> {
+    option_setters! { options: FindOneAndUpdateOptions;
         array_filters: Vec<Document>,
         bypass_document_validation: bool,
         max_time: Duration,
         projection: Document,
+        return_document: ReturnDocument,
         sort: Document,
         upsert: bool,
         write_concern: WriteConcern,
@@ -225,54 +234,72 @@ impl<'a, T: Send + Sync> FindAndModify<'a, T, Update> {
         comment: Bson,
     }
 
-    /// Set the [`FindOneAndUpdateOptions::return_document`] option.
-    pub fn return_document(mut self, value: ReturnDocument) -> Self {
-        self.options().new = Some(value.as_bool());
-        self
-    }
-}
-
-impl<'a, T: Send + Sync> FindAndModify<'a, T, Replace> {
-    /// Set all options.  Note that this will replace all previous values set.
-    pub fn with_options(mut self, value: impl Into<Option<FindOneAndReplaceOptions>>) -> Self {
-        self.options = value.into().map(FindAndModifyOptions::from);
-        self
-    }
-
-    option_setters! { FindOneAndReplaceOptions;
-        bypass_document_validation: bool,
-        max_time: Duration,
-        projection: Document,
-        sort: Document,
-        upsert: bool,
-        write_concern: WriteConcern,
-        collation: Collation,
-        hint: Hint,
-        let_vars: Document,
-        comment: Bson,
-    }
-
-    /// Set the [`FindOneAndReplaceOptions::return_document`] option.
-    pub fn return_document(mut self, value: ReturnDocument) -> Self {
-        self.options().new = Some(value.as_bool());
+    /// Use the provided session when running the operation.
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
+        self.session = Some(value.into());
         self
     }
 }
 
 action_impl! {
-    impl<'a, T: DeserializeOwned + Send + Sync, Mode> Action for FindAndModify<'a, T, Mode> {
-        type Future = FindAndModifyFuture<'a, T: DeserializeOwned + Send + Sync>;
+    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndUpdate<'a, T> {
+        type Future = FindOneAndUpdateFuture;
 
-        async fn execute(mut self) -> Result<Option<T>> {
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-
-            let op = Op::<T>::with_modification(
-                self.coll.namespace(),
+        async fn execute(self) -> Result<Option<T>> {
+            self.coll.find_and_modify(
                 self.filter,
-                self.modification?,
-                self.options,
-            )?;
-            self.coll.client().execute_operation(op, self.session).await
+                Modification::Update(self.update.into()),
+                self.options.map(FindAndModifyOptions::from),
+                self.session,
+            ).await
+        }
+    }
+}
+
+/// Atomically finds up to one document in the collection matching a filter and replaces it.
+/// Construct with [`Collection::find_one_and_replace`].
+#[must_use]
+pub struct FindOneAndReplace<'a, T: Send + Sync> {
+    coll: &'a Collection<T>,
+    filter: Document,
+    replacement: Result<RawDocumentBuf>,
+    options: Option<FindOneAndReplaceOptions>,
+    session: Option<&'a mut ClientSession>,
+}
+
+impl<'a, T: Send + Sync> FindOneAndReplace<'a, T> {
+    option_setters! { options: FindOneAndReplaceOptions;
+        bypass_document_validation: bool,
+        max_time: Duration,
+        projection: Document,
+        return_document: ReturnDocument,
+        sort: Document,
+        upsert: bool,
+        write_concern: WriteConcern,
+        collation: Collation,
+        hint: Hint,
+        let_vars: Document,
+        comment: Bson,
+    }
+
+    /// Use the provided session when running the operation.
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
+        self.session = Some(value.into());
+        self
+    }
+}
+
+action_impl! {
+    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndReplace<'a, T> {
+        type Future = FindOneAndReplaceFuture;
+
+        async fn execute(self) -> Result<Option<T>> {
+            self.coll.find_and_modify(
+                self.filter,
+                Modification::Update(UpdateOrReplace::Replacement(self.replacement?)),
+                self.options.map(FindAndModifyOptions::from),
+                self.session,
+            ).await
         }
     }
 }

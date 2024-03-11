@@ -70,7 +70,8 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     }
 }
 
-/// Finds the documents in a collection matching a filter.  Construct with [`Collection::find`].
+/// Finds the documents in a collection matching a filter.  Construct with [`Collection::find`] or
+/// [`Collection::find_one`].
 #[must_use]
 pub struct Find<'a, T: Send + Sync, Mode = Multiple, Session = ImplicitSession> {
     coll: &'a Collection<T>,
