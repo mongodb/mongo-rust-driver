@@ -250,9 +250,7 @@ async fn transaction_ids_included() {
         .unwrap();
     assert!(includes_txn_number("update"));
 
-    coll.replace_one(doc! {}, doc! { "x": 1 }, None)
-        .await
-        .unwrap();
+    coll.replace_one(doc! {}, doc! { "x": 1 }).await.unwrap();
     assert!(includes_txn_number("update"));
 
     coll.delete_one(doc! {}).await.unwrap();

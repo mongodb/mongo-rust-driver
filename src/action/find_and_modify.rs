@@ -178,7 +178,7 @@ impl<'a, T: Send + Sync, Mode> FindAndModify<'a, T, Mode> {
             .get_or_insert_with(<FindAndModifyOptions>::default)
     }
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
@@ -261,7 +261,7 @@ impl<'a, T: Send + Sync> FindAndModify<'a, T, Replace> {
 
 action_impl! {
     impl<'a, T: DeserializeOwned + Send + Sync, Mode> Action for FindAndModify<'a, T, Mode> {
-        type Future = FindAndDeleteFuture<'a, T: DeserializeOwned + Send + Sync>;
+        type Future = FindAndModifyFuture<'a, T: DeserializeOwned + Send + Sync>;
 
         async fn execute(mut self) -> Result<Option<T>> {
             resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;

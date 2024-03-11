@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
-    options::{Acknowledgment, ReadConcern, ReplaceOptions, TransactionOptions, WriteConcern},
+    options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
     test::{EventClient, TestClient},
     Collection,
 };
@@ -356,34 +356,24 @@ async fn command_contains_write_concern_replace_one() {
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
-    coll.replace_one(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        ReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.replace_one(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        ReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.replace_one(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.replace_one(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),

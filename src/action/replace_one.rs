@@ -26,7 +26,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// retryable writes.
     ///
     /// `await` will return `Result<UpdateResult>`.
-    pub fn replace_one_2(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
+    pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
         ReplaceOne {
             coll: CollRef::new(self),
             query,
@@ -50,8 +50,8 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// retryable writes.
     ///
     /// [`run`](ReplaceOne::run) will return `Result<UpdateResult>`.
-    pub fn replace_one_2(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
-        self.async_collection.replace_one_2(query, replacement)
+    pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
+        self.async_collection.replace_one(query, replacement)
     }
 }
 
@@ -76,7 +76,7 @@ impl<'a> ReplaceOne<'a> {
         comment: Bson,
     }
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self

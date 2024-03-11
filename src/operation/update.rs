@@ -91,23 +91,6 @@ impl Update {
         }
     }
 
-    pub(crate) fn with_replace<T: Serialize>(
-        ns: Namespace,
-        filter: Document,
-        update: &T,
-        multi: bool,
-        options: Option<UpdateOptions>,
-        human_readable_serialization: bool,
-    ) -> Result<Self> {
-        Ok(Self {
-            ns,
-            filter,
-            update: UpdateOrReplace::replacement(update, human_readable_serialization)?,
-            multi: multi.then_some(true),
-            options,
-        })
-    }
-
     pub(crate) fn with_replace_raw(
         ns: Namespace,
         filter: Document,

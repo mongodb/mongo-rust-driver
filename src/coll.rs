@@ -1,22 +1,19 @@
 mod action;
 pub mod options;
 
-use std::{borrow::Borrow, fmt, fmt::Debug, str::FromStr, sync::Arc};
+use std::{fmt, fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 use self::options::*;
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{Error, Result},
-    operation::Update,
-    results::UpdateResult,
     selection_criteria::SelectionCriteria,
     Client,
-    ClientSession,
     Database,
 };
 
@@ -219,69 +216,6 @@ where
 
     pub(crate) fn human_readable_serialization(&self) -> bool {
         self.inner.human_readable_serialization
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: Serialize + Send + Sync,
-{
-    async fn replace_one_common(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<UpdateResult> {
-        let mut options = options.into();
-
-        let session = session.into();
-
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let update = Update::with_replace(
-            self.namespace(),
-            query,
-            replacement.borrow(),
-            false,
-            options.map(UpdateOptions::from_replace_options),
-            self.inner.human_readable_serialization,
-        )?;
-        self.client().execute_operation(update, session).await
-    }
-
-    /// Replaces up to one document matching `query` in the collection with `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn replace_one(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-    ) -> Result<UpdateResult> {
-        self.replace_one_common(query, replacement, options, None)
-            .await
-    }
-
-    /// Replaces up to one document matching `query` in the collection with `replacement` using the
-    /// provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn replace_one_with_session(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        self.replace_one_common(query, replacement, options, session)
-            .await
     }
 }
 

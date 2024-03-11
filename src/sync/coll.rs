@@ -1,13 +1,5 @@
-use std::{borrow::Borrow, fmt::Debug};
-
-use serde::Serialize;
-
-use super::ClientSession;
 use crate::{
-    bson::Document,
-    error::Result,
-    options::{ReadConcern, ReplaceOptions, SelectionCriteria, WriteConcern},
-    results::UpdateResult,
+    options::{ReadConcern, SelectionCriteria, WriteConcern},
     Collection as AsyncCollection,
     Namespace,
 };
@@ -97,51 +89,5 @@ where
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: Serialize + Send + Sync,
-{
-    /// Replaces up to one document matching `query` in the collection with `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn replace_one(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-    ) -> Result<UpdateResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one(
-            query,
-            replacement.borrow(),
-            options.into(),
-        ))
-    }
-
-    /// Replaces up to one document matching `query` in the collection with `replacement` using the
-    /// provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn replace_one_with_session(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one_with_session(
-            query,
-            replacement.borrow(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 }

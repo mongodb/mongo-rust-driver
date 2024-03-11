@@ -94,7 +94,7 @@ impl<'a, Mode, Session> ListIndexes<'a, Mode, Session> {
 }
 
 impl<'a, Mode> ListIndexes<'a, Mode, ImplicitSession> {
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(
         self,
         value: impl Into<&'a mut ClientSession>,

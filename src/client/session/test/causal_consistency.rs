@@ -69,12 +69,8 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
-        .replace_one_with_session(
-            doc! { "x": 1 },
-            doc! { "x": 2 },
-            None,
-            s,
-        )));
+        .replace_one(doc! { "x": 1 }, doc! { "x": 2 },)
+        .session(s)));
 
     ops.push(op!("delete", false, |coll, s| coll
         .delete_one(doc! { "x": 1 })

@@ -1129,7 +1129,6 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                     },
                 ],
             },
-            None,
         )
         .await?;
     // End Example 54

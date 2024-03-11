@@ -825,7 +825,7 @@ async fn typed_replace_one() {
         str: "b".into(),
     };
     coll.insert_one(insert_data).await.unwrap();
-    coll.replace_one(doc! { "x": 1 }, replacement.clone(), None)
+    coll.replace_one(doc! { "x": 1 }, replacement.clone())
         .await
         .unwrap();
 
@@ -1070,7 +1070,7 @@ async fn invalid_utf8_response() {
 
     // test triggering an invalid error message via a replace_one.
     let replace_err = coll
-        .replace_one(doc! {"x": 1}, &long_unicode_str_doc, None)
+        .replace_one(doc! {"x": 1}, &long_unicode_str_doc)
         .await
         .expect_err("replacement with duplicate key should fail")
         .kind;
@@ -1178,7 +1178,6 @@ async fn configure_human_readable_serialization() {
                 id: 1,
                 s: StringOrBytes("non human readable!".into()),
             },
-            None,
         )
         .await
         .unwrap();
@@ -1221,7 +1220,6 @@ async fn configure_human_readable_serialization() {
                 id: 1,
                 s: StringOrBytes("human readable!".into()),
             },
-            None,
         )
         .await
         .unwrap();

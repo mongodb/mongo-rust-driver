@@ -1240,11 +1240,8 @@ impl TestOperation for ReplaceOne {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .replace_one(
-                    self.filter.clone(),
-                    self.replacement.clone(),
-                    self.options.clone(),
-                )
+                .replace_one(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
