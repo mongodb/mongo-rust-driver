@@ -90,9 +90,7 @@ impl Update {
             options,
         }
     }
-}
 
-impl Update {
     pub(crate) fn with_replace<T: Serialize>(
         ns: Namespace,
         filter: Document,
@@ -105,6 +103,22 @@ impl Update {
             ns,
             filter,
             update: UpdateOrReplace::replacement(update, human_readable_serialization)?,
+            multi: multi.then_some(true),
+            options,
+        })
+    }
+
+    pub(crate) fn with_replace_raw(
+        ns: Namespace,
+        filter: Document,
+        update: RawDocumentBuf,
+        multi: bool,
+        options: Option<UpdateOptions>,
+    ) -> Result<Self> {
+        Ok(Self {
+            ns,
+            filter,
+            update: UpdateOrReplace::Replacement(update),
             multi: multi.then_some(true),
             options,
         })
