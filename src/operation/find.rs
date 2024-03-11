@@ -80,9 +80,7 @@ impl OperationWithDefaults for Find {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        if !self.filter.is_empty() {
-            body.insert("filter", self.filter.clone());
-        }
+        body.insert("filter", self.filter.clone());
 
         Ok(Command::new_read(
             Self::NAME.to_string(),
