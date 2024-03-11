@@ -16,7 +16,7 @@ use crate::{
 
 use super::{action_impl, option_setters, CollRef};
 
-impl<T: Serialize> Collection<T> {
+impl<T: Serialize + Send + Sync> Collection<T> {
     /// Inserts `doc` into the collection.
     ///
     /// Note that either an owned or borrowed value can be inserted here, so the input document
@@ -42,7 +42,7 @@ impl<T: Serialize> Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T: Serialize> crate::sync::Collection<T> {
+impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// Inserts `doc` into the collection.
     ///
     /// Note that either an owned or borrowed value can be inserted here, so the input document

@@ -26,7 +26,7 @@ use crate::{
 
 use super::{action_impl, option_setters};
 
-impl<T: DeserializeOwned> Collection<T> {
+impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -74,7 +74,7 @@ impl<T: DeserializeOwned> Collection<T> {
     }
 }
 
-impl<T: Serialize + DeserializeOwned> Collection<T> {
+impl<T: Serialize + DeserializeOwned + Send + Sync> Collection<T> {
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
     /// `replacement`.
     ///
@@ -104,7 +104,7 @@ impl<T: Serialize + DeserializeOwned> Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
+impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -138,7 +138,7 @@ impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T: Serialize + DeserializeOwned> crate::sync::Collection<T> {
+impl<T: Serialize + DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
     /// `replacement`.
     ///
@@ -159,7 +159,7 @@ impl<T: Serialize + DeserializeOwned> crate::sync::Collection<T> {
 /// Atomically find up to one document in the collection matching a filter and modify it.  Construct
 /// with [`Collection::find_one_and_delete`].
 #[must_use]
-pub struct FindAndModify<'a, T, Mode> {
+pub struct FindAndModify<'a, T: Send + Sync, Mode> {
     coll: &'a Collection<T>,
     filter: Document,
     modification: Result<Modification>,
@@ -172,7 +172,7 @@ pub struct Delete;
 pub struct Update;
 pub struct Replace;
 
-impl<'a, T, Mode> FindAndModify<'a, T, Mode> {
+impl<'a, T: Send + Sync, Mode> FindAndModify<'a, T, Mode> {
     fn options(&mut self) -> &mut FindAndModifyOptions {
         self.options
             .get_or_insert_with(<FindAndModifyOptions>::default)
@@ -185,7 +185,7 @@ impl<'a, T, Mode> FindAndModify<'a, T, Mode> {
     }
 }
 
-impl<'a, T> FindAndModify<'a, T, Delete> {
+impl<'a, T: Send + Sync> FindAndModify<'a, T, Delete> {
     /// Set all options.  Note that this will replace all previous values set.
     pub fn with_options(mut self, value: impl Into<Option<FindOneAndDeleteOptions>>) -> Self {
         self.options = value.into().map(FindAndModifyOptions::from);
@@ -204,7 +204,7 @@ impl<'a, T> FindAndModify<'a, T, Delete> {
     }
 }
 
-impl<'a, T> FindAndModify<'a, T, Update> {
+impl<'a, T: Send + Sync> FindAndModify<'a, T, Update> {
     /// Set all options.  Note that this will replace all previous values set.
     pub fn with_options(mut self, value: impl Into<Option<FindOneAndUpdateOptions>>) -> Self {
         self.options = value.into().map(FindAndModifyOptions::from);
@@ -232,7 +232,7 @@ impl<'a, T> FindAndModify<'a, T, Update> {
     }
 }
 
-impl<'a, T> FindAndModify<'a, T, Replace> {
+impl<'a, T: Send + Sync> FindAndModify<'a, T, Replace> {
     /// Set all options.  Note that this will replace all previous values set.
     pub fn with_options(mut self, value: impl Into<Option<FindOneAndReplaceOptions>>) -> Self {
         self.options = value.into().map(FindAndModifyOptions::from);
@@ -260,8 +260,8 @@ impl<'a, T> FindAndModify<'a, T, Replace> {
 }
 
 action_impl! {
-    impl<'a, T: DeserializeOwned + Send, Mode> Action for FindAndModify<'a, T, Mode> {
-        type Future = FindAndDeleteFuture<'a, T: DeserializeOwned + Send>;
+    impl<'a, T: DeserializeOwned + Send + Sync, Mode> Action for FindAndModify<'a, T, Mode> {
+        type Future = FindAndDeleteFuture<'a, T: DeserializeOwned + Send + Sync>;
 
         async fn execute(mut self) -> Result<Option<T>> {
             resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;

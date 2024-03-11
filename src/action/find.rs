@@ -18,7 +18,7 @@ use crate::{
 
 use super::{action_impl, option_setters, ExplicitSession, ImplicitSession, Multiple, Single};
 
-impl<T> Collection<T> {
+impl<T: Send + Sync> Collection<T> {
     /// Finds the documents in the collection matching `filter`.
     ///
     /// `await` will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is
@@ -34,7 +34,7 @@ impl<T> Collection<T> {
     }
 }
 
-impl<T: DeserializeOwned + Send> Collection<T> {
+impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
     /// `await` will return `Result<Option<T>>`.
@@ -50,7 +50,7 @@ impl<T: DeserializeOwned + Send> Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T: Send + Sync> crate::sync::Collection<T> {
     /// Finds the documents in the collection matching `filter`.
     ///
     /// [`run`](Find::run) will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a
@@ -61,7 +61,7 @@ impl<T> crate::sync::Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
+impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
     /// [`run`](Find::run) will return `Result<Option<T>>`.
@@ -72,7 +72,7 @@ impl<T: DeserializeOwned + Send> crate::sync::Collection<T> {
 
 /// Finds the documents in a collection matching a filter.  Construct with [`Collection::find`].
 #[must_use]
-pub struct Find<'a, T, Mode = Multiple, Session = ImplicitSession> {
+pub struct Find<'a, T: Send + Sync, Mode = Multiple, Session = ImplicitSession> {
     coll: &'a Collection<T>,
     filter: Document,
     options: Option<FindOptions>,
@@ -80,7 +80,7 @@ pub struct Find<'a, T, Mode = Multiple, Session = ImplicitSession> {
     _mode: PhantomData<Mode>,
 }
 
-impl<'a, T, Mode, Session> Find<'a, T, Mode, Session> {
+impl<'a, T: Send + Sync, Mode, Session> Find<'a, T, Mode, Session> {
     option_setters!(options: FindOptions;
         allow_partial_results: bool,
         comment: String,
@@ -103,7 +103,7 @@ impl<'a, T, Mode, Session> Find<'a, T, Mode, Session> {
 }
 
 // Some options don't make sense for `find_one`.
-impl<'a, T, Session> Find<'a, T, Multiple, Session> {
+impl<'a, T: Send + Sync, Session> Find<'a, T, Multiple, Session> {
     option_setters!(FindOptions;
         allow_disk_use: bool,
         batch_size: u32,
@@ -114,7 +114,7 @@ impl<'a, T, Session> Find<'a, T, Multiple, Session> {
     );
 }
 
-impl<'a, T, Mode> Find<'a, T, Mode, ImplicitSession> {
+impl<'a, T: Send + Sync, Mode> Find<'a, T, Mode, ImplicitSession> {
     /// Runs the query using the provided session.
     pub fn session<'s>(
         self,
@@ -131,7 +131,7 @@ impl<'a, T, Mode> Find<'a, T, Mode, ImplicitSession> {
 }
 
 action_impl! {
-    impl<'a, T> Action for Find<'a, T, Multiple, ImplicitSession> {
+    impl<'a, T: Send + Sync> Action for Find<'a, T, Multiple, ImplicitSession> {
         type Future = FindFuture;
 
         async fn execute(mut self) -> Result<Cursor<T>> {
@@ -148,7 +148,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl<'a, T> Action for Find<'a, T, Multiple, ExplicitSession<'a>> {
+    impl<'a, T: Send + Sync> Action for Find<'a, T, Multiple, ExplicitSession<'a>> {
         type Future = FindSessionFuture;
 
         async fn execute(mut self) -> Result<SessionCursor<T>> {
@@ -166,7 +166,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl<'a, T: DeserializeOwned> Action for Find<'a, T, Single, ImplicitSession>
+    impl<'a, T: DeserializeOwned + Send + Sync> Action for Find<'a, T, Single, ImplicitSession>
     {
         type Future = FindOneFuture;
 
@@ -181,7 +181,7 @@ action_impl! {
 }
 
 action_impl! {
-    impl<'a, T: DeserializeOwned + Send> Action for Find<'a, T, Single, ExplicitSession<'a>> {
+    impl<'a, T: DeserializeOwned + Send + Sync> Action for Find<'a, T, Single, ExplicitSession<'a>> {
         type Future = FindOneSessionFuture;
 
         async fn execute(self) -> Result<Option<T>> {
