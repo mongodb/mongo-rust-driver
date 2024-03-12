@@ -224,6 +224,15 @@ fn get_refresh_token_and_idp_info(
     (refresh_token, idp_info)
 }
 
+pub(crate) async fn reauthenticate_stream(
+    conn: &mut Connection,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+) -> Result<()> {
+    invalidate_caches(conn, credential);
+    authenticate_stream(conn, credential, server_api, None).await
+}
+
 pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,

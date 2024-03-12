@@ -341,6 +341,44 @@ impl AuthMechanism {
             .into()),
         }
     }
+
+    pub(crate) async fn reauthenticate_stream(
+        &self,
+        stream: &mut Connection,
+        credential: &Credential,
+        server_api: Option<&ServerApi>,
+    ) -> Result<()> {
+        self.validate_credential(credential)?;
+
+        match self {
+            AuthMechanism::ScramSha1
+            | AuthMechanism::ScramSha256
+            | AuthMechanism::MongoDbX509
+            | AuthMechanism::Plain
+            | AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
+                message: format!(
+                    "Reauthentication for authentication mechanism {:?} is not supported.",
+                    self
+                ),
+            }
+            .into()),
+            #[cfg(feature = "aws-auth")]
+            AuthMechanism::MongoDbAws => Err(ErrorKind::Authentication {
+                message: format!(
+                    "Reauthentication for authentication mechanism {:?} is not supported.",
+                    self
+                ),
+            }
+            .into()),
+            AuthMechanism::MongoDbOidc => {
+                oidc::reauthenticate_stream(stream, credential, server_api).await
+            }
+            _ => Err(ErrorKind::Authentication {
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
+            }
+            .into()),
+        }
+    }
 }
 
 impl FromStr for AuthMechanism {
