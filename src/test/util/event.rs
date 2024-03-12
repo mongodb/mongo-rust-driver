@@ -15,30 +15,16 @@ use crate::{
     bson::{doc, to_document, Document},
     event::{
         cmap::{
-            CmapEvent,
-            ConnectionCheckedInEvent,
-            ConnectionCheckedOutEvent,
-            ConnectionCheckoutFailedEvent,
-            ConnectionCheckoutStartedEvent,
-            ConnectionClosedEvent,
-            ConnectionCreatedEvent,
-            ConnectionReadyEvent,
-            PoolClearedEvent,
-            PoolClosedEvent,
-            PoolCreatedEvent,
-            PoolReadyEvent,
+            CmapEvent, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+            ConnectionCheckoutFailedEvent, ConnectionCheckoutStartedEvent, ConnectionClosedEvent,
+            ConnectionCreatedEvent, ConnectionReadyEvent, PoolClearedEvent, PoolClosedEvent,
+            PoolCreatedEvent, PoolReadyEvent,
         },
         command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::{
-            SdamEvent,
-            ServerClosedEvent,
-            ServerDescriptionChangedEvent,
-            ServerHeartbeatFailedEvent,
-            ServerHeartbeatStartedEvent,
-            ServerHeartbeatSucceededEvent,
-            ServerOpeningEvent,
-            TopologyClosedEvent,
-            TopologyDescriptionChangedEvent,
+            SdamEvent, ServerClosedEvent, ServerDescriptionChangedEvent,
+            ServerHeartbeatFailedEvent, ServerHeartbeatStartedEvent, ServerHeartbeatSucceededEvent,
+            ServerOpeningEvent, TopologyClosedEvent, TopologyDescriptionChangedEvent,
             TopologyOpeningEvent,
         },
     },
@@ -71,6 +57,14 @@ impl Event {
             e
         } else {
             panic!("expected SDAM event, instead got {:#?}", self)
+        }
+    }
+
+    pub(crate) fn as_command_event(&self) -> Option<&CommandEvent> {
+        if let Event::Command(e) = self {
+            Some(e)
+        } else {
+            None
         }
     }
 

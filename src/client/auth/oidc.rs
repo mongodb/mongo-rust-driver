@@ -1,8 +1,9 @@
 use serde::Deserialize;
 use std::{
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::sync::{Mutex, MutexGuard};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
     error::{Error, Result},
     BoxFuture,
 };
-use bson::{doc, rawdoc, Document};
+use bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document};
 
 use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
 
@@ -39,7 +40,8 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
 #[derive(Clone)]
 pub struct State {
     callback: Callback,
-    cache: Arc<RwLock<Cache>>,
+    // pub(crate) for spec tests
+    pub(crate) cache: Arc<Mutex<Cache>>,
 }
 
 #[derive(Clone)]
@@ -105,7 +107,7 @@ impl Callback {
     {
         State {
             callback: Self::new(callback, kind),
-            cache: Arc::new(RwLock::new(Cache::new())),
+            cache: Arc::new(Mutex::new(Cache::new())),
         }
     }
 }
@@ -123,8 +125,10 @@ pub struct CallbackInner {
 #[derive(Debug, Clone)]
 pub struct Cache {
     idp_server_info: Option<IdpServerInfo>,
-    refresh_token: Option<String>,
-    access_token: Option<String>,
+    // pub(crate) for spec tests
+    pub(crate) refresh_token: Option<String>,
+    // pub(crate) for spec tests
+    pub(crate) access_token: Option<String>,
     token_gen_id: u32,
     last_call_time: Instant,
 }
@@ -168,60 +172,60 @@ pub struct IdpServerResponse {
     pub refresh_token: Option<String>,
 }
 
-pub(crate) fn build_speculative_client_first(credential: &Credential) -> Command {
-    self::build_client_first(credential, None)
-}
-
-/// Constructs the first client message in the OIDC handshake for speculative authentication
-pub(crate) fn build_client_first(
-    credential: &Credential,
+fn make_spec_auth_command(
+    source: String,
+    payload: Vec<u8>,
     server_api: Option<&ServerApi>,
 ) -> Command {
-    let mut auth_command_doc = doc! {
-        "authenticate": 1,
+    let body = doc! {
+        "saslStart": 1,
         "mechanism": MONGODB_OIDC_STR,
+        "payload": Binary { subtype: BinarySubtype::Generic, bytes: payload },
+        "db": "$external",
     };
 
-    if credential.oidc_callback.is_none() {
-        auth_command_doc.insert("jwt", "");
-    } else if let Some(access_token) = get_access_token(credential) {
-        auth_command_doc.insert("jwt", access_token);
-    }
-
-    let mut command = Command::new("authenticate", "$external", auth_command_doc);
+    let mut command = Command::new("saslStart", source, body);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }
-
     command
 }
 
-fn get_access_token(credential: &Credential) -> Option<String> {
-    credential
-        .oidc_callback
-        .as_ref()
-        .unwrap()
-        .cache
-        .read()
-        .unwrap()
-        .access_token
-        .clone()
+pub(crate) async fn build_speculative_client_first(credential: &Credential) -> Option<Command> {
+    self::build_client_first(credential, None).await
 }
 
-fn get_refresh_token_and_idp_info(
+/// Constructs the first client message in the OIDC handshake for speculative authentication
+pub(crate) async fn build_client_first(
     credential: &Credential,
-) -> (Option<String>, Option<IdpServerInfo>) {
-    let cache = credential
+    server_api: Option<&ServerApi>,
+) -> Option<Command> {
+    if credential.oidc_callback.is_none() {
+        return None;
+    }
+    if let Some(ref access_token) = credential
         .oidc_callback
         .as_ref()
-        // this unwrap is safe because this function is only called from within authenticate_human
         .unwrap()
         .cache
-        .read()
-        .unwrap();
-    let refresh_token = cache.refresh_token.clone();
-    let idp_info = cache.idp_server_info.clone();
-    (refresh_token, idp_info)
+        .lock()
+        .await
+        .access_token
+    {
+        let start_doc = rawdoc! {
+            "jwt": access_token.clone()
+        };
+        let source = credential
+            .source
+            .clone()
+            .unwrap_or_else(|| "$external".to_string());
+        return Some(make_spec_auth_command(
+            source,
+            start_doc.as_bytes().to_vec(),
+            server_api,
+        ));
+    }
+    None
 }
 
 pub(crate) async fn reauthenticate_stream(
@@ -229,7 +233,18 @@ pub(crate) async fn reauthenticate_stream(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
-    invalidate_caches(conn, credential);
+    invalidate_caches(
+        conn,
+        &mut credential
+            .oidc_callback
+            .as_ref()
+            .unwrap()
+            .cache
+            .lock()
+            .await,
+        true,
+    )
+    .await;
     authenticate_stream(conn, credential, server_api, None).await
 }
 
@@ -239,10 +254,26 @@ pub(crate) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
     server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
+    // We need to hold the lock for the entire function so that multiple callbacks
+    // are not called during an authentication race, and so that token_gen_id on the Connection
+    // always matches that in the Credential Cache.
+    let mut cred_cache = credential
+        .oidc_callback
+        .as_ref()
+        .ok_or_else(|| auth_error("no callbacks supplied"))?
+        .cache
+        .lock()
+        .await;
+
+    propagate_token_gen_id(conn, &cred_cache).await;
+
     if server_first.into().is_some() {
         // speculative authentication succeeded, no need to authenticate again
+        // update the Connection gen_id to be that of the cred_cache
+        propagate_token_gen_id(conn, &cred_cache).await;
         return Ok(());
     }
+    let source = credential.source.as_deref().unwrap_or("$external");
 
     let Callback { inner, kind } = credential
         .oidc_callback
@@ -251,27 +282,20 @@ pub(crate) async fn authenticate_stream(
         .callback
         .clone();
     match kind {
-        CallbackKind::Machine => authenticate_machine(conn, credential, server_api, inner).await,
-        CallbackKind::Human => authenticate_human(conn, credential, server_api, inner).await,
+        CallbackKind::Machine => {
+            authenticate_machine(source, conn, credential, &mut cred_cache, server_api, inner).await
+        }
+        CallbackKind::Human => {
+            authenticate_human(source, conn, credential, &mut cred_cache, server_api, inner).await
+        }
     }
 }
 
-fn update_caches(
-    conn: &Connection,
-    credential: &Credential,
+async fn update_cred_cache(
+    cred_cache: &mut MutexGuard<'_, Cache>,
     response: &IdpServerResponse,
     idp_server_info: Option<IdpServerInfo>,
 ) {
-    let mut token_gen_id = conn.oidc_token_gen_id.write().unwrap();
-    let mut cred_cache = credential
-            .oidc_callback
-            .as_ref()
-            // unwrap() is safe here because authenticate_human is only called if oidc_callback is Some
-            .unwrap()
-            .cache
-            .write()
-            .unwrap();
-
     if idp_server_info.is_some() {
         cred_cache.idp_server_info = idp_server_info;
     }
@@ -279,22 +303,20 @@ fn update_caches(
     cred_cache.refresh_token = response.refresh_token.clone();
     cred_cache.last_call_time = Instant::now();
     cred_cache.token_gen_id += 1;
-    *token_gen_id = cred_cache.token_gen_id;
 }
 
-fn invalidate_caches(conn: &Connection, credential: &Credential) {
-    let mut token_gen_id = conn.oidc_token_gen_id.write().unwrap();
-    let mut cred_cache = credential
-        .oidc_callback
-        .as_ref()
-        // unwrap() is safe here because authenticate_human/machine is only called if oidc_callback is Some
-        .unwrap()
-        .cache
-        .write()
-        .unwrap();
+async fn propagate_token_gen_id(conn: &Connection, cred_cache: &MutexGuard<'_, Cache>) {
+    let mut token_gen_id = conn.oidc_token_gen_id.lock().await;
+    if *token_gen_id < cred_cache.token_gen_id {
+        *token_gen_id = cred_cache.token_gen_id;
+    }
+}
+
+async fn invalidate_caches(conn: &Connection, cred_cache: &mut MutexGuard<'_, Cache>, force: bool) {
+    let mut token_gen_id = conn.oidc_token_gen_id.lock().await;
     // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in
     // case
-    if *token_gen_id >= cred_cache.token_gen_id {
+    if force || *token_gen_id >= cred_cache.token_gen_id {
         cred_cache.access_token = None;
         *token_gen_id = 0;
     }
@@ -325,14 +347,49 @@ async fn send_sasl_start_command(
     send_sasl_command(conn, sasl_start).await
 }
 
-async fn do_two_step_auth(
+// do_shared_flow is the shared flow for both human and machine
+async fn do_shared_flow(
     source: &str,
     conn: &mut Connection,
+    cred_cache: &mut MutexGuard<'_, Cache>,
     credential: &Credential,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
     timeout: Duration,
 ) -> Result<()> {
+    // If the idpinfo is cached, we use that instead of doing two_step. It seems we do not allow
+    // idpinfo to change on invalidations.
+    if cred_cache.idp_server_info.is_some() {
+        let idp_response = {
+            let cb_context = CallbackContext {
+                timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
+                version: API_VERSION,
+                refresh_token: None,
+                idp_info: cred_cache.idp_server_info.clone(),
+            };
+            (callback.f)(cb_context).await?
+        };
+        let response = send_sasl_start_command(
+            source,
+            conn,
+            credential,
+            server_api,
+            Some(idp_response.access_token.clone()),
+        )
+        .await?;
+        if response.done {
+            update_cred_cache(
+                cred_cache,
+                &idp_response,
+                cred_cache.idp_server_info.clone(),
+            )
+            .await;
+            return Ok(());
+        }
+        return Err(invalid_auth_response());
+    }
+
+    // Here we do not have the idpinfo, so we need to do the two step flow.
     let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
     if response.done {
         return Err(invalid_auth_response());
@@ -352,7 +409,7 @@ async fn do_two_step_auth(
 
     // Update the credential and connection caches with the access token and the credential cache
     // with the refresh token and token_gen_id
-    update_caches(conn, credential, &idp_response, Some(server_info));
+    update_cred_cache(cred_cache, &idp_response, Some(server_info)).await;
 
     let sasl_continue = SaslContinue::new(
         source.to_string(),
@@ -410,18 +467,21 @@ fn validate_address_with_allowed_hosts(
 }
 
 async fn authenticate_human(
+    source: &str,
     conn: &mut Connection,
     credential: &Credential,
+    mut cred_cache: &mut MutexGuard<'_, Cache>,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
     validate_address_with_allowed_hosts(credential.mechanism_properties.as_ref(), &conn.address)?;
 
-    let source = credential.source.as_deref().unwrap_or("$external");
+    // We need to hold the lock for the entire function so that multiple callbacks
+    // are not called during an authentication race.
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
-    if let Some(access_token) = get_access_token(credential) {
+    if let Some(ref access_token) = cred_cache.access_token {
         let response = send_sasl_start_command(
             source,
             conn,
@@ -429,15 +489,20 @@ async fn authenticate_human(
             server_api,
             Some(access_token.clone()),
         )
-        .await?;
-        if response.done {
-            return Ok(());
+        .await;
+        if let Ok(response) = response {
+            if response.done {
+                return Ok(());
+            }
         }
-        invalidate_caches(conn, credential);
+        invalidate_caches(conn, &mut cred_cache, false).await;
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
-    if let (refresh_token @ Some(_), idp_info) = get_refresh_token_and_idp_info(credential) {
+    if let (refresh_token @ Some(_), idp_info) = (
+        cred_cache.refresh_token.clone(),
+        cred_cache.idp_server_info.clone(),
+    ) {
         let idp_response = {
             let cb_context = CallbackContext {
                 timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
@@ -447,28 +512,32 @@ async fn authenticate_human(
             };
             (callback.f)(cb_context).await?
         };
-        // Update the credential and connection caches with the access token and the credential
-        // cache with the refresh token and token_gen_id
-        update_caches(conn, credential, &idp_response, None);
 
-        let access_token = idp_response.access_token;
-        let response = send_sasl_start_command(
-            source,
-            conn,
-            credential,
-            server_api,
-            Some(access_token.clone()),
-        )
-        .await?;
-        if response.done {
-            return Ok(());
+        let access_token = idp_response.access_token.clone();
+        let response =
+            send_sasl_start_command(source, conn, credential, server_api, Some(access_token)).await;
+        if let Ok(response) = response {
+            if response.done {
+                // Update the credential and connection caches with the access token and the
+                // credential cache with the refresh token and token_gen_id
+                update_cred_cache(&mut cred_cache, &idp_response, None).await;
+                return Ok(());
+            }
+            // It should really not be possible for this to occur, we would get an error, if the
+            // response is not done. Just in case, we will fall through to two_step to try one
+            // more time.
+        } else {
+            // since this is an error, we will go ahead and invalidate the caches so we do not
+            // try to use them again and waste time. We should fall through so that we can
+            // do the shared flow from the beginning
+            invalidate_caches(conn, &mut cred_cache, false).await;
         }
-        invalidate_caches(conn, credential);
     }
 
-    do_two_step_auth(
+    do_shared_flow(
         source,
         conn,
+        &mut cred_cache,
         credential,
         server_api,
         callback,
@@ -478,16 +547,16 @@ async fn authenticate_human(
 }
 
 async fn authenticate_machine(
+    source: &str,
     conn: &mut Connection,
     credential: &Credential,
+    mut cred_cache: &mut MutexGuard<'_, Cache>,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
-    let source = credential.source.as_deref().unwrap_or("$external");
-
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the callback and sasl_continue
-    if let Some(access_token) = get_access_token(credential) {
+    if let Some(ref access_token) = cred_cache.access_token {
         let response = send_sasl_start_command(
             source,
             conn,
@@ -495,17 +564,20 @@ async fn authenticate_machine(
             server_api,
             Some(access_token.clone()),
         )
-        .await?;
-        if response.done {
-            return Ok(());
+        .await;
+        if let Ok(response) = response {
+            if response.done {
+                return Ok(());
+            }
         }
-        invalidate_caches(conn, credential);
+        invalidate_caches(conn, &mut cred_cache, false).await;
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
-    do_two_step_auth(
+    do_shared_flow(
         source,
         conn,
+        &mut cred_cache,
         credential,
         server_api,
         callback,
