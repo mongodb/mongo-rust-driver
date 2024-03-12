@@ -128,12 +128,15 @@ impl TestCursor {
 
 impl ClientEntity {
     pub(crate) fn new(
-        client_options: ClientOptions,
-        handler: Arc<EventHandler>,
+        mut client_options: ClientOptions,
         observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
+        let handler = Arc::new(EventHandler::new());
+        client_options.command_event_handler = Some(handler.clone().command_sender().into());
+        client_options.cmap_event_handler = Some(handler.clone().cmap_sender().into());
+        client_options.sdam_event_handler = Some(handler.clone().sdam_sender().into());
         // ensure the observer is already listening before the client is created to avoid any races
         // around collecting initial events when the topology opens.
         let observer = EventObserver::new(handler.broadcaster().subscribe());
