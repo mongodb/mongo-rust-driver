@@ -15,7 +15,11 @@ use crate::{
     change_stream::ChangeStream,
     client::{options::ClientOptions, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, Result},
-    event::{cmap::CmapEvent, command::{CommandEvent, CommandStartedEvent}, EventHandler},
+    event::{
+        cmap::CmapEvent,
+        command::{CommandEvent, CommandStartedEvent},
+        EventHandler,
+    },
     gridfs::GridFsBucket,
     runtime,
     sdam::TopologyDescription,
@@ -133,7 +137,10 @@ fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
     event_received: Arc<Notify>,
 ) -> impl Fn(T) + Send + Sync + 'static {
     move |ev: T| {
-        events.lock().unwrap().push((ev.into(), OffsetDateTime::now_utc()));
+        events
+            .lock()
+            .unwrap()
+            .push((ev.into(), OffsetDateTime::now_utc()));
         event_received.notify_waiters();
     }
 }
@@ -154,8 +161,10 @@ impl ClientEntity {
     ) -> Self {
         let events = Arc::new(SyncMutex::new(vec![]));
         let event_received = Arc::new(Notify::new());
-        client_options.command_event_handler = wrapped_ev_callback(events.clone(), event_received.clone());
-        client_options.sdam_event_handler = wrapped_ev_callback(events.clone(), event_received.clone());
+        client_options.command_event_handler =
+            wrapped_ev_callback(events.clone(), event_received.clone());
+        client_options.sdam_event_handler =
+            wrapped_ev_callback(events.clone(), event_received.clone());
         let connections_checked_out = Arc::new(SyncMutex::new(0));
         {
             let connections_checked_out = connections_checked_out.clone();
@@ -191,12 +200,18 @@ impl ClientEntity {
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
     pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
-        self.events.lock().unwrap().iter()
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
             .map(|(ev, _)| ev)
             .filter(|event| {
                 match (expected_type, event) {
                     (ExpectedEventType::Cmap, Event::Cmap(_)) => (),
-                    (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(CmapEvent::ConnectionReady(_))) => return false,
+                    (
+                        ExpectedEventType::CmapWithoutConnectionReady,
+                        Event::Cmap(CmapEvent::ConnectionReady(_)),
+                    ) => return false,
                     (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(_)) => (),
                     (ExpectedEventType::Command, Event::Command(_)) => (),
                     (ExpectedEventType::Sdam, Event::Sdam(_)) => (),
@@ -213,7 +228,9 @@ impl ClientEntity {
                     }
                 }
                 true
-            }).cloned().collect()
+            })
+            .cloned()
+            .collect()
     }
 
     pub(crate) fn matching_events(
@@ -238,11 +255,16 @@ impl ClientEntity {
         entities: Arc<RwLock<EntityMap>>,
     ) -> Result<()> {
         crate::runtime::timeout(Duration::from_secs(10), async {
-            while self.matching_events(expected, &*entities.read().await).len() < count {
+            while self
+                .matching_events(expected, &*entities.read().await)
+                .len()
+                < count
+            {
                 self.event_received.notified().await;
             }
             Ok(())
-        }).await?
+        })
+        .await?
     }
 
     /// Returns `true` if a given `CommandEvent` is allowed to be observed.
@@ -283,7 +305,11 @@ impl ClientEntity {
             .iter()
             .map(|(ev, _)| ev)
             .filter_map(|ev| match ev {
-                Event::Command(CommandEvent::Started(ev)) if ev.command_name != "configureFailPoint" => Some(ev.clone()),
+                Event::Command(CommandEvent::Started(ev))
+                    if ev.command_name != "configureFailPoint" =>
+                {
+                    Some(ev.clone())
+                }
                 _ => None,
             })
             .collect()

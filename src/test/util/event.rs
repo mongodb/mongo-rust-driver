@@ -1,7 +1,5 @@
 use std::{
     collections::VecDeque,
-    fs::File,
-    io::{BufWriter, Write},
     sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
@@ -13,7 +11,7 @@ use tokio::sync::broadcast::error::SendError;
 
 use super::{subscriber::EventSubscriber, TestClient, TestClientBuilder};
 use crate::{
-    bson::{doc, to_document, Document},
+    bson::doc,
     event::{
         cmap::{
             CmapEvent,
@@ -45,7 +43,6 @@ use crate::{
     },
     options::ClientOptions,
     runtime,
-    test::spec::ExpectedEventType,
     Client,
 };
 
@@ -170,48 +167,6 @@ impl EventHandler {
         }
     }
 
-    pub(crate) fn command_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CommandEvent> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<CommandEvent>(100);
-        crate::runtime::spawn(async move {
-            while let Some(ev) = rx.recv().await {
-                self.handle(ev.clone());
-                add_event_to_queue(&self.command_events, ev);
-            }
-        });
-        tx
-    }
-
-    pub(crate) fn cmap_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<CmapEvent> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<CmapEvent>(100);
-        crate::runtime::spawn(async move {
-            while let Some(ev) = rx.recv().await {
-                match &ev {
-                    CmapEvent::ConnectionCheckedOut(_) => {
-                        *self.connections_checked_out.lock().unwrap() += 1
-                    }
-                    CmapEvent::ConnectionCheckedIn(_) => {
-                        *self.connections_checked_out.lock().unwrap() -= 1
-                    }
-                    _ => (),
-                }
-                self.handle(ev.clone());
-                add_event_to_queue(&self.cmap_events, ev);
-            }
-        });
-        tx
-    }
-
-    pub(crate) fn sdam_sender(self: Arc<Self>) -> tokio::sync::mpsc::Sender<SdamEvent> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<SdamEvent>(100);
-        crate::runtime::spawn(async move {
-            while let Some(ev) = rx.recv().await {
-                self.handle(ev.clone());
-                add_event_to_queue(&self.sdam_events, ev);
-            }
-        });
-        tx
-    }
-
     fn handle(&self, event: impl Into<Event>) {
         // this only errors if no receivers are listening which isn't a concern here.
         let _: std::result::Result<usize, SendError<Event>> =
@@ -220,10 +175,6 @@ impl EventHandler {
 
     pub(crate) fn subscribe(&self) -> EventSubscriber<EventHandler, Event> {
         EventSubscriber::new(self, self.event_broadcaster.subscribe())
-    }
-
-    pub(crate) fn broadcaster(&self) -> &tokio::sync::broadcast::Sender<Event> {
-        &self.event_broadcaster
     }
 
     /// Gets all of the command started events for the specified command names.
@@ -259,91 +210,6 @@ impl EventHandler {
                 _ => None,
             })
             .collect()
-    }
-
-    pub(crate) fn get_filtered_events<F>(
-        &self,
-        event_type: ExpectedEventType,
-        filter: F,
-    ) -> Vec<Event>
-    where
-        F: Fn(&Event) -> bool,
-    {
-        match event_type {
-            ExpectedEventType::Command => {
-                let events = self.command_events.read().unwrap();
-                events
-                    .iter()
-                    .cloned()
-                    .map(|(event, _)| Event::Command(event))
-                    .filter(|e| filter(e))
-                    .collect()
-            }
-            ExpectedEventType::Cmap => {
-                let events = self.cmap_events.read().unwrap();
-                events
-                    .iter()
-                    .cloned()
-                    .map(|(event, _)| Event::Cmap(event))
-                    .filter(|e| filter(e))
-                    .collect()
-            }
-            ExpectedEventType::CmapWithoutConnectionReady => {
-                let mut events = self.get_filtered_events(ExpectedEventType::Cmap, filter);
-                events.retain(|ev| !matches!(ev, Event::Cmap(CmapEvent::ConnectionReady(_))));
-                events
-            }
-            ExpectedEventType::Sdam => {
-                let events = self.sdam_events.read().unwrap();
-                events
-                    .iter()
-                    .cloned()
-                    .map(|(event, _)| Event::Sdam(event))
-                    .filter(filter)
-                    .collect()
-            }
-        }
-    }
-
-    pub(crate) fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
-        let mut add_comma = false;
-        let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
-            event.insert("name", name);
-            event.insert("observedAt", time.unix_timestamp());
-            let mut json_string = serde_json::to_string(&event).unwrap();
-            if add_comma {
-                json_string.insert(0, ',');
-            } else {
-                add_comma = true;
-            }
-            write!(writer, "{}", json_string).unwrap();
-        };
-
-        for (command_event, time) in self.command_events.read().unwrap().iter() {
-            let name = command_event.name();
-            if names.contains(&name) {
-                let event = to_document(&command_event).unwrap();
-                write_json(event, name, time);
-            }
-        }
-        for (sdam_event, time) in self.sdam_events.read().unwrap().iter() {
-            let name = sdam_event.name();
-            if names.contains(&name) {
-                let event = to_document(&sdam_event).unwrap();
-                write_json(event, name, time);
-            }
-        }
-        for (cmap_event, time) in self.cmap_events.read().unwrap().iter() {
-            let name = cmap_event.planned_maintenance_testing_name();
-            if names.contains(&name) {
-                let event = to_document(&cmap_event).unwrap();
-                write_json(event, name, time);
-            }
-        }
-    }
-
-    pub(crate) fn connections_checked_out(&self) -> u32 {
-        *self.connections_checked_out.lock().unwrap()
     }
 
     pub(crate) fn clear_cached_events(&self) {
