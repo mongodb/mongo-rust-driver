@@ -493,10 +493,6 @@ where
         }
 
         let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
         let mut error_labels: HashSet<String> = Default::default();
@@ -510,7 +506,7 @@ where
                 self.namespace(),
                 docs,
                 options.clone(),
-                encrypted,
+                self.client().should_auto_encrypt().await,
                 self.inner.human_readable_serialization,
             );
 
@@ -635,16 +631,11 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
-
         let insert = Insert::new(
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
-            encrypted,
+            self.client().should_auto_encrypt().await,
             self.inner.human_readable_serialization,
         );
         self.client()
@@ -749,7 +740,7 @@ where
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
     /// The name of the database associated with this namespace.
     pub db: String,
@@ -764,14 +755,6 @@ impl Namespace {
         Self {
             db: db.into(),
             coll: coll.into(),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            db: String::new(),
-            coll: String::new(),
         }
     }
 

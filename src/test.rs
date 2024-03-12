@@ -2,6 +2,7 @@ mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
 #[cfg(feature = "aws-auth")]
 mod auth_aws;
+mod bulk_write;
 mod change_stream;
 mod client;
 mod coll;

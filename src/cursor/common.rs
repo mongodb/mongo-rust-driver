@@ -443,21 +443,6 @@ impl CursorSpecification {
     pub(crate) fn id(&self) -> i64 {
         self.info.id
     }
-
-    #[cfg(test)]
-    pub(crate) fn address(&self) -> &ServerAddress {
-        &self.info.address
-    }
-
-    #[cfg(test)]
-    pub(crate) fn batch_size(&self) -> Option<u32> {
-        self.info.batch_size
-    }
-
-    #[cfg(test)]
-    pub(crate) fn max_time(&self) -> Option<Duration> {
-        self.info.max_time
-    }
 }
 
 /// Static information about a cursor.

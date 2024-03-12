@@ -11,8 +11,11 @@ use crate::{
         WriteConcernOnlyBody,
     },
     options::{DropCollectionOptions, WriteConcern},
+    ClientSession,
     Namespace,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct DropCollection {
@@ -51,9 +54,12 @@ impl OperationWithDefaults for DropCollection {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteConcernOnlyBody = response.body()?;
+            response.validate()
+        }}
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {

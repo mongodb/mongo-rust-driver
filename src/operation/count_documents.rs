@@ -2,16 +2,24 @@ use std::convert::TryInto;
 
 use serde::Deserialize;
 
-use super::{OperationWithDefaults, Retryability, SingleCursorResult};
 use crate::{
+    bson::{doc, Document, RawDocument},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
     selection_criteria::SelectionCriteria,
+    ClientSession,
     Namespace,
 };
-use bson::{doc, Document, RawDocument};
+
+use super::{
+    handle_response_sync,
+    OperationResponse,
+    OperationWithDefaults,
+    Retryability,
+    SingleCursorResult,
+};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -91,9 +99,12 @@ impl OperationWithDefaults for CountDocuments {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: SingleCursorResult<Body> = response.body()?;
-        Ok(response.0.map(|r| r.n).unwrap_or(0))
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: SingleCursorResult<Body> = response.body()?;
+            Ok(response.0.map(|r| r.n).unwrap_or(0))
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

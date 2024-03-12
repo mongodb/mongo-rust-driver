@@ -8,9 +8,10 @@ use crate::{
     operation::Retryability,
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
+    ClientSession,
 };
 
-use super::{OperationWithDefaults, WriteConcernOnlyBody};
+use super::{handle_response_sync, OperationResponse, OperationWithDefaults, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -53,9 +54,12 @@ impl OperationWithDefaults for AbortTransaction {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteConcernOnlyBody = response.body()?;
+            response.validate()
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

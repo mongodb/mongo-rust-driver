@@ -1,8 +1,5 @@
 pub(crate) mod change_stream;
 
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
@@ -11,11 +8,14 @@ use crate::{
     error::Result,
     operation::{append_options, remove_empty_write_concern, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
+    ClientSession,
     Namespace,
 };
 
 use super::{
+    handle_response_sync,
     CursorBody,
+    OperationResponse,
     OperationWithDefaults,
     WriteConcernOnlyBody,
     SERVER_4_2_0_WIRE_VERSION,
@@ -30,11 +30,6 @@ pub(crate) struct Aggregate {
 }
 
 impl Aggregate {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(Namespace::empty(), Vec::new(), None)
-    }
-
     pub(crate) fn new(
         target: impl Into<AggregateTarget>,
         pipeline: impl IntoIterator<Item = Document>,
@@ -91,28 +86,31 @@ impl OperationWithDefaults for Aggregate {
         &self,
         response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let cursor_response: CursorBody = response.body()?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let cursor_response: CursorBody = response.body()?;
 
-        if self.is_out_or_merge() {
-            let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
-            wc_error_info.validate()?;
-        };
+            if self.is_out_or_merge() {
+                let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
+                wc_error_info.validate()?;
+            };
 
-        // The comment should only be propagated to getMore calls on 4.4+.
-        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-            None
-        } else {
-            self.options.as_ref().and_then(|opts| opts.comment.clone())
-        };
+            // The comment should only be propagated to getMore calls on 4.4+.
+            let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+                None
+            } else {
+                self.options.as_ref().and_then(|opts| opts.comment.clone())
+            };
 
-        Ok(CursorSpecification::new(
-            cursor_response.cursor,
-            description.server_address.clone(),
-            self.options.as_ref().and_then(|opts| opts.batch_size),
-            self.options.as_ref().and_then(|opts| opts.max_await_time),
-            comment,
-        ))
+            Ok(CursorSpecification::new(
+                cursor_response.cursor,
+                description.server_address.clone(),
+                self.options.as_ref().and_then(|opts| opts.batch_size),
+                self.options.as_ref().and_then(|opts| opts.max_await_time),
+                comment,
+            ))
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

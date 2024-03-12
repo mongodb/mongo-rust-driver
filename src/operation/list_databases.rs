@@ -8,7 +8,10 @@ use crate::{
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -47,9 +50,12 @@ impl OperationWithDefaults for ListDatabases {
         &self,
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: Response = raw_response.body()?;
-        Ok(response.databases)
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: Response = raw_response.body()?;
+            Ok(response.databases)
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use std::{collections::VecDeque, time::Duration};
 
 use bson::{Document, RawDocumentBuf};
@@ -15,8 +12,11 @@ use crate::{
     operation::OperationWithDefaults,
     options::SelectionCriteria,
     results::GetMoreResult,
+    ClientSession,
     Namespace,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {
@@ -88,16 +88,21 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: GetMoreResponseBody = response.body()?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: GetMoreResponseBody = response.body()?;
 
-        Ok(GetMoreResult {
-            batch: response.cursor.next_batch,
-            exhausted: response.cursor.id == 0,
-            post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token),
-            id: response.cursor.id,
-            ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
-        })
+            Ok(GetMoreResult {
+                batch: response.cursor.next_batch,
+                exhausted: response.cursor.id == 0,
+                post_batch_resume_token: ResumeToken::from_raw(
+                    response.cursor.post_batch_resume_token,
+                ),
+                id: response.cursor.id,
+                ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
+            })
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

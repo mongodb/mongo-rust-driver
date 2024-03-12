@@ -1,9 +1,15 @@
 use bson::{doc, Document};
 use serde::Deserialize;
 
-use crate::{cmap::Command, error::Result, Namespace, SearchIndexModel};
+use crate::{
+    cmap::{Command, RawCommandResponse, StreamDescription},
+    error::Result,
+    ClientSession,
+    Namespace,
+    SearchIndexModel,
+};
 
-use super::OperationWithDefaults;
+use super::{handle_response_sync, OperationResponse, OperationWithDefaults};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -35,28 +41,31 @@ impl OperationWithDefaults for CreateSearchIndexes {
 
     fn handle_response(
         &self,
-        response: crate::cmap::RawCommandResponse,
-        _description: &crate::cmap::StreamDescription,
-    ) -> Result<Self::O> {
-        #[derive(Debug, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Response {
-            indexes_created: Vec<CreatedIndex>,
-        }
+        response: RawCommandResponse,
+        _description: &StreamDescription,
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            #[derive(Debug, Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Response {
+                indexes_created: Vec<CreatedIndex>,
+            }
 
-        #[derive(Debug, Deserialize)]
-        struct CreatedIndex {
-            #[allow(unused)]
-            id: String,
-            name: String,
-        }
+            #[derive(Debug, Deserialize)]
+            struct CreatedIndex {
+                #[allow(unused)]
+                id: String,
+                name: String,
+            }
 
-        let response: Response = response.body()?;
-        Ok(response
-            .indexes_created
-            .into_iter()
-            .map(|ci| ci.name)
-            .collect())
+            let response: Response = response.body()?;
+            Ok(response
+                .indexes_created
+                .into_iter()
+                .map(|ci| ci.name)
+                .collect())
+        }}
     }
 
     fn supports_sessions(&self) -> bool {
@@ -107,10 +116,11 @@ impl OperationWithDefaults for UpdateSearchIndex {
 
     fn handle_response(
         &self,
-        _response: crate::cmap::RawCommandResponse,
-        _description: &crate::cmap::StreamDescription,
-    ) -> crate::error::Result<Self::O> {
-        Ok(())
+        _response: RawCommandResponse,
+        _description: &StreamDescription,
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{ Ok(()) }}
     }
 
     fn supports_sessions(&self) -> bool {
@@ -155,10 +165,11 @@ impl OperationWithDefaults for DropSearchIndex {
 
     fn handle_response(
         &self,
-        _response: crate::cmap::RawCommandResponse,
-        _description: &crate::cmap::StreamDescription,
-    ) -> Result<Self::O> {
-        Ok(())
+        _response: RawCommandResponse,
+        _description: &StreamDescription,
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{ Ok(()) }}
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

@@ -168,6 +168,7 @@ tokio = { version = ">= 0.0.0", features = ["fs", "parking_lot"] }
 tracing-subscriber = "0.3.16"
 regex = "1.6.0"
 serde-hex = "0.1.0"
+serde_path_to_error = "0.1.15"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

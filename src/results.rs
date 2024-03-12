@@ -1,5 +1,7 @@
 //! Contains the types of results returned by CRUD operations.
 
+mod bulk_write;
+
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
@@ -13,9 +15,11 @@ use crate::{
 use bson::{Binary, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
+pub use bulk_write::*;
+
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertOneResult {
@@ -51,7 +55,7 @@ impl InsertManyResult {
 
 /// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateResult {
@@ -69,7 +73,7 @@ pub struct UpdateResult {
 
 /// The result of a [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DeleteResult {

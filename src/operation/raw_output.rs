@@ -1,9 +1,10 @@
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
+    ClientSession,
 };
 
-use super::Operation;
+use super::{handle_response_sync, Operation, OperationResponse};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.
@@ -30,8 +31,9 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        Ok(response)
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{ Ok(response) }}
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

@@ -8,7 +8,10 @@ use crate::{
     operation::{run_command::RunCommand, CursorBody, Operation},
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCursorCommand<'conn> {
@@ -89,20 +92,23 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         &self,
         response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let cursor_response: CursorBody = response.body()?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let cursor_response: CursorBody = response.body()?;
 
-        let comment = match &self.options {
-            Some(options) => options.comment.clone(),
-            None => None,
-        };
+            let comment = match &self.options {
+                Some(options) => options.comment.clone(),
+                None => None,
+            };
 
-        Ok(CursorSpecification::new(
-            cursor_response.cursor,
-            description.server_address.clone(),
-            self.options.as_ref().and_then(|opts| opts.batch_size),
-            self.options.as_ref().and_then(|opts| opts.max_time),
-            comment,
-        ))
+            Ok(CursorSpecification::new(
+                cursor_response.cursor,
+                description.server_address.clone(),
+                self.options.as_ref().and_then(|opts| opts.batch_size),
+                self.options.as_ref().and_then(|opts| opts.max_time),
+                comment,
+            ))
+        }}
     }
 }

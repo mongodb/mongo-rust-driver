@@ -53,14 +53,6 @@ impl SelectionCriteria {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn as_predicate(&self) -> Option<&Predicate> {
-        match self {
-            Self::Predicate(ref p) => Some(p),
-            _ => None,
-        }
-    }
-
     pub(crate) fn from_address(address: ServerAddress) -> Self {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }

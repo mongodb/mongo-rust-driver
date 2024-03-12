@@ -85,13 +85,16 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
             .unwrap_or_else(|e| panic!("Failed to open file at {:?}: {}", &path, e));
 
         // Use BSON as an intermediary to deserialize extended JSON properly.
-        let test_bson: Bson = serde_json::from_reader(file).unwrap_or_else(|e| {
+        let deserializer = &mut serde_json::Deserializer::from_reader(file);
+        let test_bson: Bson = serde_path_to_error::deserialize(deserializer).unwrap_or_else(|e| {
             panic!(
                 "Failed to deserialize test JSON to BSON in {:?}: {}",
                 &path, e
             )
         });
-        let test: T = bson::from_bson(test_bson).unwrap_or_else(|e| {
+
+        let deserializer = bson::Deserializer::new(test_bson);
+        let test: T = serde_path_to_error::deserialize(deserializer).unwrap_or_else(|e| {
             panic!(
                 "Failed to deserialize test BSON to {} in {:?}: {}",
                 type_name::<T>(),

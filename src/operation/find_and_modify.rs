@@ -28,7 +28,10 @@ use crate::{
         Retryability,
     },
     options::WriteConcern,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 pub(crate) struct FindAndModify<'a, R, T: DeserializeOwned> {
     ns: Namespace,
@@ -142,25 +145,28 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        #[derive(Debug, Deserialize)]
-        pub(crate) struct Response {
-            value: RawBson,
-        }
-        let response: Response = response.body()?;
-
-        match response.value {
-            RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
-            RawBson::Null => Ok(None),
-            other => Err(ErrorKind::InvalidResponse {
-                message: format!(
-                    "expected document for value field of findAndModify response, but instead got \
-                     {:?}",
-                    other
-                ),
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            #[derive(Debug, Deserialize)]
+            pub(crate) struct Response {
+                value: RawBson,
             }
-            .into()),
-        }
+            let response: Response = response.body()?;
+
+            match response.value {
+                RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
+                RawBson::Null => Ok(None),
+                other => Err(ErrorKind::InvalidResponse {
+                    message: format!(
+                        "expected document for value field of findAndModify response, but instead \
+                         got {:?}",
+                        other
+                    ),
+                }
+                .into()),
+            }
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

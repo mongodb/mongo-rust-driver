@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -14,8 +11,11 @@ use crate::{
         SERVER_4_4_0_WIRE_VERSION,
     },
     options::{CursorType, FindOptions, SelectionCriteria},
+    ClientSession,
     Namespace,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct Find {
@@ -25,18 +25,6 @@ pub(crate) struct Find {
 }
 
 impl Find {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            None,
-            None,
-        )
-    }
-
     pub(crate) fn new(
         ns: Namespace,
         filter: Option<Document>,
@@ -122,25 +110,28 @@ impl OperationWithDefaults for Find {
         &self,
         response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: CursorBody = response.body()?;
 
-        // The comment should only be propagated to getMore calls on 4.4+.
-        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-            None
-        } else {
-            self.options
-                .as_ref()
-                .and_then(|opts| opts.comment_bson.clone())
-        };
+            // The comment should only be propagated to getMore calls on 4.4+.
+            let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+                None
+            } else {
+                self.options
+                    .as_ref()
+                    .and_then(|opts| opts.comment_bson.clone())
+            };
 
-        Ok(CursorSpecification::new(
-            response.cursor,
-            description.server_address.clone(),
-            self.options.as_ref().and_then(|opts| opts.batch_size),
-            self.options.as_ref().and_then(|opts| opts.max_await_time),
-            comment,
-        ))
+            Ok(CursorSpecification::new(
+                response.cursor,
+                description.server_address.clone(),
+                self.options.as_ref().and_then(|opts| opts.batch_size),
+                self.options.as_ref().and_then(|opts| opts.max_await_time),
+                comment,
+            ))
+        }}
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

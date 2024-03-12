@@ -7,9 +7,10 @@ use crate::{
     error::Result,
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
+    ClientSession,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{handle_response_sync, OperationResponse, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -46,9 +47,12 @@ impl OperationWithDefaults for CommitTransaction {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: WriteConcernOnlyBody = response.body()?;
+            response.validate()
+        }}
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

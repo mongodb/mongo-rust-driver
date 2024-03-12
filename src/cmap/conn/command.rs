@@ -199,18 +199,6 @@ impl RawCommandResponse {
         })
     }
 
-    /// Initialize a response from a document.
-    #[cfg(test)]
-    pub(crate) fn with_document(doc: Document) -> Result<Self> {
-        Self::with_document_and_address(
-            ServerAddress::Tcp {
-                host: "localhost".to_string(),
-                port: None,
-            },
-            doc,
-        )
-    }
-
     pub(crate) fn new(source: ServerAddress, message: Message) -> Self {
         Self::new_raw(source, message.document_payload)
     }

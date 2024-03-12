@@ -6,13 +6,11 @@ use crate::{
     operation::{append_options, OperationWithDefaults},
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
+    ClientSession,
     Namespace,
 };
 
-use super::{CursorBody, Retryability};
-
-#[cfg(test)]
-mod test;
+use super::{handle_response_sync, CursorBody, OperationResponse, Retryability};
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
@@ -22,17 +20,6 @@ pub(crate) struct ListIndexes {
 impl ListIndexes {
     pub(crate) fn new(ns: Namespace, options: Option<ListIndexesOptions>) -> Self {
         ListIndexes { ns, options }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            options: None,
-        }
     }
 }
 
@@ -62,15 +49,18 @@ impl OperationWithDefaults for ListIndexes {
         &self,
         raw_response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        let response: CursorBody = raw_response.body()?;
-        Ok(CursorSpecification::new(
-            response.cursor,
-            description.server_address.clone(),
-            self.options.as_ref().and_then(|o| o.batch_size),
-            self.options.as_ref().and_then(|o| o.max_time),
-            None,
-        ))
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{
+            let response: CursorBody = raw_response.body()?;
+            Ok(CursorSpecification::new(
+                response.cursor,
+                description.server_address.clone(),
+                self.options.as_ref().and_then(|o| o.batch_size),
+                self.options.as_ref().and_then(|o| o.max_time),
+                None,
+            ))
+        }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

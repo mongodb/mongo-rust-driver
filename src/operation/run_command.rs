@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use std::convert::TryInto;
 
 use bson::{RawBsonRef, RawDocumentBuf};
@@ -12,7 +9,10 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     selection_criteria::SelectionCriteria,
+    ClientSession,
 };
+
+use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -98,8 +98,9 @@ impl<'conn> OperationWithDefaults for RunCommand<'conn> {
         &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        Ok(response.into_raw_document_buf().try_into()?)
+        _session: Option<&mut ClientSession>,
+    ) -> OperationResponse<'static, Self::O> {
+        handle_response_sync! {{ Ok(response.into_raw_document_buf().try_into()?) }}
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

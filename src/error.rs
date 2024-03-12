@@ -1,5 +1,7 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
+mod bulk_write;
+
 use std::{
     any::Any,
     collections::{HashMap, HashSet},
@@ -7,14 +9,16 @@ use std::{
     sync::Arc,
 };
 
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
 use crate::{
-    bson::Document,
+    bson::{Bson, Document},
     options::ServerAddress,
     sdam::{ServerType, TopologyVersion},
 };
-use bson::Bson;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
+
+pub use bulk_write::BulkWriteError as ClientBulkWriteError;
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -251,7 +255,13 @@ impl Error {
 
     /// Whether this error contains the specified label.
     pub fn contains_label<T: AsRef<str>>(&self, label: T) -> bool {
-        self.labels().contains(label.as_ref())
+        let label = label.as_ref();
+        self.labels().contains(label)
+            || self
+                .source
+                .as_ref()
+                .map(|source| source.contains_label(label))
+                .unwrap_or(false)
     }
 
     /// Adds the given label to this error.
@@ -301,7 +311,7 @@ impl Error {
     }
 
     /// Gets the code from this error.
-    #[allow(unused)]
+    #[cfg(test)]
     pub(crate) fn code(&self) -> Option<i32> {
         match self.kind.as_ref() {
             ErrorKind::Command(command_error) => Some(command_error.code),
@@ -456,6 +466,10 @@ impl Error {
     /// sensitive commands. Currently, the only field besides those that we expose is the
     /// error message.
     pub(crate) fn redact(&mut self) {
+        if let Some(source) = self.source.as_deref_mut() {
+            source.redact();
+        }
+
         // This is intentionally written without a catch-all branch so that if new error
         // kinds are added we remember to reason about whether they need to be redacted.
         match *self.kind {
@@ -467,6 +481,14 @@ impl Error {
                 }
                 if let Some(ref mut wce) = bwe.write_concern_error {
                     wce.redact();
+                }
+            }
+            ErrorKind::ClientBulkWrite(ref mut client_bulk_write_error) => {
+                for write_concern_error in client_bulk_write_error.write_concern_errors.iter_mut() {
+                    write_concern_error.redact();
+                }
+                for (_, write_error) in client_bulk_write_error.write_errors.iter_mut() {
+                    write_error.redact();
                 }
             }
             ErrorKind::Command(ref mut command_error) => {
@@ -579,6 +601,9 @@ pub enum ErrorKind {
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
     BulkWrite(BulkWriteFailure),
+
+    #[error("An error occurred when executing Client::bulk_write: {0:?}")]
+    ClientBulkWrite(ClientBulkWriteError),
 
     /// The server returned an error to an attempted operation.
     #[error("Command failed: {0}")]
@@ -882,6 +907,7 @@ impl WriteFailure {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn code(&self) -> i32 {
         match self {
             Self::WriteConcernError(e) => e.code,
