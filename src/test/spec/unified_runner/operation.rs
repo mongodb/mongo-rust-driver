@@ -2559,8 +2559,7 @@ impl TestOperation for AssertEventCount {
             let client = test_runner.get_client(self.client.as_str()).await;
             let entities = test_runner.entities.read().await;
             let actual_events = client
-                .matching_events(&self.event, &*entities)
-                .await;
+                .matching_events(&self.event, &*entities);
             assert_eq!(
                 actual_events.len(),
                 self.count,

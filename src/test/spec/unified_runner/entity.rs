@@ -1,26 +1,27 @@
 use std::{
     fs::File,
-    io::BufWriter,
+    io::{BufWriter, Write},
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, Mutex as SyncMutex},
     time::Duration,
 };
 
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use bson::to_document;
+use time::OffsetDateTime;
+use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
 
 use crate::{
     bson::{Bson, Document},
     change_stream::ChangeStream,
     client::{options::ClientOptions, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, Result},
-    event::command::{CommandEvent, CommandStartedEvent},
+    event::{cmap::CmapEvent, command::{CommandEvent, CommandStartedEvent}, EventHandler},
     gridfs::GridFsBucket,
     runtime,
     sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
         Event,
-        EventHandler,
     },
     Client,
     ClientSession,
@@ -30,7 +31,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{observer::EventObserver, test_file::ThreadMessage, EntityMap, ExpectedEvent, Operation};
+use super::{events_match, test_file::ThreadMessage, EntityMap, ExpectedEvent, Operation};
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -62,11 +63,12 @@ pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
     pub(crate) topology_id: bson::oid::ObjectId,
-    handler: Arc<EventHandler>,
-    observer: Arc<Mutex<EventObserver>>,
+    events: Arc<SyncMutex<Vec<(Event, OffsetDateTime)>>>,
+    event_received: Arc<Notify>,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
+    connections_checked_out: Arc<SyncMutex<u32>>,
 }
 
 #[derive(Debug)]
@@ -126,6 +128,23 @@ impl TestCursor {
     }
 }
 
+fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
+    events: Arc<SyncMutex<Vec<(Event, OffsetDateTime)>>>,
+    event_received: Arc<Notify>,
+) -> impl Fn(T) + Send + Sync + 'static {
+    move |ev: T| {
+        events.lock().unwrap().push((ev.into(), OffsetDateTime::now_utc()));
+        event_received.notify_waiters();
+    }
+}
+
+fn wrapped_ev_callback<T: Into<Event> + Send + Sync + 'static>(
+    events: Arc<SyncMutex<Vec<(Event, OffsetDateTime)>>>,
+    event_received: Arc<Notify>,
+) -> Option<EventHandler<T>> {
+    Some(EventHandler::callback(ev_callback(events, event_received)))
+}
+
 impl ClientEntity {
     pub(crate) fn new(
         mut client_options: ClientOptions,
@@ -133,23 +152,38 @@ impl ClientEntity {
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
-        let handler = Arc::new(EventHandler::new());
-        client_options.command_event_handler = Some(handler.clone().command_sender().into());
-        client_options.cmap_event_handler = Some(handler.clone().cmap_sender().into());
-        client_options.sdam_event_handler = Some(handler.clone().sdam_sender().into());
-        // ensure the observer is already listening before the client is created to avoid any races
-        // around collecting initial events when the topology opens.
-        let observer = EventObserver::new(handler.broadcaster().subscribe());
+        let events = Arc::new(SyncMutex::new(vec![]));
+        let event_received = Arc::new(Notify::new());
+        client_options.command_event_handler = wrapped_ev_callback(events.clone(), event_received.clone());
+        client_options.sdam_event_handler = wrapped_ev_callback(events.clone(), event_received.clone());
+        let connections_checked_out = Arc::new(SyncMutex::new(0));
+        {
+            let connections_checked_out = connections_checked_out.clone();
+            let cmap_cb = ev_callback(events.clone(), event_received.clone());
+            client_options.cmap_event_handler = Some(EventHandler::callback(move |ev| {
+                match &ev {
+                    CmapEvent::ConnectionCheckedOut(_) => {
+                        *connections_checked_out.lock().unwrap() += 1
+                    }
+                    CmapEvent::ConnectionCheckedIn(_) => {
+                        *connections_checked_out.lock().unwrap() -= 1
+                    }
+                    _ => (),
+                }
+                (cmap_cb)(ev);
+            }));
+        }
         let client = Client::with_options(client_options).unwrap();
         let topology_id = client.topology().id;
         Self {
             client: Some(client),
             topology_id,
-            handler,
-            observer: Arc::new(Mutex::new(observer)),
+            events,
+            event_received,
             observe_events,
             ignore_command_names,
             observe_sensitive_commands,
+            connections_checked_out,
         }
     }
 
@@ -157,36 +191,58 @@ impl ClientEntity {
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
     pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
-        self.handler.get_filtered_events(expected_type, |event| {
-            if let Event::Command(cev) = event {
-                if !self.allow_command_event(cev) {
-                    return false;
+        self.events.lock().unwrap().iter()
+            .map(|(ev, _)| ev)
+            .filter(|event| {
+                match (expected_type, event) {
+                    (ExpectedEventType::Cmap, Event::Cmap(_)) => (),
+                    (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(CmapEvent::ConnectionReady(_))) => return false,
+                    (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(_)) => (),
+                    (ExpectedEventType::Command, Event::Command(_)) => (),
+                    (ExpectedEventType::Sdam, Event::Sdam(_)) => (),
+                    _ => return false,
                 }
-            }
-            if let Some(observe_events) = self.observe_events.as_ref() {
-                if !observe_events.iter().any(|observe| observe.matches(event)) {
-                    return false;
+                if let Event::Command(cev) = event {
+                    if !self.allow_command_event(cev) {
+                        return false;
+                    }
                 }
-            }
-            true
-        })
+                if let Some(observe_events) = self.observe_events.as_ref() {
+                    if !observe_events.iter().any(|observe| observe.matches(event)) {
+                        return false;
+                    }
+                }
+                true
+            }).cloned().collect()
     }
 
-    pub(crate) async fn matching_events(
+    pub(crate) fn matching_events(
         &self,
-        event: &ExpectedEvent,
+        expected: &ExpectedEvent,
         entities: &EntityMap,
     ) -> Vec<Event> {
-        self.observer.lock().await.matching_events(event, entities)
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(ev, _)| ev)
+            .filter(|e| events_match(e, expected, Some(entities)).is_ok())
+            .cloned()
+            .collect()
     }
 
     pub(crate) async fn wait_for_matching_events(
         &self,
-        event: &ExpectedEvent,
+        expected: &ExpectedEvent,
         count: usize,
         entities: Arc<RwLock<EntityMap>>,
     ) -> Result<()> {
-        self.observer.lock().await.wait_for_matching_events(event, count, entities).await
+        crate::runtime::timeout(Duration::from_secs(10), async {
+            while self.matching_events(expected, &*entities.read().await).len() < count {
+                self.event_received.notified().await;
+            }
+            Ok(())
+        }).await?
     }
 
     /// Returns `true` if a given `CommandEvent` is allowed to be observed.
@@ -221,17 +277,49 @@ impl ClientEntity {
 
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
     pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        self.handler.get_all_command_started_events()
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(ev, _)| ev)
+            .filter_map(|ev| match ev {
+                Event::Command(CommandEvent::Started(ev)) if ev.command_name != "configureFailPoint" => Some(ev.clone()),
+                _ => None,
+            })
+            .collect()
     }
 
     /// Writes all events with the given name to the given BufWriter.
     pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
-        self.handler.write_events_list_to_file(names, writer);
+        let mut add_comma = false;
+        let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
+            event.insert("name", name);
+            event.insert("observedAt", time.unix_timestamp());
+            let mut json_string = serde_json::to_string(&event).unwrap();
+            if add_comma {
+                json_string.insert(0, ',');
+            } else {
+                add_comma = true;
+            }
+            write!(writer, "{}", json_string).unwrap();
+        };
+
+        for (event, time) in self.events.lock().unwrap().iter() {
+            let name = match event {
+                Event::Command(ev) => ev.name(),
+                Event::Sdam(ev) => ev.name(),
+                Event::Cmap(ev) => ev.planned_maintenance_testing_name(),
+            };
+            if names.contains(&name) {
+                let ev_doc = to_document(event).unwrap();
+                write_json(ev_doc, name, time);
+            }
+        }
     }
 
     /// Gets the count of connections currently checked out.
     pub(crate) fn connections_checked_out(&self) -> u32 {
-        self.handler.connections_checked_out()
+        *self.connections_checked_out.lock().unwrap()
     }
 
     /// Synchronize all connection pool worker threads.

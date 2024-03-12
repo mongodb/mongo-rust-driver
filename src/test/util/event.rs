@@ -7,6 +7,7 @@ use std::{
 };
 
 use derive_more::From;
+use serde::Serialize;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::error::SendError;
 
@@ -57,7 +58,8 @@ fn add_event_to_queue<T>(event_queue: &EventQueue<T>, event: T) {
         .push_back((event, OffsetDateTime::now_utc()))
 }
 
-#[derive(Clone, Debug, From)]
+#[derive(Clone, Debug, From, Serialize)]
+#[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Event {
     Cmap(CmapEvent),
