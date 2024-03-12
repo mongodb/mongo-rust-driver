@@ -55,18 +55,17 @@ impl EventObserver {
         }
     }
 
-    pub(crate) async fn matching_events(
+    pub(crate) fn matching_events(
         &mut self,
         event: &ExpectedEvent,
-        entities: Arc<RwLock<EntityMap>>,
+        entities: &EntityMap,
     ) -> Vec<Event> {
         // first retrieve all the events buffered in the channel
         while self.try_recv().is_some() {}
-        let es = entities.read().await;
         // Then collect all matching events.
         self.seen_events
             .iter()
-            .filter(|e| events_match(e, event, Some(&es)).is_ok())
+            .filter(|e| events_match(e, event, Some(&entities)).is_ok())
             .cloned()
             .collect()
     }
@@ -77,7 +76,7 @@ impl EventObserver {
         count: usize,
         entities: Arc<RwLock<EntityMap>>,
     ) -> Result<()> {
-        let mut seen = self.matching_events(event, entities.clone()).await.len();
+        let mut seen = self.matching_events(event, &*entities.read().await).len();
 
         if seen >= count {
             return Ok(());

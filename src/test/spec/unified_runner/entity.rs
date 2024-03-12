@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 use crate::{
     bson::{Bson, Document},
@@ -30,7 +30,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{observer::EventObserver, test_file::ThreadMessage, Operation};
+use super::{observer::EventObserver, test_file::ThreadMessage, EntityMap, ExpectedEvent, Operation};
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -63,7 +63,7 @@ pub(crate) struct ClientEntity {
     pub(crate) client: Option<Client>,
     pub(crate) topology_id: bson::oid::ObjectId,
     handler: Arc<EventHandler>,
-    pub(crate) observer: Arc<Mutex<EventObserver>>,
+    observer: Arc<Mutex<EventObserver>>,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
@@ -170,6 +170,23 @@ impl ClientEntity {
             }
             true
         })
+    }
+
+    pub(crate) async fn matching_events(
+        &self,
+        event: &ExpectedEvent,
+        entities: &EntityMap,
+    ) -> Vec<Event> {
+        self.observer.lock().await.matching_events(event, entities)
+    }
+
+    pub(crate) async fn wait_for_matching_events(
+        &self,
+        event: &ExpectedEvent,
+        count: usize,
+        entities: Arc<RwLock<EntityMap>>,
+    ) -> Result<()> {
+        self.observer.lock().await.wait_for_matching_events(event, count, entities).await
     }
 
     /// Returns `true` if a given `CommandEvent` is allowed to be observed.

@@ -2557,12 +2557,9 @@ impl TestOperation for AssertEventCount {
     ) -> BoxFuture<'a, ()> {
         async {
             let client = test_runner.get_client(self.client.as_str()).await;
-            let entities = test_runner.entities.clone();
+            let entities = test_runner.entities.read().await;
             let actual_events = client
-                .observer
-                .lock()
-                .await
-                .matching_events(&self.event, entities)
+                .matching_events(&self.event, &*entities)
                 .await;
             assert_eq!(
                 actual_events.len(),
@@ -2594,9 +2591,6 @@ impl TestOperation for WaitForEvent {
             let client = test_runner.get_client(self.client.as_str()).await;
             let entities = test_runner.entities.clone();
             client
-                .observer
-                .lock()
-                .await
                 .wait_for_matching_events(&self.event, self.count, entities)
                 .await
                 .unwrap();
