@@ -2,29 +2,26 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
     ops::{Deref, DerefMut},
-    sync::{Arc, Mutex as SyncMutex},
+    sync::Arc,
     time::Duration,
 };
 
 use bson::to_document;
 use time::OffsetDateTime;
-use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 use crate::{
     bson::{Bson, Document},
     change_stream::ChangeStream,
     client::{options::ClientOptions, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, Result},
-    event::{
-        cmap::CmapEvent,
-        command::{CommandEvent, CommandStartedEvent},
-        EventHandler,
-    },
+    event::command::{CommandEvent, CommandStartedEvent},
     gridfs::GridFsBucket,
     runtime,
     sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
+        util::EventBuffer,
         Event,
     },
     Client,
@@ -67,12 +64,10 @@ pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
     pub(crate) topology_id: bson::oid::ObjectId,
-    events: Arc<SyncMutex<Vec<(Event, OffsetDateTime)>>>,
-    event_received: Arc<Notify>,
+    events: EventBuffer,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
-    connections_checked_out: Arc<SyncMutex<u32>>,
 }
 
 #[derive(Debug)]
@@ -132,26 +127,6 @@ impl TestCursor {
     }
 }
 
-fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
-    events: Arc<SyncMutex<Vec<(Event, OffsetDateTime)>>>,
-    event_received: Arc<Notify>,
-) -> impl Fn(T) + Send + Sync + 'static {
-    move |ev: T| {
-        events
-            .lock()
-            .unwrap()
-            .push((ev.into(), OffsetDateTime::now_utc()));
-        event_received.notify_waiters();
-    }
-}
-
-fn wrapped_ev_callback<T: Into<Event> + Send + Sync + 'static>(
-    events: Arc<SyncMutex<Vec<(Event, OffsetDateTime)>>>,
-    event_received: Arc<Notify>,
-) -> Option<EventHandler<T>> {
-    Some(EventHandler::callback(ev_callback(events, event_received)))
-}
-
 impl ClientEntity {
     pub(crate) fn new(
         mut client_options: ClientOptions,
@@ -159,40 +134,17 @@ impl ClientEntity {
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
-        let events = Arc::new(SyncMutex::new(vec![]));
-        let event_received = Arc::new(Notify::new());
-        client_options.command_event_handler =
-            wrapped_ev_callback(events.clone(), event_received.clone());
-        client_options.sdam_event_handler =
-            wrapped_ev_callback(events.clone(), event_received.clone());
-        let connections_checked_out = Arc::new(SyncMutex::new(0));
-        {
-            let connections_checked_out = connections_checked_out.clone();
-            let cmap_cb = ev_callback(events.clone(), event_received.clone());
-            client_options.cmap_event_handler = Some(EventHandler::callback(move |ev| {
-                match &ev {
-                    CmapEvent::ConnectionCheckedOut(_) => {
-                        *connections_checked_out.lock().unwrap() += 1
-                    }
-                    CmapEvent::ConnectionCheckedIn(_) => {
-                        *connections_checked_out.lock().unwrap() -= 1
-                    }
-                    _ => (),
-                }
-                (cmap_cb)(ev);
-            }));
-        }
+        let events = EventBuffer::new();
+        events.register(&mut client_options);
         let client = Client::with_options(client_options).unwrap();
         let topology_id = client.topology().id;
         Self {
             client: Some(client),
             topology_id,
             events,
-            event_received,
             observe_events,
             ignore_command_names,
             observe_sensitive_commands,
-            connections_checked_out,
         }
     }
 
@@ -201,11 +153,10 @@ impl ClientEntity {
     /// events.
     pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
         self.events
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(ev, _)| ev)
-            .filter(|&event| {
+            .get_events()
+            .0
+            .into_iter()
+            .filter(|event| {
                 if !expected_type.matches(event) {
                     return false;
                 }
@@ -221,7 +172,6 @@ impl ClientEntity {
                 }
                 true
             })
-            .cloned()
             .collect()
     }
 
@@ -231,12 +181,10 @@ impl ClientEntity {
         entities: &EntityMap,
     ) -> Vec<Event> {
         self.events
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(ev, _)| ev)
+            .get_events()
+            .0
+            .into_iter()
             .filter(|e| events_match(e, expected, Some(entities)).is_ok())
-            .cloned()
             .collect()
     }
 
@@ -247,14 +195,20 @@ impl ClientEntity {
         entities: Arc<RwLock<EntityMap>>,
     ) -> Result<()> {
         crate::runtime::timeout(Duration::from_secs(10), async {
-            while self
-                .matching_events(expected, &*entities.read().await)
-                .len()
-                < count
-            {
-                self.event_received.notified().await;
+            loop {
+                let (events, notified) = self.events.get_events();
+                let matched = {
+                    let entities = &*entities.read().await;
+                    events
+                        .into_iter()
+                        .filter(|e| events_match(e, expected, Some(entities)).is_ok())
+                        .count()
+                };
+                if matched >= count {
+                    return Ok(());
+                }
+                notified.await;
             }
-            Ok(())
         })
         .await?
     }
@@ -292,15 +246,14 @@ impl ClientEntity {
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
     pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.events
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(ev, _)| ev)
+            .get_events()
+            .0
+            .into_iter()
             .filter_map(|ev| match ev {
                 Event::Command(CommandEvent::Started(ev))
                     if ev.command_name != "configureFailPoint" =>
                 {
-                    Some(ev.clone())
+                    Some(ev)
                 }
                 _ => None,
             })
@@ -308,7 +261,7 @@ impl ClientEntity {
     }
 
     /// Writes all events with the given name to the given BufWriter.
-    pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
+    pub(crate) fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
         let mut add_comma = false;
         let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
             event.insert("name", name);
@@ -322,22 +275,22 @@ impl ClientEntity {
             write!(writer, "{}", json_string).unwrap();
         };
 
-        for (event, time) in self.events.lock().unwrap().iter() {
-            let name = match event {
+        for (event, time) in self.events.get_timed_events() {
+            let name = match &event {
                 Event::Command(ev) => ev.name(),
                 Event::Sdam(ev) => ev.name(),
                 Event::Cmap(ev) => ev.planned_maintenance_testing_name(),
             };
             if names.contains(&name) {
-                let ev_doc = to_document(event).unwrap();
-                write_json(ev_doc, name, time);
+                let ev_doc = to_document(&event).unwrap();
+                write_json(ev_doc, name, &time);
             }
         }
     }
 
     /// Gets the count of connections currently checked out.
     pub(crate) fn connections_checked_out(&self) -> u32 {
-        *self.connections_checked_out.lock().unwrap()
+        self.events.connections_checked_out()
     }
 
     /// Synchronize all connection pool worker threads.

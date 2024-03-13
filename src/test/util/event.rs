@@ -7,7 +7,7 @@ use std::{
 use derive_more::From;
 use serde::Serialize;
 use time::OffsetDateTime;
-use tokio::sync::broadcast::error::SendError;
+use tokio::sync::{broadcast::error::SendError, futures::Notified, Notify};
 
 use super::{subscriber::EventSubscriber, TestClient, TestClientBuilder};
 use crate::{
@@ -600,4 +600,95 @@ async fn command_started_event_count() {
     }
 
     assert_eq!(client.get_command_started_events(&["insert"]).len(), 10);
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct EventBuffer {
+    inner: Arc<EventBufferInner>,
+}
+
+#[derive(Debug)]
+struct EventBufferInner {
+    events: Mutex<Vec<(Event, OffsetDateTime)>>,
+    event_received: Notify,
+    connections_checked_out: Mutex<u32>,
+}
+
+impl EventBufferInner {
+    fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
+        self: Arc<Self>,
+    ) -> impl Fn(T) + Send + Sync + 'static {
+        move |ev: T| {
+            self.events
+                .lock()
+                .unwrap()
+                .push((ev.into(), OffsetDateTime::now_utc()));
+            self.event_received.notify_waiters();
+        }
+    }
+
+    fn wrapped_ev_callback<T: Into<Event> + Send + Sync + 'static>(
+        self: Arc<Self>,
+    ) -> Option<crate::event::EventHandler<T>> {
+        Some(crate::event::EventHandler::callback(self.ev_callback()))
+    }
+}
+
+impl EventBuffer {
+    pub(crate) fn new() -> Self {
+        Self {
+            inner: Arc::new(EventBufferInner {
+                events: Mutex::new(vec![]),
+                event_received: Notify::new(),
+                connections_checked_out: Mutex::new(0),
+            }),
+        }
+    }
+
+    pub(crate) fn register(&self, client_options: &mut ClientOptions) {
+        client_options.command_event_handler = self.inner.clone().wrapped_ev_callback();
+        client_options.sdam_event_handler = self.inner.clone().wrapped_ev_callback();
+        {
+            let inner = self.inner.clone();
+            let cmap_cb = self.inner.clone().ev_callback();
+            client_options.cmap_event_handler =
+                Some(crate::event::EventHandler::callback(move |ev| {
+                    match &ev {
+                        CmapEvent::ConnectionCheckedOut(_) => {
+                            *inner.connections_checked_out.lock().unwrap() += 1
+                        }
+                        CmapEvent::ConnectionCheckedIn(_) => {
+                            *inner.connections_checked_out.lock().unwrap() -= 1
+                        }
+                        _ => (),
+                    }
+                    (cmap_cb)(ev);
+                }));
+        }
+    }
+
+    /// Returns a list of current events and a future to await for more being received.
+    pub(crate) fn get_events(&self) -> (Vec<Event>, Notified) {
+        // The `Notify` must be created *before* reading the events to ensure any added
+        // events trigger notifications.
+        let notify = self.inner.event_received.notified();
+        let events = self
+            .inner
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(ev, _)| ev)
+            .cloned()
+            .collect();
+        (events, notify)
+    }
+
+    pub(crate) fn get_timed_events(&self) -> Vec<(Event, OffsetDateTime)> {
+        self.inner.events.lock().unwrap().clone()
+    }
+
+    pub(crate) fn connections_checked_out(&self) -> u32 {
+        *self.inner.connections_checked_out.lock().unwrap()
+    }
 }

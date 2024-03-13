@@ -6,7 +6,7 @@ mod subscriber;
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventClient, EventHandler},
+    event::{Event, EventBuffer, EventClient, EventHandler},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
     subscriber::EventSubscriber,
