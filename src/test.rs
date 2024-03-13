@@ -1,3 +1,6 @@
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;

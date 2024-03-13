@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::{
     bson::rawdoc,
     bson_util,
+    checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
@@ -64,14 +65,14 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         let mut docs = Vec::new();
         let mut size = 0;
 
-        let max_doc_size = description.max_bson_object_size as u64;
+        let max_doc_size = Checked::<usize>::try_from(description.max_bson_object_size)?;
         let max_doc_sequence_size =
-            description.max_message_size_bytes as u64 - COMMAND_OVERHEAD_SIZE;
+            Checked::<usize>::try_from(description.max_message_size_bytes)? - COMMAND_OVERHEAD_SIZE;
 
         for (i, d) in self
             .documents
             .iter()
-            .take(description.max_write_batch_size as usize)
+            .take(Checked::new(description.max_write_batch_size).try_into()?)
             .enumerate()
         {
             let mut doc =
@@ -92,7 +93,7 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
                     bytes.splice(4..4, oid_slice.iter().cloned());
 
                     // overwrite old length
-                    let new_length = (bytes.len() as i32).to_le_bytes();
+                    let new_length = Checked::new(bytes.len()).try_into::<i32>()?.to_le_bytes();
                     bytes[0..4].copy_from_slice(&new_length);
                     doc = RawDocumentBuf::from_bytes(bytes)?;
 
@@ -100,8 +101,8 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
                 }
             };
 
-            let doc_size = doc.as_bytes().len() as u64;
-            if doc_size > max_doc_size {
+            let doc_size = doc.as_bytes().len();
+            if doc_size > max_doc_size.get()? {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
                         "insert document must be within {} bytes, but document provided is {} \
@@ -116,11 +117,11 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
             // automatic encryption. I.e. if a single document has size larger than 2MiB (but less
             // than `maxBsonObjectSize`) proceed with automatic encryption.
             if self.encrypted && i != 0 {
-                let doc_entry_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len());
-                if size + doc_entry_size >= MAX_ENCRYPTED_WRITE_SIZE {
+                let doc_entry_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len())?;
+                if (Checked::new(size) + doc_entry_size).get()? >= MAX_ENCRYPTED_WRITE_SIZE {
                     break;
                 }
-            } else if size + doc_size > max_doc_sequence_size {
+            } else if (Checked::new(size) + doc_size).get()? > max_doc_sequence_size.get()? {
                 break;
             }
 
@@ -157,16 +158,12 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let response: WriteResponseBody = raw_response.body_utf8_lossy()?;
+        let response_n = Checked::<usize>::try_from(response.n)?;
 
         let mut map = HashMap::new();
         if self.options.ordered == Some(true) {
             // in ordered inserts, only the first n were attempted.
-            for (i, id) in self
-                .inserted_ids
-                .iter()
-                .enumerate()
-                .take(response.n as usize)
-            {
+            for (i, id) in self.inserted_ids.iter().enumerate().take(response_n.get()?) {
                 map.insert(i, id.clone());
             }
         } else {
