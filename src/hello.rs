@@ -189,6 +189,7 @@ pub(crate) struct HelloCommandResponse {
     pub connection_id: Option<i64>,
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn deserialize_connection_id<'de, D: serde::Deserializer<'de>>(
     de: D,
 ) -> std::result::Result<Option<i64>, D::Error> {

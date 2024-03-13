@@ -180,6 +180,7 @@ impl Connection {
         )
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
