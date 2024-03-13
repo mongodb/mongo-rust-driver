@@ -205,17 +205,9 @@ impl ClientEntity {
             .unwrap()
             .iter()
             .map(|(ev, _)| ev)
-            .filter(|event| {
-                match (expected_type, event) {
-                    (ExpectedEventType::Cmap, Event::Cmap(_)) => (),
-                    (
-                        ExpectedEventType::CmapWithoutConnectionReady,
-                        Event::Cmap(CmapEvent::ConnectionReady(_)),
-                    ) => return false,
-                    (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(_)) => (),
-                    (ExpectedEventType::Command, Event::Command(_)) => (),
-                    (ExpectedEventType::Sdam, Event::Sdam(_)) => (),
-                    _ => return false,
+            .filter(|&event| {
+                if !expected_type.matches(event) {
+                    return false;
                 }
                 if let Event::Command(cev) = event {
                     if !self.allow_command_event(cev) {
