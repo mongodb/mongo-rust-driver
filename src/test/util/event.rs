@@ -646,7 +646,7 @@ impl<T: Clone> EventBuffer<T> {
     }
 
     /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn get_events(&self) -> (Vec<T>, Notified) {
+    pub(crate) fn all(&self) -> (Vec<T>, Notified) {
         // The `Notify` must be created *before* reading the events to ensure any added
         // events trigger notifications.
         let notify = self.inner.event_received.notified();
@@ -662,8 +662,15 @@ impl<T: Clone> EventBuffer<T> {
         (events, notify)
     }
 
-    pub(crate) fn get_timed_events(&self) -> Vec<(T, OffsetDateTime)> {
+    pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
         self.inner.events.lock().unwrap().clone()
+    }
+
+    pub(crate) fn stream(&self) -> EventStream<'_, T> {
+        EventStream {
+            buffer: self,
+            index: 0,
+        }
     }
 }
 
@@ -698,4 +705,111 @@ impl EventBuffer<Event> {
 pub(crate) struct EventStream<'a, T> {
     buffer: &'a EventBuffer<T>,
     index: usize,
+}
+
+impl<'a, T: Clone> EventStream<'a, T> {
+    async fn next(&mut self, timeout: Duration) -> Option<T> {
+        crate::runtime::timeout(timeout, async move {
+            loop {
+                let notified = self.buffer.inner.event_received.notified();
+                {
+                    let events = self.buffer.inner.events.lock().unwrap();
+                    if events.len() > self.index {
+                        let event = events[self.index].0.clone();
+                        self.index += 1;
+                        return Some(event);
+                    }
+                }
+                notified.await;
+            }
+        }).await.unwrap_or(None)
+    }
+
+    /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
+    pub(crate) async fn filter_map_event<F, R>(
+        &mut self,
+        timeout: Duration,
+        mut filter_map: F,
+    ) -> Option<R>
+    where
+        F: FnMut(T) -> Option<R>,
+    {
+        runtime::timeout(timeout, async move {
+            loop {
+                match self.next(timeout).await {
+                    Some(ev) => {
+                        if let Some(r) = filter_map(ev) {
+                            return Some(r);
+                        }
+                        continue;
+                    }
+                    None => return None,
+                }
+            }
+        }).await.unwrap_or(None)
+    }
+
+    /// Waits for an event to occur within the given duration that passes the given filter.
+    pub(crate) async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<T>
+    where
+        F: FnMut(&T) -> bool,
+    {
+        self.filter_map_event(timeout, |e| if filter(&e) { Some(e) } else { None })
+            .await
+    }
+
+    pub(crate) async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<T>
+    where
+        F: FnMut(&T) -> bool,
+    {
+        let mut events = Vec::new();
+        let _ = runtime::timeout(timeout, async {
+            while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
+                events.push(event);
+            }
+        })
+        .await;
+        events
+    }
+
+    #[cfg(feature = "in-use-encryption-unstable")]
+    pub(crate) async fn collect_events_map<F, R>(
+        &mut self,
+        timeout: Duration,
+        mut filter: F,
+    ) -> Vec<R>
+    where
+        F: FnMut(T) -> Option<R>,
+    {
+        let mut events = Vec::new();
+        let _ = runtime::timeout(timeout, async {
+            while let Some(event) = self.filter_map_event(timeout, &mut filter).await {
+                events.push(event);
+            }
+        })
+        .await;
+        events
+    }
+
+    #[cfg(feature = "in-use-encryption-unstable")]
+    pub(crate) async fn clear_events(&mut self, timeout: Duration) {
+        self.collect_events(timeout, |_| true).await;
+    }
+
+    /// Returns the received events without waiting for any more.
+    pub(crate) fn all<F>(&mut self, filter: F) -> Vec<T>
+    where
+        F: Fn(&T) -> bool,
+    {
+        let events = self.buffer.inner.events.lock().unwrap();
+        let out = events
+            .iter()
+            .skip(self.index)
+            .map(|(e, _)| e)
+            .filter(|e| filter(*e))
+            .cloned()
+            .collect();
+        self.index = events.len();
+        out
+    }    
 }
