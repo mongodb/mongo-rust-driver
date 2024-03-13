@@ -603,18 +603,18 @@ async fn command_started_event_count() {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct EventBuffer {
-    inner: Arc<EventBufferInner>,
+pub(crate) struct EventBuffer<T> {
+    inner: Arc<EventBufferInner<T>>,
 }
 
 #[derive(Debug)]
-struct EventBufferInner {
-    events: Mutex<Vec<(Event, OffsetDateTime)>>,
+struct EventBufferInner<T> {
+    events: Mutex<Vec<(T, OffsetDateTime)>>,
     event_received: Notify,
     connections_checked_out: Mutex<u32>,
 }
 
-impl EventBufferInner {
+impl EventBufferInner<Event> {
     fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
         self: Arc<Self>,
     ) -> impl Fn(T) + Send + Sync + 'static {
@@ -634,7 +634,7 @@ impl EventBufferInner {
     }
 }
 
-impl EventBuffer {
+impl<T: Clone> EventBuffer<T> {
     pub(crate) fn new() -> Self {
         Self {
             inner: Arc::new(EventBufferInner {
@@ -645,6 +645,29 @@ impl EventBuffer {
         }
     }
 
+    /// Returns a list of current events and a future to await for more being received.
+    pub(crate) fn get_events(&self) -> (Vec<T>, Notified) {
+        // The `Notify` must be created *before* reading the events to ensure any added
+        // events trigger notifications.
+        let notify = self.inner.event_received.notified();
+        let events = self
+            .inner
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(ev, _)| ev)
+            .cloned()
+            .collect();
+        (events, notify)
+    }
+
+    pub(crate) fn get_timed_events(&self) -> Vec<(T, OffsetDateTime)> {
+        self.inner.events.lock().unwrap().clone()
+    }
+}
+
+impl EventBuffer<Event> {
     pub(crate) fn register(&self, client_options: &mut ClientOptions) {
         client_options.command_event_handler = self.inner.clone().wrapped_ev_callback();
         client_options.sdam_event_handler = self.inner.clone().wrapped_ev_callback();
@@ -667,28 +690,12 @@ impl EventBuffer {
         }
     }
 
-    /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn get_events(&self) -> (Vec<Event>, Notified) {
-        // The `Notify` must be created *before* reading the events to ensure any added
-        // events trigger notifications.
-        let notify = self.inner.event_received.notified();
-        let events = self
-            .inner
-            .events
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(ev, _)| ev)
-            .cloned()
-            .collect();
-        (events, notify)
-    }
-
-    pub(crate) fn get_timed_events(&self) -> Vec<(Event, OffsetDateTime)> {
-        self.inner.events.lock().unwrap().clone()
-    }
-
     pub(crate) fn connections_checked_out(&self) -> u32 {
         *self.inner.connections_checked_out.lock().unwrap()
     }
+}
+
+pub(crate) struct EventStream<'a, T> {
+    buffer: &'a EventBuffer<T>,
+    index: usize,
 }
