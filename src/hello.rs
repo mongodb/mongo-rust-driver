@@ -54,7 +54,13 @@ pub(crate) fn hello_command(
 
     if let Some(opts) = awaitable_options {
         command.insert("topologyVersion", opts.topology_version);
-        command.insert("maxAwaitTimeMS", opts.max_await_time.as_millis() as i64);
+        command.insert(
+            "maxAwaitTimeMS",
+            opts.max_await_time
+                .as_millis()
+                .try_into()
+                .unwrap_or(i64::MAX),
+        );
     }
 
     let mut command = Command::new(command_name, "admin", command);

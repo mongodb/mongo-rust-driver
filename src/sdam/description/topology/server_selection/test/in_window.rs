@@ -198,18 +198,21 @@ async fn load_balancing_test() {
         counts.sort();
 
         let share_of_selections = (*counts[0] as f64) / ((*counts[0] + *counts[1]) as f64);
-        assert!(
-            share_of_selections <= max_share,
-            "expected no more than {}% of selections, instead got {}%",
-            (max_share * 100.0) as u32,
-            (share_of_selections * 100.0) as u32
-        );
-        assert!(
-            share_of_selections >= min_share,
-            "expected at least {}% of selections, instead got {}%",
-            (min_share * 100.0) as u32,
-            (share_of_selections * 100.0) as u32
-        );
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            assert!(
+                share_of_selections <= max_share,
+                "expected no more than {}% of selections, instead got {}%",
+                (max_share * 100.0) as u32,
+                (share_of_selections * 100.0) as u32
+            );
+            assert!(
+                share_of_selections >= min_share,
+                "expected at least {}% of selections, instead got {}%",
+                (min_share * 100.0) as u32,
+                (share_of_selections * 100.0) as u32
+            );
+        }
     }
 
     let mut handler = EventHandler::new();
