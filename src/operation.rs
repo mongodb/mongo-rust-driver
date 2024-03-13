@@ -79,6 +79,11 @@ pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
+// The maximum number of bytes that may be included in a write payload when auto-encryption is
+// enabled.
+const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
+// The amount of overhead bytes to account for when building a document sequence.
+const COMMAND_OVERHEAD_SIZE: usize = 16_000;
 
 /// A trait modeling the behavior of a server side operation.
 ///
@@ -97,10 +102,6 @@ pub(crate) trait Operation {
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
-
-    /// Perform custom serialization of the built command.
-    /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>>;
 
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
@@ -413,12 +414,6 @@ pub(crate) trait OperationWithDefaults {
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
 
-    /// Perform custom serialization of the built command.
-    /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        Ok(bson::to_vec(&cmd)?)
-    }
-
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
     fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>> {
@@ -488,9 +483,6 @@ impl<T: OperationWithDefaults> Operation for T {
     const NAME: &'static str = T::NAME;
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
         self.build(description)
-    }
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        self.serialize_command(cmd)
     }
     fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
         self.extract_at_cluster_time(response)

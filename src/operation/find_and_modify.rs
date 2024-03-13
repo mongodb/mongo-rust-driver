@@ -138,10 +138,6 @@ impl<'a, R: Serialize, T: DeserializeOwned> OperationWithDefaults for FindAndMod
         ))
     }
 
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        cmd.into_bson_bytes()
-    }
-
     fn handle_response(
         &self,
         response: RawCommandResponse,

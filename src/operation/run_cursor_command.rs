@@ -38,10 +38,6 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         self.run_command.build(description)
     }
 
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        self.run_command.serialize_command(cmd)
-    }
-
     fn extract_at_cluster_time(
         &self,
         response: &bson::RawDocument,

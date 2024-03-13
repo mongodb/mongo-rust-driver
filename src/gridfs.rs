@@ -11,6 +11,7 @@ use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
+    checked::Checked,
     cursor::Cursor,
     error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
     options::{CollectionOptions, FindOptions, ReadConcern, SelectionCriteria, WriteConcern},
@@ -76,8 +77,8 @@ impl FilesCollectionDocument {
 
     fn n_from_vals(length: u64, chunk_size_bytes: u32) -> u32 {
         let chunk_size_bytes = chunk_size_bytes as u64;
-        let n = length / chunk_size_bytes + u64::from(length % chunk_size_bytes != 0);
-        n as u32
+        let n = Checked::new(length) / chunk_size_bytes + u64::from(length % chunk_size_bytes != 0);
+        n.try_into().unwrap()
     }
 
     /// Returns the expected length of a chunk given its index.
@@ -88,7 +89,7 @@ impl FilesCollectionDocument {
     fn expected_chunk_length_from_vals(length: u64, chunk_size_bytes: u32, n: u32) -> u32 {
         let remainder = length % (chunk_size_bytes as u64);
         if n == Self::n_from_vals(length, chunk_size_bytes) - 1 && remainder != 0 {
-            remainder as u32
+            Checked::new(remainder).try_into().unwrap()
         } else {
             chunk_size_bytes
         }

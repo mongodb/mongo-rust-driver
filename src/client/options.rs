@@ -738,7 +738,11 @@ impl Serialize for ClientOptions {
             writeconcern: &self.write_concern,
             loadbalanced: &self.load_balanced,
             zlibcompressionlevel: &None,
-            srvmaxhosts: self.srv_max_hosts.map(|v| v as i32),
+            srvmaxhosts: self
+                .srv_max_hosts
+                .map(|v| v.try_into())
+                .transpose()
+                .map_err(serde::ser::Error::custom)?,
         };
 
         client_options.serialize(serializer)

@@ -7,6 +7,7 @@ use crate::{
     bson::{doc, Bson, Document, RawDocumentBuf},
     bson_util::get_u64,
     error::{Error, Result},
+    options::WriteConcern,
 };
 
 pub(crate) mod duration_option_as_int_seconds {
@@ -17,9 +18,13 @@ pub(crate) mod duration_option_as_int_seconds {
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error> {
         match val {
-            Some(duration) if duration.as_secs() > i32::MAX as u64 => {
-                serializer.serialize_i64(duration.as_secs() as i64)
-            }
+            Some(duration) if duration.as_secs() > i32::MAX as u64 => serializer.serialize_i64(
+                duration
+                    .as_secs()
+                    .try_into()
+                    .map_err(serde::ser::Error::custom)?,
+            ),
+            #[allow(clippy::cast_possible_truncation)]
             Some(duration) => serializer.serialize_i32(duration.as_secs() as i32),
             None => serializer.serialize_none(),
         }
@@ -41,9 +46,13 @@ pub(crate) fn serialize_duration_option_as_int_millis<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(duration) if duration.as_millis() > i32::MAX as u128 => {
-            serializer.serialize_i64(duration.as_millis() as i64)
-        }
+        Some(duration) if duration.as_millis() > i32::MAX as u128 => serializer.serialize_i64(
+            duration
+                .as_millis()
+                .try_into()
+                .map_err(serde::ser::Error::custom)?,
+        ),
+        #[allow(clippy::cast_possible_truncation)]
         Some(duration) => serializer.serialize_i32(duration.as_millis() as i32),
         None => serializer.serialize_none(),
     }
@@ -76,6 +85,7 @@ pub(crate) fn serialize_u32_option_as_batch_size<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
+        #[allow(clippy::cast_possible_wrap)]
         Some(val) if *val <= std::i32::MAX as u32 => (doc! {
             "batchSize": (*val as i32)
         })
@@ -140,6 +150,7 @@ where
     }
 
     let date_time = match AwsDateTime::deserialize(deserializer)? {
+        #[allow(clippy::cast_possible_truncation)]
         AwsDateTime::Double(seconds) => {
             let millis = seconds * 1000.0;
             bson::DateTime::from_millis(millis as i64)
@@ -165,6 +176,12 @@ pub(crate) fn to_raw_document_buf_with_options<T: Serialize>(
         bson::to_raw_document_buf(doc)?
     };
     Ok(raw_doc)
+}
+
+pub(crate) fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
+    write_concern
+        .as_ref()
+        .map_or(true, |write_concern| write_concern.is_empty())
 }
 
 #[cfg(test)]

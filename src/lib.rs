@@ -294,6 +294,8 @@
 
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
+#![warn(clippy::cast_possible_truncation)]
+#![warn(clippy::cast_possible_wrap)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
@@ -320,6 +322,7 @@ pub use ::mongocrypt;
 
 mod bson_util;
 pub mod change_stream;
+pub(crate) mod checked;
 mod client;
 mod cmap;
 mod coll;
