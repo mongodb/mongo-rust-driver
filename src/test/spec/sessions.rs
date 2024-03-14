@@ -247,7 +247,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
         return;
     };
 
-    let mut subscriber = client.handler.subscribe();
+    let mut subscriber = client.events.subscribe();
     let coll = client.database(name).collection(name);
 
     let _ = coll.find(doc! {}).await;

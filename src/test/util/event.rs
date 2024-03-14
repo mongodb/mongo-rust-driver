@@ -12,7 +12,7 @@ use crate::{
     }, options::ClientOptions, Client
 };
 
-pub(crate) use super::handler::{EventHandler, EventSubscriber};
+pub(crate) use super::buffer::{EventBuffer, EventSubscriber};
 
 #[derive(Clone, Debug, From, Serialize)]
 #[serde(untagged)]
@@ -108,7 +108,7 @@ impl CommandEvent {
 #[derive(Clone, Debug)]
 pub(crate) struct EventClient {
     client: TestClient,
-    pub(crate) handler: EventHandler,
+    pub(crate) events: EventBuffer,
 }
 
 impl std::ops::Deref for EventClient {
@@ -139,7 +139,7 @@ impl EventClientBuilder {
     pub(crate) async fn build(self) -> EventClient {
         let mut inner = self.inner;
         if inner.handler.is_none() {
-            inner = inner.event_handler(EventHandler::new());
+            inner = inner.event_handler(EventBuffer::new());
         }
         let mut handler = inner.handler().unwrap().clone();
         let client = inner.build().await;
@@ -147,7 +147,7 @@ impl EventClientBuilder {
         // clear events from commands used to set up client.
         handler.retain(|ev| !matches!(ev, Event::Command(_)));
 
-        EventClient { client, handler }
+        EventClient { client, events: handler }
     }
 }
 
@@ -158,7 +158,7 @@ impl EventClient {
 
     async fn with_options_and_handler(
         options: impl Into<Option<ClientOptions>>,
-        handler: impl Into<Option<EventHandler>>,
+        handler: impl Into<Option<EventBuffer>>,
     ) -> Self {
         Client::test_builder()
             .options(options)
@@ -176,7 +176,7 @@ impl EventClient {
         options: impl Into<Option<ClientOptions>>,
         min_heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
-        event_handler: impl Into<Option<EventHandler>>,
+        event_handler: impl Into<Option<EventBuffer>>,
     ) -> Self {
         Client::test_builder()
             .additional_options(options, use_multiple_mongoses.unwrap_or(false))
@@ -204,5 +204,5 @@ async fn command_started_event_count() {
         coll.insert_one(doc! { "x": i }).await.unwrap();
     }
 
-    assert_eq!(client.handler.get_command_started_events(&["insert"]).len(), 10);
+    assert_eq!(client.events.get_command_started_events(&["insert"]).len(), 10);
 }

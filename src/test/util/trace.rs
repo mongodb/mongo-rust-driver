@@ -1,4 +1,3 @@
-use super::subscriber::EventSubscriber;
 use crate::test::spec::unified_runner::{test_file::TestCase, TestFileEntity};
 use serde::Serialize;
 use std::{
@@ -6,8 +5,9 @@ use std::{
     convert::TryInto,
     sync::{Arc, RwLock},
 };
-use tokio::sync::broadcast;
 use tracing::{field::Field, span, subscriber::Interest, Level, Metadata};
+
+use super::{EventBuffer, EventSubscriber};
 
 /// Models the data reported in a tracing event.
 #[derive(Debug, Clone)]
@@ -104,8 +104,7 @@ impl Serialize for TracingEventValue {
 /// [`TracingHandler::subscribe`] to create a new [`TracingSubscriber`].
 #[derive(Clone, Debug)]
 pub(crate) struct TracingHandler {
-    /// Sender for the channel where events will be broadcast.
-    event_broadcaster: broadcast::Sender<TracingEvent>,
+    buffer: EventBuffer<TracingEvent>,
 
     /// Contains a map of (tracing component name, maximum verbosity level) which this handler
     /// will subscribe to messages for. This is stored in an Arc<RwLock> so that we are able
@@ -122,9 +121,8 @@ impl TracingHandler {
     /// Initializes a new tracing handler with the specified components and corresponding maximum
     /// verbosity levels.
     pub(crate) fn new_with_levels(levels: HashMap<String, Level>) -> TracingHandler {
-        let (event_broadcaster, _) = tokio::sync::broadcast::channel(10_000);
         Self {
-            event_broadcaster,
+            buffer: EventBuffer::new(),
             levels: Arc::new(RwLock::new(levels)),
         }
     }
@@ -140,8 +138,8 @@ impl TracingHandler {
     }
 
     /// Returns a `TracingSubscriber` that will listen for tracing events broadcast by this handler.
-    pub(crate) fn subscribe(&self) -> EventSubscriber<TracingHandler, TracingEvent> {
-        EventSubscriber::new(self, self.event_broadcaster.subscribe())
+    pub(crate) fn subscribe(&self) -> EventSubscriber<TracingEvent> {
+        self.buffer.subscribe()
     }
 }
 
@@ -242,9 +240,7 @@ impl tracing::Subscriber for TracingHandler {
         );
         let mut visitor = TracingEventVisitor::new(&mut test_event);
         event.record(&mut visitor);
-        // this only errors if no receivers are listening; we don't care if that is the case.
-        let _: std::result::Result<usize, broadcast::error::SendError<TracingEvent>> =
-            self.event_broadcaster.send(test_event);
+        self.buffer.push_event(test_event);
     }
 
     /// These methods all relate to spans. Since we don't create any spans ourselves or need

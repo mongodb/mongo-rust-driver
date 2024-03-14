@@ -2,7 +2,7 @@ use std::{fmt::Debug, time::Duration};
 
 use crate::{
     event::command::CommandEvent,
-    test::{Event, EventHandler},
+    test::{Event, EventBuffer},
     Client,
     Namespace,
 };
@@ -247,7 +247,7 @@ async fn aggregate_out() {
 
 fn kill_cursors_sent(client: &EventClient) -> bool {
     !client
-        .handler
+        .events
         .get_command_started_events(&["killCursors"])
         .is_empty()
 }
@@ -535,7 +535,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection::<Document>(function_name!());
     coll.find(doc! {}).with_options(options).await.unwrap();
 
-    let events = event_client.handler.get_command_started_events(&["find"]);
+    let events = event_client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
 
     let allow_disk_use = events[0].command.get_bool("allowDiskUse").ok();
@@ -559,7 +559,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
         .with_options(options.clone())
         .await;
 
-    let events = client.handler.get_command_started_events(&["delete"]);
+    let events = client.events.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
 
     let event_hint = events[0].command.get_array("deletes").unwrap()[0]
@@ -609,7 +609,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
         .with_options(options.clone())
         .await;
 
-    let events = client.handler.get_command_started_events(&["findAndModify"]);
+    let events = client.events.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
 
     let event_hint = events[0]
@@ -693,8 +693,8 @@ async fn no_read_preference_to_standalone() {
         .await
         .unwrap();
 
-    let mut handler = client.handler.clone();
-    let command_started = handler.get_successful_command_execution("find").0;
+    let mut events = client.events.clone();
+    let command_started = events.get_successful_command_execution("find").0;
 
     assert!(!command_started.command.contains_key("$readPreference"));
 }
@@ -921,7 +921,7 @@ async fn collection_options_inherited() {
 }
 
 async fn assert_options_inherited(client: &EventClient, command_name: &str) {
-    let events = client.handler.get_command_started_events(&[command_name]);
+    let events = client.events.get_command_started_events(&[command_name]);
     let event = events.iter().last().unwrap();
     assert!(event.command.contains_key("readConcern"));
     assert_eq!(
@@ -1242,7 +1242,7 @@ async fn insert_many_document_sequences() {
         return;
     }
 
-    let handler = EventHandler::new();
+    let handler = EventBuffer::new();
     let client = Client::test_builder()
         .event_handler(handler.clone())
         .build()

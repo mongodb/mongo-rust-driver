@@ -212,14 +212,14 @@ async fn index_management_executes_commands() {
 
     // Collection::create_index and Collection::create_indexes execute createIndexes.
     assert_eq!(
-        client.handler.get_command_started_events(&["createIndexes"]).len(),
+        client.events.get_command_started_events(&["createIndexes"]).len(),
         0
     );
     coll.create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
         .await
         .expect("Create Index op failed");
     assert_eq!(
-        client.handler.get_command_started_events(&["createIndexes"]).len(),
+        client.events.get_command_started_events(&["createIndexes"]).len(),
         1
     );
     coll.create_indexes(vec![
@@ -229,23 +229,23 @@ async fn index_management_executes_commands() {
     .await
     .expect("Create Indexes op failed");
     assert_eq!(
-        client.handler.get_command_started_events(&["createIndexes"]).len(),
+        client.events.get_command_started_events(&["createIndexes"]).len(),
         2
     );
 
     // Collection::list_indexes and Collection::list_index_names execute listIndexes.
-    assert_eq!(client.handler.get_command_started_events(&["listIndexes"]).len(), 0);
+    assert_eq!(client.events.get_command_started_events(&["listIndexes"]).len(), 0);
     coll.list_indexes().await.expect("List index op failed");
-    assert_eq!(client.handler.get_command_started_events(&["listIndexes"]).len(), 1);
+    assert_eq!(client.events.get_command_started_events(&["listIndexes"]).len(), 1);
     coll.list_index_names().await.expect("List index op failed");
-    assert_eq!(client.handler.get_command_started_events(&["listIndexes"]).len(), 2);
+    assert_eq!(client.events.get_command_started_events(&["listIndexes"]).len(), 2);
 
     // Collection::drop_index and Collection::drop_indexes execute dropIndexes.
-    assert_eq!(client.handler.get_command_started_events(&["dropIndexes"]).len(), 0);
+    assert_eq!(client.events.get_command_started_events(&["dropIndexes"]).len(), 0);
     coll.drop_index("a_1").await.expect("Drop index op failed");
-    assert_eq!(client.handler.get_command_started_events(&["dropIndexes"]).len(), 1);
+    assert_eq!(client.events.get_command_started_events(&["dropIndexes"]).len(), 1);
     coll.drop_indexes().await.expect("Drop indexes op failed");
-    assert_eq!(client.handler.get_command_started_events(&["dropIndexes"]).len(), 2);
+    assert_eq!(client.events.get_command_started_events(&["dropIndexes"]).len(), 2);
 }
 
 #[tokio::test]

@@ -165,7 +165,7 @@ async fn snapshot_read_concern() {
 
 async fn assert_event_contains_read_concern(client: &EventClient) {
     let event = client
-        .handler
+        .events
         .get_command_started_events(&["find"])
         .into_iter()
         .next()
@@ -671,8 +671,8 @@ async fn command_contains_write_concern_drop() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    let mut handler = client.handler.clone();
-    handler.clear_cached_events();
+    let mut events = client.events.clone();
+    events.clear_cached_events();
     coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.drop()
         .write_concern(
@@ -754,7 +754,7 @@ async fn command_contains_write_concern_create_collection() {
 
 fn command_write_concerns(client: &EventClient, key: &str) -> Vec<Document> {
     client
-        .handler
+        .events
         .get_command_started_events(&[key])
         .into_iter()
         .map(|d| d.command.get_document("writeConcern").unwrap().clone())

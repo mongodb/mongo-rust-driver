@@ -9,12 +9,12 @@ use super::Event;
 
 
 #[derive(Clone, Debug)]
-pub(crate) struct EventHandler<T = Event> {
-    inner: Arc<EventHandlerInner<T>>,
+pub(crate) struct EventBuffer<T = Event> {
+    inner: Arc<EventBufferInner<T>>,
 }
 
 #[derive(Debug)]
-struct EventHandlerInner<T> {
+struct EventBufferInner<T> {
     events: Mutex<GenVec<(T, OffsetDateTime)>>,
     event_received: Notify,
 }
@@ -37,55 +37,17 @@ impl<T> GenVec<T> {
     }
 }
 
-impl EventHandlerInner<Event> {
-    fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
-        self: Arc<Self>,
-    ) -> crate::event::EventHandler<T> {
-        crate::event::EventHandler::callback(
-            move |ev: T| {
-                self.events
-                    .lock()
-                    .unwrap()
-                    .data
-                    .push((ev.into(), OffsetDateTime::now_utc()));
-                self.event_received.notify_waiters();
-            }    
-        )
-    }
-}
-
-impl<T: Clone> EventHandler<T> {
+impl<T> EventBuffer<T> {
     pub(crate) fn new() -> Self {
         Self {
-            inner: Arc::new(EventHandlerInner {
+            inner: Arc::new(EventBufferInner {
                 events: Mutex::new(GenVec::new()),
                 event_received: Notify::new(),
             }),
         }
     }
 
-    /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn all(&self) -> (Vec<T>, Notified) {
-        // The `Notify` must be created *before* reading the events to ensure any added
-        // events trigger notifications.
-        let notify = self.inner.event_received.notified();
-        let events = self
-            .inner
-            .events
-            .lock()
-            .unwrap()
-            .data
-            .iter()
-            .map(|(ev, _)| ev)
-            .cloned()
-            .collect();
-        (events, notify)
-    }
-
-    pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
-        self.inner.events.lock().unwrap().data.clone()
-    }
-
+    #[allow(unused)]
     pub(crate) fn filter_map<R>(&self, f: impl Fn(&T) -> Option<R>) -> Vec<R> {
         self.inner
             .events
@@ -128,19 +90,58 @@ impl<T: Clone> EventHandler<T> {
     pub(crate) fn retain(&mut self, mut f: impl FnMut(&T) -> bool) {
         self.invalidate(|data| data.retain(|(ev, _)| f(ev)));
     }
+
+    pub(crate) fn push_event(&self, ev: T) {
+        self.inner
+            .events
+            .lock()
+            .unwrap()
+            .data
+            .push((ev, OffsetDateTime::now_utc()));
+        self.inner.event_received.notify_waiters();
+    }
 }
 
-impl EventHandler<Event> {
-    pub(crate) fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
-        &self,
-    ) -> crate::event::EventHandler<T> {
-        self.inner.clone().ev_callback()
+impl<T: Clone> EventBuffer<T> {
+    /// Returns a list of current events and a future to await for more being received.
+    pub(crate) fn all(&self) -> (Vec<T>, Notified) {
+        // The `Notify` must be created *before* reading the events to ensure any added
+        // events trigger notifications.
+        let notify = self.inner.event_received.notified();
+        let events = self
+            .inner
+            .events
+            .lock()
+            .unwrap()
+            .data
+            .iter()
+            .map(|(ev, _)| ev)
+            .cloned()
+            .collect();
+        (events, notify)
     }
 
+    pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
+        self.inner.events.lock().unwrap().data.clone()
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> EventBuffer<T> {
+    pub(crate) fn handler<V: Into<T> + Send + Sync + 'static>(
+        &self,
+    ) -> crate::event::EventHandler<V> {
+        let this = self.clone();
+        crate::event::EventHandler::callback(
+            move |ev: V| this.push_event(ev.into())
+        )
+    }
+}
+
+impl EventBuffer<Event> {
     pub(crate) fn register(&self, client_options: &mut ClientOptions) {
-        client_options.command_event_handler = Some(self.ev_callback());
-        client_options.sdam_event_handler = Some(self.ev_callback());
-        client_options.cmap_event_handler = Some(self.ev_callback());
+        client_options.command_event_handler = Some(self.handler());
+        client_options.sdam_event_handler = Some(self.handler());
+        client_options.cmap_event_handler = Some(self.handler());
     }
 
     pub(crate) fn connections_checked_out(&self) -> u32 {
@@ -269,7 +270,7 @@ impl EventHandler<Event> {
 }
 
 pub(crate) struct EventSubscriber<'a, T> {
-    buffer: &'a EventHandler<T>,
+    buffer: &'a EventBuffer<T>,
     index: usize,
     generation: Generation,
 }

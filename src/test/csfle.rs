@@ -44,7 +44,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{Event, EventHandler},
+    test::{Event, EventBuffer},
     Client,
     Collection,
     IndexModel,
@@ -281,7 +281,7 @@ async fn data_key_double_encryption() -> Result<()> {
     )?;
 
     // Testing each provider:
-    let mut events = client.handler.subscribe();
+    let mut events = client.events.subscribe();
     let provider_keys = [
         (
             KmsProvider::Aws,
@@ -544,9 +544,9 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let handler = EventHandler::new();
-    let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.ev_callback());
+    let buffer = EventBuffer::<Event>::new();
+    let mut events = buffer.subscribe();
+    opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
             .extra_options(EXTRA_OPTIONS.clone())
@@ -1504,7 +1504,7 @@ impl DeadlockTestCase {
             opts
         })
         .await;
-        let mut keyvault_events = client_keyvault.handler.subscribe();
+        let mut keyvault_events = client_keyvault.events.subscribe();
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1540,12 +1540,12 @@ impl DeadlockTestCase {
             .await?;
 
         // Run test case
-        let event_handler = EventHandler::new();
+        let event_handler = EventBuffer::new();
         let mut encrypted_events = event_handler.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.ev_callback());
-        opts.sdam_event_handler = Some(event_handler.ev_callback());
+        opts.command_event_handler = Some(event_handler.handler());
+        opts.sdam_event_handler = Some(event_handler.handler());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)

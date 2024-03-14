@@ -19,7 +19,7 @@ use crate::{
         log_uncaptured,
         Event,
         EventClient,
-        EventHandler,
+        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -100,7 +100,7 @@ async fn sdam_pool_management() {
     options.app_name = Some("SDAMPoolManagementTest".to_string());
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
-    let event_handler = EventHandler::new();
+    let event_handler = EventBuffer::new();
     let mut subscriber = event_handler.subscribe();
 
     let client = EventClient::with_additional_options(
@@ -193,11 +193,11 @@ async fn hello_ok_true() {
         return;
     }
 
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(EventBuffer::new());
     let mut subscriber = handler.subscribe();
 
     let mut options = setup_client_options.clone();
-    options.sdam_event_handler = Some(handler.ev_callback());
+    options.sdam_event_handler = Some(handler.handler());
     options.direct_connection = Some(true);
     options.heartbeat_freq = Some(Duration::from_millis(500));
     let _client = Client::with_options(options).expect("client creation should succeed");
@@ -263,7 +263,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
 /// topology.
 #[tokio::test(flavor = "multi_thread")]
 async fn removed_server_monitor_stops() -> crate::error::Result<()> {
-    let handler = EventHandler::new();
+    let handler = EventBuffer::new();
     let options = ClientOptions::builder()
         .hosts(vec![
             ServerAddress::parse("localhost:49152")?,
@@ -271,7 +271,7 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
             ServerAddress::parse("localhost:49154")?,
         ])
         .heartbeat_freq(Duration::from_millis(50))
-        .sdam_event_handler(handler.ev_callback())
+        .sdam_event_handler(handler.handler())
         .repl_set_name("foo".to_string())
         .build();
 

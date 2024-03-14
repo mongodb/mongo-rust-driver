@@ -1,12 +1,12 @@
 mod event;
 mod failpoint;
-mod handler;
+mod buffer;
 mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventClient, EventHandler, EventSubscriber},
+    event::{Event, EventClient, EventBuffer, EventSubscriber},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
 };
@@ -78,7 +78,7 @@ impl Client {
 
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
-    handler: Option<EventHandler>,
+    handler: Option<EventBuffer>,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
@@ -106,7 +106,7 @@ impl TestClientBuilder {
         self
     }
 
-    pub(crate) fn event_handler(mut self, handler: impl Into<Option<EventHandler>>) -> Self {
+    pub(crate) fn event_handler(mut self, handler: impl Into<Option<EventBuffer>>) -> Self {
         let handler = handler.into();
         assert!(self.handler.is_none() || handler.is_none());
         self.handler = handler;
@@ -161,7 +161,7 @@ impl TestClientBuilder {
         TestClient::from_client(client).await
     }
 
-    pub(crate) fn handler(&self) -> Option<&EventHandler> {
+    pub(crate) fn handler(&self) -> Option<&EventBuffer> {
         self.handler.as_ref()
     }
 }

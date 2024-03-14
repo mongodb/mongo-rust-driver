@@ -13,7 +13,7 @@ use crate::{
     options::{FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
+    test::{get_client_options, log_uncaptured, Event, EventClient, EventBuffer, TestClient},
     Client,
     Collection,
 };
@@ -231,7 +231,7 @@ async fn cluster_time_in_commands() {
     async fn cluster_time_test<F, G, R>(
         command_name: &str,
         client: &Client,
-        event_handler: &EventHandler,
+        event_handler: &EventBuffer,
         operation: F,
     ) where
         F: Fn(Client) -> G,
@@ -284,11 +284,11 @@ async fn cluster_time_in_commands() {
         );
     }
 
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(EventBuffer::new());
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
-    options.command_event_handler = Some(handler.ev_callback());
-    options.sdam_event_handler = Some(handler.ev_callback());
+    options.command_event_handler = Some(handler.handler());
+    options.sdam_event_handler = Some(handler.handler());
 
     // Ensure we only connect to one server so the monitor checks from other servers
     // don't affect the TopologyDescription's clusterTime value between commands.
@@ -385,8 +385,8 @@ async fn session_usage() {
     {
         let client = EventClient::new().await;
         operation(client.clone()).await;
-        let mut handler = client.handler.clone();
-        let (command_started, _) = handler.get_successful_command_execution(command_name);
+        let mut events = client.events.clone();
+        let (command_started, _) = events.get_successful_command_execution(command_name);
         assert!(
             command_started.command.get("lsid").is_some(),
             "implicit session not passed to {}",
@@ -420,8 +420,8 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let mut cursor = coll.find(doc! {}).await.expect("find should succeed");
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
-    let mut handler = client.handler.clone();
-    let (find_started, _) = handler.get_successful_command_execution("find");
+    let mut events = client.events.clone();
+    let (find_started, _) = events.get_successful_command_execution("find");
     let session_id = find_started
         .command
         .get("lsid")
@@ -470,8 +470,8 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         assert!(matches!(cursor.next().await, Some(Ok(_))));
     }
 
-    let mut handler = client.handler.clone();
-    let (find_started, _) = handler.get_successful_command_execution("find");
+    let mut events = client.events.clone();
+    let (find_started, _) = events.get_successful_command_execution("find");
 
     let session_id = find_started
         .command
@@ -568,15 +568,15 @@ async fn find_and_getmore_share_session() {
                 });
         }
 
-        let mut handler = client.handler.clone();
-        let (find_started, _) = handler.get_successful_command_execution("find");
+        let mut events = client.events.clone();
+        let (find_started, _) = events.get_successful_command_execution("find");
         let session_id = find_started
             .command
             .get("lsid")
             .expect("find should use implicit session");
         assert!(session_id != &Bson::Null);
 
-        let (command_started, _) = handler.get_successful_command_execution("getMore");
+        let (command_started, _) = events.get_successful_command_execution("getMore");
         let getmore_session_id = command_started
             .command
             .get("lsid")

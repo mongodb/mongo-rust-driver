@@ -16,7 +16,7 @@ use crate::{
         log_uncaptured,
         util::TestClient,
         Event,
-        EventHandler,
+        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -687,9 +687,9 @@ async fn retry_commit_txn_check_out() {
         .unwrap();
 
     let mut options = get_client_options().await.clone();
-    let handler = EventHandler::new();
-    options.cmap_event_handler = Some(handler.ev_callback());
-    options.sdam_event_handler = Some(handler.ev_callback());
+    let handler = EventBuffer::new();
+    options.cmap_event_handler = Some(handler.handler());
+    options.sdam_event_handler = Some(handler.handler());
     options.heartbeat_freq = Some(Duration::from_secs(120));
     options.app_name = Some("retry_commit_txn_check_out".to_string());
     let client = Client::with_options(options).unwrap();
@@ -799,7 +799,7 @@ async fn manual_shutdown_with_nothing() {
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
 #[tokio::test]
 async fn manual_shutdown_with_resources() {
-    let events = EventHandler::new();
+    let events = EventBuffer::new();
     let client = Client::test_builder()
         .event_handler(events.clone())
         .build()
@@ -860,7 +860,7 @@ async fn manual_shutdown_immediate_with_nothing() {
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
 #[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
-    let events = EventHandler::new();
+    let events = EventBuffer::new();
     let client = Client::test_builder()
         .event_handler(events.clone())
         .build()

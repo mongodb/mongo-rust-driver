@@ -19,7 +19,7 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         Event,
-        EventHandler,
+        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -162,7 +162,7 @@ async fn load_balancing_test() {
     /// was selected. max_share is the upper bound.
     async fn do_test(
         client: &TestClient,
-        handler: &mut EventHandler,
+        handler: &mut EventBuffer,
         min_share: f64,
         max_share: f64,
         iterations: usize,
@@ -213,7 +213,7 @@ async fn load_balancing_test() {
         }
     }
 
-    let mut handler = EventHandler::new();
+    let mut handler = EventBuffer::new();
     let mut subscriber = handler.subscribe();
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;

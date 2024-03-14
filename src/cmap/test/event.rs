@@ -1,87 +1,8 @@
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::time::Duration;
 
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 
-use crate::{event::cmap::*, options::ServerAddress, test::util::EventSubscriber};
-use tokio::sync::broadcast::error::SendError;
-
-#[derive(Clone, Debug)]
-pub struct TestEventHandler {
-    pub(crate) events: Arc<RwLock<Vec<CmapEvent>>>,
-    channel_sender: tokio::sync::broadcast::Sender<CmapEvent>,
-}
-
-impl TestEventHandler {
-    pub fn new() -> Self {
-        let (channel_sender, _) = tokio::sync::broadcast::channel(500);
-        Self {
-            events: Default::default(),
-            channel_sender,
-        }
-    }
-
-    fn handle<E: Into<CmapEvent>>(&self, event: E) {
-        let event = event.into();
-        // this only errors if no receivers are listening which isn't a concern here.
-        let _: std::result::Result<usize, SendError<CmapEvent>> =
-            self.channel_sender.send(event.clone());
-        self.events.write().unwrap().push(event);
-    }
-
-    pub(crate) fn subscribe(&self) -> EventSubscriber<'_, TestEventHandler, CmapEvent> {
-        EventSubscriber::new(self, self.channel_sender.subscribe())
-    }
-}
-
-#[allow(deprecated)]
-impl CmapEventHandler for TestEventHandler {
-    fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        self.handle(event);
-    }
-
-    fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
-        self.handle(event);
-    }
-
-    fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
-        self.handle(event);
-    }
-}
+use crate::{event::cmap::*, options::ServerAddress};
 
 impl Serialize for CmapEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

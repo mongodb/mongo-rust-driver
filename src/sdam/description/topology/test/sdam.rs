@@ -30,7 +30,7 @@ use crate::{
         run_spec_test,
         Event,
         EventClient,
-        EventHandler,
+        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -274,8 +274,8 @@ async fn run_test(test_file: TestFile) {
         .await
         .expect(test_description);
 
-    let handler = EventHandler::new();
-    options.sdam_event_handler = Some(handler.ev_callback());
+    let handler = EventBuffer::new();
+    options.sdam_event_handler = Some(handler.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_subscriber = handler.subscribe();
@@ -590,7 +590,7 @@ async fn load_balanced() {
 #[tokio::test]
 #[function_name::named]
 async fn topology_closed_event_last() {
-    let event_handler = EventHandler::new();
+    let event_handler = EventBuffer::new();
     let mut subscriber = event_handler.subscribe();
     let client = EventClient::with_additional_options(
         None,
@@ -635,7 +635,7 @@ async fn heartbeat_events() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
 
-    let event_handler = EventHandler::new();
+    let event_handler = EventBuffer::new();
     let mut subscriber = event_handler.subscribe();
 
     let client = EventClient::with_additional_options(

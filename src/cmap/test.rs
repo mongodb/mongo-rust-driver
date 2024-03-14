@@ -6,10 +6,8 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use tokio::sync::{Mutex, RwLock};
 
-use self::{
-    event::TestEventHandler,
-    file::{Operation, TestFile, ThreadedOperation},
-};
+use self::file::{Operation, TestFile, ThreadedOperation};
+use crate::test::util::EventBuffer;
 
 use crate::{
     cmap::{
@@ -21,8 +19,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::cmap::{CmapEvent, ConnectionPoolOptions as EventOptions},
     options::TlsOptions,
-    runtime,
-    runtime::AsyncJoinHandle,
+    runtime::{self, AsyncJoinHandle},
     sdam::{TopologyUpdater, UpdateMessage},
     test::{
         assert_matches,
@@ -70,7 +67,7 @@ struct Executor {
 
 #[derive(Debug)]
 struct State {
-    handler: Arc<TestEventHandler>,
+    events: EventBuffer<CmapEvent>,
     connections: RwLock<HashMap<String, Connection>>,
     unlabeled_connections: Mutex<Vec<Connection>>,
     threads: RwLock<HashMap<String, CmapThread>>,
@@ -85,11 +82,10 @@ struct State {
 impl State {
     // Counts the number of events of the given type that have occurred so far.
     fn count_events(&self, event_type: &str) -> usize {
-        self.handler
-            .events
-            .read()
-            .unwrap()
-            .iter()
+        self.events
+            .all()
+            .0
+            .into_iter()
             .filter(|cmap_event| cmap_event.name() == event_type)
             .count()
     }
@@ -126,14 +122,14 @@ impl CmapThread {
 
 impl Executor {
     async fn new(test_file: TestFile) -> Self {
-        let handler = Arc::new(TestEventHandler::new());
+        let events = EventBuffer::new();
         let error = test_file.error;
 
         let mut pool_options = test_file.pool_options.unwrap_or_default();
-        pool_options.cmap_event_handler = Some(handler.clone().into());
+        pool_options.cmap_event_handler = Some(events.handler());
 
         let state = State {
-            handler,
+            events,
             pool: RwLock::new(None),
             connections: Default::default(),
             threads: Default::default(),
@@ -152,7 +148,7 @@ impl Executor {
     }
 
     async fn execute_test(self) {
-        let mut subscriber = self.state.handler.subscribe();
+        let mut subscriber = self.state.events.subscribe();
 
         let (updater, mut receiver) = TopologyUpdater::channel();
 
@@ -268,7 +264,7 @@ impl Operation {
                 }
             }
             Operation::CheckIn { connection } => {
-                let mut subscriber = state.handler.subscribe();
+                let mut subscriber = state.events.subscribe();
                 let conn = state.connections.write().await.remove(&connection).unwrap();
                 let id = conn.id;
                 // connections are checked in via tasks spawned in their drop implementation,
@@ -306,7 +302,7 @@ impl Operation {
                 }
             }
             Operation::Close => {
-                let mut subscriber = state.handler.subscribe();
+                let mut subscriber = state.events.subscribe();
 
                 // pools are closed via their drop implementation
                 state.pool.write().await.take();

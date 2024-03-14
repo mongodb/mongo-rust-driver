@@ -29,7 +29,7 @@ use crate::{
         util::get_default_name,
         Event,
         EventClient,
-        EventHandler,
+        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -192,9 +192,9 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let mut handler = client.handler.clone();
+    let mut events = client.events.clone();
     let mut excludes_txn_number = move |command_name: &str| -> bool {
-        let (started, _) = handler.get_successful_command_execution(command_name);
+        let (started, _) = events.get_successful_command_execution(command_name);
         !started.command.contains_key("txnNumber")
     };
 
@@ -238,9 +238,9 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let mut handler = client.handler.clone();
+    let mut events = client.events.clone();
     let mut includes_txn_number = move |command_name: &str| -> bool {
-        let (started, _) = handler.get_successful_command_execution(command_name);
+        let (started, _) = events.get_successful_command_execution(command_name);
         started.command.contains_key("txnNumber")
     };
 
@@ -381,13 +381,13 @@ async fn label_not_added(retry_reads: bool) {
 /// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
-    let handler = Arc::new(EventHandler::new());
+    let handler = Arc::new(EventBuffer::new());
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.ev_callback());
-    client_options.command_event_handler = Some(handler.ev_callback());
+    client_options.cmap_event_handler = Some(handler.handler());
+    client_options.command_event_handler = Some(handler.handler());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -608,8 +608,8 @@ async fn retry_write_different_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
-    let mut handler = client.handler.clone();
-    let events = handler.get_command_events(&["insert"]);
+    let mut events = client.events.clone();
+    let events = events.get_command_events(&["insert"]);
     assert!(
         matches!(
             &events[..],
@@ -667,8 +667,8 @@ async fn retry_write_same_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let mut handler = client.handler.clone();
-    let events = handler.get_command_events(&["insert"]);
+    let mut events = client.events.clone();
+    let events = events.get_command_events(&["insert"]);
     assert!(
         matches!(
             &events[..],
