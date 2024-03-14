@@ -582,7 +582,6 @@ async fn load_balanced() {
 #[function_name::named]
 async fn topology_closed_event_last() {
     let event_handler = EventBuffer::new();
-    let mut subscriber = event_handler.subscribe();
     let client = EventClient::with_additional_options(
         None,
         Some(Duration::from_millis(50)),
@@ -590,6 +589,7 @@ async fn topology_closed_event_last() {
         event_handler.clone(),
     )
     .await;
+    let mut subscriber = event_handler.subscribe_all();
 
     client
         .database(function_name!())

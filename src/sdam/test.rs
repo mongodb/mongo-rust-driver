@@ -93,7 +93,6 @@ async fn sdam_pool_management() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
     let event_handler = EventBuffer::new();
-    let mut subscriber = event_handler.subscribe();
 
     let client = EventClient::with_additional_options(
         Some(options),
@@ -102,6 +101,7 @@ async fn sdam_pool_management() {
         event_handler.clone(),
     )
     .await;
+    let mut subscriber = event_handler.subscribe_all();
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()
