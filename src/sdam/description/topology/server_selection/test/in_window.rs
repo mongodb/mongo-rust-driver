@@ -253,7 +253,6 @@ async fn load_balancing_test() {
             .expect("timed out waiting for both pools to be saturated");
         conns += 1;
     }
-    drop(subscriber);
 
     // enable a failpoint on one of the mongoses to slow it down
     let options = FailCommandOptions::builder()

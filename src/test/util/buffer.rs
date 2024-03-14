@@ -267,10 +267,10 @@ impl EventBuffer<Event> {
             }
             _ => true,
         });
-        return match (started, succeeded) {
+        match (started, succeeded) {
             (Some(started), Some(succeeded)) => (started, succeeded),
             _ => panic!("could not find event for {} command", command_name),
-        };
+        }
     }
 
     pub(crate) fn count_pool_cleared_events(&self) -> usize {
