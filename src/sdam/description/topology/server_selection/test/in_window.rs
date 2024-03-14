@@ -24,8 +24,7 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-    },
-    ServerInfo,
+    }, Client, ServerInfo
 };
 
 use super::TestTopologyDescription;
@@ -223,7 +222,7 @@ async fn load_balancing_test() {
     options.min_pool_size = Some(max_pool_size);
     let client = Client::test_builder()
         .options(options)
-        .event_handler(Some(Arc::new(handler.clone())))
+        .event_handler(handler.clone())
         .build()
         .await;
 

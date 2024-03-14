@@ -40,8 +40,8 @@ impl<T> GenVec<T> {
 impl EventHandlerInner<Event> {
     fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
         self: Arc<Self>,
-    ) -> Option<crate::event::EventHandler<T>> {
-        Some(crate::event::EventHandler::callback(
+    ) -> crate::event::EventHandler<T> {
+        crate::event::EventHandler::callback(
             move |ev: T| {
                 self.events
                     .lock()
@@ -50,7 +50,7 @@ impl EventHandlerInner<Event> {
                     .push((ev.into(), OffsetDateTime::now_utc()));
                 self.event_received.notify_waiters();
             }    
-        ))
+        )
     }
 }
 
@@ -113,27 +113,34 @@ impl<T: Clone> EventHandler<T> {
     // The `mut` isn't necessary on `self` here, but it serves as a useful lint on those
     // methods that modify; if the caller only has a `&EventHandler` it can at worst case
     // `clone` to get a `mut` one.
-    fn invalidate(&mut self, f: impl FnOnce(&mut Vec<(T, OffsetDateTime)>)) {
+    fn invalidate<R>(&mut self, f: impl FnOnce(&mut Vec<(T, OffsetDateTime)>) -> R) -> R {
         let mut events = self.inner.events.lock().unwrap();
         events.generation = Generation(events.generation.0 + 1);
-        f(&mut events.data);
+        let out = f(&mut events.data);
         self.inner.event_received.notify_waiters();
+        out
     }
 
     pub(crate) fn clear_cached_events(&mut self) {
         self.invalidate(|data| data.clear());
     }
 
-    pub(crate) fn retain(&mut self, f: impl Fn(&T) -> bool) {
+    pub(crate) fn retain(&mut self, mut f: impl FnMut(&T) -> bool) {
         self.invalidate(|data| data.retain(|(ev, _)| f(ev)));
     }
 }
 
 impl EventHandler<Event> {
+    pub(crate) fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
+        &self,
+    ) -> crate::event::EventHandler<T> {
+        self.inner.clone().ev_callback()
+    }
+
     pub(crate) fn register(&self, client_options: &mut ClientOptions) {
-        client_options.command_event_handler = self.inner.clone().ev_callback();
-        client_options.sdam_event_handler = self.inner.clone().ev_callback();
-        client_options.cmap_event_handler = self.inner.clone().ev_callback();
+        client_options.command_event_handler = Some(self.ev_callback());
+        client_options.sdam_event_handler = Some(self.ev_callback());
+        client_options.cmap_event_handler = Some(self.ev_callback());
     }
 
     pub(crate) fn connections_checked_out(&self) -> u32 {
@@ -194,54 +201,60 @@ impl EventHandler<Event> {
             .collect()
     }
 
-    pub(crate) fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
-        self.filter_map(|ev| match ev {
-            Event::Command(cev) => Some(cev.clone()),
-            _ => None,
-        })
+    /// Remove all command events from the buffer, returning those matching any of the command names.
+    pub(crate) fn get_command_events(&mut self, command_names: &[&str]) -> Vec<CommandEvent> {
+        let mut out = vec![];
+        self.retain(|ev| match ev {
+            Event::Command(cev) => {
+                if command_names.contains(&cev.command_name()) {
+                    out.push(cev.clone());
+                }
+                false
+            }
+            _ => true,
+        });
+        out
     }
 
-    /// Gets the first started/succeeded pair of events for the given command name.
+    /// Gets the first started/succeeded pair of events for the given command name, popping off all
+    /// command events before and between them.
     ///
     /// Panics if the command failed or could not be found in the events.
     pub(crate) fn get_successful_command_execution(
-        &self,
+        &mut self,
         command_name: &str,
     ) -> (CommandStartedEvent, CommandSucceededEvent) {
-        let mut command_events = self.filter_map(|ev| match ev {
-            Event::Command(cev) => Some(cev.clone()),
-            _ => None,
-        });
-        command_events.reverse();
-
-        let mut started: Option<CommandStartedEvent> = None;
-
-        while let Some(event) = command_events.pop() {
-            if event.command_name() == command_name {
-                match started {
-                    None => {
-                        let event = event
-                            .as_command_started()
+        let mut started = None;
+        let mut succeeded = None;
+        self.retain(|ev| match (ev, &started, &succeeded) {
+            (Event::Command(cev), None, None) => {
+                if cev.command_name() == command_name {
+                    started = Some(
+                        cev.as_command_started()
                             .unwrap_or_else(|| {
-                                panic!("first event not a command started event {:?}", event)
+                                panic!("first event not a command started event {:?}", cev)
                             })
-                            .clone();
-                        started = Some(event);
-                        continue;
-                    }
-                    Some(started) if event.request_id() == started.request_id => {
-                        let succeeded = event
-                            .as_command_succeeded()
-                            .expect("second event not a command succeeded event")
-                            .clone();
-
-                        return (started, succeeded);
-                    }
-                    _ => continue,
+                            .clone()
+                    );
                 }
+                false
+            },
+            (Event::Command(cev), Some(started), None) => {
+                if cev.request_id() == started.request_id {
+                    succeeded = Some(
+                        cev.as_command_succeeded()
+                            .expect("second event not a command succeeded event")
+                            .clone()
+                    );
+                }
+                false
             }
-        }
-        panic!("could not find event for {} command", command_name);
+            _ => true,
+        });
+        return match (started, succeeded) {
+            (Some(started), Some(succeeded)) => (started, succeeded),
+            _ => panic!("could not find event for {} command", command_name),
+        };
     }
 
     pub(crate) fn count_pool_cleared_events(&self) -> usize {
@@ -266,20 +279,25 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
         crate::runtime::timeout(timeout, async move {
             loop {
                 let notified = self.buffer.inner.event_received.notified();
-                {
-                    let events = self.buffer.inner.events.lock().unwrap();
-                    if events.generation != self.generation {
-                        panic!("EventBuffer cleared during EventStream iteration");
-                    }
-                    if events.data.len() > self.index {
-                        let event = events.data[self.index].0.clone();
-                        self.index += 1;
-                        return Some(event);
-                    }
+                if let Some(next) = self.try_next() {
+                    return Some(next);
                 }
                 notified.await;
             }
         }).await.unwrap_or(None)
+    }
+
+    fn try_next(&mut self) -> Option<T> {
+        let events = self.buffer.inner.events.lock().unwrap();
+        if events.generation != self.generation {
+            panic!("EventBuffer cleared during EventStream iteration");
+        }
+        if events.data.len() > self.index {
+            let event = events.data[self.index].0.clone();
+            self.index += 1;
+            return Some(event);
+        }
+        None
     }
 
     /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
@@ -371,7 +389,7 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
 }
 
 impl<'a> EventSubscriber<'a, Event> {
-        /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
+    /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
     /// panic.
     pub(crate) async fn wait_for_successful_command_execution(

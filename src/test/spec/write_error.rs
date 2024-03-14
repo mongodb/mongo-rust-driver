@@ -29,7 +29,8 @@ async fn details() {
         ErrorKind::Write(WriteFailure::WriteError(e)) => e,
         _ => panic!("expected WriteError, got {:?}", err.kind),
     };
-    let (_, event) = client.get_successful_command_execution("insert");
+    let mut handler = client.handler.clone();
+    let (_, event) = handler.get_successful_command_execution("insert");
     assert_eq!(write_err.code, 121 /* DocumentValidationFailure */);
     assert_eq!(
         &write_err.details.unwrap(),

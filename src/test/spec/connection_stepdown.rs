@@ -90,7 +90,7 @@ async fn get_more() {
         }
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 0);
+        assert_eq!(client.handler.count_pool_cleared_events(), 0);
     }
 
     run_test("get_more", get_more_test).await;
@@ -136,7 +136,7 @@ async fn notwritableprimary_keep_pool() {
             .expect("insert should have succeeded");
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 0);
+        assert_eq!(client.handler.count_pool_cleared_events(), 0);
     }
 
     run_test(
@@ -184,7 +184,7 @@ async fn notwritableprimary_reset_pool() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 1);
+        assert_eq!(client.handler.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await
@@ -233,7 +233,7 @@ async fn shutdown_in_progress() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 1);
+        assert_eq!(client.handler.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await
@@ -278,7 +278,7 @@ async fn interrupted_at_shutdown() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 1);
+        assert_eq!(client.handler.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await

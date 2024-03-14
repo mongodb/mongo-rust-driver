@@ -281,7 +281,7 @@ async fn data_key_double_encryption() -> Result<()> {
     )?;
 
     // Testing each provider:
-    let mut events = client.subscribe_to_events();
+    let mut events = client.handler.subscribe();
     let provider_keys = [
         (
             KmsProvider::Aws,
@@ -363,7 +363,7 @@ async fn data_key_double_encryption() -> Result<()> {
                 }),
             )
             .await;
-        assert!(found.is_some(), "no valid event found in {:?}", events);
+        assert!(found.is_some(), "no valid event found");
 
         // Manually encrypt a value and automatically decrypt it.
         let encrypted = client_encryption
@@ -544,9 +544,9 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let handler = Arc::new(EventHandler::new());
+    let handler = EventHandler::new();
     let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.clone().into());
+    opts.command_event_handler = Some(handler.ev_callback());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
             .extra_options(EXTRA_OPTIONS.clone())
@@ -1504,7 +1504,7 @@ impl DeadlockTestCase {
             opts
         })
         .await;
-        let mut keyvault_events = client_keyvault.subscribe_to_events();
+        let mut keyvault_events = client_keyvault.handler.subscribe();
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1540,12 +1540,12 @@ impl DeadlockTestCase {
             .await?;
 
         // Run test case
-        let event_handler = Arc::new(EventHandler::new());
+        let event_handler = EventHandler::new();
         let mut encrypted_events = event_handler.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.clone().into());
-        opts.sdam_event_handler = Some(event_handler.clone().into());
+        opts.command_event_handler = Some(event_handler.ev_callback());
+        opts.sdam_event_handler = Some(event_handler.ev_callback());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)

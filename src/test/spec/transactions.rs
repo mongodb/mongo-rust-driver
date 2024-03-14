@@ -122,7 +122,7 @@ async fn convenient_api_custom_error() {
 
     assert!(result.is_err());
     assert!(result.unwrap_err().get_custom::<MyErr>().is_some());
-    let events = client.get_all_command_started_events();
+    let events = client.handler.get_all_command_started_events();
     let commands: Vec<_> = events.iter().map(|ev| &ev.command_name).collect();
     assert_eq!(&["find", "abortTransaction"], &commands[..]);
 }

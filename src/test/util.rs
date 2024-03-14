@@ -2,15 +2,13 @@ mod event;
 mod failpoint;
 mod handler;
 mod matchable;
-mod subscriber;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventClient, EventHandler},
+    event::{Event, EventClient, EventHandler, EventSubscriber},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
-    subscriber::EventSubscriber,
 };
 
 #[cfg(feature = "tracing-unstable")]

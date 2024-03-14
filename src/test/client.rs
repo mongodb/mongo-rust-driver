@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, sync::Arc, time::Duration};
+use std::{borrow::Cow, collections::HashMap, future::IntoFuture, time::Duration};
 
 use bson::Document;
 use serde::{Deserialize, Serialize};
@@ -687,9 +687,9 @@ async fn retry_commit_txn_check_out() {
         .unwrap();
 
     let mut options = get_client_options().await.clone();
-    let handler = Arc::new(EventHandler::new());
-    options.cmap_event_handler = Some(handler.clone().into());
-    options.sdam_event_handler = Some(handler.clone().into());
+    let handler = EventHandler::new();
+    options.cmap_event_handler = Some(handler.ev_callback());
+    options.sdam_event_handler = Some(handler.ev_callback());
     options.heartbeat_freq = Some(Duration::from_secs(120));
     options.app_name = Some("retry_commit_txn_check_out".to_string());
     let client = Client::with_options(options).unwrap();
@@ -799,9 +799,9 @@ async fn manual_shutdown_with_nothing() {
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
 #[tokio::test]
 async fn manual_shutdown_with_resources() {
-    let events = Arc::new(EventHandler::new());
+    let events = EventHandler::new();
     let client = Client::test_builder()
-        .event_handler(Arc::clone(&events))
+        .event_handler(events.clone())
         .build()
         .await;
     if !client.supports_transactions() {
@@ -860,9 +860,9 @@ async fn manual_shutdown_immediate_with_nothing() {
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
 #[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
-    let events = Arc::new(EventHandler::new());
+    let events = EventHandler::new();
     let client = Client::test_builder()
-        .event_handler(Arc::clone(&events))
+        .event_handler(events.clone())
         .build()
         .await;
     if !client.supports_transactions() {

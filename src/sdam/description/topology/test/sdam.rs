@@ -274,8 +274,8 @@ async fn run_test(test_file: TestFile) {
         .await
         .expect(test_description);
 
-    let handler = Arc::new(EventHandler::new());
-    options.sdam_event_handler = Some(handler.clone().into());
+    let handler = EventHandler::new();
+    options.sdam_event_handler = Some(handler.ev_callback());
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_subscriber = handler.subscribe();

@@ -1,12 +1,7 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::time::Duration;
 
 use derive_more::From;
 use serde::Serialize;
-use time::OffsetDateTime;
 
 use super::{TestClient, TestClientBuilder};
 use crate::{
@@ -17,16 +12,7 @@ use crate::{
     }, options::ClientOptions, Client
 };
 
-pub(crate) use super::handler::EventHandler;
-
-pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
-
-fn add_event_to_queue<T>(event_queue: &EventQueue<T>, event: T) {
-    event_queue
-        .write()
-        .unwrap()
-        .push_back((event, OffsetDateTime::now_utc()))
-}
+pub(crate) use super::handler::{EventHandler, EventSubscriber};
 
 #[derive(Clone, Debug, From, Serialize)]
 #[serde(untagged)]

@@ -158,7 +158,8 @@ async fn first_read_no_after_cluser_time() {
         )
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
-        let (started, _) = client.get_successful_command_execution(name);
+        let mut handler = client.handler.clone();
+        let (started, _) = handler.get_successful_command_execution(name);
 
         // assert that no read concern was set.
         started.command.get_document("readConcern").unwrap_err();
@@ -192,7 +193,8 @@ async fn first_op_update_op_time() {
         .await
         .unwrap();
 
-        let event = client
+        let mut handler = client.handler.clone();
+        let event = handler
             .get_command_events(&[name])
             .into_iter()
             .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
@@ -235,6 +237,7 @@ async fn read_includes_after_cluster_time() {
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
+            .handler
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -278,7 +281,7 @@ async fn find_after_write_includes_after_cluster_time() {
         let op_time = session.operation_time().unwrap();
         coll.find_one(doc! {}).session(&mut session).await.unwrap();
 
-        let command_started = client.get_command_started_events(&["find"]).pop().unwrap();
+        let command_started = client.handler.get_command_started_events(&["find"]).pop().unwrap();
         assert_eq!(
             command_started
                 .command
@@ -319,6 +322,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
+            .handler
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -354,6 +358,7 @@ async fn omit_after_cluster_time_standalone() {
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
+            .handler
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -393,6 +398,7 @@ async fn omit_default_read_concern_level() {
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
+            .handler
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -438,6 +444,7 @@ async fn test_causal_consistency_read_concern_merge() {
         op.execute(coll.clone(), &mut session).await.unwrap();
 
         let command_started = client
+            .handler
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -466,7 +473,8 @@ async fn omit_cluster_time_standalone() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    let (started, _) = client.get_successful_command_execution("find");
+    let mut handler = client.handler.clone();
+    let (started, _) = handler.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap_err();
 }
 
@@ -485,6 +493,7 @@ async fn cluster_time_sent_in_commands() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    let (started, _) = client.get_successful_command_execution("find");
+    let mut handler = client.handler.clone();
+    let (started, _) = handler.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap();
 }

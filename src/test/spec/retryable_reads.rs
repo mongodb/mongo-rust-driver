@@ -72,13 +72,13 @@ async fn retry_releases_connection() {
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_pool_cleared() {
-    let handler = Arc::new(EventHandler::new());
+    let handler = EventHandler::new();
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone().into());
-    client_options.command_event_handler = Some(handler.clone().into());
+    client_options.cmap_event_handler = Some(handler.ev_callback());
+    client_options.command_event_handler = Some(handler.ev_callback());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -203,7 +203,8 @@ async fn retry_read_different_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_err());
-    let events = client.get_command_events(&["find"]);
+    let mut handler = client.handler.clone();
+    let events = handler.get_command_events(&["find"]);
     assert!(
         matches!(
             &events[..],
@@ -260,7 +261,8 @@ async fn retry_read_same_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let events = client.get_command_events(&["find"]);
+    let mut handler = client.handler.clone();
+    let events = handler.get_command_events(&["find"]);
     assert!(
         matches!(
             &events[..],

@@ -325,7 +325,7 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
         .unwrap();
     db.drop().await.unwrap();
 
-    let events = client.get_command_started_events(&["create"]);
+    let events = client.handler.get_command_started_events(&["create"]);
     assert_eq!(events.len(), 1);
 
     let event_defaults = match events[0].command.get_document("indexOptionDefaults") {
