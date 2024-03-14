@@ -5,11 +5,14 @@ use serde::Serialize;
 
 use super::{buffer::EventBuffer, TestClient, TestClientBuilder};
 use crate::{
-    bson::doc, event::{
+    bson::doc,
+    event::{
         cmap::CmapEvent,
         command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
-    }, options::ClientOptions, Client
+    },
+    options::ClientOptions,
+    Client,
 };
 
 #[derive(Clone, Debug, From, Serialize)]
@@ -145,7 +148,10 @@ impl EventClientBuilder {
         // clear events from commands used to set up client.
         handler.retain(|ev| !matches!(ev, Event::Command(_)));
 
-        EventClient { client, events: handler }
+        EventClient {
+            client,
+            events: handler,
+        }
     }
 }
 
@@ -186,7 +192,6 @@ impl EventClient {
             .await
     }
 
-
     #[allow(dead_code)]
     pub(crate) fn into_client(self) -> crate::Client {
         self.client.into_client()
@@ -202,5 +207,8 @@ async fn command_started_event_count() {
         coll.insert_one(doc! { "x": i }).await.unwrap();
     }
 
-    assert_eq!(client.events.get_command_started_events(&["insert"]).len(), 10);
+    assert_eq!(
+        client.events.get_command_started_events(&["insert"]).len(),
+        10
+    );
 }

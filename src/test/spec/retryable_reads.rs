@@ -10,7 +10,15 @@ use crate::{
     },
     runtime::{self, AsyncJoinHandle},
     test::{
-        get_client_options, log_uncaptured, spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests}, util::buffer::EventBuffer, Event, FailCommandOptions, FailPoint, FailPointMode, TestClient
+        get_client_options,
+        log_uncaptured,
+        spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
+        util::buffer::EventBuffer,
+        Event,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
     },
     Client,
 };

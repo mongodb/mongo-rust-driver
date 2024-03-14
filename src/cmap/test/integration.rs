@@ -16,7 +16,13 @@ use crate::{
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
-        get_client_options, log_uncaptured, util::buffer::EventBuffer, FailCommandOptions, FailPoint, FailPointMode, TestClient
+        get_client_options,
+        log_uncaptured,
+        util::buffer::EventBuffer,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
     },
 };
 use semver::VersionReq;

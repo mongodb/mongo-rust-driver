@@ -1,12 +1,21 @@
-use std::{sync::{Arc, Mutex}, time::Duration};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use time::OffsetDateTime;
 use tokio::sync::{futures::Notified, Notify};
 
-use crate::{client::options::ClientOptions, event::{cmap::CmapEvent, command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent}}, runtime};
+use crate::{
+    client::options::ClientOptions,
+    event::{
+        cmap::CmapEvent,
+        command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
+    },
+    runtime,
+};
 
 use super::Event;
-
 
 #[derive(Clone, Debug)]
 pub(crate) struct EventBuffer<T = Event> {
@@ -141,9 +150,7 @@ impl<T: Clone + Send + Sync + 'static> EventBuffer<T> {
         &self,
     ) -> crate::event::EventHandler<V> {
         let this = self.clone();
-        crate::event::EventHandler::callback(
-            move |ev: V| this.push_event(ev.into())
-        )
+        crate::event::EventHandler::callback(move |ev: V| this.push_event(ev.into()))
     }
 }
 
@@ -158,12 +165,8 @@ impl EventBuffer<Event> {
         let mut count = 0;
         for (ev, _) in self.inner.events.lock().unwrap().data.iter() {
             match ev {
-                Event::Cmap(CmapEvent::ConnectionCheckedOut(_)) => {
-                    count += 1
-                }
-                Event::Cmap(CmapEvent::ConnectionCheckedIn(_)) => {
-                    count -= 1
-                }
+                Event::Cmap(CmapEvent::ConnectionCheckedOut(_)) => count += 1,
+                Event::Cmap(CmapEvent::ConnectionCheckedIn(_)) => count -= 1,
                 _ => (),
             }
         }
@@ -195,8 +198,7 @@ impl EventBuffer<Event> {
     }
 
     /// Gets all of the command started events, excluding configureFailPoint events.
-    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> 
-    {
+    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.inner
             .events
             .lock()
@@ -204,7 +206,9 @@ impl EventBuffer<Event> {
             .data
             .iter()
             .filter_map(|(event, _)| match event {
-                Event::Command(CommandEvent::Started(event)) if event.command_name != "configureFailPoint" => {
+                Event::Command(CommandEvent::Started(event))
+                    if event.command_name != "configureFailPoint" =>
+                {
                     Some(event.clone())
                 }
                 _ => None,
@@ -212,7 +216,8 @@ impl EventBuffer<Event> {
             .collect()
     }
 
-    /// Remove all command events from the buffer, returning those matching any of the command names.
+    /// Remove all command events from the buffer, returning those matching any of the command
+    /// names.
     pub(crate) fn get_command_events(&mut self, command_names: &[&str]) -> Vec<CommandEvent> {
         let mut out = vec![];
         self.retain(|ev| match ev {
@@ -245,17 +250,17 @@ impl EventBuffer<Event> {
                             .unwrap_or_else(|| {
                                 panic!("first event not a command started event {:?}", cev)
                             })
-                            .clone()
+                            .clone(),
                     );
                 }
                 false
-            },
+            }
             (Event::Command(cev), Some(started), None) => {
                 if cev.request_id() == started.request_id {
                     succeeded = Some(
                         cev.as_command_succeeded()
                             .expect("second event not a command succeeded event")
-                            .clone()
+                            .clone(),
                     );
                 }
                 false
@@ -295,7 +300,9 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
                 }
                 notified.await;
             }
-        }).await.unwrap_or(None)
+        })
+        .await
+        .unwrap_or(None)
     }
 
     fn try_next(&mut self) -> Option<T> {
@@ -327,7 +334,9 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
                     return Some(r);
                 }
             }
-        }).await.unwrap_or(None)
+        })
+        .await
+        .unwrap_or(None)
     }
 
     /// Waits for an event to occur within the given duration that passes the given filter.
@@ -396,7 +405,7 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
             .collect();
         self.index = events.data.len();
         out
-    }    
+    }
 }
 
 impl<'a> EventSubscriber<'a, Event> {

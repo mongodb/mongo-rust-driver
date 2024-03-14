@@ -1,6 +1,6 @@
+pub(crate) mod buffer;
 mod event;
 mod failpoint;
-pub(crate) mod buffer;
 mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
@@ -19,7 +19,6 @@ pub(crate) use self::trace::{
     TracingHandler,
 };
 
-use std::{fmt::Debug, time::Duration};
 use self::buffer::EventBuffer;
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
@@ -32,6 +31,7 @@ use crate::{
 use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Serialize};
+use std::{fmt::Debug, time::Duration};
 
 use super::get_client_options;
 use crate::{

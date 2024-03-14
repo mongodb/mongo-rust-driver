@@ -13,7 +13,14 @@ use crate::{
     options::{FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, util::buffer::EventBuffer, Event, EventClient, TestClient},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        util::buffer::EventBuffer,
+        Event,
+        EventClient,
+        TestClient,
+    },
     Client,
     Collection,
 };

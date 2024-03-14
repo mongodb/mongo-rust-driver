@@ -25,7 +25,16 @@ use crate::{
     },
     selection_criteria::TagSet,
     test::{
-        get_client_options, log_uncaptured, run_spec_test, util::buffer::EventBuffer, Event, EventClient, FailCommandOptions, FailPoint, FailPointMode, TestClient
+        get_client_options,
+        log_uncaptured,
+        run_spec_test,
+        util::buffer::EventBuffer,
+        Event,
+        EventClient,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
     },
 };
 

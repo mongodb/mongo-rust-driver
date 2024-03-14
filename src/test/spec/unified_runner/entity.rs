@@ -20,7 +20,9 @@ use crate::{
     runtime,
     sdam::TopologyDescription,
     test::{
-        spec::unified_runner::{ExpectedEventType, ObserveEvent}, util::buffer::EventBuffer, Event
+        spec::unified_runner::{ExpectedEventType, ObserveEvent},
+        util::buffer::EventBuffer,
+        Event,
     },
     Client,
     ClientSession,

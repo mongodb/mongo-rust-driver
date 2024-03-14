@@ -281,7 +281,11 @@ async fn find_after_write_includes_after_cluster_time() {
         let op_time = session.operation_time().unwrap();
         coll.find_one(doc! {}).session(&mut session).await.unwrap();
 
-        let command_started = client.events.get_command_started_events(&["find"]).pop().unwrap();
+        let command_started = client
+            .events
+            .get_command_started_events(&["find"])
+            .pop()
+            .unwrap();
         assert_eq!(
             command_started
                 .command
