@@ -666,7 +666,7 @@ async fn command_contains_write_concern_aggregate() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
-    let client = EventClient::new().await;
+    let mut client = Client::test_builder().event_client().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();

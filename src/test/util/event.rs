@@ -11,8 +11,7 @@ use tokio::sync::{broadcast::error::SendError, futures::Notified, Notify};
 
 use super::{subscriber::EventSubscriber, TestClient, TestClientBuilder};
 use crate::{
-    bson::doc,
-    event::{
+    bson::doc, error::{Error, Result}, event::{
         cmap::{
             CmapEvent,
             ConnectionCheckedInEvent,
@@ -40,10 +39,7 @@ use crate::{
             TopologyDescriptionChangedEvent,
             TopologyOpeningEvent,
         },
-    },
-    options::ClientOptions,
-    runtime,
-    Client,
+    }, options::ClientOptions, runtime, Client
 };
 
 pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
@@ -212,7 +208,7 @@ impl EventHandler {
             .collect()
     }
 
-    pub(crate) fn clear_cached_events(&self) {
+    pub(crate) fn clear_cached_events(&mut self) {
         self.command_events.write().unwrap().clear();
         self.cmap_events.write().unwrap().clear();
         self.sdam_events.write().unwrap().clear();
@@ -580,8 +576,11 @@ impl EventClient {
         self.handler.subscribe()
     }
 
-    pub(crate) fn clear_cached_events(&self) {
-        self.handler.clear_cached_events()
+    /// This will only succeed if no other clones of this `EventClient` are live.
+    pub(crate) fn clear_cached_events(&mut self) -> Result<()> {
+        Arc::get_mut(&mut self.handler)
+            .map(|h| h.clear_cached_events())
+            .ok_or_else(|| Error::internal("cannot clear shared cached events"))
     }
 
     #[allow(dead_code)]
@@ -611,26 +610,21 @@ pub(crate) struct EventBuffer<T> {
 struct EventBufferInner<T> {
     events: Mutex<Vec<(T, OffsetDateTime)>>,
     event_received: Notify,
-    connections_checked_out: Mutex<u32>,
 }
 
 impl EventBufferInner<Event> {
     fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
         self: Arc<Self>,
-    ) -> impl Fn(T) + Send + Sync + 'static {
-        move |ev: T| {
-            self.events
-                .lock()
-                .unwrap()
-                .push((ev.into(), OffsetDateTime::now_utc()));
-            self.event_received.notify_waiters();
-        }
-    }
-
-    fn wrapped_ev_callback<T: Into<Event> + Send + Sync + 'static>(
-        self: Arc<Self>,
     ) -> Option<crate::event::EventHandler<T>> {
-        Some(crate::event::EventHandler::callback(self.ev_callback()))
+        Some(crate::event::EventHandler::callback(
+            move |ev: T| {
+                self.events
+                    .lock()
+                    .unwrap()
+                    .push((ev.into(), OffsetDateTime::now_utc()));
+                self.event_received.notify_waiters();
+            }    
+        ))
     }
 }
 
@@ -640,7 +634,6 @@ impl<T: Clone> EventBuffer<T> {
             inner: Arc::new(EventBufferInner {
                 events: Mutex::new(vec![]),
                 event_received: Notify::new(),
-                connections_checked_out: Mutex::new(0),
             }),
         }
     }
@@ -672,33 +665,33 @@ impl<T: Clone> EventBuffer<T> {
             index: 0,
         }
     }
+
+    pub(crate) fn clear(&mut self) {
+        self.inner.events.lock().unwrap().clear();
+    }
 }
 
 impl EventBuffer<Event> {
     pub(crate) fn register(&self, client_options: &mut ClientOptions) {
-        client_options.command_event_handler = self.inner.clone().wrapped_ev_callback();
-        client_options.sdam_event_handler = self.inner.clone().wrapped_ev_callback();
-        {
-            let inner = self.inner.clone();
-            let cmap_cb = self.inner.clone().ev_callback();
-            client_options.cmap_event_handler =
-                Some(crate::event::EventHandler::callback(move |ev| {
-                    match &ev {
-                        CmapEvent::ConnectionCheckedOut(_) => {
-                            *inner.connections_checked_out.lock().unwrap() += 1
-                        }
-                        CmapEvent::ConnectionCheckedIn(_) => {
-                            *inner.connections_checked_out.lock().unwrap() -= 1
-                        }
-                        _ => (),
-                    }
-                    (cmap_cb)(ev);
-                }));
-        }
+        client_options.command_event_handler = self.inner.clone().ev_callback();
+        client_options.sdam_event_handler = self.inner.clone().ev_callback();
+        client_options.cmap_event_handler = self.inner.clone().ev_callback();
     }
 
     pub(crate) fn connections_checked_out(&self) -> u32 {
-        *self.inner.connections_checked_out.lock().unwrap()
+        let mut count = 0;
+        for (ev, _) in self.inner.events.lock().unwrap().iter() {
+            match ev {
+                Event::Cmap(CmapEvent::ConnectionCheckedOut(_)) => {
+                    count += 1
+                }
+                Event::Cmap(CmapEvent::ConnectionCheckedIn(_)) => {
+                    count -= 1
+                }
+                _ => (),
+            }
+        }
+        count
     }
 }
 
