@@ -1,46 +1,23 @@
 use std::{
     collections::VecDeque,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
     time::Duration,
 };
 
 use derive_more::From;
 use serde::Serialize;
 use time::OffsetDateTime;
-use tokio::sync::{broadcast::error::SendError, futures::Notified, Notify};
 
-use super::{subscriber::EventSubscriber, TestClient, TestClientBuilder};
+use super::{TestClient, TestClientBuilder};
 use crate::{
-    bson::doc, error::{Error, Result}, event::{
-        cmap::{
-            CmapEvent,
-            ConnectionCheckedInEvent,
-            ConnectionCheckedOutEvent,
-            ConnectionCheckoutFailedEvent,
-            ConnectionCheckoutStartedEvent,
-            ConnectionClosedEvent,
-            ConnectionCreatedEvent,
-            ConnectionReadyEvent,
-            PoolClearedEvent,
-            PoolClosedEvent,
-            PoolCreatedEvent,
-            PoolReadyEvent,
-        },
-        command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-        sdam::{
-            SdamEvent,
-            ServerClosedEvent,
-            ServerDescriptionChangedEvent,
-            ServerHeartbeatFailedEvent,
-            ServerHeartbeatStartedEvent,
-            ServerHeartbeatSucceededEvent,
-            ServerOpeningEvent,
-            TopologyClosedEvent,
-            TopologyDescriptionChangedEvent,
-            TopologyOpeningEvent,
-        },
-    }, options::ClientOptions, runtime, Client
+    bson::doc, event::{
+        cmap::CmapEvent,
+        command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
+        sdam::SdamEvent,
+    }, options::ClientOptions, Client
 };
+
+pub(crate) use super::handler::EventHandler;
 
 pub(crate) type EventQueue<T> = Arc<RwLock<VecDeque<(T, OffsetDateTime)>>>;
 
@@ -119,7 +96,7 @@ impl CommandEvent {
         }
     }
 
-    fn request_id(&self) -> i32 {
+    pub(crate) fn request_id(&self) -> i32 {
         match self {
             CommandEvent::Started(event) => event.request_id,
             CommandEvent::Failed(event) => event.request_id,
@@ -143,281 +120,9 @@ impl CommandEvent {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct EventHandler {
-    command_events: EventQueue<CommandEvent>,
-    sdam_events: EventQueue<SdamEvent>,
-    cmap_events: EventQueue<CmapEvent>,
-    event_broadcaster: tokio::sync::broadcast::Sender<Event>,
-    connections_checked_out: Arc<Mutex<u32>>,
-}
-
-impl EventHandler {
-    pub(crate) fn new() -> Self {
-        let (event_broadcaster, _) = tokio::sync::broadcast::channel(10_000);
-        Self {
-            command_events: Default::default(),
-            sdam_events: Default::default(),
-            cmap_events: Default::default(),
-            event_broadcaster,
-            connections_checked_out: Arc::new(Mutex::new(0)),
-        }
-    }
-
-    fn handle(&self, event: impl Into<Event>) {
-        // this only errors if no receivers are listening which isn't a concern here.
-        let _: std::result::Result<usize, SendError<Event>> =
-            self.event_broadcaster.send(event.into());
-    }
-
-    pub(crate) fn subscribe(&self) -> EventSubscriber<EventHandler, Event> {
-        EventSubscriber::new(self, self.event_broadcaster.subscribe())
-    }
-
-    /// Gets all of the command started events for the specified command names.
-    pub(crate) fn get_command_started_events(
-        &self,
-        command_names: &[&str],
-    ) -> Vec<CommandStartedEvent> {
-        let events = self.command_events.read().unwrap();
-        events
-            .iter()
-            .filter_map(|(event, _)| match event {
-                CommandEvent::Started(event) => {
-                    if command_names.contains(&event.command_name.as_str()) {
-                        Some(event.clone())
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            })
-            .collect()
-    }
-
-    /// Gets all of the command started events, excluding configureFailPoint events.
-    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        let events = self.command_events.read().unwrap();
-        events
-            .iter()
-            .filter_map(|(event, _)| match event {
-                CommandEvent::Started(event) if event.command_name != "configureFailPoint" => {
-                    Some(event.clone())
-                }
-                _ => None,
-            })
-            .collect()
-    }
-
-    pub(crate) fn clear_cached_events(&mut self) {
-        self.command_events.write().unwrap().clear();
-        self.cmap_events.write().unwrap().clear();
-        self.sdam_events.write().unwrap().clear();
-    }
-}
-
-#[allow(deprecated)]
-impl crate::event::cmap::CmapEventHandler for EventHandler {
-    fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
-        *self.connections_checked_out.lock().unwrap() += 1;
-        let event = CmapEvent::ConnectionCheckedOut(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
-        let event = CmapEvent::ConnectionCheckoutFailed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_pool_cleared_event(&self, pool_cleared_event: PoolClearedEvent) {
-        let event = CmapEvent::PoolCleared(pool_cleared_event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        let event = CmapEvent::PoolReady(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
-        let event = CmapEvent::PoolCreated(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
-        let event = CmapEvent::PoolClosed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
-        let event = CmapEvent::ConnectionCreated(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
-        let event = CmapEvent::ConnectionReady(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
-        let event = CmapEvent::ConnectionClosed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
-        let event = CmapEvent::ConnectionCheckoutStarted(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-
-    fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
-        *self.connections_checked_out.lock().unwrap() -= 1;
-        let event = CmapEvent::ConnectionCheckedIn(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.cmap_events, event);
-    }
-}
-
-#[allow(deprecated)]
-impl crate::event::sdam::SdamEventHandler for EventHandler {
-    fn handle_server_description_changed_event(&self, event: ServerDescriptionChangedEvent) {
-        let event = SdamEvent::ServerDescriptionChanged(Box::new(event));
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_server_opening_event(&self, event: ServerOpeningEvent) {
-        let event = SdamEvent::ServerOpening(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_server_closed_event(&self, event: ServerClosedEvent) {
-        let event = SdamEvent::ServerClosed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_topology_description_changed_event(&self, event: TopologyDescriptionChangedEvent) {
-        let event = SdamEvent::TopologyDescriptionChanged(Box::new(event));
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_topology_opening_event(&self, event: TopologyOpeningEvent) {
-        let event = SdamEvent::TopologyOpening(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_topology_closed_event(&self, event: TopologyClosedEvent) {
-        let event = SdamEvent::TopologyClosed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_server_heartbeat_started_event(&self, event: ServerHeartbeatStartedEvent) {
-        let event = SdamEvent::ServerHeartbeatStarted(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_server_heartbeat_succeeded_event(&self, event: ServerHeartbeatSucceededEvent) {
-        let event = SdamEvent::ServerHeartbeatSucceeded(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-
-    fn handle_server_heartbeat_failed_event(&self, event: ServerHeartbeatFailedEvent) {
-        let event = SdamEvent::ServerHeartbeatFailed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.sdam_events, event);
-    }
-}
-
-#[allow(deprecated)]
-impl crate::event::command::CommandEventHandler for EventHandler {
-    fn handle_command_started_event(&self, event: CommandStartedEvent) {
-        let event = CommandEvent::Started(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.command_events, event);
-    }
-
-    fn handle_command_failed_event(&self, event: CommandFailedEvent) {
-        let event = CommandEvent::Failed(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.command_events, event);
-    }
-
-    fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        let event = CommandEvent::Succeeded(event);
-        self.handle(event.clone());
-        add_event_to_queue(&self.command_events, event);
-    }
-}
-
-impl EventSubscriber<'_, EventHandler, Event> {
-    /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
-    /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
-    /// panic.
-    pub(crate) async fn wait_for_successful_command_execution(
-        &mut self,
-        timeout: Duration,
-        command_name: impl AsRef<str>,
-    ) -> Option<(CommandStartedEvent, CommandSucceededEvent)> {
-        runtime::timeout(timeout, async {
-            let started = self
-                .filter_map_event(Duration::MAX, |event| match event {
-                    Event::Command(CommandEvent::Started(s))
-                        if s.command_name == command_name.as_ref() =>
-                    {
-                        Some(s)
-                    }
-                    _ => None,
-                })
-                .await
-                .unwrap();
-
-            let succeeded = self
-                .filter_map_event(Duration::MAX, |event| match event {
-                    Event::Command(CommandEvent::Succeeded(s))
-                        if s.request_id == started.request_id =>
-                    {
-                        Some(s)
-                    }
-                    Event::Command(CommandEvent::Failed(f))
-                        if f.request_id == started.request_id =>
-                    {
-                        panic!(
-                            "expected {} to succeed but it failed: {:#?}",
-                            command_name.as_ref(),
-                            f
-                        )
-                    }
-                    _ => None,
-                })
-                .await
-                .unwrap();
-
-            (started, succeeded)
-        })
-        .await
-        .ok()
-    }
-}
-
-#[derive(Clone, Debug)]
 pub(crate) struct EventClient {
     client: TestClient,
-    pub(crate) handler: Arc<EventHandler>,
+    pub(crate) handler: EventHandler,
 }
 
 impl std::ops::Deref for EventClient {
@@ -448,13 +153,13 @@ impl EventClientBuilder {
     pub(crate) async fn build(self) -> EventClient {
         let mut inner = self.inner;
         if inner.handler.is_none() {
-            inner = inner.event_handler(Arc::new(EventHandler::new()));
+            inner = inner.event_handler(EventHandler::new());
         }
-        let handler = inner.handler().unwrap().clone();
+        let mut handler = inner.handler().unwrap().clone();
         let client = inner.build().await;
 
         // clear events from commands used to set up client.
-        handler.command_events.write().unwrap().clear();
+        handler.retain(|ev| !matches!(ev, Event::Command(_)));
 
         EventClient { client, handler }
     }
@@ -471,7 +176,7 @@ impl EventClient {
     ) -> Self {
         Client::test_builder()
             .options(options)
-            .event_handler(handler.into().map(Arc::new))
+            .event_handler(handler)
             .event_client()
             .build()
             .await
@@ -491,97 +196,12 @@ impl EventClient {
             .additional_options(options, use_multiple_mongoses.unwrap_or(false))
             .await
             .min_heartbeat_freq(min_heartbeat_freq)
-            .event_handler(event_handler.into().map(Arc::new))
+            .event_handler(event_handler)
             .event_client()
             .build()
             .await
     }
 
-    /// Gets the first started/succeeded pair of events for the given command name, popping off all
-    /// events before and between them.
-    ///
-    /// Panics if the command failed or could not be found in the events.
-    pub(crate) fn get_successful_command_execution(
-        &self,
-        command_name: &str,
-    ) -> (CommandStartedEvent, CommandSucceededEvent) {
-        let mut command_events = self.handler.command_events.write().unwrap();
-
-        let mut started: Option<CommandStartedEvent> = None;
-
-        while let Some((event, _)) = command_events.pop_front() {
-            if event.command_name() == command_name {
-                match started {
-                    None => {
-                        let event = event
-                            .as_command_started()
-                            .unwrap_or_else(|| {
-                                panic!("first event not a command started event {:?}", event)
-                            })
-                            .clone();
-                        started = Some(event);
-                        continue;
-                    }
-                    Some(started) if event.request_id() == started.request_id => {
-                        let succeeded = event
-                            .as_command_succeeded()
-                            .expect("second event not a command succeeded event")
-                            .clone();
-
-                        return (started, succeeded);
-                    }
-                    _ => continue,
-                }
-            }
-        }
-        panic!("could not find event for {} command", command_name);
-    }
-
-    /// Gets all of the command started events for the specified command names.
-    pub(crate) fn get_command_started_events(
-        &self,
-        command_names: &[&str],
-    ) -> Vec<CommandStartedEvent> {
-        self.handler.get_command_started_events(command_names)
-    }
-
-    /// Gets all command started events, excluding configureFailPoint events.
-    pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        self.handler.get_all_command_started_events()
-    }
-
-    pub(crate) fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
-        self.handler
-            .command_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .map(|(event, _)| event)
-            .filter(|event| command_names.contains(&event.command_name()))
-            .collect()
-    }
-
-    pub(crate) fn count_pool_cleared_events(&self) -> usize {
-        let mut out = 0;
-        for (event, _) in self.handler.cmap_events.read().unwrap().iter() {
-            if matches!(event, CmapEvent::PoolCleared(_)) {
-                out += 1;
-            }
-        }
-        out
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn subscribe_to_events(&self) -> EventSubscriber<'_, EventHandler, Event> {
-        self.handler.subscribe()
-    }
-
-    /// This will only succeed if no other clones of this `EventClient` are live.
-    pub(crate) fn clear_cached_events(&mut self) -> Result<()> {
-        Arc::get_mut(&mut self.handler)
-            .map(|h| h.clear_cached_events())
-            .ok_or_else(|| Error::internal("cannot clear shared cached events"))
-    }
 
     #[allow(dead_code)]
     pub(crate) fn into_client(self) -> crate::Client {
@@ -598,211 +218,5 @@ async fn command_started_event_count() {
         coll.insert_one(doc! { "x": i }).await.unwrap();
     }
 
-    assert_eq!(client.get_command_started_events(&["insert"]).len(), 10);
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct EventBuffer<T> {
-    inner: Arc<EventBufferInner<T>>,
-}
-
-#[derive(Debug)]
-struct EventBufferInner<T> {
-    events: Mutex<Vec<(T, OffsetDateTime)>>,
-    event_received: Notify,
-}
-
-impl EventBufferInner<Event> {
-    fn ev_callback<T: Into<Event> + Send + Sync + 'static>(
-        self: Arc<Self>,
-    ) -> Option<crate::event::EventHandler<T>> {
-        Some(crate::event::EventHandler::callback(
-            move |ev: T| {
-                self.events
-                    .lock()
-                    .unwrap()
-                    .push((ev.into(), OffsetDateTime::now_utc()));
-                self.event_received.notify_waiters();
-            }    
-        ))
-    }
-}
-
-impl<T: Clone> EventBuffer<T> {
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: Arc::new(EventBufferInner {
-                events: Mutex::new(vec![]),
-                event_received: Notify::new(),
-            }),
-        }
-    }
-
-    /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn all(&self) -> (Vec<T>, Notified) {
-        // The `Notify` must be created *before* reading the events to ensure any added
-        // events trigger notifications.
-        let notify = self.inner.event_received.notified();
-        let events = self
-            .inner
-            .events
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(ev, _)| ev)
-            .cloned()
-            .collect();
-        (events, notify)
-    }
-
-    pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
-        self.inner.events.lock().unwrap().clone()
-    }
-
-    pub(crate) fn stream(&self) -> EventStream<'_, T> {
-        EventStream {
-            buffer: self,
-            index: 0,
-        }
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.inner.events.lock().unwrap().clear();
-    }
-}
-
-impl EventBuffer<Event> {
-    pub(crate) fn register(&self, client_options: &mut ClientOptions) {
-        client_options.command_event_handler = self.inner.clone().ev_callback();
-        client_options.sdam_event_handler = self.inner.clone().ev_callback();
-        client_options.cmap_event_handler = self.inner.clone().ev_callback();
-    }
-
-    pub(crate) fn connections_checked_out(&self) -> u32 {
-        let mut count = 0;
-        for (ev, _) in self.inner.events.lock().unwrap().iter() {
-            match ev {
-                Event::Cmap(CmapEvent::ConnectionCheckedOut(_)) => {
-                    count += 1
-                }
-                Event::Cmap(CmapEvent::ConnectionCheckedIn(_)) => {
-                    count -= 1
-                }
-                _ => (),
-            }
-        }
-        count
-    }
-}
-
-pub(crate) struct EventStream<'a, T> {
-    buffer: &'a EventBuffer<T>,
-    index: usize,
-}
-
-impl<'a, T: Clone> EventStream<'a, T> {
-    async fn next(&mut self, timeout: Duration) -> Option<T> {
-        crate::runtime::timeout(timeout, async move {
-            loop {
-                let notified = self.buffer.inner.event_received.notified();
-                {
-                    let events = self.buffer.inner.events.lock().unwrap();
-                    if events.len() > self.index {
-                        let event = events[self.index].0.clone();
-                        self.index += 1;
-                        return Some(event);
-                    }
-                }
-                notified.await;
-            }
-        }).await.unwrap_or(None)
-    }
-
-    /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
-    pub(crate) async fn filter_map_event<F, R>(
-        &mut self,
-        timeout: Duration,
-        mut filter_map: F,
-    ) -> Option<R>
-    where
-        F: FnMut(T) -> Option<R>,
-    {
-        runtime::timeout(timeout, async move {
-            loop {
-                match self.next(timeout).await {
-                    Some(ev) => {
-                        if let Some(r) = filter_map(ev) {
-                            return Some(r);
-                        }
-                        continue;
-                    }
-                    None => return None,
-                }
-            }
-        }).await.unwrap_or(None)
-    }
-
-    /// Waits for an event to occur within the given duration that passes the given filter.
-    pub(crate) async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<T>
-    where
-        F: FnMut(&T) -> bool,
-    {
-        self.filter_map_event(timeout, |e| if filter(&e) { Some(e) } else { None })
-            .await
-    }
-
-    pub(crate) async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<T>
-    where
-        F: FnMut(&T) -> bool,
-    {
-        let mut events = Vec::new();
-        let _ = runtime::timeout(timeout, async {
-            while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
-                events.push(event);
-            }
-        })
-        .await;
-        events
-    }
-
-    #[cfg(feature = "in-use-encryption-unstable")]
-    pub(crate) async fn collect_events_map<F, R>(
-        &mut self,
-        timeout: Duration,
-        mut filter: F,
-    ) -> Vec<R>
-    where
-        F: FnMut(T) -> Option<R>,
-    {
-        let mut events = Vec::new();
-        let _ = runtime::timeout(timeout, async {
-            while let Some(event) = self.filter_map_event(timeout, &mut filter).await {
-                events.push(event);
-            }
-        })
-        .await;
-        events
-    }
-
-    #[cfg(feature = "in-use-encryption-unstable")]
-    pub(crate) async fn clear_events(&mut self, timeout: Duration) {
-        self.collect_events(timeout, |_| true).await;
-    }
-
-    /// Returns the received events without waiting for any more.
-    pub(crate) fn all<F>(&mut self, filter: F) -> Vec<T>
-    where
-        F: Fn(&T) -> bool,
-    {
-        let events = self.buffer.inner.events.lock().unwrap();
-        let out = events
-            .iter()
-            .skip(self.index)
-            .map(|(e, _)| e)
-            .filter(|e| filter(*e))
-            .cloned()
-            .collect();
-        self.index = events.len();
-        out
-    }    
+    assert_eq!(client.handler.get_command_started_events(&["insert"]).len(), 10);
 }

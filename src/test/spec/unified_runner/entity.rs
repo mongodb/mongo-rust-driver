@@ -21,7 +21,7 @@ use crate::{
     sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
-        util::EventBuffer,
+        util::EventHandler,
         Event,
     },
     Client,
@@ -64,7 +64,7 @@ pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
     pub(crate) topology_id: bson::oid::ObjectId,
-    events: EventBuffer<Event>,
+    events: EventHandler,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
@@ -134,7 +134,7 @@ impl ClientEntity {
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
-        let events = EventBuffer::<Event>::new();
+        let events = EventHandler::new();
         events.register(&mut client_options);
         let client = Client::with_options(client_options).unwrap();
         let topology_id = client.topology().id;

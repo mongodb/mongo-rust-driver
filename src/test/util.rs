@@ -1,12 +1,13 @@
 mod event;
 mod failpoint;
+mod handler;
 mod matchable;
 mod subscriber;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventBuffer, EventClient, EventHandler},
+    event::{Event, EventClient, EventHandler},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
     subscriber::EventSubscriber,
@@ -20,7 +21,7 @@ pub(crate) use self::trace::{
     TracingHandler,
 };
 
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
@@ -79,7 +80,7 @@ impl Client {
 
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
-    handler: Option<Arc<EventHandler>>,
+    handler: Option<EventHandler>,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
@@ -107,7 +108,7 @@ impl TestClientBuilder {
         self
     }
 
-    pub(crate) fn event_handler(mut self, handler: impl Into<Option<Arc<EventHandler>>>) -> Self {
+    pub(crate) fn event_handler(mut self, handler: impl Into<Option<EventHandler>>) -> Self {
         let handler = handler.into();
         assert!(self.handler.is_none() || handler.is_none());
         self.handler = handler;
@@ -141,9 +142,7 @@ impl TestClientBuilder {
         };
 
         if let Some(handler) = self.handler {
-            options.command_event_handler = Some(handler.clone().into());
-            options.cmap_event_handler = Some(handler.clone().into());
-            options.sdam_event_handler = Some(handler.clone().into());
+            handler.register(&mut options);
         }
 
         if let Some(freq) = self.min_heartbeat_freq {
@@ -164,7 +163,7 @@ impl TestClientBuilder {
         TestClient::from_client(client).await
     }
 
-    pub(crate) fn handler(&self) -> Option<&Arc<EventHandler>> {
+    pub(crate) fn handler(&self) -> Option<&EventHandler> {
         self.handler.as_ref()
     }
 }
@@ -176,18 +175,7 @@ impl TestClient {
     }
 
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Self::with_handler(None, options).await
-    }
-
-    pub(crate) async fn with_handler(
-        event_handler: Option<Arc<EventHandler>>,
-        options: impl Into<Option<ClientOptions>>,
-    ) -> Self {
-        Client::test_builder()
-            .options(options)
-            .event_handler(event_handler)
-            .build()
-            .await
+        Client::test_builder().options(options).build().await
     }
 
     async fn from_client(client: Client) -> Self {
