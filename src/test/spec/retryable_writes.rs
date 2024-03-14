@@ -26,10 +26,9 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         spec::unified_runner::run_unified_tests,
-        util::get_default_name,
+        util::{buffer::EventBuffer, get_default_name},
         Event,
         EventClient,
-        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -381,13 +380,13 @@ async fn label_not_added(retry_reads: bool) {
 /// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
-    let handler = Arc::new(EventBuffer::new());
+    let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.handler());
-    client_options.command_event_handler = Some(handler.handler());
+    client_options.cmap_event_handler = Some(buffer.handler());
+    client_options.command_event_handler = Some(buffer.handler());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -423,7 +422,7 @@ async fn retry_write_pool_cleared() {
     let failpoint = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
+    let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
@@ -472,7 +471,7 @@ async fn retry_write_pool_cleared() {
         );
     }
 
-    assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
+    assert_eq!(buffer.get_command_started_events(&["insert"]).len(), 3);
 }
 
 /// Prose test from retryable writes spec verifying that the original error is returned after

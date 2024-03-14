@@ -25,16 +25,7 @@ use crate::{
     },
     selection_criteria::TagSet,
     test::{
-        get_client_options,
-        log_uncaptured,
-        run_spec_test,
-        Event,
-        EventClient,
-        EventBuffer,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
+        get_client_options, log_uncaptured, run_spec_test, util::buffer::EventBuffer, Event, EventClient, FailCommandOptions, FailPoint, FailPointMode, TestClient
     },
 };
 
@@ -636,7 +627,6 @@ async fn heartbeat_events() {
     options.app_name = "heartbeat_events".to_string().into();
 
     let event_handler = EventBuffer::new();
-    let mut subscriber = event_handler.subscribe();
 
     let client = EventClient::with_additional_options(
         Some(options.clone()),
@@ -645,6 +635,8 @@ async fn heartbeat_events() {
         event_handler.clone(),
     )
     .await;
+
+    let mut subscriber = event_handler.subscribe_all();
 
     if client.is_load_balanced() {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");

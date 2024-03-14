@@ -15,15 +15,7 @@ use crate::{
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     sdam::{ServerDescription, Topology},
     test::{
-        get_client_options,
-        log_uncaptured,
-        Event,
-        EventClient,
-        EventBuffer,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
+        get_client_options, log_uncaptured, util::buffer::EventBuffer, Event, EventClient, FailCommandOptions, FailPoint, FailPointMode, TestClient
     },
     Client,
 };

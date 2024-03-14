@@ -3,7 +3,7 @@ use std::time::Duration;
 use derive_more::From;
 use serde::Serialize;
 
-use super::{TestClient, TestClientBuilder};
+use super::{buffer::EventBuffer, TestClient, TestClientBuilder};
 use crate::{
     bson::doc, event::{
         cmap::CmapEvent,
@@ -11,8 +11,6 @@ use crate::{
         sdam::SdamEvent,
     }, options::ClientOptions, Client
 };
-
-pub(crate) use super::buffer::{EventBuffer, EventSubscriber};
 
 #[derive(Clone, Debug, From, Serialize)]
 #[serde(untagged)]

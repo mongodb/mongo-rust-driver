@@ -1,12 +1,12 @@
 mod event;
 mod failpoint;
-mod buffer;
+pub(crate) mod buffer;
 mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
 pub(crate) use self::{
-    event::{Event, EventClient, EventBuffer, EventSubscriber},
+    event::{Event, EventClient},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
 };
@@ -20,7 +20,7 @@ pub(crate) use self::trace::{
 };
 
 use std::{fmt::Debug, time::Duration};
-
+use self::buffer::EventBuffer;
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
 use crate::{

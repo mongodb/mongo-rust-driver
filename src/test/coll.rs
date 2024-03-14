@@ -2,7 +2,7 @@ use std::{fmt::Debug, time::Duration};
 
 use crate::{
     event::command::CommandEvent,
-    test::{Event, EventBuffer},
+    test::{util::buffer::EventBuffer, Event},
     Client,
     Namespace,
 };

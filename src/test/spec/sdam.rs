@@ -7,15 +7,7 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
-        get_client_options,
-        log_uncaptured,
-        spec::unified_runner::run_unified_tests,
-        Event,
-        EventBuffer,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
+        get_client_options, log_uncaptured, spec::unified_runner::run_unified_tests, util::buffer::EventBuffer, Event, FailCommandOptions, FailPoint, FailPointMode, TestClient
     },
     Client,
 };
@@ -52,10 +44,10 @@ async fn streaming_min_heartbeat_frequency() {
         return;
     }
 
-    let handler = Arc::new(EventBuffer::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
-    options.sdam_event_handler = Some(handler.handler());
+    options.sdam_event_handler = Some(buffer.handler());
 
     let hosts = options.hosts.clone();
 
@@ -71,7 +63,7 @@ async fn streaming_min_heartbeat_frequency() {
     // 500ms for 5 heartbeats.
     let mut tasks = Vec::new();
     for address in hosts {
-        let h = handler.clone();
+        let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
             let mut subscriber = h.subscribe();
             for _ in 0..5 {

@@ -14,9 +14,8 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::TestClient,
+        util::{buffer::EventBuffer, TestClient},
         Event,
-        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,

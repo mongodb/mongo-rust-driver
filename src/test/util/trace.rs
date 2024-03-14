@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::{field::Field, span, subscriber::Interest, Level, Metadata};
 
-use super::{EventBuffer, EventSubscriber};
+use super::buffer::{EventBuffer, EventSubscriber};
 
 /// Models the data reported in a tracing event.
 #[derive(Debug, Clone)]

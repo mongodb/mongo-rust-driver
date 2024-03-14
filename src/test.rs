@@ -30,7 +30,6 @@ pub(crate) use self::{
         log_uncaptured,
         Event,
         EventClient,
-        EventBuffer,
         FailCommandOptions,
         FailPoint,
         FailPointMode,

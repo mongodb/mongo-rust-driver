@@ -60,6 +60,7 @@ impl<T> EventBuffer<T> {
             .collect()
     }
 
+    /// Subscribe to events generated after the point of this call.
     pub(crate) fn subscribe(&self) -> EventSubscriber<'_, T> {
         let (index, generation) = {
             let events = self.inner.events.lock().unwrap();
@@ -69,6 +70,15 @@ impl<T> EventBuffer<T> {
             buffer: self,
             index,
             generation,
+        }
+    }
+
+    /// Subscribe to all events contained in the buffer.
+    pub(crate) fn subscribe_all(&self) -> EventSubscriber<'_, T> {
+        EventSubscriber {
+            buffer: self,
+            index: 0,
+            generation: self.inner.events.lock().unwrap().generation,
         }
     }
 

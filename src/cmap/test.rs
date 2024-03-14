@@ -7,7 +7,6 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::sync::{Mutex, RwLock};
 
 use self::file::{Operation, TestFile, ThreadedOperation};
-use crate::test::util::EventBuffer;
 
 use crate::{
     cmap::{
@@ -22,14 +21,7 @@ use crate::{
     runtime::{self, AsyncJoinHandle},
     sdam::{TopologyUpdater, UpdateMessage},
     test::{
-        assert_matches,
-        eq_matches,
-        get_client_options,
-        log_uncaptured,
-        run_spec_test,
-        EventClient,
-        MatchErrExt,
-        Matchable,
+        assert_matches, eq_matches, get_client_options, log_uncaptured, run_spec_test, util::buffer::EventBuffer, EventClient, MatchErrExt, Matchable
     },
 };
 use bson::doc;

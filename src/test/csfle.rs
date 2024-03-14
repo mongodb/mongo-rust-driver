@@ -44,7 +44,7 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{Event, EventBuffer},
+    test::{util::buffer::EventBuffer, Event},
     Client,
     Collection,
     IndexModel,
