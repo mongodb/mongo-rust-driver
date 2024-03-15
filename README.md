@@ -44,7 +44,7 @@ The driver tests against Linux, MacOS, and Windows in CI.
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.8.1"
+mongodb = "2.8.2"
 ```
 
 Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
@@ -55,7 +55,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.8.1"
+version = "2.8.2"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -64,7 +64,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.8.1"
+version = "2.8.2"
 features = ["tokio-sync"]
 ```
 Using the `"sync"` feature also requires using `default-features = false`.
