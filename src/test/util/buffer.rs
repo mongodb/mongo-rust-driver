@@ -123,7 +123,7 @@ impl<T> EventBuffer<T> {
 
 impl<T: Clone> EventBuffer<T> {
     /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn all(&self) -> (Vec<T>, Notified) {
+    pub(crate) fn watch_all(&self) -> (Vec<T>, Notified) {
         // The `Notify` must be created *before* reading the events to ensure any added
         // events trigger notifications.
         let notify = self.inner.event_received.notified();
@@ -138,6 +138,11 @@ impl<T: Clone> EventBuffer<T> {
             .cloned()
             .collect();
         (events, notify)
+    }
+
+    /// Returns a list of current events.
+    pub(crate) fn all(&self) -> Vec<T> {
+        self.watch_all().0
     }
 
     pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
@@ -275,7 +280,7 @@ impl EventBuffer<Event> {
 
     pub(crate) fn count_pool_cleared_events(&self) -> usize {
         let mut out = 0;
-        for event in self.all().0.iter() {
+        for event in self.all().iter() {
             if matches!(event, Event::Cmap(CmapEvent::PoolCleared(_))) {
                 out += 1;
             }

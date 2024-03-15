@@ -154,7 +154,6 @@ impl ClientEntity {
     pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
         self.events
             .all()
-            .0
             .into_iter()
             .filter(|event| {
                 if !expected_type.matches(event) {
@@ -182,7 +181,6 @@ impl ClientEntity {
     ) -> Vec<Event> {
         self.events
             .all()
-            .0
             .into_iter()
             .filter(|e| events_match(e, expected, Some(entities)).is_ok())
             .collect()
@@ -196,7 +194,7 @@ impl ClientEntity {
     ) -> Result<()> {
         crate::runtime::timeout(Duration::from_secs(10), async {
             loop {
-                let (events, notified) = self.events.all();
+                let (events, notified) = self.events.watch_all();
                 let matched = {
                     let entities = &*entities.read().await;
                     events
@@ -247,7 +245,6 @@ impl ClientEntity {
     pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.events
             .all()
-            .0
             .into_iter()
             .filter_map(|ev| match ev {
                 Event::Command(CommandEvent::Started(ev))

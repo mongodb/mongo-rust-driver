@@ -138,7 +138,7 @@ async fn concurrent_connections() {
 
     {
         // ensure all three ConnectionCreatedEvents were emitted before one ConnectionReadyEvent.
-        let events = buffer.all().0;
+        let events = buffer.all();
         let mut consecutive_creations = 0;
         for event in events.iter() {
             match event {

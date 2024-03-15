@@ -84,7 +84,6 @@ impl State {
     fn count_events(&self, event_type: &str) -> usize {
         self.events
             .all()
-            .0
             .into_iter()
             .filter(|cmap_event| cmap_event.name() == event_type)
             .count()
