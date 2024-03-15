@@ -99,16 +99,16 @@ async fn sdam_pool_management() {
     options.app_name = Some("SDAMPoolManagementTest".to_string());
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
-    let event_handler = EventBuffer::new();
+    let event_buffer = EventBuffer::new();
 
     let client = EventClient::with_additional_options(
         Some(options),
         Some(Duration::from_millis(50)),
         None,
-        event_handler.clone(),
+        event_buffer.clone(),
     )
     .await;
-    let mut subscriber = event_handler.subscribe_all();
+    let mut subscriber = event_buffer.subscribe_all();
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()

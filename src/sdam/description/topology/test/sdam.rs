@@ -590,15 +590,15 @@ async fn load_balanced() {
 #[tokio::test]
 #[function_name::named]
 async fn topology_closed_event_last() {
-    let event_handler = EventBuffer::new();
+    let event_buffer = EventBuffer::new();
     let client = EventClient::with_additional_options(
         None,
         Some(Duration::from_millis(50)),
         None,
-        event_handler.clone(),
+        event_buffer.clone(),
     )
     .await;
-    let mut subscriber = event_handler.subscribe_all();
+    let mut subscriber = event_buffer.subscribe_all();
 
     client
         .database(function_name!())
@@ -635,17 +635,17 @@ async fn heartbeat_events() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
 
-    let event_handler = EventBuffer::new();
+    let event_buffer = EventBuffer::new();
 
     let client = EventClient::with_additional_options(
         Some(options.clone()),
         Some(Duration::from_millis(50)),
         None,
-        event_handler.clone(),
+        event_buffer.clone(),
     )
     .await;
 
-    let mut subscriber = event_handler.subscribe_all();
+    let mut subscriber = event_buffer.subscribe_all();
 
     if client.is_load_balanced() {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
