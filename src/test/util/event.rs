@@ -142,7 +142,7 @@ impl EventClientBuilder {
         if inner.buffer.is_none() {
             inner = inner.event_buffer(EventBuffer::new());
         }
-        let mut handler = inner.handler().unwrap().clone();
+        let mut handler = inner.buffer().unwrap().clone();
         let client = inner.build().await;
 
         // clear events from commands used to set up client.

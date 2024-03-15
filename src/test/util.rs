@@ -161,7 +161,7 @@ impl TestClientBuilder {
         TestClient::from_client(client).await
     }
 
-    pub(crate) fn handler(&self) -> Option<&EventBuffer> {
+    pub(crate) fn buffer(&self) -> Option<&EventBuffer> {
         self.buffer.as_ref()
     }
 }
