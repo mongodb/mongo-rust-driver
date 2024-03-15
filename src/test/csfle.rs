@@ -1540,12 +1540,12 @@ impl DeadlockTestCase {
             .await?;
 
         // Run test case
-        let event_handler = EventBuffer::new();
-        let mut encrypted_events = event_handler.subscribe();
+        let event_buffer = EventBuffer::new();
+        let mut encrypted_events = event_buffer.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.handler());
-        opts.sdam_event_handler = Some(event_handler.handler());
+        opts.command_event_handler = Some(event_buffer.handler());
+        opts.sdam_event_handler = Some(event_buffer.handler());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)
