@@ -1242,12 +1242,12 @@ async fn insert_many_document_sequences() {
         return;
     }
 
-    let handler = EventBuffer::new();
+    let buffer = EventBuffer::new();
     let client = Client::test_builder()
-        .event_handler(handler.clone())
+        .event_buffer(buffer.clone())
         .build()
         .await;
-    let mut subscriber = handler.subscribe();
+    let mut subscriber = buffer.subscribe();
 
     let max_object_size = client.server_info.max_bson_object_size;
     let max_message_size = client.server_info.max_message_size_bytes;

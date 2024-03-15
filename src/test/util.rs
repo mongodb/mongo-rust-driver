@@ -68,7 +68,7 @@ impl Client {
     pub(crate) fn test_builder() -> TestClientBuilder {
         TestClientBuilder {
             options: None,
-            handler: None,
+            buffer: None,
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption-unstable")]
             encrypted: None,
@@ -78,7 +78,7 @@ impl Client {
 
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
-    handler: Option<EventBuffer>,
+    buffer: Option<EventBuffer>,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
@@ -106,10 +106,10 @@ impl TestClientBuilder {
         self
     }
 
-    pub(crate) fn event_handler(mut self, handler: impl Into<Option<EventBuffer>>) -> Self {
-        let handler = handler.into();
-        assert!(self.handler.is_none() || handler.is_none());
-        self.handler = handler;
+    pub(crate) fn event_buffer(mut self, buffer: impl Into<Option<EventBuffer>>) -> Self {
+        let buffer = buffer.into();
+        assert!(self.buffer.is_none() || buffer.is_none());
+        self.buffer = buffer;
         self
     }
 
@@ -139,7 +139,7 @@ impl TestClientBuilder {
             None => get_client_options().await.clone(),
         };
 
-        if let Some(handler) = self.handler {
+        if let Some(handler) = self.buffer {
             handler.register(&mut options);
         }
 
@@ -162,7 +162,7 @@ impl TestClientBuilder {
     }
 
     pub(crate) fn handler(&self) -> Option<&EventBuffer> {
-        self.handler.as_ref()
+        self.buffer.as_ref()
     }
 }
 

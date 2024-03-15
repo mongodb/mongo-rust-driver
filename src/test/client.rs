@@ -686,9 +686,9 @@ async fn retry_commit_txn_check_out() {
         .unwrap();
 
     let mut options = get_client_options().await.clone();
-    let handler = EventBuffer::new();
-    options.cmap_event_handler = Some(handler.handler());
-    options.sdam_event_handler = Some(handler.handler());
+    let buffer = EventBuffer::new();
+    options.cmap_event_handler = Some(buffer.handler());
+    options.sdam_event_handler = Some(buffer.handler());
     options.heartbeat_freq = Some(Duration::from_secs(120));
     options.app_name = Some("retry_commit_txn_check_out".to_string());
     let client = Client::with_options(options).unwrap();
@@ -714,7 +714,7 @@ async fn retry_commit_txn_check_out() {
     );
     let _guard = setup_client.enable_failpoint(fp, None).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
+    let mut subscriber = buffer.subscribe();
     client
         .database("foo")
         .run_command(doc! { "ping": 1 })
@@ -800,7 +800,7 @@ async fn manual_shutdown_with_nothing() {
 async fn manual_shutdown_with_resources() {
     let events = EventBuffer::new();
     let client = Client::test_builder()
-        .event_handler(events.clone())
+        .event_buffer(events.clone())
         .build()
         .await;
     if !client.supports_transactions() {
@@ -861,7 +861,7 @@ async fn manual_shutdown_immediate_with_nothing() {
 async fn manual_shutdown_immediate_with_resources() {
     let events = EventBuffer::new();
     let client = Client::test_builder()
-        .event_handler(events.clone())
+        .event_buffer(events.clone())
         .build()
         .await;
     if !client.supports_transactions() {

@@ -213,8 +213,8 @@ async fn load_balancing_test() {
         }
     }
 
-    let mut handler = EventBuffer::new();
-    let mut subscriber = handler.subscribe();
+    let mut buffer = EventBuffer::new();
+    let mut subscriber = buffer.subscribe();
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
@@ -222,7 +222,7 @@ async fn load_balancing_test() {
     options.min_pool_size = Some(max_pool_size);
     let client = Client::test_builder()
         .options(options)
-        .event_handler(handler.clone())
+        .event_buffer(buffer.clone())
         .build()
         .await;
 
@@ -268,9 +268,9 @@ async fn load_balancing_test() {
         .expect("enabling failpoint should succeed");
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
-    do_test(&client, &mut handler, 0.05, 0.25, 10).await;
+    do_test(&client, &mut buffer, 0.05, 0.25, 10).await;
 
     // disable failpoint and rerun, should be back to even split
     drop(fp_guard);
-    do_test(&client, &mut handler, 0.40, 0.50, 100).await;
+    do_test(&client, &mut buffer, 0.40, 0.50, 100).await;
 }

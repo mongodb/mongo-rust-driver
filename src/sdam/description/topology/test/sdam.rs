@@ -274,11 +274,11 @@ async fn run_test(test_file: TestFile) {
         .await
         .expect(test_description);
 
-    let handler = EventBuffer::new();
-    options.sdam_event_handler = Some(handler.handler());
+    let buffer = EventBuffer::new();
+    options.sdam_event_handler = Some(buffer.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
-    let mut event_subscriber = handler.subscribe();
+    let mut event_subscriber = buffer.subscribe();
     let mut topology = Topology::new(options.clone()).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {

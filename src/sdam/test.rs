@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -193,11 +192,11 @@ async fn hello_ok_true() {
         return;
     }
 
-    let handler = Arc::new(EventBuffer::new());
-    let mut subscriber = handler.subscribe();
+    let buffer = EventBuffer::new();
+    let mut subscriber = buffer.subscribe();
 
     let mut options = setup_client_options.clone();
-    options.sdam_event_handler = Some(handler.handler());
+    options.sdam_event_handler = Some(buffer.handler());
     options.direct_connection = Some(true);
     options.heartbeat_freq = Some(Duration::from_millis(500));
     let _client = Client::with_options(options).expect("client creation should succeed");
@@ -263,7 +262,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
 /// topology.
 #[tokio::test(flavor = "multi_thread")]
 async fn removed_server_monitor_stops() -> crate::error::Result<()> {
-    let handler = EventBuffer::new();
+    let buffer = EventBuffer::new();
     let options = ClientOptions::builder()
         .hosts(vec![
             ServerAddress::parse("localhost:49152")?,
@@ -271,14 +270,14 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
             ServerAddress::parse("localhost:49154")?,
         ])
         .heartbeat_freq(Duration::from_millis(50))
-        .sdam_event_handler(handler.handler())
+        .sdam_event_handler(buffer.handler())
         .repl_set_name("foo".to_string())
         .build();
 
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
 
-    let mut subscriber = handler.subscribe();
+    let mut subscriber = buffer.subscribe();
     let topology = Topology::new(options)?;
 
     // Wait until all three monitors have started.

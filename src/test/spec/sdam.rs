@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use bson::{doc, Document};
 
@@ -102,10 +102,10 @@ async fn heartbeat_frequency_is_respected() {
         return;
     }
 
-    let handler = Arc::new(EventBuffer::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(1000));
-    options.sdam_event_handler = Some(handler.handler());
+    options.sdam_event_handler = Some(buffer.handler());
 
     let hosts = options.hosts.clone();
 
@@ -121,7 +121,7 @@ async fn heartbeat_frequency_is_respected() {
     // 1s for 3s.
     let mut tasks = Vec::new();
     for address in hosts {
-        let h = handler.clone();
+        let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
             let mut subscriber = h.subscribe();
 
@@ -166,18 +166,18 @@ async fn rtt_is_updated() {
 
     let app_name = "streamingRttTest";
 
-    let handler = Arc::new(EventBuffer::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
     options.app_name = Some(app_name.to_string());
-    options.sdam_event_handler = Some(handler.handler());
+    options.sdam_event_handler = Some(buffer.handler());
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
 
     let host = options.hosts[0].clone();
 
     let client = Client::with_options(options).unwrap();
-    let mut subscriber = handler.subscribe();
+    let mut subscriber = buffer.subscribe();
 
     // run a find to wait for the primary to be discovered
     client

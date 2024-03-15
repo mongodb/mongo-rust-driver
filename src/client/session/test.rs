@@ -238,13 +238,13 @@ async fn cluster_time_in_commands() {
     async fn cluster_time_test<F, G, R>(
         command_name: &str,
         client: &Client,
-        event_handler: &EventBuffer,
+        event_buffer: &EventBuffer,
         operation: F,
     ) where
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
-        let mut subscriber = event_handler.subscribe();
+        let mut subscriber = event_buffer.subscribe();
 
         operation(client.clone())
             .await
@@ -291,11 +291,11 @@ async fn cluster_time_in_commands() {
         );
     }
 
-    let handler = Arc::new(EventBuffer::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
-    options.command_event_handler = Some(handler.handler());
-    options.sdam_event_handler = Some(handler.handler());
+    options.command_event_handler = Some(buffer.handler());
+    options.sdam_event_handler = Some(buffer.handler());
 
     // Ensure we only connect to one server so the monitor checks from other servers
     // don't affect the TopologyDescription's clusterTime value between commands.
@@ -311,7 +311,7 @@ async fn cluster_time_in_commands() {
         }
     }
 
-    let mut subscriber = handler.subscribe();
+    let mut subscriber = buffer.subscribe();
 
     let client = Client::with_options(options).unwrap();
 
@@ -335,7 +335,7 @@ async fn cluster_time_in_commands() {
         .await
         .unwrap();
 
-    cluster_time_test("ping", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("ping", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .run_command(doc! { "ping": 1 })
@@ -343,21 +343,16 @@ async fn cluster_time_in_commands() {
     })
     .await;
 
-    cluster_time_test(
-        "aggregate",
-        &client,
-        handler.as_ref(),
-        |client| async move {
-            client
-                .database(function_name!())
-                .collection::<Document>(function_name!())
-                .aggregate(vec![doc! { "$match": { "x": 1 } }])
-                .await
-        },
-    )
+    cluster_time_test("aggregate", &client, &buffer, |client| async move {
+        client
+            .database(function_name!())
+            .collection::<Document>(function_name!())
+            .aggregate(vec![doc! { "$match": { "x": 1 } }])
+            .await
+    })
     .await;
 
-    cluster_time_test("find", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("find", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
@@ -366,7 +361,7 @@ async fn cluster_time_in_commands() {
     })
     .await;
 
-    cluster_time_test("insert", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("insert", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())

@@ -139,8 +139,8 @@ pub(crate) struct EventClientBuilder {
 impl EventClientBuilder {
     pub(crate) async fn build(self) -> EventClient {
         let mut inner = self.inner;
-        if inner.handler.is_none() {
-            inner = inner.event_handler(EventBuffer::new());
+        if inner.buffer.is_none() {
+            inner = inner.event_buffer(EventBuffer::new());
         }
         let mut handler = inner.handler().unwrap().clone();
         let client = inner.build().await;
@@ -160,20 +160,20 @@ impl EventClient {
         EventClient::with_options(None).await
     }
 
-    async fn with_options_and_handler(
+    async fn with_options_and_buffer(
         options: impl Into<Option<ClientOptions>>,
         handler: impl Into<Option<EventBuffer>>,
     ) -> Self {
         Client::test_builder()
             .options(options)
-            .event_handler(handler)
+            .event_buffer(handler)
             .event_client()
             .build()
             .await
     }
 
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Self::with_options_and_handler(options, None).await
+        Self::with_options_and_buffer(options, None).await
     }
 
     pub(crate) async fn with_additional_options(
@@ -186,7 +186,7 @@ impl EventClient {
             .additional_options(options, use_multiple_mongoses.unwrap_or(false))
             .await
             .min_heartbeat_freq(min_heartbeat_freq)
-            .event_handler(event_handler)
+            .event_buffer(event_handler)
             .event_client()
             .build()
             .await
