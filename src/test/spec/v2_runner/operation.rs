@@ -680,7 +680,7 @@ impl TestOperation for FindOne {
         async move {
             let action = collection
                 .find_one(self.filter.clone().unwrap_or_default())
-                .with_options(self.options.clone().map(FindOptions::from));
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => action.session(session).await?,
                 None => action.await?,
