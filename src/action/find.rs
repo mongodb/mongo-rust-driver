@@ -179,7 +179,7 @@ impl<'a, T: Send + Sync> FindOne<'a, T> {
     }
 
     /// Use the provided session when running the operation.
-    pub fn session<'s>(mut self, value: impl Into<&'s mut ClientSession>) -> Self {
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
@@ -196,11 +196,11 @@ action_impl! {
             options.limit = Some(-1);
             let find = self.coll.find(self.filter).with_options(options);
             if let Some(session) = self.session {
-                let mut cursor = find.session(session).await?;
+                let mut cursor = find.session(&mut *session).await?;
                 let mut stream = cursor.stream(session);
                 stream.next().await.transpose()
             } else {
-                let mut cursor = self.coll.find(self.filter).with_options(options).await?;
+                let mut cursor = find.await?;
                 cursor.next().await.transpose()
             }
         }

@@ -246,8 +246,7 @@ impl GridFsBucket {
     ) -> Result<Option<FilesCollectionDocument>> {
         let find_options = options
             .into()
-            .map(FindOneOptions::from)
-            .map(FindOptions::from);
+            .map(FindOneOptions::from);
         self.files()
             .find_one(filter)
             .with_options(find_options)
