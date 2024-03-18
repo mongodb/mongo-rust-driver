@@ -21,19 +21,25 @@ pub(crate) enum UpdateOrReplace {
 }
 
 impl UpdateOrReplace {
-    pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
+    pub(crate) fn append_to_rawdoc(&self, doc: &mut RawDocumentBuf, key: &str) -> Result<()> {
         match self {
             Self::UpdateModifications(update_modifications) => match update_modifications {
                 UpdateModifications::Document(document) => {
-                    Ok(RawDocumentBuf::from_document(document)?.into())
+                    let raw = RawDocumentBuf::from_document(document)?;
+                    doc.append(key, raw);
                 }
-                UpdateModifications::Pipeline(pipeline) => bson_util::to_raw_bson_array(pipeline),
+                UpdateModifications::Pipeline(pipeline) => {
+                    let raw = bson_util::to_raw_bson_array(pipeline)?;
+                    doc.append(key, raw);
+                }
             },
             Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(replacement_doc)?;
-                Ok(replacement_doc.clone().into())
+                doc.append_ref(key, replacement_doc);
             }
         }
+
+        Ok(())
     }
 }
 
@@ -110,8 +116,8 @@ impl OperationWithDefaults for Update {
 
         let mut update = rawdoc! {
             "q": RawDocumentBuf::from_document(&self.filter)?,
-            "u": self.update.to_raw_bson()?,
         };
+        self.update.append_to_rawdoc(&mut update, "u")?;
 
         if let Some(ref options) = self.options {
             if let Some(upsert) = options.upsert {

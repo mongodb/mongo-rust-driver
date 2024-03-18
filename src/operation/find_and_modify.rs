@@ -77,11 +77,12 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
             "query": RawDocumentBuf::from_document(&self.query)?,
         };
 
-        let (key, modification) = match &self.modification {
-            Modification::Delete => ("remove", true.into()),
-            Modification::Update(update_or_replace) => ("update", update_or_replace.to_raw_bson()?),
-        };
-        body.append(key, modification);
+        match &self.modification {
+            Modification::Delete => body.append("remove", true),
+            Modification::Update(update_or_replace) => {
+                update_or_replace.append_to_rawdoc(&mut body, "update")?
+            }
+        }
 
         if let Some(ref mut options) = self.options {
             remove_empty_write_concern!(Some(options));
