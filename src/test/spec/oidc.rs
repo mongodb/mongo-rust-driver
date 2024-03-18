@@ -1,3 +1,5 @@
+use bson::doc;
+
 use crate::{
     client::{
         auth::{oidc, AuthMechanism, Credential},
