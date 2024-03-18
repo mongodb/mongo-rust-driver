@@ -4,7 +4,7 @@ use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
 use crate::{
-    coll::options::{FindOneOptions, FindOptions, Hint},
+    coll::options::{CursorType, FindOneOptions, FindOptions, Hint},
     collation::Collation,
     error::Result,
     operation::Find as Op,
@@ -79,14 +79,20 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
 
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     option_setters!(options: FindOptions;
+        allow_disk_use: bool,
         allow_partial_results: bool,
+        batch_size: u32,
         comment: String,
         comment_bson: Bson,
+        cursor_type: CursorType,
         hint: Hint,
+        limit: i64,
         max: Document,
+        max_await_time: Duration,
         max_scan: u64,
         max_time: Duration,
         min: Document,
+        no_cursor_timeout: bool,
         projection: Document,
         read_concern: ReadConcern,
         return_key: bool,
