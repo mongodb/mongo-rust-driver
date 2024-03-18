@@ -36,7 +36,7 @@ pub use delete::Delete;
 pub use distinct::Distinct;
 pub use drop::{DropCollection, DropDatabase};
 pub use drop_index::DropIndex;
-pub use find::Find;
+pub use find::{Find, FindOne};
 pub use find_and_modify::{FindOneAndDelete, FindOneAndReplace, FindOneAndUpdate};
 pub use insert_many::InsertMany;
 pub use insert_one::InsertOne;
