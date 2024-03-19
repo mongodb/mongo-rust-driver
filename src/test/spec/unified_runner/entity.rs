@@ -1,12 +1,14 @@
 use std::{
     fs::File,
-    io::BufWriter,
+    io::{BufWriter, Write},
     ops::{Deref, DerefMut},
     sync::Arc,
     time::Duration,
 };
 
-use tokio::sync::{mpsc, oneshot, Mutex};
+use bson::to_document;
+use time::OffsetDateTime;
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 use crate::{
     bson::{Bson, Document},
@@ -19,8 +21,8 @@ use crate::{
     sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
+        util::event_buffer::EventBuffer,
         Event,
-        EventHandler,
     },
     Client,
     ClientSession,
@@ -30,7 +32,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{observer::EventObserver, test_file::ThreadMessage, Operation};
+use super::{events_match, test_file::ThreadMessage, EntityMap, ExpectedEvent, Operation};
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -62,8 +64,7 @@ pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
     pub(crate) topology_id: bson::oid::ObjectId,
-    handler: Arc<EventHandler>,
-    pub(crate) observer: Arc<Mutex<EventObserver>>,
+    events: EventBuffer,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
@@ -128,22 +129,19 @@ impl TestCursor {
 
 impl ClientEntity {
     pub(crate) fn new(
-        client_options: ClientOptions,
-        handler: Arc<EventHandler>,
+        mut client_options: ClientOptions,
         observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
-        // ensure the observer is already listening before the client is created to avoid any races
-        // around collecting initial events when the topology opens.
-        let observer = EventObserver::new(handler.broadcaster().subscribe());
+        let events = EventBuffer::new();
+        events.register(&mut client_options);
         let client = Client::with_options(client_options).unwrap();
         let topology_id = client.topology().id;
         Self {
             client: Some(client),
             topology_id,
-            handler,
-            observer: Arc::new(Mutex::new(observer)),
+            events,
             observe_events,
             ignore_command_names,
             observe_sensitive_commands,
@@ -154,19 +152,63 @@ impl ClientEntity {
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
     pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
-        self.handler.get_filtered_events(expected_type, |event| {
-            if let Event::Command(cev) = event {
-                if !self.allow_command_event(cev) {
+        self.events
+            .all()
+            .into_iter()
+            .filter(|event| {
+                if !expected_type.matches(event) {
                     return false;
                 }
-            }
-            if let Some(observe_events) = self.observe_events.as_ref() {
-                if !observe_events.iter().any(|observe| observe.matches(event)) {
-                    return false;
+                if let Event::Command(cev) = event {
+                    if !self.allow_command_event(cev) {
+                        return false;
+                    }
                 }
+                if let Some(observe_events) = self.observe_events.as_ref() {
+                    if !observe_events.iter().any(|observe| observe.matches(event)) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+
+    pub(crate) fn matching_events(
+        &self,
+        expected: &ExpectedEvent,
+        entities: &EntityMap,
+    ) -> Vec<Event> {
+        self.events
+            .all()
+            .into_iter()
+            .filter(|e| events_match(e, expected, Some(entities)).is_ok())
+            .collect()
+    }
+
+    pub(crate) async fn wait_for_matching_events(
+        &self,
+        expected: &ExpectedEvent,
+        count: usize,
+        entities: Arc<RwLock<EntityMap>>,
+    ) -> Result<()> {
+        crate::runtime::timeout(Duration::from_secs(10), async {
+            loop {
+                let (events, notified) = self.events.watch_all();
+                let matched = {
+                    let entities = &*entities.read().await;
+                    events
+                        .into_iter()
+                        .filter(|e| events_match(e, expected, Some(entities)).is_ok())
+                        .count()
+                };
+                if matched >= count {
+                    return Ok(());
+                }
+                notified.await;
             }
-            true
         })
+        .await?
     }
 
     /// Returns `true` if a given `CommandEvent` is allowed to be observed.
@@ -201,17 +243,51 @@ impl ClientEntity {
 
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
     pub(crate) fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        self.handler.get_all_command_started_events()
+        self.events
+            .all()
+            .into_iter()
+            .filter_map(|ev| match ev {
+                Event::Command(CommandEvent::Started(ev))
+                    if ev.command_name != "configureFailPoint" =>
+                {
+                    Some(ev)
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// Writes all events with the given name to the given BufWriter.
-    pub fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
-        self.handler.write_events_list_to_file(names, writer);
+    pub(crate) fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
+        let mut add_comma = false;
+        let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
+            event.insert("name", name);
+            event.insert("observedAt", time.unix_timestamp());
+            let mut json_string = serde_json::to_string(&event).unwrap();
+            if add_comma {
+                json_string.insert(0, ',');
+            } else {
+                add_comma = true;
+            }
+            write!(writer, "{}", json_string).unwrap();
+        };
+
+        for (event, time) in self.events.all_timed() {
+            let name = match &event {
+                Event::Command(ev) => ev.name(),
+                Event::Sdam(ev) => ev.name(),
+                Event::Cmap(ev) => ev.planned_maintenance_testing_name(),
+            };
+            if names.contains(&name) {
+                let ev_doc = to_document(&event).unwrap();
+                write_json(ev_doc, name, &time);
+            }
+        }
     }
 
     /// Gets the count of connections currently checked out.
     pub(crate) fn connections_checked_out(&self) -> u32 {
-        self.handler.connections_checked_out()
+        self.events.connections_checked_out()
     }
 
     /// Synchronize all connection pool worker threads.

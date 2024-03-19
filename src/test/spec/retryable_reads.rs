@@ -1,4 +1,4 @@
-use std::{future::IntoFuture, sync::Arc, time::Duration};
+use std::{future::IntoFuture, time::Duration};
 
 use bson::doc;
 
@@ -8,14 +8,13 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    runtime,
-    runtime::AsyncJoinHandle,
+    runtime::{self, AsyncJoinHandle},
     test::{
         get_client_options,
         log_uncaptured,
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
+        util::event_buffer::EventBuffer,
         Event,
-        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -72,13 +71,13 @@ async fn retry_releases_connection() {
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_pool_cleared() {
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone().into());
-    client_options.command_event_handler = Some(handler.clone().into());
+    client_options.cmap_event_handler = Some(buffer.handler());
+    client_options.command_event_handler = Some(buffer.handler());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -108,7 +107,8 @@ async fn retry_read_pool_cleared() {
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
@@ -157,7 +157,7 @@ async fn retry_read_pool_cleared() {
         );
     }
 
-    assert_eq!(handler.get_command_started_events(&["find"]).len(), 3);
+    assert_eq!(buffer.get_command_started_events(&["find"]).len(), 3);
 }
 
 // Retryable Reads Are Retried on a Different mongos if One is Available
@@ -192,6 +192,7 @@ async fn retry_read_different_mongos() {
         guards.push(client.enable_failpoint(fp, None).await.unwrap());
     }
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -203,7 +204,11 @@ async fn retry_read_different_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_err());
-    let events = client.get_command_events(&["find"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["find"])
+    };
     assert!(
         matches!(
             &events[..],
@@ -249,6 +254,7 @@ async fn retry_read_same_mongos() {
         client.enable_failpoint(fp, None).await.unwrap()
     };
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -260,7 +266,11 @@ async fn retry_read_same_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let events = client.get_command_events(&["find"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["find"])
+    };
     assert!(
         matches!(
             &events[..],

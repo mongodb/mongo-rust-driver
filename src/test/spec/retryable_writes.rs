@@ -9,6 +9,8 @@ use tokio::sync::Mutex;
 
 use test_file::{TestFile, TestResult};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
@@ -26,10 +28,8 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         spec::unified_runner::run_unified_tests,
-        util::get_default_name,
+        util::{event_buffer::EventBuffer, get_default_name},
         Event,
-        EventClient,
-        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -56,6 +56,7 @@ async fn run_legacy() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
 
+            #[allow(deprecated)]
             let client = EventClient::with_additional_options(
                 options,
                 Some(Duration::from_millis(50)),
@@ -183,6 +184,7 @@ async fn run_legacy() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -192,8 +194,11 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let excludes_txn_number = |command_name: &str| -> bool {
-        let (started, _) = client.get_successful_command_execution(command_name);
+    #[allow(deprecated)]
+    let mut events = client.events.clone();
+    let mut excludes_txn_number = move |command_name: &str| -> bool {
+        #[allow(deprecated)]
+        let (started, _) = events.get_successful_command_execution(command_name);
         !started.command.contains_key("txnNumber")
     };
 
@@ -228,6 +233,7 @@ async fn transaction_ids_excluded() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -237,8 +243,11 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let includes_txn_number = |command_name: &str| -> bool {
-        let (started, _) = client.get_successful_command_execution(command_name);
+    #[allow(deprecated)]
+    let mut events = client.events.clone();
+    let mut includes_txn_number = move |command_name: &str| -> bool {
+        #[allow(deprecated)]
+        let (started, _) = events.get_successful_command_execution(command_name);
         started.command.contains_key("txnNumber")
     };
 
@@ -379,13 +388,13 @@ async fn label_not_added(retry_reads: bool) {
 /// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone().into());
-    client_options.command_event_handler = Some(handler.clone().into());
+    client_options.cmap_event_handler = Some(buffer.handler());
+    client_options.command_event_handler = Some(buffer.handler());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -421,7 +430,8 @@ async fn retry_write_pool_cleared() {
     let failpoint = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
@@ -470,7 +480,7 @@ async fn retry_write_pool_cleared() {
         );
     }
 
-    assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
+    assert_eq!(buffer.get_command_started_events(&["insert"]).len(), 3);
 }
 
 /// Prose test from retryable writes spec verifying that the original error is returned after
@@ -595,6 +605,7 @@ async fn retry_write_different_mongos() {
         guards.push(client.enable_failpoint(fp, None).await.unwrap());
     }
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -606,7 +617,11 @@ async fn retry_write_different_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
-    let events = client.get_command_events(&["insert"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["insert"])
+    };
     assert!(
         matches!(
             &events[..],
@@ -653,6 +668,7 @@ async fn retry_write_same_mongos() {
         client.enable_failpoint(fp, None).await.unwrap()
     };
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -664,7 +680,11 @@ async fn retry_write_same_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let events = client.get_command_events(&["insert"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["insert"])
+    };
     assert!(
         matches!(
             &events[..],

@@ -29,7 +29,7 @@ use crate::{
         WriteConcern,
     },
     serde_util,
-    test::{Serverless, TestClient, DEFAULT_URI},
+    test::{Event, Serverless, TestClient, DEFAULT_URI},
 };
 
 #[derive(Debug, Deserialize)]
@@ -426,6 +426,22 @@ pub(crate) enum ExpectedEventType {
     #[serde(skip)]
     CmapWithoutConnectionReady,
     Sdam,
+}
+
+impl ExpectedEventType {
+    pub(crate) fn matches(&self, event: &Event) -> bool {
+        match (self, event) {
+            (ExpectedEventType::Cmap, Event::Cmap(_)) => true,
+            (
+                ExpectedEventType::CmapWithoutConnectionReady,
+                Event::Cmap(crate::event::cmap::CmapEvent::ConnectionReady(_)),
+            ) => false,
+            (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(_)) => true,
+            (ExpectedEventType::Command, Event::Command(_)) => true,
+            (ExpectedEventType::Sdam, Event::Sdam(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]

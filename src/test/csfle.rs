@@ -44,17 +44,18 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{Event, EventHandler},
+    test::{util::event_buffer::EventBuffer, Event},
     Client,
     Collection,
     IndexModel,
     Namespace,
 };
 
+#[allow(deprecated)]
+use super::EventClient;
 use super::{
     get_client_options,
     log_uncaptured,
-    EventClient,
     FailCommandOptions,
     FailPoint,
     FailPointMode,
@@ -63,6 +64,7 @@ use super::{
 
 type Result<T> = anyhow::Result<T>;
 
+#[allow(deprecated)]
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = EventClient::new().await;
     let datakeys = client
@@ -281,7 +283,8 @@ async fn data_key_double_encryption() -> Result<()> {
     )?;
 
     // Testing each provider:
-    let mut events = client.subscribe_to_events();
+    #[allow(deprecated)]
+    let mut events = client.events.subscribe();
     let provider_keys = [
         (
             KmsProvider::Aws,
@@ -363,7 +366,7 @@ async fn data_key_double_encryption() -> Result<()> {
                 }),
             )
             .await;
-        assert!(found.is_some(), "no valid event found in {:?}", events);
+        assert!(found.is_some(), "no valid event found");
 
         // Manually encrypt a value and automatically decrypt it.
         let encrypted = client_encryption
@@ -544,9 +547,10 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let handler = Arc::new(EventHandler::new());
-    let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.clone().into());
+    let buffer = EventBuffer::<Event>::new();
+    #[allow(deprecated)]
+    let mut events = buffer.subscribe();
+    opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
             .extra_options(EXTRA_OPTIONS.clone())
@@ -1498,13 +1502,15 @@ impl DeadlockTestCase {
     async fn run(&self) -> Result<()> {
         // Setup
         let client_test = TestClient::new().await;
+        #[allow(deprecated)]
         let client_keyvault = EventClient::with_options({
             let mut opts = get_client_options().await.clone();
             opts.max_pool_size = Some(1);
             opts
         })
         .await;
-        let mut keyvault_events = client_keyvault.subscribe_to_events();
+        #[allow(deprecated)]
+        let mut keyvault_events = client_keyvault.events.subscribe();
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1540,12 +1546,13 @@ impl DeadlockTestCase {
             .await?;
 
         // Run test case
-        let event_handler = Arc::new(EventHandler::new());
-        let mut encrypted_events = event_handler.subscribe();
+        let event_buffer = EventBuffer::new();
+        #[allow(deprecated)]
+        let mut encrypted_events = event_buffer.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.clone().into());
-        opts.sdam_event_handler = Some(event_handler.clone().into());
+        opts.command_event_handler = Some(event_buffer.handler());
+        opts.sdam_event_handler = Some(event_buffer.handler());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)

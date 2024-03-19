@@ -17,10 +17,13 @@ use crate::{
     Collection,
 };
 
-use super::{get_client_options, log_uncaptured, EventClient, TestClient};
+#[allow(deprecated)]
+use super::EventClient;
+use super::{get_client_options, log_uncaptured, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+#[allow(deprecated)]
 async fn init_stream(
     coll_name: &str,
     direct_connection: bool,
@@ -78,14 +81,18 @@ async fn tracks_resume_token() -> Result<()> {
         tokens.push(stream.resume_token().unwrap().parsed()?);
     }
 
-    let events: Vec<_> = client
-        .get_command_events(&["aggregate", "getMore"])
-        .into_iter()
-        .filter_map(|ev| match ev {
-            CommandEvent::Succeeded(s) => Some(s),
-            _ => None,
-        })
-        .collect();
+    #[allow(deprecated)]
+    let events: Vec<_> = {
+        let mut events = client.events.clone();
+        events
+            .get_command_events(&["aggregate", "getMore"])
+            .into_iter()
+            .filter_map(|ev| match ev {
+                CommandEvent::Succeeded(s) => Some(s),
+                _ => None,
+            })
+            .collect()
+    };
     let mut expected = vec![];
     // Token from `aggregate`
     if let Some(initial) = events[0]
@@ -182,7 +189,8 @@ async fn resumes_on_error() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    let events = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let events = client.events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
     Ok(())
@@ -230,7 +238,11 @@ async fn empty_batch_not_closed() -> Result<()> {
     coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
 
-    let events = client.get_command_events(&["aggregate", "getMore"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["aggregate", "getMore"])
+    };
     let cursor_id = match &events[1] {
         CommandEvent::Succeeded(CommandSucceededEvent { reply, .. }) => {
             reply.get_document("cursor")?.get_i64("id")?
@@ -283,7 +295,8 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    let events = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let events = client.events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
     Ok(())
@@ -321,7 +334,11 @@ async fn resume_start_at_operation_time() -> Result<()> {
     coll.insert_one(doc! { "_id": 2 }).await?;
     stream.next().await.transpose()?;
 
-    let events = client.get_command_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["aggregate"])
+    };
     assert_eq!(events.len(), 4);
 
     fn has_saot(command: &Document) -> Result<bool> {
@@ -364,7 +381,11 @@ async fn batch_end_resume_token() -> Result<()> {
 
     assert_eq!(stream.next_if_any().await?, None);
     let token = stream.resume_token().unwrap().parsed()?;
-    let commands = client.get_command_events(&["aggregate", "getMore"]);
+    #[allow(deprecated)]
+    let commands = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["aggregate", "getMore"])
+    };
     assert!(matches!(commands.last(), Some(
         CommandEvent::Succeeded(CommandSucceededEvent {
             reply,
@@ -527,7 +548,8 @@ async fn resume_uses_start_after() -> Result<()> {
     .await?;
     stream.next().await.transpose()?;
 
-    let commands = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let commands = client.events.get_command_started_events(&["aggregate"]);
     fn has_start_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -587,7 +609,8 @@ async fn resume_uses_resume_after() -> Result<()> {
     .await?;
     stream.next().await.transpose()?;
 
-    let commands = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let commands = client.events.get_command_started_events(&["aggregate"]);
     fn has_resume_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()

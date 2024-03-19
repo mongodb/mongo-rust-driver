@@ -18,13 +18,14 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
+        util::event_buffer::EventBuffer,
         Event,
-        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
     },
+    Client,
     ServerInfo,
 };
 
@@ -163,7 +164,7 @@ async fn load_balancing_test() {
     /// was selected. max_share is the upper bound.
     async fn do_test(
         client: &TestClient,
-        handler: &mut EventHandler,
+        handler: &mut EventBuffer,
         min_share: f64,
         max_share: f64,
         iterations: usize,
@@ -214,14 +215,19 @@ async fn load_balancing_test() {
         }
     }
 
-    let mut handler = EventHandler::new();
-    let mut subscriber = handler.subscribe();
+    let mut buffer = EventBuffer::new();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
     options.min_pool_size = Some(max_pool_size);
-    let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
+    let client = Client::test_builder()
+        .options(options)
+        .event_buffer(buffer.clone())
+        .build()
+        .await;
 
     // wait for both servers pools to be saturated.
     for address in hosts {
@@ -250,7 +256,6 @@ async fn load_balancing_test() {
             .expect("timed out waiting for both pools to be saturated");
         conns += 1;
     }
-    drop(subscriber);
 
     // enable a failpoint on one of the mongoses to slow it down
     let options = FailCommandOptions::builder()
@@ -266,9 +271,9 @@ async fn load_balancing_test() {
         .expect("enabling failpoint should succeed");
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
-    do_test(&client, &mut handler, 0.05, 0.25, 10).await;
+    do_test(&client, &mut buffer, 0.05, 0.25, 10).await;
 
     // disable failpoint and rerun, should be back to even split
     drop(fp_guard);
-    do_test(&client, &mut handler, 0.40, 0.50, 100).await;
+    do_test(&client, &mut buffer, 0.40, 0.50, 100).await;
 }

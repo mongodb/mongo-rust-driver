@@ -1,12 +1,13 @@
 use std::{
     collections::HashSet,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
 use bson::doc;
 use semver::VersionReq;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
@@ -17,9 +18,8 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
+        util::event_buffer::EventBuffer,
         Event,
-        EventClient,
-        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -100,16 +100,18 @@ async fn sdam_pool_management() {
     options.app_name = Some("SDAMPoolManagementTest".to_string());
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
-    let event_handler = EventHandler::new();
-    let mut subscriber = event_handler.subscribe();
+    let event_buffer = EventBuffer::new();
 
+    #[allow(deprecated)]
     let client = EventClient::with_additional_options(
         Some(options),
         Some(Duration::from_millis(50)),
         None,
-        event_handler.clone(),
+        event_buffer.clone(),
     )
     .await;
+    #[allow(deprecated)]
+    let mut subscriber = event_buffer.subscribe_all();
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()
@@ -193,11 +195,12 @@ async fn hello_ok_true() {
         return;
     }
 
-    let handler = Arc::new(EventHandler::new());
-    let mut subscriber = handler.subscribe();
+    let buffer = EventBuffer::new();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let mut options = setup_client_options.clone();
-    options.sdam_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(buffer.handler());
     options.direct_connection = Some(true);
     options.heartbeat_freq = Some(Duration::from_millis(500));
     let _client = Client::with_options(options).expect("client creation should succeed");
@@ -263,7 +266,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
 /// topology.
 #[tokio::test(flavor = "multi_thread")]
 async fn removed_server_monitor_stops() -> crate::error::Result<()> {
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
     let options = ClientOptions::builder()
         .hosts(vec![
             ServerAddress::parse("localhost:49152")?,
@@ -271,14 +274,15 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
             ServerAddress::parse("localhost:49154")?,
         ])
         .heartbeat_freq(Duration::from_millis(50))
-        .sdam_event_handler(handler.clone())
+        .sdam_event_handler(buffer.handler())
         .repl_set_name("foo".to_string())
         .build();
 
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
     let topology = Topology::new(options)?;
 
     // Wait until all three monitors have started.

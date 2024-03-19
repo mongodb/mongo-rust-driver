@@ -28,7 +28,6 @@ use crate::{
         },
         update_options_for_testing,
         util::FailPointGuard,
-        EventHandler,
         TestClient,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
@@ -458,10 +457,6 @@ impl TestRunner {
                                 )
                             });
                     update_options_for_testing(&mut options);
-                    let handler = Arc::new(EventHandler::new());
-                    options.command_event_handler = Some(handler.clone().command_sender().into());
-                    options.cmap_event_handler = Some(handler.clone().cmap_sender().into());
-                    options.sdam_event_handler = Some(handler.clone().sdam_sender().into());
 
                     options.server_api = server_api;
 
@@ -500,7 +495,6 @@ impl TestRunner {
                         id,
                         Entity::Client(ClientEntity::new(
                             options,
-                            handler,
                             observe_events,
                             ignore_command_names,
                             observe_sensitive_commands,

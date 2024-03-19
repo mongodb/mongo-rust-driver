@@ -5,6 +5,8 @@ use std::{future::Future, sync::Arc, time::Duration};
 use bson::Document;
 use futures::stream::StreamExt;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson},
     coll::options::CountOptions,
@@ -13,7 +15,13 @@ use crate::{
     options::{FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        util::event_buffer::EventBuffer,
+        Event,
+        TestClient,
+    },
     Client,
     Collection,
 };
@@ -231,13 +239,14 @@ async fn cluster_time_in_commands() {
     async fn cluster_time_test<F, G, R>(
         command_name: &str,
         client: &Client,
-        event_handler: &EventHandler,
+        event_buffer: &EventBuffer,
         operation: F,
     ) where
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
-        let mut subscriber = event_handler.subscribe();
+        #[allow(deprecated)]
+        let mut subscriber = event_buffer.subscribe();
 
         operation(client.clone())
             .await
@@ -284,11 +293,11 @@ async fn cluster_time_in_commands() {
         );
     }
 
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
-    options.command_event_handler = Some(handler.clone().into());
-    options.sdam_event_handler = Some(handler.clone().into());
+    options.command_event_handler = Some(buffer.handler());
+    options.sdam_event_handler = Some(buffer.handler());
 
     // Ensure we only connect to one server so the monitor checks from other servers
     // don't affect the TopologyDescription's clusterTime value between commands.
@@ -304,7 +313,8 @@ async fn cluster_time_in_commands() {
         }
     }
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let client = Client::with_options(options).unwrap();
 
@@ -328,7 +338,7 @@ async fn cluster_time_in_commands() {
         .await
         .unwrap();
 
-    cluster_time_test("ping", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("ping", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .run_command(doc! { "ping": 1 })
@@ -336,21 +346,16 @@ async fn cluster_time_in_commands() {
     })
     .await;
 
-    cluster_time_test(
-        "aggregate",
-        &client,
-        handler.as_ref(),
-        |client| async move {
-            client
-                .database(function_name!())
-                .collection::<Document>(function_name!())
-                .aggregate(vec![doc! { "$match": { "x": 1 } }])
-                .await
-        },
-    )
+    cluster_time_test("aggregate", &client, &buffer, |client| async move {
+        client
+            .database(function_name!())
+            .collection::<Document>(function_name!())
+            .aggregate(vec![doc! { "$match": { "x": 1 } }])
+            .await
+    })
     .await;
 
-    cluster_time_test("find", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("find", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
@@ -359,7 +364,7 @@ async fn cluster_time_in_commands() {
     })
     .await;
 
-    cluster_time_test("insert", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("insert", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
@@ -378,6 +383,7 @@ async fn session_usage() {
         return;
     }
 
+    #[allow(deprecated)]
     async fn session_usage_test<F, G>(command_name: &str, operation: F)
     where
         F: Fn(EventClient) -> G,
@@ -385,7 +391,9 @@ async fn session_usage() {
     {
         let client = EventClient::new().await;
         operation(client.clone()).await;
-        let (command_started, _) = client.get_successful_command_execution(command_name);
+        let mut events = client.events.clone();
+        #[allow(deprecated)]
+        let (command_started, _) = events.get_successful_command_execution(command_name);
         assert!(
             command_started.command.get("lsid").is_some(),
             "implicit session not passed to {}",
@@ -400,6 +408,7 @@ async fn session_usage() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -419,7 +428,11 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let mut cursor = coll.find(doc! {}).await.expect("find should succeed");
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
-    let (find_started, _) = client.get_successful_command_execution("find");
+    #[allow(deprecated)]
+    let (find_started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
     let session_id = find_started
         .command
         .get("lsid")
@@ -440,6 +453,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -468,7 +482,12 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         assert!(matches!(cursor.next().await, Some(Ok(_))));
     }
 
-    let (find_started, _) = client.get_successful_command_execution("find");
+    #[allow(deprecated)]
+    let (find_started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
+
     let session_id = find_started
         .command
         .get("lsid")
@@ -489,6 +508,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(
@@ -522,6 +542,7 @@ async fn find_and_getmore_share_session() {
         },
     ];
 
+    #[allow(deprecated)]
     async fn run_test(
         client: &EventClient,
         coll: &Collection<Document>,
@@ -564,14 +585,17 @@ async fn find_and_getmore_share_session() {
                 });
         }
 
-        let (find_started, _) = client.get_successful_command_execution("find");
+        let mut events = client.events.clone();
+        #[allow(deprecated)]
+        let (find_started, _) = events.get_successful_command_execution("find");
         let session_id = find_started
             .command
             .get("lsid")
             .expect("find should use implicit session");
         assert!(session_id != &Bson::Null);
 
-        let (command_started, _) = client.get_successful_command_execution("getMore");
+        #[allow(deprecated)]
+        let (command_started, _) = events.get_successful_command_execution("getMore");
         let getmore_session_id = command_started
             .command
             .get("lsid")

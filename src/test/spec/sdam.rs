@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use bson::{doc, Document};
 
@@ -10,8 +10,8 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
+        util::event_buffer::EventBuffer,
         Event,
-        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -52,10 +52,10 @@ async fn streaming_min_heartbeat_frequency() {
         return;
     }
 
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
-    options.sdam_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(buffer.handler());
 
     let hosts = options.hosts.clone();
 
@@ -71,8 +71,9 @@ async fn streaming_min_heartbeat_frequency() {
     // 500ms for 5 heartbeats.
     let mut tasks = Vec::new();
     for address in hosts {
-        let h = handler.clone();
+        let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
+            #[allow(deprecated)]
             let mut subscriber = h.subscribe();
             for _ in 0..5 {
                 let event = subscriber
@@ -102,10 +103,10 @@ async fn heartbeat_frequency_is_respected() {
         return;
     }
 
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(1000));
-    options.sdam_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(buffer.handler());
 
     let hosts = options.hosts.clone();
 
@@ -121,8 +122,9 @@ async fn heartbeat_frequency_is_respected() {
     // 1s for 3s.
     let mut tasks = Vec::new();
     for address in hosts {
-        let h = handler.clone();
+        let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
+            #[allow(deprecated)]
             let mut subscriber = h.subscribe();
 
             // collect events for 2 seconds, should see between 2 and 3 heartbeats.
@@ -166,18 +168,19 @@ async fn rtt_is_updated() {
 
     let app_name = "streamingRttTest";
 
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_millis(500));
     options.app_name = Some(app_name.to_string());
-    options.sdam_event_handler = Some(handler.clone().into());
+    options.sdam_event_handler = Some(buffer.handler());
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
 
     let host = options.hosts[0].clone();
 
     let client = Client::with_options(options).unwrap();
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     // run a find to wait for the primary to be discovered
     client

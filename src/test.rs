@@ -21,6 +21,8 @@ pub(crate) mod util;
 
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
+#[allow(deprecated)]
+pub(crate) use self::util::EventClient;
 pub(crate) use self::{
     spec::{run_spec_test, RunOn, Serverless, Topology},
     util::{
@@ -29,8 +31,6 @@ pub(crate) use self::{
         file_level_log,
         log_uncaptured,
         Event,
-        EventClient,
-        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
