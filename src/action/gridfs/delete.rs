@@ -12,7 +12,7 @@ impl GridFsBucket {
     /// bucket.
     ///
     /// `await` will return `Result<()>`.
-    pub fn delete_2(&self, id: Bson) -> Delete {
+    pub fn delete(&self, id: Bson) -> Delete {
         Delete { bucket: self, id }
     }
 }
@@ -24,8 +24,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// bucket.
     ///
     /// [`run`](Delete::run) will return `Result<()>`.
-    pub fn delete_2(&self, id: Bson) -> Delete {
-        self.async_bucket.delete_2(id)
+    pub fn delete(&self, id: Bson) -> Delete {
+        self.async_bucket.delete(id)
     }
 }
 

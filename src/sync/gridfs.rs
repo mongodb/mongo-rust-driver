@@ -58,13 +58,6 @@ impl GridFsBucket {
         self.async_bucket.selection_criteria()
     }
 
-    /// Deletes the [`FilesCollectionDocument`] with the given `id` and its associated chunks from
-    /// this bucket. This method returns an error if the `id` does not match any files in the
-    /// bucket.
-    pub fn delete(&self, id: Bson) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.delete(id))
-    }
-
     /// Finds the [`FilesCollectionDocument`]s in the bucket matching the given `filter`.
     pub fn find(
         &self,

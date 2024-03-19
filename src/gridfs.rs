@@ -13,7 +13,7 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     checked::Checked,
     cursor::Cursor,
-    error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
+    error::{Error, Result},
     options::{
         CollectionOptions,
         FindOneOptions,
@@ -203,27 +203,6 @@ impl GridFsBucket {
     /// Gets a handle to the chunks collection for the bucket.
     pub(crate) fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
-    }
-
-    /// Deletes the [`FilesCollectionDocument`] with the given `id` and its associated chunks from
-    /// this bucket. This method returns an error if the `id` does not match any files in the
-    /// bucket.
-    pub async fn delete(&self, id: Bson) -> Result<()> {
-        let delete_result = self.files().delete_one(doc! { "_id": id.clone() }).await?;
-        // Delete chunks regardless of whether a file was found. This will remove any possibly
-        // orphaned chunks.
-        self.chunks()
-            .delete_many(doc! { "files_id": id.clone() })
-            .await?;
-
-        if delete_result.deleted_count == 0 {
-            return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
-                identifier: GridFsFileIdentifier::Id(id),
-            })
-            .into());
-        }
-
-        Ok(())
     }
 
     /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
