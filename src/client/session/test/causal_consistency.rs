@@ -159,6 +159,7 @@ async fn first_read_no_after_cluser_time() {
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
         let mut events = client.events.clone();
+        #[allow(deprecated)]
         let (started, _) = events.get_successful_command_execution(name);
 
         // assert that no read concern was set.
@@ -194,6 +195,7 @@ async fn first_op_update_op_time() {
         .unwrap();
 
         let mut events = client.events.clone();
+        #[allow(deprecated)]
         let event = events
             .get_command_events(&[name])
             .into_iter()
@@ -478,6 +480,7 @@ async fn omit_cluster_time_standalone() {
     coll.find_one(doc! {}).await.unwrap();
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let (started, _) = events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap_err();
 }
@@ -498,6 +501,7 @@ async fn cluster_time_sent_in_commands() {
     coll.find_one(doc! {}).await.unwrap();
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let (started, _) = events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap();
 }

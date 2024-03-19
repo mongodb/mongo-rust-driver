@@ -244,6 +244,7 @@ async fn cluster_time_in_commands() {
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
+        #[allow(deprecated)]
         let mut subscriber = event_buffer.subscribe();
 
         operation(client.clone())
@@ -311,6 +312,7 @@ async fn cluster_time_in_commands() {
         }
     }
 
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let client = Client::with_options(options).unwrap();
@@ -388,6 +390,7 @@ async fn session_usage() {
         let client = EventClient::new().await;
         operation(client.clone()).await;
         let mut events = client.events.clone();
+        #[allow(deprecated)]
         let (command_started, _) = events.get_successful_command_execution(command_name);
         assert!(
             command_started.command.get("lsid").is_some(),
@@ -423,6 +426,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let (find_started, _) = events.get_successful_command_execution("find");
     let session_id = find_started
         .command
@@ -473,6 +477,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
     }
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let (find_started, _) = events.get_successful_command_execution("find");
 
     let session_id = find_started
@@ -571,6 +576,7 @@ async fn find_and_getmore_share_session() {
         }
 
         let mut events = client.events.clone();
+        #[allow(deprecated)]
         let (find_started, _) = events.get_successful_command_execution("find");
         let session_id = find_started
             .command
@@ -578,6 +584,7 @@ async fn find_and_getmore_share_session() {
             .expect("find should use implicit session");
         assert!(session_id != &Bson::Null);
 
+        #[allow(deprecated)]
         let (command_started, _) = events.get_successful_command_execution("getMore");
         let getmore_session_id = command_started
             .command

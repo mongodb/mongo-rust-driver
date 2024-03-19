@@ -30,6 +30,7 @@ async fn details() {
         _ => panic!("expected WriteError, got {:?}", err.kind),
     };
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let (_, event) = events.get_successful_command_execution("insert");
     assert_eq!(write_err.code, 121 /* DocumentValidationFailure */);
     assert_eq!(

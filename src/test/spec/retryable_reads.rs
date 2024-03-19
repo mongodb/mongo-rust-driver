@@ -107,6 +107,7 @@ async fn retry_read_pool_cleared() {
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
@@ -203,6 +204,7 @@ async fn retry_read_different_mongos() {
         .await;
     assert!(result.is_err());
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events = events.get_command_events(&["find"]);
     assert!(
         matches!(
@@ -261,6 +263,7 @@ async fn retry_read_same_mongos() {
         .await;
     assert!(result.is_ok(), "{:?}", result);
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events = events.get_command_events(&["find"]);
     assert!(
         matches!(

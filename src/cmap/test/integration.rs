@@ -198,6 +198,7 @@ async fn connection_error_during_establishment() {
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
     let buffer = EventBuffer::<CmapEvent>::new();
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
@@ -248,6 +249,7 @@ async fn connection_error_during_operation() {
     let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(10), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     client

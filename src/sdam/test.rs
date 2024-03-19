@@ -108,6 +108,7 @@ async fn sdam_pool_management() {
         event_buffer.clone(),
     )
     .await;
+    #[allow(deprecated)]
     let mut subscriber = event_buffer.subscribe_all();
 
     if !VersionReq::parse(">= 4.2.9")
@@ -193,6 +194,7 @@ async fn hello_ok_true() {
     }
 
     let buffer = EventBuffer::new();
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let mut options = setup_client_options.clone();
@@ -277,6 +279,7 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
 
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
     let topology = Topology::new(options)?;
 

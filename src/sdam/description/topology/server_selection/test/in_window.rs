@@ -214,6 +214,7 @@ async fn load_balancing_test() {
     }
 
     let mut buffer = EventBuffer::new();
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;

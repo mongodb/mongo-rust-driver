@@ -714,6 +714,7 @@ async fn retry_commit_txn_check_out() {
     );
     let _guard = setup_client.enable_failpoint(fp, None).await.unwrap();
 
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
     client
         .database("foo")

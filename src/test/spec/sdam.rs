@@ -73,6 +73,7 @@ async fn streaming_min_heartbeat_frequency() {
     for address in hosts {
         let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
+            #[allow(deprecated)]
             let mut subscriber = h.subscribe();
             for _ in 0..5 {
                 let event = subscriber
@@ -123,6 +124,7 @@ async fn heartbeat_frequency_is_respected() {
     for address in hosts {
         let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
+            #[allow(deprecated)]
             let mut subscriber = h.subscribe();
 
             // collect events for 2 seconds, should see between 2 and 3 heartbeats.
@@ -177,6 +179,7 @@ async fn rtt_is_updated() {
     let host = options.hosts[0].clone();
 
     let client = Client::with_options(options).unwrap();
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     // run a find to wait for the primary to be discovered

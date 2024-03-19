@@ -694,6 +694,7 @@ async fn no_read_preference_to_standalone() {
         .unwrap();
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let command_started = events.get_successful_command_execution("find").0;
 
     assert!(!command_started.command.contains_key("$readPreference"));
@@ -1247,6 +1248,7 @@ async fn insert_many_document_sequences() {
         .event_buffer(buffer.clone())
         .build()
         .await;
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let max_object_size = client.server_info.max_bson_object_size;

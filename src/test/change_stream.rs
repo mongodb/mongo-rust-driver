@@ -79,6 +79,7 @@ async fn tracks_resume_token() -> Result<()> {
     }
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events: Vec<_> = events
         .get_command_events(&["aggregate", "getMore"])
         .into_iter()
@@ -232,6 +233,7 @@ async fn empty_batch_not_closed() -> Result<()> {
     stream.next().await.transpose()?;
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events = events.get_command_events(&["aggregate", "getMore"]);
     let cursor_id = match &events[1] {
         CommandEvent::Succeeded(CommandSucceededEvent { reply, .. }) => {
@@ -324,6 +326,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
     stream.next().await.transpose()?;
 
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events = events.get_command_events(&["aggregate"]);
     assert_eq!(events.len(), 4);
 
@@ -368,6 +371,7 @@ async fn batch_end_resume_token() -> Result<()> {
     assert_eq!(stream.next_if_any().await?, None);
     let token = stream.resume_token().unwrap().parsed()?;
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let commands = events.get_command_events(&["aggregate", "getMore"]);
     assert!(matches!(commands.last(), Some(
         CommandEvent::Succeeded(CommandSucceededEvent {

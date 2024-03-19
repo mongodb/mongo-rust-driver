@@ -76,6 +76,8 @@ impl<T> EventBuffer<T> {
     /// Subscribe to events generated after the point of this call.
     ///
     /// New test code should prefer using `watch_all` over this.
+    #[deprecated = "use watch_all"]
+    #[allow(deprecated)]
     pub(crate) fn subscribe(&self) -> EventSubscriber<'_, T> {
         let (index, generation) = {
             let events = self.inner.events.lock().unwrap();
@@ -91,6 +93,8 @@ impl<T> EventBuffer<T> {
     /// Subscribe to all events contained in the buffer.
     ///
     /// New test code should prefer using `watch_all` over this.
+    #[deprecated = "use watch_all"]
+    #[allow(deprecated)]
     pub(crate) fn subscribe_all(&self) -> EventSubscriber<'_, T> {
         EventSubscriber {
             buffer: self,
@@ -231,6 +235,7 @@ impl EventBuffer<Event> {
 
     /// Remove all command events from the buffer, returning those matching any of the command
     /// names.
+    #[deprecated = "use immutable methods"]
     pub(crate) fn get_command_events(&mut self, command_names: &[&str]) -> Vec<CommandEvent> {
         let mut out = vec![];
         self.retain(|ev| match ev {
@@ -249,6 +254,7 @@ impl EventBuffer<Event> {
     /// command events before and between them.
     ///
     /// Panics if the command failed or could not be found in the events.
+    #[deprecated = "use immutable methods"]
     pub(crate) fn get_successful_command_execution(
         &mut self,
         command_name: &str,
@@ -300,12 +306,14 @@ impl EventBuffer<Event> {
 /// Process events one at a time as they arrive asynchronously.
 ///
 /// New test code should prefer to use `EventBuffer`.
+#[deprecated = "use EventBuffer"]
 pub(crate) struct EventSubscriber<'a, T> {
     buffer: &'a EventBuffer<T>,
     index: usize,
     generation: Generation,
 }
 
+#[allow(deprecated)]
 impl<'a, T: Clone> EventSubscriber<'a, T> {
     async fn next(&mut self, timeout: Duration) -> Option<T> {
         crate::runtime::timeout(timeout, async move {
@@ -424,6 +432,7 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
     }
 }
 
+#[allow(deprecated)]
 impl<'a> EventSubscriber<'a, Event> {
     /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will

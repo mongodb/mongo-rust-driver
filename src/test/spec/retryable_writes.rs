@@ -193,6 +193,7 @@ async fn transaction_ids_excluded() {
 
     let mut events = client.events.clone();
     let mut excludes_txn_number = move |command_name: &str| -> bool {
+        #[allow(deprecated)]
         let (started, _) = events.get_successful_command_execution(command_name);
         !started.command.contains_key("txnNumber")
     };
@@ -239,6 +240,7 @@ async fn transaction_ids_included() {
 
     let mut events = client.events.clone();
     let mut includes_txn_number = move |command_name: &str| -> bool {
+        #[allow(deprecated)]
         let (started, _) = events.get_successful_command_execution(command_name);
         started.command.contains_key("txnNumber")
     };
@@ -422,6 +424,7 @@ async fn retry_write_pool_cleared() {
     let failpoint = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
+    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
@@ -608,6 +611,7 @@ async fn retry_write_different_mongos() {
         .await;
     assert!(result.is_err());
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events = events.get_command_events(&["insert"]);
     assert!(
         matches!(
@@ -667,6 +671,7 @@ async fn retry_write_same_mongos() {
         .await;
     assert!(result.is_ok(), "{:?}", result);
     let mut events = client.events.clone();
+    #[allow(deprecated)]
     let events = events.get_command_events(&["insert"]);
     assert!(
         matches!(
