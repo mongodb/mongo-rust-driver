@@ -585,12 +585,11 @@ impl Find {
             selection_criteria: None,
             let_vars: self.let_vars.clone(),
         };
+        let act = collection.find(self.filter.clone()).with_options(options);
         match &self.session {
             Some(session_id) => {
                 let cursor = with_mut_session!(test_runner, session_id, |session| async {
-                    collection
-                        .find_with_session(self.filter.clone(), options, session)
-                        .await
+                    act.session(session.deref_mut()).await
                 })
                 .await?;
                 Ok(TestCursor::Session {
@@ -599,7 +598,7 @@ impl Find {
                 })
             }
             None => {
-                let cursor = collection.find(self.filter.clone(), options).await?;
+                let cursor = act.await?;
                 Ok(TestCursor::Normal(Mutex::new(cursor)))
             }
         }
@@ -728,27 +727,17 @@ impl TestOperation for InsertMany {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .insert_many(&self.documents)
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| {
-                        async move {
-                            collection
-                                .insert_many_with_session(
-                                    self.documents.clone(),
-                                    self.options.clone(),
-                                    session,
-                                )
-                                .await
-                        }
-                        .boxed()
+                        async move { action.session(session.deref_mut()).await }.boxed()
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .insert_many(self.documents.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let ids: HashMap<String, Bson> = result
                 .inserted_ids
@@ -779,24 +768,17 @@ impl TestOperation for InsertOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .insert_one(self.document.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .insert_one_with_session(
-                                self.document.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .insert_one(self.document.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1089,7 +1071,8 @@ impl TestOperation for FindOne {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one(self.filter.clone(), self.options.clone())
+                .find_one(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone())
                 .await?;
             match result {
                 Some(result) => Ok(Some(Bson::from(result).into())),
@@ -1256,11 +1239,8 @@ impl TestOperation for ReplaceOne {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .replace_one(
-                    self.filter.clone(),
-                    self.replacement.clone(),
-                    self.options.clone(),
-                )
+                .replace_one(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1287,29 +1267,17 @@ impl TestOperation for FindOneAndUpdate {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .find_one_and_update(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .find_one_and_update_with_session(
-                                self.filter.clone(),
-                                self.update.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .find_one_and_update(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1336,11 +1304,8 @@ impl TestOperation for FindOneAndReplace {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one_and_replace(
-                    self.filter.clone(),
-                    self.replacement.clone(),
-                    self.options.clone(),
-                )
+                .find_one_and_replace(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
 
@@ -1367,7 +1332,8 @@ impl TestOperation for FindOneAndDelete {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one_and_delete(self.filter.clone(), self.options.clone())
+                .find_one_and_delete(self.filter.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))

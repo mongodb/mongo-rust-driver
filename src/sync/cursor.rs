@@ -31,12 +31,12 @@ use crate::{
 /// documents it yields using a for loop:
 ///
 /// ```rust
-/// # use mongodb::{bson::Document, sync::Client, error::Result};
+/// # use mongodb::{bson::{doc, Document}, sync::Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
-/// # let mut cursor = coll.find(None, None)?;
+/// # let mut cursor = coll.find(doc! {}).run()?;
 /// #
 /// for doc in cursor {
 ///   println!("{}", doc?)
@@ -60,7 +60,7 @@ use crate::{
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
+/// # let cursor = coll.find(doc! { "x": 1 }).run()?;
 /// #
 /// let results: Vec<Result<Document>> = cursor.collect();
 /// # Ok(())
@@ -92,11 +92,11 @@ impl<T> Cursor<T> {
     /// calling [`Cursor::advance`] first or after [`Cursor::advance`] returns an error / false.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # use mongodb::{sync::Client, bson::{Document, doc}, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find(None, None)?;
+    /// let mut cursor = coll.find(doc! {}).run()?;
     /// while cursor.advance()? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }
@@ -115,11 +115,11 @@ impl<T> Cursor<T> {
     /// or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # use mongodb::{sync::Client, bson::{doc, Document}, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find(None, None)?;
+    /// let mut cursor = coll.find(doc! {}).run()?;
     /// while cursor.advance()? {
     ///     println!("{:?}", cursor.current());
     /// }
@@ -138,7 +138,7 @@ impl<T> Cursor<T> {
     /// true or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, error::Result};
+    /// # use mongodb::{sync::Client, error::Result, bson::doc};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let db = client.database("foo");
@@ -151,7 +151,7 @@ impl<T> Cursor<T> {
     /// }
     ///
     /// let coll = db.collection::<Cat>("cat");
-    /// let mut cursor = coll.find(None, None)?;
+    /// let mut cursor = coll.find(doc! {}).run()?;
     /// while cursor.advance()? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }
@@ -181,13 +181,13 @@ where
 /// one. To iterate, retrieve a [`SessionCursorIter]` using [`SessionCursor::iter`]:
 ///
 /// ```rust
-/// # use mongodb::{bson::Document, sync::Client, error::Result};
+/// # use mongodb::{bson::{doc, Document}, sync::Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let mut session = client.start_session().run()?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
-/// # let mut cursor = coll.find_with_session(None, None, &mut session)?;
+/// # let mut cursor = coll.find(doc! {}).session(&mut session).run()?;
 /// #
 /// for doc in cursor.iter(&mut session) {
 ///   println!("{}", doc?)
@@ -220,12 +220,12 @@ impl<T> SessionCursor<T> {
     /// calling [`Cursor::advance`] first or after [`Cursor::advance`] returns an error / false.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # use mongodb::{sync::Client, bson::{doc, Document}, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let mut session = client.start_session().run()?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
+    /// let mut cursor = coll.find(doc! {}).session(&mut session).run()?;
     /// while cursor.advance(&mut session)? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }
@@ -245,12 +245,12 @@ impl<T> SessionCursor<T> {
     /// or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # use mongodb::{sync::Client, bson::{doc, Document}, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let mut session = client.start_session().run()?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
+    /// let mut cursor = coll.find(doc! {}).session(&mut session).run()?;
     /// while cursor.advance(&mut session)? {
     ///     println!("{:?}", cursor.current());
     /// }
@@ -269,7 +269,7 @@ impl<T> SessionCursor<T> {
     /// true or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, error::Result};
+    /// # use mongodb::{sync::Client, error::Result, bson::doc};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let mut session = client.start_session().run()?;
@@ -283,7 +283,7 @@ impl<T> SessionCursor<T> {
     /// }
     ///
     /// let coll = db.collection::<Cat>("cat");
-    /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
+    /// let mut cursor = coll.find(doc! {}).session(&mut session).run()?;
     /// while cursor.advance(&mut session)? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }
@@ -327,9 +327,9 @@ where
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
     /// # let mut session = client.start_session().run()?;
-    /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session)?;
+    /// let mut cursor = coll.find(doc! { "x": 1 }).session(&mut session).run()?;
     /// while let Some(doc) = cursor.next(&mut session).transpose()? {
-    ///     other_coll.insert_one_with_session(doc, None, &mut session)?;
+    ///     other_coll.insert_one(doc).session(&mut session).run()?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())
     /// # }

@@ -58,7 +58,7 @@ let coll = client.database("items").collection::<Item>("in_stock");
 
 for i in 0..5 {
     // Perform operations that work with directly our model.
-    coll.insert_one(Item { id: i }, None).await;
+    coll.insert_one(Item { id: i }).await;
 }
 #
 # Ok(())
@@ -89,9 +89,10 @@ use futures::stream::TryStreamExt;
 use mongodb::{bson::doc, options::FindOptions};
 
 // Query the books in the collection with a filter and an option.
-let filter = doc! { "author": "George Orwell" };
-let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-let mut cursor = typed_collection.find(filter, find_options).await?;
+let mut cursor = typed_collection
+    .find(doc! { "author": "George Orwell" })
+    .sort(doc! { "title": 1 })
+    .await?;
 
 // Iterate over the results of the cursor.
 while let Some(book) = cursor.try_next().await? {

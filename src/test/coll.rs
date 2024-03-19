@@ -21,11 +21,9 @@ use crate::{
         DeleteOptions,
         DropCollectionOptions,
         FindOneAndDeleteOptions,
-        FindOneOptions,
         FindOptions,
         Hint,
         IndexOptions,
-        InsertManyOptions,
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
@@ -76,7 +74,7 @@ async fn insert_err_details() {
         .await
         .unwrap();
 
-    let wc_error_result = coll.insert_one(doc! { "test": 1 }, None).await;
+    let wc_error_result = coll.insert_one(doc! { "test": 1 }).await;
     match *wc_error_result.unwrap_err().kind {
         ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_error)) => {
             match &wc_error.details {
@@ -106,11 +104,11 @@ async fn count() {
 
     assert_eq!(coll.estimated_document_count().await.unwrap(), 0);
 
-    let _ = coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    let _ = coll.insert_one(doc! { "x": 1 }).await.unwrap();
     assert_eq!(coll.estimated_document_count().await.unwrap(), 1);
 
     let result = coll
-        .insert_many((1..4).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
+        .insert_many((1..4).map(|i| doc! { "x": i }).collect::<Vec<_>>())
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 3);
@@ -126,12 +124,12 @@ async fn find() {
         .await;
 
     let result = coll
-        .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
+        .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>())
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let mut cursor = coll.find(None, None).await.unwrap().enumerate();
+    let mut cursor = coll.find(doc! {}).await.unwrap().enumerate();
 
     while let Some((i, result)) = cursor.next().await {
         let doc = result.unwrap();
@@ -151,7 +149,7 @@ async fn update() {
         .await;
 
     let result = coll
-        .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>(), None)
+        .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>())
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
@@ -188,7 +186,7 @@ async fn delete() {
         .await;
 
     let result = coll
-        .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>(), None)
+        .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>())
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
@@ -212,7 +210,7 @@ async fn aggregate_out() {
     drop_collection(&coll).await;
 
     let result = coll
-        .insert_many((0i32..5).map(|n| doc! { "x": n }).collect::<Vec<_>>(), None)
+        .insert_many((0i32..5).map(|n| doc! { "x": n }).collect::<Vec<_>>())
         .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
@@ -262,7 +260,7 @@ async fn kill_cursors_on_drop() {
 
     drop_collection(&coll).await;
 
-    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
+    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }])
         .await
         .unwrap();
 
@@ -271,10 +269,7 @@ async fn kill_cursors_on_drop() {
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    let cursor = coll
-        .find(None, FindOptions::builder().batch_size(1).build())
-        .await
-        .unwrap();
+    let cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
 
     assert!(!kill_cursors_sent(&event_client));
 
@@ -297,7 +292,7 @@ async fn no_kill_cursors_on_exhausted() {
 
     drop_collection(&coll).await;
 
-    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
+    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }])
         .await
         .unwrap();
 
@@ -306,10 +301,7 @@ async fn no_kill_cursors_on_exhausted() {
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    let cursor = coll
-        .find(None, FindOptions::builder().build())
-        .await
-        .unwrap();
+    let cursor = coll.find(doc! {}).await.unwrap();
 
     assert!(!kill_cursors_sent(&event_client));
 
@@ -388,11 +380,7 @@ async fn large_insert() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
     assert_eq!(
-        coll.insert_many(docs, None)
-            .await
-            .unwrap()
-            .inserted_ids
-            .len(),
+        coll.insert_many(docs).await.unwrap().inserted_ids.len(),
         35000
     );
 }
@@ -434,10 +422,10 @@ async fn large_insert_unordered_with_errors() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    let options = InsertManyOptions::builder().ordered(false).build();
 
     match *coll
-        .insert_many(docs, options)
+        .insert_many(docs)
+        .ordered(false)
         .await
         .expect_err("should get error")
         .kind
@@ -472,10 +460,10 @@ async fn large_insert_ordered_with_errors() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    let options = InsertManyOptions::builder().ordered(true).build();
 
     match *coll
-        .insert_many(docs, options)
+        .insert_many(docs)
+        .ordered(true)
         .await
         .expect_err("should get error")
         .kind
@@ -506,7 +494,7 @@ async fn empty_insert() {
         .database(function_name!())
         .collection::<Document>(function_name!());
     match *coll
-        .insert_many(Vec::<Document>::new(), None)
+        .insert_many(Vec::<Document>::new())
         .await
         .expect_err("should get error")
         .kind
@@ -544,7 +532,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
-    coll.find(None, options).await.unwrap();
+    coll.find(doc! {}).with_options(options).await.unwrap();
 
     let events = event_client.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
@@ -615,7 +603,10 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     }
 
     let coll = client.database(name).collection(name);
-    let _: Result<Option<Document>> = coll.find_one_and_delete(doc! {}, options.clone()).await;
+    let _: Result<Option<Document>> = coll
+        .find_one_and_delete(doc! {})
+        .with_options(options.clone())
+        .await;
 
     let events = client.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
@@ -661,10 +652,10 @@ async fn find_one_and_delete_hint_server_version() {
         .database(function_name!())
         .collection::<Document>("coll");
 
-    let options = FindOneAndDeleteOptions::builder()
+    let res = coll
+        .find_one_and_delete(doc! {})
         .hint(Hint::Name(String::new()))
-        .build();
-    let res = coll.find_one_and_delete(doc! {}, options).await;
+        .await;
 
     let req1 = VersionReq::parse("< 4.2").unwrap();
     let req2 = VersionReq::parse("4.2.*").unwrap();
@@ -689,18 +680,15 @@ async fn no_read_preference_to_standalone() {
         return;
     }
 
-    let options = FindOneOptions::builder()
+    client
+        .database(function_name!())
+        .collection::<Document>(function_name!())
+        .find_one(doc! {})
         .selection_criteria(SelectionCriteria::ReadPreference(
             ReadPreference::SecondaryPreferred {
                 options: Default::default(),
             },
         ))
-        .build();
-
-    client
-        .database(function_name!())
-        .collection::<Document>(function_name!())
-        .find_one(None, options)
         .await
         .unwrap();
 
@@ -747,9 +735,9 @@ async fn insert_one_and_find<T>(coll: &Collection<T>, insert_data: T)
 where
     T: Serialize + DeserializeOwned + Clone + PartialEq + Debug + Unpin + Send + Sync,
 {
-    coll.insert_one(insert_data.clone(), None).await.unwrap();
+    coll.insert_one(insert_data.clone()).await.unwrap();
     let result = coll
-        .find_one(to_document(&insert_data).unwrap(), None)
+        .find_one(to_document(&insert_data).unwrap())
         .await
         .unwrap();
     match result {
@@ -778,11 +766,11 @@ async fn typed_insert_many() {
             str: "b".into(),
         },
     ];
-    coll.insert_many(insert_data.clone(), None).await.unwrap();
+    coll.insert_many(insert_data.clone()).await.unwrap();
 
-    let options = FindOptions::builder().sort(doc! { "x": 1 }).build();
     let actual: Vec<UserType> = coll
-        .find(doc! { "x": 2 }, options)
+        .find(doc! { "x": 2 })
+        .sort(doc! { "x": 1 })
         .await
         .unwrap()
         .try_collect()
@@ -803,20 +791,20 @@ async fn typed_find_one_and_replace() {
         x: 1,
         str: "a".into(),
     };
-    coll.insert_one(insert_data.clone(), None).await.unwrap();
+    coll.insert_one(insert_data.clone()).await.unwrap();
 
     let replacement = UserType {
         x: 2,
         str: "b".into(),
     };
     let result = coll
-        .find_one_and_replace(doc! { "x": 1 }, replacement.clone(), None)
+        .find_one_and_replace(doc! { "x": 1 }, replacement.clone())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(result, insert_data);
 
-    let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
+    let result = coll.find_one(doc! { "x": 2 }).await.unwrap().unwrap();
     assert_eq!(result, replacement);
 }
 
@@ -836,12 +824,12 @@ async fn typed_replace_one() {
         x: 2,
         str: "b".into(),
     };
-    coll.insert_one(insert_data, None).await.unwrap();
-    coll.replace_one(doc! { "x": 1 }, replacement.clone(), None)
+    coll.insert_one(insert_data).await.unwrap();
+    coll.replace_one(doc! { "x": 1 }, replacement.clone())
         .await
         .unwrap();
 
-    let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
+    let result = coll.find_one(doc! { "x": 2 }).await.unwrap().unwrap();
     assert_eq!(result, replacement);
 }
 
@@ -857,17 +845,17 @@ async fn typed_returns() {
         x: 1,
         str: "a".into(),
     };
-    coll.insert_one(insert_data.clone(), None).await.unwrap();
+    coll.insert_one(insert_data.clone()).await.unwrap();
 
     let result = coll
-        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } }, None)
+        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } })
         .await
         .unwrap()
         .unwrap();
     assert_eq!(result, insert_data);
 
     let result = coll
-        .find_one_and_delete(doc! { "x": 2 }, None)
+        .find_one_and_delete(doc! { "x": 2 })
         .await
         .unwrap()
         .unwrap();
@@ -895,7 +883,7 @@ async fn count_documents_with_wc() {
         .database(function_name!())
         .collection(function_name!());
 
-    coll.insert_one(doc! {}, None).await.unwrap();
+    coll.insert_one(doc! {}).await.unwrap();
 
     coll.count_documents(doc! {})
         .await
@@ -920,10 +908,10 @@ async fn collection_options_inherited() {
         .database(function_name!())
         .collection_with_options::<Document>(function_name!(), options);
 
-    coll.find(None, None).await.unwrap();
+    coll.find(doc! {}).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
     coll.count_documents(doc! {}).await.unwrap();
@@ -963,7 +951,7 @@ async fn collection_generic_bounds() {
     let coll: Collection<Foo> = client
         .database(function_name!())
         .collection(function_name!());
-    let _result: Result<Option<Foo>> = coll.find_one(None, None).await;
+    let _result: Result<Option<Foo>> = coll.find_one(doc! {}).await;
 
     #[derive(Serialize)]
     struct Bar;
@@ -972,7 +960,7 @@ async fn collection_generic_bounds() {
     let coll: Collection<Bar> = client
         .database(function_name!())
         .collection(function_name!());
-    let _result = coll.insert_one(Bar {}, None).await;
+    let _result = coll.insert_one(Bar {}).await;
 }
 
 /// Verify that a cursor with multiple batches whose last batch isn't full
@@ -985,10 +973,10 @@ async fn cursor_batch_size() {
         .await;
 
     let doc = Document::new();
-    coll.insert_many(vec![&doc; 10], None).await.unwrap();
+    coll.insert_many(vec![&doc; 10]).await.unwrap();
 
     let opts = FindOptions::builder().batch_size(3).build();
-    let cursor_no_session = coll.find(doc! {}, opts.clone()).await.unwrap();
+    let cursor_no_session = coll.find(doc! {}).with_options(opts.clone()).await.unwrap();
     let docs: Vec<_> = cursor_no_session.try_collect().await.unwrap();
     assert_eq!(docs.len(), 10);
 
@@ -999,7 +987,9 @@ async fn cursor_batch_size() {
     }
     let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
-        .find_with_session(doc! {}, opts.clone(), &mut session)
+        .find(doc! {})
+        .with_options(opts.clone())
+        .session(&mut session)
         .await
         .unwrap();
     let mut docs = Vec::new();
@@ -1009,7 +999,9 @@ async fn cursor_batch_size() {
     assert_eq!(docs.len(), 10);
 
     let mut cursor = coll
-        .find_with_session(doc! {}, opts, &mut session)
+        .find(doc! {})
+        .with_options(opts)
+        .session(&mut session)
         .await
         .unwrap();
     let docs: Vec<_> = cursor.stream(&mut session).try_collect().await.unwrap();
@@ -1036,13 +1028,13 @@ async fn invalid_utf8_response() {
     // a document containing a long string with multi-byte unicode characters. taken from a user
     // repro in RUBY-2560.
     let long_unicode_str_doc = doc! {"name":  "(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻(╯°□°)╯︵ ┻━┻"};
-    coll.insert_one(&long_unicode_str_doc, None)
+    coll.insert_one(&long_unicode_str_doc)
         .await
         .expect("first insert of document should succeed");
 
     // test triggering an invalid error message via an insert_one.
     let insert_err = coll
-        .insert_one(&long_unicode_str_doc, None)
+        .insert_one(&long_unicode_str_doc)
         .await
         .expect_err("second insert of document should fail")
         .kind;
@@ -1050,14 +1042,14 @@ async fn invalid_utf8_response() {
 
     // test triggering an invalid error message via an insert_many.
     let insert_err = coll
-        .insert_many([&long_unicode_str_doc], None)
+        .insert_many([&long_unicode_str_doc])
         .await
         .expect_err("second insert of document should fail")
         .kind;
     assert_duplicate_key_error_with_utf8_replacement(&insert_err);
 
     // test triggering an invalid error message via an update_one.
-    coll.insert_one(doc! {"x": 1}, None)
+    coll.insert_one(doc! {"x": 1})
         .await
         .expect("inserting new document should succeed");
 
@@ -1078,7 +1070,7 @@ async fn invalid_utf8_response() {
 
     // test triggering an invalid error message via a replace_one.
     let replace_err = coll
-        .replace_one(doc! {"x": 1}, &long_unicode_str_doc, None)
+        .replace_one(doc! {"x": 1}, &long_unicode_str_doc)
         .await
         .expect_err("replacement with duplicate key should fail")
         .kind;
@@ -1162,13 +1154,10 @@ async fn configure_human_readable_serialization() {
     non_human_readable_collection.drop().await.unwrap();
 
     non_human_readable_collection
-        .insert_one(
-            Data {
-                id: 0,
-                s: StringOrBytes("non human readable!".into()),
-            },
-            None,
-        )
+        .insert_one(Data {
+            id: 0,
+            s: StringOrBytes("non human readable!".into()),
+        })
         .await
         .unwrap();
 
@@ -1176,7 +1165,7 @@ async fn configure_human_readable_serialization() {
     // instead.
     let document_collection = non_human_readable_collection.clone_with_type::<Document>();
     let doc = document_collection
-        .find_one(doc! { "id": 0 }, None)
+        .find_one(doc! { "id": 0 })
         .await
         .unwrap()
         .unwrap();
@@ -1189,13 +1178,12 @@ async fn configure_human_readable_serialization() {
                 id: 1,
                 s: StringOrBytes("non human readable!".into()),
             },
-            None,
         )
         .await
         .unwrap();
 
     let doc = document_collection
-        .find_one(doc! { "id": 1 }, None)
+        .find_one(doc! { "id": 1 })
         .await
         .unwrap()
         .unwrap();
@@ -1211,20 +1199,17 @@ async fn configure_human_readable_serialization() {
     human_readable_collection.drop().await.unwrap();
 
     human_readable_collection
-        .insert_one(
-            Data {
-                id: 0,
-                s: StringOrBytes("human readable!".into()),
-            },
-            None,
-        )
+        .insert_one(Data {
+            id: 0,
+            s: StringOrBytes("human readable!".into()),
+        })
         .await
         .unwrap();
 
     // Proper deserialization to a string demonstrates that the data was correctly serialized as a
     // string.
     human_readable_collection
-        .find_one(doc! { "id": 0 }, None)
+        .find_one(doc! { "id": 0 })
         .await
         .unwrap();
 
@@ -1235,13 +1220,12 @@ async fn configure_human_readable_serialization() {
                 id: 1,
                 s: StringOrBytes("human readable!".into()),
             },
-            None,
         )
         .await
         .unwrap();
 
     human_readable_collection
-        .find_one(doc! { "id": 1 }, None)
+        .find_one(doc! { "id": 1 })
         .await
         .unwrap();
 }
@@ -1277,7 +1261,7 @@ async fn insert_many_document_sequences() {
         rawdoc! { "s": "a".repeat((max_object_size / 2) as usize) },
         rawdoc! { "s": "b".repeat((max_object_size / 2) as usize) },
     ];
-    collection.insert_many(docs, None).await.unwrap();
+    collection.insert_many(docs).await.unwrap();
 
     let event = subscriber
         .filter_map_event(Duration::from_millis(500), |e| match e {
@@ -1305,7 +1289,7 @@ async fn insert_many_document_sequences() {
         docs.push(doc);
     }
     let total_docs = docs.len();
-    collection.insert_many(docs, None).await.unwrap();
+    collection.insert_many(docs).await.unwrap();
 
     let first_event = subscriber
         .filter_map_event(Duration::from_millis(500), |e| match e {

@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{future::IntoFuture, sync::Arc, time::Duration};
 
 use bson::doc;
 
@@ -52,7 +52,7 @@ async fn retry_releases_connection() {
     let collection = client
         .database("retry_releases_connection")
         .collection("retry_releases_connection");
-    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     // Use a connection error to ensure streaming monitor checks get cancelled. Otherwise, we'd have
     // to wait for the entire heartbeatFrequencyMS before the find succeeds.
@@ -60,10 +60,13 @@ async fn retry_releases_connection() {
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    runtime::timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
-        .await
-        .expect("operation should not time out")
-        .expect("find should succeed");
+    runtime::timeout(
+        Duration::from_secs(1),
+        collection.find_one(doc! {}).into_future(),
+    )
+    .await
+    .expect("operation should not time out")
+    .expect("find should succeed");
 }
 
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
@@ -96,7 +99,7 @@ async fn retry_read_pool_cleared() {
     let collection = client
         .database("retry_read_pool_cleared")
         .collection("retry_read_pool_cleared");
-    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     let options = FailCommandOptions::builder()
         .error_code(91)
@@ -110,7 +113,7 @@ async fn retry_read_pool_cleared() {
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = runtime::spawn(async move { coll.find_one(doc! {}, None).await });
+        let task = runtime::spawn(async move { coll.find_one(doc! {}).await });
         tasks.push(task);
     }
 
@@ -197,7 +200,7 @@ async fn retry_read_different_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_read_different_mongos")
-        .find(doc! {}, None)
+        .find(doc! {})
         .await;
     assert!(result.is_err());
     let events = client.get_command_events(&["find"]);
@@ -254,7 +257,7 @@ async fn retry_read_same_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_read_same_mongos")
-        .find(doc! {}, None)
+        .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
     let events = client.get_command_events(&["find"]);

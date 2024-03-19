@@ -7,10 +7,10 @@ use futures::stream::StreamExt;
 
 use crate::{
     bson::{doc, Bson},
-    coll::options::{CountOptions, InsertManyOptions},
+    coll::options::CountOptions,
     error::Result,
     event::sdam::SdamEvent,
-    options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
+    options::{FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
@@ -58,16 +58,12 @@ macro_rules! for_each_op {
         // collection operations
         $test_func(
             "insert",
-            collection_op!($test_name, coll, coll.insert_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.insert_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
             "insert",
-            collection_op!(
-                $test_name,
-                coll,
-                coll.insert_many(vec![doc! { "x": 1 }], None)
-            ),
+            collection_op!($test_name, coll, coll.insert_many(vec![doc! { "x": 1 }])),
         )
         .await;
         $test_func(
@@ -75,7 +71,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.replace_one(doc! { "x": 1 }, doc! { "x": 2 }, None)
+                coll.replace_one(doc! { "x": 1 }, doc! { "x": 2 })
             ),
         )
         .await;
@@ -109,10 +105,15 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "findAndModify",
+            collection_op!($test_name, coll, coll.find_one_and_delete(doc! { "x": 1 })),
+        )
+        .await;
+        $test_func(
+            "findAndModify",
             collection_op!(
                 $test_name,
                 coll,
-                coll.find_one_and_delete(doc! { "x": 1 }, None)
+                coll.find_one_and_update(doc! {}, doc! { "$inc": { "x": 1 } })
             ),
         )
         .await;
@@ -121,16 +122,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.find_one_and_update(doc! {}, doc! { "$inc": { "x": 1 } }, None)
-            ),
-        )
-        .await;
-        $test_func(
-            "findAndModify",
-            collection_op!(
-                $test_name,
-                coll,
-                coll.find_one_and_replace(doc! {}, doc! {"x": 1}, None)
+                coll.find_one_and_replace(doc! {}, doc! {"x": 1})
             ),
         )
         .await;
@@ -145,12 +137,12 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "find",
-            collection_op!($test_name, coll, coll.find(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.find(doc! { "x": 1 })),
         )
         .await;
         $test_func(
             "find",
-            collection_op!($test_name, coll, coll.find_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.find_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
@@ -362,7 +354,7 @@ async fn cluster_time_in_commands() {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
-            .find(doc! {}, None)
+            .find(doc! {})
             .await
     })
     .await;
@@ -371,7 +363,7 @@ async fn cluster_time_in_commands() {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
-            .insert_one(doc! {}, None)
+            .insert_one(doc! {})
             .await
     })
     .await;
@@ -416,7 +408,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    coll.insert_many(vec![doc! {}, doc! {}], None)
+    coll.insert_many(vec![doc! {}, doc! {}])
         .await
         .expect("insert should succeed");
 
@@ -424,7 +416,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
-    let mut cursor = coll.find(doc! {}, None).await.expect("find should succeed");
+    let mut cursor = coll.find(doc! {}).await.expect("find should succeed");
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
     let (find_started, _) = client.get_successful_command_execution("find");
@@ -457,7 +449,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
     for _ in 0..5 {
-        coll.insert_one(doc! {}, None)
+        coll.insert_one(doc! {})
             .await
             .expect("insert should succeed");
     }
@@ -466,9 +458,9 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
     tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
-    let options = FindOptions::builder().batch_size(3).build();
     let mut cursor = coll
-        .find(doc! {}, options)
+        .find(doc! {})
+        .batch_size(3)
         .await
         .expect("find should succeed");
 
@@ -509,10 +501,10 @@ async fn find_and_getmore_share_session() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    let options = InsertManyOptions::builder()
-        .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-        .build();
-    coll.insert_many(vec![doc! {}; 3], options).await.unwrap();
+    coll.insert_many(vec![doc! {}; 3])
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
 
     let read_preferences: Vec<ReadPreference> = vec![
         ReadPreference::Primary,
@@ -545,7 +537,8 @@ async fn find_and_getmore_share_session() {
         let mut cursor;
         loop {
             cursor = coll
-                .find(doc! {}, options.clone())
+                .find(doc! {})
+                .with_options(options.clone())
                 .await
                 .expect("find should succeed");
             if cursor.has_next() {

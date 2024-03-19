@@ -3,7 +3,6 @@ use std::{collections::HashMap, iter, sync::Arc, time::Duration};
 use crate::{
     bson::{doc, Document},
     client::options::ServerAddress,
-    coll::options::FindOptions,
     error::{
         BulkWriteError,
         BulkWriteFailure,
@@ -88,7 +87,7 @@ async fn command_logging_truncation_default_limit() {
     let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
 
     let docs = iter::repeat(doc! { "x": "y" }).take(100);
-    coll.insert_many(docs, None)
+    coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
@@ -105,7 +104,7 @@ async fn command_logging_truncation_default_limit() {
     let reply = succeeded.get_value_as_string("reply");
     assert!(reply.len() <= DEFAULT_MAX_DOCUMENT_LENGTH_BYTES + 3); // +3 for trailing "..."
 
-    coll.find(None, None).await.expect("find should succeed");
+    coll.find(doc! {}).await.expect("find should succeed");
     let succeeded = tracing_subscriber
         .wait_for_event(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
@@ -179,7 +178,7 @@ async fn command_logging_truncation_mid_codepoint() {
     let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
 
     let docs = iter::repeat(doc! { "🤔": "🤔🤔🤔🤔🤔🤔" }).take(10);
-    coll.insert_many(docs, None)
+    coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
@@ -196,10 +195,8 @@ async fn command_logging_truncation_mid_codepoint() {
     // trailing "..."
     assert_eq!(command.len(), 221);
 
-    let find_options = FindOptions::builder()
+    coll.find(doc! {})
         .projection(doc! { "_id": 0, "🤔": 1 })
-        .build();
-    coll.find(None, find_options)
         .await
         .expect("find should succeed");
     let succeeded = tracing_subscriber

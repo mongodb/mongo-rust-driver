@@ -7,7 +7,6 @@ use serde::Deserialize;
 
 use crate::{
     cmap::DEFAULT_MAX_POOL_SIZE,
-    coll::options::FindOptions,
     error::Result,
     event::cmap::CmapEvent,
     options::ServerAddress,
@@ -156,7 +155,7 @@ async fn load_balancing_test() {
     setup_client
         .database("load_balancing_test")
         .collection("load_balancing_test")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .unwrap();
 
@@ -178,7 +177,7 @@ async fn load_balancing_test() {
                 .collection::<Document>("load_balancing_test");
             handles.push(runtime::spawn(async move {
                 for _ in 0..iterations {
-                    collection.find_one(None, None).await?;
+                    collection.find_one(doc! {}).await?;
                 }
                 Ok(())
             }))
@@ -231,13 +230,11 @@ async fn load_balancing_test() {
             let client = client.clone();
             let selector = selector.clone();
             runtime::spawn(async move {
-                let options = FindOptions::builder()
-                    .selection_criteria(SelectionCriteria::Predicate(selector))
-                    .build();
                 client
                     .database("load_balancing_test")
                     .collection::<Document>("load_balancing_test")
-                    .find(doc! { "$where": "sleep(500) && true" }, options)
+                    .find(doc! { "$where": "sleep(500) && true" })
+                    .selection_criteria(SelectionCriteria::Predicate(selector))
                     .await
                     .unwrap();
             });

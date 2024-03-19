@@ -23,7 +23,7 @@ e.g.
 # let client = Client::with_uri_str("mongodb://example.com").await?;
 let collection = client.database("foo").collection("bar");
 let handle = tokio::task::spawn(async move {
-    collection.insert_one(doc! { "x": 1 }, None).await
+    collection.insert_one(doc! { "x": 1 }).await
 });
 
 tokio::time::timeout(Duration::from_secs(5), handle).await???;

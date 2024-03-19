@@ -386,20 +386,19 @@ impl TestOperation for Find {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let act = collection
+                .find(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match session {
                 Some(session) => {
-                    let mut cursor = collection
-                        .find_with_session(self.filter.clone(), self.options.clone(), session)
-                        .await?;
+                    let mut cursor = act.session(&mut *session).await?;
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
                 None => {
-                    let cursor = collection
-                        .find(self.filter.clone(), self.options.clone())
-                        .await?;
+                    let cursor = act.await?;
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
@@ -426,14 +425,11 @@ impl TestOperation for InsertMany {
         let options = self.options.clone();
 
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .insert_many_with_session(documents, options, session)
-                        .await?
-                }
-                None => collection.insert_many(documents, options).await?,
-            };
+            let result = collection
+                .insert_many(documents)
+                .with_options(options)
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let ids: HashMap<String, Bson> = result
                 .inserted_ids
                 .into_iter()
@@ -462,14 +458,11 @@ impl TestOperation for InsertOne {
         let document = self.document.clone();
         let options = self.options.clone();
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .insert_one_with_session(document, options, session)
-                        .await?
-                }
-                None => collection.insert_one(document, options).await?,
-            };
+            let result = collection
+                .insert_one(document)
+                .with_options(options)
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -685,17 +678,12 @@ impl TestOperation for FindOne {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
+            let action = collection
+                .find_one(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone());
             let result = match session {
-                Some(session) => {
-                    collection
-                        .find_one_with_session(self.filter.clone(), self.options.clone(), session)
-                        .await?
-                }
-                None => {
-                    collection
-                        .find_one(self.filter.clone(), self.options.clone())
-                        .await?
-                }
+                Some(session) => action.session(session).await?,
+                None => action.await?,
             };
             match result {
                 Some(result) => Ok(Some(Bson::from(result))),
@@ -783,27 +771,11 @@ impl TestOperation for ReplaceOne {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .replace_one_with_session(
-                            self.filter.clone(),
-                            self.replacement.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .replace_one(
-                            self.filter.clone(),
-                            self.replacement.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
-            };
+            let result = collection
+                .replace_one(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -826,27 +798,11 @@ impl TestOperation for FindOneAndUpdate {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .find_one_and_update_with_session(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .find_one_and_update(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
-            };
+            let result = collection
+                .find_one_and_update(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -869,27 +825,11 @@ impl TestOperation for FindOneAndReplace {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .find_one_and_replace_with_session(
-                            self.filter.clone(),
-                            self.replacement.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .find_one_and_replace(
-                            self.filter.clone(),
-                            self.replacement.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
-            };
+            let result = collection
+                .find_one_and_replace(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }
@@ -911,22 +851,11 @@ impl TestOperation for FindOneAndDelete {
         session: Option<&'a mut ClientSession>,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let result = match session {
-                Some(session) => {
-                    collection
-                        .find_one_and_delete_with_session(
-                            self.filter.clone(),
-                            self.options.clone(),
-                            session,
-                        )
-                        .await?
-                }
-                None => {
-                    collection
-                        .find_one_and_delete(self.filter.clone(), self.options.clone())
-                        .await?
-                }
-            };
+            let result = collection
+                .find_one_and_delete(self.filter.clone())
+                .with_options(self.options.clone())
+                .optional(session, |a, s| a.session(s))
+                .await?;
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
         }

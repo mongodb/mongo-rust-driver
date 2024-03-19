@@ -36,7 +36,7 @@ use super::ClientSession;
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
 /// let mut change_stream = coll.watch().run()?;
-/// coll.insert_one(doc! { "x": 1 }, None)?;
+/// coll.insert_one(doc! { "x": 1 }).run()?;
 /// for event in change_stream {
 ///     let event = event?;
 ///     println!("operation performed: {:?}, document: {:?}", event.operation_type, event.full_document);
@@ -192,7 +192,7 @@ where
     /// let mut cs = coll.watch().session(&mut session).run()?;
     /// while let Some(event) = cs.next(&mut session)? {
     ///     let id = bson::to_bson(&event.id)?;
-    ///     other_coll.insert_one_with_session(doc! { "id": id }, None, &mut session)?;
+    ///     other_coll.insert_one(doc! { "id": id }).session(&mut session).run()?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())
     /// # };

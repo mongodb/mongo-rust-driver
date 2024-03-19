@@ -64,11 +64,10 @@ async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
         .await?;
 
     events
-        .insert_one_with_session(
-            doc! { "employee": 3, "status": { "new": "Inactive", "old": "Active" } },
-            None,
-            session,
+        .insert_one(
+            doc! { "employee": 3, "status": { "new": "Inactive", "old": "Active" } }
         )
+        .session(&mut *session)
         .await?;
 
     commit_with_retry(session).await

@@ -120,7 +120,7 @@ impl<'a> Update<'a> {
         comment: Bson,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
@@ -143,7 +143,6 @@ action_impl! {
                 self.update,
                 self.multi,
                 self.options,
-                self.coll.human_readable_serialization(),
             );
             self.coll.client().execute_operation(op, self.session).await
         }

@@ -3,19 +3,7 @@ use std::time::Duration;
 use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
-    options::{
-        Acknowledgment,
-        FindOneAndDeleteOptions,
-        FindOneAndReplaceOptions,
-        FindOneAndUpdateOptions,
-        FindOneOptions,
-        InsertManyOptions,
-        InsertOneOptions,
-        ReadConcern,
-        ReplaceOptions,
-        TransactionOptions,
-        WriteConcern,
-    },
+    options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
     test::{EventClient, TestClient},
     Collection,
 };
@@ -112,9 +100,9 @@ async fn inconsistent_write_concern_rejected() {
         journal: true.into(),
         w_timeout: None,
     };
-    let options = InsertOneOptions::builder().write_concern(wc).build();
     let error = coll
-        .insert_one(doc! {}, options)
+        .insert_one(doc! {})
+        .write_concern(wc)
         .await
         .expect_err("insert should fail");
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
@@ -131,9 +119,9 @@ async fn unacknowledged_write_concern_rejected() {
         journal: false.into(),
         w_timeout: None,
     };
-    let options = InsertOneOptions::builder().write_concern(wc).build();
     let error = coll
-        .insert_one(doc! {}, options)
+        .insert_one(doc! {})
+        .write_concern(wc)
         .await
         .expect_err("insert should fail");
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
@@ -158,17 +146,15 @@ async fn snapshot_read_concern() {
             .read_concern(ReadConcern::snapshot())
             .build();
         session.start_transaction(options).await.unwrap();
-        let result = coll.find_one_with_session(None, None, &mut session).await;
+        let result = coll.find_one(doc! {}).session(&mut session).await;
         assert!(result.is_ok());
         assert_event_contains_read_concern(&client).await;
     }
 
     if client.server_version_lt(4, 9) {
-        let options = FindOneOptions::builder()
-            .read_concern(ReadConcern::snapshot())
-            .build();
         let error = coll
-            .find_one(None, options)
+            .find_one(doc! {})
+            .read_concern(ReadConcern::snapshot())
             .await
             .expect_err("non-transaction find one with snapshot read concern should fail");
         // ensure that an error from the server is returned
@@ -201,32 +187,24 @@ async fn command_contains_write_concern_insert_one() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(
-        doc! { "foo": "bar" },
-        InsertOneOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.insert_one(
-        doc! { "foo": "bar" },
-        InsertOneOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.insert_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "insert"),
@@ -250,32 +228,24 @@ async fn command_contains_write_concern_insert_many() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(
-        &[doc! { "foo": "bar" }],
-        InsertManyOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.insert_many(
-        &[doc! { "foo": "bar" }],
-        InsertManyOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_many(&[doc! { "foo": "bar" }])
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.insert_many(&[doc! { "foo": "bar" }])
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "insert"),
@@ -299,7 +269,7 @@ async fn command_contains_write_concern_update_one() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.update_one(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
         .write_concern(
             WriteConcern::builder()
@@ -341,7 +311,7 @@ async fn command_contains_write_concern_update_many() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.update_many(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
@@ -385,35 +355,25 @@ async fn command_contains_write_concern_replace_one() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.replace_one(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        ReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.replace_one(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        ReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
+    coll.replace_one(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.replace_one(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -437,7 +397,7 @@ async fn command_contains_write_concern_delete_one() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_one(doc! { "foo": "bar" })
@@ -481,7 +441,7 @@ async fn command_contains_write_concern_delete_many() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_many(doc! { "foo": "bar" })
@@ -493,7 +453,7 @@ async fn command_contains_write_concern_delete_many() {
         )
         .await
         .unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_many(doc! { "foo": "bar" })
@@ -528,35 +488,27 @@ async fn command_contains_write_concern_find_one_and_delete() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
-    coll.find_one_and_delete(
-        doc! { "foo": "bar" },
-        FindOneAndDeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_delete(
-        doc! { "foo": "bar" },
-        FindOneAndDeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_delete(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_delete(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),
@@ -580,37 +532,27 @@ async fn command_contains_write_concern_find_one_and_replace() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
-    coll.find_one_and_replace(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        FindOneAndReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_replace(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        FindOneAndReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),
@@ -634,37 +576,27 @@ async fn command_contains_write_concern_find_one_and_update() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
-    coll.find_one_and_update(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "fun" } },
-        FindOneAndUpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_update(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "fun" } },
-        FindOneAndUpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),
@@ -688,7 +620,7 @@ async fn command_contains_write_concern_aggregate() {
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.aggregate(vec![
         doc! { "$match": { "foo": "bar" } },
         doc! { "$addFields": { "foo": "baz" } },
@@ -739,7 +671,7 @@ async fn command_contains_write_concern_drop() {
 
     coll.drop().await.unwrap();
     client.clear_cached_events();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.drop()
         .write_concern(
             WriteConcern::builder()
@@ -749,7 +681,7 @@ async fn command_contains_write_concern_drop() {
         )
         .await
         .unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.drop()
         .write_concern(
             WriteConcern::builder()

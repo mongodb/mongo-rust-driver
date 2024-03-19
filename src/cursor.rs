@@ -67,7 +67,7 @@ pub(crate) use common::{
 /// used in conjunction with the `?` operator.
 ///
 /// ```rust
-/// # use mongodb::{bson::Document, Client, error::Result};
+/// # use mongodb::{bson::{Document, doc}, Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
@@ -75,7 +75,7 @@ pub(crate) use common::{
 /// #
 /// use futures::stream::{StreamExt, TryStreamExt};
 ///
-/// let mut cursor = coll.find(None, None).await?;
+/// let mut cursor = coll.find(doc! {}).await?;
 /// // regular Stream uses next() and iterates over Option<Result<T>>
 /// while let Some(doc) = cursor.next().await {
 ///   println!("{}", doc?)
@@ -83,7 +83,7 @@ pub(crate) use common::{
 /// // regular Stream uses collect() and collects into a Vec<Result<T>>
 /// let v: Vec<Result<_>> = cursor.collect().await;
 ///
-/// let mut cursor = coll.find(None, None).await?;
+/// let mut cursor = coll.find(doc! {}).await?;
 /// // TryStream uses try_next() and iterates over Result<Option<T>>
 /// while let Some(doc) = cursor.try_next().await? {
 ///   println!("{}", doc)
@@ -190,11 +190,11 @@ impl<T> Cursor<T> {
     /// calling [`Cursor::advance`] first or after [`Cursor::advance`] returns an error / false.
     ///
     /// ```
-    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # use mongodb::{Client, bson::{Document, doc}, error::Result};
     /// # async fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find(None, None).await?;
+    /// let mut cursor = coll.find(doc! {}).await?;
     /// while cursor.advance().await? {
     ///     println!("{:?}", cursor.current());
     /// }
@@ -223,11 +223,11 @@ impl<T> Cursor<T> {
     /// or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # use mongodb::{Client, bson::{Document, doc}, error::Result};
     /// # async fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find(None, None).await?;
+    /// let mut cursor = coll.find(doc! {}).await?;
     /// while cursor.advance().await? {
     ///     println!("{:?}", cursor.current());
     /// }
@@ -246,7 +246,7 @@ impl<T> Cursor<T> {
     /// true or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{Client, error::Result, bson::doc};
     /// # async fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
     /// # let db = client.database("foo");
@@ -259,7 +259,7 @@ impl<T> Cursor<T> {
     /// }
     ///
     /// let coll = db.collection::<Cat>("cat");
-    /// let mut cursor = coll.find(None, None).await?;
+    /// let mut cursor = coll.find(doc! {}).await?;
     /// while cursor.advance().await? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }

@@ -5,7 +5,7 @@ use futures::stream::StreamExt;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{Acknowledgment, ClientOptions, FindOptions, InsertManyOptions, WriteConcern},
+    options::{Acknowledgment, ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, util::EventClient},
     Collection,
@@ -57,21 +57,12 @@ async fn get_more() {
         }
 
         let docs = vec![doc! { "x": 1 }; 5];
-        coll.insert_many(
-            docs,
-            Some(
-                InsertManyOptions::builder()
-                    .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-                    .build(),
-            ),
-        )
-        .await
-        .unwrap();
-
-        let mut cursor = coll
-            .find(None, Some(FindOptions::builder().batch_size(2).build()))
+        coll.insert_many(docs)
+            .write_concern(WriteConcern::majority())
             .await
             .unwrap();
+
+        let mut cursor = coll.find(doc! {}).batch_size(2).await.unwrap();
 
         let db = client.database("admin");
 
@@ -131,7 +122,7 @@ async fn notwritableprimary_keep_pool() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -140,7 +131,7 @@ async fn notwritableprimary_keep_pool() {
             "insert should have failed"
         );
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 
@@ -183,7 +174,7 @@ async fn notwritableprimary_reset_pool() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -195,7 +186,7 @@ async fn notwritableprimary_reset_pool() {
         tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
     }
@@ -232,7 +223,7 @@ async fn shutdown_in_progress() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -244,7 +235,7 @@ async fn shutdown_in_progress() {
         tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
     }
@@ -277,7 +268,7 @@ async fn interrupted_at_shutdown() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -289,7 +280,7 @@ async fn interrupted_at_shutdown() {
         tokio::time::sleep(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 

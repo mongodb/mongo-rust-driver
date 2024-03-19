@@ -45,21 +45,20 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     let mut ops = vec![];
 
     ops.push(op!("insert", false, |coll, session| {
-        coll.insert_one_with_session(doc! { "x": 1 }, None, session)
+        coll.insert_one(doc! { "x": 1 }).session(session)
     }));
 
     ops.push(op!("insert", false, |coll, session| {
-        coll.insert_many_with_session(vec![doc! { "x": 1 }], None, session)
+        coll.insert_many(vec![doc! { "x": 1 }]).session(session)
     }));
 
     ops.push(op!("find", true, |coll, session| coll
-        .find_one_with_session(doc! { "x": 1 }, None, session)));
+        .find_one(doc! { "x": 1 })
+        .session(session)));
 
-    ops.push(op!("find", true, |coll, session| coll.find_with_session(
-        doc! { "x": 1 },
-        None,
-        session
-    )));
+    ops.push(op!("find", true, |coll, session| coll
+        .find(doc! { "x": 1 })
+        .session(session)));
 
     ops.push(op!("update", false, |coll, s| coll
         .update_one(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
@@ -70,12 +69,8 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
-        .replace_one_with_session(
-            doc! { "x": 1 },
-            doc! { "x": 2 },
-            None,
-            s,
-        )));
+        .replace_one(doc! { "x": 1 }, doc! { "x": 2 },)
+        .session(s)));
 
     ops.push(op!("delete", false, |coll, s| coll
         .delete_one(doc! { "x": 1 })
@@ -86,23 +81,16 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
-        .find_one_and_update_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
-        .find_one_and_replace_with_session(
-            doc! { "x": 1 },
-            doc! { "x": 1  },
-            None,
-            s,
-        )));
+        .find_one_and_replace(doc! { "x": 1 }, doc! { "x": 1  },)
+        .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
-        .find_one_and_delete_with_session(doc! { "x": 1 }, None, s,)));
+        .find_one_and_delete(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("aggregate", true, |coll, s| coll
         .count_documents(doc! { "x": 1 })
@@ -242,9 +230,7 @@ async fn read_includes_after_cluster_time() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
         let mut session = client.start_session().await.unwrap();
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
@@ -290,9 +276,7 @@ async fn find_after_write_includes_after_cluster_time() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
 
         let command_started = client.get_command_started_events(&["find"]).pop().unwrap();
         assert_eq!(
@@ -404,9 +388,7 @@ async fn omit_default_read_concern_level() {
             .causal_consistency(true)
             .await
             .unwrap();
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
@@ -451,9 +433,7 @@ async fn test_causal_consistency_read_concern_merge() {
 
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
@@ -484,7 +464,7 @@ async fn omit_cluster_time_standalone() {
         .database("causal_consistency_11")
         .collection::<Document>("causal_consistency_11");
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
 
     let (started, _) = client.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap_err();
@@ -503,7 +483,7 @@ async fn cluster_time_sent_in_commands() {
         .database("causal_consistency_12")
         .collection::<Document>("causal_consistency_12");
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
 
     let (started, _) = client.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap();

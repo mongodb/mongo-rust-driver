@@ -98,7 +98,7 @@
 //! ];
 //!
 //! // Insert some documents into the "mydb.books" collection.
-//! collection.insert_many(docs, None).await?;
+//! collection.insert_many(docs).await?;
 //! # Ok(()) }
 //! ```
 //!
@@ -137,7 +137,7 @@
 //! ];
 //!
 //! // Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
-//! typed_collection.insert_many(books, None).await?;
+//! typed_collection.insert_many(books).await?;
 //! # Ok(()) }
 //! ```
 //!
@@ -166,8 +166,10 @@
 //!
 //! // Query the books in the collection with a filter and an option.
 //! let filter = doc! { "author": "George Orwell" };
-//! let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-//! let mut cursor = typed_collection.find(filter, find_options).await?;
+//! let mut cursor = typed_collection
+//!     .find(filter)
+//!     .sort(doc! { "title": 1 })
+//!     .await?;
 //!
 //! // Iterate over the results of the cursor.
 //! while let Some(book) = cursor.try_next().await? {
@@ -218,9 +220,9 @@
 //! ];
 //!
 //! // Insert some books into the "mydb.books" collection.
-//! collection.insert_many(docs, None)?;
+//! collection.insert_many(docs).run()?;
 //!
-//! let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
+//! let cursor = collection.find(doc! { "author": "George Orwell" }).run()?;
 //! for result in cursor {
 //!     println!("title: {}", result?.title);
 //! }
@@ -256,7 +258,7 @@
 //! # let client = Client::with_uri_str("mongodb://example.com").await?;
 //! let collection = client.database("foo").collection("bar");
 //! let handle = tokio::task::spawn(async move {
-//!     collection.insert_one(doc! { "x": 1 }, None).await
+//!     collection.insert_one(doc! { "x": 1 }).await
 //! });
 //!
 //! tokio::time::timeout(Duration::from_secs(5), handle).await???;

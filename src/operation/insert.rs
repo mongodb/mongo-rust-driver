@@ -1,10 +1,6 @@
-#[cfg(test)]
-mod test;
-
 use std::{collections::HashMap, convert::TryInto};
 
-use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocumentBuf};
-use serde::Serialize;
+use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocument, RawDocumentBuf};
 
 use crate::{
     bson::rawdoc,
@@ -15,29 +11,26 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
-    serde_util,
     Namespace,
 };
 
 use super::{COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
 
 #[derive(Debug)]
-pub(crate) struct Insert<'a, T> {
+pub(crate) struct Insert<'a> {
     ns: Namespace,
-    documents: Vec<&'a T>,
+    documents: Vec<&'a RawDocument>,
     inserted_ids: Vec<Bson>,
     options: InsertManyOptions,
     encrypted: bool,
-    human_readable_serialization: bool,
 }
 
-impl<'a, T> Insert<'a, T> {
+impl<'a> Insert<'a> {
     pub(crate) fn new(
         ns: Namespace,
-        documents: Vec<&'a T>,
+        documents: Vec<&'a RawDocument>,
         options: Option<InsertManyOptions>,
         encrypted: bool,
-        human_readable_serialization: bool,
     ) -> Self {
         let mut options = options.unwrap_or_default();
         if options.ordered.is_none() {
@@ -50,12 +43,11 @@ impl<'a, T> Insert<'a, T> {
             documents,
             inserted_ids: vec![],
             encrypted,
-            human_readable_serialization,
         }
     }
 }
 
-impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
+impl<'a> OperationWithDefaults for Insert<'a> {
     type O = InsertManyResult;
     type Command = RawDocumentBuf;
 
@@ -69,14 +61,13 @@ impl<'a, T: Serialize> OperationWithDefaults for Insert<'a, T> {
         let max_doc_sequence_size =
             Checked::<usize>::try_from(description.max_message_size_bytes)? - COMMAND_OVERHEAD_SIZE;
 
-        for (i, d) in self
+        for (i, &d) in self
             .documents
             .iter()
             .take(Checked::new(description.max_write_batch_size).try_into()?)
             .enumerate()
         {
-            let mut doc =
-                serde_util::to_raw_document_buf_with_options(d, self.human_readable_serialization)?;
+            let mut doc = d.to_owned();
             let id = match doc.get("_id")? {
                 Some(b) => b.try_into()?,
                 None => {

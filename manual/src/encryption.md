@@ -187,16 +187,16 @@ async fn main() -> Result<()> {
     // Clear old data.
     coll.drop().await?;
 
-    coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+    coll.insert_one(doc! { "encryptedField": "123456789" })
         .await?;
-    println!("Decrypted document: {:?}", coll.find_one(None, None).await?);
+    println!("Decrypted document: {:?}", coll.find_one(doc! {}).await?);
     let unencrypted_coll = Client::with_uri_str(URI)
         .await?
         .database(&encrypted_namespace.db)
         .collection::<Document>(&encrypted_namespace.coll);
     println!(
         "Encrypted document: {:?}",
-        unencrypted_coll.find_one(None, None).await?
+        unencrypted_coll.find_one(doc! {}).await?
     );
 
     Ok(())
@@ -294,19 +294,19 @@ async fn main() -> Result<()> {
         .validator(doc! { "$jsonSchema": schema })
         .await?;
 
-    coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+    coll.insert_one(doc! { "encryptedField": "123456789" })
         .await?;
-    println!("Decrypted document: {:?}", coll.find_one(None, None).await?);
+    println!("Decrypted document: {:?}", coll.find_one(doc! {}).await?);
     let unencrypted_coll = Client::with_uri_str(URI)
         .await?
         .database(&encrypted_namespace.db)
         .collection::<Document>(&encrypted_namespace.coll);
     println!(
         "Encrypted document: {:?}",
-        unencrypted_coll.find_one(None, None).await?
+        unencrypted_coll.find_one(doc! {}).await?
     );
     // This would return a Write error with the message "Document failed validation".
-    // unencrypted_coll.insert_one(doc! { "encryptedField": "123456789" }, None)
+    // unencrypted_coll.insert_one(doc! { "encryptedField": "123456789" })
     //    .await?;
 
     Ok(())
@@ -407,11 +407,10 @@ async fn main() -> Result<()> {
     db.create_collection("encryptedCollection").await?;
     coll.insert_one(
         doc! { "_id": 1, "firstName": "Jane", "lastName": "Doe" },
-        None,
     )
     .await?;
     let docs: Vec<_> = coll
-        .find(doc! {"firstName": "Jane"}, None)
+        .find(doc! {"firstName": "Jane"})
         .await?
         .try_collect()
         .await?;
@@ -540,7 +539,6 @@ async fn main() -> Result<()> {
             "encryptedIndexed": insert_payload_indexed,
             "encryptedUnindexed": insert_payload_unindexed,
         },
-        None,
     )
     .await?;
 
@@ -556,7 +554,7 @@ async fn main() -> Result<()> {
     // Find the document we inserted using the encrypted payload.
     // The returned document is automatically decrypted.
     let doc = coll
-        .find_one(doc! { "encryptedIndexed": find_payload }, None)
+        .find_one(doc! { "encryptedIndexed": find_payload })
         .await?;
     println!("Returned document: {:?}", doc);
 
@@ -634,9 +632,9 @@ async fn main() -> Result<()> {
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
         .await?;
-    coll.insert_one(doc! { "encryptedField": encrypted_field }, None)
+    coll.insert_one(doc! { "encryptedField": encrypted_field })
         .await?;
-    let mut doc = coll.find_one(None, None).await?.unwrap();
+    let mut doc = coll.find_one(doc! {}).await?.unwrap();
     println!("Encrypted document: {:?}", doc);
 
     // Explicitly decrypt the field:
@@ -735,10 +733,10 @@ async fn main() -> Result<()> {
             Algorithm::AeadAes256CbcHmacSha512Deterministic,
         )
         .await?;
-    coll.insert_one(doc! { "encryptedField": encrypted_field }, None)
+    coll.insert_one(doc! { "encryptedField": encrypted_field })
         .await?;
     // Automatically decrypts any encrypted fields.
-    let doc = coll.find_one(None, None).await?.unwrap();
+    let doc = coll.find_one(doc! {}).await?.unwrap();
     println!("Decrypted document: {:?}", doc);
     let unencrypted_coll = Client::with_uri_str(URI)
         .await?
@@ -746,7 +744,7 @@ async fn main() -> Result<()> {
         .collection::<Document>("coll");
     println!(
         "Encrypted document: {:?}",
-        unencrypted_coll.find_one(None, None).await?
+        unencrypted_coll.find_one(doc! {}).await?
     );
 
     Ok(())

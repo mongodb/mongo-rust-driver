@@ -66,7 +66,7 @@ impl<'a> CreateCollection<'a> {
         encrypted_fields: Document,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self

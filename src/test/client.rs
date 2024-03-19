@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Bson},
-    coll::options::FindOptions,
     error::{CommandError, Error, ErrorKind},
     event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -97,7 +96,7 @@ async fn connection_drop_during_read() {
     let db = client.database("test");
 
     db.collection(function_name!())
-        .insert_one(doc! { "x": 1 }, None)
+        .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
 
@@ -179,7 +178,7 @@ async fn list_databases() {
         let db = client.database(name);
 
         db.collection("foo")
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -224,7 +223,7 @@ async fn list_database_names() {
         let db = client.database(name);
 
         db.collection("foo")
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -604,7 +603,7 @@ async fn x509_auth() {
     client
         .database(function_name!())
         .collection::<Document>(function_name!())
-        .find_one(None, None)
+        .find_one(doc! {})
         .await
         .unwrap();
 }
@@ -633,7 +632,7 @@ async fn plain_auth() {
     let client = Client::with_options(options).unwrap();
     let coll = client.database("ldap").collection("test");
 
-    let doc = coll.find_one(None, None).await.unwrap().unwrap();
+    let doc = coll.find_one(doc! {}).await.unwrap().unwrap();
 
     #[derive(Debug, Deserialize, PartialEq)]
     struct TestDocument {
@@ -683,7 +682,7 @@ async fn retry_commit_txn_check_out() {
     setup_client
         .database("retry_commit_txn_check_out")
         .collection("retry_commit_txn_check_out")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .unwrap();
 
@@ -702,7 +701,8 @@ async fn retry_commit_txn_check_out() {
     client
         .database("retry_commit_txn_check_out")
         .collection("retry_commit_txn_check_out")
-        .insert_one_with_session(doc! {}, None, &mut session)
+        .insert_one(doc! {})
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -811,15 +811,12 @@ async fn manual_shutdown_with_resources() {
     let db = client.database("shutdown_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
-    coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
+    coll.insert_many([doc! {}, doc! {}]).await.unwrap();
     let bucket = db.gridfs_bucket(None);
     // Scope to force drop of resources
     {
         // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
-        let _cursor = coll
-            .find(None, FindOptions::builder().batch_size(1).build())
-            .await
-            .unwrap();
+        let _cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
         // Similarly, sessions need an in-progress transaction to have cleanup.
         let mut session = client.start_session().await.unwrap();
         if session.start_transaction(None).await.is_err() {
@@ -828,7 +825,8 @@ async fn manual_shutdown_with_resources() {
             return;
         }
         if coll
-            .insert_one_with_session(doc! {}, None, &mut session)
+            .insert_one(doc! {})
+            .session(&mut session)
             .await
             .is_err()
         {
@@ -874,20 +872,18 @@ async fn manual_shutdown_immediate_with_resources() {
     let db = client.database("shutdown_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
-    coll.insert_many([doc! {}, doc! {}], None).await.unwrap();
+    coll.insert_many([doc! {}, doc! {}]).await.unwrap();
     let bucket = db.gridfs_bucket(None);
 
     // Resources are scoped to past the `shutdown_immediate`.
 
     // Exhausted cursors don't need cleanup, so make sure there's more than one batch to fetch
-    let _cursor = coll
-        .find(None, FindOptions::builder().batch_size(1).build())
-        .await
-        .unwrap();
+    let _cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
     // Similarly, sessions need an in-progress transaction to have cleanup.
     let mut session = client.start_session().await.unwrap();
     session.start_transaction(None).await.unwrap();
-    coll.insert_one_with_session(doc! {}, None, &mut session)
+    coll.insert_one(doc! {})
+        .session(&mut session)
         .await
         .unwrap();
     let _stream = bucket.open_upload_stream("test", None);
@@ -921,17 +917,13 @@ async fn find_one_and_delete_serde_consistency() {
         problematic: vec![0, 1, 2, 3, 4, 5, 6, 7],
     };
 
-    coll.insert_one(&doc, None).await.unwrap();
-    let rec: Foo = coll.find_one(doc! {}, None).await.unwrap().unwrap();
+    coll.insert_one(&doc).await.unwrap();
+    let rec: Foo = coll.find_one(doc! {}).await.unwrap().unwrap();
     assert_eq!(doc.problematic, rec.problematic);
-    let rec: Foo = coll
-        .find_one_and_delete(doc! {}, None)
-        .await
-        .unwrap()
-        .unwrap();
+    let rec: Foo = coll.find_one_and_delete(doc! {}).await.unwrap().unwrap();
     assert_eq!(doc.problematic, rec.problematic);
 
-    let nothing = coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    let nothing = coll.find_one_and_delete(doc! {}).await.unwrap();
     assert!(nothing.is_none());
 }
 

@@ -40,7 +40,7 @@ use crate::{
 /// [`SessionCursor::stream`]:
 ///
 /// ```rust
-/// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
+/// # use mongodb::{bson::{Document, doc}, Client, error::Result, ClientSession, SessionCursor};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
@@ -48,7 +48,7 @@ use crate::{
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// #
 /// // iterate using next()
-/// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+/// let mut cursor = coll.find(doc! {}).session(&mut session).await?;
 /// while let Some(doc) = cursor.next(&mut session).await.transpose()? {
 ///     println!("{}", doc)
 /// }
@@ -56,7 +56,7 @@ use crate::{
 /// // iterate using `Stream`:
 /// use futures::stream::TryStreamExt;
 ///
-/// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+/// let mut cursor = coll.find(doc! {}).session(&mut session).await?;
 /// let results: Vec<_> = cursor.stream(&mut session).try_collect().await?;
 /// #
 /// # Ok(())
@@ -129,23 +129,23 @@ where
     /// use futures::stream::TryStreamExt;
     ///
     /// // iterate over the results
-    /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let mut cursor = coll.find(doc! { "x": 1 }).session(&mut session).await?;
     /// while let Some(doc) = cursor.stream(&mut session).try_next().await? {
     ///     println!("{}", doc);
     /// }
     ///
     /// // collect the results
-    /// let mut cursor1 = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let mut cursor1 = coll.find(doc! { "x": 1 }).session(&mut session).await?;
     /// let v: Vec<Document> = cursor1.stream(&mut session).try_collect().await?;
     ///
     /// // use session between iterations
-    /// let mut cursor2 = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let mut cursor2 = coll.find(doc! { "x": 1 }).session(&mut session).await?;
     /// loop {
     ///     let doc = match cursor2.stream(&mut session).try_next().await? {
     ///         Some(d) => d,
     ///         None => break,
     ///     };
-    ///     other_coll.insert_one_with_session(doc, None, &mut session).await?;
+    ///     other_coll.insert_one(doc).session(&mut session).await?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())
     /// # };
@@ -173,9 +173,9 @@ where
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let other_coll = coll.clone();
     /// # let mut session = client.start_session().await?;
-    /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let mut cursor = coll.find(doc! { "x": 1 }).session(&mut session).await?;
     /// while let Some(doc) = cursor.next(&mut session).await.transpose()? {
-    ///     other_coll.insert_one_with_session(doc, None, &mut session).await?;
+    ///     other_coll.insert_one(doc).session(&mut session).await?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())
     /// # };
@@ -223,12 +223,12 @@ impl<T> SessionCursor<T> {
     /// [`SessionCursor::advance`] returns an error / false.
     ///
     /// ```
-    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # use mongodb::{Client, bson::{doc, Document}, error::Result};
     /// # async fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
     /// # let mut session = client.start_session().await?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+    /// let mut cursor = coll.find(doc! {}).session(&mut session).await?;
     /// while cursor.advance(&mut session).await? {
     ///     println!("{:?}", cursor.current());
     /// }
@@ -256,12 +256,12 @@ impl<T> SessionCursor<T> {
     /// true or without calling [`SessionCursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # use mongodb::{Client, bson::{Document, doc}, error::Result};
     /// # async fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
     /// # let mut session = client.start_session().await?;
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
-    /// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+    /// let mut cursor = coll.find(doc! {}).session(&mut session).await?;
     /// while cursor.advance(&mut session).await? {
     ///     println!("{:?}", cursor.current());
     /// }
@@ -281,7 +281,7 @@ impl<T> SessionCursor<T> {
     /// true or without calling [`SessionCursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{Client, error::Result, bson::doc};
     /// # async fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
     /// # let mut session = client.start_session().await?;
@@ -295,7 +295,7 @@ impl<T> SessionCursor<T> {
     /// }
     ///
     /// let coll = db.collection::<Cat>("cat");
-    /// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+    /// let mut cursor = coll.find(doc! {}).session(&mut session).await?;
     /// while cursor.advance(&mut session).await? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }

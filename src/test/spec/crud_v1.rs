@@ -20,7 +20,6 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    coll::options::FindOptions,
     test::log_uncaptured,
     Collection,
 };
@@ -63,8 +62,8 @@ pub struct CollectionOutcome {
 }
 
 pub async fn find_all(coll: &Collection<Document>) -> Vec<Document> {
-    let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
-    coll.find(None, options)
+    coll.find(doc! {})
+        .sort(doc! { "_id": 1 })
         .await
         .unwrap()
         .try_collect()

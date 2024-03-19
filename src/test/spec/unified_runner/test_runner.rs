@@ -12,7 +12,6 @@ use crate::{
     options::{
         CollectionOptions,
         CreateCollectionOptions,
-        FindOptions,
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
@@ -357,9 +356,9 @@ impl TestRunner {
                         .internal_client
                         .get_coll_with_options(db_name, coll_name, options);
 
-                    let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
                     let actual_data: Vec<Document> = collection
-                        .find(doc! {}, options)
+                        .find(doc! {})
+                        .sort(doc! { "_id": 1 })
                         .await
                         .unwrap()
                         .try_collect()
@@ -387,9 +386,7 @@ impl TestRunner {
                     collection_options,
                 )
                 .await;
-            coll.insert_many(data.documents.clone(), None)
-                .await
-                .unwrap();
+            coll.insert_many(data.documents.clone()).await.unwrap();
         } else {
             let collection_options = CreateCollectionOptions::builder()
                 .write_concern(write_concern)

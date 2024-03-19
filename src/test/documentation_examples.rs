@@ -7,7 +7,7 @@ use semver::Version;
 use crate::{
     bson::{doc, Bson},
     error::Result,
-    options::{ClientOptions, FindOptions, ServerApi, ServerApiVersion},
+    options::{ClientOptions, ServerApi, ServerApiVersion},
     test::{log_uncaptured, TestClient, DEFAULT_URI},
     Client,
     Collection,
@@ -39,26 +39,23 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
 
     // Start Example 1
     collection
-        .insert_one(
-            doc! {
-                "item": "canvas",
-                "qty": 100,
-                "tags": ["cotton"],
-                "size": {
-                    "h": 28,
-                    "w": 35.5,
-                    "uom": "cm",
-                }
-            },
-            None,
-        )
+        .insert_one(doc! {
+            "item": "canvas",
+            "qty": 100,
+            "tags": ["cotton"],
+            "size": {
+                "h": 28,
+                "w": 35.5,
+                "uom": "cm",
+            }
+        })
         .await?;
     // End Example 1
 
     assert_coll_count!(collection, 1);
 
     // Start Example 2
-    let cursor = collection.find(doc! { "item": "canvas" }, None).await?;
+    let cursor = collection.find(doc! { "item": "canvas" }).await?;
     // End Example 2
 
     assert_cursor_count!(cursor, 1);
@@ -97,7 +94,7 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 3
 
     assert_coll_count!(collection, 4);
@@ -162,33 +159,30 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 6
 
     assert_coll_count!(collection, 5);
 
     // Start Example 7
-    let cursor = collection.find(None, None).await?;
+    let cursor = collection.find(doc! {}).await?;
     // End Example 7
 
     assert_cursor_count!(cursor, 5);
 
     // Start Example 9
-    let cursor = collection.find(doc! { "status": "D" }, None).await?;
+    let cursor = collection.find(doc! { "status": "D" }).await?;
     // End Example 9
 
     assert_cursor_count!(cursor, 2);
 
     // Start Example 10
     let cursor = collection
-        .find(
-            doc! {
-                "status": {
-                    "$in": ["A", "D"],
-                }
-            },
-            None,
-        )
+        .find(doc! {
+            "status": {
+                "$in": ["A", "D"],
+            }
+        })
         .await?;
     // End Example 10
 
@@ -196,13 +190,10 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
 
     // Start Example 11
     let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-                "qty": { "$lt": 30 },
-            },
-            None,
-        )
+        .find(doc! {
+            "status": "A",
+            "qty": { "$lt": 30 },
+        })
         .await?;
     // End Example 11
 
@@ -210,17 +201,14 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
 
     // Start Example 12
     let cursor = collection
-        .find(
-            doc! {
-                "$or": [
-                    { "status": "A" },
-                    {
-                        "qty": { "$lt": 30 },
-                    }
-                ],
-            },
-            None,
-        )
+        .find(doc! {
+            "$or": [
+                { "status": "A" },
+                {
+                    "qty": { "$lt": 30 },
+                }
+            ],
+        })
         .await?;
     // End Example 12
 
@@ -228,20 +216,17 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
 
     // Start Example 13
     let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-                "$or": [
-                    {
-                        "qty": { "$lt": 30 },
-                    },
-                    {
-                        "item": { "$regex": "^p" },
-                    },
-                ],
-            },
-            None,
-        )
+        .find(doc! {
+            "status": "A",
+            "$or": [
+                {
+                    "qty": { "$lt": 30 },
+                },
+                {
+                    "item": { "$regex": "^p" },
+                },
+            ],
+        })
         .await?;
     // End Example 13
 
@@ -307,23 +292,20 @@ async fn query_embedded_documents_examples(collection: &Collection<Document>) ->
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 14
 
     assert_coll_count!(collection, 5);
 
     // Start Example 15
     let cursor = collection
-        .find(
-            doc! {
-                "size": {
-                    "h": 14,
-                    "w": 21,
-                    "uom": "cm",
-                },
+        .find(doc! {
+            "size": {
+                "h": 14,
+                "w": 21,
+                "uom": "cm",
             },
-            None,
-        )
+        })
         .await?;
     // End Example 15
 
@@ -331,35 +313,29 @@ async fn query_embedded_documents_examples(collection: &Collection<Document>) ->
 
     // Start Example 16
     let cursor = collection
-        .find(
-            doc! {
-                "size": {
-                    "w": 21,
-                    "h": 14,
-                    "uom": "cm",
-                },
+        .find(doc! {
+            "size": {
+                "w": 21,
+                "h": 14,
+                "uom": "cm",
             },
-            None,
-        )
+        })
         .await?;
     // End Example 16
 
     assert_cursor_count!(cursor, 0);
 
     // Start Example 17
-    let cursor = collection.find(doc! { "size.uom": "in" }, None).await?;
+    let cursor = collection.find(doc! { "size.uom": "in" }).await?;
     // End Example 17
 
     assert_cursor_count!(cursor, 2);
 
     // Start Example 18
     let cursor = collection
-        .find(
-            doc! {
-                "size.h": { "$lt": 15 },
-            },
-            None,
-        )
+        .find(doc! {
+            "size.h": { "$lt": 15 },
+        })
         .await?;
     // End Example 18
 
@@ -367,14 +343,11 @@ async fn query_embedded_documents_examples(collection: &Collection<Document>) ->
 
     // Start Example 19
     let cursor = collection
-        .find(
-            doc! {
-                "size.h": { "$lt": 15 },
-                "size.uom": "in",
-                "status": "D",
-            },
-            None,
-        )
+        .find(doc! {
+            "size.h": { "$lt": 15 },
+            "size.uom": "in",
+            "status": "D",
+        })
         .await?;
     // End Example 19
 
@@ -420,19 +393,16 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 20
 
     assert_coll_count!(collection, 5);
 
     // Start Example 21
     let cursor = collection
-        .find(
-            doc! {
-                "tags": ["red", "blank"],
-            },
-            None,
-        )
+        .find(doc! {
+            "tags": ["red", "blank"],
+        })
         .await?;
     // End Example 21
 
@@ -440,14 +410,11 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 22
     let cursor = collection
-        .find(
-            doc! {
-                "tags": {
-                    "$all": ["red", "blank"],
-                }
-            },
-            None,
-        )
+        .find(doc! {
+            "tags": {
+                "$all": ["red", "blank"],
+            }
+        })
         .await?;
     // End Example 22
 
@@ -455,12 +422,9 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 23
     let cursor = collection
-        .find(
-            doc! {
-                "tags": "red",
-            },
-            None,
-        )
+        .find(doc! {
+            "tags": "red",
+        })
         .await?;
     // End Example 23
 
@@ -468,12 +432,9 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 24
     let cursor = collection
-        .find(
-            doc! {
-                "dim_cm": { "$gt": 25 },
-            },
-            None,
-        )
+        .find(doc! {
+            "dim_cm": { "$gt": 25 },
+        })
         .await?;
     // End Example 24
 
@@ -481,15 +442,12 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 25
     let cursor = collection
-        .find(
-            doc! {
-                "dim_cm": {
-                    "$gt": 15,
-                    "$lt": 20,
-                },
+        .find(doc! {
+            "dim_cm": {
+                "$gt": 15,
+                "$lt": 20,
             },
-            None,
-        )
+        })
         .await?;
     // End Example 25
 
@@ -497,17 +455,14 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 26
     let cursor = collection
-        .find(
-            doc! {
-                "dim_cm": {
-                    "$elemMatch": {
-                        "$gt": 22,
-                        "$lt": 30,
-                    }
-                },
+        .find(doc! {
+            "dim_cm": {
+                "$elemMatch": {
+                    "$gt": 22,
+                    "$lt": 30,
+                }
             },
-            None,
-        )
+        })
         .await?;
     // End Example 26
 
@@ -515,12 +470,9 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 27
     let cursor = collection
-        .find(
-            doc! {
-                "dim_cm.1": { "$gt": 25 },
-            },
-            None,
-        )
+        .find(doc! {
+            "dim_cm.1": { "$gt": 25 },
+        })
         .await?;
     // End Example 27
 
@@ -528,12 +480,9 @@ async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> 
 
     // Start Example 28
     let cursor = collection
-        .find(
-            doc! {
-                "tags": { "$size": 3 },
-            },
-            None,
-        )
+        .find(doc! {
+            "tags": { "$size": 3 },
+        })
         .await?;
     // End Example 28
 
@@ -581,22 +530,19 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 29
 
     assert_coll_count!(collection, 5);
 
     // Start Example 30
     let cursor = collection
-        .find(
-            doc! {
-                "instock": {
-                    "warehouse": "A",
-                    "qty": 5,
-                },
+        .find(doc! {
+            "instock": {
+                "warehouse": "A",
+                "qty": 5,
             },
-            None,
-        )
+        })
         .await?;
     // End Example 30
 
@@ -604,15 +550,12 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 31
     let cursor = collection
-        .find(
-            doc! {
-                "instock": {
-                    "qty": 5,
-                    "warehouse": "A",
-                },
+        .find(doc! {
+            "instock": {
+                "qty": 5,
+                "warehouse": "A",
             },
-            None,
-        )
+        })
         .await?;
     // End Example 31
 
@@ -620,12 +563,9 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 32
     let cursor = collection
-        .find(
-            doc! {
-                "instock.0.qty": { "$lte": 20 },
-            },
-            None,
-        )
+        .find(doc! {
+            "instock.0.qty": { "$lte": 20 },
+        })
         .await?;
     // End Example 32
 
@@ -633,12 +573,9 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 33
     let cursor = collection
-        .find(
-            doc! {
-                "instock.qty": { "$lte": 20 },
-            },
-            None,
-        )
+        .find(doc! {
+            "instock.qty": { "$lte": 20 },
+        })
         .await?;
     // End Example 33
 
@@ -646,17 +583,14 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 34
     let cursor = collection
-        .find(
-            doc! {
-                "instock": {
-                    "$elemMatch": {
-                        "qty": 5,
-                        "warehouse": "A",
-                    }
-                },
+        .find(doc! {
+            "instock": {
+                "$elemMatch": {
+                    "qty": 5,
+                    "warehouse": "A",
+                }
             },
-            None,
-        )
+        })
         .await?;
     // End Example 34
 
@@ -664,19 +598,16 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 35
     let cursor = collection
-        .find(
-            doc! {
-                "instock": {
-                    "$elemMatch": {
-                        "qty": {
-                            "$gt": 10,
-                            "$lte": 20,
-                        }
+        .find(doc! {
+            "instock": {
+                "$elemMatch": {
+                    "qty": {
+                        "$gt": 10,
+                        "$lte": 20,
                     }
-                },
+                }
             },
-            None,
-        )
+        })
         .await?;
     // End Example 35
 
@@ -684,15 +615,12 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 36
     let cursor = collection
-        .find(
-            doc! {
-                "instock.qty": {
-                    "$gt": 10,
-                    "$lte": 20,
-                },
+        .find(doc! {
+            "instock.qty": {
+                "$gt": 10,
+                "$lte": 20,
             },
-            None,
-        )
+        })
         .await?;
     // End Example 36
 
@@ -700,13 +628,10 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 
     // Start Example 37
     let cursor = collection
-        .find(
-            doc! {
-                "instock.qty": 5,
-                "instock.warehouse": "A",
-            },
-            None,
-        )
+        .find(doc! {
+            "instock.qty": 5,
+            "instock.warehouse": "A",
+        })
         .await?;
     // End Example 37
 
@@ -729,19 +654,16 @@ async fn query_null_or_missing_fields_examples(collection: &Collection<Document>
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 38
 
     assert_coll_count!(collection, 2);
 
     // Start Example 39
     let cursor = collection
-        .find(
-            doc! {
-                "item": Bson::Null,
-            },
-            None,
-        )
+        .find(doc! {
+            "item": Bson::Null,
+        })
         .await?;
     // End Example 39
 
@@ -749,12 +671,9 @@ async fn query_null_or_missing_fields_examples(collection: &Collection<Document>
 
     // Start Example 40
     let cursor = collection
-        .find(
-            doc! {
-                "item": { "$type": 10 },
-            },
-            None,
-        )
+        .find(doc! {
+            "item": { "$type": 10 },
+        })
         .await?;
     // End Example 40
 
@@ -762,12 +681,9 @@ async fn query_null_or_missing_fields_examples(collection: &Collection<Document>
 
     // Start Example 41
     let cursor = collection
-        .find(
-            doc! {
-                "item": { "$exists": false },
-            },
-            None,
-        )
+        .find(doc! {
+            "item": { "$exists": false },
+        })
         .await?;
     // End Example 41
 
@@ -863,39 +779,30 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 42
 
     assert_coll_count!(collection, 5);
 
     // Start Example 43
     let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            None,
-        )
+        .find(doc! {
+            "status": "A",
+        })
         .await?;
     // End Example 43
 
     assert_cursor_count!(cursor, 3);
 
     // Start Example 44
-    let options = FindOptions::builder()
+    let cursor = collection
+        .find(doc! {
+            "status": "A",
+        })
         .projection(doc! {
             "item": 1,
             "status": 1,
         })
-        .build();
-
-    let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            options,
-        )
         .await?;
     // End Example 44
 
@@ -908,21 +815,15 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
     });
 
     // Start Example 45
-    let options = FindOptions::builder()
+    let cursor = collection
+        .find(doc! {
+            "status": "A",
+        })
         .projection(doc! {
             "item": 1,
             "status": 1,
             "_id": 0,
         })
-        .build();
-
-    let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            options,
-        )
         .await?;
     // End Example 45
 
@@ -935,20 +836,14 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
     });
 
     // Start Example 46
-    let options = FindOptions::builder()
+    let cursor = collection
+        .find(doc! {
+            "status": "A",
+        })
         .projection(doc! {
             "status": 0,
             "instock": 0,
         })
-        .build();
-
-    let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            options,
-        )
         .await?;
     // End Example 46
 
@@ -961,21 +856,15 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
     });
 
     // Start Example 47
-    let options = FindOptions::builder()
+    let cursor = collection
+        .find(doc! {
+            "status": "A",
+        })
         .projection(doc! {
             "item": 1,
             "status": 1,
             "size.uom": 1,
         })
-        .build();
-
-    let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            options,
-        )
         .await?;
     // End Example 47
 
@@ -994,19 +883,13 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
     });
 
     // Start Example 48
-    let options = FindOptions::builder()
+    let cursor = collection
+        .find(doc! {
+            "status": "A",
+        })
         .projection(doc! {
             "size.uom": 0,
         })
-        .build();
-
-    let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            options,
-        )
         .await?;
     // End Example 48
 
@@ -1025,21 +908,15 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
     });
 
     // Start Example 50
-    let options = FindOptions::builder()
+    let cursor = collection
+        .find(doc! {
+            "status": "A",
+        })
         .projection(doc! {
             "item": 1,
             "status": 1,
             "instock": { "$slice": -1 },
         })
-        .build();
-
-    let cursor = collection
-        .find(
-            doc! {
-                "status": "A",
-            },
-            options,
-        )
         .await?;
     // End Example 50
 
@@ -1165,7 +1042,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 51
 
     assert_coll_count!(collection, 10);
@@ -1186,10 +1063,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
     // End Example 52
 
     run_on_each_doc!(
-        collection
-            .find(doc! { "item": "paper" }, None)
-            .await
-            .unwrap(),
+        collection.find(doc! { "item": "paper" }).await.unwrap(),
         doc,
         {
             let uom = doc.get_document("size").unwrap().get_str("uom").unwrap();
@@ -1221,12 +1095,9 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
 
     run_on_each_doc!(
         collection
-            .find(
-                doc! {
-                    "qty": { "$lt": 50  },
-                },
-                None,
-            )
+            .find(doc! {
+                "qty": { "$lt": 50  },
+            })
             .await
             .unwrap(),
         doc,
@@ -1258,16 +1129,12 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
                     },
                 ],
             },
-            None,
         )
         .await?;
     // End Example 54
 
     run_on_each_doc!(
-        collection
-            .find(doc! { "item": "paper" }, None,)
-            .await
-            .unwrap(),
+        collection.find(doc! { "item": "paper" }).await.unwrap(),
         doc,
         {
             assert_eq!(doc.len(), 3);
@@ -1340,7 +1207,7 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
         },
     ];
 
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
     // End Example 55
 
     assert_coll_count!(collection, 5);
@@ -1453,7 +1320,7 @@ async fn stable_api_examples() -> GenericResult<()> {
         doc! { "_id" : 6, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : iso_date("2021-02-15T12:05:10Z")? },
         doc! { "_id" : 7, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T14:12:12Z")? },
         doc! { "_id" : 8, "item" : "abc", "price" : 10, "quantity" : 5, "date" : iso_date("2021-03-16T20:20:13Z")? }
-    ], None).await?;
+    ]).await?;
     // End Versioned API Example 5
 
     // Start Versioned API Example 6
@@ -1635,16 +1502,13 @@ async fn run_command_examples() -> Result<()> {
     let db = client.database("run_command_examples");
     db.drop().await?;
     db.collection::<Document>("restaurants")
-        .insert_one(
-            doc! {
-                "name": "Chez Panisse",
-                "city": "Oakland",
-                "state": "California",
-                "country": "United States",
-                "rating": 4.4,
-            },
-            None,
-        )
+        .insert_one(doc! {
+            "name": "Chez Panisse",
+            "city": "Oakland",
+            "state": "California",
+            "country": "United States",
+            "rating": 4.4,
+        })
         .await?;
 
     #[allow(unused)]
@@ -1665,46 +1529,40 @@ async fn index_examples() -> Result<()> {
     let db = client.database("index_examples");
     db.drop().await?;
     db.collection::<Document>("records")
-        .insert_many(
-            vec![
-                doc! {
-                    "student": "Marty McFly",
-                    "classYear": 1986,
-                    "school": "Hill Valley High",
-                    "score": 56.5,
-                },
-                doc! {
-                    "student": "Ferris F. Bueller",
-                    "classYear": 1987,
-                    "school": "Glenbrook North High",
-                    "status": "Suspended",
-                    "score": 76.0,
-                },
-            ],
-            None,
-        )
+        .insert_many(vec![
+            doc! {
+                "student": "Marty McFly",
+                "classYear": 1986,
+                "school": "Hill Valley High",
+                "score": 56.5,
+            },
+            doc! {
+                "student": "Ferris F. Bueller",
+                "classYear": 1987,
+                "school": "Glenbrook North High",
+                "status": "Suspended",
+                "score": 76.0,
+            },
+        ])
         .await?;
     db.collection::<Document>("restaurants")
-        .insert_many(
-            vec![
-                doc! {
-                    "name": "Chez Panisse",
-                    "city": "Oakland",
-                    "state": "California",
-                    "country": "United States",
-                    "rating": 4.4,
-                },
-                doc! {
-                    "name": "Eleven Madison Park",
-                    "cuisine": "French",
-                    "city": "New York City",
-                    "state": "New York",
-                    "country": "United States",
-                    "rating": 7.1,
-                },
-            ],
-            None,
-        )
+        .insert_many(vec![
+            doc! {
+                "name": "Chez Panisse",
+                "city": "Oakland",
+                "state": "California",
+                "country": "United States",
+                "rating": 4.4,
+            },
+            doc! {
+                "name": "Eleven Madison Park",
+                "cuisine": "French",
+                "city": "New York City",
+                "state": "New York",
+                "country": "United States",
+                "rating": 7.1,
+            },
+        ])
         .await?;
 
     use crate::IndexModel;
@@ -1747,7 +1605,7 @@ async fn change_streams_examples() -> Result<()> {
     db.drop().await?;
     let inventory = db.collection::<Document>("inventory");
     // Populate an item so the collection exists for the change stream to watch.
-    inventory.insert_one(doc! {}, None).await?;
+    inventory.insert_one(doc! {}).await?;
 
     // Background writer thread so that the `stream.next()` calls return something.
     let (tx, mut rx) = tokio::sync::oneshot::channel();
@@ -1757,7 +1615,7 @@ async fn change_streams_examples() -> Result<()> {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    writer_inventory.insert_one(doc! {}, None).await?;
+                    writer_inventory.insert_one(doc! {}).await?;
                 }
                 _ = &mut rx => break,
             }
@@ -1832,12 +1690,12 @@ async fn convenient_transaction_examples() -> Result<()> {
     client
         .database("mydb1")
         .collection::<Document>("foo")
-        .insert_one(doc! { "abc": 0}, None)
+        .insert_one(doc! { "abc": 0})
         .await?;
     client
         .database("mydb2")
         .collection::<Document>("bar")
-        .insert_one(doc! { "xyz": 0}, None)
+        .insert_one(doc! { "xyz": 0})
         .await?;
 
     // Step 1: Define the callback that specifies the sequence of operations to perform inside the
@@ -1854,10 +1712,12 @@ async fn convenient_transaction_examples() -> Result<()> {
 
         // Important: You must pass the session to the operations.
         collection_one
-            .insert_one_with_session(doc! { "abc": 1 }, None, session)
+            .insert_one(doc! { "abc": 1 })
+            .session(&mut *session)
             .await?;
         collection_two
-            .insert_one_with_session(doc! { "xyz": 999 }, None, session)
+            .insert_one(doc! { "xyz": 999 })
+            .session(session)
             .await?;
 
         Ok(())

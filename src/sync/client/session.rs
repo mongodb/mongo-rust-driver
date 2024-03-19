@@ -67,7 +67,7 @@ impl ClientSession {
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
-    /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)?;
+    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).run()?;
     /// session.commit_transaction()?;
     /// # Ok(())
     /// # }
@@ -89,7 +89,7 @@ impl ClientSession {
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().run()?;
     /// session.start_transaction(None)?;
-    /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)?;
+    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).run()?;
     /// session.commit_transaction()?;
     /// # Ok(())
     /// # }
@@ -122,8 +122,8 @@ impl ClientSession {
     /// # }
     ///
     /// fn execute_transaction(coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
-    ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session)?;
-    ///     coll.delete_one(doc! { "y": 2 }).session(session).run()?;
+    ///     coll.insert_one(doc! { "x": 1 }).session(&mut *session).run()?;
+    ///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).run()?;
     ///     Ok(())   
     /// }
     /// ```

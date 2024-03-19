@@ -78,7 +78,7 @@ async fn deserialize_recovery_token() {
     let coll = client
         .database(function_name!())
         .collection(function_name!());
-    coll.insert_one(A { num: 4 }, None).await.unwrap();
+    coll.insert_one(A { num: 4 }).await.unwrap();
 
     // Attempt to execute Find on a document with schema B.
     let coll: Collection<B> = client
@@ -86,7 +86,7 @@ async fn deserialize_recovery_token() {
         .collection(function_name!());
     session.start_transaction(None).await.unwrap();
     assert!(session.transaction.recovery_token.is_none());
-    let result = coll.find_one_with_session(None, None, &mut session).await;
+    let result = coll.find_one(doc! {}).session(&mut session).await;
     assert!(result.is_err()); // Assert that the deserialization failed.
 
     // Nevertheless, the recovery token should have been retrieved from the ok: 1 response.
@@ -111,7 +111,7 @@ async fn convenient_api_custom_error() {
             coll,
             |session, coll| {
                 async move {
-                    coll.find_one_with_session(None, None, session).await?;
+                    coll.find_one(doc! {}).session(session).await?;
                     Err(Error::custom(MyErr))
                 }
                 .boxed()
@@ -144,7 +144,7 @@ async fn convenient_api_returned_value() {
             coll,
             |session, coll| {
                 async move {
-                    coll.find_one_with_session(None, None, session).await?;
+                    coll.find_one(doc! {}).session(session).await?;
                     Ok(42)
                 }
                 .boxed()
@@ -175,7 +175,7 @@ async fn convenient_api_retry_timeout_callback() {
             coll,
             |session, coll| {
                 async move {
-                    coll.find_one_with_session(None, None, session).await?;
+                    coll.find_one(doc! {}).session(session).await?;
                     let mut err = Error::custom(42);
                     err.add_label(TRANSIENT_TRANSACTION_ERROR);
                     Err(err)
@@ -232,7 +232,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
             coll,
             |session, coll| {
                 async move {
-                    coll.find_one_with_session(None, None, session).await?;
+                    coll.find_one(doc! {}).session(session).await?;
                     Ok(())
                 }
                 .boxed()
@@ -286,7 +286,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
             coll,
             |session, coll| {
                 async move {
-                    coll.find_one_with_session(None, None, session).await?;
+                    coll.find_one(doc! {}).session(session).await?;
                     Ok(())
                 }
                 .boxed()

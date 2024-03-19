@@ -57,7 +57,7 @@ use crate::{
 /// let mut change_stream = coll.watch().await?;
 /// let coll_ref = coll.clone();
 /// task::spawn(async move {
-///     coll_ref.insert_one(doc! { "x": 1 }, None).await;
+///     coll_ref.insert_one(doc! { "x": 1 }).await;
 /// });
 /// while let Some(event) = change_stream.next().await.transpose()? {
 ///     println!("operation performed: {:?}, document: {:?}", event.operation_type, event.full_document);

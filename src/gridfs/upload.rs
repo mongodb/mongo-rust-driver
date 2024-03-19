@@ -19,7 +19,7 @@ use crate::{
     client::AsyncDropToken,
     error::{Error, ErrorKind, GridFsErrorKind, Result},
     index::IndexModel,
-    options::{FindOneOptions, ReadPreference, SelectionCriteria},
+    options::{ReadPreference, SelectionCriteria},
     Collection,
 };
 
@@ -132,7 +132,7 @@ impl GridFsBucket {
                     bytes: &buf[..bytes_read],
                 },
             };
-            self.chunks().insert_one(chunk, None).await?;
+            self.chunks().insert_one(chunk).await?;
 
             length += bytes_read as u64;
             n += 1;
@@ -146,21 +146,19 @@ impl GridFsBucket {
             filename: Some(filename.as_ref().to_string()),
             metadata: options.and_then(|opts| opts.metadata),
         };
-        self.files().insert_one(file, None).await?;
+        self.files().insert_one(file).await?;
 
         Ok(())
     }
 
     async fn create_indexes(&self) -> Result<()> {
         if !self.inner.created_indexes.load(Ordering::SeqCst) {
-            let find_options = FindOneOptions::builder()
-                .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
-                .projection(doc! { "_id": 1 })
-                .build();
             if self
                 .files()
                 .clone_with_type::<Document>()
-                .find_one(None, find_options)
+                .find_one(doc! {})
+                .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+                .projection(doc! { "_id": 1 })
                 .await?
                 .is_none()
             {
@@ -532,7 +530,7 @@ async fn write_bytes(
         chunks.push(chunk);
     }
 
-    match bucket.chunks().insert_many(chunks, None).await {
+    match bucket.chunks().insert_many(chunks).await {
         Ok(_) => {
             buffer.drain(..(n * chunk_size_bytes).get()?);
             Ok((n.try_into()?, buffer))
@@ -559,9 +557,9 @@ async fn close(bucket: GridFsBucket, buffer: Vec<u8>, file: FilesCollectionDocum
                     bytes: &buffer[..],
                 },
             };
-            bucket.chunks().insert_one(final_chunk, None).await?;
+            bucket.chunks().insert_one(final_chunk).await?;
         }
-        bucket.files().insert_one(&file, None).await?;
+        bucket.files().insert_one(&file).await?;
         Ok(())
     }
     .await;

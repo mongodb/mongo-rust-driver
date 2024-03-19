@@ -56,7 +56,7 @@ async fn _inserting_documents_into_a_collection(db: mongodb::Database) -> Result
     ];
 
     // Insert some documents into the "mydb.books" collection.
-    collection.insert_many(docs, None).await?;
+    collection.insert_many(docs).await?;
 
     Ok(())
 }
@@ -84,7 +84,7 @@ async fn _inserting_documents_into_a_typed_collection(db: mongodb::Database) -> 
     ];
 
     // Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
-    typed_collection.insert_many(books, None).await?;
+    typed_collection.insert_many(books).await?;
 
     Ok(())
 }
@@ -94,12 +94,11 @@ async fn _finding_documents_into_a_collection(
 ) -> Result<()> {
     // This trait is required to use `try_next()` on the cursor
     use futures::stream::TryStreamExt;
-    use mongodb::{bson::doc, options::FindOptions};
+    use mongodb::bson::doc;
 
     // Query the books in the collection with a filter and an option.
     let filter = doc! { "author": "George Orwell" };
-    let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-    let mut cursor = typed_collection.find(filter, find_options).await?;
+    let mut cursor = typed_collection.find(filter).sort(doc! { "title": 1 }).await?;
 
     // Iterate over the results of the cursor.
     while let Some(book) = cursor.try_next().await? {
@@ -133,9 +132,9 @@ async fn _using_the_sync_api() -> Result<()> {
     ];
 
     // Insert some books into the "mydb.books" collection.
-    collection.insert_many(docs, None)?;
+    collection.insert_many(docs).run()?;
 
-    let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
+    let cursor = collection.find(doc! { "author": "George Orwell" }).run()?;
     for result in cursor {
         println!("title: {}", result?.title);
     }

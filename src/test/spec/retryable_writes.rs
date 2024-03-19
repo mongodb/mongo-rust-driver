@@ -16,7 +16,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::{ClientOptions, FindOptions, InsertManyOptions},
+    options::ClientOptions,
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     sdam::MIN_HEARTBEAT_FREQUENCY,
@@ -78,7 +78,7 @@ async fn run_legacy() {
             let coll = client.init_db_and_coll(&db_name, coll_name).await;
 
             if !test_file.data.is_empty() {
-                coll.insert_many(test_file.data.clone(), None)
+                coll.insert_many(test_file.data.clone())
                     .await
                     .expect(&test_case.description);
             }
@@ -163,9 +163,9 @@ async fn run_legacy() {
             };
 
             let coll = client.get_coll(&db_name, &coll_name);
-            let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
-                .find(None, options)
+                .find(doc! {})
+                .sort(doc! { "_id": 1 })
                 .await
                 .unwrap()
                 .try_collect()
@@ -242,7 +242,7 @@ async fn transaction_ids_included() {
         started.command.contains_key("txnNumber")
     };
 
-    coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    coll.insert_one(doc! { "x": 1 }).await.unwrap();
     assert!(includes_txn_number("insert"));
 
     coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } })
@@ -250,35 +250,33 @@ async fn transaction_ids_included() {
         .unwrap();
     assert!(includes_txn_number("update"));
 
-    coll.replace_one(doc! {}, doc! { "x": 1 }, None)
-        .await
-        .unwrap();
+    coll.replace_one(doc! {}, doc! { "x": 1 }).await.unwrap();
     assert!(includes_txn_number("update"));
 
     coll.delete_one(doc! {}).await.unwrap();
     assert!(includes_txn_number("delete"));
 
-    coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    coll.find_one_and_delete(doc! {}).await.unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    coll.find_one_and_replace(doc! {}, doc! { "x": 1 }, None)
+    coll.find_one_and_replace(doc! {}, doc! { "x": 1 })
         .await
         .unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    let options = InsertManyOptions::builder().ordered(true).build();
-    coll.insert_many(vec![doc! { "x": 1 }], options)
+    coll.insert_many(vec![doc! { "x": 1 }])
+        .ordered(true)
         .await
         .unwrap();
     assert!(includes_txn_number("insert"));
 
-    let options = InsertManyOptions::builder().ordered(false).build();
-    coll.insert_many(vec![doc! { "x": 1 }], options)
+    coll.insert_many(vec![doc! { "x": 1 }])
+        .ordered(false)
         .await
         .unwrap();
     assert!(includes_txn_number("insert"));
@@ -312,7 +310,7 @@ async fn mmapv1_error_raised() {
         return;
     }
 
-    let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
+    let err = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
     match *err.kind {
         ErrorKind::Command(err) => {
             assert_eq!(
@@ -373,7 +371,7 @@ async fn label_not_added(retry_reads: bool) {
         .await
         .unwrap();
 
-    let err = coll.find(doc! {}, None).await.unwrap_err();
+    let err = coll.find(doc! {}).await.unwrap_err();
 
     assert!(!err.contains_label("RetryableWriteError"));
 }
@@ -428,7 +426,7 @@ async fn retry_write_pool_cleared() {
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = runtime::spawn(async move { coll.insert_one(doc! {}, None).await });
+        let task = runtime::spawn(async move { coll.insert_one(doc! {}).await });
         tasks.push(task);
     }
 
@@ -556,7 +554,7 @@ async fn retry_write_retryable_write_error() {
     let result = client
         .database("test")
         .collection::<Document>("test")
-        .insert_one(doc! { "hello": "there" }, None)
+        .insert_one(doc! { "hello": "there" })
         .await;
     assert_eq!(result.unwrap_err().code(), Some(91));
 
@@ -605,7 +603,7 @@ async fn retry_write_different_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_write_different_mongos")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     assert!(result.is_err());
     let events = client.get_command_events(&["insert"]);
@@ -663,7 +661,7 @@ async fn retry_write_same_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_write_same_mongos")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
     let events = client.get_command_events(&["insert"]);

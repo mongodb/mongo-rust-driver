@@ -603,7 +603,7 @@ async fn topology_closed_event_last() {
     client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! { "x": 1 }, None)
+        .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
     drop(client);
@@ -722,7 +722,7 @@ async fn direct_connection() {
     direct_false_client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection=false on secondary");
 
@@ -733,7 +733,7 @@ async fn direct_connection() {
     let error = direct_true_client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .expect_err("write should fail with directConnection=true on secondary");
     assert!(error.is_notwritableprimary());
@@ -743,7 +743,7 @@ async fn direct_connection() {
     client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection unspecified");
 }

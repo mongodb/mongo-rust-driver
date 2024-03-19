@@ -19,16 +19,16 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub(super) enum Modification<'a, T> {
+pub(crate) enum Modification {
     Delete,
-    Update(UpdateOrReplace<'a, T>),
+    Update(UpdateOrReplace),
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, TypedBuilder, Serialize, Default)]
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
-pub(super) struct FindAndModifyOptions {
+pub(crate) struct FindAndModifyOptions {
     #[builder(default)]
     pub(crate) sort: Option<Document>,
 
@@ -130,11 +130,5 @@ impl From<FindOneAndReplaceOptions> for FindAndModifyOptions {
 }
 
 fn return_document_to_bool(return_document: Option<ReturnDocument>) -> Option<bool> {
-    if let Some(return_document) = return_document {
-        return match return_document {
-            ReturnDocument::After => Some(true),
-            ReturnDocument::Before => Some(false),
-        };
-    }
-    None
+    return_document.as_ref().map(ReturnDocument::as_bool)
 }
