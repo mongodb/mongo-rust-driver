@@ -2,27 +2,38 @@ use std::time::Duration;
 
 use bson::Document;
 
-use crate::coll::options::{FindOneOptions, FindOptions};
-use crate::gridfs::{FilesCollectionDocument, GridFsFindOneOptions, GridFsFindOptions};
-use crate::{Cursor, GridFsBucket};
-use crate::action::{action_impl, option_setters};
-use crate::error::Result;
+use crate::{
+    action::{action_impl, option_setters},
+    coll::options::{FindOneOptions, FindOptions},
+    error::Result,
+    gridfs::{FilesCollectionDocument, GridFsFindOneOptions, GridFsFindOptions},
+    Cursor,
+    GridFsBucket,
+};
 
 impl GridFsBucket {
     /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
     /// filter.
-    /// 
+    ///
     /// `await` will return `Result<Cursor<FilesCollectionDocument>>`.
-    pub fn find_2(&self, filter: Document) -> Find {
-        Find { bucket: self, filter, options: None }
+    pub fn find(&self, filter: Document) -> Find {
+        Find {
+            bucket: self,
+            filter,
+            options: None,
+        }
     }
 
     /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
     /// given filter.
-    /// 
+    ///
     /// `await` will return `Result<Option<FilesCollectionDocument>>`.
-    pub fn find_one_2(&self, filter: Document) -> FindOne {
-        FindOne { bucket: self, filter, options: None }
+    pub fn find_one(&self, filter: Document) -> FindOne {
+        FindOne {
+            bucket: self,
+            filter,
+            options: None,
+        }
     }
 }
 
@@ -30,18 +41,18 @@ impl GridFsBucket {
 impl crate::sync::gridfs::GridFsBucket {
     /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
     /// filter.
-    /// 
+    ///
     /// [`run`](Find::run) will return `Result<Cursor<FilesCollectionDocument>>`.
-    pub fn find_2(&self, filter: Document) -> Find {
-        self.async_bucket.find_2(filter)
+    pub fn find(&self, filter: Document) -> Find {
+        self.async_bucket.find(filter)
     }
 
     /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
     /// given filter.
-    /// 
+    ///
     /// [`run`](FindOne::run) will return `Result<Option<FilesCollectionDocument>>`.
-    pub fn find_one_2(&self, filter: Document) -> FindOne {
-        self.async_bucket.find_one_2(filter)
+    pub fn find_one(&self, filter: Document) -> FindOne {
+        self.async_bucket.find_one(filter)
     }
 }
 

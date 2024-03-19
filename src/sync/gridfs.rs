@@ -4,9 +4,8 @@ use std::io::{Read, Write};
 
 use futures_util::{AsyncReadExt, AsyncWriteExt};
 
-use super::Cursor;
 use crate::{
-    bson::{Bson, Document},
+    bson::Bson,
     error::Result,
     gridfs::{
         GridFsBucket as AsyncGridFsBucket,
@@ -15,7 +14,6 @@ use crate::{
     },
     options::{
         GridFsDownloadByNameOptions,
-        GridFsFindOptions,
         GridFsUploadOptions,
         ReadConcern,
         SelectionCriteria,
@@ -56,17 +54,6 @@ impl GridFsBucket {
     /// Gets the read preference of the `GridFsBucket`.
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.async_bucket.selection_criteria()
-    }
-
-    /// Finds the [`FilesCollectionDocument`]s in the bucket matching the given `filter`.
-    pub fn find(
-        &self,
-        filter: Document,
-        options: impl Into<Option<GridFsFindOptions>>,
-    ) -> Result<Cursor<FilesCollectionDocument>> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_bucket.find(filter, options))
-            .map(Cursor::new)
     }
 
     /// Renames the file with the given `id` to `new_filename`. This method returns an error if the

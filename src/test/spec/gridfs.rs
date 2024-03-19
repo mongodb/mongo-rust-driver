@@ -117,7 +117,7 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
     assert_eq!(data, &uploaded);
 
     let file = bucket
-        .find_one(doc! { "_id": upload_stream.id() }, None)
+        .find_one(doc! { "_id": upload_stream.id() })
         .await
         .unwrap()
         .unwrap();
@@ -339,7 +339,7 @@ async fn test_gridfs_bucket_find_one() {
     upload_stream.close().await.unwrap();
 
     let found = bucket
-        .find_one(doc! { "_id": upload_stream.id() }, None)
+        .find_one(doc! { "_id": upload_stream.id() })
         .await
         .unwrap()
         .unwrap();

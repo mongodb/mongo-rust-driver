@@ -12,16 +12,8 @@ use serde_with::skip_serializing_none;
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     checked::Checked,
-    cursor::Cursor,
     error::{Error, Result},
-    options::{
-        CollectionOptions,
-        FindOneOptions,
-        FindOptions,
-        ReadConcern,
-        SelectionCriteria,
-        WriteConcern,
-    },
+    options::{CollectionOptions, ReadConcern, SelectionCriteria, WriteConcern},
     Collection,
     Database,
 };
@@ -203,31 +195,6 @@ impl GridFsBucket {
     /// Gets a handle to the chunks collection for the bucket.
     pub(crate) fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
-    }
-
-    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
-    /// filter.
-    pub async fn find(
-        &self,
-        filter: Document,
-        options: impl Into<Option<GridFsFindOptions>>,
-    ) -> Result<Cursor<FilesCollectionDocument>> {
-        let find_options = options.into().map(FindOptions::from);
-        self.files().find(filter).with_options(find_options).await
-    }
-
-    /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
-    /// given filter.
-    pub async fn find_one(
-        &self,
-        filter: Document,
-        options: impl Into<Option<GridFsFindOneOptions>>,
-    ) -> Result<Option<FilesCollectionDocument>> {
-        let find_options = options.into().map(FindOneOptions::from);
-        self.files()
-            .find_one(filter)
-            .with_options(find_options)
-            .await
     }
 
     /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an

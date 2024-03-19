@@ -21,7 +21,7 @@ use crate::{
 // Utility functions for finding files within the bucket.
 impl GridFsBucket {
     async fn find_file_by_id(&self, id: &Bson) -> Result<FilesCollectionDocument> {
-        match self.find_one(doc! { "_id": id }, None).await? {
+        match self.find_one(doc! { "_id": id }).await? {
             Some(file) => Ok(file),
             None => Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
                 identifier: GridFsFileIdentifier::Id(id.clone()),
