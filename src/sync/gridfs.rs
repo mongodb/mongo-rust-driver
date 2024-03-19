@@ -35,7 +35,7 @@ pub use crate::gridfs::FilesCollectionDocument;
 /// `GridFsBucket` uses [`std::sync::Arc`] internally, so it can be shared safely across threads or
 /// async tasks.
 pub struct GridFsBucket {
-    async_bucket: AsyncGridFsBucket,
+    pub(crate) async_bucket: AsyncGridFsBucket,
 }
 
 impl GridFsBucket {
