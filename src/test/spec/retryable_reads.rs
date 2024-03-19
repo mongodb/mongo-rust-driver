@@ -1,4 +1,4 @@
-use std::{future::IntoFuture, sync::Arc, time::Duration};
+use std::{future::IntoFuture, time::Duration};
 
 use bson::doc;
 

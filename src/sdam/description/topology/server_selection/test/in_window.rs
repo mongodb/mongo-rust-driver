@@ -24,7 +24,9 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-    }, Client, ServerInfo
+    },
+    Client,
+    ServerInfo,
 };
 
 use super::TestTopologyDescription;

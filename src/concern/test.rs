@@ -6,7 +6,8 @@ use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
     options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
-    test::{EventClient, TestClient},
+    test::TestClient,
+    Client,
     Collection,
 };
 
