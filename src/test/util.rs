@@ -1,5 +1,5 @@
-pub(crate) mod buffer;
 mod event;
+pub(crate) mod event_buffer;
 mod failpoint;
 mod matchable;
 #[cfg(feature = "tracing-unstable")]
@@ -19,7 +19,7 @@ pub(crate) use self::trace::{
     TracingHandler,
 };
 
-use self::buffer::EventBuffer;
+use self::event_buffer::EventBuffer;
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
 use crate::{

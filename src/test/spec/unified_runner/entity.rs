@@ -21,7 +21,7 @@ use crate::{
     sdam::TopologyDescription,
     test::{
         spec::unified_runner::{ExpectedEventType, ObserveEvent},
-        util::buffer::EventBuffer,
+        util::event_buffer::EventBuffer,
         Event,
     },
     Client,

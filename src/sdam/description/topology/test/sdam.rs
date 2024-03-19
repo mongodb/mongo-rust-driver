@@ -28,7 +28,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
-        util::buffer::EventBuffer,
+        util::event_buffer::EventBuffer,
         Event,
         EventClient,
         FailCommandOptions,

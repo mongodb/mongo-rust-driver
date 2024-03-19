@@ -10,7 +10,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        util::buffer::EventBuffer,
+        util::event_buffer::EventBuffer,
         Event,
         FailCommandOptions,
         FailPoint,

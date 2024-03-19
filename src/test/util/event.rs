@@ -3,7 +3,7 @@ use std::time::Duration;
 use derive_more::From;
 use serde::Serialize;
 
-use super::{buffer::EventBuffer, TestClient, TestClientBuilder};
+use super::{event_buffer::EventBuffer, TestClient, TestClientBuilder};
 use crate::{
     bson::doc,
     event::{

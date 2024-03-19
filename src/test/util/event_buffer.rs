@@ -17,6 +17,10 @@ use crate::{
 
 use super::Event;
 
+/// A buffer of events that provides utility methods for querying the buffer and awaiting new event
+/// arrival.
+///
+/// New test code should prefer to use this over `EventSubscriber`.
 #[derive(Clone, Debug)]
 pub(crate) struct EventBuffer<T = Event> {
     inner: Arc<EventBufferInner<T>>,
@@ -70,6 +74,8 @@ impl<T> EventBuffer<T> {
     }
 
     /// Subscribe to events generated after the point of this call.
+    ///
+    /// New test code should prefer using `watch_all` over this.
     pub(crate) fn subscribe(&self) -> EventSubscriber<'_, T> {
         let (index, generation) = {
             let events = self.inner.events.lock().unwrap();
@@ -83,6 +89,8 @@ impl<T> EventBuffer<T> {
     }
 
     /// Subscribe to all events contained in the buffer.
+    ///
+    /// New test code should prefer using `watch_all` over this.
     pub(crate) fn subscribe_all(&self) -> EventSubscriber<'_, T> {
         EventSubscriber {
             buffer: self,
@@ -289,6 +297,9 @@ impl EventBuffer<Event> {
     }
 }
 
+/// Process events one at a time as they arrive asynchronously.
+///
+/// New test code should prefer to use `EventBuffer`.
 pub(crate) struct EventSubscriber<'a, T> {
     buffer: &'a EventBuffer<T>,
     index: usize,

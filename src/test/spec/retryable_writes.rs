@@ -26,7 +26,7 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         spec::unified_runner::run_unified_tests,
-        util::{buffer::EventBuffer, get_default_name},
+        util::{event_buffer::EventBuffer, get_default_name},
         Event,
         EventClient,
         FailCommandOptions,

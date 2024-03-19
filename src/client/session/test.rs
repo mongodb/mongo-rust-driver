@@ -16,7 +16,7 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::buffer::EventBuffer,
+        util::event_buffer::EventBuffer,
         Event,
         EventClient,
         TestClient,
