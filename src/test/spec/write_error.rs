@@ -1,12 +1,15 @@
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, WriteFailure},
-    test::{log_uncaptured, EventClient},
+    test::log_uncaptured,
     Collection,
 };
 
 #[tokio::test]
 async fn details() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.server_version_lt(5, 0) {
@@ -29,9 +32,11 @@ async fn details() {
         ErrorKind::Write(WriteFailure::WriteError(e)) => e,
         _ => panic!("expected WriteError, got {:?}", err.kind),
     };
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let (_, event) = events.get_successful_command_execution("insert");
+    let (_, event) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("insert")
+    };
     assert_eq!(write_err.code, 121 /* DocumentValidationFailure */);
     assert_eq!(
         &write_err.details.unwrap(),

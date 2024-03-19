@@ -5,8 +5,10 @@ mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
+#[allow(deprecated)]
+pub(crate) use self::event::EventClient;
 pub(crate) use self::{
-    event::{Event, EventClient},
+    event::Event,
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
 };

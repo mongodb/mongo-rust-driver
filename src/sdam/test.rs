@@ -6,6 +6,8 @@ use std::{
 use bson::doc;
 use semver::VersionReq;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
@@ -18,7 +20,6 @@ use crate::{
         log_uncaptured,
         util::event_buffer::EventBuffer,
         Event,
-        EventClient,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -101,6 +102,7 @@ async fn sdam_pool_management() {
 
     let event_buffer = EventBuffer::new();
 
+    #[allow(deprecated)]
     let client = EventClient::with_additional_options(
         Some(options),
         Some(Duration::from_millis(50)),

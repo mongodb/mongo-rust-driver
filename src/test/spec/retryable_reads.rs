@@ -192,6 +192,7 @@ async fn retry_read_different_mongos() {
         guards.push(client.enable_failpoint(fp, None).await.unwrap());
     }
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -203,9 +204,11 @@ async fn retry_read_different_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_err());
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let events = events.get_command_events(&["find"]);
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["find"])
+    };
     assert!(
         matches!(
             &events[..],
@@ -251,6 +254,7 @@ async fn retry_read_same_mongos() {
         client.enable_failpoint(fp, None).await.unwrap()
     };
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -262,9 +266,11 @@ async fn retry_read_same_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let events = events.get_command_events(&["find"]);
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["find"])
+    };
     assert!(
         matches!(
             &events[..],

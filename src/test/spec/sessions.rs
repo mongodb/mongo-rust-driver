@@ -7,6 +7,8 @@ use std::{
 use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
@@ -18,7 +20,6 @@ use crate::{
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
         util::Event,
-        EventClient,
         TestClient,
     },
     Client,
@@ -204,6 +205,7 @@ async fn implicit_session_after_connection() {
     );
 }
 
+#[allow(deprecated)]
 async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let util_client = TestClient::new().await;
     if util_client.server_version_lt(4, 2) {
@@ -226,6 +228,7 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let options = ClientOptions::parse("mongodb://localhost:47017")
         .await
         .unwrap();
+    #[allow(deprecated)]
     let client = EventClient::with_options(options).await;
     assert!(client.server_info.logical_session_timeout_minutes.is_none());
 

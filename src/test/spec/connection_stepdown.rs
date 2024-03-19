@@ -2,16 +2,19 @@ use std::{future::Future, time::Duration};
 
 use futures::stream::StreamExt;
 
+#[allow(deprecated)]
+use crate::test::util::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
     options::{Acknowledgment, ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, util::EventClient},
+    test::{get_client_options, log_uncaptured},
     Collection,
     Database,
 };
 
+#[allow(deprecated)]
 async fn run_test<F: Future>(
     name: &str,
     test: impl Fn(EventClient, Database, Collection<Document>) -> F,
@@ -49,6 +52,7 @@ async fn run_test<F: Future>(
 
 #[tokio::test]
 async fn get_more() {
+    #[allow(deprecated)]
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
@@ -98,6 +102,7 @@ async fn get_more() {
 
 #[tokio::test]
 async fn notwritableprimary_keep_pool() {
+    #[allow(deprecated)]
     async fn notwritableprimary_keep_pool_test(
         client: EventClient,
         _db: Database,
@@ -148,6 +153,7 @@ async fn notwritableprimary_keep_pool() {
 
 #[tokio::test]
 async fn notwritableprimary_reset_pool() {
+    #[allow(deprecated)]
     async fn notwritableprimary_reset_pool_test(
         client: EventClient,
         _db: Database,
@@ -200,6 +206,7 @@ async fn notwritableprimary_reset_pool() {
 
 #[tokio::test]
 async fn shutdown_in_progress() {
+    #[allow(deprecated)]
     async fn shutdown_in_progress_test(
         client: EventClient,
         _db: Database,
@@ -245,6 +252,7 @@ async fn shutdown_in_progress() {
 
 #[tokio::test]
 async fn interrupted_at_shutdown() {
+    #[allow(deprecated)]
     async fn interrupted_at_shutdown_test(
         client: EventClient,
         _db: Database,

@@ -12,6 +12,8 @@ use once_cell::sync::Lazy;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
@@ -33,7 +35,7 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::{drop_collection, EventClient, TestClient},
+        util::{drop_collection, TestClient},
     },
     Collection,
     IndexModel,
@@ -245,6 +247,7 @@ async fn aggregate_out() {
         .any(|name| name.as_str() == out_coll.name()));
 }
 
+#[allow(deprecated)]
 fn kill_cursors_sent(client: &EventClient) -> bool {
     !client
         .events
@@ -265,6 +268,7 @@ async fn kill_cursors_on_drop() {
         .await
         .unwrap();
 
+    #[allow(deprecated)]
     let event_client = EventClient::new().await;
     let coll = event_client
         .database(function_name!())
@@ -297,6 +301,7 @@ async fn no_kill_cursors_on_exhausted() {
         .await
         .unwrap();
 
+    #[allow(deprecated)]
     let event_client = EventClient::new().await;
     let coll = event_client
         .database(function_name!())
@@ -525,6 +530,7 @@ async fn find_allow_disk_use_not_specified() {
 
 #[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
+    #[allow(deprecated)]
     let event_client = EventClient::new().await;
     if event_client.server_version_lt(4, 3) {
         log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
@@ -535,6 +541,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection::<Document>(function_name!());
     coll.find(doc! {}).with_options(options).await.unwrap();
 
+    #[allow(deprecated)]
     let events = event_client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
 
@@ -552,6 +559,7 @@ async fn ns_not_found_suppression() {
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll = client.database(name).collection::<Document>(name);
     let _: Result<DeleteResult> = coll
@@ -559,6 +567,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
         .with_options(options.clone())
         .await;
 
+    #[allow(deprecated)]
     let events = client.events.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
 
@@ -595,6 +604,7 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     let req = VersionReq::parse(">= 4.2").unwrap();
@@ -609,6 +619,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
         .with_options(options.clone())
         .await;
 
+    #[allow(deprecated)]
     let events = client.events.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
 
@@ -648,6 +659,7 @@ async fn find_one_and_delete_hint_not_specified() {
 #[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_server_version() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll = client
         .database(function_name!())
@@ -674,6 +686,7 @@ async fn find_one_and_delete_hint_server_version() {
 #[tokio::test]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
@@ -693,6 +706,7 @@ async fn no_read_preference_to_standalone() {
         .await
         .unwrap();
 
+    #[allow(deprecated)]
     let mut events = client.events.clone();
     #[allow(deprecated)]
     let command_started = events.get_successful_command_execution("find").0;
@@ -896,6 +910,7 @@ async fn count_documents_with_wc() {
 #[tokio::test]
 #[function_name::named]
 async fn collection_options_inherited() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     let read_concern = ReadConcern::majority();
@@ -921,6 +936,7 @@ async fn collection_options_inherited() {
     assert_options_inherited(&client, "aggregate").await;
 }
 
+#[allow(deprecated)]
 async fn assert_options_inherited(client: &EventClient, command_name: &str) {
     let events = client.events.get_command_started_events(&[command_name]);
     let event = events.iter().last().unwrap();

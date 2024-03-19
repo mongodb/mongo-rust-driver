@@ -5,6 +5,8 @@ use std::{future::Future, sync::Arc, time::Duration};
 use bson::Document;
 use futures::stream::StreamExt;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson},
     coll::options::CountOptions,
@@ -18,7 +20,6 @@ use crate::{
         log_uncaptured,
         util::event_buffer::EventBuffer,
         Event,
-        EventClient,
         TestClient,
     },
     Client,
@@ -382,6 +383,7 @@ async fn session_usage() {
         return;
     }
 
+    #[allow(deprecated)]
     async fn session_usage_test<F, G>(command_name: &str, operation: F)
     where
         F: Fn(EventClient) -> G,
@@ -406,6 +408,7 @@ async fn session_usage() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -425,9 +428,11 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let mut cursor = coll.find(doc! {}).await.expect("find should succeed");
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let (find_started, _) = events.get_successful_command_execution("find");
+    let (find_started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
     let session_id = find_started
         .command
         .get("lsid")
@@ -448,6 +453,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -476,9 +482,11 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         assert!(matches!(cursor.next().await, Some(Ok(_))));
     }
 
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let (find_started, _) = events.get_successful_command_execution("find");
+    let (find_started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
 
     let session_id = find_started
         .command
@@ -500,6 +508,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(
@@ -533,6 +542,7 @@ async fn find_and_getmore_share_session() {
         },
     ];
 
+    #[allow(deprecated)]
     async fn run_test(
         client: &EventClient,
         coll: &Collection<Document>,

@@ -1,12 +1,14 @@
 use bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     coll::options::CollectionOptions,
     error::Result,
     event::command::CommandEvent,
     options::ReadConcern,
-    test::{log_uncaptured, EventClient},
+    test::log_uncaptured,
     ClientSession,
     Collection,
 };
@@ -117,6 +119,7 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
 /// Test 1 from the causal consistency specification.
 #[tokio::test]
 async fn new_session_operation_time_null() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -133,6 +136,7 @@ async fn new_session_operation_time_null() {
 /// Test 2 from the causal consistency specification.
 #[tokio::test]
 async fn first_read_no_after_cluser_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -158,9 +162,11 @@ async fn first_read_no_after_cluser_time() {
         )
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
-        let mut events = client.events.clone();
         #[allow(deprecated)]
-        let (started, _) = events.get_successful_command_execution(name);
+        let (started, _) = {
+            let mut events = client.events.clone();
+            events.get_successful_command_execution(name)
+        };
 
         // assert that no read concern was set.
         started.command.get_document("readConcern").unwrap_err();
@@ -170,6 +176,7 @@ async fn first_read_no_after_cluser_time() {
 /// Test 3 from the causal consistency specification.
 #[tokio::test]
 async fn first_op_update_op_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -194,13 +201,15 @@ async fn first_op_update_op_time() {
         .await
         .unwrap();
 
-        let mut events = client.events.clone();
         #[allow(deprecated)]
-        let event = events
-            .get_command_events(&[name])
-            .into_iter()
-            .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-            .unwrap_or_else(|| panic!("no event found for {}", name));
+        let event = {
+            let mut events = client.events.clone();
+            events
+                .get_command_events(&[name])
+                .into_iter()
+                .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
+                .unwrap_or_else(|| panic!("no event found for {}", name))
+        };
 
         match event {
             CommandEvent::Succeeded(s) => {
@@ -218,6 +227,7 @@ async fn first_op_update_op_time() {
 /// Test 4 from the causal consistency specification.
 #[tokio::test]
 async fn read_includes_after_cluster_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -238,6 +248,7 @@ async fn read_includes_after_cluster_time() {
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -259,6 +270,7 @@ async fn read_includes_after_cluster_time() {
 /// Test 5 from the causal consistency specification.
 #[tokio::test]
 async fn find_after_write_includes_after_cluster_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -283,6 +295,7 @@ async fn find_after_write_includes_after_cluster_time() {
         let op_time = session.operation_time().unwrap();
         coll.find_one(doc! {}).session(&mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&["find"])
@@ -303,6 +316,7 @@ async fn find_after_write_includes_after_cluster_time() {
 /// Test 6 from the causal consistency specification.
 #[tokio::test]
 async fn not_causally_consistent_omits_after_cluster_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -327,6 +341,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -342,6 +357,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
 /// Test 7 from the causal consistency specification.
 #[tokio::test]
 async fn omit_after_cluster_time_standalone() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
@@ -363,6 +379,7 @@ async fn omit_after_cluster_time_standalone() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -378,6 +395,7 @@ async fn omit_after_cluster_time_standalone() {
 /// Test 8 from the causal consistency specification.
 #[tokio::test]
 async fn omit_default_read_concern_level() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -403,6 +421,7 @@ async fn omit_default_read_concern_level() {
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -418,6 +437,7 @@ async fn omit_default_read_concern_level() {
 /// Test 9 from the causal consistency specification.
 #[tokio::test]
 async fn test_causal_consistency_read_concern_merge() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(
@@ -449,6 +469,7 @@ async fn test_causal_consistency_read_concern_merge() {
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -467,6 +488,7 @@ async fn test_causal_consistency_read_concern_merge() {
 /// Test 11 from the causal consistency specification.
 #[tokio::test]
 async fn omit_cluster_time_standalone() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if !client.is_standalone() {
         log_uncaptured("skipping omit_cluster_time_standalone due to unsupported topology");
@@ -479,15 +501,18 @@ async fn omit_cluster_time_standalone() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let (started, _) = events.get_successful_command_execution("find");
+    let (started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
     started.command.get_document("$clusterTime").unwrap_err();
 }
 
 /// Test 12 from the causal consistency specification.
 #[tokio::test]
 async fn cluster_time_sent_in_commands() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured("skipping cluster_time_sent_in_commands due to unsupported topology");
@@ -500,6 +525,7 @@ async fn cluster_time_sent_in_commands() {
 
     coll.find_one(doc! {}).await.unwrap();
 
+    #[allow(deprecated)]
     let mut events = client.events.clone();
     #[allow(deprecated)]
     let (started, _) = events.get_successful_command_execution("find");

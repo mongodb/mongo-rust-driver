@@ -106,12 +106,14 @@ impl CommandEvent {
     }
 }
 
+#[deprecated = "use EventBuffer directly"]
 #[derive(Clone, Debug)]
 pub(crate) struct EventClient {
     client: TestClient,
     pub(crate) events: EventBuffer,
 }
 
+#[allow(deprecated)]
 impl std::ops::Deref for EventClient {
     type Target = TestClient;
 
@@ -120,6 +122,7 @@ impl std::ops::Deref for EventClient {
     }
 }
 
+#[allow(deprecated)]
 impl std::ops::DerefMut for EventClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.client
@@ -127,15 +130,19 @@ impl std::ops::DerefMut for EventClient {
 }
 
 impl TestClientBuilder {
+    #[deprecated = "use EventBuffer directly"]
+    #[allow(deprecated)]
     pub(crate) fn event_client(self) -> EventClientBuilder {
         EventClientBuilder { inner: self }
     }
 }
 
+#[deprecated = "use EventBuffer directly"]
 pub(crate) struct EventClientBuilder {
     inner: TestClientBuilder,
 }
 
+#[allow(deprecated)]
 impl EventClientBuilder {
     pub(crate) async fn build(self) -> EventClient {
         let mut inner = self.inner;
@@ -155,6 +162,7 @@ impl EventClientBuilder {
     }
 }
 
+#[allow(deprecated)]
 impl EventClient {
     pub(crate) async fn new() -> Self {
         EventClient::with_options(None).await
@@ -199,6 +207,7 @@ impl EventClient {
 }
 
 #[tokio::test]
+#[allow(deprecated)]
 async fn command_started_event_count() {
     let client = EventClient::new().await;
     let coll = client.database("foo").collection("bar");

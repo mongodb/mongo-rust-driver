@@ -9,6 +9,8 @@ use tokio::sync::Mutex;
 
 use test_file::{TestFile, TestResult};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
@@ -28,7 +30,6 @@ use crate::{
         spec::unified_runner::run_unified_tests,
         util::{event_buffer::EventBuffer, get_default_name},
         Event,
-        EventClient,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -55,6 +56,7 @@ async fn run_legacy() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
 
+            #[allow(deprecated)]
             let client = EventClient::with_additional_options(
                 options,
                 Some(Duration::from_millis(50)),
@@ -182,6 +184,7 @@ async fn run_legacy() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -191,6 +194,7 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
+    #[allow(deprecated)]
     let mut events = client.events.clone();
     let mut excludes_txn_number = move |command_name: &str| -> bool {
         #[allow(deprecated)]
@@ -229,6 +233,7 @@ async fn transaction_ids_excluded() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -238,6 +243,7 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
+    #[allow(deprecated)]
     let mut events = client.events.clone();
     let mut includes_txn_number = move |command_name: &str| -> bool {
         #[allow(deprecated)]
@@ -599,6 +605,7 @@ async fn retry_write_different_mongos() {
         guards.push(client.enable_failpoint(fp, None).await.unwrap());
     }
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -610,9 +617,11 @@ async fn retry_write_different_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let events = events.get_command_events(&["insert"]);
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["insert"])
+    };
     assert!(
         matches!(
             &events[..],
@@ -659,6 +668,7 @@ async fn retry_write_same_mongos() {
         client.enable_failpoint(fp, None).await.unwrap()
     };
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -670,9 +680,11 @@ async fn retry_write_same_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let mut events = client.events.clone();
     #[allow(deprecated)]
-    let events = events.get_command_events(&["insert"]);
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["insert"])
+    };
     assert!(
         matches!(
             &events[..],
