@@ -2736,7 +2736,9 @@ impl TestOperation for Download {
             // First, read via the download_to_writer API.
             let mut buf: Vec<u8> = vec![];
             bucket
-                .download_to_futures_0_3_writer(self.id.clone(), &mut buf)
+                .open_download_stream(self.id.clone())
+                .await?
+                .read_to_end(&mut buf)
                 .await?;
             let writer_data = hex::encode(buf);
 
@@ -2772,27 +2774,14 @@ impl TestOperation for DownloadByName {
         async move {
             let bucket = test_runner.get_bucket(id).await;
 
-            // First, read via the download_to_writer API.
             let mut buf: Vec<u8> = vec![];
             bucket
-                .download_to_futures_0_3_writer_by_name(
-                    self.filename.clone(),
-                    &mut buf,
-                    self.options.clone(),
-                )
+                .open_download_stream_by_name(&self.filename)
+                .with_options(self.options.clone())
+                .await?
+                .read_to_end(&mut buf)
                 .await?;
             let writer_data = hex::encode(buf);
-
-            // Next, read via the open_download_stream API.
-            let mut buf: Vec<u8> = vec![];
-            let mut stream = bucket
-                .open_download_stream_by_name(self.filename.clone(), self.options.clone())
-                .await?;
-            stream.read_to_end(&mut buf).await?;
-            let stream_data = hex::encode(buf);
-
-            // Assert that both APIs returned the same data.
-            assert_eq!(writer_data, stream_data);
 
             Ok(Some(Entity::Bson(writer_data.into())))
         }

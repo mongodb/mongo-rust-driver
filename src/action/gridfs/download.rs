@@ -13,7 +13,7 @@ impl GridFsBucket {
     /// the contents of the stored file specified by `id`.
     ///
     /// `await` will return `Result<GridFsDownloadStream>`.
-    pub fn open_download_stream_2(&self, id: Bson) -> OpenDownloadStream {
+    pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream {
         OpenDownloadStream { bucket: self, id }
     }
 
@@ -26,7 +26,7 @@ impl GridFsBucket {
     /// provided, the file with `filename` most recently uploaded will be downloaded.
     ///
     /// `await` will return `Result<GridFsDownloadStream>`.
-    pub fn open_download_stream_by_name_2(
+    pub fn open_download_stream_by_name(
         &self,
         filename: impl AsRef<str>,
     ) -> OpenDownloadStreamByName {
@@ -39,7 +39,7 @@ impl GridFsBucket {
 
     // Utility functions for finding files within the bucket.
 
-    async fn find_file_by_id_2(&self, id: &Bson) -> Result<FilesCollectionDocument> {
+    async fn find_file_by_id(&self, id: &Bson) -> Result<FilesCollectionDocument> {
         match self.find_one(doc! { "_id": id }).await? {
             Some(file) => Ok(file),
             None => Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
@@ -49,7 +49,7 @@ impl GridFsBucket {
         }
     }
 
-    async fn find_file_by_name_2(
+    async fn find_file_by_name(
         &self,
         filename: &str,
         options: Option<GridFsDownloadByNameOptions>,
@@ -94,8 +94,24 @@ impl crate::sync::gridfs::GridFsBucket {
     /// the contents of the stored file specified by `id`.
     ///
     /// [`run`](OpenDownloadStream::run) will return `Result<GridFsDownloadStream>`.
-    pub fn open_download_stream_2(&self, id: Bson) -> OpenDownloadStream {
-        self.async_bucket.open_download_stream_2(id)
+    pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream {
+        self.async_bucket.open_download_stream(id)
+    }
+
+    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
+    /// the contents of the stored file specified by `filename`.
+    ///
+    /// If there are multiple files in the bucket with the given filename, the `revision` in the
+    /// options provided is used to determine which one to download. See the documentation for
+    /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
+    /// provided, the file with `filename` most recently uploaded will be downloaded.
+    ///
+    /// [`run`](OpenDownloadStreamByName::run) will return `Result<GridFsDownloadStream>`.
+    pub fn open_download_stream_by_name(
+        &self,
+        filename: impl AsRef<str>,
+    ) -> OpenDownloadStreamByName {
+        self.async_bucket.open_download_stream_by_name(filename)
     }
 }
 
@@ -113,7 +129,7 @@ action_impl! {
         type Future = OpenDownloadStreamFuture;
 
         async fn execute(self) -> Result<GridFsDownloadStream> {
-            let file = self.bucket.find_file_by_id_2(&self.id).await?;
+            let file = self.bucket.find_file_by_id(&self.id).await?;
             GridFsDownloadStream::new(file, self.bucket.chunks()).await
         }
 
@@ -146,7 +162,7 @@ action_impl! {
         async fn execute(self) -> Result<GridFsDownloadStream> {
             let file = self
                 .bucket
-                .find_file_by_name_2(&self.filename, self.options)
+                .find_file_by_name(&self.filename, self.options)
                 .await?;
             GridFsDownloadStream::new(file, self.bucket.chunks()).await
         }

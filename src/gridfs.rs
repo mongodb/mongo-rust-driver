@@ -80,11 +80,6 @@ impl FilesCollectionDocument {
         n.try_into().unwrap()
     }
 
-    /// Returns the expected length of a chunk given its index.
-    fn expected_chunk_length(&self, n: u32) -> u32 {
-        Self::expected_chunk_length_from_vals(self.length, self.chunk_size_bytes, n)
-    }
-
     fn expected_chunk_length_from_vals(length: u64, chunk_size_bytes: u32, n: u32) -> u32 {
         let remainder = length % (chunk_size_bytes as u64);
         if n == Self::n_from_vals(length, chunk_size_bytes) - 1 && remainder != 0 {

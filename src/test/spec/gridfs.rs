@@ -111,7 +111,10 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
 
     let mut uploaded = Vec::new();
     bucket
-        .download_to_futures_0_3_writer(upload_stream.id().clone(), &mut uploaded)
+        .open_download_stream(upload_stream.id().clone())
+        .await
+        .unwrap()
+        .read_to_end(&mut uploaded)
         .await
         .unwrap();
     assert_eq!(data, &uploaded);
@@ -170,7 +173,10 @@ async fn upload_stream_multiple_buffers() {
 
     let mut uploaded = Vec::new();
     bucket
-        .download_to_futures_0_3_writer(upload_stream.id().clone(), &mut uploaded)
+        .open_download_stream(upload_stream.id().clone())
+        .await
+        .unwrap()
+        .read_to_end(&mut uploaded)
         .await
         .unwrap();
     assert_eq!(uploaded, data);

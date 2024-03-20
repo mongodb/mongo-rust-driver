@@ -12,13 +12,7 @@ use crate::{
         GridFsDownloadStream as AsyncGridFsDownloadStream,
         GridFsUploadStream as AsyncGridFsUploadStream,
     },
-    options::{
-        GridFsDownloadByNameOptions,
-        GridFsUploadOptions,
-        ReadConcern,
-        SelectionCriteria,
-        WriteConcern,
-    },
+    options::{GridFsUploadOptions, ReadConcern, SelectionCriteria, WriteConcern},
 };
 
 pub use crate::gridfs::FilesCollectionDocument;
@@ -86,37 +80,6 @@ impl Read for GridFsDownloadStream {
 impl GridFsDownloadStream {
     pub(crate) fn new(async_stream: AsyncGridFsDownloadStream) -> Self {
         Self { async_stream }
-    }
-}
-
-// Download API
-impl GridFsBucket {
-    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `id`.
-    pub fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_bucket.open_download_stream(id))
-            .map(GridFsDownloadStream::new)
-    }
-
-    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `filename`.
-    ///
-    /// If there are multiple files in the bucket with the given filename, the `revision` in the
-    /// options provided is used to determine which one to download. See the documentation for
-    /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
-    /// provided, the file with `filename` most recently uploaded will be downloaded.
-    pub fn open_download_stream_by_name(
-        &self,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) -> Result<GridFsDownloadStream> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(
-                self.async_bucket
-                    .open_download_stream_by_name(filename, options),
-            )
-            .map(GridFsDownloadStream::new)
     }
 }
 

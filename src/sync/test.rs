@@ -458,6 +458,7 @@ fn gridfs() {
 
     let mut download_stream = bucket
         .open_download_stream(upload_stream.id().clone())
+        .run()
         .unwrap();
     download_stream.read_to_end(&mut download).unwrap();
 
