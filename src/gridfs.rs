@@ -175,7 +175,7 @@ impl GridFsBucket {
     }
 
     /// Gets the chunk size in bytes for the bucket.
-    fn chunk_size_bytes(&self) -> u32 {
+    pub(crate) fn chunk_size_bytes(&self) -> u32 {
         self.inner
             .options
             .chunk_size_bytes

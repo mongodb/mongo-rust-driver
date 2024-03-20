@@ -142,6 +142,10 @@ pub struct GridFsUploadStream {
 }
 
 impl GridFsUploadStream {
+    pub(crate) fn new(async_stream: AsyncGridFsUploadStream) -> Self {
+        Self { async_stream }
+    }
+
     /// Gets the stream's unique [`Bson`] identifier. This value will be the `id` field for the
     /// [`FilesCollectionDocument`] uploaded to the files collection when the stream is closed.
     pub fn id(&self) -> &Bson {

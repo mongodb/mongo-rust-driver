@@ -361,6 +361,26 @@ impl State {
 }
 
 impl GridFsUploadStream {
+    pub(crate) fn new(
+        bucket: GridFsBucket,
+        id: Bson,
+        filename: String,
+        chunk_size_bytes: u32,
+        metadata: Option<Document>,
+        drop_token: AsyncDropToken,
+    ) -> Self {
+        Self {
+            bucket,
+            state: State::Idle(Some(Vec::new())),
+            current_n: 0,
+            id,
+            filename: Some(filename),
+            chunk_size_bytes,
+            metadata: Some(metadata),
+            drop_token,
+        }
+    }
+
     /// Gets the stream's unique [`Bson`] identifier. This value will be the `id` field for the
     /// [`FilesCollectionDocument`] uploaded to the files collection when the stream is closed.
     pub fn id(&self) -> &Bson {
