@@ -7,7 +7,7 @@ use std::{
 
 use futures_util::{
     future::{BoxFuture, FutureExt},
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite},
 };
 
 use super::{options::GridFsDownloadByNameOptions, Chunk, FilesCollectionDocument, GridFsBucket};
@@ -94,12 +94,19 @@ impl GridFsBucket {
     ///
     /// Note that once an `AsyncWrite` trait is stabilized in the standard library, this method will
     /// be deprecated in favor of one that accepts a `std::io::AsyncWrite` source.
-    pub async fn download_to_futures_0_3_writer<T>(&self, id: Bson, destination: T) -> Result<()>
+    pub async fn download_to_futures_0_3_writer<T>(
+        &self,
+        id: Bson,
+        mut destination: T,
+    ) -> Result<()>
     where
         T: AsyncWrite + Unpin,
     {
-        let file = self.find_file_by_id(&id).await?;
-        self.download_to_writer_common(file, destination).await
+        let stream = self.open_download_stream(id).await?;
+        futures_util::io::copy(stream, &mut destination).await?;
+        Ok(())
+        // let file = self.find_file_by_id(&id).await?;
+        // self.download_to_writer_common(file, destination).await
     }
 
     /// Downloads the contents of the stored file specified by `filename` and writes the contents to
@@ -134,67 +141,19 @@ impl GridFsBucket {
     pub async fn download_to_futures_0_3_writer_by_name<T>(
         &self,
         filename: impl AsRef<str>,
-        destination: T,
+        mut destination: T,
         options: impl Into<Option<GridFsDownloadByNameOptions>>,
     ) -> Result<()>
     where
         T: AsyncWrite + Unpin,
     {
-        let file = self
-            .find_file_by_name(filename.as_ref(), options.into())
-            .await?;
-        self.download_to_writer_common(file, destination).await
-    }
-
-    async fn download_to_writer_common<T>(
-        &self,
-        file: FilesCollectionDocument,
-        mut destination: T,
-    ) -> Result<()>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        if file.length == 0 {
-            return Ok(());
-        }
-
-        let mut cursor = self
-            .chunks()
-            .find(doc! { "files_id": &file.id })
-            .sort(doc! { "n": 1 })
-            .await?;
-
-        let mut n = 0;
-        while cursor.advance().await? {
-            let chunk = cursor.deserialize_current()?;
-            if chunk.n != n {
-                return Err(ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n }).into());
-            }
-
-            let chunk_length = chunk.data.bytes.len();
-            let expected_length = file.expected_chunk_length(n);
-            if chunk_length != expected_length as usize {
-                return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
-                    actual_size: chunk_length,
-                    expected_size: expected_length,
-                    n,
-                })
-                .into());
-            }
-
-            destination.write_all(chunk.data.bytes).await?;
-            n += 1;
-        }
-
-        if n != file.n() {
-            return Err(ErrorKind::GridFs(GridFsErrorKind::WrongNumberOfChunks {
-                actual_number: n,
-                expected_number: file.n(),
-            })
-            .into());
-        }
-
+        let stream = self.open_download_stream_by_name(filename, options).await?;
+        futures_util::io::copy(stream, &mut destination).await?;
         Ok(())
+        // let file = self
+        // .find_file_by_name(filename.as_ref(), options.into())
+        // .await?;
+        // self.download_to_writer_common(file, destination).await
     }
 }
 
@@ -262,7 +221,7 @@ impl State {
 }
 
 impl GridFsDownloadStream {
-    async fn new(
+    pub(crate) async fn new(
         file: FilesCollectionDocument,
         chunks: &Collection<Chunk<'static>>,
     ) -> Result<Self> {

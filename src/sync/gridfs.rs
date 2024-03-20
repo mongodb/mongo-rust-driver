@@ -84,7 +84,7 @@ impl Read for GridFsDownloadStream {
 }
 
 impl GridFsDownloadStream {
-    fn new(async_stream: AsyncGridFsDownloadStream) -> Self {
+    pub(crate) fn new(async_stream: AsyncGridFsDownloadStream) -> Self {
         Self { async_stream }
     }
 }
