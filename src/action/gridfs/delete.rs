@@ -1,5 +1,7 @@
 use bson::{doc, Bson};
 
+#[cfg(docsrs)]
+use crate::gridfs::FilesCollectionDocument;
 use crate::{
     action::action_impl,
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},

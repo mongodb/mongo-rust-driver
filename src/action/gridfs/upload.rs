@@ -1,5 +1,7 @@
 use bson::{oid::ObjectId, Bson, Document};
 
+#[cfg(docsrs)]
+use crate::gridfs::FilesCollectionDocument;
 use crate::{
     action::{action_impl, option_setters},
     error::Result,

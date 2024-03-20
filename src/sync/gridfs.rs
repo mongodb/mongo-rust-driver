@@ -62,7 +62,7 @@ impl GridFsBucket {
 /// use std::io::Read;
 ///
 /// let mut buf = Vec::new();
-/// let mut download_stream = bucket.open_download_stream(id)?;
+/// let mut download_stream = bucket.open_download_stream(id).run()?;
 /// download_stream.read_to_end(&mut buf)?;
 /// # Ok(())
 /// # }
@@ -99,7 +99,7 @@ impl GridFsDownloadStream {
 /// use std::io::Write;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").run()?;
 /// upload_stream.write_all(&bytes[..])?;
 /// upload_stream.close()?;
 /// # Ok(())
@@ -117,7 +117,7 @@ impl GridFsDownloadStream {
 /// use std::io::Write;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").run()?;
 /// upload_stream.write_all(&bytes[..])?;
 /// upload_stream.abort()?;
 /// # Ok(())

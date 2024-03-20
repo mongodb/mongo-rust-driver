@@ -119,7 +119,7 @@ impl GridFsBucket {
 /// use futures_util::io::AsyncWriteExt;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").await?;
 /// upload_stream.write_all(&bytes[..]).await?;
 /// upload_stream.close().await?;
 /// # Ok(())
@@ -137,7 +137,7 @@ impl GridFsBucket {
 /// use futures_util::io::AsyncWriteExt;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").await?;
 /// upload_stream.write_all(&bytes[..]).await?;
 /// upload_stream.abort().await?;
 /// # Ok(())
@@ -164,11 +164,13 @@ impl GridFsBucket {
 ///
 /// ```rust
 /// # use mongodb::gridfs::{GridFsBucket, GridFsUploadStream};
-/// # fn compat_example(bucket: GridFsBucket) {
+/// # use mongodb::error::Result;
+/// # async fn compat_example(bucket: GridFsBucket) -> Result<()> {
 /// use tokio_util::compat::FuturesAsyncWriteCompatExt;
 ///
-/// let futures_upload_stream = bucket.open_upload_stream("example_file", None);
+/// let futures_upload_stream = bucket.open_upload_stream("example_file").await?;
 /// let tokio_upload_stream = futures_upload_stream.compat_write();
+/// # Ok(())
 /// # }
 /// ```
 pub struct GridFsUploadStream {
