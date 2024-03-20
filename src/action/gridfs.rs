@@ -7,7 +7,7 @@ mod find;
 mod rename;
 
 pub use delete::Delete;
-pub use download::OpenDownloadStream;
+pub use download::{OpenDownloadStream, OpenDownloadStreamByName};
 pub use drop::Drop;
 pub use find::{Find, FindOne};
 pub use rename::Rename;
