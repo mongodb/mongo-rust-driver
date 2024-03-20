@@ -12,7 +12,7 @@ use crate::{
         GridFsDownloadStream as AsyncGridFsDownloadStream,
         GridFsUploadStream as AsyncGridFsUploadStream,
     },
-    options::{GridFsUploadOptions, ReadConcern, SelectionCriteria, WriteConcern},
+    options::{ReadConcern, SelectionCriteria, WriteConcern},
 };
 
 pub use crate::gridfs::FilesCollectionDocument;
@@ -175,36 +175,5 @@ impl Write for GridFsUploadStream {
 
     fn flush(&mut self) -> std::io::Result<()> {
         crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.flush())
-    }
-}
-
-// Upload API
-impl GridFsBucket {
-    /// Creates and returns a [`GridFsUploadStream`] that the application can write the contents of
-    /// the file to. This method generates a unique [`ObjectId`](crate::bson::oid::ObjectId) for the
-    /// corresponding [`FilesCollectionDocument`]'s `id` field that can be accessed via the
-    /// stream's `id` method.
-    pub fn open_upload_stream(
-        &self,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> GridFsUploadStream {
-        let async_stream = self.async_bucket.open_upload_stream(filename, options);
-        GridFsUploadStream { async_stream }
-    }
-
-    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
-    /// The provided `id` will be used for the corresponding [`FilesCollectionDocument`]'s `id`
-    /// field.
-    pub fn open_upload_stream_with_id(
-        &self,
-        id: Bson,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> GridFsUploadStream {
-        let async_stream = self
-            .async_bucket
-            .open_upload_stream_with_id(id, filename, options);
-        GridFsUploadStream { async_stream }
     }
 }

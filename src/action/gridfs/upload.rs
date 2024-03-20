@@ -13,7 +13,7 @@ impl GridFsBucket {
     /// the file to.
     ///
     /// `await` will return `Result<GridFsUploadStream>`.
-    pub fn open_upload_stream_2(&self, filename: impl AsRef<str>) -> OpenUploadStream {
+    pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         OpenUploadStream {
             bucket: self,
             filename: filename.as_ref().to_owned(),
@@ -29,8 +29,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// the file to.
     ///
     /// [`run`](OpenUploadStream::run) will return `Result<GridFsUploadStream>`.
-    pub fn open_upload_stream_2(&self, filename: impl AsRef<str>) -> OpenUploadStream {
-        self.async_bucket.open_upload_stream_2(filename)
+    pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
+        self.async_bucket.open_upload_stream(filename)
     }
 }
 

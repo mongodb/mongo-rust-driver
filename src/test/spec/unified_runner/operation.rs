@@ -21,6 +21,7 @@ use futures::{
     future::BoxFuture,
     io::AsyncReadExt,
     stream::{StreamExt, TryStreamExt},
+    AsyncWriteExt,
     FutureExt,
 };
 use serde::{
@@ -2835,15 +2836,17 @@ impl TestOperation for Upload {
             let hex_string = self.source.get("$$hexBytes").unwrap().as_str().unwrap();
             let bytes = hex::decode(hex_string).unwrap();
 
-            let id = bucket
-                .upload_from_futures_0_3_reader(
-                    self.filename.clone(),
-                    &bytes[..],
-                    self.options.clone(),
-                )
-                .await?;
+            let id = {
+                let mut stream = bucket
+                    .open_upload_stream(&self.filename)
+                    .with_options(self.options.clone())
+                    .await?;
+                stream.write_all(&bytes[..]).await?;
+                stream.close().await?;
+                stream.id().clone()
+            };
 
-            Ok(Some(Entity::Bson(id.into())))
+            Ok(Some(Entity::Bson(id)))
         }
         .boxed()
     }
