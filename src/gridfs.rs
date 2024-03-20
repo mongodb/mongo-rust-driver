@@ -12,7 +12,7 @@ use serde_with::skip_serializing_none;
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     checked::Checked,
-    error::{Error, Result},
+    error::Error,
     options::{CollectionOptions, ReadConcern, SelectionCriteria, WriteConcern},
     Collection,
     Database,
@@ -195,14 +195,6 @@ impl GridFsBucket {
     /// Gets a handle to the chunks collection for the bucket.
     pub(crate) fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
-    }
-
-    /// Removes all of the files and their associated chunks from this bucket.
-    pub async fn drop(&self) -> Result<()> {
-        self.files().drop().await?;
-        self.chunks().drop().await?;
-
-        Ok(())
     }
 }
 

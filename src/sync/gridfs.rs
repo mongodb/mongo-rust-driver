@@ -55,11 +55,6 @@ impl GridFsBucket {
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.async_bucket.selection_criteria()
     }
-
-    /// Removes all of the files and their associated chunks from this bucket.
-    pub fn drop(&self) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.drop())
-    }
 }
 
 /// A stream from which a file stored in a GridFS bucket can be downloaded.
