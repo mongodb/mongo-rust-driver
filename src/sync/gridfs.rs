@@ -56,12 +56,6 @@ impl GridFsBucket {
         self.async_bucket.selection_criteria()
     }
 
-    /// Renames the file with the given `id` to `new_filename`. This method returns an error if the
-    /// `id` does not match any files in the bucket.
-    pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.rename(id, new_filename))
-    }
-
     /// Removes all of the files and their associated chunks from this bucket.
     pub fn drop(&self) -> Result<()> {
         crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.drop())

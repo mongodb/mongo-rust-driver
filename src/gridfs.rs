@@ -197,19 +197,6 @@ impl GridFsBucket {
         &self.inner.chunks
     }
 
-    /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
-    /// error if the `id` does not match any files in the bucket.
-    pub async fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
-        self.files()
-            .update_one(
-                doc! { "_id": id },
-                doc! { "$set": { "filename": new_filename.as_ref() } },
-            )
-            .await?;
-
-        Ok(())
-    }
-
     /// Removes all of the files and their associated chunks from this bucket.
     pub async fn drop(&self) -> Result<()> {
         self.files().drop().await?;
