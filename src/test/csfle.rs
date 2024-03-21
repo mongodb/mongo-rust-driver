@@ -2986,7 +2986,7 @@ async fn range_explicit_encryption() -> Result<()> {
         return Ok(());
     }
     let client = TestClient::new().await;
-    if client.server_version_lt(6, 2) || client.is_standalone() {
+    if client.server_version_lt(6, 2) || client.server_version_gte(8, 0) || client.is_standalone() {
         log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
         return Ok(());
     }
