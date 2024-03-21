@@ -208,7 +208,7 @@ impl TestRunner {
                 for data in initial_data {
                     self.insert_initial_data(data, &mut session).await;
                 }
-                *self.cluster_time.write().await = Some(session.cluster_time().unwrap().clone());
+                *self.cluster_time.write().await = session.cluster_time().cloned();
             }
 
             self.entities.write().await.clear();
