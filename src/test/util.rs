@@ -25,6 +25,7 @@ use self::event_buffer::EventBuffer;
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
 use crate::{
+    action::DropCollection,
     bson::{doc, Bson},
     client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
@@ -284,17 +285,6 @@ impl TestClient {
             .collection_with_options(coll_name, options)
     }
 
-    pub(crate) async fn init_db_and_coll_with_options(
-        &self,
-        db_name: &str,
-        coll_name: &str,
-        options: CollectionOptions,
-    ) -> Collection<Document> {
-        let coll = self.get_coll_with_options(db_name, coll_name, options);
-        drop_collection(&coll).await;
-        coll
-    }
-
     pub(crate) async fn create_fresh_collection(
         &self,
         db_name: &str,
@@ -494,7 +484,16 @@ pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
 where
     T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
-    match coll.drop().await.map_err(|e| *e.kind) {
+    drop_collection_opt(coll, |a| a).await
+}
+
+pub(crate) async fn drop_collection_opt<'a, T>(
+    coll: &'a Collection<T>,
+    opt: impl FnOnce(DropCollection<'a>) -> DropCollection<'a>,
+) where
+    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+{
+    match opt(coll.drop()).await.map_err(|e| *e.kind) {
         Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();
