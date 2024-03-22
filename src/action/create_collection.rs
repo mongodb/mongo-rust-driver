@@ -11,6 +11,7 @@ impl Database {
     /// not needed if no special options are required.
     ///
     /// `await` will return `Result<()>`.
+    #[action_macro::action_return_doc(Result<()>)]
     pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
         CreateCollection {
             db: self,

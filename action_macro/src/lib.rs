@@ -3,13 +3,11 @@ extern crate proc_macro;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
-    ext::IdentExt,
     parenthesized,
     parse::{Parse, ParseStream},
     parse_macro_input,
     parse_quote,
     parse_quote_spanned,
-    punctuated::Punctuated,
     spanned::Spanned,
     Attribute,
     Block,
@@ -18,6 +16,7 @@ use syn::{
     Ident,
     ImplItemFn,
     Lifetime,
+    Path,
     Token,
     Type,
 };
@@ -239,14 +238,14 @@ pub fn action_return_doc(
     let mut impl_fn = parse_macro_input!(item as ImplItemFn);
 
     let call = if let Some(r) = run {
-        format!("<code>{}</code>", r.doc_link())
+        format!("<code>{}</code>", doc_link(&r))
     } else {
         "`await`".to_string()
     };
     let session = if let Some(t) = session_type {
         format!(
             " or <code>{}</code> if a [`ClientSession`] is provided",
-            t.doc_link()
+            doc_link(&t)
         )
     } else {
         String::new()
@@ -254,7 +253,7 @@ pub fn action_return_doc(
     let s = format!(
         "\n\n{} will return <code>{}</code>{}.",
         call,
-        ret_type.doc_link(),
+        doc_link(&ret_type),
         session,
     );
     let attr: Attribute = parse_quote! { #[doc = #s] };
@@ -264,9 +263,9 @@ pub fn action_return_doc(
 
 // return type [, session = type] [, run = path]
 struct ActionReturnArgs {
-    ret_type: SimplePath,
-    session_type: Option<SimplePath>,
-    run: Option<SimplePath>,
+    ret_type: Type,
+    session_type: Option<Type>,
+    run: Option<Path>,
 }
 
 impl Parse for ActionReturnArgs {
@@ -306,43 +305,47 @@ impl Parse for ActionReturnArgs {
     }
 }
 
-struct SimplePath {
-    segments: Punctuated<Ident, Token![::]>,
-    args: Option<Punctuated<SimplePath, Token![,]>>,
-}
+fn doc_link<T: ToTokens>(value: &T) -> String {
+    // Convert to text..
+    let text = value
+        .to_token_stream()
+        .to_string()
+        //.. and strip whitespace
+        .split_ascii_whitespace()
+        .collect::<String>();
 
-impl Parse for SimplePath {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let segments = input
-            .call(|input| Punctuated::parse_separated_nonempty_with(input, Ident::parse_any))?;
-        let args = if input.peek(Token![<]) {
-            input.parse::<Token![<]>()?;
-            let val = input.call(Punctuated::parse_separated_nonempty)?;
-            input.parse::<Token![>]>()?;
-            Some(val)
-        } else {
-            None
-        };
-        Ok(Self { segments, args })
-    }
-}
+    // Break into segments delimited by '<' or '>'
+    let segments = text.split_inclusive(&['<', '>'])
+        // Put each delimiter in its own segment
+        .flat_map(|s| {
+            if s == "<" || s == ">" {
+                vec![s]
+            } else if let Some(sub) = s.strip_suffix(&['<', '>']) {
+                vec![sub, &s[sub.len()..]]
+            } else {
+                vec![s]
+            }
+        });
 
-impl SimplePath {
-    fn doc_link(&self) -> String {
-        let mut out = format!(
-            "[{}]({})",
-            self.segments.last().unwrap().to_token_stream(),
-            self.segments
-                .to_token_stream()
-                .to_string()
-                .split_ascii_whitespace()
-                .collect::<String>(),
-        );
-        if let Some(args) = &self.args {
-            let arg_strs: Vec<_> = args.into_iter().map(|p| p.doc_link()).collect();
-            out += &format!("&lt;{}&gt;", arg_strs.join(","));
+    // Build output
+    let mut out = vec![];
+    for segment in segments {
+        match segment {
+            // Escape angle brackets
+            "<" => out.push("&lt;"),
+            ">" => out.push("&gt;"),
+            // Don't link unit
+            "()" => out.push("()"),
+            // Link to types
+            _ => {
+                // Use the short name
+                if let Some((_, short)) = segment.rsplit_once("::") {
+                    out.extend(["[", short, "](", segment, ")"]);
+                } else {
+                    out.extend(["[", segment, "]"]);
+                }
+            }
         }
-
-        out
     }
+    out.concat()
 }
