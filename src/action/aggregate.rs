@@ -23,9 +23,7 @@ impl Database {
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
-    ///
-    /// `await` will return `Result<`[`Cursor`]`<Document>>` or `Result<SessionCursor<Document>>` if
-    /// a `ClientSession` is provided.
+    #[action_macro::action_return_doc(Result<Cursor<Document>>, session = Result<SessionCursor<Document>>)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Database(self),
@@ -66,6 +64,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](Aggregate::run) will return `Result<`[`Cursor`]`<Document>>` or
     /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
+    #[action_macro::action_return_doc(Result<crate::sync::Cursor<Document>>, session = Result<crate::sync::SessionCursor<Document>>, run = Aggregate::run)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }
