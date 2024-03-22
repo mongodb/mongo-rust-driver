@@ -16,14 +16,17 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, CollRef, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, CollRef, ExplicitSession, ImplicitSession};
 
 impl Database {
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
-    #[action_macro::action_return_doc(Result<Cursor<Document>>, session = Result<SessionCursor<Document>>)]
+    ///
+    /// `await` will return d[`Result<Cursor<Document>>`] or d[`Result<SessionCursor<Document>>`] if
+    /// a `ClientSession` is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Database(self),
@@ -62,9 +65,9 @@ impl crate::sync::Database {
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return `Result<`[`Cursor`]`<Document>>` or
-    /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
-    #[action_macro::action_return_doc(Result<crate::sync::Cursor<Document>>, session = Result<crate::sync::SessionCursor<Document>>, run = Aggregate::run)]
+    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[action_macro::deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }

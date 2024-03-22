@@ -143,7 +143,7 @@ pub trait Action: private::Sealed + IntoFuture {
     }
 }
 
-pub(crate) use action_macro::action_impl;
+pub(crate) use action_macro::{action_impl, deeplink};
 
 use crate::Collection;
 

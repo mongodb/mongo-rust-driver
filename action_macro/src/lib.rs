@@ -9,14 +9,15 @@ use syn::{
     parse_quote,
     parse_quote_spanned,
     spanned::Spanned,
-    Attribute,
     Block,
     Error,
+    Expr,
     Generics,
     Ident,
     ImplItemFn,
     Lifetime,
-    Path,
+    Lit,
+    Meta,
     Token,
     Type,
 };
@@ -222,98 +223,7 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
     Ok(())
 }
 
-/// #[action_return_doc(return_type [, session = type] [, run = path])]
-///
-/// Generates linked documentation for the return value of an action.
-#[proc_macro_attribute]
-pub fn action_return_doc(
-    attr: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    let ActionReturnArgs {
-        ret_type,
-        session_type,
-        run,
-    } = parse_macro_input!(attr as ActionReturnArgs);
-    let mut impl_fn = parse_macro_input!(item as ImplItemFn);
-
-    let call = if let Some(r) = run {
-        format!("<code>{}</code>", doc_link(&r))
-    } else {
-        "`await`".to_string()
-    };
-    let session = if let Some(t) = session_type {
-        format!(
-            " or <code>{}</code> if a [`ClientSession`] is provided",
-            doc_link(&t)
-        )
-    } else {
-        String::new()
-    };
-    let s = format!(
-        "\n\n{} will return <code>{}</code>{}.",
-        call,
-        doc_link(&ret_type),
-        session,
-    );
-    let attr: Attribute = parse_quote! { #[doc = #s] };
-    impl_fn.attrs.push(attr);
-    impl_fn.into_token_stream().into()
-}
-
-// return type [, session = type] [, run = path]
-struct ActionReturnArgs {
-    ret_type: Type,
-    session_type: Option<Type>,
-    run: Option<Path>,
-}
-
-impl Parse for ActionReturnArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let ret_type = input.parse()?;
-
-        let mut session_type = None;
-        let mut run = None;
-        for _ in 0..2 {
-            if input.parse::<Option<Token![,]>>()?.is_none() {
-                break;
-            }
-            let ident = input.parse::<Ident>()?;
-            match ident.to_string().as_str() {
-                "session" => {
-                    input.parse::<Token![=]>()?;
-                    session_type = Some(input.parse()?);
-                }
-                "run" => {
-                    input.parse::<Token![=]>()?;
-                    run = Some(input.parse()?);
-                }
-                _ => {
-                    return Err(Error::new(
-                        ident.span(),
-                        format!("expected 'session' or 'run', got '{}'", ident),
-                    ))
-                }
-            }
-        }
-
-        Ok(Self {
-            ret_type,
-            session_type,
-            run,
-        })
-    }
-}
-
-fn doc_link<T: ToTokens>(value: &T) -> String {
-    // Convert to text..
-    let text = value
-        .to_token_stream()
-        .to_string()
-        //.. and strip whitespace
-        .split_ascii_whitespace()
-        .collect::<String>();
-
+fn text_link(text: &str) -> String {
     // Break into segments delimited by '<' or '>'
     let segments = text.split_inclusive(&['<', '>'])
         // Put each delimiter in its own segment
@@ -348,4 +258,70 @@ fn doc_link<T: ToTokens>(value: &T) -> String {
         }
     }
     out.concat()
+}
+
+/// Enables deep-linking doc type links that link individually to each type
+/// component.
+#[proc_macro_attribute]
+pub fn deeplink(
+    _attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut impl_fn = parse_macro_input!(item as ImplItemFn);
+
+    for attr in &mut impl_fn.attrs {
+        // Skip non-`doc` attrs
+        if attr.path() != &parse_quote! { doc } {
+            continue;
+        }
+        // Get the string literal value from #[doc = "lit"]
+        let mut text = match &mut attr.meta {
+            Meta::NameValue(nv) => match &mut nv.value {
+                Expr::Lit(el) => match &mut el.lit {
+                    Lit::Str(ls) => ls.value(),
+                    _ => continue,
+                },
+                _ => continue,
+            },
+            _ => continue,
+        };
+        // Process substrings delimited by "d[...]"
+        while let Some(ix) = text.find("d[") {
+            let pre = &text[..ix];
+            let rest = &text[ix + 2..];
+            let end = match rest.find(']') {
+                Some(v) => v,
+                None => {
+                    return Error::new(attr.span(), "unterminated d[")
+                        .into_compile_error()
+                        .into()
+                }
+            };
+            let body = &rest[..end];
+            let post = &rest[end + 1..];
+            // Strip inner backticks, if any
+            let (fixed, body) = if body.starts_with('`') && body.ends_with('`') {
+                (
+                    true,
+                    body.strip_prefix('`').unwrap().strip_suffix('`').unwrap(),
+                )
+            } else {
+                (false, body)
+            };
+            // Build new string
+            let mut new_text = pre.to_owned();
+            if fixed {
+                new_text.push_str("<code>");
+            }
+            new_text.push_str(&text_link(body));
+            if fixed {
+                new_text.push_str("</code>");
+            }
+            new_text.push_str(post);
+            text = new_text;
+        }
+        *attr = parse_quote! { #[doc = #text] };
+    }
+
+    impl_fn.into_token_stream().into()
 }

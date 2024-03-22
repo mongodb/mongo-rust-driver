@@ -2,7 +2,7 @@ use bson::Document;
 
 use crate::{options::CreateCollectionOptions, ClientSession, Database};
 
-use crate::action::option_setters;
+use crate::action::{deeplink, option_setters};
 
 impl Database {
     /// Creates a new collection in the database with the given `name`.
@@ -10,8 +10,8 @@ impl Database {
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
     ///
-    /// `await` will return `Result<()>`.
-    #[action_macro::action_return_doc(Result<()>)]
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
         CreateCollection {
             db: self,
