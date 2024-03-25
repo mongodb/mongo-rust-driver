@@ -37,7 +37,7 @@ impl crate::sync::Client {
     }
 }
 
-/// Add connections to the connection pool up to `min_pool_size`.  Create by calling
+/// Add connections to the connection pool up to `min_pool_size`.  Construct with
 /// [`Client::warm_connection_pool`].
 #[must_use]
 pub struct WarmConnectionPool<'a> {

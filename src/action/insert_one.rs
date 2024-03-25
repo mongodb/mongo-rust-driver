@@ -14,7 +14,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Inserts `doc` into the collection.
@@ -27,7 +27,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<InsertOneResult>`.
+    /// `await` will return d[`Result<InsertOneResult>`].
+    #[deeplink]
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
@@ -53,7 +54,8 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](InsertOne::run) will return `Result<InsertOneResult>`.
+    /// [`run`](InsertOne::run) will return d[`Result<InsertOneResult>`].
+    #[deeplink]
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         self.async_collection.insert_one(doc)
     }

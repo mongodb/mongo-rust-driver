@@ -46,8 +46,9 @@ where
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// `await` will return `Result<Cursor<Document>>` or `Result<SessionCursor<Document>>` if
-    /// a `ClientSession` is provided.
+    /// `await` will return d[`Result<Cursor<Document>>`] or d[`Result<SessionCursor<Document>>`] if
+    /// a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Collection(CollRef::new(self)),
@@ -67,7 +68,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
     /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
-    #[action_macro::deeplink]
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }
@@ -83,14 +84,15 @@ where
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return `Result<Cursor<Document>>` or
-    /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
+    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a `ClientSession` is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_collection.aggregate(pipeline)
     }
 }
 
-/// Run an aggregation operation.  Create by calling [`Database::aggregate`] or
+/// Run an aggregation operation.  Construct with [`Database::aggregate`] or
 /// [`Collection::aggregate`].
 #[must_use]
 pub struct Aggregate<'a, Session = ImplicitSession> {

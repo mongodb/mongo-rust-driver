@@ -15,7 +15,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Replaces up to one document matching `query` in the collection with `replacement`.
@@ -25,7 +25,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<UpdateResult>`.
+    /// `await` will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
         ReplaceOne {
             coll: CollRef::new(self),
@@ -49,7 +50,8 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](ReplaceOne::run) will return `Result<UpdateResult>`.
+    /// [`run`](ReplaceOne::run) will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
         self.async_collection.replace_one(query, replacement)
     }

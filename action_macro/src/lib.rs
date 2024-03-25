@@ -223,44 +223,7 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
     Ok(())
 }
 
-fn text_link(text: &str) -> String {
-    // Break into segments delimited by '<' or '>'
-    let segments = text.split_inclusive(&['<', '>'])
-        // Put each delimiter in its own segment
-        .flat_map(|s| {
-            if s == "<" || s == ">" {
-                vec![s]
-            } else if let Some(sub) = s.strip_suffix(&['<', '>']) {
-                vec![sub, &s[sub.len()..]]
-            } else {
-                vec![s]
-            }
-        });
-
-    // Build output
-    let mut out = vec![];
-    for segment in segments {
-        match segment {
-            // Escape angle brackets
-            "<" => out.push("&lt;"),
-            ">" => out.push("&gt;"),
-            // Don't link unit
-            "()" => out.push("()"),
-            // Link to types
-            _ => {
-                // Use the short name
-                if let Some((_, short)) = segment.rsplit_once("::") {
-                    out.extend(["[", short, "](", segment, ")"]);
-                } else {
-                    out.extend(["[", segment, "]"]);
-                }
-            }
-        }
-    }
-    out.concat()
-}
-
-/// Enables deep-linking doc type links that link individually to each type
+/// Enables rustdoc links to types that link individually to each type
 /// component.
 #[proc_macro_attribute]
 pub fn deeplink(
@@ -324,4 +287,41 @@ pub fn deeplink(
     }
 
     impl_fn.into_token_stream().into()
+}
+
+fn text_link(text: &str) -> String {
+    // Break into segments delimited by '<' or '>'
+    let segments = text.split_inclusive(&['<', '>'])
+        // Put each delimiter in its own segment
+        .flat_map(|s| {
+            if s == "<" || s == ">" {
+                vec![s]
+            } else if let Some(sub) = s.strip_suffix(&['<', '>']) {
+                vec![sub, &s[sub.len()..]]
+            } else {
+                vec![s]
+            }
+        });
+
+    // Build output
+    let mut out = vec![];
+    for segment in segments {
+        match segment {
+            // Escape angle brackets
+            "<" => out.push("&lt;"),
+            ">" => out.push("&gt;"),
+            // Don't link unit
+            "()" => out.push("()"),
+            // Link to types
+            _ => {
+                // Use the short name
+                let short = segment
+                    .rsplit_once("::")
+                    .map(|(_, short)| short)
+                    .unwrap_or(segment);
+                out.extend(["[", short, "](", segment, ")"]);
+            }
+        }
+    }
+    out.concat()
 }

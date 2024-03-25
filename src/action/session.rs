@@ -5,12 +5,13 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, option_setters};
+use super::{action_impl, deeplink, option_setters};
 
 impl Client {
     /// Starts a new [`ClientSession`].
     ///
-    /// `await` will return `Result<`[`ClientSession`]`>`.
+    /// `await` will return d[`Result<ClientSession>`].
+    #[deeplink]
     pub fn start_session(&self) -> StartSession {
         StartSession {
             client: self,
@@ -23,13 +24,14 @@ impl Client {
 impl crate::sync::Client {
     /// Starts a new [`ClientSession`].
     ///
-    /// [run](StartSession::run) will return `Result<`[`ClientSession`]`>`.
+    /// [run](StartSession::run) will return d[`Result<crate::sync::ClientSession>`].
+    #[deeplink]
     pub fn start_session(&self) -> StartSession {
         self.async_client.start_session()
     }
 }
 
-/// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`].
+/// Starts a new [`ClientSession`].  Construct with [`Client::start_session`].
 #[must_use]
 pub struct StartSession<'a> {
     client: &'a Client,

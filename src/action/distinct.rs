@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T> Collection<T>
 where
@@ -21,7 +21,8 @@ where
 {
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
-    /// `await` will return `Result<Vec<Bson>>`.
+    /// `await` will return d[`Result<Vec<Bson>>`].
+    #[deeplink]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         Distinct {
             coll: CollRef::new(self),
@@ -40,7 +41,8 @@ where
 {
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
-    /// [`run`](Distinct::run) will return `Result<Vec<Bson>>`.
+    /// [`run`](Distinct::run) will return d[`Result<Vec<Bson>>`].
+    #[deeplink]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         self.async_collection.distinct(field_name, filter)
     }

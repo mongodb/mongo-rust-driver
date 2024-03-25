@@ -29,13 +29,14 @@ impl crate::sync::Database {
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
     ///
-    /// [`run`](CreateCollection::run) will return `Result<()>`.
+    /// [`run`](CreateCollection::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
         self.async_database.create_collection(name)
     }
 }
 
-/// Creates a new collection.  Create by calling [`Database::create_collection`].
+/// Creates a new collection.  Construct with [`Database::create_collection`].
 #[must_use]
 pub struct CreateCollection<'a> {
     pub(crate) db: &'a Database,

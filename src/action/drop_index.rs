@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::Bson;
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 use crate::{
     coll::options::DropIndexOptions,
     error::{ErrorKind, Result},
@@ -18,7 +18,8 @@ where
 {
     /// Drops the index specified by `name` from this collection.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -30,7 +31,8 @@ where
 
     /// Drops all indexes associated with this collection.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_indexes(&self) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -48,14 +50,16 @@ where
 {
     /// Drops the index specified by `name` from this collection.
     ///
-    /// [`run`](DropIndex::run) will return `Result<()>`.
+    /// [`run`](DropIndex::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         self.async_collection.drop_index(name)
     }
 
     /// Drops all indexes associated with this collection.
     ///
-    /// [`run`](DropIndex::run) will return `Result<()>`.
+    /// [`run`](DropIndex::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_indexes(&self) -> DropIndex {
         self.async_collection.drop_indexes()
     }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -41,9 +41,10 @@ impl Client {
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
     ///
-    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
-    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
+    #[deeplink]
     pub fn watch(&self) -> Watch {
         Watch::new_cluster(self)
     }
@@ -68,9 +69,10 @@ impl Database {
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
     ///
-    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
-    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
+    #[deeplink]
     pub fn watch(&self) -> Watch {
         Watch::new(
             self.client(),
@@ -94,9 +96,10 @@ where
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
     ///
-    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
-    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
+    #[deeplink]
     pub fn watch(&self) -> Watch {
         Watch::new(self.client(), self.namespace().into())
     }
