@@ -37,7 +37,7 @@ use std::{fmt::Debug, time::Duration};
 
 use super::get_client_options;
 use crate::{
-    error::{CommandError, ErrorKind, Result},
+    error::Result,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     test::{
         update_options_for_testing,
@@ -257,7 +257,7 @@ impl TestClient {
         coll_name: &str,
     ) -> Collection<Document> {
         let coll = self.get_coll(db_name, coll_name);
-        drop_collection(&coll).await;
+        coll.drop().await.unwrap();
         coll
     }
 
@@ -270,7 +270,7 @@ impl TestClient {
         T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         let coll = self.database(db_name).collection(coll_name);
-        drop_collection(&coll).await;
+        coll.drop().await.unwrap();
         coll
     }
 
@@ -282,17 +282,6 @@ impl TestClient {
     ) -> Collection<Document> {
         self.database(db_name)
             .collection_with_options(coll_name, options)
-    }
-
-    pub(crate) async fn init_db_and_coll_with_options(
-        &self,
-        db_name: &str,
-        coll_name: &str,
-        options: CollectionOptions,
-    ) -> Collection<Document> {
-        let coll = self.get_coll_with_options(db_name, coll_name, options);
-        drop_collection(&coll).await;
-        coll
     }
 
     pub(crate) async fn create_fresh_collection(
@@ -410,7 +399,7 @@ impl TestClient {
 
     pub(crate) async fn drop_collection(&self, db_name: &str, coll_name: &str) {
         let coll = self.get_coll(db_name, coll_name);
-        drop_collection(&coll).await;
+        coll.drop().await.unwrap();
     }
 
     /// Returns the `Topology' that can be determined without a server query, i.e. all except
@@ -488,18 +477,6 @@ impl TestClient {
     pub(crate) fn into_client(self) -> Client {
         self.client
     }
-}
-
-pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
-where
-    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
-{
-    match coll.drop().await.map_err(|e| *e.kind) {
-        Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}
-        e @ Err(_) => {
-            e.unwrap();
-        }
-    };
 }
 
 pub(crate) fn get_default_name(description: &str) -> String {

@@ -32,11 +32,7 @@ use crate::{
         WriteConcern,
     },
     results::DeleteResult,
-    test::{
-        get_client_options,
-        log_uncaptured,
-        util::{drop_collection, TestClient},
-    },
+    test::{get_client_options, log_uncaptured, util::TestClient},
     Collection,
     IndexModel,
 };
@@ -209,7 +205,7 @@ async fn aggregate_out() {
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
-    drop_collection(&coll).await;
+    coll.drop().await.unwrap();
 
     let result = coll
         .insert_many((0i32..5).map(|n| doc! { "x": n }).collect::<Vec<_>>())
@@ -226,7 +222,7 @@ async fn aggregate_out() {
         },
         doc! {"$out": out_coll.name()},
     ];
-    drop_collection(&out_coll).await;
+    out_coll.drop().await.unwrap();
 
     coll.aggregate(pipeline.clone()).await.unwrap();
     assert!(db
@@ -235,7 +231,7 @@ async fn aggregate_out() {
         .unwrap()
         .into_iter()
         .any(|name| name.as_str() == out_coll.name()));
-    drop_collection(&out_coll).await;
+    out_coll.drop().await.unwrap();
 
     // check that even with a batch size of 0, a new collection is created.
     coll.aggregate(pipeline).batch_size(0).await.unwrap();
@@ -262,7 +258,7 @@ async fn kill_cursors_on_drop() {
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
-    drop_collection(&coll).await;
+    coll.drop().await.unwrap();
 
     coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }])
         .await
@@ -295,7 +291,7 @@ async fn no_kill_cursors_on_exhausted() {
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
-    drop_collection(&coll).await;
+    coll.drop().await.unwrap();
 
     coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }])
         .await
