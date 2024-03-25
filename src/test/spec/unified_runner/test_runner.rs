@@ -21,7 +21,7 @@ use crate::{
             test_file::{ExpectedEventType, TestFile},
         },
         update_options_for_testing,
-        util::{drop_collection_opt, FailPointGuard},
+        util::FailPointGuard,
         TestClient,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
@@ -385,7 +385,7 @@ impl TestRunner {
                 &data.collection_name,
                 collection_options,
             );
-            drop_collection_opt(&coll, |drop| drop.session(&mut *session)).await;
+            coll.drop().session(&mut *session).await.unwrap();
             coll.insert_many(data.documents.clone())
                 .session(session)
                 .await
@@ -394,7 +394,7 @@ impl TestRunner {
             let coll = self
                 .internal_client
                 .get_coll(&data.database_name, &data.collection_name);
-            drop_collection_opt(&coll, |drop| drop.session(&mut *session)).await;
+            coll.drop().session(&mut *session).await.unwrap();
             self.internal_client
                 .database(&data.database_name)
                 .create_collection(&data.collection_name)
