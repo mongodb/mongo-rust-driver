@@ -31,11 +31,6 @@ pub enum Compressor {
     Snappy,
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 impl Compressor {
     pub(crate) fn name(&self) -> &'static str {
         match *self {

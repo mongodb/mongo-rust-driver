@@ -26,15 +26,3 @@ async fn test_compression_enabled() {
         .iter()
         .any(|compressor| matches!(compressor, Compressor::Snappy)));
 }
-
-#[tokio::test]
-async fn compression_operation() {
-    let client = crate::test::TestClient::new().await;
-
-    client
-        .database("c")
-        .collection::<bson::Document>("c")
-        .find_one(bson::doc! {})
-        .await
-        .unwrap();
-}
