@@ -257,7 +257,7 @@ async fn heartbeat_started_before_socket() {
                 let (mut socket, _) = listener.accept().await.unwrap();
                 events.lock().unwrap().push(Event::ClientConnected);
                 let mut buf = [0; 1024];
-                socket.read(&mut buf).await.unwrap();
+                let _ = socket.read(&mut buf).await.unwrap();
                 events.lock().unwrap().push(Event::ClientHelloReceived);
             }
         });
