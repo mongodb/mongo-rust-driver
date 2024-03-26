@@ -126,6 +126,9 @@ impl GridFsBucket {
 /// # }
 /// ```
 ///
+/// If the data is a local file (or other `AsyncRead` byte source), its contents can be efficiently
+/// written to the stream with [`futures_util::io::copy`].
+///
 /// # Aborting the Stream
 /// A stream can be aborted by calling the `abort` method. This will remove any chunks associated
 /// with the stream from the chunks collection. It is an error to write to, abort, or close the

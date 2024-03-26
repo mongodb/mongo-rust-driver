@@ -36,6 +36,9 @@ use crate::{
 /// # }
 /// ```
 ///
+/// If the destination is a local file (or other `AsyncWrite` byte sink), the contents of the stream
+/// can be efficiently written to it with [`futures_util::io::copy`].
+///
 /// # Using [`tokio::io::AsyncRead`]
 /// Users who prefer to use tokio's `AsyncRead` trait can use the [`tokio_util::compat`] module.
 ///

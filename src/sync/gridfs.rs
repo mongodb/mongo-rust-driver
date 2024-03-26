@@ -67,6 +67,9 @@ impl GridFsBucket {
 /// # Ok(())
 /// # }
 /// ```
+///
+/// If the destination is a local file (or other `Write` byte sink), the contents of the stream
+/// can be efficiently written to it with [`std::io::copy`].
 pub struct GridFsDownloadStream {
     async_stream: AsyncGridFsDownloadStream,
 }
@@ -105,6 +108,9 @@ impl GridFsDownloadStream {
 /// # Ok(())
 /// # }
 /// ```
+///
+/// If the data is a local file (or other `Read` byte source), its contents can be efficiently
+/// written to the stream with [`std::io::copy`].
 ///
 /// # Aborting the Stream
 /// A stream can be aborted by calling the `abort` method. This will remove any chunks associated
