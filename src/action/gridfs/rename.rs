@@ -18,7 +18,7 @@ impl GridFsBucket {
 
 #[cfg(feature = "sync")]
 impl crate::sync::gridfs::GridFsBucket {
-    /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
+    /// Renames the file with the given `id` to the provided `new_filename`. This method returns an
     /// error if the `id` does not match any files in the bucket.
     ///
     /// [`run`](Rename::run) will return `Result<()>`.
