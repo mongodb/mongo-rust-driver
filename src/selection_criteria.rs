@@ -106,6 +106,7 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 /// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference) for more details.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,

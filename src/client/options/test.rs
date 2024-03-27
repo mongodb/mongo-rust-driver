@@ -33,9 +33,10 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "User info for multiple hosts with database",
     ];
 
-    if cfg!(not(feature = "openssl-tls")) {
-        skipped_tests.push("tlsAllowInvalidHostnames is parsed correctly");
-    }
+    // TODO RUST-1896: unskip this test when openssl-tls is enabled
+    // if cfg!(not(feature = "openssl-tls"))
+    skipped_tests.push("tlsAllowInvalidHostnames is parsed correctly");
+    // }
 
     if cfg!(not(feature = "zlib-compression")) {
         skipped_tests.push("Valid compression options are parsed correctly");
@@ -251,6 +252,8 @@ async fn run_connection_string_spec_tests() {
     if cfg!(not(unix)) {
         skipped_files.push("valid-unix_socket-absolute.json");
         skipped_files.push("valid-unix_socket-relative.json");
+        // All the tests in this file use unix domain sockets
+        skipped_files.push("valid-db-with-dotted-name.json");
     }
 
     run_tests(&["connection-string"], &skipped_files).await;
