@@ -6,7 +6,11 @@ use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
 use crate::{
     error::{Error, Result},
     operation,
-    search_index::options::{CreateSearchIndexOptions, UpdateSearchIndexOptions},
+    search_index::options::{
+        CreateSearchIndexOptions,
+        DropSearchIndexOptions,
+        UpdateSearchIndexOptions,
+    },
     Collection,
     SearchIndexModel,
 };
@@ -59,6 +63,17 @@ where
             options: None,
         }
     }
+
+    /// Drops the search index with the given name.
+    ///
+    /// `await` will return [`Result<()>`].
+    pub fn drop_search_index_2(&self, name: impl Into<String>) -> DropSearchIndex {
+        DropSearchIndex {
+            coll: CollRef::new(self),
+            name: name.into(),
+            options: None,
+        }
+    }
 }
 
 #[cfg(feature = "sync")]
@@ -94,6 +109,13 @@ where
         definition: Document,
     ) -> UpdateSearchIndex {
         self.async_collection.update_search_index(name, definition)
+    }
+
+    /// Drops the search index with the given name.
+    ///
+    /// `await` will return [`Result<()>`].
+    pub fn drop_search_index_2(&self, name: impl Into<String>) -> DropSearchIndex {
+        self.async_collection.drop_search_index_2(name)
     }
 }
 
@@ -139,7 +161,8 @@ action_impl! {
     }
 }
 
-/// Updates a specific search index to use a new definition.
+/// Updates a specific search index to use a new definition.  Construct with
+/// [`Collection::update_search_index`].
 #[must_use]
 pub struct UpdateSearchIndex<'a> {
     coll: CollRef<'a>,
@@ -161,6 +184,32 @@ action_impl! {
                 self.coll.namespace(),
                 self.name,
                 self.definition,
+            );
+            self.coll.client().execute_operation(op, None).await
+        }
+    }
+}
+
+/// Drops a specific search index.  Construct with [`Collection::drop_search_index`].
+#[must_use]
+pub struct DropSearchIndex<'a> {
+    coll: CollRef<'a>,
+    name: String,
+    options: Option<DropSearchIndexOptions>,
+}
+
+impl<'a> DropSearchIndex<'a> {
+    option_setters! { options: DropSearchIndexOptions; }
+}
+
+action_impl! {
+    impl<'a> Action for DropSearchIndex<'a> {
+        type Future = DropSearchIndexFuture;
+
+        async fn execute(self) -> Result<()> {
+            let op = operation::DropSearchIndex::new(
+                self.coll.namespace(),
+                self.name,
             );
             self.coll.client().execute_operation(op, None).await
         }
