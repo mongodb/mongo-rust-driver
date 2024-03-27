@@ -13,7 +13,7 @@ impl GridFsBucket {
     /// this bucket. This method returns an error if the `id` does not match any files in the
     /// bucket.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return [`Result<()>`].
     pub fn delete(&self, id: Bson) -> Delete {
         Delete { bucket: self, id }
     }
@@ -25,7 +25,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// this bucket. This method returns an error if the `id` does not match any files in the
     /// bucket.
     ///
-    /// [`run`](Delete::run) will return `Result<()>`.
+    /// [`run`](Delete::run) will return [`Result<()>`].
     pub fn delete(&self, id: Bson) -> Delete {
         self.async_bucket.delete(id)
     }

@@ -6,7 +6,7 @@ impl GridFsBucket {
     /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
     /// error if the `id` does not match any files in the bucket.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return [`Result<()>`].
     pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Rename {
         Rename {
             bucket: self,
@@ -21,7 +21,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// Renames the file with the given `id` to the provided `new_filename`. This method returns an
     /// error if the `id` does not match any files in the bucket.
     ///
-    /// [`run`](Rename::run) will return `Result<()>`.
+    /// [`run`](Rename::run) will return [`Result<()>`].
     pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Rename {
         self.async_bucket.rename(id, new_filename)
     }

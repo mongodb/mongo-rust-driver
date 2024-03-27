@@ -1,7 +1,7 @@
 use bson::{doc, Bson};
 
 use crate::{
-    action::{action_impl, option_setters},
+    action::{action_impl, deeplink, option_setters},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
     gridfs::{FilesCollectionDocument, GridFsDownloadByNameOptions},
     GridFsBucket,
@@ -12,7 +12,8 @@ impl GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     ///
-    /// `await` will return `Result<GridFsDownloadStream>`.
+    /// `await` will return d[`Result<GridFsDownloadStream>`].
+    #[deeplink]
     pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream {
         OpenDownloadStream { bucket: self, id }
     }
@@ -25,7 +26,8 @@ impl GridFsBucket {
     /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
     /// provided, the file with `filename` most recently uploaded will be downloaded.
     ///
-    /// `await` will return `Result<GridFsDownloadStream>`.
+    /// `await` will return d[`Result<GridFsDownloadStream>`].
+    #[deeplink]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl AsRef<str>,
@@ -93,7 +95,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
     /// the contents of the stored file specified by `id`.
     ///
-    /// [`run`](OpenDownloadStream::run) will return `Result<GridFsDownloadStream>`.
+    /// [`run`](OpenDownloadStream::run) will return d[`Result<GridFsDownloadStream>`].
+    #[deeplink]
     pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream {
         self.async_bucket.open_download_stream(id)
     }
@@ -106,7 +109,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
     /// provided, the file with `filename` most recently uploaded will be downloaded.
     ///
-    /// [`run`](OpenDownloadStreamByName::run) will return `Result<GridFsDownloadStream>`.
+    /// [`run`](OpenDownloadStreamByName::run) will return d[`Result<GridFsDownloadStream>`].
+    #[deeplink]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl AsRef<str>,

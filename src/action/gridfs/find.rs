@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::Document;
 
 use crate::{
-    action::{action_impl, option_setters},
+    action::{action_impl, deeplink, option_setters},
     coll::options::{FindOneOptions, FindOptions},
     error::Result,
     gridfs::{FilesCollectionDocument, GridFsFindOneOptions, GridFsFindOptions},
@@ -15,7 +15,8 @@ impl GridFsBucket {
     /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
     /// filter.
     ///
-    /// `await` will return `Result<Cursor<FilesCollectionDocument>>`.
+    /// `await` will return d[`Result<Cursor<FilesCollectionDocument>>`].
+    #[deeplink]
     pub fn find(&self, filter: Document) -> Find {
         Find {
             bucket: self,
@@ -27,7 +28,8 @@ impl GridFsBucket {
     /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
     /// given filter.
     ///
-    /// `await` will return `Result<Option<FilesCollectionDocument>>`.
+    /// `await` will return d[`Result<Option<FilesCollectionDocument>>`].
+    #[deeplink]
     pub fn find_one(&self, filter: Document) -> FindOne {
         FindOne {
             bucket: self,
@@ -42,7 +44,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
     /// filter.
     ///
-    /// [`run`](Find::run) will return `Result<Cursor<FilesCollectionDocument>>`.
+    /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<FilesCollectionDocument>>`].
+    #[deeplink]
     pub fn find(&self, filter: Document) -> Find {
         self.async_bucket.find(filter)
     }
@@ -50,7 +53,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
     /// given filter.
     ///
-    /// [`run`](FindOne::run) will return `Result<Option<FilesCollectionDocument>>`.
+    /// [`run`](FindOne::run) will return d[`Result<Option<FilesCollectionDocument>>`].
+    #[deeplink]
     pub fn find_one(&self, filter: Document) -> FindOne {
         self.async_bucket.find_one(filter)
     }

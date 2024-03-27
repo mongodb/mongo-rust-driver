@@ -3,7 +3,7 @@ use bson::{oid::ObjectId, Bson, Document};
 #[cfg(docsrs)]
 use crate::gridfs::FilesCollectionDocument;
 use crate::{
-    action::{action_impl, option_setters},
+    action::{action_impl, deeplink, option_setters},
     error::Result,
     gridfs::GridFsUploadOptions,
     GridFsBucket,
@@ -14,7 +14,8 @@ impl GridFsBucket {
     /// Creates and returns a [`GridFsUploadStream`] that the application can write the contents of
     /// the file to.
     ///
-    /// `await` will return `Result<GridFsUploadStream>`.
+    /// `await` will return d[`Result<GridFsUploadStream>`].
+    #[deeplink]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         OpenUploadStream {
             bucket: self,
@@ -30,7 +31,8 @@ impl crate::sync::gridfs::GridFsBucket {
     /// Creates and returns a [`GridFsUploadStream`] that the application can write the contents of
     /// the file to.
     ///
-    /// [`run`](OpenUploadStream::run) will return `Result<GridFsUploadStream>`.
+    /// [`run`](OpenUploadStream::run) will return d[`Result<GridFsUploadStream>`].
+    #[deeplink]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         self.async_bucket.open_upload_stream(filename)
     }
