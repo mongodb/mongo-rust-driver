@@ -1,10 +1,12 @@
 use std::marker::PhantomData;
 
+use bson::Document;
+
 use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
 use crate::{
     error::{Error, Result},
     operation,
-    search_index::options::CreateSearchIndexOptions,
+    search_index::options::{CreateSearchIndexOptions, UpdateSearchIndexOptions},
     Collection,
     SearchIndexModel,
 };
@@ -41,6 +43,22 @@ where
             _mode: PhantomData,
         }
     }
+
+    /// Updates the search index with the given name to use the provided definition.
+    ///
+    /// `await` will return [`Result<()>`].
+    pub fn update_search_index_2(
+        &self,
+        name: impl Into<String>,
+        definition: Document,
+    ) -> UpdateSearchIndex {
+        UpdateSearchIndex {
+            coll: CollRef::new(self),
+            name: name.into(),
+            definition,
+            options: None,
+        }
+    }
 }
 
 #[cfg(feature = "sync")]
@@ -66,8 +84,22 @@ where
     pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
         self.async_collection.create_search_index(model)
     }
+
+    /// Updates the search index with the given name to use the provided definition.
+    ///
+    /// [`run`](UpdateSearchIndex::run) will return [`Result<()>`].
+    pub fn update_search_index_2(
+        &self,
+        name: impl Into<String>,
+        definition: Document,
+    ) -> UpdateSearchIndex {
+        self.async_collection
+            .update_search_index_2(name, definition)
+    }
 }
 
+/// Create search indexes on a collection.  Construct with [`Collection::create_search_index`] or
+/// [`Collection::create_search_indexes`].
 #[must_use]
 pub struct CreateSearchIndex<'a, Mode> {
     coll: CollRef<'a>,
@@ -104,6 +136,34 @@ action_impl! {
                 1 => Ok(names.pop().unwrap()),
                 n => Err(Error::internal(format!("expected 1 index name, got {}", n))),
             }
+        }
+    }
+}
+
+/// Updates a specific search index to use a new definition.
+#[must_use]
+pub struct UpdateSearchIndex<'a> {
+    coll: CollRef<'a>,
+    name: String,
+    definition: Document,
+    options: Option<UpdateSearchIndexOptions>,
+}
+
+impl<'a> UpdateSearchIndex<'a> {
+    option_setters! { options: UpdateSearchIndexOptions; }
+}
+
+action_impl! {
+    impl<'a> Action for UpdateSearchIndex<'a> {
+        type Future = UpdateSearchIndexFuture;
+
+        async fn execute(self) -> Result<()> {
+            let op = operation::UpdateSearchIndex::new(
+                self.coll.namespace(),
+                self.name,
+                self.definition,
+            );
+            self.coll.client().execute_operation(op, None).await
         }
     }
 }

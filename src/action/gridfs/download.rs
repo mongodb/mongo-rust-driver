@@ -30,11 +30,11 @@ impl GridFsBucket {
     #[deeplink]
     pub fn open_download_stream_by_name(
         &self,
-        filename: impl AsRef<str>,
+        filename: impl Into<String>,
     ) -> OpenDownloadStreamByName {
         OpenDownloadStreamByName {
             bucket: self,
-            filename: filename.as_ref().to_owned(),
+            filename: filename.into(),
             options: None,
         }
     }
@@ -113,7 +113,7 @@ impl crate::sync::gridfs::GridFsBucket {
     #[deeplink]
     pub fn open_download_stream_by_name(
         &self,
-        filename: impl AsRef<str>,
+        filename: impl Into<String>,
     ) -> OpenDownloadStreamByName {
         self.async_bucket.open_download_stream_by_name(filename)
     }

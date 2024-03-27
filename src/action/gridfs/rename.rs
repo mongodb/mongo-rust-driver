@@ -7,11 +7,11 @@ impl GridFsBucket {
     /// error if the `id` does not match any files in the bucket.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Rename {
+    pub fn rename(&self, id: Bson, new_filename: impl Into<String>) -> Rename {
         Rename {
             bucket: self,
             id,
-            new_filename: new_filename.as_ref().to_owned(),
+            new_filename: new_filename.into(),
         }
     }
 }
@@ -22,7 +22,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// error if the `id` does not match any files in the bucket.
     ///
     /// [`run`](Rename::run) will return [`Result<()>`].
-    pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Rename {
+    pub fn rename(&self, id: Bson, new_filename: impl Into<String>) -> Rename {
         self.async_bucket.rename(id, new_filename)
     }
 }

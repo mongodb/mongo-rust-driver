@@ -48,6 +48,7 @@ pub use list_indexes::ListIndexes;
 pub use perf::WarmConnectionPool;
 pub use replace_one::ReplaceOne;
 pub use run_command::{RunCommand, RunCursorCommand};
+pub use search_index::{CreateSearchIndex, UpdateSearchIndex};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
 pub use update::Update;
