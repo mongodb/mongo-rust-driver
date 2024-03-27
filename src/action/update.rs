@@ -11,7 +11,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T> Collection<T>
 where
@@ -24,7 +24,8 @@ where
     /// in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
-    /// `await` will return `Result<UpdateResult>`.
+    /// `await` will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
@@ -48,7 +49,8 @@ where
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<UpdateResult>`.
+    /// `await` will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
@@ -73,7 +75,8 @@ where
     /// in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
-    /// [`run`](Update::run) will return `Result<UpdateResult>`.
+    /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         self.async_collection.update_many(query, update)
     }
@@ -90,7 +93,8 @@ where
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](Update::run) will return `Result<UpdateResult>`.
+    /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         self.async_collection.update_one(query, update)
     }

@@ -16,6 +16,7 @@ use crate::{
 
 use super::{
     action_impl,
+    deeplink,
     option_setters,
     ExplicitSession,
     ImplicitSession,
@@ -26,7 +27,8 @@ use super::{
 impl Database {
     /// Gets information about each of the collections in the database.
     ///
-    /// `await` will return `Result<`[`Cursor`]`<`[`CollectionSpecification`]`>>`.
+    /// `await` will return d[`Result<Cursor<CollectionSpecification>>`].
+    #[deeplink]
     pub fn list_collections(&self) -> ListCollections {
         ListCollections {
             db: self,
@@ -38,7 +40,8 @@ impl Database {
 
     /// Gets the names of the collections in the database.
     ///
-    /// `await` will return `Result<Vec<String>>`.
+    /// `await` will return d[`Result<Vec<String>>`].
+    #[deeplink]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         ListCollections {
             db: self,
@@ -54,14 +57,16 @@ impl crate::sync::Database {
     /// Gets information about each of the collections in the database.
     ///
     /// [`run`](ListCollections::run) will return
-    /// `Result<`[`Cursor`]`<`[`CollectionSpecification`]`>>`.
+    /// d[`Result<Cursor<CollectionSpecification>>`].
+    #[deeplink]
     pub fn list_collections(&self) -> ListCollections {
         self.async_database.list_collections()
     }
 
     /// Gets the names of the collections in the database.
     ///
-    /// [`run`](ListCollections::run) will return `Result<Vec<String>>`.
+    /// [`run`](ListCollections::run) will return d[`Result<Vec<String>>`].
+    #[deeplink]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         self.async_database.list_collection_names()
     }

@@ -13,12 +13,13 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, option_setters, ListNames, ListSpecifications};
+use super::{action_impl, deeplink, option_setters, ListNames, ListSpecifications};
 
 impl Client {
     /// Gets information about each database present in the cluster the Client is connected to.
     ///
-    /// `await` will return `Result<Vec<`[`DatabaseSpecification`]`>>`.
+    /// `await` will return d[`Result<Vec<DatabaseSpecification>>`].
+    #[deeplink]
     pub fn list_databases(&self) -> ListDatabases {
         ListDatabases {
             client: self,
@@ -30,7 +31,8 @@ impl Client {
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
     ///
-    /// `await` will return `Result<Vec<String>>`.
+    /// `await` will return d[`Result<Vec<String>>`].
+    #[deeplink]
     pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         ListDatabases {
             client: self,
@@ -45,14 +47,16 @@ impl Client {
 impl SyncClient {
     /// Gets information about each database present in the cluster the Client is connected to.
     ///
-    /// [run](ListDatabases::run) will return `Result<Vec<`[`DatabaseSpecification`]`>>`.
+    /// [run](ListDatabases::run) will return d[`Result<Vec<DatabaseSpecification>>`].
+    #[deeplink]
     pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
     ///
-    /// [run](ListDatabases::run) will return `Result<Vec<String>>`.
+    /// [run](ListDatabases::run) will return d[`Result<Vec<String>>`].
+    #[deeplink]
     pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         self.async_client.list_database_names()
     }

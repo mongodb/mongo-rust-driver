@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
     braced,
     parenthesized,
@@ -11,9 +11,13 @@ use syn::{
     spanned::Spanned,
     Block,
     Error,
+    Expr,
     Generics,
     Ident,
+    ImplItemFn,
     Lifetime,
+    Lit,
+    Meta,
     Token,
     Type,
 };
@@ -217,4 +221,107 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
         ));
     }
     Ok(())
+}
+
+/// Enables rustdoc links to types that link individually to each type
+/// component.
+#[proc_macro_attribute]
+pub fn deeplink(
+    _attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut impl_fn = parse_macro_input!(item as ImplItemFn);
+
+    for attr in &mut impl_fn.attrs {
+        // Skip non-`doc` attrs
+        if attr.path() != &parse_quote! { doc } {
+            continue;
+        }
+        // Get the string literal value from #[doc = "lit"]
+        let mut text = match &mut attr.meta {
+            Meta::NameValue(nv) => match &mut nv.value {
+                Expr::Lit(el) => match &mut el.lit {
+                    Lit::Str(ls) => ls.value(),
+                    _ => continue,
+                },
+                _ => continue,
+            },
+            _ => continue,
+        };
+        // Process substrings delimited by "d[...]"
+        while let Some(ix) = text.find("d[") {
+            let pre = &text[..ix];
+            let rest = &text[ix + 2..];
+            let end = match rest.find(']') {
+                Some(v) => v,
+                None => {
+                    return Error::new(attr.span(), "unterminated d[")
+                        .into_compile_error()
+                        .into()
+                }
+            };
+            let body = &rest[..end];
+            let post = &rest[end + 1..];
+            // Strip inner backticks, if any
+            let (fixed, body) = if body.starts_with('`') && body.ends_with('`') {
+                (
+                    true,
+                    body.strip_prefix('`').unwrap().strip_suffix('`').unwrap(),
+                )
+            } else {
+                (false, body)
+            };
+            // Build new string
+            let mut new_text = pre.to_owned();
+            if fixed {
+                new_text.push_str("<code>");
+            }
+            new_text.push_str(&text_link(body));
+            if fixed {
+                new_text.push_str("</code>");
+            }
+            new_text.push_str(post);
+            text = new_text;
+        }
+        *attr = parse_quote! { #[doc = #text] };
+    }
+
+    impl_fn.into_token_stream().into()
+}
+
+fn text_link(text: &str) -> String {
+    // Break into segments delimited by '<' or '>'
+    let segments = text.split_inclusive(&['<', '>'])
+        // Put each delimiter in its own segment
+        .flat_map(|s| {
+            if s == "<" || s == ">" {
+                vec![s]
+            } else if let Some(sub) = s.strip_suffix(&['<', '>']) {
+                vec![sub, &s[sub.len()..]]
+            } else {
+                vec![s]
+            }
+        });
+
+    // Build output
+    let mut out = vec![];
+    for segment in segments {
+        match segment {
+            // Escape angle brackets
+            "<" => out.push("&lt;"),
+            ">" => out.push("&gt;"),
+            // Don't link unit
+            "()" => out.push("()"),
+            // Link to types
+            _ => {
+                // Use the short name
+                let short = segment
+                    .rsplit_once("::")
+                    .map(|(_, short)| short)
+                    .unwrap_or(segment);
+                out.extend(["[", short, "](", segment, ")"]);
+            }
+        }
+    }
+    out.concat()
 }

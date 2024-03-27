@@ -13,7 +13,7 @@ use crate::{
     IndexModel,
 };
 
-use super::{action_impl, option_setters, CollRef, Multiple, Single};
+use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
 
 impl<T> Collection<T>
 where
@@ -21,7 +21,8 @@ where
 {
     /// Creates the given index on this collection.
     ///
-    /// `await` will return `Result<CreateIndexResult>`.
+    /// `await` will return d[`Result<CreateIndexResult>`].
+    #[deeplink]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         CreateIndex {
             coll: CollRef::new(self),
@@ -34,7 +35,8 @@ where
 
     /// Creates the given indexes on this collection.
     ///
-    /// `await` will return `Result<CreateIndexesResult>`.
+    /// `await` will return d[`Result<CreateIndexesResult>`].
+    #[deeplink]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -56,14 +58,16 @@ where
 {
     /// Creates the given index on this collection.
     ///
-    /// [`run`](CreateIndex::run) will return `Result<CreateIndexResult>`.
+    /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
+    #[deeplink]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         self.async_collection.create_index(index)
     }
 
     /// Creates the given indexes on this collection.
     ///
-    /// [`run`](CreateIndex::run) will return `Result<CreateIndexesResult>`.
+    /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexesResult>`].
+    #[deeplink]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,

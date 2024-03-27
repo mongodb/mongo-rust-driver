@@ -11,7 +11,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T> Collection<T>
 where
@@ -24,7 +24,8 @@ where
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<DeleteResult>`.
+    /// `await` will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_one(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
@@ -37,7 +38,8 @@ where
 
     /// Deletes all documents stored in the collection matching `query`.
     ///
-    /// `await` will return `Result<DeleteResult>`.
+    /// `await` will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_many(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
@@ -61,14 +63,16 @@ where
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](Delete::run) will return `Result<DeleteResult>`.
+    /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_one(&self, query: Document) -> Delete {
         self.async_collection.delete_one(query)
     }
 
     /// Deletes all documents stored in the collection matching `query`.
     ///
-    /// [`run`](Delete::run) will return `Result<DeleteResult>`.
+    /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_many(&self, query: Document) -> Delete {
         self.async_collection.delete_many(query)
     }

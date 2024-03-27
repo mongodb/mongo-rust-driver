@@ -7,7 +7,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T> Collection<T>
 where
@@ -25,7 +25,8 @@ where
     /// For more information on the behavior of the `count` server command, see
     /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
     ///
-    /// `await` will return `Result<u64>`.
+    /// `await` will return d[`Result<u64>`].
+    #[deeplink]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         EstimatedDocumentCount {
             cr: CollRef::new(self),
@@ -37,7 +38,8 @@ where
     ///
     /// Note that this method returns an accurate count.
     ///
-    /// `await` will return `Result<u64>`.
+    /// `await` will return d[`Result<u64>`].
+    #[deeplink]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         CountDocuments {
             cr: CollRef::new(self),
@@ -65,7 +67,8 @@ where
     /// For more information on the behavior of the `count` server command, see
     /// [Count: Behavior](https://www.mongodb.com/docs/manual/reference/command/count/#behavior).
     ///
-    /// [`run`](EstimatedDocumentCount::run) will return `Result<u64>`.
+    /// [`run`](EstimatedDocumentCount::run) will return d[`Result<u64>`].
+    #[deeplink]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         self.async_collection.estimated_document_count()
     }
@@ -74,13 +77,14 @@ where
     ///
     /// Note that this method returns an accurate count.
     ///
-    /// [`run`](CountDocuments::run) will return `Result<u64>`.
+    /// [`run`](CountDocuments::run) will return d[`Result<u64>`].
+    #[deeplink]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         self.async_collection.count_documents(filter)
     }
 }
 
-/// Gather an estimated document count.  Create by calling [`Collection::estimated_document_count`].
+/// Gather an estimated document count.  Construct with [`Collection::estimated_document_count`].
 #[must_use]
 pub struct EstimatedDocumentCount<'a> {
     cr: CollRef<'a>,
@@ -108,7 +112,7 @@ action_impl! {
     }
 }
 
-/// Get an accurate count of documents.  Create by calling [`Collection::count_documents`].
+/// Get an accurate count of documents.  Construct with [`Collection::count_documents`].
 #[must_use]
 pub struct CountDocuments<'a> {
     cr: CollRef<'a>,

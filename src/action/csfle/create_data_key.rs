@@ -1,12 +1,13 @@
 use crate::client_encryption::{ClientEncryption, MasterKey};
 
-use super::super::option_setters;
+use super::super::{deeplink, option_setters};
 
 impl ClientEncryption {
     /// Creates a new key document and inserts into the key vault collection.
     ///
-    /// `await` will return `Result<Binary>` (subtype 0x04) with the _id of the created
+    /// `await` will return d[`Result<Binary>`] (subtype 0x04) with the _id of the created
     /// document as a UUID.
+    #[deeplink]
     pub fn create_data_key(&self, master_key: MasterKey) -> CreateDataKey {
         CreateDataKey {
             client_enc: self,

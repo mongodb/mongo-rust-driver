@@ -14,7 +14,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Inserts the data in `docs` into the collection.
@@ -27,7 +27,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<InsertManyResult>`.
+    /// `await` will return d[`Result<InsertManyResult>`].
+    #[deeplink]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         let human_readable = self.human_readable_serialization();
         InsertMany {
@@ -54,7 +55,8 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](InsertMany::run) will return `Result<InsertManyResult>`.
+    /// [`run`](InsertMany::run) will return d[`Result<InsertManyResult>`].
+    #[deeplink]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         self.async_collection.insert_many(docs)
     }

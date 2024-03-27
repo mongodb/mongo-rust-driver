@@ -12,7 +12,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
 
 impl Database {
     /// Runs a database-level command.
@@ -23,7 +23,8 @@ impl Database {
     /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
     /// command document.
     ///
-    /// `await` will return `Result<Document>`.
+    /// `await` will return d[`Result<Document>`].
+    #[deeplink]
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
             db: self,
@@ -35,8 +36,9 @@ impl Database {
 
     /// Runs a database-level command and returns a cursor to the response.
     ///
-    /// `await` will return `Result<`[`Cursor`]`<Document>>` or a
-    /// `Result<`[`SessionCursor`]`<Document>>` if a [`ClientSession`] is provided.
+    /// `await` will return d[`Result<Cursor<Document>>`] or a
+    /// d[`Result<SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         RunCursorCommand {
             db: self,
@@ -57,15 +59,17 @@ impl crate::sync::Database {
     /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
     /// command document.
     ///
-    /// [`run`](RunCommand::run) will return `Result<Document>`.
+    /// [`run`](RunCommand::run) will return d[`Result<Document>`].
+    #[deeplink]
     pub fn run_command(&self, command: Document) -> RunCommand {
         self.async_database.run_command(command)
     }
 
     /// Runs a database-level command and returns a cursor to the response.
     ///
-    /// [`run`](RunCursorCommand::run) will return `Result<`[`Cursor`]`<Document>>` or a
-    /// `Result<`[`SessionCursor`]`<Document>>` if a [`ClientSession`] is provided.
+    /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         self.async_database.run_cursor_command(command)
     }

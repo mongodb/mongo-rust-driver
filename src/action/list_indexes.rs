@@ -16,6 +16,7 @@ use crate::{
 
 use super::{
     action_impl,
+    deeplink,
     option_setters,
     CollRef,
     ExplicitSession,
@@ -30,8 +31,9 @@ where
 {
     /// Lists all indexes on this collection.
     ///
-    /// `await` will return `Result<Cursor<IndexModel>>` (or `Result<SessionCursor<IndexModel>>` if
-    /// a `ClientSession` is provided).
+    /// `await` will return d[`Result<Cursor<IndexModel>>`] (or
+    /// d[`Result<SessionCursor<IndexModel>>`] if a `ClientSession` is provided).
+    #[deeplink]
     pub fn list_indexes(&self) -> ListIndexes {
         ListIndexes {
             coll: CollRef::new(self),
@@ -43,7 +45,8 @@ where
 
     /// Gets the names of all indexes on the collection.
     ///
-    /// `await` will return `Result<Vec<String>>`.
+    /// `await` will return d[`Result<Vec<String>>`].
+    #[deeplink]
     pub fn list_index_names(&self) -> ListIndexes<ListNames> {
         ListIndexes {
             coll: CollRef::new(self),
@@ -61,15 +64,17 @@ where
 {
     /// Lists all indexes on this collection.
     ///
-    /// [`run`](ListIndexes::run) will return `Result<Cursor<IndexModel>>` (or
-    /// `Result<SessionCursor<IndexModel>>` if a `ClientSession` is provided).
+    /// [`run`](ListIndexes::run) will return d[`Result<crate::sync::Cursor<IndexModel>>`] (or
+    /// d[`Result<crate::sync::SessionCursor<IndexModel>>`] if a `ClientSession` is provided).
+    #[deeplink]
     pub fn list_indexes(&self) -> ListIndexes {
         self.async_collection.list_indexes()
     }
 
     /// Gets the names of all indexes on the collection.
     ///
-    /// [`run`](ListIndexes::run) will return `Result<Vec<String>>`.
+    /// [`run`](ListIndexes::run) will return d[`Result<Vec<String>>`].
+    #[deeplink]
     pub fn list_index_names(&self) -> ListIndexes<ListNames> {
         self.async_collection.list_index_names()
     }

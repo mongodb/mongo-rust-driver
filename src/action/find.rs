@@ -16,13 +16,14 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
 
 impl<T: Send + Sync> Collection<T> {
     /// Finds the documents in the collection matching `filter`.
     ///
-    /// `await` will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a session is
+    /// `await` will return d[`Result<Cursor<T>>`] (or d[`Result<SessionCursor<T>>`] if a session is
     /// provided).
+    #[deeplink]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
@@ -36,7 +37,8 @@ impl<T: Send + Sync> Collection<T> {
 impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
-    /// `await` will return `Result<Option<T>>`.
+    /// `await` will return d[`Result<Option<T>>`].
+    #[deeplink]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         FindOne {
             coll: self,
@@ -51,8 +53,9 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
 impl<T: Send + Sync> crate::sync::Collection<T> {
     /// Finds the documents in the collection matching `filter`.
     ///
-    /// [`run`](Find::run) will return `Result<Cursor<T>>` (or `Result<SessionCursor<T>>` if a
-    /// session is provided).
+    /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<T>>`] (or
+    /// d[`Result<crate::sync::SessionCursor<T>>`] if a session is provided).
+    #[deeplink]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         self.async_collection.find(filter)
     }
@@ -62,7 +65,8 @@ impl<T: Send + Sync> crate::sync::Collection<T> {
 impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
-    /// [`run`](Find::run) will return `Result<Option<T>>`.
+    /// [`run`](Find::run) will return d[`Result<Option<T>>`].
+    #[deeplink]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         self.async_collection.find_one(filter)
     }
