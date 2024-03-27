@@ -47,7 +47,7 @@ where
     /// Updates the search index with the given name to use the provided definition.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn update_search_index_2(
+    pub fn update_search_index(
         &self,
         name: impl Into<String>,
         definition: Document,
@@ -88,13 +88,12 @@ where
     /// Updates the search index with the given name to use the provided definition.
     ///
     /// [`run`](UpdateSearchIndex::run) will return [`Result<()>`].
-    pub fn update_search_index_2(
+    pub fn update_search_index(
         &self,
         name: impl Into<String>,
         definition: Document,
     ) -> UpdateSearchIndex {
-        self.async_collection
-            .update_search_index_2(name, definition)
+        self.async_collection.update_search_index(name, definition)
     }
 }
 

@@ -144,7 +144,8 @@ impl TestOperation for UpdateSearchIndex {
         async move {
             let collection = test_runner.get_collection(id).await;
             collection
-                .update_search_index(&self.name, self.definition.clone(), self.options.clone())
+                .update_search_index(&self.name, self.definition.clone())
+                .with_options(self.options.clone())
                 .await?;
             Ok(None)
         }

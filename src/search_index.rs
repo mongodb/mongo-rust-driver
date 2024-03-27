@@ -3,7 +3,7 @@ use crate::{
     bson::Document,
     coll::options::AggregateOptions,
     error::Result,
-    operation::{DropSearchIndex, UpdateSearchIndex},
+    operation::DropSearchIndex,
     Collection,
     Cursor,
 };
@@ -16,21 +16,6 @@ impl<T> Collection<T>
 where
     T: Send + Sync,
 {
-    /// Updates the search index with the given name to use the provided definition.
-    pub async fn update_search_index(
-        &self,
-        name: impl AsRef<str>,
-        definition: Document,
-        _options: impl Into<Option<UpdateSearchIndexOptions>>,
-    ) -> Result<()> {
-        let op = UpdateSearchIndex::new(
-            self.namespace(),
-            name.as_ref().to_string(),
-            definition.clone(),
-        );
-        self.client().execute_operation(op, None).await
-    }
-
     /// Drops the search index with the given name.
     pub async fn drop_search_index(
         &self,

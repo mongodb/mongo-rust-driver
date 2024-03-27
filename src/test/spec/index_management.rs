@@ -234,7 +234,6 @@ async fn search_index_update() {
         .update_search_index(
             "test-search-index",
             doc! { "mappings": { "dynamic": true } },
-            None,
         )
         .await
         .unwrap();
