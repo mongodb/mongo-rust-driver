@@ -67,7 +67,7 @@ where
     /// Drops the search index with the given name.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn drop_search_index_2(&self, name: impl Into<String>) -> DropSearchIndex {
+    pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
         DropSearchIndex {
             coll: CollRef::new(self),
             name: name.into(),
@@ -114,8 +114,8 @@ where
     /// Drops the search index with the given name.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn drop_search_index_2(&self, name: impl Into<String>) -> DropSearchIndex {
-        self.async_collection.drop_search_index_2(name)
+    pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
+        self.async_collection.drop_search_index(name)
     }
 }
 

@@ -173,10 +173,7 @@ async fn search_index_drop() {
         }
     }
 
-    coll0
-        .drop_search_index("test-search-index", None)
-        .await
-        .unwrap();
+    coll0.drop_search_index("test-search-index").await.unwrap();
 
     loop {
         let cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
@@ -273,8 +270,5 @@ async fn search_index_drop_not_found() {
         .database("search_index_test")
         .collection::<Document>(&coll_name);
 
-    coll0
-        .drop_search_index("test-search-index", None)
-        .await
-        .unwrap();
+    coll0.drop_search_index("test-search-index").await.unwrap();
 }

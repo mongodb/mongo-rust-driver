@@ -87,7 +87,8 @@ impl TestOperation for DropSearchIndex {
         async move {
             let collection = test_runner.get_collection(id).await;
             collection
-                .drop_search_index(&self.name, self.options.clone())
+                .drop_search_index(&self.name)
+                .with_options(self.options.clone())
                 .await?;
             Ok(None)
         }
