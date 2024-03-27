@@ -35,7 +35,8 @@ impl TestOperation for CreateSearchIndex {
         async move {
             let collection = test_runner.get_collection(id).await;
             let name = collection
-                .create_search_index(self.model.clone(), self.options.clone())
+                .create_search_index(self.model.clone())
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::String(name).into()))
         }
@@ -60,7 +61,8 @@ impl TestOperation for CreateSearchIndexes {
         async move {
             let collection = test_runner.get_collection(id).await;
             let names = collection
-                .create_search_indexes(self.models.clone(), self.options.clone())
+                .create_search_indexes(self.models.clone())
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(to_bson(&names)?.into()))
         }

@@ -17,7 +17,7 @@ where
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
-    pub fn create_search_indexes_2(
+    pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
     ) -> CreateSearchIndex<Multiple> {
@@ -33,7 +33,7 @@ where
     ///
     /// `await` will return d[`Result<String>`].
     #[deeplink]
-    pub fn create_search_index_2(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
+    pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
         CreateSearchIndex {
             coll: CollRef::new(self),
             models: vec![model],
@@ -52,19 +52,19 @@ where
     ///
     /// [`run`](CreateSearchIndex::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    pub fn create_search_indexes_2(
+    pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
     ) -> CreateSearchIndex<Multiple> {
-        self.async_collection.create_search_indexes_2(models)
+        self.async_collection.create_search_indexes(models)
     }
 
     /// Convenience method for creating a single search index.
     ///
     /// [`run`](CreateSearchIndex::run) will return d[`Result<String>`].
     #[deeplink]
-    pub fn create_search_index_2(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
-        self.async_collection.create_search_index_2(model)
+    pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
+        self.async_collection.create_search_index(model)
     }
 }
 
@@ -98,7 +98,7 @@ action_impl! {
 
         async fn execute(self) -> Result<String> {
             let mut names = self.coll
-                .create_search_indexes_2(self.models)
+                .create_search_indexes(self.models)
                 .with_options(self.options).await?;
             match names.len() {
                 1 => Ok(names.pop().unwrap()),

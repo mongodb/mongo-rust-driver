@@ -45,7 +45,6 @@ async fn search_index_create_list() {
                 .name(String::from("test-search-index"))
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
-            None,
         )
         .await
         .unwrap();
@@ -87,19 +86,16 @@ async fn search_index_create_multiple() {
     let coll0 = db.collection::<Document>(&coll_name);
 
     let names = coll0
-        .create_search_indexes(
-            [
-                SearchIndexModel::builder()
-                    .name(String::from("test-search-index-1"))
-                    .definition(doc! { "mappings": { "dynamic": false } })
-                    .build(),
-                SearchIndexModel::builder()
-                    .name(String::from("test-search-index-2"))
-                    .definition(doc! { "mappings": { "dynamic": false } })
-                    .build(),
-            ],
-            None,
-        )
+        .create_search_indexes([
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-1"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-2"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+        ])
         .await
         .unwrap();
     assert_eq!(names, ["test-search-index-1", "test-search-index-2"]);
@@ -159,7 +155,6 @@ async fn search_index_drop() {
                 .name(String::from("test-search-index"))
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
-            None,
         )
         .await
         .unwrap();
@@ -217,7 +212,6 @@ async fn search_index_update() {
                 .name(String::from("test-search-index"))
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
-            None,
         )
         .await
         .unwrap();

@@ -2,8 +2,8 @@ use self::options::*;
 use crate::{
     bson::Document,
     coll::options::AggregateOptions,
-    error::{Error, Result},
-    operation::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex},
+    error::Result,
+    operation::{DropSearchIndex, UpdateSearchIndex},
     Collection,
     Cursor,
 };
@@ -16,29 +16,6 @@ impl<T> Collection<T>
 where
     T: Send + Sync,
 {
-    /// Convenience method for creating a single search index.
-    pub async fn create_search_index(
-        &self,
-        model: SearchIndexModel,
-        options: impl Into<Option<CreateSearchIndexOptions>>,
-    ) -> Result<String> {
-        let mut names = self.create_search_indexes(Some(model), options).await?;
-        match names.len() {
-            1 => Ok(names.pop().unwrap()),
-            n => Err(Error::internal(format!("expected 1 index name, got {}", n))),
-        }
-    }
-
-    /// Creates multiple search indexes on the collection.
-    pub async fn create_search_indexes(
-        &self,
-        models: impl IntoIterator<Item = SearchIndexModel>,
-        _options: impl Into<Option<CreateSearchIndexOptions>>,
-    ) -> Result<Vec<String>> {
-        let op = CreateSearchIndexes::new(self.namespace(), models.into_iter().collect());
-        self.client().execute_operation(op, None).await
-    }
-
     /// Updates the search index with the given name to use the provided definition.
     pub async fn update_search_index(
         &self,
