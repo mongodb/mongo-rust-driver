@@ -252,25 +252,6 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn into_document(self) -> Document {
-        match self {
-            Self::Tcp { host, port } => {
-                doc! {
-                    "host": host,
-                    "port": port.map(|i| Bson::Int32(i.into())).unwrap_or(Bson::Null)
-                }
-            }
-            #[cfg(unix)]
-            Self::Unix { path } => {
-                doc! {
-                    "host": path.to_string_lossy().as_ref(),
-                    "port": Bson::Null,
-                }
-            }
-        }
-    }
-
     pub(crate) fn host(&self) -> Cow<'_, str> {
         match self {
             Self::Tcp { host, .. } => Cow::Borrowed(host.as_str()),
@@ -2837,18 +2818,20 @@ mod tests {
                 ],
                 selection_criteria: Some(
                     ReadPreference::SecondaryPreferred {
-                        options: ReadPreferenceOptions::builder()
-                            .tag_sets(vec![
-                                tag_set! {
-                                    "dc" => "ny",
-                                    "rack" => "1"
-                                },
-                                tag_set! {
-                                    "dc" => "ny"
-                                },
-                                tag_set! {},
-                            ])
-                            .build()
+                        options: Some(
+                            ReadPreferenceOptions::builder()
+                                .tag_sets(vec![
+                                    tag_set! {
+                                        "dc" => "ny",
+                                        "rack" => "1"
+                                    },
+                                    tag_set! {
+                                        "dc" => "ny"
+                                    },
+                                    tag_set! {},
+                                ])
+                                .build()
+                        )
                     }
                     .into()
                 ),

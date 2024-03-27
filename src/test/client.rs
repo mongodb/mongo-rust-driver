@@ -130,9 +130,11 @@ async fn server_selection_timeout_message() {
     tag_set.insert("asdfasdf".to_string(), "asdfadsf".to_string());
 
     let unsatisfiable_read_preference = ReadPreference::Secondary {
-        options: ReadPreferenceOptions::builder()
-            .tag_sets(vec![tag_set])
-            .build(),
+        options: Some(
+            ReadPreferenceOptions::builder()
+                .tag_sets(vec![tag_set])
+                .build(),
+        ),
     };
 
     let mut options = get_client_options().await.clone();

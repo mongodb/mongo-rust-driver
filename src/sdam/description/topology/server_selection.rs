@@ -198,29 +198,31 @@ impl TopologyDescription {
         &self,
         read_preference: &ReadPreference,
     ) -> Result<Vec<&ServerDescription>> {
+        let tag_sets = read_preference.tag_sets();
+        let max_staleness = read_preference.max_staleness();
+
         let servers = match read_preference {
             ReadPreference::Primary => self.servers_with_type(&[ServerType::RsPrimary]).collect(),
-            ReadPreference::Secondary { ref options } => self
-                .suitable_servers_for_read_preference(
-                    &[ServerType::RsSecondary],
-                    options.tag_sets.as_ref(),
-                    options.max_staleness,
-                )?,
-            ReadPreference::PrimaryPreferred { ref options } => {
+            ReadPreference::Secondary { .. } => self.suitable_servers_for_read_preference(
+                &[ServerType::RsSecondary],
+                tag_sets,
+                max_staleness,
+            )?,
+            ReadPreference::PrimaryPreferred { .. } => {
                 match self.servers_with_type(&[ServerType::RsPrimary]).next() {
                     Some(primary) => vec![primary],
                     None => self.suitable_servers_for_read_preference(
                         &[ServerType::RsSecondary],
-                        options.tag_sets.as_ref(),
-                        options.max_staleness,
+                        tag_sets,
+                        max_staleness,
                     )?,
                 }
             }
-            ReadPreference::SecondaryPreferred { ref options } => {
+            ReadPreference::SecondaryPreferred { .. } => {
                 let suitable_servers = self.suitable_servers_for_read_preference(
                     &[ServerType::RsSecondary],
-                    options.tag_sets.as_ref(),
-                    options.max_staleness,
+                    tag_sets,
+                    max_staleness,
                 )?;
 
                 if suitable_servers.is_empty() {
@@ -229,10 +231,10 @@ impl TopologyDescription {
                     suitable_servers
                 }
             }
-            ReadPreference::Nearest { ref options } => self.suitable_servers_for_read_preference(
+            ReadPreference::Nearest { .. } => self.suitable_servers_for_read_preference(
                 &[ServerType::RsPrimary, ServerType::RsSecondary],
-                options.tag_sets.as_ref(),
-                options.max_staleness,
+                tag_sets,
+                max_staleness,
             )?,
         };
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
-    selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
+    options::{ReadPreference, ReadPreferenceOptions, TagSet},
     test::run_spec_test,
 };
 
@@ -28,12 +28,13 @@ struct TestFile {
     _operation: Option<String>,
 }
 
+// Deserialize into a helper struct to avoid deserialization errors for invalid read preferences.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TestReadPreference {
-    pub mode: Option<String>,
-    pub tag_sets: Option<Vec<TagSet>>,
+struct TestReadPreference {
+    mode: Option<String>,
+    tag_sets: Option<Vec<TagSet>>,
     #[serde(rename = "maxStalenessSeconds")]
-    pub max_staleness_seconds: Option<u64>,
+    max_staleness_seconds: Option<u64>,
 }
 
 impl TryFrom<TestReadPreference> for ReadPreference {
@@ -57,10 +58,18 @@ impl TryFrom<TestReadPreference> for ReadPreference {
                 }
                 ReadPreference::Primary
             }
-            Some("Secondary") => ReadPreference::Secondary { options },
-            Some("PrimaryPreferred") => ReadPreference::PrimaryPreferred { options },
-            Some("SecondaryPreferred") => ReadPreference::SecondaryPreferred { options },
-            Some("Nearest") => ReadPreference::Nearest { options },
+            Some("Secondary") => ReadPreference::Secondary {
+                options: Some(options),
+            },
+            Some("PrimaryPreferred") => ReadPreference::PrimaryPreferred {
+                options: Some(options),
+            },
+            Some("SecondaryPreferred") => ReadPreference::SecondaryPreferred {
+                options: Some(options),
+            },
+            Some("Nearest") => ReadPreference::Nearest {
+                options: Some(options),
+            },
             Some(m) => {
                 return Err(Error::invalid_argument(
                     format!("invalid read preference mode: {}", m).as_str(),
@@ -109,18 +118,18 @@ async fn run_test(test_file: TestFile) {
             Client,
         };
 
-        let mut options = Vec::new();
+        let mut uri_options = Vec::new();
         if let Some(ref mode) = test_file.read_preference.mode {
-            options.push(format!("readPreference={}", mode));
+            uri_options.push(format!("readPreference={}", mode));
         }
         if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
-            options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
+            uri_options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
         }
         if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
-            options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
+            uri_options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
         }
 
-        let uri_str = format!("mongodb://localhost:27017/?{}", options.join("&"));
+        let uri_str = format!("mongodb://localhost:27017/?{}", uri_options.join("&"));
         ClientOptions::parse(uri_str)
             .await
             .err()

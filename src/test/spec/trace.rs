@@ -360,7 +360,7 @@ fn selection_criteria_tracing_representation() {
 
     // non-primary read preferences with empty options - options should be omitted from
     // representation.
-    let empty_opts = ReadPreferenceOptions::builder().build();
+    let empty_opts = Some(ReadPreferenceOptions::builder().build());
 
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
@@ -393,9 +393,11 @@ fn selection_criteria_tracing_representation() {
 
     let mut tag_set = HashMap::new();
     tag_set.insert("a".to_string(), "b".to_string());
-    let opts_with_tag_sets = ReadPreferenceOptions::builder()
-        .tag_sets(vec![tag_set.clone()])
-        .build();
+    let opts_with_tag_sets = Some(
+        ReadPreferenceOptions::builder()
+            .tag_sets(vec![tag_set.clone()])
+            .build(),
+    );
 
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
@@ -405,9 +407,11 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Tag Sets: [{\"a\": \"b\"}] }"
     );
 
-    let opts_with_max_staleness = ReadPreferenceOptions::builder()
-        .max_staleness(Duration::from_millis(200))
-        .build();
+    let opts_with_max_staleness = Some(
+        ReadPreferenceOptions::builder()
+            .max_staleness(Duration::from_millis(200))
+            .build(),
+    );
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
             options: opts_with_max_staleness
@@ -416,9 +420,11 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Max Staleness: 200ms }"
     );
 
-    let opts_with_hedge = ReadPreferenceOptions::builder()
-        .hedge(HedgedReadOptions::with_enabled(true))
-        .build();
+    let opts_with_hedge = Some(
+        ReadPreferenceOptions::builder()
+            .hedge(HedgedReadOptions::with_enabled(true))
+            .build(),
+    );
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
             options: opts_with_hedge
@@ -427,10 +433,12 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Hedge: true }"
     );
 
-    let opts_with_multiple_options = ReadPreferenceOptions::builder()
-        .max_staleness(Duration::from_millis(200))
-        .tag_sets(vec![tag_set])
-        .build();
+    let opts_with_multiple_options = Some(
+        ReadPreferenceOptions::builder()
+            .max_staleness(Duration::from_millis(200))
+            .tag_sets(vec![tag_set])
+            .build(),
+    );
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
             options: opts_with_multiple_options
