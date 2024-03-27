@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 
-use bson::Document;
+use bson::{doc, Document};
 
 use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
 use crate::{
+    coll::options::{AggregateOptions, ListIndexesOptions},
     error::{Error, Result},
     operation,
     search_index::options::{
@@ -12,6 +13,7 @@ use crate::{
         UpdateSearchIndexOptions,
     },
     Collection,
+    Cursor,
     SearchIndexModel,
 };
 
@@ -74,6 +76,22 @@ where
             options: None,
         }
     }
+
+    /// Gets index information for one or more search indexes in the collection.
+    ///
+    /// If name is not specified, information for all indexes on the specified collection will be
+    /// returned.
+    ///
+    /// `await` will return d[`Result<Cursor<Document>>`].
+    #[deeplink]
+    pub fn list_search_indexes_2(&self) -> ListSearchIndexes {
+        ListSearchIndexes {
+            coll: CollRef::new(self),
+            name: None,
+            agg_options: None,
+            options: None,
+        }
+    }
 }
 
 #[cfg(feature = "sync")]
@@ -113,9 +131,20 @@ where
 
     /// Drops the search index with the given name.
     ///
-    /// `await` will return [`Result<()>`].
+    /// [`run`](DropSearchIndex::run) will return [`Result<()>`].
     pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
         self.async_collection.drop_search_index(name)
+    }
+
+    /// Gets index information for one or more search indexes in the collection.
+    ///
+    /// If name is not specified, information for all indexes on the specified collection will be
+    /// returned.
+    ///
+    /// [`run`](ListSearchIndexes::run) will return d[`Result<crate::sync::Cursor<Document>>`].
+    #[deeplink]
+    pub fn list_search_indexes_2(&self) -> ListSearchIndexes {
+        self.async_collection.list_search_indexes_2()
     }
 }
 
@@ -212,6 +241,55 @@ action_impl! {
                 self.name,
             );
             self.coll.client().execute_operation(op, None).await
+        }
+    }
+}
+
+/// Gets index information for one or more search indexes in a collection.
+#[must_use]
+pub struct ListSearchIndexes<'a> {
+    coll: CollRef<'a>,
+    name: Option<String>,
+    agg_options: Option<AggregateOptions>,
+    options: Option<ListIndexesOptions>,
+}
+
+impl<'a> ListSearchIndexes<'a> {
+    option_setters! { options: ListIndexesOptions; }
+
+    /// Get information for the named index.
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set aggregation options.
+    pub fn aggregate_options(mut self, value: AggregateOptions) -> Self {
+        self.agg_options = Some(value);
+        self
+    }
+}
+
+action_impl! {
+    impl<'a> Action for ListSearchIndexes<'a> {
+        type Future = ListSearchIndexesFuture;
+
+        async fn execute(self) -> Result<Cursor<Document>> {
+            let mut inner = doc! {};
+            if let Some(name) = self.name {
+                inner.insert("name", name);
+            }
+            self.coll
+                .clone_unconcerned()
+                .aggregate(vec![doc! {
+                    "$listSearchIndexes": inner,
+                }])
+                .with_options(self.agg_options)
+                .await
+        }
+
+        fn sync_wrap(out) -> Result<crate::sync::Cursor<Document>> {
+            out.map(crate::sync::Cursor::new)
         }
     }
 }
