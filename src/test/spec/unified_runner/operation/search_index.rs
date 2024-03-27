@@ -4,6 +4,7 @@ use futures_util::{FutureExt, TryStreamExt};
 use serde::Deserialize;
 
 use crate::{
+    action::Action,
     coll::options::AggregateOptions,
     error::Result,
     search_index::options::{
@@ -114,11 +115,12 @@ impl TestOperation for ListSearchIndexes {
         async move {
             let collection = test_runner.get_collection(id).await;
             let cursor = collection
-                .list_search_indexes(
-                    self.name.as_deref(),
-                    self.aggregation_options.clone(),
-                    self.options.clone(),
-                )
+                .list_search_indexes()
+                .optional(self.name.clone(), |a, n| a.name(n))
+                .optional(self.aggregation_options.clone(), |a, o| {
+                    a.aggregate_options(o)
+                })
+                .with_options(self.options.clone())
                 .await?;
             let values: Vec<_> = cursor.try_collect().await?;
             Ok(Some(to_bson(&values)?.into()))

@@ -51,7 +51,7 @@ async fn search_index_create_list() {
     assert_eq!(name, "test-search-index");
 
     let found = 'outer: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
                 break 'outer d;
@@ -103,7 +103,7 @@ async fn search_index_create_multiple() {
     let mut index1 = None;
     let mut index2 = None;
     loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index-1") && d.get_bool("queryable") == Ok(true)
             {
@@ -161,7 +161,7 @@ async fn search_index_drop() {
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
                 break 'outer;
@@ -176,7 +176,7 @@ async fn search_index_drop() {
     coll0.drop_search_index("test-search-index").await.unwrap();
 
     loop {
-        let cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let cursor = coll0.list_search_indexes().await.unwrap();
         if !cursor.has_next() {
             break;
         }
@@ -215,7 +215,7 @@ async fn search_index_update() {
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
                 break 'outer;
@@ -236,7 +236,7 @@ async fn search_index_update() {
         .unwrap();
 
     let found = 'find: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index")
                 && d.get_bool("queryable") == Ok(true)

@@ -4,12 +4,13 @@ use bson::{doc, Document};
 
 use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
 use crate::{
-    coll::options::{AggregateOptions, ListIndexesOptions},
+    coll::options::AggregateOptions,
     error::{Error, Result},
     operation,
     search_index::options::{
         CreateSearchIndexOptions,
         DropSearchIndexOptions,
+        ListSearchIndexOptions,
         UpdateSearchIndexOptions,
     },
     Collection,
@@ -84,7 +85,7 @@ where
     ///
     /// `await` will return d[`Result<Cursor<Document>>`].
     #[deeplink]
-    pub fn list_search_indexes_2(&self) -> ListSearchIndexes {
+    pub fn list_search_indexes(&self) -> ListSearchIndexes {
         ListSearchIndexes {
             coll: CollRef::new(self),
             name: None,
@@ -143,8 +144,8 @@ where
     ///
     /// [`run`](ListSearchIndexes::run) will return d[`Result<crate::sync::Cursor<Document>>`].
     #[deeplink]
-    pub fn list_search_indexes_2(&self) -> ListSearchIndexes {
-        self.async_collection.list_search_indexes_2()
+    pub fn list_search_indexes(&self) -> ListSearchIndexes {
+        self.async_collection.list_search_indexes()
     }
 }
 
@@ -251,11 +252,11 @@ pub struct ListSearchIndexes<'a> {
     coll: CollRef<'a>,
     name: Option<String>,
     agg_options: Option<AggregateOptions>,
-    options: Option<ListIndexesOptions>,
+    options: Option<ListSearchIndexOptions>,
 }
 
 impl<'a> ListSearchIndexes<'a> {
-    option_setters! { options: ListIndexesOptions; }
+    option_setters! { options: ListSearchIndexOptions; }
 
     /// Get information for the named index.
     pub fn name(mut self, name: impl Into<String>) -> Self {
