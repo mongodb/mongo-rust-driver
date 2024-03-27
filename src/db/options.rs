@@ -105,6 +105,7 @@ pub struct CreateCollectionOptions {
     pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
 
     /// Options for clustered collections.
+    #[serde(default, deserialize_with = "ClusteredIndex::deserialize_self_or_true")]
     pub clustered_index: Option<ClusteredIndex>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -173,6 +174,35 @@ impl Default for ClusteredIndex {
             name: None,
             v: None,
         }
+    }
+}
+
+impl ClusteredIndex {
+    /// When creating a time-series collection on MongoDB Atlas the `clusteredIndex` field of the
+    /// collection options is given as `true` instead of as an object that deserializes to
+    /// `ClusteredIndex`. This custom deserializer handles that case by using the default value for
+    /// `ClusteredIndex`.
+    fn deserialize_self_or_true<'de, D>(deserializer: D) -> Result<Option<ClusteredIndex>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum ValueUnion {
+            Bool(bool),
+            ClusteredIndex(ClusteredIndex),
+        }
+
+        let value_option: Option<ValueUnion> = Deserialize::deserialize(deserializer)?;
+        value_option
+            .map(|value| match value {
+                ValueUnion::Bool(true) => Ok(ClusteredIndex::default()),
+                ValueUnion::Bool(false) => Err(serde::de::Error::custom(
+                    "if clusteredIndex is a boolean it must be `true`",
+                )),
+                ValueUnion::ClusteredIndex(value) => Ok(value),
+            })
+            .transpose()
     }
 }
 
