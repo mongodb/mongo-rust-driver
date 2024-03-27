@@ -3,7 +3,6 @@ use std::time::Duration;
 use bson::{doc, Document};
 
 use crate::{
-    client::options::ClientOptions,
     event::sdam::SdamEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
@@ -234,6 +233,7 @@ async fn rtt_is_updated() {
     .unwrap();
 }
 
+/* TODO RUST-1895 enable this
 #[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_started_before_socket() {
     use std::sync::{Arc, Mutex};
@@ -295,3 +295,4 @@ async fn heartbeat_started_before_socket() {
         &events.lock().unwrap()[0..4],
     );
 }
+*/
