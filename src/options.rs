@@ -15,12 +15,17 @@
 //!                   .build();
 //! ```
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+pub use crate::compression::compressors::Compressor;
 pub use crate::{
     change_stream::options::*,
     client::{auth::*, options::*},
     coll::options::*,
     collation::*,
-    compression::*,
     concern::*,
     db::options::*,
     gridfs::options::*,

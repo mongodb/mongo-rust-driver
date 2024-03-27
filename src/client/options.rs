@@ -23,12 +23,17 @@ use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use crate::options::Compressor;
 #[cfg(test)]
 use crate::srv::LookupHosts;
 use crate::{
     bson::{doc, Bson, Document},
     client::auth::{AuthMechanism, Credential},
-    compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
     event::EventHandler,
@@ -389,10 +394,15 @@ pub struct ClientOptions {
     #[builder(default)]
     pub app_name: Option<String>,
 
-    /// The compressors that the Client is willing to use in the order they are specified
-    /// in the configuration.  The Client sends this list of compressors to the server.
-    /// The server responds with the intersection of its supported list of compressors.
-    /// The order of compressors indicates preference of compressors.
+    /// The allowed compressors to use to compress messages sent to and decompress messages
+    /// received from the server. This list should be specified in priority order, as the
+    /// compressor used for messages will be the first compressor in this list that is also
+    /// supported by the server selected for operations.
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     #[builder(default)]
     #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
@@ -836,6 +846,11 @@ pub struct ConnectionString {
     /// By default, connections will not be closed due to being idle.
     pub max_idle_time: Option<Duration>,
 
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     /// The compressors that the Client is willing to use in the order they are specified
     /// in the configuration.  The Client sends this list of compressors to the server.
     /// The server responds with the intersection of its supported list of compressors.
@@ -1344,6 +1359,11 @@ impl ClientOptions {
             max_idle_time: conn_str.max_idle_time,
             max_connecting: conn_str.max_connecting,
             server_selection_timeout: conn_str.server_selection_timeout,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             compressors: conn_str.compressors,
             connect_timeout: conn_str.connect_timeout,
             retry_reads: conn_str.retry_reads,
@@ -1415,6 +1435,11 @@ impl ClientOptions {
             }
         }
 
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
         if let Some(ref compressors) = self.compressors {
             for compressor in compressors {
                 compressor.validate()?;
@@ -1483,12 +1508,19 @@ impl ClientOptions {
         if self.hosts.is_empty() {
             self.hosts = other.hosts;
         }
+
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        merge_options!(other, self, [compressors]);
+
         merge_options!(
             other,
             self,
             [
                 app_name,
-                compressors,
                 cmap_event_handler,
                 command_event_handler,
                 connect_timeout,
@@ -1939,14 +1971,22 @@ impl ConnectionString {
             }
         }
 
-        // If zlib and zlib_compression_level are specified then write zlib_compression_level into
-        // zlib enum
-        if let (Some(compressors), Some(zlib_compression_level)) =
-            (self.compressors.as_mut(), parts.zlib_compression)
-        {
-            for compressor in compressors {
-                compressor.write_zlib_level(zlib_compression_level)
+        #[cfg(feature = "zlib-compression")]
+        if let Some(zlib_compression_level) = parts.zlib_compression {
+            if let Some(compressors) = self.compressors.as_mut() {
+                for compressor in compressors {
+                    compressor.write_zlib_level(zlib_compression_level)?;
+                }
             }
+        }
+        #[cfg(not(feature = "zlib-compression"))]
+        if parts.zlib_compression.is_some() {
+            return Err(ErrorKind::InvalidArgument {
+                message: "zlibCompressionLevel may not be specified without the zlib-compression \
+                          feature flag enabled"
+                    .into(),
+            }
+            .into());
         }
 
         Ok(parts)
@@ -2078,16 +2118,20 @@ impl ConnectionString {
                 }
                 parts.auth_mechanism_properties = Some(doc);
             }
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             "compressors" => {
-                let compressors = value
-                    .split(',')
-                    .filter_map(|x| Compressor::parse_str(x).ok())
-                    .collect::<Vec<Compressor>>();
-                self.compressors = if compressors.is_empty() {
-                    None
-                } else {
-                    Some(compressors)
+                let mut compressors: Option<Vec<Compressor>> = None;
+                for compressor in value.split(',') {
+                    let compressor = Compressor::from_str(compressor)?;
+                    compressors
+                        .get_or_insert_with(Default::default)
+                        .push(compressor);
                 }
+                self.compressors = compressors;
             }
             k @ "connecttimeoutms" => {
                 self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
