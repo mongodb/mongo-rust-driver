@@ -1,9 +1,8 @@
-edition = "2018"
+edition = "2021"
 combine_control_expr = false
 comment_width = 100
 condense_wildcard_suffixes = true
 format_strings = true
-normalize_comments = true
 use_try_shorthand = true
 wrap_comments = true
 imports_layout = "HorizontalVertical"

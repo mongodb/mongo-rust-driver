@@ -232,3 +232,67 @@ async fn rtt_is_updated() {
     .await
     .unwrap();
 }
+
+/* TODO RUST-1895 enable this
+#[tokio::test(flavor = "multi_thread")]
+async fn heartbeat_started_before_socket() {
+    use std::sync::{Arc, Mutex};
+    use tokio::{io::AsyncReadExt, net::TcpListener};
+
+    #[derive(Debug, PartialEq)]
+    enum Event {
+        ClientConnected,
+        ClientHelloReceived,
+        HeartbeatStarted,
+        HeartbeatFailed,
+    }
+    let events: Arc<Mutex<Vec<Event>>> = Arc::new(Mutex::new(vec![]));
+
+    // Mock server
+    {
+        let listener = TcpListener::bind("127.0.0.1:9999").await.unwrap();
+        let events = Arc::clone(&events);
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                events.lock().unwrap().push(Event::ClientConnected);
+                let mut buf = [0; 1024];
+                let _ = socket.read(&mut buf).await.unwrap();
+                events.lock().unwrap().push(Event::ClientHelloReceived);
+            }
+        });
+    }
+
+    // Client setup
+    let mut options = ClientOptions::parse("mongodb://127.0.0.1:9999/")
+        .await
+        .unwrap();
+    options.server_selection_timeout = Some(Duration::from_millis(500));
+    {
+        let events = Arc::clone(&events);
+        options.sdam_event_handler =
+            Some(crate::event::EventHandler::callback(move |ev| match ev {
+                SdamEvent::ServerHeartbeatStarted(_) => {
+                    events.lock().unwrap().push(Event::HeartbeatStarted)
+                }
+                SdamEvent::ServerHeartbeatFailed(_) => {
+                    events.lock().unwrap().push(Event::HeartbeatFailed)
+                }
+                _ => (),
+            }));
+    }
+    let client = Client::with_options(options).unwrap();
+
+    // Test event order
+    let _ = client.list_database_names().await;
+    assert_eq!(
+        &[
+            Event::HeartbeatStarted,
+            Event::ClientConnected,
+            Event::ClientHelloReceived,
+            Event::HeartbeatFailed
+        ],
+        &events.lock().unwrap()[0..4],
+    );
+}
+*/
