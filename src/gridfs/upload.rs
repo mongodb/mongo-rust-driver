@@ -6,11 +6,11 @@ use std::{
 
 use futures_util::{
     future::{BoxFuture, FutureExt},
-    io::{AsyncRead, AsyncReadExt, AsyncWrite},
+    io::AsyncWrite,
     stream::TryStreamExt,
 };
 
-use super::{options::GridFsUploadOptions, Chunk, FilesCollectionDocument, GridFsBucket};
+use super::{Chunk, FilesCollectionDocument, GridFsBucket};
 use crate::{
     action::Action,
     bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson, DateTime, Document, RawBinaryRef},
@@ -23,134 +23,7 @@ use crate::{
     Collection,
 };
 
-// User functions for uploading from readers.
 impl GridFsBucket {
-    /// Uploads a user file to the bucket. Bytes are read from `source`, which may be any type that
-    /// implements the [`futures_io::AsyncRead`] trait, and stored in chunks in the bucket's
-    /// chunks collection. After all the chunks have been uploaded, a corresponding
-    /// [`FilesCollectionDocument`] is stored in the bucket's files collection.
-    ///
-    /// This method generates an [`ObjectId`] for the `id` field of the
-    /// [`FilesCollectionDocument`] and returns it.
-    ///
-    /// To upload from a type that implements [`tokio::io::AsyncRead`], use the
-    /// [`tokio_util::compat`] module to convert between types.
-    ///
-    /// ```rust
-    /// # use mongodb::{error::Result, gridfs::GridFsBucket};
-    /// # async fn compat_example(
-    /// #     bucket: GridFsBucket,
-    /// #     tokio_reader: impl tokio::io::AsyncRead + Unpin)
-    /// # -> Result<()> {
-    /// use tokio_util::compat::TokioAsyncReadCompatExt;
-    ///
-    /// let futures_reader = tokio_reader.compat();
-    /// bucket.upload_from_futures_0_3_reader("example_file", futures_reader, None).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// Note that once an `AsyncRead` trait is stabilized in the standard library, this method will
-    /// be deprecated in favor of one that accepts a `std::io::AsyncRead` source.
-    pub async fn upload_from_futures_0_3_reader<T>(
-        &self,
-        filename: impl AsRef<str>,
-        source: T,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<ObjectId>
-    where
-        T: AsyncRead + Unpin,
-    {
-        let id = ObjectId::new();
-        self.upload_from_futures_0_3_reader_with_id(id.into(), filename, source, options)
-            .await?;
-        Ok(id)
-    }
-
-    /// Uploads a user file to the bucket. Bytes are read from `source`, which may be any type that
-    /// implements the [`futures_io::AsyncRead`] trait, and stored in chunks in the bucket's
-    /// chunks collection. After all the chunks have been uploaded, a corresponding
-    /// [`FilesCollectionDocument`] with the given `id` is stored in the bucket's files collection.
-    ///
-    /// To upload from a type that implements [`tokio::io::AsyncRead`], use the
-    /// [`tokio_util::compat`] module to convert between types.
-    ///
-    /// ```rust
-    /// # use mongodb::{bson::Bson, error::Result, gridfs::GridFsBucket};
-    /// # async fn compat_example(
-    /// #     bucket: GridFsBucket,
-    /// #     tokio_reader: impl tokio::io::AsyncRead + Unpin,
-    /// #     id: Bson,
-    /// # ) -> Result<()> {
-    /// use tokio_util::compat::TokioAsyncReadCompatExt;
-    ///
-    /// let futures_reader = tokio_reader.compat();
-    /// bucket.upload_from_futures_0_3_reader_with_id(id, "example_file", futures_reader, None).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// Note that once an `AsyncRead` trait is stabilized in the standard library, this method will
-    /// be deprecated in favor of one that accepts a `std::io::AsyncRead` source.
-    pub async fn upload_from_futures_0_3_reader_with_id<T>(
-        &self,
-        id: Bson,
-        filename: impl AsRef<str>,
-        mut source: T,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> Result<()>
-    where
-        T: AsyncRead + Unpin,
-    {
-        let options = options.into();
-
-        self.create_indexes().await?;
-
-        let chunk_size_bytes = options
-            .as_ref()
-            .and_then(|opts| opts.chunk_size_bytes)
-            .unwrap_or_else(|| self.chunk_size_bytes());
-        let mut length = 0u64;
-        let mut n = 0;
-
-        let mut buf = vec![0u8; chunk_size_bytes as usize];
-        loop {
-            let bytes_read = match read_exact_or_to_end(&mut buf, &mut source).await {
-                Ok(0) => break,
-                Ok(n) => n,
-                Err(error) => {
-                    return clean_up_chunks(id.clone(), self.chunks().clone(), Some(error)).await;
-                }
-            };
-
-            let chunk = Chunk {
-                id: ObjectId::new(),
-                files_id: id.clone(),
-                n,
-                data: RawBinaryRef {
-                    subtype: BinarySubtype::Generic,
-                    bytes: &buf[..bytes_read],
-                },
-            };
-            self.chunks().insert_one(chunk).await?;
-
-            length += bytes_read as u64;
-            n += 1;
-        }
-
-        let file = FilesCollectionDocument {
-            id,
-            length,
-            chunk_size_bytes,
-            upload_date: DateTime::now(),
-            filename: Some(filename.as_ref().to_string()),
-            metadata: options.and_then(|opts| opts.metadata),
-        };
-        self.files().insert_one(file).await?;
-
-        Ok(())
-    }
-
     async fn create_indexes(&self) -> Result<()> {
         if !self.inner.created_indexes.load(Ordering::SeqCst) {
             if self
@@ -227,25 +100,6 @@ impl GridFsBucket {
     }
 }
 
-async fn read_exact_or_to_end<T>(buf: &mut [u8], source: &mut T) -> Result<usize>
-where
-    T: AsyncRead + Unpin,
-{
-    let mut total_bytes_read = 0;
-    loop {
-        let bytes_read = match source.read(&mut buf[total_bytes_read..]).await? {
-            0 => break,
-            n => n,
-        };
-        total_bytes_read += bytes_read;
-        if total_bytes_read == buf.len() {
-            break;
-        }
-    }
-
-    Ok(total_bytes_read)
-}
-
 /// A stream to which bytes can be written to be uploaded to a GridFS bucket.
 ///
 /// # Uploading to the Stream
@@ -265,12 +119,15 @@ where
 /// use futures_util::io::AsyncWriteExt;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").await?;
 /// upload_stream.write_all(&bytes[..]).await?;
 /// upload_stream.close().await?;
 /// # Ok(())
 /// # }
 /// ```
+///
+/// If the data is a local file (or other `AsyncRead` byte source), its contents can be efficiently
+/// written to the stream with [`futures_util::io::copy`].
 ///
 /// # Aborting the Stream
 /// A stream can be aborted by calling the `abort` method. This will remove any chunks associated
@@ -283,7 +140,7 @@ where
 /// use futures_util::io::AsyncWriteExt;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").await?;
 /// upload_stream.write_all(&bytes[..]).await?;
 /// upload_stream.abort().await?;
 /// # Ok(())
@@ -310,11 +167,13 @@ where
 ///
 /// ```rust
 /// # use mongodb::gridfs::{GridFsBucket, GridFsUploadStream};
-/// # fn compat_example(bucket: GridFsBucket) {
+/// # use mongodb::error::Result;
+/// # async fn compat_example(bucket: GridFsBucket) -> Result<()> {
 /// use tokio_util::compat::FuturesAsyncWriteCompatExt;
 ///
-/// let futures_upload_stream = bucket.open_upload_stream("example_file", None);
+/// let futures_upload_stream = bucket.open_upload_stream("example_file").await?;
 /// let tokio_upload_stream = futures_upload_stream.compat_write();
+/// # Ok(())
 /// # }
 /// ```
 pub struct GridFsUploadStream {
@@ -361,6 +220,26 @@ impl State {
 }
 
 impl GridFsUploadStream {
+    pub(crate) fn new(
+        bucket: GridFsBucket,
+        id: Bson,
+        filename: String,
+        chunk_size_bytes: u32,
+        metadata: Option<Document>,
+        drop_token: AsyncDropToken,
+    ) -> Self {
+        Self {
+            bucket,
+            state: State::Idle(Some(Vec::new())),
+            current_n: 0,
+            id,
+            filename: Some(filename),
+            chunk_size_bytes,
+            metadata: Some(metadata),
+            drop_token,
+        }
+    }
+
     /// Gets the stream's unique [`Bson`] identifier. This value will be the `id` field for the
     /// [`FilesCollectionDocument`] uploaded to the files collection when the stream is closed.
     pub fn id(&self) -> &Bson {
@@ -591,44 +470,4 @@ async fn clean_up_chunks(
 fn get_closed_error() -> futures_io::Error {
     let error: Error = ErrorKind::GridFs(GridFsErrorKind::UploadStreamClosed).into();
     error.into_futures_io_error()
-}
-
-// User functions for creating upload streams.
-impl GridFsBucket {
-    /// Creates and returns a [`GridFsUploadStream`] that the application can write the contents of
-    /// the file to. This method generates a unique [`ObjectId`] for the corresponding
-    /// [`FilesCollectionDocument`]'s `id` field that can be accessed via the stream's `id`
-    /// method.
-    pub fn open_upload_stream(
-        &self,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> GridFsUploadStream {
-        self.open_upload_stream_with_id(ObjectId::new().into(), filename, options)
-    }
-
-    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
-    /// The provided `id` will be used for the corresponding [`FilesCollectionDocument`]'s `id`
-    /// field.
-    pub fn open_upload_stream_with_id(
-        &self,
-        id: Bson,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> GridFsUploadStream {
-        let options = options.into();
-        GridFsUploadStream {
-            bucket: self.clone(),
-            state: State::Idle(Some(Vec::new())),
-            current_n: 0,
-            id,
-            filename: Some(filename.as_ref().into()),
-            chunk_size_bytes: options
-                .as_ref()
-                .and_then(|opts| opts.chunk_size_bytes)
-                .unwrap_or_else(|| self.chunk_size_bytes()),
-            metadata: Some(options.and_then(|opts| opts.metadata)),
-            drop_token: self.client().register_async_drop(),
-        }
-    }
 }

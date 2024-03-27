@@ -452,12 +452,13 @@ fn gridfs() {
     let upload = vec![0u8; 100];
     let mut download = vec![];
 
-    let mut upload_stream = bucket.open_upload_stream("sync gridfs", None);
+    let mut upload_stream = bucket.open_upload_stream("sync gridfs").run().unwrap();
     upload_stream.write_all(&upload[..]).unwrap();
     upload_stream.close().unwrap();
 
     let mut download_stream = bucket
         .open_download_stream(upload_stream.id().clone())
+        .run()
         .unwrap();
     download_stream.read_to_end(&mut download).unwrap();
 

@@ -834,7 +834,7 @@ async fn manual_shutdown_with_resources() {
             log_uncaptured("Skipping manual_shutdown_with_resources: transaction operation failed");
             return;
         }
-        let _stream = bucket.open_upload_stream("test", None);
+        let _stream = bucket.open_upload_stream("test").await.unwrap();
     }
     let is_sharded = client.is_sharded();
     client.into_client().shutdown().await;
@@ -886,7 +886,7 @@ async fn manual_shutdown_immediate_with_resources() {
         .session(&mut session)
         .await
         .unwrap();
-    let _stream = bucket.open_upload_stream("test", None);
+    let _stream = bucket.open_upload_stream("test").await.unwrap();
 
     client.into_client().shutdown().immediate(true).await;
 

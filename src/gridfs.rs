@@ -12,16 +12,8 @@ use serde_with::skip_serializing_none;
 use crate::{
     bson::{doc, oid::ObjectId, Bson, DateTime, Document, RawBinaryRef},
     checked::Checked,
-    cursor::Cursor,
-    error::{Error, ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    options::{
-        CollectionOptions,
-        FindOneOptions,
-        FindOptions,
-        ReadConcern,
-        SelectionCriteria,
-        WriteConcern,
-    },
+    error::Error,
+    options::{CollectionOptions, ReadConcern, SelectionCriteria, WriteConcern},
     Collection,
     Database,
 };
@@ -86,11 +78,6 @@ impl FilesCollectionDocument {
         let chunk_size_bytes = chunk_size_bytes as u64;
         let n = Checked::new(length) / chunk_size_bytes + u64::from(length % chunk_size_bytes != 0);
         n.try_into().unwrap()
-    }
-
-    /// Returns the expected length of a chunk given its index.
-    fn expected_chunk_length(&self, n: u32) -> u32 {
-        Self::expected_chunk_length_from_vals(self.length, self.chunk_size_bytes, n)
     }
 
     fn expected_chunk_length_from_vals(length: u64, chunk_size_bytes: u32, n: u32) -> u32 {
@@ -188,7 +175,7 @@ impl GridFsBucket {
     }
 
     /// Gets the chunk size in bytes for the bucket.
-    fn chunk_size_bytes(&self) -> u32 {
+    pub(crate) fn chunk_size_bytes(&self) -> u32 {
         self.inner
             .options
             .chunk_size_bytes
@@ -203,73 +190,6 @@ impl GridFsBucket {
     /// Gets a handle to the chunks collection for the bucket.
     pub(crate) fn chunks(&self) -> &Collection<Chunk<'static>> {
         &self.inner.chunks
-    }
-
-    /// Deletes the [`FilesCollectionDocument`] with the given `id` and its associated chunks from
-    /// this bucket. This method returns an error if the `id` does not match any files in the
-    /// bucket.
-    pub async fn delete(&self, id: Bson) -> Result<()> {
-        let delete_result = self.files().delete_one(doc! { "_id": id.clone() }).await?;
-        // Delete chunks regardless of whether a file was found. This will remove any possibly
-        // orphaned chunks.
-        self.chunks()
-            .delete_many(doc! { "files_id": id.clone() })
-            .await?;
-
-        if delete_result.deleted_count == 0 {
-            return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
-                identifier: GridFsFileIdentifier::Id(id),
-            })
-            .into());
-        }
-
-        Ok(())
-    }
-
-    /// Finds and returns the [`FilesCollectionDocument`]s within this bucket that match the given
-    /// filter.
-    pub async fn find(
-        &self,
-        filter: Document,
-        options: impl Into<Option<GridFsFindOptions>>,
-    ) -> Result<Cursor<FilesCollectionDocument>> {
-        let find_options = options.into().map(FindOptions::from);
-        self.files().find(filter).with_options(find_options).await
-    }
-
-    /// Finds and returns a single [`FilesCollectionDocument`] within this bucket that matches the
-    /// given filter.
-    pub async fn find_one(
-        &self,
-        filter: Document,
-        options: impl Into<Option<GridFsFindOneOptions>>,
-    ) -> Result<Option<FilesCollectionDocument>> {
-        let find_options = options.into().map(FindOneOptions::from);
-        self.files()
-            .find_one(filter)
-            .with_options(find_options)
-            .await
-    }
-
-    /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
-    /// error if the `id` does not match any files in the bucket.
-    pub async fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
-        self.files()
-            .update_one(
-                doc! { "_id": id },
-                doc! { "$set": { "filename": new_filename.as_ref() } },
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    /// Removes all of the files and their associated chunks from this bucket.
-    pub async fn drop(&self) -> Result<()> {
-        self.files().drop().await?;
-        self.chunks().drop().await?;
-
-        Ok(())
     }
 }
 
