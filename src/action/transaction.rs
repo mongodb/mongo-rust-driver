@@ -73,7 +73,7 @@ impl ClientSession {
     /// retryable writes.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn commit_transaction_2(&mut self) -> CommitTransaction {
+    pub fn commit_transaction(&mut self) -> CommitTransaction {
         CommitTransaction { session: self }
     }
 }
@@ -126,8 +126,8 @@ impl crate::sync::ClientSession {
     /// retryable writes.
     ///
     /// [`run`](CommitTransaction::run) will return [`Result<()>`].
-    pub fn commit_transaction_2(&mut self) -> CommitTransaction {
-        self.async_client_session.commit_transaction_2()
+    pub fn commit_transaction(&mut self) -> CommitTransaction {
+        self.async_client_session.commit_transaction()
     }
 }
 

@@ -286,7 +286,7 @@ fn transactions() {
     .unwrap();
 
     loop {
-        match session.commit_transaction() {
+        match session.commit_transaction().run() {
             Ok(()) => {
                 break;
             }

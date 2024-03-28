@@ -54,30 +54,6 @@ impl ClientSession {
         self.async_client_session.advance_cluster_time(to)
     }
 
-    /// Commits the transaction that is currently active on this session.
-    ///
-    /// ```rust
-    /// # use mongodb::{bson::{doc, Document}, error::Result, sync::{Client, ClientSession}};
-    /// #
-    /// # async fn do_stuff() -> Result<()> {
-    /// # let client = Client::with_uri_str("mongodb://example.com")?;
-    /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session().run()?;
-    /// session.start_transaction(None)?;
-    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).run()?;
-    /// session.commit_transaction()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn commit_transaction(&mut self) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_client_session.commit_transaction())
-    }
-
     /// Aborts the transaction that is currently active on this session. Any open transaction will
     /// be aborted automatically in the `Drop` implementation of `ClientSession`.
     ///
@@ -170,7 +146,7 @@ impl ClientSession {
                 return Ok(ret);
             }
             'commit: loop {
-                match self.commit_transaction() {
+                match self.commit_transaction().run() {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
                         if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
