@@ -1001,7 +1001,8 @@ impl TestOperation for StartTransaction {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             session
-                .start_transaction(self.options.clone())
+                .start_transaction()
+                .with_options(self.options.clone())
                 .await
                 .map(|_| None)
         }
@@ -1408,7 +1409,9 @@ impl TestOperation for WithTransaction {
         async move {
             let session = sessions.session0.unwrap();
             session
-                .with_transaction(
+                .start_transaction()
+                .with_options(self.options.clone())
+                .and_run(
                     (runner, &self.callback.operations, sessions.session1),
                     |session, (runner, operations, session1)| {
                         async move {
@@ -1432,7 +1435,6 @@ impl TestOperation for WithTransaction {
                         }
                         .boxed()
                     },
-                    self.options.clone(),
                 )
                 .await?;
             Ok(None)

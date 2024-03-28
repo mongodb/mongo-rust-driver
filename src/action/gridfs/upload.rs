@@ -63,29 +63,25 @@ impl<'a> OpenUploadStream<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for OpenUploadStream<'a> {
-        type Future = OpenUploadStreamFuture;
+#[action_impl(sync = crate::sync::gridfs::GridFsUploadStream)]
+impl<'a> Action for OpenUploadStream<'a> {
+    type Future = OpenUploadStreamFuture;
 
-        async fn execute(self) -> Result<GridFsUploadStream> {
-            let id = self.id.unwrap_or_else(|| ObjectId::new().into());
-            let chunk_size_bytes = self.options
-                .as_ref()
-                .and_then(|opts| opts.chunk_size_bytes)
-                .unwrap_or_else(|| self.bucket.chunk_size_bytes());
-            let metadata = self.options.and_then(|opts| opts.metadata);
-            Ok(GridFsUploadStream::new(
-                self.bucket.clone(),
-                id,
-                self.filename,
-                chunk_size_bytes,
-                metadata,
-                self.bucket.client().register_async_drop(),
-            ))
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::gridfs::GridFsUploadStream> {
-            out.map(crate::sync::gridfs::GridFsUploadStream::new)
-        }
+    async fn execute(self) -> Result<GridFsUploadStream> {
+        let id = self.id.unwrap_or_else(|| ObjectId::new().into());
+        let chunk_size_bytes = self
+            .options
+            .as_ref()
+            .and_then(|opts| opts.chunk_size_bytes)
+            .unwrap_or_else(|| self.bucket.chunk_size_bytes());
+        let metadata = self.options.and_then(|opts| opts.metadata);
+        Ok(GridFsUploadStream::new(
+            self.bucket.clone(),
+            id,
+            self.filename,
+            chunk_size_bytes,
+            metadata,
+            self.bucket.client().register_async_drop(),
+        ))
     }
 }

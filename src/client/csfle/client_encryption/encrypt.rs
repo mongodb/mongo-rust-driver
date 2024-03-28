@@ -11,43 +11,41 @@ use crate::{
 
 use super::ClientEncryption;
 
-action_impl! {
-    impl<'a> Action for Encrypt<'a, Value> {
-        type Future = EncryptFuture;
+#[action_impl]
+impl<'a> Action for Encrypt<'a, Value> {
+    type Future = EncryptFuture;
 
-        async fn execute(self) -> Result<Binary> {
-            let ctx = self
-                .client_enc
-                .get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?
-                .build_explicit_encrypt(self.mode.value)?;
-            let result = self.client_enc.exec.run_ctx(ctx, None).await?;
-            let bin_ref = result
-                .get_binary("v")
-                .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-            Ok(bin_ref.to_binary())
-        }
+    async fn execute(self) -> Result<Binary> {
+        let ctx = self
+            .client_enc
+            .get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?
+            .build_explicit_encrypt(self.mode.value)?;
+        let result = self.client_enc.exec.run_ctx(ctx, None).await?;
+        let bin_ref = result
+            .get_binary("v")
+            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+        Ok(bin_ref.to_binary())
     }
 }
 
-action_impl! {
-    impl<'a> Action for Encrypt<'a, Expression> {
-        type Future = EncryptExpressionFuture;
+#[action_impl]
+impl<'a> Action for Encrypt<'a, Expression> {
+    type Future = EncryptExpressionFuture;
 
-        async fn execute(self) -> Result<Document> {
-            let ctx = self
-                .client_enc
-                .get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?
-                .build_explicit_encrypt_expression(self.mode.value)?;
-            let result = self.client_enc.exec.run_ctx(ctx, None).await?;
-            let doc_ref = result
-                .get_document("v")
-                .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-            let doc = doc_ref
-                .to_owned()
-                .to_document()
-                .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-            Ok(doc)
-        }
+    async fn execute(self) -> Result<Document> {
+        let ctx = self
+            .client_enc
+            .get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?
+            .build_explicit_encrypt_expression(self.mode.value)?;
+        let result = self.client_enc.exec.run_ctx(ctx, None).await?;
+        let doc_ref = result
+            .get_document("v")
+            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+        let doc = doc_ref
+            .to_owned()
+            .to_document()
+            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+        Ok(doc)
     }
 }
 

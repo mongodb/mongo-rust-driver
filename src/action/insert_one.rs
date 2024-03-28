@@ -84,31 +84,31 @@ impl<'a> InsertOne<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for InsertOne<'a> {
-        type Future = InsertOneFuture;
+#[action_impl]
+impl<'a> Action for InsertOne<'a> {
+    type Future = InsertOneFuture;
 
-        async fn execute(mut self) -> Result<InsertOneResult> {
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<InsertOneResult> {
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            #[cfg(feature = "in-use-encryption-unstable")]
-            let encrypted = self.coll.client().auto_encryption_opts().await.is_some();
-            #[cfg(not(feature = "in-use-encryption-unstable"))]
-            let encrypted = false;
+        #[cfg(feature = "in-use-encryption-unstable")]
+        let encrypted = self.coll.client().auto_encryption_opts().await.is_some();
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
+        let encrypted = false;
 
-            let doc = self.doc?;
+        let doc = self.doc?;
 
-            let insert = Op::new(
-                self.coll.namespace(),
-                vec![doc.deref()],
-                self.options.map(InsertManyOptions::from_insert_one_options),
-                encrypted,
-            );
-            self.coll.client()
-                .execute_operation(insert, self.session)
-                .await
-                .map(InsertOneResult::from_insert_many_result)
-                .map_err(convert_bulk_errors)
-        }
+        let insert = Op::new(
+            self.coll.namespace(),
+            vec![doc.deref()],
+            self.options.map(InsertManyOptions::from_insert_one_options),
+            encrypted,
+        );
+        self.coll
+            .client()
+            .execute_operation(insert, self.session)
+            .await
+            .map(InsertOneResult::from_insert_many_result)
+            .map_err(convert_bulk_errors)
     }
 }

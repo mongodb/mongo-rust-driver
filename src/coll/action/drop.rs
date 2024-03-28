@@ -4,22 +4,23 @@ use crate::{
     operation::drop_collection as op,
 };
 
-action_impl! {
-    impl<'a> Action for DropCollection<'a> {
-        type Future = DropCollectionFuture;
+#[action_impl]
+impl<'a> Action for DropCollection<'a> {
+    type Future = DropCollectionFuture;
 
-        async fn execute(mut self) -> Result<()> {
-            resolve_options!(self.cr, self.options, [write_concern]);
+    async fn execute(mut self) -> Result<()> {
+        resolve_options!(self.cr, self.options, [write_concern]);
 
-            #[cfg(feature = "in-use-encryption-unstable")]
-            self.cr.drop_aux_collections(self.options.as_ref(), self.session.as_deref_mut())
-                .await?;
+        #[cfg(feature = "in-use-encryption-unstable")]
+        self.cr
+            .drop_aux_collections(self.options.as_ref(), self.session.as_deref_mut())
+            .await?;
 
-            let drop = op::DropCollection::new(self.cr.namespace(), self.options);
-            self.cr.client()
-                .execute_operation(drop, self.session.as_deref_mut())
-                .await
-        }
+        let drop = op::DropCollection::new(self.cr.namespace(), self.options);
+        self.cr
+            .client()
+            .execute_operation(drop, self.session.as_deref_mut())
+            .await
     }
 }
 

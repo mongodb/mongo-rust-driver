@@ -39,27 +39,30 @@ pub struct Delete<'a> {
     id: Bson,
 }
 
-action_impl! {
-    impl<'a> Action for Delete<'a> {
-        type Future = DeleteFuture;
+#[action_impl]
+impl<'a> Action for Delete<'a> {
+    type Future = DeleteFuture;
 
-        async fn execute(self) -> Result<()> {
-            let delete_result = self.bucket.files().delete_one(doc! { "_id": self.id.clone() }).await?;
-            // Delete chunks regardless of whether a file was found. This will remove any possibly
-            // orphaned chunks.
-            self.bucket
-                .chunks()
-                .delete_many(doc! { "files_id": self.id.clone() })
-                .await?;
+    async fn execute(self) -> Result<()> {
+        let delete_result = self
+            .bucket
+            .files()
+            .delete_one(doc! { "_id": self.id.clone() })
+            .await?;
+        // Delete chunks regardless of whether a file was found. This will remove any possibly
+        // orphaned chunks.
+        self.bucket
+            .chunks()
+            .delete_many(doc! { "files_id": self.id.clone() })
+            .await?;
 
-            if delete_result.deleted_count == 0 {
-                return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
-                    identifier: GridFsFileIdentifier::Id(self.id),
-                })
-                .into());
-            }
-
-            Ok(())
+        if delete_result.deleted_count == 0 {
+            return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
+                identifier: GridFsFileIdentifier::Id(self.id),
+            })
+            .into());
         }
+
+        Ok(())
     }
 }

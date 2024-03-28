@@ -131,24 +131,23 @@ impl<'a> Update<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for Update<'a> {
-        type Future = UpdateFuture;
+#[action_impl]
+impl<'a> Action for Update<'a> {
+    type Future = UpdateFuture;
 
-        async fn execute(mut self) -> Result<UpdateResult> {
-            if let UpdateModifications::Document(d) = &self.update {
-                crate::bson_util::update_document_check(d)?;
-            }
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-
-            let op = Op::with_update(
-                self.coll.namespace(),
-                self.query,
-                self.update,
-                self.multi,
-                self.options,
-            );
-            self.coll.client().execute_operation(op, self.session).await
+    async fn execute(mut self) -> Result<UpdateResult> {
+        if let UpdateModifications::Document(d) = &self.update {
+            crate::bson_util::update_document_check(d)?;
         }
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+
+        let op = Op::with_update(
+            self.coll.namespace(),
+            self.query,
+            self.update,
+            self.multi,
+            self.options,
+        );
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

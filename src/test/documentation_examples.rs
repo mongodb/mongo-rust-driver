@@ -1726,10 +1726,11 @@ async fn convenient_transaction_examples() -> Result<()> {
     // Step 2: Start a client session.
     let mut session = client.start_session().await?;
 
-    // Step 3: Use with_transaction to start a transaction, execute the callback, and commit (or
+    // Step 3: Use and_run to start a transaction, execute the callback, and commit (or
     // abort on error).
     session
-        .with_transaction((), |session, _| callback(session).boxed(), None)
+        .start_transaction()
+        .and_run((), |session, _| callback(session).boxed())
         .await?;
 
     // End Transactions withTxn API Example 1

@@ -106,45 +106,31 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListCollections<'a, ListSpecifications, ImplicitSession> {
-        type Future = ListCollectionsFuture;
+#[action_impl(sync = crate::sync::Cursor::<CollectionSpecification>)]
+impl<'a> Action for ListCollections<'a, ListSpecifications, ImplicitSession> {
+    type Future = ListCollectionsFuture;
 
-        async fn execute(self) -> Result<Cursor<CollectionSpecification>> {
-            let list_collections = op::ListCollections::new(
-                self.db.name().to_string(),
-                false,
-                self.options,
-            );
-            self.db.client()
-                .execute_cursor_operation(list_collections)
-                .await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<CollectionSpecification>> {
-            out.map(crate::sync::Cursor::new)
-        }
+    async fn execute(self) -> Result<Cursor<CollectionSpecification>> {
+        let list_collections =
+            op::ListCollections::new(self.db.name().to_string(), false, self.options);
+        self.db
+            .client()
+            .execute_cursor_operation(list_collections)
+            .await
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListCollections<'a, ListSpecifications, ExplicitSession<'a>> {
-        type Future = ListCollectionsSessionFuture;
+#[action_impl(sync = crate::sync::SessionCursor::<CollectionSpecification>)]
+impl<'a> Action for ListCollections<'a, ListSpecifications, ExplicitSession<'a>> {
+    type Future = ListCollectionsSessionFuture;
 
-        async fn execute(self) -> Result<SessionCursor<CollectionSpecification>> {
-            let list_collections = op::ListCollections::new(
-                self.db.name().to_string(),
-                false,
-                self.options,
-            );
-            self.db.client()
-                .execute_session_cursor_operation(list_collections, self.session.0)
-                .await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::SessionCursor<CollectionSpecification>> {
-            out.map(crate::sync::SessionCursor::new)
-        }
+    async fn execute(self) -> Result<SessionCursor<CollectionSpecification>> {
+        let list_collections =
+            op::ListCollections::new(self.db.name().to_string(), false, self.options);
+        self.db
+            .client()
+            .execute_session_cursor_operation(list_collections, self.session.0)
+            .await
     }
 }
 
@@ -166,41 +152,35 @@ async fn list_collection_names_common(
         .await
 }
 
-action_impl! {
-    impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
-        type Future = ListCollectionNamesFuture;
+#[action_impl]
+impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
+    type Future = ListCollectionNamesFuture;
 
-        async fn execute(self) -> Result<Vec<String>> {
-            let list_collections = op::ListCollections::new(
-                self.db.name().to_string(),
-                true,
-                self.options,
-            );
-            let cursor: Cursor<Document> = self.db.client()
-                .execute_cursor_operation(list_collections)
-                .await?;
-            return list_collection_names_common(cursor).await;
-        }
+    async fn execute(self) -> Result<Vec<String>> {
+        let list_collections =
+            op::ListCollections::new(self.db.name().to_string(), true, self.options);
+        let cursor: Cursor<Document> = self
+            .db
+            .client()
+            .execute_cursor_operation(list_collections)
+            .await?;
+        return list_collection_names_common(cursor).await;
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
-        type Future = ListCollectionNamesSessionFuture;
+#[action_impl]
+impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
+    type Future = ListCollectionNamesSessionFuture;
 
-        async fn execute(self) -> Result<Vec<String>> {
-            let list_collections = op::ListCollections::new(
-                self.db.name().to_string(),
-                true,
-                self.options,
-            );
-            let mut cursor: SessionCursor<Document> = self
-                .db.client()
-                .execute_session_cursor_operation(list_collections, &mut *self.session.0)
-                .await?;
+    async fn execute(self) -> Result<Vec<String>> {
+        let list_collections =
+            op::ListCollections::new(self.db.name().to_string(), true, self.options);
+        let mut cursor: SessionCursor<Document> = self
+            .db
+            .client()
+            .execute_session_cursor_operation(list_collections, &mut *self.session.0)
+            .await?;
 
-            list_collection_names_common(cursor.stream(self.session.0))
-                .await
-        }
+        list_collection_names_common(cursor.stream(self.session.0)).await
     }
 }

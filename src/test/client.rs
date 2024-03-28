@@ -694,7 +694,7 @@ async fn retry_commit_txn_check_out() {
     let client = Client::with_options(options).unwrap();
 
     let mut session = client.start_session().await.unwrap();
-    session.start_transaction(None).await.unwrap();
+    session.start_transaction().await.unwrap();
     // transition transaction to "in progress" so that the commit
     // actually executes an operation.
     client
@@ -819,7 +819,7 @@ async fn manual_shutdown_with_resources() {
         let _cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
         // Similarly, sessions need an in-progress transaction to have cleanup.
         let mut session = client.start_session().await.unwrap();
-        if session.start_transaction(None).await.is_err() {
+        if session.start_transaction().await.is_err() {
             // Transaction start can transiently fail; if so, just bail out of the test.
             log_uncaptured("Skipping manual_shutdown_with_resources: transaction start failed");
             return;
@@ -881,7 +881,7 @@ async fn manual_shutdown_immediate_with_resources() {
     let _cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
     // Similarly, sessions need an in-progress transaction to have cleanup.
     let mut session = client.start_session().await.unwrap();
-    session.start_transaction(None).await.unwrap();
+    session.start_transaction().await.unwrap();
     coll.insert_one(doc! {})
         .session(&mut session)
         .await

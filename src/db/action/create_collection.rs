@@ -6,51 +6,52 @@ use crate::{
     Namespace,
 };
 
-action_impl! {
-    impl<'a> Action for CreateCollection<'a> {
-        type Future = CreateCollectionFuture;
+#[action_impl]
+impl<'a> Action for CreateCollection<'a> {
+    type Future = CreateCollectionFuture;
 
-        async fn execute(mut self) -> Result<()> {
-            resolve_options!(self.db, self.options, [write_concern]);
+    async fn execute(mut self) -> Result<()> {
+        resolve_options!(self.db, self.options, [write_concern]);
 
-            let ns = Namespace {
-                db: self.db.name().to_string(),
-                coll: self.name,
-            };
+        let ns = Namespace {
+            db: self.db.name().to_string(),
+            coll: self.name,
+        };
 
-            #[cfg(feature = "in-use-encryption-unstable")]
-            let has_encrypted_fields = {
-                self.db.resolve_encrypted_fields(&ns, &mut self.options).await;
-                self.db.create_aux_collections(&ns, &self.options, self.session.as_deref_mut())
-                    .await?;
-                self.options
-                    .as_ref()
-                    .and_then(|o| o.encrypted_fields.as_ref())
-                    .is_some()
-            };
-
-            let create = op::Create::new(ns.clone(), self.options);
-            self.db.client()
-                .execute_operation(create, self.session.as_deref_mut())
+        #[cfg(feature = "in-use-encryption-unstable")]
+        let has_encrypted_fields = {
+            self.db
+                .resolve_encrypted_fields(&ns, &mut self.options)
+                .await;
+            self.db
+                .create_aux_collections(&ns, &self.options, self.session.as_deref_mut())
                 .await?;
+            self.options
+                .as_ref()
+                .and_then(|o| o.encrypted_fields.as_ref())
+                .is_some()
+        };
 
-            #[cfg(feature = "in-use-encryption-unstable")]
-            if has_encrypted_fields {
-                use crate::action::Action;
-                use bson::{doc, Document};
-                let coll = self.db.collection::<Document>(&ns.coll);
-                coll.create_index(
-                    crate::IndexModel {
-                        keys: doc! {"__safeContent__": 1},
-                        options: None,
-                    }
-                )
-                .optional(self.session.as_deref_mut(), |a, s| a.session(s))
-                .await?;
-            }
+        let create = op::Create::new(ns.clone(), self.options);
+        self.db
+            .client()
+            .execute_operation(create, self.session.as_deref_mut())
+            .await?;
 
-            Ok(())
+        #[cfg(feature = "in-use-encryption-unstable")]
+        if has_encrypted_fields {
+            use crate::action::Action;
+            use bson::{doc, Document};
+            let coll = self.db.collection::<Document>(&ns.coll);
+            coll.create_index(crate::IndexModel {
+                keys: doc! {"__safeContent__": 1},
+                options: None,
+            })
+            .optional(self.session.as_deref_mut(), |a, s| a.session(s))
+            .await?;
         }
+
+        Ok(())
     }
 }
 

@@ -2,14 +2,7 @@
 use mongodb::{
     bson::{doc, Document},
     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
-    options::{
-        Acknowledgment,
-        ReadConcern,
-        ReadPreference,
-        SelectionCriteria,
-        TransactionOptions,
-        WriteConcern,
-    },
+    options::{Acknowledgment, ReadConcern, ReadPreference, SelectionCriteria, WriteConcern},
     Client,
     ClientSession,
 };
@@ -44,12 +37,12 @@ async fn run_transaction_with_retry(session: &mut ClientSession) -> Result<()> {
 }
 
 async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
-    let transaction_options = TransactionOptions::builder()
+    session
+        .start_transaction()
         .read_concern(ReadConcern::snapshot())
         .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
         .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
-        .build();
-    session.start_transaction(transaction_options).await?;
+        .await?;
 
     let client = session.client();
     let employees = client.database("hr").collection::<Document>("employees");
@@ -58,15 +51,13 @@ async fn execute_transaction(session: &mut ClientSession) -> Result<()> {
     employees
         .update_one(
             doc! { "employee": 3 },
-            doc! { "$set": { "status": "Inactive" } }
+            doc! { "$set": { "status": "Inactive" } },
         )
         .session(&mut *session)
         .await?;
 
     events
-        .insert_one(
-            doc! { "employee": 3, "status": { "new": "Inactive", "old": "Active" } }
-        )
+        .insert_one(doc! { "employee": 3, "status": { "new": "Inactive", "old": "Active" } })
         .session(&mut *session)
         .await?;
 

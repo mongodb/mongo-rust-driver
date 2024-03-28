@@ -86,48 +86,46 @@ impl<'a, M> ListDatabases<'a, M> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListDatabases<'a, ListSpecifications> {
-        type Future = ListDatabasesFuture;
+#[action_impl]
+impl<'a> Action for ListDatabases<'a, ListSpecifications> {
+    type Future = ListDatabasesFuture;
 
-        async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
-            let op = op::ListDatabases::new(false, self.options);
-                self.client
-                    .execute_operation(op, self.session)
-                    .await
-                    .and_then(|dbs| {
-                        dbs.into_iter()
-                            .map(|db_spec| {
-                                bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
-                            })
-                            .collect()
+    async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
+        let op = op::ListDatabases::new(false, self.options);
+        self.client
+            .execute_operation(op, self.session)
+            .await
+            .and_then(|dbs| {
+                dbs.into_iter()
+                    .map(|db_spec| {
+                        bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
                     })
-        }
+                    .collect()
+            })
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListDatabases<'a, ListNames> {
-        type Future = ListDatabaseNamesFuture;
+#[action_impl]
+impl<'a> Action for ListDatabases<'a, ListNames> {
+    type Future = ListDatabaseNamesFuture;
 
-        async fn execute(self) -> Result<Vec<String>> {
-            let op = op::ListDatabases::new(true, self.options);
-            match self.client.execute_operation(op, self.session).await {
-                Ok(databases) => databases
-                    .into_iter()
-                    .map(|doc| {
-                        let name = doc
-                            .get_str("name")
-                            .map_err(|_| ErrorKind::InvalidResponse {
-                                message: "Expected \"name\" field in server response, but it was \
-                                            not found"
-                                    .to_string(),
-                            })?;
-                        Ok(name.to_string())
-                    })
-                    .collect(),
-                Err(e) => Err(e),
-            }
+    async fn execute(self) -> Result<Vec<String>> {
+        let op = op::ListDatabases::new(true, self.options);
+        match self.client.execute_operation(op, self.session).await {
+            Ok(databases) => databases
+                .into_iter()
+                .map(|doc| {
+                    let name = doc
+                        .get_str("name")
+                        .map_err(|_| ErrorKind::InvalidResponse {
+                            message: "Expected \"name\" field in server response, but it was not \
+                                      found"
+                                .to_string(),
+                        })?;
+                    Ok(name.to_string())
+                })
+                .collect(),
+            Err(e) => Err(e),
         }
     }
 }

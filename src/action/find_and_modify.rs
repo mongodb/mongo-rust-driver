@@ -202,18 +202,19 @@ impl<'a, T: Send + Sync> FindOneAndDelete<'a, T> {
     }
 }
 
-action_impl! {
-    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndDelete<'a, T> {
-        type Future = FindOneAndDeleteFuture;
+#[action_impl]
+impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndDelete<'a, T> {
+    type Future = FindOneAndDeleteFuture;
 
-        async fn execute(self) -> Result<Option<T>> {
-            self.coll.find_and_modify(
+    async fn execute(self) -> Result<Option<T>> {
+        self.coll
+            .find_and_modify(
                 self.filter,
                 Modification::Delete,
                 self.options.map(FindAndModifyOptions::from),
                 self.session,
-            ).await
-        }
+            )
+            .await
     }
 }
 
@@ -251,18 +252,19 @@ impl<'a, T: Send + Sync> FindOneAndUpdate<'a, T> {
     }
 }
 
-action_impl! {
-    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndUpdate<'a, T> {
-        type Future = FindOneAndUpdateFuture;
+#[action_impl]
+impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndUpdate<'a, T> {
+    type Future = FindOneAndUpdateFuture;
 
-        async fn execute(self) -> Result<Option<T>> {
-            self.coll.find_and_modify(
+    async fn execute(self) -> Result<Option<T>> {
+        self.coll
+            .find_and_modify(
                 self.filter,
                 Modification::Update(self.update.into()),
                 self.options.map(FindAndModifyOptions::from),
                 self.session,
-            ).await
-        }
+            )
+            .await
     }
 }
 
@@ -299,17 +301,18 @@ impl<'a, T: Send + Sync> FindOneAndReplace<'a, T> {
     }
 }
 
-action_impl! {
-    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndReplace<'a, T> {
-        type Future = FindOneAndReplaceFuture;
+#[action_impl]
+impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOneAndReplace<'a, T> {
+    type Future = FindOneAndReplaceFuture;
 
-        async fn execute(self) -> Result<Option<T>> {
-            self.coll.find_and_modify(
+    async fn execute(self) -> Result<Option<T>> {
+        self.coll
+            .find_and_modify(
                 self.filter,
                 Modification::Update(UpdateOrReplace::Replacement(self.replacement?)),
                 self.options.map(FindAndModifyOptions::from),
                 self.session,
-            ).await
-        }
+            )
+            .await
     }
 }

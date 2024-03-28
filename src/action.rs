@@ -24,6 +24,7 @@ mod run_command;
 mod search_index;
 mod session;
 mod shutdown;
+pub(crate) mod transaction;
 mod update;
 mod watch;
 
@@ -51,6 +52,7 @@ pub use run_command::{RunCommand, RunCursorCommand};
 pub use search_index::{CreateSearchIndex, DropSearchIndex, ListSearchIndexes, UpdateSearchIndex};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
+pub use transaction::{AbortTransaction, CommitTransaction, StartTransaction};
 pub use update::Update;
 pub use watch::Watch;
 

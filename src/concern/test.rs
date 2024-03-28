@@ -5,7 +5,7 @@ use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
-    options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
+    options::{Acknowledgment, ReadConcern, WriteConcern},
     test::TestClient,
     Client,
     Collection,
@@ -146,10 +146,11 @@ async fn snapshot_read_concern() {
 
     if client.supports_transactions() {
         let mut session = client.start_session().await.unwrap();
-        let options = TransactionOptions::builder()
+        session
+            .start_transaction()
             .read_concern(ReadConcern::snapshot())
-            .build();
-        session.start_transaction(options).await.unwrap();
+            .await
+            .unwrap();
         let result = coll.find_one(doc! {}).session(&mut session).await;
         assert!(result.is_ok());
         assert_event_contains_read_concern(&client).await;

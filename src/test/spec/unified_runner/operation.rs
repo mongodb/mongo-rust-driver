@@ -1867,7 +1867,7 @@ impl TestOperation for StartTransaction {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             with_mut_session!(test_runner, id, |session| {
-                async move { session.start_transaction(None).await }
+                async move { session.start_transaction().await }
             })
             .await?;
             Ok(None)
