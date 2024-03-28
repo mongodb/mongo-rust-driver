@@ -32,6 +32,12 @@ impl<'a> From<&'a mut ClientSession> for &'a mut AsyncClientSession {
 }
 
 impl ClientSession {
+    pub(crate) fn new(async_client_session: AsyncClientSession) -> Self {
+        Self {
+            async_client_session,
+        }
+    }
+
     /// The client used to create this session.
     pub fn client(&self) -> Client {
         self.async_client_session.client().into()

@@ -80,18 +80,17 @@ impl<'a> Find<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for Find<'a> {
-        type Future = FindFuture;
+#[action_impl(sync = crate::sync::Cursor::<FilesCollectionDocument>)]
+impl<'a> Action for Find<'a> {
+    type Future = FindFuture;
 
-        async fn execute(self) -> Result<Cursor<FilesCollectionDocument>> {
-            let find_options = self.options.map(FindOptions::from);
-            self.bucket.files().find(self.filter).with_options(find_options).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<FilesCollectionDocument>> {
-            out.map(crate::sync::Cursor::new)
-        }
+    async fn execute(self) -> Result<Cursor<FilesCollectionDocument>> {
+        let find_options = self.options.map(FindOptions::from);
+        self.bucket
+            .files()
+            .find(self.filter)
+            .with_options(find_options)
+            .await
     }
 }
 
@@ -112,17 +111,16 @@ impl<'a> FindOne<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for FindOne<'a> {
-        type Future = FindOneFuture;
+#[action_impl]
+impl<'a> Action for FindOne<'a> {
+    type Future = FindOneFuture;
 
-        async fn execute(self) -> Result<Option<FilesCollectionDocument>> {
-            let find_options = self.options.map(FindOneOptions::from);
-            self.bucket
-                .files()
-                .find_one(self.filter)
-                .with_options(find_options)
-                .await
-        }
+    async fn execute(self) -> Result<Option<FilesCollectionDocument>> {
+        let find_options = self.options.map(FindOneOptions::from);
+        self.bucket
+            .files()
+            .find_one(self.filter)
+            .with_options(find_options)
+            .await
     }
 }

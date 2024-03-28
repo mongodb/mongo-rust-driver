@@ -128,18 +128,13 @@ pub struct OpenDownloadStream<'a> {
     id: Bson,
 }
 
-action_impl! {
-    impl<'a> Action for OpenDownloadStream<'a> {
-        type Future = OpenDownloadStreamFuture;
+#[action_impl(sync = crate::sync::gridfs::GridFsDownloadStream)]
+impl<'a> Action for OpenDownloadStream<'a> {
+    type Future = OpenDownloadStreamFuture;
 
-        async fn execute(self) -> Result<GridFsDownloadStream> {
-            let file = self.bucket.find_file_by_id(&self.id).await?;
-            GridFsDownloadStream::new(file, self.bucket.chunks()).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::gridfs::GridFsDownloadStream> {
-            out.map(crate::sync::gridfs::GridFsDownloadStream::new)
-        }
+    async fn execute(self) -> Result<GridFsDownloadStream> {
+        let file = self.bucket.find_file_by_id(&self.id).await?;
+        GridFsDownloadStream::new(file, self.bucket.chunks()).await
     }
 }
 
@@ -159,20 +154,15 @@ impl<'a> OpenDownloadStreamByName<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for OpenDownloadStreamByName<'a> {
-        type Future = OpenDownloadStreamByNameFuture;
+#[action_impl(sync = crate::sync::gridfs::GridFsDownloadStream)]
+impl<'a> Action for OpenDownloadStreamByName<'a> {
+    type Future = OpenDownloadStreamByNameFuture;
 
-        async fn execute(self) -> Result<GridFsDownloadStream> {
-            let file = self
-                .bucket
-                .find_file_by_name(&self.filename, self.options)
-                .await?;
-            GridFsDownloadStream::new(file, self.bucket.chunks()).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::gridfs::GridFsDownloadStream> {
-            out.map(crate::sync::gridfs::GridFsDownloadStream::new)
-        }
+    async fn execute(self) -> Result<GridFsDownloadStream> {
+        let file = self
+            .bucket
+            .find_file_by_name(&self.filename, self.options)
+            .await?;
+        GridFsDownloadStream::new(file, self.bucket.chunks()).await
     }
 }

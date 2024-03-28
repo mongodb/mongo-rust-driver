@@ -26,15 +26,14 @@ pub struct Drop<'a> {
     bucket: &'a GridFsBucket,
 }
 
-action_impl! {
-    impl<'a> Action for Drop<'a> {
-        type Future = DropFuture;
+#[action_impl]
+impl<'a> Action for Drop<'a> {
+    type Future = DropFuture;
 
-        async fn execute(self) -> Result<()> {
-            self.bucket.files().drop().await?;
-            self.bucket.chunks().drop().await?;
+    async fn execute(self) -> Result<()> {
+        self.bucket.files().drop().await?;
+        self.bucket.chunks().drop().await?;
 
-            Ok(())
-        }
+        Ok(())
     }
 }

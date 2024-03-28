@@ -164,29 +164,29 @@ impl<'a, Mode> CreateSearchIndex<'a, Mode> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for CreateSearchIndex<'a, Multiple> {
-        type Future = CreateSearchIndexesFuture;
+#[action_impl]
+impl<'a> Action for CreateSearchIndex<'a, Multiple> {
+    type Future = CreateSearchIndexesFuture;
 
-        async fn execute(self) -> Result<Vec<String>> {
-            let op = operation::CreateSearchIndexes::new(self.coll.namespace(), self.models);
-            self.coll.client().execute_operation(op, None).await
-        }
+    async fn execute(self) -> Result<Vec<String>> {
+        let op = operation::CreateSearchIndexes::new(self.coll.namespace(), self.models);
+        self.coll.client().execute_operation(op, None).await
     }
 }
 
-action_impl! {
-    impl<'a> Action for CreateSearchIndex<'a, Single> {
-        type Future = CreateSearchIndexFuture;
+#[action_impl]
+impl<'a> Action for CreateSearchIndex<'a, Single> {
+    type Future = CreateSearchIndexFuture;
 
-        async fn execute(self) -> Result<String> {
-            let mut names = self.coll
-                .create_search_indexes(self.models)
-                .with_options(self.options).await?;
-            match names.len() {
-                1 => Ok(names.pop().unwrap()),
-                n => Err(Error::internal(format!("expected 1 index name, got {}", n))),
-            }
+    async fn execute(self) -> Result<String> {
+        let mut names = self
+            .coll
+            .create_search_indexes(self.models)
+            .with_options(self.options)
+            .await?;
+        match names.len() {
+            1 => Ok(names.pop().unwrap()),
+            n => Err(Error::internal(format!("expected 1 index name, got {}", n))),
         }
     }
 }
@@ -205,18 +205,14 @@ impl<'a> UpdateSearchIndex<'a> {
     option_setters! { options: UpdateSearchIndexOptions; }
 }
 
-action_impl! {
-    impl<'a> Action for UpdateSearchIndex<'a> {
-        type Future = UpdateSearchIndexFuture;
+#[action_impl]
+impl<'a> Action for UpdateSearchIndex<'a> {
+    type Future = UpdateSearchIndexFuture;
 
-        async fn execute(self) -> Result<()> {
-            let op = operation::UpdateSearchIndex::new(
-                self.coll.namespace(),
-                self.name,
-                self.definition,
-            );
-            self.coll.client().execute_operation(op, None).await
-        }
+    async fn execute(self) -> Result<()> {
+        let op =
+            operation::UpdateSearchIndex::new(self.coll.namespace(), self.name, self.definition);
+        self.coll.client().execute_operation(op, None).await
     }
 }
 
@@ -232,17 +228,13 @@ impl<'a> DropSearchIndex<'a> {
     option_setters! { options: DropSearchIndexOptions; }
 }
 
-action_impl! {
-    impl<'a> Action for DropSearchIndex<'a> {
-        type Future = DropSearchIndexFuture;
+#[action_impl]
+impl<'a> Action for DropSearchIndex<'a> {
+    type Future = DropSearchIndexFuture;
 
-        async fn execute(self) -> Result<()> {
-            let op = operation::DropSearchIndex::new(
-                self.coll.namespace(),
-                self.name,
-            );
-            self.coll.client().execute_operation(op, None).await
-        }
+    async fn execute(self) -> Result<()> {
+        let op = operation::DropSearchIndex::new(self.coll.namespace(), self.name);
+        self.coll.client().execute_operation(op, None).await
     }
 }
 
@@ -271,26 +263,21 @@ impl<'a> ListSearchIndexes<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListSearchIndexes<'a> {
-        type Future = ListSearchIndexesFuture;
+#[action_impl(sync = crate::sync::Cursor::<Document>)]
+impl<'a> Action for ListSearchIndexes<'a> {
+    type Future = ListSearchIndexesFuture;
 
-        async fn execute(self) -> Result<Cursor<Document>> {
-            let mut inner = doc! {};
-            if let Some(name) = self.name {
-                inner.insert("name", name);
-            }
-            self.coll
-                .clone_unconcerned()
-                .aggregate(vec![doc! {
-                    "$listSearchIndexes": inner,
-                }])
-                .with_options(self.agg_options)
-                .await
+    async fn execute(self) -> Result<Cursor<Document>> {
+        let mut inner = doc! {};
+        if let Some(name) = self.name {
+            inner.insert("name", name);
         }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<Document>> {
-            out.map(crate::sync::Cursor::new)
-        }
+        self.coll
+            .clone_unconcerned()
+            .aggregate(vec![doc! {
+                "$listSearchIndexes": inner,
+            }])
+            .with_options(self.agg_options)
+            .await
     }
 }
