@@ -1,6 +1,7 @@
 use crate::{
-    action::{action_impl, StartTransaction},
+    action::{action_impl, CommitTransaction, StartTransaction},
     error::{ErrorKind, Result},
+    operation::{self, Operation},
     sdam::TransactionSupportStatus,
 };
 
@@ -87,4 +88,52 @@ action_impl! {
             }
         }
     }
+}
+
+action_impl! {
+    impl<'a> Action for CommitTransaction<'a> {
+        type Future = CommitTransactionFuture;
+
+        async fn execute(self) -> Result<()> {
+            match &mut self.session.transaction.state {
+                TransactionState::None => Err(ErrorKind::Transaction {
+                    message: "no transaction started".into(),
+                }
+                .into()),
+                TransactionState::Aborted => Err(ErrorKind::Transaction {
+                    message: "Cannot call commitTransaction after calling abortTransaction".into(),
+                }
+                .into()),
+                TransactionState::Starting => {
+                    self.session.transaction.commit(false);
+                    Ok(())
+                }
+                TransactionState::InProgress => {
+                    let commit_transaction =
+                        operation::CommitTransaction::new(self.session.transaction.options.clone());
+                    self.session.transaction.commit(true);
+                    self.session
+                        .client
+                        .clone()
+                        .execute_operation(commit_transaction, self.session)
+                        .await
+                }
+                TransactionState::Committed {
+                    data_committed: true,
+                } => {
+                    let mut commit_transaction =
+                        operation::CommitTransaction::new(self.session.transaction.options.clone());
+                    commit_transaction.update_for_retry();
+                    self.session
+                        .client
+                        .clone()
+                        .execute_operation(commit_transaction, self.session)
+                        .await
+                }
+                TransactionState::Committed {
+                    data_committed: false,
+                } => Ok(()),
+            }
+        }
+}
 }
