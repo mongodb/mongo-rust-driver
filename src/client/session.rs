@@ -1,3 +1,4 @@
+mod action;
 mod cluster_time;
 mod pool;
 #[cfg(test)]
