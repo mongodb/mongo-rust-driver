@@ -52,7 +52,7 @@ pub use run_command::{RunCommand, RunCursorCommand};
 pub use search_index::{CreateSearchIndex, DropSearchIndex, ListSearchIndexes, UpdateSearchIndex};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
-pub use transaction::{CommitTransaction, StartTransaction};
+pub use transaction::{AbortTransaction, CommitTransaction, StartTransaction};
 pub use update::Update;
 pub use watch::Watch;
 

@@ -1,5 +1,5 @@
 use crate::{
-    action::{action_impl, CommitTransaction, StartTransaction},
+    action::{action_impl, AbortTransaction, CommitTransaction, StartTransaction},
     error::{ErrorKind, Result},
     operation::{self, Operation},
     sdam::TransactionSupportStatus,
@@ -135,5 +135,54 @@ action_impl! {
                 } => Ok(()),
             }
         }
+    }
 }
+
+action_impl! {
+    impl<'a> Action for AbortTransaction<'a> {
+        type Future = AbortTransactionFuture;
+
+        async fn execute(self) -> Result<()> {
+            match self.session.transaction.state {
+                TransactionState::None => Err(ErrorKind::Transaction {
+                    message: "no transaction started".into(),
+                }
+                .into()),
+                TransactionState::Committed { .. } => Err(ErrorKind::Transaction {
+                    message: "Cannot call abortTransaction after calling commitTransaction".into(),
+                }
+                .into()),
+                TransactionState::Aborted => Err(ErrorKind::Transaction {
+                    message: "cannot call abortTransaction twice".into(),
+                }
+                .into()),
+                TransactionState::Starting => {
+                    self.session.transaction.abort();
+                    Ok(())
+                }
+                TransactionState::InProgress => {
+                    let write_concern = self
+                        .session
+                        .transaction
+                        .options
+                        .as_ref()
+                        .and_then(|options| options.write_concern.as_ref())
+                        .cloned();
+                    let abort_transaction = operation::AbortTransaction::new(
+                        write_concern,
+                        self.session.transaction.pinned.take(),
+                    );
+                    self.session.transaction.abort();
+                    // Errors returned from running an abortTransaction command should be ignored.
+                    let _result = self
+                        .session
+                        .client
+                        .clone()
+                        .execute_operation(abort_transaction, &mut *self.session)
+                        .await;
+                    Ok(())
+                }
+            }
+        }
+    }
 }
