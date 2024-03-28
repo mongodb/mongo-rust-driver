@@ -37,9 +37,9 @@ impl ClientSession {
     /// ```
     ///
     /// `await` will return [`Result<()>`].
-    pub fn start_transaction(&mut self) -> StartTransaction {
+    pub fn start_transaction(&mut self) -> StartTransaction<AsyncSession> {
         StartTransaction {
-            session: self,
+            session: AsyncSession(self),
             options: None,
         }
     }
@@ -135,8 +135,11 @@ impl crate::sync::ClientSession {
     /// ```
     ///
     /// [`run`](StartTransaction::run) will return [`Result<()>`].
-    pub fn start_transaction(&mut self) -> StartTransaction {
-        self.async_client_session.start_transaction()
+    pub fn start_transaction(&mut self) -> StartTransaction<SyncSession> {
+        StartTransaction {
+            session: SyncSession(self),
+            options: None,
+        }
     }
 
     /// Commits the transaction that is currently active on this session.
@@ -203,12 +206,16 @@ impl crate::sync::ClientSession {
 
 /// Start a new transaction.  Construct with [`ClientSession::start_transaction`].
 #[must_use]
-pub struct StartTransaction<'a> {
-    pub(crate) session: &'a mut ClientSession,
+pub struct StartTransaction<S> {
+    pub(crate) session: S,
     pub(crate) options: Option<TransactionOptions>,
 }
 
-impl<'a> StartTransaction<'a> {
+pub struct AsyncSession<'a>(pub(crate) &'a mut ClientSession);
+#[cfg(feature = "sync")]
+pub struct SyncSession<'a>(pub(crate) &'a mut crate::sync::ClientSession);
+
+impl<S> StartTransaction<S> {
     option_setters! { options: TransactionOptions;
         read_concern: ReadConcern,
         write_concern: WriteConcern,

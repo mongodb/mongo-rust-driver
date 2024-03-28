@@ -24,7 +24,7 @@ mod run_command;
 mod search_index;
 mod session;
 mod shutdown;
-mod transaction;
+pub(crate) mod transaction;
 mod update;
 mod watch;
 
