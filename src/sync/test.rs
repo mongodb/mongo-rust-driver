@@ -275,7 +275,8 @@ fn transactions() {
         .expect("create collection should succeed");
 
     session
-        .start_transaction(None)
+        .start_transaction()
+        .run()
         .expect("start transaction should succeed");
 
     run_transaction_with_retry(&mut session, |s| {
@@ -300,7 +301,8 @@ fn transactions() {
     }
 
     session
-        .start_transaction(None)
+        .start_transaction()
+        .run()
         .expect("start transaction should succeed");
     run_transaction_with_retry(&mut session, |s| {
         coll.insert_one(doc! { "x": 1 }).session(s).run()?;

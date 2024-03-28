@@ -84,7 +84,7 @@ async fn deserialize_recovery_token() {
     let coll: Collection<B> = client
         .database(function_name!())
         .collection(function_name!());
-    session.start_transaction(None).await.unwrap();
+    session.start_transaction().await.unwrap();
     assert!(session.transaction.recovery_token.is_none());
     let result = coll.find_one(doc! {}).session(&mut session).await;
     assert!(result.is_err()); // Assert that the deserialization failed.

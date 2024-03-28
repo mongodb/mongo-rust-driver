@@ -54,31 +54,6 @@ impl ClientSession {
         self.async_client_session.advance_cluster_time(to)
     }
 
-    /// Starts a new transaction on this session with the given `TransactionOptions`. If no options
-    /// are provided, the session's `defaultTransactionOptions` will be used. This session must
-    /// be passed into each operation within the transaction; otherwise, the operation will be
-    /// executed outside of the transaction.
-    ///
-    /// ```rust
-    /// # use mongodb::{bson::{doc, Document}, error::Result, sync::{Client, ClientSession}};
-    /// #
-    /// # async fn do_stuff() -> Result<()> {
-    /// # let client = Client::with_uri_str("mongodb://example.com")?;
-    /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session().run()?;
-    /// session.start_transaction(None)?;
-    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).run()?;
-    /// session.commit_transaction()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn start_transaction(
-        &mut self,
-        options: impl Into<Option<TransactionOptions>>,
-    ) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_client_session.start_transaction(options))
-    }
-
     /// Commits the transaction that is currently active on this session.
     ///
     /// ```rust
@@ -168,7 +143,9 @@ impl ClientSession {
         };
 
         'transaction: loop {
-            self.start_transaction(options.clone())?;
+            self.start_transaction()
+                .with_options(options.clone())
+                .run()?;
             let ret = match callback(self) {
                 Ok(v) => v,
                 Err(e) => {

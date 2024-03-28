@@ -19,7 +19,7 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
-    sdam::{ServerInfo, TransactionSupportStatus},
+    sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     BoxFuture,
     Client,
@@ -336,110 +336,6 @@ impl ClientSession {
         self.server_session.dirty
     }
 
-    /// Starts a new transaction on this session with the given `TransactionOptions`. If no options
-    /// are provided, the session's `defaultTransactionOptions` will be used. This session must
-    /// be passed into each operation within the transaction; otherwise, the operation will be
-    /// executed outside of the transaction.
-    ///
-    /// Errors returned from operations executed within a transaction may include a
-    /// [`crate::error::TRANSIENT_TRANSACTION_ERROR`] label. This label indicates that the entire
-    /// transaction can be retried with a reasonable expectation that it will succeed.
-    ///
-    /// Transactions are supported on MongoDB 4.0+. The Rust driver currently only supports
-    /// transactions on replica sets.
-    ///
-    /// ```rust
-    /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession};
-    /// #
-    /// # async fn do_stuff() -> Result<()> {
-    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session().await?;
-    /// session.start_transaction(None).await?;
-    /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).await?;
-    /// session.commit_transaction().await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn start_transaction(
-        &mut self,
-        options: impl Into<Option<TransactionOptions>>,
-    ) -> Result<()> {
-        if self
-            .options
-            .as_ref()
-            .and_then(|o| o.snapshot)
-            .unwrap_or(false)
-        {
-            return Err(ErrorKind::Transaction {
-                message: "Transactions are not supported in snapshot sessions".into(),
-            }
-            .into());
-        }
-        match self.transaction.state {
-            TransactionState::Starting | TransactionState::InProgress => {
-                return Err(ErrorKind::Transaction {
-                    message: "transaction already in progress".into(),
-                }
-                .into());
-            }
-            TransactionState::Committed { .. } => {
-                self.unpin(); // Unpin session if previous transaction is committed.
-            }
-            _ => {}
-        }
-        match self.client.transaction_support_status().await? {
-            TransactionSupportStatus::Supported => {
-                let mut options = match options.into() {
-                    Some(mut options) => {
-                        if let Some(defaults) = self.default_transaction_options() {
-                            merge_options!(
-                                defaults,
-                                options,
-                                [
-                                    read_concern,
-                                    write_concern,
-                                    selection_criteria,
-                                    max_commit_time
-                                ]
-                            );
-                        }
-                        Some(options)
-                    }
-                    None => self.default_transaction_options().cloned(),
-                };
-                resolve_options!(
-                    self.client,
-                    options,
-                    [read_concern, write_concern, selection_criteria]
-                );
-
-                if let Some(ref options) = options {
-                    if !options
-                        .write_concern
-                        .as_ref()
-                        .map(|wc| wc.is_acknowledged())
-                        .unwrap_or(true)
-                    {
-                        return Err(ErrorKind::Transaction {
-                            message: "transactions do not support unacknowledged write concerns"
-                                .into(),
-                        }
-                        .into());
-                    }
-                }
-
-                self.increment_txn_number();
-                self.transaction.start(options);
-                Ok(())
-            }
-            _ => Err(ErrorKind::Transaction {
-                message: "Transactions are not supported by this deployment".into(),
-            }
-            .into()),
-        }
-    }
-
     /// Commits the transaction that is currently active on this session.
     ///
     ///
@@ -640,7 +536,9 @@ impl ClientSession {
         use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
 
         'transaction: loop {
-            self.start_transaction(options.clone()).await?;
+            self.start_transaction()
+                .with_options(options.clone())
+                .await?;
             let ret = match callback(self, &mut context).await {
                 Ok(v) => v,
                 Err(e) => {

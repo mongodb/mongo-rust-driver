@@ -1001,7 +1001,8 @@ impl TestOperation for StartTransaction {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             session
-                .start_transaction(self.options.clone())
+                .start_transaction()
+                .with_options(self.options.clone())
                 .await
                 .map(|_| None)
         }

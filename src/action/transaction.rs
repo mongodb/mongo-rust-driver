@@ -37,7 +37,7 @@ impl ClientSession {
     /// ```
     ///
     /// `await` will return [`Result<()>`].
-    pub fn start_transaction_2(&mut self) -> StartTransaction {
+    pub fn start_transaction(&mut self) -> StartTransaction {
         StartTransaction {
             session: self,
             options: None,
@@ -67,8 +67,8 @@ impl crate::sync::ClientSession {
     /// ```
     ///
     /// [`run`](StartTransaction::run) will return [`Result<()>`].
-    pub fn start_transaction_2(&mut self) -> StartTransaction {
-        self.async_client_session.start_transaction_2()
+    pub fn start_transaction(&mut self) -> StartTransaction {
+        self.async_client_session.start_transaction()
     }
 }
 
