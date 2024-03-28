@@ -4,6 +4,7 @@ use futures_util::{FutureExt, TryStreamExt};
 use serde::Deserialize;
 
 use crate::{
+    action::Action,
     coll::options::AggregateOptions,
     error::Result,
     search_index::options::{
@@ -35,7 +36,8 @@ impl TestOperation for CreateSearchIndex {
         async move {
             let collection = test_runner.get_collection(id).await;
             let name = collection
-                .create_search_index(self.model.clone(), self.options.clone())
+                .create_search_index(self.model.clone())
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(Bson::String(name).into()))
         }
@@ -60,7 +62,8 @@ impl TestOperation for CreateSearchIndexes {
         async move {
             let collection = test_runner.get_collection(id).await;
             let names = collection
-                .create_search_indexes(self.models.clone(), self.options.clone())
+                .create_search_indexes(self.models.clone())
+                .with_options(self.options.clone())
                 .await?;
             Ok(Some(to_bson(&names)?.into()))
         }
@@ -85,7 +88,8 @@ impl TestOperation for DropSearchIndex {
         async move {
             let collection = test_runner.get_collection(id).await;
             collection
-                .drop_search_index(&self.name, self.options.clone())
+                .drop_search_index(&self.name)
+                .with_options(self.options.clone())
                 .await?;
             Ok(None)
         }
@@ -111,11 +115,12 @@ impl TestOperation for ListSearchIndexes {
         async move {
             let collection = test_runner.get_collection(id).await;
             let cursor = collection
-                .list_search_indexes(
-                    self.name.as_deref(),
-                    self.aggregation_options.clone(),
-                    self.options.clone(),
-                )
+                .list_search_indexes()
+                .optional(self.name.clone(), |a, n| a.name(n))
+                .optional(self.aggregation_options.clone(), |a, o| {
+                    a.aggregate_options(o)
+                })
+                .with_options(self.options.clone())
                 .await?;
             let values: Vec<_> = cursor.try_collect().await?;
             Ok(Some(to_bson(&values)?.into()))
@@ -142,7 +147,8 @@ impl TestOperation for UpdateSearchIndex {
         async move {
             let collection = test_runner.get_collection(id).await;
             collection
-                .update_search_index(&self.name, self.definition.clone(), self.options.clone())
+                .update_search_index(&self.name, self.definition.clone())
+                .with_options(self.options.clone())
                 .await?;
             Ok(None)
         }

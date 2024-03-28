@@ -21,6 +21,7 @@ mod list_indexes;
 mod perf;
 mod replace_one;
 mod run_command;
+mod search_index;
 mod session;
 mod shutdown;
 mod update;
@@ -47,6 +48,7 @@ pub use list_indexes::ListIndexes;
 pub use perf::WarmConnectionPool;
 pub use replace_one::ReplaceOne;
 pub use run_command::{RunCommand, RunCursorCommand};
+pub use search_index::{CreateSearchIndex, DropSearchIndex, ListSearchIndexes, UpdateSearchIndex};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
 pub use update::Update;
@@ -76,6 +78,7 @@ macro_rules! option_setters {
             $opt_name:ident: $opt_ty:ty,
         )*
     ) => {
+        #[allow(unused)]
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
         }
