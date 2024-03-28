@@ -29,7 +29,7 @@ impl ClientSession {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().await?;
-    /// session.start_transaction(None).await?;
+    /// session.start_transaction().await?;
     /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).await?;
     /// session.commit_transaction().await?;
     /// # Ok(())
@@ -60,7 +60,7 @@ impl ClientSession {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().await?;
-    /// session.start_transaction(None).await?;
+    /// session.start_transaction().await?;
     /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).await?;
     /// session.commit_transaction().await?;
     /// # Ok(())
@@ -87,7 +87,7 @@ impl ClientSession {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().await?;
-    /// session.start_transaction(None).await?;
+    /// session.start_transaction().await?;
     /// match execute_transaction(&coll, &mut session).await {
     ///     Ok(_) => session.commit_transaction().await?,
     ///     Err(_) => session.abort_transaction().await?,
@@ -127,9 +127,9 @@ impl crate::sync::ClientSession {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().run()?;
-    /// session.start_transaction(None)?;
+    /// session.start_transaction().run()?;
     /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).run()?;
-    /// session.commit_transaction()?;
+    /// session.commit_transaction().run()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -151,9 +151,9 @@ impl crate::sync::ClientSession {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().run()?;
-    /// session.start_transaction(None)?;
+    /// session.start_transaction().run()?;
     /// let result = coll.insert_one(doc! { "x": 1 }).session(&mut session).run()?;
-    /// session.commit_transaction()?;
+    /// session.commit_transaction().run()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -178,10 +178,10 @@ impl crate::sync::ClientSession {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session().run()?;
-    /// session.start_transaction(None)?;
+    /// session.start_transaction().run()?;
     /// match execute_transaction(coll, &mut session) {
-    ///     Ok(_) => session.commit_transaction()?,
-    ///     Err(_) => session.abort_transaction()?,
+    ///     Ok(_) => session.commit_transaction().run()?,
+    ///     Err(_) => session.abort_transaction().run()?,
     /// }
     /// # Ok(())
     /// # }

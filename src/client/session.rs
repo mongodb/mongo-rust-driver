@@ -63,11 +63,11 @@ pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: Lazy<HashSet<&'static str>> = L
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll: Collection<Document> = client.database("foo").collection("bar");
 /// let mut session = client.start_session().await?;
-/// let options = TransactionOptions::builder()
+/// session
+///     .start_transaction()
 ///     .read_concern(ReadConcern::majority())
-///     .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-///     .build();
-/// session.start_transaction(options).await?;
+///     .write_concern(WriteConcern::majority())
+///     .await?;
 /// // A "TransientTransactionError" label indicates that the entire transaction can be retried
 /// // with a reasonable expectation that it will succeed.
 /// while let Err(error) = execute_transaction(&coll, &mut session).await {
