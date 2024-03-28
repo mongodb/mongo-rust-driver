@@ -16,11 +16,9 @@ use uuid::Uuid;
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
     cmap::conn::PinnedConnectionHandle,
-    error::Result,
     options::{SessionOptions, TransactionOptions},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    BoxFuture,
     Client,
 };
 pub use cluster_time::ClusterTime;
@@ -333,118 +331,6 @@ impl ClientSession {
     #[cfg(test)]
     pub(crate) fn is_dirty(&self) -> bool {
         self.server_session.dirty
-    }
-
-    /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
-    /// Transient transaction errors will cause the callback or the commit to be retried;
-    /// other errors will cause the transaction to be aborted and the error returned to the
-    /// caller.  If the callback needs to provide its own error information, the
-    /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
-    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
-    ///
-    /// If a command inside the callback fails, it may cause the transaction on the server to be
-    /// aborted. This situation is normally handled transparently by the driver. However, if the
-    /// application does not return that error from the callback, the driver will not be able to
-    /// determine whether the transaction was aborted or not. The driver will then retry the
-    /// callback indefinitely. To avoid this situation, the application MUST NOT silently handle
-    /// errors within the callback. If the application needs to handle errors within the
-    /// callback, it MUST return them after doing so.
-    ///
-    /// Because the callback can be repeatedly executed and because it returns a future, the rust
-    /// closure borrowing rules for captured values can be overly restrictive.  As a
-    /// convenience, `with_transaction` accepts a context argument that will be passed to the
-    /// callback along with the session:
-    ///
-    /// ```no_run
-    /// # use mongodb::{bson::{doc, Document}, error::Result, Client};
-    /// # use futures::FutureExt;
-    /// # async fn wrapper() -> Result<()> {
-    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let mut session = client.start_session().await?;
-    /// let coll = client.database("mydb").collection::<Document>("mycoll");
-    /// let my_data = "my data".to_string();
-    /// // This works:
-    /// session.with_transaction(
-    ///     (&coll, &my_data),
-    ///     |session, (coll, my_data)| async move {
-    ///         coll.insert_one(doc! { "data": *my_data }).session(session).await
-    ///     }.boxed(),
-    ///     None,
-    /// ).await?;
-    /// /* This will not compile with a "variable moved due to use in generator" error:
-    /// session.with_transaction(
-    ///     (),
-    ///     |session, _| async move {
-    ///         coll.insert_one(doc! { "data": my_data }).session(session).await
-    ///     }.boxed(),
-    ///     None,
-    /// ).await?;
-    /// */
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn with_transaction<R, C, F>(
-        &mut self,
-        mut context: C,
-        mut callback: F,
-        options: impl Into<Option<TransactionOptions>>,
-    ) -> Result<R>
-    where
-        F: for<'a> FnMut(&'a mut ClientSession, &'a mut C) -> BoxFuture<'a, Result<R>>,
-    {
-        let options = options.into();
-        let timeout = Duration::from_secs(120);
-        #[cfg(test)]
-        let timeout = self.convenient_transaction_timeout.unwrap_or(timeout);
-        let start = Instant::now();
-
-        use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
-
-        'transaction: loop {
-            self.start_transaction()
-                .with_options(options.clone())
-                .await?;
-            let ret = match callback(self, &mut context).await {
-                Ok(v) => v,
-                Err(e) => {
-                    if matches!(
-                        self.transaction.state,
-                        TransactionState::Starting | TransactionState::InProgress
-                    ) {
-                        self.abort_transaction().await?;
-                    }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
-                        continue 'transaction;
-                    }
-                    return Err(e);
-                }
-            };
-            if matches!(
-                self.transaction.state,
-                TransactionState::None
-                    | TransactionState::Aborted
-                    | TransactionState::Committed { .. }
-            ) {
-                return Ok(ret);
-            }
-            'commit: loop {
-                match self.commit_transaction().await {
-                    Ok(()) => return Ok(ret),
-                    Err(e) => {
-                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
-                            return Err(e);
-                        }
-                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-                            continue 'commit;
-                        }
-                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
-                            continue 'transaction;
-                        }
-                        return Err(e);
-                    }
-                }
-            }
-        }
     }
 
     fn default_transaction_options(&self) -> Option<&TransactionOptions> {
