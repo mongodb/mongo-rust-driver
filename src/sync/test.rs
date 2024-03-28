@@ -252,7 +252,7 @@ fn transactions() {
                     if error.contains_label(TRANSIENT_TRANSACTION_ERROR) {
                         continue;
                     } else {
-                        session.abort_transaction()?;
+                        session.abort_transaction().run()?;
                         return Err(error);
                     }
                 }
@@ -311,6 +311,7 @@ fn transactions() {
     .unwrap();
     session
         .abort_transaction()
+        .run()
         .expect("abort transaction should succeed");
 }
 

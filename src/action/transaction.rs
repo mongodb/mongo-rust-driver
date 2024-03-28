@@ -108,7 +108,7 @@ impl ClientSession {
     /// retryable writes.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn abort_transaction_2(&mut self) -> AbortTransaction {
+    pub fn abort_transaction(&mut self) -> AbortTransaction {
         AbortTransaction { session: self }
     }
 }
@@ -196,8 +196,8 @@ impl crate::sync::ClientSession {
     /// retryable writes.
     ///
     /// [`run`](AbortTransaction::run) will return [`Result<()>`].
-    pub fn abort_transaction_2(&mut self) -> AbortTransaction {
-        self.async_client_session.abort_transaction_2()
+    pub fn abort_transaction(&mut self) -> AbortTransaction {
+        self.async_client_session.abort_transaction()
     }
 }
 

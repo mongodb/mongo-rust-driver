@@ -54,39 +54,6 @@ impl ClientSession {
         self.async_client_session.advance_cluster_time(to)
     }
 
-    /// Aborts the transaction that is currently active on this session. Any open transaction will
-    /// be aborted automatically in the `Drop` implementation of `ClientSession`.
-    ///
-    /// ```rust
-    /// # use mongodb::{bson::{doc, Document}, error::Result, sync::{Client, ClientSession, Collection}};
-    /// #
-    /// # async fn do_stuff() -> Result<()> {
-    /// # let client = Client::with_uri_str("mongodb://example.com")?;
-    /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session().run()?;
-    /// session.start_transaction(None)?;
-    /// match execute_transaction(coll, &mut session) {
-    ///     Ok(_) => session.commit_transaction()?,
-    ///     Err(_) => session.abort_transaction()?,
-    /// }
-    /// # Ok(())
-    /// # }
-    ///
-    /// fn execute_transaction(coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
-    ///     coll.insert_one(doc! { "x": 1 }).session(&mut *session).run()?;
-    ///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).run()?;
-    ///     Ok(())   
-    /// }
-    /// ```
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn abort_transaction(&mut self) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_client_session.abort_transaction())
-    }
-
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
@@ -129,7 +96,7 @@ impl ClientSession {
                         self.async_client_session.transaction.state,
                         TransactionState::Starting | TransactionState::InProgress
                     ) {
-                        self.abort_transaction()?;
+                        self.abort_transaction().run()?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
                         continue 'transaction;

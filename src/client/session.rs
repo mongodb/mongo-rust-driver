@@ -16,8 +16,7 @@ use uuid::Uuid;
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
     cmap::conn::PinnedConnectionHandle,
-    error::{ErrorKind, Result},
-    operation::AbortTransaction,
+    error::Result,
     options::{SessionOptions, TransactionOptions},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
@@ -334,74 +333,6 @@ impl ClientSession {
     #[cfg(test)]
     pub(crate) fn is_dirty(&self) -> bool {
         self.server_session.dirty
-    }
-
-    /// Aborts the transaction that is currently active on this session. Any open transaction will
-    /// be aborted automatically in the `Drop` implementation of `ClientSession`.
-    ///
-    /// ```rust
-    /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession, Collection};
-    /// #
-    /// # async fn do_stuff() -> Result<()> {
-    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let coll = client.database("foo").collection::<Document>("bar");
-    /// # let mut session = client.start_session().await?;
-    /// session.start_transaction(None).await?;
-    /// match execute_transaction(&coll, &mut session).await {
-    ///     Ok(_) => session.commit_transaction().await?,
-    ///     Err(_) => session.abort_transaction().await?,
-    /// }
-    /// # Ok(())
-    /// # }
-    ///
-    /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
-    ///     coll.insert_one(doc! { "x": 1 }).session(&mut *session).await?;
-    ///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).await?;
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn abort_transaction(&mut self) -> Result<()> {
-        match self.transaction.state {
-            TransactionState::None => Err(ErrorKind::Transaction {
-                message: "no transaction started".into(),
-            }
-            .into()),
-            TransactionState::Committed { .. } => Err(ErrorKind::Transaction {
-                message: "Cannot call abortTransaction after calling commitTransaction".into(),
-            }
-            .into()),
-            TransactionState::Aborted => Err(ErrorKind::Transaction {
-                message: "cannot call abortTransaction twice".into(),
-            }
-            .into()),
-            TransactionState::Starting => {
-                self.transaction.abort();
-                Ok(())
-            }
-            TransactionState::InProgress => {
-                let write_concern = self
-                    .transaction
-                    .options
-                    .as_ref()
-                    .and_then(|options| options.write_concern.as_ref())
-                    .cloned();
-                let abort_transaction =
-                    AbortTransaction::new(write_concern, self.transaction.pinned.take());
-                self.transaction.abort();
-                // Errors returned from running an abortTransaction command should be ignored.
-                let _result = self
-                    .client
-                    .clone()
-                    .execute_operation(abort_transaction, &mut *self)
-                    .await;
-                Ok(())
-            }
-        }
     }
 
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
