@@ -619,11 +619,16 @@ fn deserialize_selection_criteria() {
 
     match selection_criteria {
         SelectionCriteria::ReadPreference(read_preference) => match read_preference {
-            ReadPreference::SecondaryPreferred { options } => {
+            ReadPreference::SecondaryPreferred {
+                options: Some(options),
+            } => {
                 assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
                 assert_eq!(options.hedge, Some(HedgedReadOptions::with_enabled(true)));
             }
-            other => panic!("Expected mode SecondaryPreferred, got {:?}", other),
+            other => panic!(
+                "Expected mode SecondaryPreferred with options, got {:?}",
+                other
+            ),
         },
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }
