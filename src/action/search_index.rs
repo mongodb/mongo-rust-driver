@@ -263,7 +263,7 @@ impl<'a> ListSearchIndexes<'a> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<Document>)]
+#[action_impl(sync = crate::sync::Cursor<Document>)]
 impl<'a> Action for ListSearchIndexes<'a> {
     type Future = ListSearchIndexesFuture;
 

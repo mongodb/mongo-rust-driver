@@ -1,5 +1,6 @@
 extern crate proc_macro;
 
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -9,6 +10,7 @@ use syn::{
     parse_quote,
     parse_quote_spanned,
     spanned::Spanned,
+    visit_mut::VisitMut,
     Block,
     Error,
     Expr,
@@ -18,6 +20,7 @@ use syn::{
     Lifetime,
     Lit,
     Meta,
+    PathArguments,
     Token,
     Type,
 };
@@ -52,10 +55,23 @@ pub fn action_impl(
     }
 
     let sync_run = if let Some(sync_type) = sync_type {
+        // In expression position, the type needs to be of the form Foo::<Bar>, not Foo<Bar>
+        let mut formal = sync_type.clone();
+        struct Visitor;
+        impl VisitMut for Visitor {
+            fn visit_path_segment_mut(&mut self, segment: &mut syn::PathSegment) {
+                if let PathArguments::AngleBracketed(args) = &mut segment.arguments {
+                    if args.colon2_token.is_none() {
+                        args.colon2_token = Some(Token![::](Span::call_site()));
+                    }
+                }
+            }
+        }
+        syn::visit_mut::visit_type_mut(&mut Visitor, &mut formal);
         quote! {
             /// Synchronously execute this action.
             pub fn run(self) -> Result<#sync_type> {
-                crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self)).map(#sync_type::new)
+                crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self)).map(#formal::new)
             }
         }
     } else {

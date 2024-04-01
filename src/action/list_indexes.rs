@@ -113,7 +113,7 @@ impl<'a, Mode> ListIndexes<'a, Mode, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<IndexModel>)]
+#[action_impl(sync = crate::sync::Cursor<IndexModel>)]
 impl<'a> Action for ListIndexes<'a, ListSpecifications, ImplicitSession> {
     type Future = ListIndexesFuture;
 
@@ -123,7 +123,7 @@ impl<'a> Action for ListIndexes<'a, ListSpecifications, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionCursor::<IndexModel>)]
+#[action_impl(sync = crate::sync::SessionCursor<IndexModel>)]
 impl<'a> Action for ListIndexes<'a, ListSpecifications, ExplicitSession<'a>> {
     type Future = ListIndexesSessionFuture;
 

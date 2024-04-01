@@ -134,7 +134,7 @@ impl<'a> Aggregate<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<Document>)]
+#[action_impl(sync = crate::sync::Cursor<Document>)]
 impl<'a> Action for Aggregate<'a, ImplicitSession> {
     type Future = AggregateFuture;
 
@@ -155,7 +155,7 @@ impl<'a> Action for Aggregate<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionCursor::<Document>)]
+#[action_impl(sync = crate::sync::SessionCursor<Document>)]
 impl<'a> Action for Aggregate<'a, ExplicitSession<'a>> {
     type Future = AggregateSessionFuture;
 

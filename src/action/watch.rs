@@ -252,7 +252,7 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::ChangeStream::<ChangeStreamEvent<Document>>)]
+#[action_impl(sync = crate::sync::ChangeStream<ChangeStreamEvent<Document>>)]
 impl<'a> Action for Watch<'a, ImplicitSession> {
     type Future = WatchFuture;
 
@@ -273,7 +273,7 @@ impl<'a> Action for Watch<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionChangeStream::<ChangeStreamEvent<Document>>)]
+#[action_impl(sync = crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>)]
 impl<'a> Action for Watch<'a, ExplicitSession<'a>> {
     type Future = WatchSessionFuture;
 

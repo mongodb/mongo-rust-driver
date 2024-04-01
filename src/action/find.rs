@@ -122,7 +122,7 @@ impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<T>)]
+#[action_impl(sync = crate::sync::Cursor<T>)]
 impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
     type Future = FindFuture;
 
@@ -134,7 +134,7 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionCursor::<T>)]
+#[action_impl(sync = crate::sync::SessionCursor<T>)]
 impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
     type Future = FindSessionFuture;
 

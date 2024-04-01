@@ -174,7 +174,7 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<Document>)]
+#[action_impl(sync = crate::sync::Cursor<Document>)]
 impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
     type Future = RunCursorCommandFuture;
 
@@ -195,7 +195,7 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionCursor::<Document>)]
+#[action_impl(sync = crate::sync::SessionCursor<Document>)]
 impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
     type Future = RunCursorCommandSessionFuture;
 

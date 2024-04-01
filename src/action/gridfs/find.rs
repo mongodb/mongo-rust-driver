@@ -80,7 +80,7 @@ impl<'a> Find<'a> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<FilesCollectionDocument>)]
+#[action_impl(sync = crate::sync::Cursor<FilesCollectionDocument>)]
 impl<'a> Action for Find<'a> {
     type Future = FindFuture;
 

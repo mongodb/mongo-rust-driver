@@ -106,7 +106,7 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor::<CollectionSpecification>)]
+#[action_impl(sync = crate::sync::Cursor<CollectionSpecification>)]
 impl<'a> Action for ListCollections<'a, ListSpecifications, ImplicitSession> {
     type Future = ListCollectionsFuture;
 
@@ -120,7 +120,7 @@ impl<'a> Action for ListCollections<'a, ListSpecifications, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionCursor::<CollectionSpecification>)]
+#[action_impl(sync = crate::sync::SessionCursor<CollectionSpecification>)]
 impl<'a> Action for ListCollections<'a, ListSpecifications, ExplicitSession<'a>> {
     type Future = ListCollectionsSessionFuture;
 
