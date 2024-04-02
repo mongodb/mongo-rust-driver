@@ -37,9 +37,9 @@ impl ClientSession {
     /// ```
     ///
     /// `await` will return [`Result<()>`].
-    pub fn start_transaction(&mut self) -> StartTransaction<AsyncSession> {
+    pub fn start_transaction(&mut self) -> StartTransaction<&mut Self> {
         StartTransaction {
-            session: AsyncSession(self),
+            session: self,
             options: None,
         }
     }
@@ -134,9 +134,9 @@ impl crate::sync::ClientSession {
     /// ```
     ///
     /// [`run`](StartTransaction::run) will return [`Result<()>`].
-    pub fn start_transaction(&mut self) -> StartTransaction<SyncSession> {
+    pub fn start_transaction(&mut self) -> StartTransaction<&mut Self> {
         StartTransaction {
-            session: SyncSession(self),
+            session: self,
             options: None,
         }
     }
@@ -209,10 +209,6 @@ pub struct StartTransaction<S> {
     pub(crate) session: S,
     pub(crate) options: Option<TransactionOptions>,
 }
-
-pub struct AsyncSession<'a>(pub(crate) &'a mut ClientSession);
-#[cfg(feature = "sync")]
-pub struct SyncSession<'a>(pub(crate) &'a mut crate::sync::ClientSession);
 
 impl<S> StartTransaction<S> {
     option_setters! { options: TransactionOptions;

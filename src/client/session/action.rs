@@ -1,15 +1,7 @@
 use std::time::{Duration, Instant};
 
-#[cfg(feature = "sync")]
-use crate::action::transaction::SyncSession;
 use crate::{
-    action::{
-        action_impl,
-        transaction::AsyncSession,
-        AbortTransaction,
-        CommitTransaction,
-        StartTransaction,
-    },
+    action::{action_impl, AbortTransaction, CommitTransaction, StartTransaction},
     client::options::TransactionOptions,
     error::{ErrorKind, Result},
     operation::{self, Operation},
@@ -99,15 +91,15 @@ impl ClientSession {
 }
 
 #[action_impl]
-impl<'a> Action for StartTransaction<AsyncSession<'a>> {
+impl<'a> Action for StartTransaction<&'a mut ClientSession> {
     type Future = StartTransactionFuture;
 
     async fn execute(self) -> Result<()> {
-        self.session.0.start_transaction_impl(self.options).await
+        self.session.start_transaction_impl(self.options).await
     }
 }
 
-impl<'a> StartTransaction<AsyncSession<'a>> {
+impl<'a> StartTransaction<&'a mut ClientSession> {
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
@@ -162,7 +154,6 @@ impl<'a> StartTransaction<AsyncSession<'a>> {
         #[cfg(test)]
         let timeout = self
             .session
-            .0
             .convenient_transaction_timeout
             .unwrap_or(timeout);
         let start = Instant::now();
@@ -171,18 +162,17 @@ impl<'a> StartTransaction<AsyncSession<'a>> {
 
         'transaction: loop {
             self.session
-                .0
                 .start_transaction()
                 .with_options(self.options.clone())
                 .await?;
-            let ret = match callback(self.session.0, &mut context).await {
+            let ret = match callback(self.session, &mut context).await {
                 Ok(v) => v,
                 Err(e) => {
                     if matches!(
-                        self.session.0.transaction.state,
+                        self.session.transaction.state,
                         TransactionState::Starting | TransactionState::InProgress
                     ) {
-                        self.session.0.abort_transaction().await?;
+                        self.session.abort_transaction().await?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
                         continue 'transaction;
@@ -191,7 +181,7 @@ impl<'a> StartTransaction<AsyncSession<'a>> {
                 }
             };
             if matches!(
-                self.session.0.transaction.state,
+                self.session.transaction.state,
                 TransactionState::None
                     | TransactionState::Aborted
                     | TransactionState::Committed { .. }
@@ -199,7 +189,7 @@ impl<'a> StartTransaction<AsyncSession<'a>> {
                 return Ok(ret);
             }
             'commit: loop {
-                match self.session.0.commit_transaction().await {
+                match self.session.commit_transaction().await {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
                         if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
@@ -220,12 +210,11 @@ impl<'a> StartTransaction<AsyncSession<'a>> {
 }
 
 #[cfg(feature = "sync")]
-impl<'a> StartTransaction<SyncSession<'a>> {
+impl<'a> StartTransaction<&'a mut crate::sync::ClientSession> {
     /// Synchronously execute this action.
     pub fn run(self) -> Result<()> {
         crate::sync::TOKIO_RUNTIME.block_on(
             self.session
-                .0
                 .async_client_session
                 .start_transaction_impl(self.options),
         )
@@ -256,18 +245,17 @@ impl<'a> StartTransaction<SyncSession<'a>> {
 
         'transaction: loop {
             self.session
-                .0
                 .start_transaction()
                 .with_options(self.options.clone())
                 .run()?;
-            let ret = match callback(self.session.0) {
+            let ret = match callback(self.session) {
                 Ok(v) => v,
                 Err(e) => {
                     if matches!(
-                        self.session.0.async_client_session.transaction.state,
+                        self.session.async_client_session.transaction.state,
                         TransactionState::Starting | TransactionState::InProgress
                     ) {
-                        self.session.0.abort_transaction().run()?;
+                        self.session.abort_transaction().run()?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
                         continue 'transaction;
@@ -276,7 +264,7 @@ impl<'a> StartTransaction<SyncSession<'a>> {
                 }
             };
             if matches!(
-                self.session.0.async_client_session.transaction.state,
+                self.session.async_client_session.transaction.state,
                 TransactionState::None
                     | TransactionState::Aborted
                     | TransactionState::Committed { .. }
@@ -284,7 +272,7 @@ impl<'a> StartTransaction<SyncSession<'a>> {
                 return Ok(ret);
             }
             'commit: loop {
-                match self.session.0.commit_transaction().run() {
+                match self.session.commit_transaction().run() {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
                         if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
