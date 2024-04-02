@@ -749,7 +749,7 @@ pub struct WriteConcernError {
     pub code_name: String,
 
     /// A description of the error that occurred.
-    #[serde(rename = "errmsg", default = "String::new")]
+    #[serde(alias = "errmsg", default = "String::new")]
     pub message: String,
 
     /// A document identifying the write concern setting related to the error.
