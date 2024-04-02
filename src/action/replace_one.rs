@@ -85,21 +85,23 @@ impl<'a> ReplaceOne<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for ReplaceOne<'a> {
-        type Future = ReplaceOneFuture;
+#[action_impl]
+impl<'a> Action for ReplaceOne<'a> {
+    type Future = ReplaceOneFuture;
 
-        async fn execute(mut self) -> Result<UpdateResult> {
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<UpdateResult> {
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            let update = Op::with_replace_raw(
-                self.coll.namespace(),
-                self.query,
-                self.replacement?,
-                false,
-                self.options.map(UpdateOptions::from_replace_options),
-            )?;
-            self.coll.client().execute_operation(update, self.session).await
-        }
+        let update = Op::with_replace_raw(
+            self.coll.namespace(),
+            self.query,
+            self.replacement?,
+            false,
+            self.options.map(UpdateOptions::from_replace_options),
+        )?;
+        self.coll
+            .client()
+            .execute_operation(update, self.session)
+            .await
     }
 }

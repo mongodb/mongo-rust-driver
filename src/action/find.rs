@@ -122,38 +122,35 @@ impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     }
 }
 
-action_impl! {
-    impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
-        type Future = FindFuture;
+#[action_impl(sync = crate::sync::Cursor<T>)]
+impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
+    type Future = FindFuture;
 
-        async fn execute(mut self) -> Result<Cursor<T>> {
-            resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
+    async fn execute(mut self) -> Result<Cursor<T>> {
+        resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
 
-            let find = Op::new(self.coll.namespace(), self.filter, self.options);
-            self.coll.client().execute_cursor_operation(find).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<T>> {
-            out.map(crate::sync::Cursor::new)
-        }
+        let find = Op::new(self.coll.namespace(), self.filter, self.options);
+        self.coll.client().execute_cursor_operation(find).await
     }
 }
 
-action_impl! {
-    impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
-        type Future = FindSessionFuture;
+#[action_impl(sync = crate::sync::SessionCursor<T>)]
+impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
+    type Future = FindSessionFuture;
 
-        async fn execute(mut self) -> Result<SessionCursor<T>> {
-            resolve_read_concern_with_session!(self.coll, self.options, Some(&mut *self.session.0))?;
-            resolve_selection_criteria_with_session!(self.coll, self.options, Some(&mut *self.session.0))?;
+    async fn execute(mut self) -> Result<SessionCursor<T>> {
+        resolve_read_concern_with_session!(self.coll, self.options, Some(&mut *self.session.0))?;
+        resolve_selection_criteria_with_session!(
+            self.coll,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
 
-            let find = Op::new(self.coll.namespace(), self.filter, self.options);
-            self.coll.client().execute_session_cursor_operation(find, self.session.0).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::SessionCursor<T>> {
-            out.map(crate::sync::SessionCursor::new)
-        }
+        let find = Op::new(self.coll.namespace(), self.filter, self.options);
+        self.coll
+            .client()
+            .execute_session_cursor_operation(find, self.session.0)
+            .await
     }
 }
 
@@ -195,24 +192,22 @@ impl<'a, T: Send + Sync> FindOne<'a, T> {
     }
 }
 
-action_impl! {
-    impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOne<'a, T>
-    {
-        type Future = FindOneFuture;
+#[action_impl]
+impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOne<'a, T> {
+    type Future = FindOneFuture;
 
-        async fn execute(self) -> Result<Option<T>> {
-            use futures_util::stream::StreamExt;
-            let mut options: FindOptions = self.options.unwrap_or_default().into();
-            options.limit = Some(-1);
-            let find = self.coll.find(self.filter).with_options(options);
-            if let Some(session) = self.session {
-                let mut cursor = find.session(&mut *session).await?;
-                let mut stream = cursor.stream(session);
-                stream.next().await.transpose()
-            } else {
-                let mut cursor = find.await?;
-                cursor.next().await.transpose()
-            }
+    async fn execute(self) -> Result<Option<T>> {
+        use futures_util::stream::StreamExt;
+        let mut options: FindOptions = self.options.unwrap_or_default().into();
+        options.limit = Some(-1);
+        let find = self.coll.find(self.filter).with_options(options);
+        if let Some(session) = self.session {
+            let mut cursor = find.session(&mut *session).await?;
+            let mut stream = cursor.stream(session);
+            stream.next().await.transpose()
+        } else {
+            let mut cursor = find.await?;
+            cursor.next().await.transpose()
         }
     }
 }

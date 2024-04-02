@@ -35,20 +35,19 @@ pub struct Rename<'a> {
     new_filename: String,
 }
 
-action_impl! {
-    impl<'a> Action for Rename<'a> {
-        type Future = RenameFuture;
+#[action_impl]
+impl<'a> Action for Rename<'a> {
+    type Future = RenameFuture;
 
-        async fn execute(self) -> Result<()> {
-            self.bucket
-                .files()
-                .update_one(
-                    doc! { "_id": self.id },
-                    doc! { "$set": { "filename": self.new_filename } },
-                )
-                .await?;
+    async fn execute(self) -> Result<()> {
+        self.bucket
+            .files()
+            .update_one(
+                doc! { "_id": self.id },
+                doc! { "$set": { "filename": self.new_filename } },
+            )
+            .await?;
 
-            Ok(())
-        }
+        Ok(())
     }
 }

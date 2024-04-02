@@ -46,19 +46,14 @@ impl<'a> StartSession<'a> {
     );
 }
 
-action_impl! {
-    impl<'a> Action for StartSession<'a> {
-        type Future = StartSessionFuture;
+#[action_impl(sync = crate::sync::ClientSession)]
+impl<'a> Action for StartSession<'a> {
+    type Future = StartSessionFuture;
 
-        async fn execute(self) -> Result<ClientSession> {
-            if let Some(options) = &self.options {
-                options.validate()?;
-            }
-            Ok(ClientSession::new(self.client.clone(), self.options, false).await)
+    async fn execute(self) -> Result<ClientSession> {
+        if let Some(options) = &self.options {
+            options.validate()?;
         }
-
-        fn sync_wrap(out) -> Result<crate::sync::ClientSession> {
-            out.map(Into::into)
-        }
+        Ok(ClientSession::new(self.client.clone(), self.options, false).await)
     }
 }

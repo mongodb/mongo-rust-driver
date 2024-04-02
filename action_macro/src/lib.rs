@@ -1,5 +1,6 @@
 extern crate proc_macro;
 
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -9,6 +10,7 @@ use syn::{
     parse_quote,
     parse_quote_spanned,
     spanned::Spanned,
+    visit_mut::VisitMut,
     Block,
     Error,
     Expr,
@@ -18,6 +20,7 @@ use syn::{
     Lifetime,
     Lit,
     Meta,
+    PathArguments,
     Token,
     Type,
 };
@@ -27,8 +30,12 @@ use syn::{
 /// * an opaque wrapper type for the future in case we want to do something more fancy than
 ///   BoxFuture.
 /// * a `run` method for sync execution, optionally with a wrapper function
-#[proc_macro]
-pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_attribute]
+pub fn action_impl(
+    attrs: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let ActionImplAttrs { sync_type } = parse_macro_input!(attrs as ActionImplAttrs);
     let ActionImpl {
         generics,
         lifetime,
@@ -37,7 +44,6 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         exec_self_mut,
         exec_output,
         exec_body,
-        sync_wrap,
     } = parse_macro_input!(input as ActionImpl);
 
     let mut unbounded_generics = generics.clone();
@@ -48,14 +54,34 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         ty.bounds.clear();
     }
 
-    let SyncWrap {
-        sync_arg_mut,
-        sync_arg,
-        sync_output,
-        sync_body,
-    } = sync_wrap.unwrap_or_else(|| {
-        parse_quote! { fn sync_wrap(out) -> #exec_output { out } }
-    });
+    let sync_run = if let Some(sync_type) = sync_type {
+        // In expression position, the type needs to be of the form Foo::<Bar>, not Foo<Bar>
+        let mut formal = sync_type.clone();
+        struct Visitor;
+        impl VisitMut for Visitor {
+            fn visit_path_segment_mut(&mut self, segment: &mut syn::PathSegment) {
+                if let PathArguments::AngleBracketed(args) = &mut segment.arguments {
+                    if args.colon2_token.is_none() {
+                        args.colon2_token = Some(Token![::](Span::call_site()));
+                    }
+                }
+            }
+        }
+        syn::visit_mut::visit_type_mut(&mut Visitor, &mut formal);
+        quote! {
+            /// Synchronously execute this action.
+            pub fn run(self) -> Result<#sync_type> {
+                crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self)).map(#formal::new)
+            }
+        }
+    } else {
+        quote! {
+            /// Synchronously execute this action.
+            pub fn run(self) -> #exec_output {
+                crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self))
+            }
+        }
+    };
 
     quote! {
         impl #generics crate::action::private::Sealed for #action { }
@@ -85,11 +111,7 @@ pub fn action_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         #[cfg(feature = "sync")]
         impl #generics #action {
-            /// Synchronously execute this action.
-            pub fn run(self) -> #sync_output {
-                let #sync_arg_mut #sync_arg = crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self));
-                #sync_body
-            }
+            #sync_run
         }
     }.into()
 }
@@ -107,7 +129,6 @@ struct ActionImpl {
     exec_self_mut: Option<Token![mut]>,
     exec_output: Type,
     exec_body: Block,
-    sync_wrap: Option<SyncWrap>,
 }
 
 impl Parse for ActionImpl {
@@ -155,13 +176,6 @@ impl Parse for ActionImpl {
         let exec_output = impl_body.parse()?;
         let exec_body = impl_body.parse()?;
 
-        // Optional SyncWrap.
-        let sync_wrap = if impl_body.peek(Token![fn]) {
-            Some(impl_body.parse()?)
-        } else {
-            None
-        };
-
         if !impl_body.is_empty() {
             return Err(exec_args.error("unexpected token"));
         }
@@ -174,40 +188,25 @@ impl Parse for ActionImpl {
             exec_self_mut,
             exec_output,
             exec_body,
-            sync_wrap,
         })
     }
 }
 
-// fn sync_wrap([mut] out) -> OutType { <out body> }
-struct SyncWrap {
-    sync_arg_mut: Option<Token![mut]>,
-    sync_arg: Ident,
-    sync_output: Type,
-    sync_body: Block,
+struct ActionImplAttrs {
+    sync_type: Option<Type>,
 }
 
-impl Parse for SyncWrap {
+impl Parse for ActionImplAttrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        input.parse::<Token![fn]>()?;
-        parse_name(input, "sync_wrap")?;
-        let args_input;
-        parenthesized!(args_input in input);
-        let sync_arg_mut = args_input.parse()?;
-        let sync_arg = args_input.parse()?;
-        if !args_input.is_empty() {
-            return Err(args_input.error("unexpected token"));
+        let mut out = Self { sync_type: None };
+        if input.is_empty() {
+            return Ok(out);
         }
-        input.parse::<Token![->]>()?;
-        let sync_output = input.parse()?;
-        let sync_body = input.parse()?;
 
-        Ok(SyncWrap {
-            sync_arg_mut,
-            sync_arg,
-            sync_output,
-            sync_body,
-        })
+        parse_name(input, "sync")?;
+        input.parse::<Token![=]>()?;
+        out.sync_type = Some(input.parse()?);
+        Ok(out)
     }
 }
 

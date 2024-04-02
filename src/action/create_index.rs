@@ -102,33 +102,31 @@ impl<'a, M> CreateIndex<'a, M> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for CreateIndex<'a, Single> {
-        type Future = CreateIndexFuture;
+#[action_impl]
+impl<'a> Action for CreateIndex<'a, Single> {
+    type Future = CreateIndexFuture;
 
-        async fn execute(self) -> Result<CreateIndexResult> {
-            let inner: CreateIndex<'a, Multiple> = CreateIndex {
-                coll: self.coll,
-                indexes: self.indexes,
-                options: self.options,
-                session: self.session,
-                _mode: PhantomData,
-            };
-            let response = inner.await?;
-            Ok(response.into_create_index_result())
-        }
+    async fn execute(self) -> Result<CreateIndexResult> {
+        let inner: CreateIndex<'a, Multiple> = CreateIndex {
+            coll: self.coll,
+            indexes: self.indexes,
+            options: self.options,
+            session: self.session,
+            _mode: PhantomData,
+        };
+        let response = inner.await?;
+        Ok(response.into_create_index_result())
     }
 }
 
-action_impl! {
-    impl<'a> Action for CreateIndex<'a, Multiple> {
-        type Future = CreateIndexesFuture;
+#[action_impl]
+impl<'a> Action for CreateIndex<'a, Multiple> {
+    type Future = CreateIndexesFuture;
 
-        async fn execute(mut self) -> Result<CreateIndexesResult> {
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<CreateIndexesResult> {
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            let op = Op::new(self.coll.namespace(), self.indexes, self.options);
-            self.coll.client().execute_operation(op, self.session).await
-        }
+        let op = Op::new(self.coll.namespace(), self.indexes, self.options);
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

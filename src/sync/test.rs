@@ -252,7 +252,7 @@ fn transactions() {
                     if error.contains_label(TRANSIENT_TRANSACTION_ERROR) {
                         continue;
                     } else {
-                        session.abort_transaction()?;
+                        session.abort_transaction().run()?;
                         return Err(error);
                     }
                 }
@@ -275,7 +275,8 @@ fn transactions() {
         .expect("create collection should succeed");
 
     session
-        .start_transaction(None)
+        .start_transaction()
+        .run()
         .expect("start transaction should succeed");
 
     run_transaction_with_retry(&mut session, |s| {
@@ -285,7 +286,7 @@ fn transactions() {
     .unwrap();
 
     loop {
-        match session.commit_transaction() {
+        match session.commit_transaction().run() {
             Ok(()) => {
                 break;
             }
@@ -300,7 +301,8 @@ fn transactions() {
     }
 
     session
-        .start_transaction(None)
+        .start_transaction()
+        .run()
         .expect("start transaction should succeed");
     run_transaction_with_retry(&mut session, |s| {
         coll.insert_one(doc! { "x": 1 }).session(s).run()?;
@@ -309,6 +311,7 @@ fn transactions() {
     .unwrap();
     session
         .abort_transaction()
+        .run()
         .expect("abort transaction should succeed");
 }
 

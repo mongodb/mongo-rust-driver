@@ -74,21 +74,20 @@ impl<'a> Distinct<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for Distinct<'a> {
-        type Future = DistinctFuture;
+#[action_impl]
+impl<'a> Action for Distinct<'a> {
+    type Future = DistinctFuture;
 
-        async fn execute(mut self) -> Result<Vec<Bson>> {
-            resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-            resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<Vec<Bson>> {
+        resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+        resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            let op = Op::new(
-                self.coll.namespace(),
-                self.field_name,
-                self.filter,
-                self.options,
-            );
-            self.coll.client().execute_operation(op, self.session).await
-        }
+        let op = Op::new(
+            self.coll.namespace(),
+            self.field_name,
+            self.filter,
+            self.options,
+        );
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

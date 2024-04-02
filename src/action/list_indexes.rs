@@ -113,74 +113,65 @@ impl<'a, Mode> ListIndexes<'a, Mode, ImplicitSession> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListIndexes<'a, ListSpecifications, ImplicitSession> {
-        type Future = ListIndexesFuture;
+#[action_impl(sync = crate::sync::Cursor<IndexModel>)]
+impl<'a> Action for ListIndexes<'a, ListSpecifications, ImplicitSession> {
+    type Future = ListIndexesFuture;
 
-        async fn execute(self) -> Result<Cursor<IndexModel>> {
-            let op = Op::new(self.coll.namespace(), self.options);
-            self.coll.client().execute_cursor_operation(op).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<IndexModel>> {
-            out.map(crate::sync::Cursor::new)
-        }
+    async fn execute(self) -> Result<Cursor<IndexModel>> {
+        let op = Op::new(self.coll.namespace(), self.options);
+        self.coll.client().execute_cursor_operation(op).await
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListIndexes<'a, ListSpecifications, ExplicitSession<'a>> {
-        type Future = ListIndexesSessionFuture;
+#[action_impl(sync = crate::sync::SessionCursor<IndexModel>)]
+impl<'a> Action for ListIndexes<'a, ListSpecifications, ExplicitSession<'a>> {
+    type Future = ListIndexesSessionFuture;
 
-        async fn execute(self) -> Result<SessionCursor<IndexModel>> {
-            let op = Op::new(self.coll.namespace(), self.options);
-            self.coll.client().execute_session_cursor_operation(op, self.session.0).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::SessionCursor<IndexModel>> {
-            out.map(crate::sync::SessionCursor::new)
-        }
+    async fn execute(self) -> Result<SessionCursor<IndexModel>> {
+        let op = Op::new(self.coll.namespace(), self.options);
+        self.coll
+            .client()
+            .execute_session_cursor_operation(op, self.session.0)
+            .await
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListIndexes<'a, ListNames, ImplicitSession> {
-        type Future = ListIndexNamesFuture;
+#[action_impl]
+impl<'a> Action for ListIndexes<'a, ListNames, ImplicitSession> {
+    type Future = ListIndexNamesFuture;
 
-        async fn execute(self) -> Result<Vec<String>> {
-            let inner = ListIndexes {
-                coll: self.coll,
-                options: self.options,
-                session: self.session,
-                _mode: PhantomData::<ListSpecifications>,
-            };
-            let cursor = inner.await?;
-            cursor
-                .try_filter_map(|index| futures_util::future::ok(index.get_name()))
-                .try_collect()
-                .await
-        }
+    async fn execute(self) -> Result<Vec<String>> {
+        let inner = ListIndexes {
+            coll: self.coll,
+            options: self.options,
+            session: self.session,
+            _mode: PhantomData::<ListSpecifications>,
+        };
+        let cursor = inner.await?;
+        cursor
+            .try_filter_map(|index| futures_util::future::ok(index.get_name()))
+            .try_collect()
+            .await
     }
 }
 
-action_impl! {
-    impl<'a> Action for ListIndexes<'a, ListNames, ExplicitSession<'a>> {
-        type Future = ListIndexNamesSessionFuture;
+#[action_impl]
+impl<'a> Action for ListIndexes<'a, ListNames, ExplicitSession<'a>> {
+    type Future = ListIndexNamesSessionFuture;
 
-        async fn execute(self) -> Result<Vec<String>> {
-            let session = self.session.0;
-            let inner = ListIndexes {
-                coll: self.coll,
-                options: self.options,
-                session: ExplicitSession(&mut *session),
-                _mode: PhantomData::<ListSpecifications>,
-            };
-            let mut cursor = inner.await?;
-            let stream = cursor.stream(session);
-            stream
-                .try_filter_map(|index| futures_util::future::ok(index.get_name()))
-                .try_collect()
-                .await
-        }
+    async fn execute(self) -> Result<Vec<String>> {
+        let session = self.session.0;
+        let inner = ListIndexes {
+            coll: self.coll,
+            options: self.options,
+            session: ExplicitSession(&mut *session),
+            _mode: PhantomData::<ListSpecifications>,
+        };
+        let mut cursor = inner.await?;
+        let stream = cursor.stream(session);
+        stream
+            .try_filter_map(|index| futures_util::future::ok(index.get_name()))
+            .try_collect()
+            .await
     }
 }
