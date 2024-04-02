@@ -46,7 +46,6 @@ impl ClientSession {
 
     /// Commits the transaction that is currently active on this session.
     ///
-    ///
     /// This method may return an error with a [`crate::error::UNKNOWN_TRANSACTION_COMMIT_RESULT`]
     /// label. This label indicates that it is unknown whether the commit has satisfied the write
     /// concern associated with the transaction. If an error with this label is returned, it is
