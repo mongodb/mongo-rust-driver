@@ -4,8 +4,9 @@ use crate::{
 };
 
 impl ClientOptions {
-    /// Parses a MongoDB connection string into a [`ClientOptions`] struct. If the string is
-    /// malformed or one of the options has an invalid value, an error will be returned.
+    /// Parses a MongoDB connection string (as either a `&str` or a [`ConnectionString`]) into a
+    /// [`ClientOptions`] struct. If the string is malformed or one of the options has an
+    /// invalid value, an error will be returned.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
     /// part of this method.
@@ -57,7 +58,8 @@ impl ClientOptions {
     ///   * `waitQueueTimeoutMS`: unsupported, does not map to any field
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: maps to the `level` field of the `Compressor::Zlib` variant
-    ///     (which requires the `zlib-compression` feature flag) of the [`Compressor`] enum
+    ///     (which requires the `zlib-compression` feature flag) of the
+    ///     [`Compressor`](crate::compression::compressors::Compressor) enum
     ///
     /// `await` will return `Result<ClientOptions>`.
     pub fn parse<C, E>(conn_str: C) -> ParseConnectionString
@@ -76,7 +78,7 @@ fn _assert_accept_str() {
     let _ = ClientOptions::parse("foo");
 }
 
-#[allow(unreachable_code)]
+#[allow(unreachable_code, clippy::diverging_sub_expression)]
 fn _assert_accept_conn_str() {
     let _c: ConnectionString = todo!();
     let _ = ClientOptions::parse(_c);
