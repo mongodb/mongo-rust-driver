@@ -151,12 +151,16 @@
               "0": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "1": {
                 "matchedCount": 2,
                 "modifiedCount": 2,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               }
             },
             "deleteResults": {}
@@ -369,17 +373,23 @@
               "0": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "1": {
                 "matchedCount": 2,
                 "modifiedCount": 2,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "2": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               }
             },
             "deleteResults": {}
@@ -603,17 +613,23 @@
               "0": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "1": {
                 "matchedCount": 2,
                 "modifiedCount": 2,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "2": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               }
             },
             "deleteResults": {}

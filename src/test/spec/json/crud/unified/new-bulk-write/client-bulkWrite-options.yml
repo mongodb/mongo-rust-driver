@@ -150,7 +150,7 @@ tests:
             0:
               matchedCount: 1
               modifiedCount: 1
-              upsertedId: null
+              upsertedId: { $$exists: false }
           deleteResults:
             1:
               deletedCount: 1

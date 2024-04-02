@@ -177,12 +177,16 @@
               "2": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "5": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               }
             },
             "deleteResults": {

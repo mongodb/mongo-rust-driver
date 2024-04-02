@@ -16,6 +16,7 @@ use bson::{Binary, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 pub use bulk_write::*;
+use serde_with::skip_serializing_none;
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
@@ -55,6 +56,7 @@ impl InsertManyResult {
 
 /// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
