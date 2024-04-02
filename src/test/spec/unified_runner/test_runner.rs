@@ -450,17 +450,14 @@ impl TestRunner {
                         client.uri_options.as_ref(),
                         client.use_multiple_mongoses(),
                     );
-                    let mut options =
-                        ClientOptions::parse_uri(&uri, None)
-                            .await
-                            .unwrap_or_else(|e| {
-                                panic!(
-                                    "[{}] invalid client URI: {}, error: {}",
-                                    description.as_ref(),
-                                    uri,
-                                    e
-                                )
-                            });
+                    let mut options = ClientOptions::parse(&uri).await.unwrap_or_else(|e| {
+                        panic!(
+                            "[{}] invalid client URI: {}, error: {}",
+                            description.as_ref(),
+                            uri,
+                            e
+                        )
+                    });
                     update_options_for_testing(&mut options);
 
                     options.server_api = server_api;

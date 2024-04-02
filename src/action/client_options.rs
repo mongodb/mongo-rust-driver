@@ -60,7 +60,7 @@ impl ClientOptions {
     ///     (which requires the `zlib-compression` feature flag) of the [`Compressor`] enum
     ///
     /// `await` will return `Result<ClientOptions>`.
-    pub fn parse_2<C, E>(conn_str: C) -> ParseConnectionString
+    pub fn parse<C, E>(conn_str: C) -> ParseConnectionString
     where
         C: TryInto<ConnectionString, Error = E>,
         E: Into<Error>,
@@ -73,13 +73,13 @@ impl ClientOptions {
 }
 
 fn _assert_accept_str() {
-    let _ = ClientOptions::parse_2("foo");
+    let _ = ClientOptions::parse("foo");
 }
 
 #[allow(unreachable_code)]
 fn _assert_accept_conn_str() {
     let _c: ConnectionString = todo!();
-    let _ = ClientOptions::parse_2(_c);
+    let _ = ClientOptions::parse(_c);
 }
 
 /// Parses a MongoDB connection string into a [`ClientOptions`] struct.  Construct with

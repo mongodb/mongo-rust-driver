@@ -45,7 +45,9 @@ static CLIENT_OPTIONS: Lazy<ClientOptions> = Lazy::new(|| {
 
 #[test]
 fn client_options() {
-    let mut options = ClientOptions::parse_sync("mongodb://localhost:27017/").unwrap();
+    let mut options = ClientOptions::parse("mongodb://localhost:27017/")
+        .run()
+        .unwrap();
 
     options.original_uri.take();
 

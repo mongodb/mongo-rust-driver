@@ -140,7 +140,7 @@ impl Client {
     /// See the documentation on
     /// [`ClientOptions::parse`](options/struct.ClientOptions.html#method.parse) for more details.
     pub async fn with_uri_str(uri: impl AsRef<str>) -> Result<Self> {
-        let options = ClientOptions::parse_uri(uri.as_ref(), None).await?;
+        let options = ClientOptions::parse(uri.as_ref()).await?;
 
         Client::with_options(options)
     }

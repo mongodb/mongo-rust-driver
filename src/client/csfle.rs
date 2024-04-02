@@ -60,7 +60,7 @@ impl ClientState {
             let uri = opts
                 .extra_option(&EO_MONGOCRYPTD_URI)?
                 .unwrap_or(Self::MONGOCRYPTD_DEFAULT_URI);
-            let mut options = crate::options::ClientOptions::parse_uri(uri, None).await?;
+            let mut options = crate::options::ClientOptions::parse(uri).await?;
             options.server_selection_timeout = Some(Self::MONGOCRYPTD_SERVER_SELECTION_TIMEOUT);
             Some(Client::with_options(options)?)
         } else {

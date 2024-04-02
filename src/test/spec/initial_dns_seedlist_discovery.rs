@@ -90,7 +90,8 @@ async fn run_test(mut test_file: TestFile) {
     }
 
     let result = if cfg!(target_os = "windows") {
-        ClientOptions::parse_with_resolver_config(&test_file.uri, ResolverConfig::cloudflare())
+        ClientOptions::parse(&test_file.uri)
+            .resolver_config(ResolverConfig::cloudflare())
             .await
     } else {
         ClientOptions::parse(&test_file.uri).await
