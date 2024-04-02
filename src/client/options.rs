@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+mod parse;
 mod resolver_config;
 
 use std::{
@@ -1306,72 +1307,6 @@ impl ClientOptions {
         ))
     }
 
-    fn from_connection_string(conn_str: ConnectionString) -> Self {
-        let mut credential = conn_str.credential;
-        // Populate default auth source, if needed.
-        let db = &conn_str.default_database;
-        if let Some(credential) = credential.as_mut() {
-            if credential.source.is_none() {
-                credential.source = match &credential.mechanism {
-                    Some(mechanism) => Some(mechanism.default_source(db.as_deref()).into()),
-                    None => {
-                        // If credentials exist (i.e. username is specified) but no mechanism, the
-                        // default source is chosen from the following list in
-                        // order (skipping null ones): authSource option, connection string db,
-                        // SCRAM default (i.e. "admin").
-                        db.clone().or_else(|| Some("admin".into()))
-                    }
-                };
-            }
-        }
-
-        Self {
-            hosts: vec![],
-            app_name: conn_str.app_name,
-            tls: conn_str.tls,
-            heartbeat_freq: conn_str.heartbeat_frequency,
-            local_threshold: conn_str.local_threshold,
-            read_concern: conn_str.read_concern,
-            selection_criteria: conn_str.read_preference.map(Into::into),
-            repl_set_name: conn_str.replica_set,
-            write_concern: conn_str.write_concern,
-            max_pool_size: conn_str.max_pool_size,
-            min_pool_size: conn_str.min_pool_size,
-            max_idle_time: conn_str.max_idle_time,
-            max_connecting: conn_str.max_connecting,
-            server_selection_timeout: conn_str.server_selection_timeout,
-            #[cfg(any(
-                feature = "zstd-compression",
-                feature = "zlib-compression",
-                feature = "snappy-compression"
-            ))]
-            compressors: conn_str.compressors,
-            connect_timeout: conn_str.connect_timeout,
-            retry_reads: conn_str.retry_reads,
-            retry_writes: conn_str.retry_writes,
-            server_monitoring_mode: conn_str.server_monitoring_mode,
-            socket_timeout: conn_str.socket_timeout,
-            direct_connection: conn_str.direct_connection,
-            default_database: conn_str.default_database,
-            driver_info: None,
-            credential,
-            cmap_event_handler: None,
-            command_event_handler: None,
-            original_srv_info: None,
-            #[cfg(test)]
-            original_uri: Some(conn_str.original_uri),
-            resolver_config: None,
-            server_api: None,
-            load_balanced: conn_str.load_balanced,
-            sdam_event_handler: None,
-            #[cfg(test)]
-            test_options: None,
-            #[cfg(feature = "tracing-unstable")]
-            tracing_max_document_length_bytes: None,
-            srv_max_hosts: conn_str.srv_max_hosts,
-        }
-    }
-
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
         match self.tls {
             Some(Tls::Enabled(ref opts)) => Some(opts.clone()),
@@ -1594,6 +1529,14 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+impl TryFrom<&str> for ConnectionString {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        Self::parse(value)
+    }
 }
 
 impl ConnectionString {

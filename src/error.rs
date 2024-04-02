@@ -559,6 +559,12 @@ impl From<mongocrypt::error::Error> for ErrorKind {
     }
 }
 
+impl From<std::convert::Infallible> for ErrorKind {
+    fn from(_err: std::convert::Infallible) -> Self {
+        unreachable!()
+    }
+}
+
 /// The types of errors that can occur.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Error)]
