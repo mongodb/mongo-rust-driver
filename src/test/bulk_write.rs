@@ -1,7 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
+use rand::{
+    distributions::{Alphanumeric, DistString},
+    thread_rng,
+};
+
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
+    error::ErrorKind,
     options::WriteModel,
     test::{log_uncaptured, spec::unified_runner::run_unified_tests, EventHandler},
     Client,
@@ -130,4 +136,53 @@ async fn max_message_size_bytes_batching() {
     let second_ops_len = second_started.command.get_array("ops").unwrap().len();
 
     assert_eq!(first_ops_len + second_ops_len, num_models);
+}
+
+#[tokio::test]
+async fn cursor_iteration() {
+    let handler = Arc::new(EventHandler::new());
+    let client = Client::test_builder()
+        .event_handler(handler.clone())
+        .build()
+        .await;
+    let mut subscriber = handler.subscribe();
+
+    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+    // 8.0+ servers always report this value
+    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
+    let id_size = max_bson_object_size / max_write_batch_size;
+
+    let document = doc! { "_id": Alphanumeric.sample_string(&mut thread_rng(), id_size) };
+    client
+        .database("bulk")
+        .collection::<Document>("write")
+        .insert_one(&document, None)
+        .await
+        .unwrap();
+
+    let models = vec![
+        WriteModel::InsertOne {
+            namespace: Namespace::new("bulk", "write"),
+            document
+        };
+        max_write_batch_size
+    ];
+    let error = client.bulk_write(models).ordered(false).await.unwrap_err();
+
+    assert!(error.source.is_none());
+
+    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
+        panic!("Expected bulk write error, got {:?}", error);
+    };
+
+    assert!(bulk_write_error.write_concern_errors.is_empty());
+    // assert!(bulk_write_error.partial_result.is_none());
+
+    let write_errors = bulk_write_error.write_errors;
+    assert_eq!(write_errors.len(), max_write_batch_size);
+
+    subscriber
+        .wait_for_successful_command_execution(Duration::from_millis(500), "getMore")
+        .await
+        .expect("no getMore observed");
 }
