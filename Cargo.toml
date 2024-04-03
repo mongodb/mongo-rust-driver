@@ -27,7 +27,8 @@ exclude = [
 ]
 
 [features]
-default = []
+default = ["compat-3-0-0"]
+compat-3-0-0 = []
 sync = []
 openssl-tls = ["openssl", "openssl-probe", "tokio-openssl"]
 
