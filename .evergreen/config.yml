@@ -608,7 +608,7 @@ task_groups:
             ${PREPARE_SHELL}
             ${DRIVERS_TOOLS}/.evergreen/auth_oidc/setup.sh
     teardown_task:
-      - command: subprocess.exec
+      - command: shell.exec
         params:
           shell: bash
           script: |
