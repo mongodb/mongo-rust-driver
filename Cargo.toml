@@ -27,35 +27,36 @@ exclude = [
 ]
 
 [features]
-default = ["compat-3-0-0"]
+default = ["compat-3-0-0", "rustls-tls"]
 compat-3-0-0 = []
 sync = []
-openssl-tls = ["openssl", "openssl-probe", "tokio-openssl"]
+rustls-tls = ["dep:rustls", "dep:rustls-pemfile", "dep:tokio-rustls"]
+openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
-aws-auth = ["reqwest"]
+aws-auth = ["dep:reqwest"]
 
 # Enable support for on-demand Azure KMS credentials.
 # This can only be used with the tokio-runtime feature flag.
-azure-kms = ["reqwest"]
+azure-kms = ["dep:reqwest"]
 
 # Enable support for on-demand GCP KMS credentials.
 # This can only be used with the tokio-runtime feature flag.
-gcp-kms = ["reqwest"]
+gcp-kms = ["dep:reqwest"]
 
-zstd-compression = ["zstd"]
-zlib-compression = ["flate2"]
-snappy-compression = ["snap"]
+zstd-compression = ["dep:zstd"]
+zlib-compression = ["dep:flate2"]
+snappy-compression = ["dep:snap"]
 
 # Enables support for client-side field level encryption and queryable encryption.
 # The In Use Encryption API is unstable and may have backwards-incompatible changes in minor version updates.
-in-use-encryption-unstable = ["mongocrypt", "rayon", "num_cpus"]
+in-use-encryption-unstable = ["dep:mongocrypt", "dep:rayon", "dep:num_cpus"]
 
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
-tracing-unstable = ["tracing", "log"]
+tracing-unstable = ["dep:tracing", "dep:log"]
 
 [dependencies]
 action_macro = { path = "action_macro" }
@@ -84,7 +85,7 @@ percent-encoding = "2.0.0"
 rand = { version = "0.8.3", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
 rustc_version_runtime = "0.2.1"
-rustls-pemfile = "1.0.1"
+rustls-pemfile = { version = "1.0.1", optional = true }
 serde_with = "1.3.1"
 sha-1 = "0.10.0"
 sha2 = "0.10.2"
@@ -114,6 +115,7 @@ features = ["json", "rustls-tls"]
 
 [dependencies.rustls]
 version = "0.21.6"
+optional = true
 features = ["dangerous_configuration"]
 
 [dependencies.serde]
@@ -129,6 +131,7 @@ features = ["io-util", "sync", "macros", "net", "process", "rt", "time"]
 
 [dependencies.tokio-rustls]
 version = "0.24.1"
+optional = true
 features = ["dangerous_configuration"]
 
 [dependencies.tokio-util]

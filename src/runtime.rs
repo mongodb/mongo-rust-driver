@@ -9,6 +9,7 @@ pub(crate) mod stream;
 mod sync_read_ext;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
+#[cfg(feature = "rustls-tls")]
 #[cfg_attr(feature = "openssl-tls", allow(unused))]
 mod tls_rustls;
 mod worker_handle;
@@ -28,8 +29,10 @@ use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;
 #[cfg(feature = "openssl-tls")]
 use tls_openssl as tls;
-#[cfg(not(feature = "openssl-tls"))]
+#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
 use tls_rustls as tls;
+#[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
+compile_error!("At least one of the features 'rustls-tls' or 'openssl-tls' must be enabled.");
 
 pub(crate) use tls::TlsConfig;
 
