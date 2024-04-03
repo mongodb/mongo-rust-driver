@@ -145,6 +145,7 @@ async fn _using_the_sync_api() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "dns-resolver")]
 async fn _windows_dns_note() -> Result<()> {
     use mongodb::{
         options::{ClientOptions, ResolverConfig},

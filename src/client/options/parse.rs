@@ -19,7 +19,10 @@ impl Action for ParseConnectionString {
             .is_some();
         let host_info = std::mem::take(&mut conn_str.host_info);
         let mut options = ClientOptions::from_connection_string(conn_str);
-        options.resolver_config = self.resolver_config.clone();
+        #[cfg(feature = "dns-resolver")]
+        {
+            options.resolver_config = self.resolver_config.clone();
+        }
 
         let resolved = host_info.resolve(self.resolver_config).await?;
         options.hosts = match resolved {
@@ -146,6 +149,7 @@ impl ClientOptions {
             original_srv_info: None,
             #[cfg(test)]
             original_uri: Some(conn_str.original_uri),
+            #[cfg(feature = "dns-resolver")]
             resolver_config: None,
             server_api: None,
             load_balanced: conn_str.load_balanced,

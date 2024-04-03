@@ -1,9 +1,10 @@
 mod acknowledged_message;
-#[cfg(feature = "reqwest")]
+#[cfg(any(feature = "aws-auth", feature = "azure-kms", feature = "gcp-kms"))]
 mod http;
 mod join_handle;
 #[cfg(any(feature = "in-use-encryption-unstable", test))]
 pub(crate) mod process;
+#[cfg(feature = "dns-resolver")]
 mod resolver;
 pub(crate) mod stream;
 mod sync_read_ext;
@@ -16,16 +17,17 @@ mod worker_handle;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
+#[cfg(feature = "dns-resolver")]
+pub(crate) use self::resolver::AsyncResolver;
 pub(crate) use self::{
     acknowledged_message::{AcknowledgedMessage, AcknowledgmentReceiver, AcknowledgmentSender},
     join_handle::AsyncJoinHandle,
-    resolver::AsyncResolver,
     stream::AsyncStream,
     sync_read_ext::SyncLittleEndianRead,
     worker_handle::{WorkerHandle, WorkerHandleListener},
 };
 use crate::{error::Result, options::ServerAddress};
-#[cfg(feature = "reqwest")]
+#[cfg(any(feature = "aws-auth", feature = "azure-kms", feature = "gcp-kms"))]
 pub(crate) use http::HttpClient;
 #[cfg(feature = "openssl-tls")]
 use tls_openssl as tls;

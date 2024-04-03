@@ -5,7 +5,6 @@ mod parse;
 mod resolver_config;
 
 use std::{
-    borrow::Cow,
     cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
@@ -45,7 +44,10 @@ use crate::{
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
+#[cfg(feature = "dns-resolver")]
 pub use resolver_config::ResolverConfig;
+#[cfg(not(feature = "dns-resolver"))]
+pub(crate) use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
@@ -253,14 +255,16 @@ impl ServerAddress {
         })
     }
 
-    pub(crate) fn host(&self) -> Cow<'_, str> {
+    #[cfg(feature = "dns-resolver")]
+    pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
-            Self::Tcp { host, .. } => Cow::Borrowed(host.as_str()),
+            Self::Tcp { host, .. } => std::borrow::Cow::Borrowed(host.as_str()),
             #[cfg(unix)]
             Self::Unix { path } => path.to_string_lossy(),
         }
     }
 
+    #[cfg(feature = "dns-resolver")]
     pub(crate) fn port(&self) -> Option<u16> {
         match self {
             Self::Tcp { port, .. } => *port,
@@ -597,6 +601,7 @@ pub struct ClientOptions {
     #[builder(default, setter(skip))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
+    #[cfg(feature = "dns-resolver")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
     /// Control test behavior of the client.
@@ -932,8 +937,7 @@ impl HostInfo {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver =
-                    SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
+                let mut resolver = SrvResolver::new(resolver_config.clone()).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1264,6 +1268,17 @@ impl ClientOptions {
             MIN_HEARTBEAT_FREQUENCY
         }
     }
+
+    pub(crate) fn resolver_config(&self) -> Option<&ResolverConfig> {
+        #[cfg(feature = "dns-resolver")]
+        {
+            self.resolver_config.as_ref()
+        }
+        #[cfg(not(feature = "dns-resolver"))]
+        {
+            None
+        }
+    }
 }
 
 /// Splits a string into a section before a given index and a section exclusively after the index.
@@ -1359,6 +1374,13 @@ impl ConnectionString {
                 .into())
             }
         };
+        #[cfg(not(feature = "dns-resolver"))]
+        if srv {
+            return Err(Error::invalid_argument(
+                "mongodb+srv connection strings cannot be used when the 'dns-resolver' feature is \
+                 disabled",
+            ));
+        }
 
         let after_scheme = &s[end_of_scheme + 3..];
 

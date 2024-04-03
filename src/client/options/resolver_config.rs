@@ -1,3 +1,4 @@
+#[cfg(feature = "dns-resolver")]
 use trust_dns_resolver::config::ResolverConfig as TrustDnsResolverConfig;
 
 /// Configuration for the upstream nameservers to use for resolution.
@@ -6,9 +7,11 @@ use trust_dns_resolver::config::ResolverConfig as TrustDnsResolverConfig;
 /// API stability.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResolverConfig {
+    #[cfg(feature = "dns-resolver")]
     pub(crate) inner: TrustDnsResolverConfig,
 }
 
+#[cfg(feature = "dns-resolver")]
 impl ResolverConfig {
     /// Creates a default configuration, using 1.1.1.1, 1.0.0.1 and 2606:4700:4700::1111,
     /// 2606:4700:4700::1001 (thank you, Cloudflare).

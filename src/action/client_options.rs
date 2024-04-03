@@ -95,6 +95,7 @@ pub struct ParseConnectionString {
 impl ParseConnectionString {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
+    #[cfg(feature = "dns-resolver")]
     pub fn resolver_config(mut self, value: ResolverConfig) -> Self {
         self.resolver_config = Some(value);
         self

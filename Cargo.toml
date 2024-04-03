@@ -27,11 +27,12 @@ exclude = [
 ]
 
 [features]
-default = ["compat-3-0-0", "rustls-tls"]
+default = ["compat-3-0-0", "rustls-tls", "dns-resolver"]
 compat-3-0-0 = []
 sync = []
 rustls-tls = ["dep:rustls", "dep:rustls-pemfile", "dep:tokio-rustls"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
+dns-resolver = ["dep:trust-dns-resolver", "dep:trust-dns-proto"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
@@ -97,8 +98,8 @@ take_mut = "0.2.2"
 thiserror = "1.0.24"
 tokio-openssl = { version = "0.6.3", optional = true }
 tracing = { version = "0.1.36", optional = true }
-trust-dns-proto = "0.21.2"
-trust-dns-resolver = "0.21.2"
+trust-dns-proto = { version = "0.21.2", optional = true }
+trust-dns-resolver = { version = "0.21.2", optional = true }
 typed-builder = "0.10.0"
 webpki-roots = "0.25.2"
 zstd = { version = "0.11.2", optional = true }

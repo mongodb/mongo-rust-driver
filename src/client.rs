@@ -478,7 +478,7 @@ impl Client {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "dns-resolver"))]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
         let watcher = self.inner.topology.watch();
         let state = watcher.peek_latest();
