@@ -21,7 +21,9 @@ async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
     let uri_string = uri.to_string_lossy();
     let options = match resolver_config {
         Some(resolver_config) => {
-            ClientOptions::parse_with_resolver_config(uri_string.as_ref(), resolver_config).await
+            ClientOptions::parse(uri_string.as_ref())
+                .resolver_config(resolver_config)
+                .await
         }
         None => ClientOptions::parse(uri_string.as_ref()).await,
     }

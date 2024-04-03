@@ -194,7 +194,7 @@ impl TestContext {
 
         // Construct the test client
         let mut additional_options = match &test.client_options {
-            Some(opts) => ClientOptions::parse_uri(&opts.uri, None).await.unwrap(),
+            Some(opts) => ClientOptions::parse(&opts.uri).await.unwrap(),
             None => ClientOptions::builder()
                 .hosts(get_client_options().await.hosts.clone())
                 .build(),

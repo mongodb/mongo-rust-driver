@@ -1,6 +1,7 @@
 //! Action builder types.
 
 mod aggregate;
+mod client_options;
 mod count;
 mod create_collection;
 mod create_index;
@@ -32,6 +33,7 @@ use std::{future::IntoFuture, marker::PhantomData, ops::Deref};
 
 pub use aggregate::Aggregate;
 use bson::Document;
+pub use client_options::ParseConnectionString;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;
 pub use create_index::CreateIndex;

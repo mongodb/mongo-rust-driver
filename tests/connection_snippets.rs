@@ -61,9 +61,10 @@ mod sync_scram {
     use mongodb::{options::ClientOptions, sync::Client};
 
     fn main() -> mongodb::error::Result<()> {
-        let client_options = ClientOptions::parse_sync(
+        let client_options = ClientOptions::parse(
             "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority",
-        )?;
+        )
+        .run()?;
         let client = Client::with_options(client_options)?;
         let database = client.database("test");
         // do something with database
@@ -84,7 +85,7 @@ mod sync_x509 {
 
     fn main() -> mongodb::error::Result<()> {
         let mut client_options =
-            ClientOptions::parse_sync("mongodb+srv://<cluster-url>/<dbname>?w=majority")?;
+            ClientOptions::parse("mongodb+srv://<cluster-url>/<dbname>?w=majority").run()?;
         client_options.credential = Some(
             Credential::builder()
                 .mechanism(AuthMechanism::MongoDbX509)

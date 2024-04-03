@@ -271,7 +271,7 @@ async fn run_test(test_file: TestFile) {
 
     log_uncaptured(format!("Executing {}", test_description));
 
-    let mut options = ClientOptions::parse_uri(&test_file.uri, None)
+    let mut options = ClientOptions::parse(&test_file.uri)
         .await
         .expect(test_description);
 

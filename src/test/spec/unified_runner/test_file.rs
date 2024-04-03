@@ -596,7 +596,7 @@ async fn merged_uri_options() {
         "readconcernlevel": "local",
     };
     let uri = merge_uri_options(&DEFAULT_URI, Some(&options), true);
-    let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
+    let options = ClientOptions::parse(&uri).await.unwrap();
 
     assert!(options.tls_options().is_some());
 
