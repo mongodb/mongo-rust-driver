@@ -1326,6 +1326,14 @@ impl TryFrom<&String> for ConnectionString {
     }
 }
 
+impl TryFrom<String> for ConnectionString {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self> {
+        Self::parse(value)
+    }
+}
+
 impl ConnectionString {
     /// Parses a MongoDB connection string into a [`ConnectionString`] struct. If the string is
     /// malformed or one of the options has an invalid value, an error will be returned.
