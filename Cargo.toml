@@ -31,18 +31,6 @@ default = []
 sync = []
 openssl-tls = ["openssl", "openssl-probe", "tokio-openssl"]
 
-# Enable support for v0.4 of the chrono crate in the public API of the BSON library.
-bson-chrono-0_4 = ["bson/chrono-0_4"]
-
-# Enable support for the serde_with crate in the BSON library.
-bson-serde_with = ["bson/serde_with"]
-
-# Enable support for v0.8 of the uuid crate in the public API of the BSON library.
-bson-uuid-0_8 = ["bson/uuid-0_8"]
-
-# Enable support for v1.x of the uuid crate in the public API of the BSON library.
-bson-uuid-1 = ["bson/uuid-1"]
-
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
 aws-auth = ["reqwest"]
