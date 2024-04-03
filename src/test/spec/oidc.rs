@@ -42,6 +42,18 @@ macro_rules! token_dir {
     };
 }
 
+macro_rules! no_user_token_file {
+    () => {
+        std::env::var("OIDC_TOKEN_FILE").unwrap(),
+    };
+}
+
+macro_rules! explicit_user {
+    ( $user_name: literal ) => {
+        format!("{}@{}", $user_name, std::env::var("OIDC_DOMAIN").unwrap(),)
+    };
+}
+
 async fn admin_client() -> Client {
     let opts = ClientOptions::parse(mongodb_uri_admin!()).await.unwrap();
     Client::with_options(opts).unwrap()
@@ -404,7 +416,7 @@ async fn human_1_2_single_principal_explicit_username() -> anyhow::Result<()> {
 
     let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
     opts.credential = Credential::builder()
-        .username("test_user1".to_string())
+        .username(explicit_user!("test_user1"))
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::human(move |_| {
             let call_count = cb_call_count.clone();
@@ -438,7 +450,7 @@ async fn human_1_3_multiple_principal_user_1() -> anyhow::Result<()> {
 
     let mut opts = ClientOptions::parse(mongodb_uri_multi!()).await?;
     opts.credential = Credential::builder()
-        .username("test_user1".to_string())
+        .username(explicit_user!("test_user1"))
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::human(move |_| {
             let call_count = cb_call_count.clone();
@@ -472,7 +484,7 @@ async fn human_1_4_multiple_principal_user_2() -> anyhow::Result<()> {
 
     let mut opts = ClientOptions::parse(mongodb_uri_multi!()).await?;
     opts.credential = Credential::builder()
-        .username("test_user2".to_string())
+        .username(explicit_user!("test_user2"))
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::human(move |_| {
             let call_count = cb_call_count.clone();
@@ -512,7 +524,7 @@ async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
             async move {
                 *call_count.lock().await += 1;
                 Ok(oidc::IdpServerResponse {
-                    access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                    access_token: tokio::fs::read_to_string(no_user_token_file!()).await?,
                     expires: None,
                     refresh_token: None,
                 })
