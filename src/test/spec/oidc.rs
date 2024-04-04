@@ -3,7 +3,7 @@ use crate::{
         auth::{oidc, AuthMechanism, Credential},
         options::ClientOptions,
     },
-    test::{FailCommandOptions, FailPoint},
+    test::{log_uncaptured, FailCommandOptions, FailPoint},
     Client,
 };
 use bson::{doc, Document};
@@ -28,7 +28,12 @@ macro_rules! mongodb_uri_single {
 
 macro_rules! mongodb_uri_multi {
     () => {
-        std::env::var("MONGODB_URI_MULTI").unwrap()
+        if let Ok(uri) = std::env::var("MONGODB_URI_MULTI") {
+            uri
+        } else {
+            log_uncaptured("Skipping Multi IDP test, MONGODB_URI_MULTI not set");
+            return Ok(());
+        }
     };
 }
 
@@ -814,7 +819,12 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
-    use crate::test::EventHandler;
+    use crate::{
+        event::command::{
+            CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
+        },
+        test::{Event, EventHandler},
+    };
 
     let admin_client = admin_client().await;
 
@@ -867,7 +877,7 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
         .await?;
 
     assert_eq!(2, *(*call_count).lock().await);
-    for (i, e) in events
+    let events = events
         .collect_events(Duration::from_secs(1), |e| {
             if let Some(ref e) = e.as_command_event() {
                 e.command_name() == "find"
@@ -875,21 +885,55 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
                 false
             }
         })
-        .await
-        .into_iter()
-        .enumerate()
-    {
-        dbg!(i, e);
-    }
-    //        match e {
-    //            Ok(event) => {
-    //                assert_eq!("find", event.command_name);
-    //                assert_eq!(i == 1, event.command_failed);
-    //                assert_eq!(event.failure, Some("Authentication failed".to_string()));
-    //            }
-    //            Err(e) => panic!("Error receiving event: {}", e),
-    //        }
-    //    }
+        .await;
+    // assert the first command is find
+    assert!(matches!(
+        events.get(0).unwrap(),
+        Event::Command(CommandEvent::Started(CommandStartedEvent {
+            command_name,
+            ..
+        })) if command_name.as_str() == "find"
+    ));
+    // assert the first command is find and succeeded
+    assert!(matches!(
+        events.get(1).unwrap(),
+        Event::Command(CommandEvent::Succeeded(CommandSucceededEvent {
+            command_name,
+            ..
+        })) if command_name.as_str() == "find"
+    ));
+    // assert the second command is find
+    assert!(matches!(
+        events.get(2).unwrap(),
+        Event::Command(CommandEvent::Started(CommandStartedEvent {
+            command_name,
+            ..
+        })) if command_name.as_str() == "find"
+    ));
+    // assert the second command is find and failed
+    assert!(matches!(
+        events.get(3).unwrap(),
+        Event::Command(CommandEvent::Failed(CommandFailedEvent {
+            command_name,
+            ..
+        })) if command_name.as_str() == "find"
+    ));
+    // assert the third command is find
+    assert!(matches!(
+        events.get(4).unwrap(),
+        Event::Command(CommandEvent::Started(CommandStartedEvent {
+            command_name,
+            ..
+        })) if command_name.as_str() == "find"
+    ));
+    // assert the third command is find and succeeded
+    assert!(matches!(
+        events.get(5).unwrap(),
+        Event::Command(CommandEvent::Succeeded(CommandSucceededEvent {
+            command_name,
+            ..
+        })) if command_name.as_str() == "find"
+    ));
     Ok(())
 }
 
