@@ -46,6 +46,7 @@ macro_rules! mongodb_uri_multi {
 
 macro_rules! token_dir {
     ( $user_name: literal ) => {
+        // this cannot use get_env_or_skip because it is used in the callback
         format!(
             "{}/{}",
             std::env::var("OIDC_TOKEN_DIR").unwrap_or_else(|_| "/tmp/tokens".to_string()),
@@ -56,13 +57,14 @@ macro_rules! token_dir {
 
 macro_rules! no_user_token_file {
     () => {
+        // this cannot use get_env_or_skip because it is used in the callback
         std::env::var("OIDC_TOKEN_FILE").unwrap()
     };
 }
 
 macro_rules! explicit_user {
     ( $user_name: literal ) => {
-        format!("{}@{}", $user_name, std::env::var("OIDC_DOMAIN").unwrap(),)
+        format!("{}@{}", $user_name, get_env_or_skip!("OIDC_DOMAIN"),)
     };
 }
 
@@ -828,10 +830,7 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
     use crate::{
         event::command::{
-            CommandEvent,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
+            CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
         },
         test::{Event, EventHandler},
     };
