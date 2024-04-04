@@ -189,4 +189,10 @@ async fn write_concern_errors_are_collected() {
     };
 
     assert_eq!(bulk_write_error.write_concern_errors.len(), 2);
+
+    let partial_result = bulk_write_error.partial_result.unwrap();
+    assert_eq!(
+        partial_result.inserted_count as usize,
+        max_write_batch_size + 1
+    );
 }
