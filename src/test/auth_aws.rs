@@ -1,5 +1,7 @@
 use std::env::{remove_var, set_var, var};
 
+use bson::doc;
+
 use crate::{bson::Document, client::auth::aws::test_utils::*, test::DEFAULT_URI, Client};
 
 use super::TestClient;
@@ -9,7 +11,7 @@ async fn auth_aws() {
     let client = TestClient::new().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
 }
 
 // The TestClient performs operations upon creation that trigger authentication, so the credential
@@ -29,7 +31,7 @@ async fn credential_caching() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_some());
 
     let now = bson::DateTime::now();
@@ -37,7 +39,7 @@ async fn credential_caching() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_some());
     assert!(cached_expiration().await > now);
 
@@ -45,7 +47,7 @@ async fn credential_caching() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    match coll.find_one(None, None).await {
+    match coll.find_one(doc! {}).await {
         Ok(_) => panic!(
             "find one should have failed with authentication error due to poisoned cached \
              credential"
@@ -54,7 +56,7 @@ async fn credential_caching() {
     }
     assert!(cached_credential().await.is_none());
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_some());
 }
 
@@ -69,7 +71,7 @@ async fn credential_caching_environment_vars() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_some());
 
     set_var("AWS_ACCESS_KEY_ID", cached_access_key_id().await);
@@ -81,7 +83,7 @@ async fn credential_caching_environment_vars() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_none());
 
     set_var("AWS_ACCESS_KEY_ID", "bad");
@@ -90,7 +92,7 @@ async fn credential_caching_environment_vars() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    match coll.find_one(None, None).await {
+    match coll.find_one(doc! {}).await {
         Ok(_) => panic!(
             "find one should have failed with authentication error due to poisoned environment \
              variables"
@@ -105,7 +107,7 @@ async fn credential_caching_environment_vars() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_some());
 
     set_var("AWS_ACCESS_KEY_ID", "bad");
@@ -114,7 +116,7 @@ async fn credential_caching_environment_vars() {
 
     let client = get_client().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
 
     remove_var("AWS_ACCESS_KEY_ID");
     remove_var("AWS_SECRET_ACCESS_KEY");

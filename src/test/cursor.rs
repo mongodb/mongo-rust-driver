@@ -3,11 +3,13 @@ use std::time::Duration;
 use futures::{future::Either, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 
+#[allow(deprecated)]
+use crate::test::util::EventClient;
 use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
-    test::{log_uncaptured, util::EventClient, TestClient, SERVERLESS},
+    test::{log_uncaptured, TestClient, SERVERLESS},
 };
 
 #[tokio::test]
@@ -33,20 +35,16 @@ async fn tailable_cursor() {
         )
         .await;
 
-    coll.insert_many((0..5).map(|i| doc! { "_id": i }), None)
+    coll.insert_many((0..5).map(|i| doc! { "_id": i }))
         .await
         .unwrap();
 
     let await_time = Duration::from_millis(500);
 
     let mut cursor = coll
-        .find(
-            None,
-            FindOptions::builder()
-                .cursor_type(CursorType::TailableAwait)
-                .max_await_time(await_time)
-                .build(),
-        )
+        .find(doc! {})
+        .cursor_type(CursorType::TailableAwait)
+        .max_await_time(await_time)
         .await
         .unwrap();
 
@@ -70,7 +68,7 @@ async fn tailable_cursor() {
     };
 
     runtime::spawn(async move {
-        coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
+        coll.insert_one(doc! { "_id": 5 }).await.unwrap();
     });
 
     let delay = tokio::time::sleep(await_time);
@@ -93,13 +91,15 @@ async fn session_cursor_next() {
         .create_fresh_collection(function_name!(), function_name!(), None)
         .await;
 
-    coll.insert_many_with_session((0..5).map(|i| doc! { "_id": i }), None, &mut session)
+    coll.insert_many((0..5).map(|i| doc! { "_id": i }))
+        .session(&mut session)
         .await
         .unwrap();
 
-    let opts = FindOptions::builder().batch_size(1).build();
     let mut cursor = coll
-        .find_with_session(None, opts, &mut session)
+        .find(doc! {})
+        .batch_size(1)
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -113,6 +113,7 @@ async fn session_cursor_next() {
 
 #[tokio::test]
 async fn batch_exhaustion() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     let coll = client
@@ -122,34 +123,32 @@ async fn batch_exhaustion() {
             None,
         )
         .await;
-    coll.insert_many(
-        vec![
-            doc! { "foo": 1 },
-            doc! { "foo": 2 },
-            doc! { "foo": 3 },
-            doc! { "foo": 4 },
-            doc! { "foo": 5 },
-            doc! { "foo": 6 },
-        ],
-        None,
-    )
+    coll.insert_many(vec![
+        doc! { "foo": 1 },
+        doc! { "foo": 2 },
+        doc! { "foo": 3 },
+        doc! { "foo": 4 },
+        doc! { "foo": 5 },
+        doc! { "foo": 6 },
+    ])
     .await
     .unwrap();
 
     // Start a find where batch size will line up with limit.
-    let cursor = coll
-        .find(None, FindOptions::builder().batch_size(2).limit(4).build())
-        .await
-        .unwrap();
+    let cursor = coll.find(doc! {}).batch_size(2).limit(4).await.unwrap();
     let v: Vec<_> = cursor.try_collect().await.unwrap();
     assert_eq!(4, v.len());
 
     // Assert that the last `getMore` response always has id 0, i.e. is exhausted.
-    let replies: Vec<_> = client
-        .get_command_events(&["getMore"])
-        .into_iter()
-        .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
-        .collect();
+    #[allow(deprecated)]
+    let replies: Vec<_> = {
+        let mut events = client.events.clone();
+        events
+            .get_command_events(&["getMore"])
+            .into_iter()
+            .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
+            .collect()
+    };
     let last = replies.last().unwrap();
     let cursor = last.get_document("cursor").unwrap();
     let id = cursor.get_i64("id").unwrap();
@@ -158,6 +157,7 @@ async fn batch_exhaustion() {
 
 #[tokio::test]
 async fn borrowed_deserialization() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -195,14 +195,18 @@ async fn borrowed_deserialization() {
         Doc { id: 5, foo: "1" },
     ];
 
-    coll.insert_many(&docs, None).await.unwrap();
+    coll.insert_many(&docs).await.unwrap();
 
     let options = FindOptions::builder()
         .batch_size(2)
         .sort(doc! { "_id": 1 })
         .build();
 
-    let mut cursor = coll.find(None, options.clone()).await.unwrap();
+    let mut cursor = coll
+        .find(doc! {})
+        .with_options(options.clone())
+        .await
+        .unwrap();
 
     let mut i = 0;
     while cursor.advance().await.unwrap() {
@@ -213,7 +217,9 @@ async fn borrowed_deserialization() {
 
     let mut session = client.start_session().await.unwrap();
     let mut cursor = coll
-        .find_with_session(None, options.clone(), &mut session)
+        .find(doc! {})
+        .with_options(options.clone())
+        .session(&mut session)
         .await
         .unwrap();
 
@@ -233,18 +239,13 @@ async fn session_cursor_with_type() {
     let coll = client.database("db").collection("coll");
     coll.drop().session(&mut session).await.unwrap();
 
-    coll.insert_many_with_session(
-        vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }],
-        None,
-        &mut session,
-    )
-    .await
-    .unwrap();
-
-    let mut cursor: crate::SessionCursor<bson::Document> = coll
-        .find_with_session(doc! {}, None, &mut session)
+    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }, doc! { "x": 3 }])
+        .session(&mut session)
         .await
         .unwrap();
+
+    let mut cursor: crate::SessionCursor<bson::Document> =
+        coll.find(doc! {}).session(&mut session).await.unwrap();
 
     let _ = cursor.next(&mut session).await.unwrap().unwrap();
 
@@ -259,23 +260,17 @@ async fn cursor_final_batch() {
     let coll = client
         .create_fresh_collection("test_cursor_final_batch", "test", None)
         .await;
-    coll.insert_many(
-        vec![
-            doc! { "foo": 1 },
-            doc! { "foo": 2 },
-            doc! { "foo": 3 },
-            doc! { "foo": 4 },
-            doc! { "foo": 5 },
-        ],
-        None,
-    )
+    coll.insert_many(vec![
+        doc! { "foo": 1 },
+        doc! { "foo": 2 },
+        doc! { "foo": 3 },
+        doc! { "foo": 4 },
+        doc! { "foo": 5 },
+    ])
     .await
     .unwrap();
 
-    let mut cursor = coll
-        .find(None, FindOptions::builder().batch_size(3).build())
-        .await
-        .unwrap();
+    let mut cursor = coll.find(doc! {}).batch_size(3).await.unwrap();
     let mut found = 0;
     while cursor.advance().await.unwrap() {
         found += 1;

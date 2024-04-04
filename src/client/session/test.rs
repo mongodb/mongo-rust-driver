@@ -5,15 +5,23 @@ use std::{future::Future, sync::Arc, time::Duration};
 use bson::Document;
 use futures::stream::StreamExt;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson},
-    coll::options::{CountOptions, InsertManyOptions},
+    coll::options::CountOptions,
     error::Result,
     event::sdam::SdamEvent,
-    options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
+    options::{FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, Event, EventClient, EventHandler, TestClient},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        util::event_buffer::EventBuffer,
+        Event,
+        TestClient,
+    },
     Client,
     Collection,
 };
@@ -58,16 +66,12 @@ macro_rules! for_each_op {
         // collection operations
         $test_func(
             "insert",
-            collection_op!($test_name, coll, coll.insert_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.insert_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
             "insert",
-            collection_op!(
-                $test_name,
-                coll,
-                coll.insert_many(vec![doc! { "x": 1 }], None)
-            ),
+            collection_op!($test_name, coll, coll.insert_many(vec![doc! { "x": 1 }])),
         )
         .await;
         $test_func(
@@ -75,7 +79,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.replace_one(doc! { "x": 1 }, doc! { "x": 2 }, None)
+                coll.replace_one(doc! { "x": 1 }, doc! { "x": 2 })
             ),
         )
         .await;
@@ -109,10 +113,15 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "findAndModify",
+            collection_op!($test_name, coll, coll.find_one_and_delete(doc! { "x": 1 })),
+        )
+        .await;
+        $test_func(
+            "findAndModify",
             collection_op!(
                 $test_name,
                 coll,
-                coll.find_one_and_delete(doc! { "x": 1 }, None)
+                coll.find_one_and_update(doc! {}, doc! { "$inc": { "x": 1 } })
             ),
         )
         .await;
@@ -121,16 +130,7 @@ macro_rules! for_each_op {
             collection_op!(
                 $test_name,
                 coll,
-                coll.find_one_and_update(doc! {}, doc! { "$inc": { "x": 1 } }, None)
-            ),
-        )
-        .await;
-        $test_func(
-            "findAndModify",
-            collection_op!(
-                $test_name,
-                coll,
-                coll.find_one_and_replace(doc! {}, doc! {"x": 1}, None)
+                coll.find_one_and_replace(doc! {}, doc! {"x": 1})
             ),
         )
         .await;
@@ -145,12 +145,12 @@ macro_rules! for_each_op {
         .await;
         $test_func(
             "find",
-            collection_op!($test_name, coll, coll.find(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.find(doc! { "x": 1 })),
         )
         .await;
         $test_func(
             "find",
-            collection_op!($test_name, coll, coll.find_one(doc! { "x": 1 }, None)),
+            collection_op!($test_name, coll, coll.find_one(doc! { "x": 1 })),
         )
         .await;
         $test_func(
@@ -239,13 +239,14 @@ async fn cluster_time_in_commands() {
     async fn cluster_time_test<F, G, R>(
         command_name: &str,
         client: &Client,
-        event_handler: &EventHandler,
+        event_buffer: &EventBuffer,
         operation: F,
     ) where
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
-        let mut subscriber = event_handler.subscribe();
+        #[allow(deprecated)]
+        let mut subscriber = event_buffer.subscribe();
 
         operation(client.clone())
             .await
@@ -292,11 +293,11 @@ async fn cluster_time_in_commands() {
         );
     }
 
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
     options.heartbeat_freq = Some(Duration::from_secs(1000));
-    options.command_event_handler = Some(handler.clone().into());
-    options.sdam_event_handler = Some(handler.clone().into());
+    options.command_event_handler = Some(buffer.handler());
+    options.sdam_event_handler = Some(buffer.handler());
 
     // Ensure we only connect to one server so the monitor checks from other servers
     // don't affect the TopologyDescription's clusterTime value between commands.
@@ -312,7 +313,8 @@ async fn cluster_time_in_commands() {
         }
     }
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let client = Client::with_options(options).unwrap();
 
@@ -336,7 +338,7 @@ async fn cluster_time_in_commands() {
         .await
         .unwrap();
 
-    cluster_time_test("ping", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("ping", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .run_command(doc! { "ping": 1 })
@@ -344,34 +346,29 @@ async fn cluster_time_in_commands() {
     })
     .await;
 
-    cluster_time_test(
-        "aggregate",
-        &client,
-        handler.as_ref(),
-        |client| async move {
-            client
-                .database(function_name!())
-                .collection::<Document>(function_name!())
-                .aggregate(vec![doc! { "$match": { "x": 1 } }])
-                .await
-        },
-    )
-    .await;
-
-    cluster_time_test("find", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("aggregate", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
-            .find(doc! {}, None)
+            .aggregate(vec![doc! { "$match": { "x": 1 } }])
             .await
     })
     .await;
 
-    cluster_time_test("insert", &client, handler.as_ref(), |client| async move {
+    cluster_time_test("find", &client, &buffer, |client| async move {
         client
             .database(function_name!())
             .collection::<Document>(function_name!())
-            .insert_one(doc! {}, None)
+            .find(doc! {})
+            .await
+    })
+    .await;
+
+    cluster_time_test("insert", &client, &buffer, |client| async move {
+        client
+            .database(function_name!())
+            .collection::<Document>(function_name!())
+            .insert_one(doc! {})
             .await
     })
     .await;
@@ -386,6 +383,7 @@ async fn session_usage() {
         return;
     }
 
+    #[allow(deprecated)]
     async fn session_usage_test<F, G>(command_name: &str, operation: F)
     where
         F: Fn(EventClient) -> G,
@@ -393,7 +391,9 @@ async fn session_usage() {
     {
         let client = EventClient::new().await;
         operation(client.clone()).await;
-        let (command_started, _) = client.get_successful_command_execution(command_name);
+        let mut events = client.events.clone();
+        #[allow(deprecated)]
+        let (command_started, _) = events.get_successful_command_execution(command_name);
         assert!(
             command_started.command.get("lsid").is_some(),
             "implicit session not passed to {}",
@@ -408,6 +408,7 @@ async fn session_usage() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -416,7 +417,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    coll.insert_many(vec![doc! {}, doc! {}], None)
+    coll.insert_many(vec![doc! {}, doc! {}])
         .await
         .expect("insert should succeed");
 
@@ -424,10 +425,14 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
-    let mut cursor = coll.find(doc! {}, None).await.expect("find should succeed");
+    let mut cursor = coll.find(doc! {}).await.expect("find should succeed");
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
-    let (find_started, _) = client.get_successful_command_execution("find");
+    #[allow(deprecated)]
+    let (find_started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
     let session_id = find_started
         .command
         .get("lsid")
@@ -448,6 +453,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         return;
@@ -457,7 +463,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
     for _ in 0..5 {
-        coll.insert_one(doc! {}, None)
+        coll.insert_one(doc! {})
             .await
             .expect("insert should succeed");
     }
@@ -466,9 +472,9 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
     tokio::time::sleep(Duration::from_millis(250)).await;
     client.clear_session_pool().await;
 
-    let options = FindOptions::builder().batch_size(3).build();
     let mut cursor = coll
-        .find(doc! {}, options)
+        .find(doc! {})
+        .batch_size(3)
         .await
         .expect("find should succeed");
 
@@ -476,7 +482,12 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         assert!(matches!(cursor.next().await, Some(Ok(_))));
     }
 
-    let (find_started, _) = client.get_successful_command_execution("find");
+    #[allow(deprecated)]
+    let (find_started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
+
     let session_id = find_started
         .command
         .get("lsid")
@@ -497,6 +508,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(
@@ -509,10 +521,10 @@ async fn find_and_getmore_share_session() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    let options = InsertManyOptions::builder()
-        .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-        .build();
-    coll.insert_many(vec![doc! {}; 3], options).await.unwrap();
+    coll.insert_many(vec![doc! {}; 3])
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
 
     let read_preferences: Vec<ReadPreference> = vec![
         ReadPreference::Primary,
@@ -530,6 +542,7 @@ async fn find_and_getmore_share_session() {
         },
     ];
 
+    #[allow(deprecated)]
     async fn run_test(
         client: &EventClient,
         coll: &Collection<Document>,
@@ -545,7 +558,8 @@ async fn find_and_getmore_share_session() {
         let mut cursor;
         loop {
             cursor = coll
-                .find(doc! {}, options.clone())
+                .find(doc! {})
+                .with_options(options.clone())
                 .await
                 .expect("find should succeed");
             if cursor.has_next() {
@@ -571,14 +585,17 @@ async fn find_and_getmore_share_session() {
                 });
         }
 
-        let (find_started, _) = client.get_successful_command_execution("find");
+        let mut events = client.events.clone();
+        #[allow(deprecated)]
+        let (find_started, _) = events.get_successful_command_execution("find");
         let session_id = find_started
             .command
             .get("lsid")
             .expect("find should use implicit session");
         assert!(session_id != &Bson::Null);
 
-        let (command_started, _) = client.get_successful_command_execution("getMore");
+        #[allow(deprecated)]
+        let (command_started, _) = events.get_successful_command_execution("getMore");
         let getmore_session_id = command_started
             .command
             .get("lsid")

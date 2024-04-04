@@ -34,7 +34,7 @@ async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
         .expect("hello should succeed");
 
     let coll = db.collection::<Document>("test");
-    coll.find_one(None, None)
+    coll.find_one(doc! {})
         .await
         .expect("findOne should succeed");
 }

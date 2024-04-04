@@ -1,12 +1,14 @@
 use bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     coll::options::CollectionOptions,
     error::Result,
     event::command::CommandEvent,
     options::ReadConcern,
-    test::{log_uncaptured, EventClient},
+    test::log_uncaptured,
     ClientSession,
     Collection,
 };
@@ -45,21 +47,20 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
     let mut ops = vec![];
 
     ops.push(op!("insert", false, |coll, session| {
-        coll.insert_one_with_session(doc! { "x": 1 }, None, session)
+        coll.insert_one(doc! { "x": 1 }).session(session)
     }));
 
     ops.push(op!("insert", false, |coll, session| {
-        coll.insert_many_with_session(vec![doc! { "x": 1 }], None, session)
+        coll.insert_many(vec![doc! { "x": 1 }]).session(session)
     }));
 
     ops.push(op!("find", true, |coll, session| coll
-        .find_one_with_session(doc! { "x": 1 }, None, session)));
+        .find_one(doc! { "x": 1 })
+        .session(session)));
 
-    ops.push(op!("find", true, |coll, session| coll.find_with_session(
-        doc! { "x": 1 },
-        None,
-        session
-    )));
+    ops.push(op!("find", true, |coll, session| coll
+        .find(doc! { "x": 1 })
+        .session(session)));
 
     ops.push(op!("update", false, |coll, s| coll
         .update_one(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
@@ -70,12 +71,8 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .session(s)));
 
     ops.push(op!("update", false, |coll, s| coll
-        .replace_one_with_session(
-            doc! { "x": 1 },
-            doc! { "x": 2 },
-            None,
-            s,
-        )));
+        .replace_one(doc! { "x": 1 }, doc! { "x": 2 },)
+        .session(s)));
 
     ops.push(op!("delete", false, |coll, s| coll
         .delete_one(doc! { "x": 1 })
@@ -86,23 +83,16 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
         .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
-        .find_one_and_update_with_session(
-            doc! { "x": 1 },
-            doc! { "$inc": { "x": 1 } },
-            None,
-            s,
-        )));
+        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } },)
+        .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
-        .find_one_and_replace_with_session(
-            doc! { "x": 1 },
-            doc! { "x": 1  },
-            None,
-            s,
-        )));
+        .find_one_and_replace(doc! { "x": 1 }, doc! { "x": 1  },)
+        .session(s)));
 
     ops.push(op!("findAndModify", false, |coll, s| coll
-        .find_one_and_delete_with_session(doc! { "x": 1 }, None, s,)));
+        .find_one_and_delete(doc! { "x": 1 })
+        .session(s)));
 
     ops.push(op!("aggregate", true, |coll, s| coll
         .count_documents(doc! { "x": 1 })
@@ -129,6 +119,7 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
 /// Test 1 from the causal consistency specification.
 #[tokio::test]
 async fn new_session_operation_time_null() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -145,6 +136,7 @@ async fn new_session_operation_time_null() {
 /// Test 2 from the causal consistency specification.
 #[tokio::test]
 async fn first_read_no_after_cluser_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -170,7 +162,11 @@ async fn first_read_no_after_cluser_time() {
         )
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
-        let (started, _) = client.get_successful_command_execution(name);
+        #[allow(deprecated)]
+        let (started, _) = {
+            let mut events = client.events.clone();
+            events.get_successful_command_execution(name)
+        };
 
         // assert that no read concern was set.
         started.command.get_document("readConcern").unwrap_err();
@@ -180,6 +176,7 @@ async fn first_read_no_after_cluser_time() {
 /// Test 3 from the causal consistency specification.
 #[tokio::test]
 async fn first_op_update_op_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -204,11 +201,15 @@ async fn first_op_update_op_time() {
         .await
         .unwrap();
 
-        let event = client
-            .get_command_events(&[name])
-            .into_iter()
-            .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-            .unwrap_or_else(|| panic!("no event found for {}", name));
+        #[allow(deprecated)]
+        let event = {
+            let mut events = client.events.clone();
+            events
+                .get_command_events(&[name])
+                .into_iter()
+                .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
+                .unwrap_or_else(|| panic!("no event found for {}", name))
+        };
 
         match event {
             CommandEvent::Succeeded(s) => {
@@ -226,6 +227,7 @@ async fn first_op_update_op_time() {
 /// Test 4 from the causal consistency specification.
 #[tokio::test]
 async fn read_includes_after_cluster_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -242,13 +244,13 @@ async fn read_includes_after_cluster_time() {
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
         let mut session = client.start_session().await.unwrap();
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
+            .events
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -268,6 +270,7 @@ async fn read_includes_after_cluster_time() {
 /// Test 5 from the causal consistency specification.
 #[tokio::test]
 async fn find_after_write_includes_after_cluster_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -290,11 +293,14 @@ async fn find_after_write_includes_after_cluster_time() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
 
-        let command_started = client.get_command_started_events(&["find"]).pop().unwrap();
+        #[allow(deprecated)]
+        let command_started = client
+            .events
+            .get_command_started_events(&["find"])
+            .pop()
+            .unwrap();
         assert_eq!(
             command_started
                 .command
@@ -310,6 +316,7 @@ async fn find_after_write_includes_after_cluster_time() {
 /// Test 6 from the causal consistency specification.
 #[tokio::test]
 async fn not_causally_consistent_omits_after_cluster_time() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -334,7 +341,9 @@ async fn not_causally_consistent_omits_after_cluster_time() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
+            .events
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -348,6 +357,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
 /// Test 7 from the causal consistency specification.
 #[tokio::test]
 async fn omit_after_cluster_time_standalone() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
@@ -369,7 +379,9 @@ async fn omit_after_cluster_time_standalone() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
+            .events
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -383,6 +395,7 @@ async fn omit_after_cluster_time_standalone() {
 /// Test 8 from the causal consistency specification.
 #[tokio::test]
 async fn omit_default_read_concern_level() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if client.is_standalone() {
@@ -404,13 +417,13 @@ async fn omit_default_read_concern_level() {
             .causal_consistency(true)
             .await
             .unwrap();
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
+            .events
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -424,6 +437,7 @@ async fn omit_default_read_concern_level() {
 /// Test 9 from the causal consistency specification.
 #[tokio::test]
 async fn test_causal_consistency_read_concern_merge() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured(
@@ -451,13 +465,13 @@ async fn test_causal_consistency_read_concern_merge() {
 
     for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
-        coll.find_one_with_session(None, None, &mut session)
-            .await
-            .unwrap();
+        coll.find_one(doc! {}).session(&mut session).await.unwrap();
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
+        #[allow(deprecated)]
         let command_started = client
+            .events
             .get_command_started_events(&[command_name])
             .pop()
             .unwrap();
@@ -474,6 +488,7 @@ async fn test_causal_consistency_read_concern_merge() {
 /// Test 11 from the causal consistency specification.
 #[tokio::test]
 async fn omit_cluster_time_standalone() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if !client.is_standalone() {
         log_uncaptured("skipping omit_cluster_time_standalone due to unsupported topology");
@@ -484,15 +499,20 @@ async fn omit_cluster_time_standalone() {
         .database("causal_consistency_11")
         .collection::<Document>("causal_consistency_11");
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
 
-    let (started, _) = client.get_successful_command_execution("find");
+    #[allow(deprecated)]
+    let (started, _) = {
+        let mut events = client.events.clone();
+        events.get_successful_command_execution("find")
+    };
     started.command.get_document("$clusterTime").unwrap_err();
 }
 
 /// Test 12 from the causal consistency specification.
 #[tokio::test]
 async fn cluster_time_sent_in_commands() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     if client.is_standalone() {
         log_uncaptured("skipping cluster_time_sent_in_commands due to unsupported topology");
@@ -503,8 +523,11 @@ async fn cluster_time_sent_in_commands() {
         .database("causal_consistency_12")
         .collection::<Document>("causal_consistency_12");
 
-    coll.find_one(None, None).await.unwrap();
+    coll.find_one(doc! {}).await.unwrap();
 
-    let (started, _) = client.get_successful_command_execution("find");
+    #[allow(deprecated)]
+    let mut events = client.events.clone();
+    #[allow(deprecated)]
+    let (started, _) = events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap();
 }

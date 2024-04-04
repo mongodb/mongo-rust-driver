@@ -5,12 +5,13 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, option_setters};
+use super::{action_impl, deeplink, option_setters};
 
 impl Client {
     /// Starts a new [`ClientSession`].
     ///
-    /// `await` will return `Result<`[`ClientSession`]`>`.
+    /// `await` will return d[`Result<ClientSession>`].
+    #[deeplink]
     pub fn start_session(&self) -> StartSession {
         StartSession {
             client: self,
@@ -23,13 +24,14 @@ impl Client {
 impl crate::sync::Client {
     /// Starts a new [`ClientSession`].
     ///
-    /// [run](StartSession::run) will return `Result<`[`ClientSession`]`>`.
+    /// [run](StartSession::run) will return d[`Result<crate::sync::ClientSession>`].
+    #[deeplink]
     pub fn start_session(&self) -> StartSession {
         self.async_client.start_session()
     }
 }
 
-/// Starts a new [`ClientSession`].  Create by calling [`Client::start_session`].
+/// Starts a new [`ClientSession`].  Construct with [`Client::start_session`].
 #[must_use]
 pub struct StartSession<'a> {
     client: &'a Client,
@@ -44,19 +46,14 @@ impl<'a> StartSession<'a> {
     );
 }
 
-action_impl! {
-    impl<'a> Action for StartSession<'a> {
-        type Future = StartSessionFuture;
+#[action_impl(sync = crate::sync::ClientSession)]
+impl<'a> Action for StartSession<'a> {
+    type Future = StartSessionFuture;
 
-        async fn execute(self) -> Result<ClientSession> {
-            if let Some(options) = &self.options {
-                options.validate()?;
-            }
-            Ok(ClientSession::new(self.client.clone(), self.options, false).await)
+    async fn execute(self) -> Result<ClientSession> {
+        if let Some(options) = &self.options {
+            options.validate()?;
         }
-
-        fn sync_wrap(out) -> Result<crate::sync::ClientSession> {
-            out.map(Into::into)
-        }
+        Ok(ClientSession::new(self.client.clone(), self.options, false).await)
     }
 }

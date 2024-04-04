@@ -19,6 +19,7 @@ use futures::{
     future::BoxFuture,
     io::AsyncReadExt,
     stream::{StreamExt, TryStreamExt},
+    AsyncWriteExt,
     FutureExt,
 };
 use serde::{
@@ -575,12 +576,11 @@ impl Find {
             selection_criteria: None,
             let_vars: self.let_vars.clone(),
         };
+        let act = collection.find(self.filter.clone()).with_options(options);
         match &self.session {
             Some(session_id) => {
                 let cursor = with_mut_session!(test_runner, session_id, |session| async {
-                    collection
-                        .find_with_session(self.filter.clone(), options, session)
-                        .await
+                    act.session(session.deref_mut()).await
                 })
                 .await?;
                 Ok(TestCursor::Session {
@@ -589,7 +589,7 @@ impl Find {
                 })
             }
             None => {
-                let cursor = collection.find(self.filter.clone(), options).await?;
+                let cursor = act.await?;
                 Ok(TestCursor::Normal(Mutex::new(cursor)))
             }
         }
@@ -718,27 +718,17 @@ impl TestOperation for InsertMany {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .insert_many(&self.documents)
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| {
-                        async move {
-                            collection
-                                .insert_many_with_session(
-                                    self.documents.clone(),
-                                    self.options.clone(),
-                                    session,
-                                )
-                                .await
-                        }
-                        .boxed()
+                        async move { action.session(session.deref_mut()).await }.boxed()
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .insert_many(self.documents.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let ids: HashMap<String, Bson> = result
                 .inserted_ids
@@ -769,24 +759,17 @@ impl TestOperation for InsertOne {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let action = collection
+                .insert_one(self.document.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .insert_one_with_session(
-                                self.document.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        action.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .insert_one(self.document.clone(), self.options.clone())
-                        .await?
-                }
+                None => action.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1079,7 +1062,8 @@ impl TestOperation for FindOne {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one(self.filter.clone(), self.options.clone())
+                .find_one(self.filter.clone().unwrap_or_default())
+                .with_options(self.options.clone())
                 .await?;
             match result {
                 Some(result) => Ok(Some(Bson::from(result).into())),
@@ -1246,11 +1230,8 @@ impl TestOperation for ReplaceOne {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .replace_one(
-                    self.filter.clone(),
-                    self.replacement.clone(),
-                    self.options.clone(),
-                )
+                .replace_one(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1277,29 +1258,17 @@ impl TestOperation for FindOneAndUpdate {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let collection = test_runner.get_collection(id).await;
+            let act = collection
+                .find_one_and_update(self.filter.clone(), self.update.clone())
+                .with_options(self.options.clone());
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        collection
-                            .find_one_and_update_with_session(
-                                self.filter.clone(),
-                                self.update.clone(),
-                                self.options.clone(),
-                                session,
-                            )
-                            .await
+                        act.session(session.deref_mut()).await
                     })
                     .await?
                 }
-                None => {
-                    collection
-                        .find_one_and_update(
-                            self.filter.clone(),
-                            self.update.clone(),
-                            self.options.clone(),
-                        )
-                        .await?
-                }
+                None => act.await?,
             };
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1326,11 +1295,8 @@ impl TestOperation for FindOneAndReplace {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one_and_replace(
-                    self.filter.clone(),
-                    self.replacement.clone(),
-                    self.options.clone(),
-                )
+                .find_one_and_replace(self.filter.clone(), self.replacement.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
 
@@ -1357,7 +1323,8 @@ impl TestOperation for FindOneAndDelete {
         async move {
             let collection = test_runner.get_collection(id).await;
             let result = collection
-                .find_one_and_delete(self.filter.clone(), self.options.clone())
+                .find_one_and_delete(self.filter.clone())
+                .with_options(self.options.clone())
                 .await?;
             let result = to_bson(&result)?;
             Ok(Some(result.into()))
@@ -1889,7 +1856,7 @@ impl TestOperation for StartTransaction {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             with_mut_session!(test_runner, id, |session| {
-                async move { session.start_transaction(None).await }
+                async move { session.start_transaction().await }
             })
             .await?;
             Ok(None)
@@ -2580,13 +2547,8 @@ impl TestOperation for AssertEventCount {
     ) -> BoxFuture<'a, ()> {
         async {
             let client = test_runner.get_client(self.client.as_str()).await;
-            let entities = test_runner.entities.clone();
-            let actual_events = client
-                .observer
-                .lock()
-                .await
-                .matching_events(&self.event, entities)
-                .await;
+            let entities = test_runner.entities.read().await;
+            let actual_events = client.matching_events(&self.event, &entities);
             assert_eq!(
                 actual_events.len(),
                 self.count,
@@ -2617,9 +2579,6 @@ impl TestOperation for WaitForEvent {
             let client = test_runner.get_client(self.client.as_str()).await;
             let entities = test_runner.entities.clone();
             client
-                .observer
-                .lock()
-                .await
                 .wait_for_matching_events(&self.event, self.count, entities)
                 .await
                 .unwrap();
@@ -2767,7 +2726,9 @@ impl TestOperation for Download {
             // First, read via the download_to_writer API.
             let mut buf: Vec<u8> = vec![];
             bucket
-                .download_to_futures_0_3_writer(self.id.clone(), &mut buf)
+                .open_download_stream(self.id.clone())
+                .await?
+                .read_to_end(&mut buf)
                 .await?;
             let writer_data = hex::encode(buf);
 
@@ -2803,27 +2764,14 @@ impl TestOperation for DownloadByName {
         async move {
             let bucket = test_runner.get_bucket(id).await;
 
-            // First, read via the download_to_writer API.
             let mut buf: Vec<u8> = vec![];
             bucket
-                .download_to_futures_0_3_writer_by_name(
-                    self.filename.clone(),
-                    &mut buf,
-                    self.options.clone(),
-                )
+                .open_download_stream_by_name(&self.filename)
+                .with_options(self.options.clone())
+                .await?
+                .read_to_end(&mut buf)
                 .await?;
             let writer_data = hex::encode(buf);
-
-            // Next, read via the open_download_stream API.
-            let mut buf: Vec<u8> = vec![];
-            let mut stream = bucket
-                .open_download_stream_by_name(self.filename.clone(), self.options.clone())
-                .await?;
-            stream.read_to_end(&mut buf).await?;
-            let stream_data = hex::encode(buf);
-
-            // Assert that both APIs returned the same data.
-            assert_eq!(writer_data, stream_data);
 
             Ok(Some(Entity::Bson(writer_data.into())))
         }
@@ -2877,15 +2825,17 @@ impl TestOperation for Upload {
             let hex_string = self.source.get("$$hexBytes").unwrap().as_str().unwrap();
             let bytes = hex::decode(hex_string).unwrap();
 
-            let id = bucket
-                .upload_from_futures_0_3_reader(
-                    self.filename.clone(),
-                    &bytes[..],
-                    self.options.clone(),
-                )
-                .await?;
+            let id = {
+                let mut stream = bucket
+                    .open_upload_stream(&self.filename)
+                    .with_options(self.options.clone())
+                    .await?;
+                stream.write_all(&bytes[..]).await?;
+                stream.close().await?;
+                stream.id().clone()
+            };
 
-            Ok(Some(Entity::Bson(id.into())))
+            Ok(Some(Entity::Bson(id)))
         }
         .boxed()
     }

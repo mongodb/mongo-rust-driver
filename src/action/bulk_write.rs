@@ -61,51 +61,50 @@ impl<'a> BulkWrite<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for BulkWrite<'a> {
-        type Future = BulkWriteFuture;
+#[action_impl]
+impl<'a> Action for BulkWrite<'a> {
+    type Future = BulkWriteFuture;
 
-        async fn execute(mut self) -> Result<BulkWriteResult> {
-            let mut total_attempted = 0;
-            let mut execution_status = ExecutionStatus::None;
+    async fn execute(mut self) -> Result<BulkWriteResult> {
+        let mut total_attempted = 0;
+        let mut execution_status = ExecutionStatus::None;
 
-            while total_attempted < self.models.len()
-                && execution_status.should_continue(self.is_ordered())
-            {
-                let mut operation = BulkWriteOperation::new(
-                    self.client.clone(),
-                    &self.models[total_attempted..],
-                    total_attempted,
-                    self.options.as_ref(),
+        while total_attempted < self.models.len()
+            && execution_status.should_continue(self.is_ordered())
+        {
+            let mut operation = BulkWriteOperation::new(
+                self.client.clone(),
+                &self.models[total_attempted..],
+                total_attempted,
+                self.options.as_ref(),
+            )
+            .await;
+            let result = self
+                .client
+                .execute_operation::<BulkWriteOperation>(
+                    &mut operation,
+                    self.session.as_deref_mut(),
                 )
                 .await;
-                let result = self
-                    .client
-                    .execute_operation::<BulkWriteOperation>(
-                        &mut operation,
-                        self.session.as_deref_mut(),
-                    )
-                    .await;
-                total_attempted += operation.n_attempted;
+            total_attempted += operation.n_attempted;
 
-                match result {
-                    Ok(result) => {
-                        execution_status = execution_status.with_success(result);
-                    }
-                    Err(error) => {
-                        execution_status = execution_status.with_failure(error);
-                    }
+            match result {
+                Ok(result) => {
+                    execution_status = execution_status.with_success(result);
+                }
+                Err(error) => {
+                    execution_status = execution_status.with_failure(error);
                 }
             }
+        }
 
-            match execution_status {
-                ExecutionStatus::Success(bulk_write_result) => Ok(bulk_write_result),
-                ExecutionStatus::Error(error) => Err(error),
-                ExecutionStatus::None => Err(ErrorKind::InvalidArgument {
-                    message: "bulk_write must be provided at least one write operation".into(),
-                }
-                .into()),
+        match execution_status {
+            ExecutionStatus::Success(bulk_write_result) => Ok(bulk_write_result),
+            ExecutionStatus::Error(error) => Err(error),
+            ExecutionStatus::None => Err(ErrorKind::InvalidArgument {
+                message: "bulk_write must be provided at least one write operation".into(),
             }
+            .into()),
         }
     }
 }

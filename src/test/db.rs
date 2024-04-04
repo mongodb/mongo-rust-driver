@@ -2,6 +2,8 @@ use std::cmp::Ord;
 
 use futures::stream::TryStreamExt;
 
+#[allow(deprecated)]
+use crate::test::util::EventClient;
 use crate::{
     action::Action,
     bson::{doc, Document},
@@ -14,7 +16,7 @@ use crate::{
         ValidationLevel,
     },
     results::{CollectionSpecification, CollectionType},
-    test::util::{EventClient, TestClient},
+    test::util::TestClient,
     Database,
 };
 
@@ -52,7 +54,7 @@ async fn list_collections() {
 
     for coll_name in coll_names {
         db.collection(coll_name)
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -80,7 +82,7 @@ async fn list_collections_filter() {
     let coll_names = &["bar", "baz", "foo"];
     for coll_name in coll_names {
         db.collection(coll_name)
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -119,7 +121,7 @@ async fn list_collection_names() {
 
     for coll in expected_colls {
         db.collection(coll)
-            .insert_one(doc! { "x": 1 }, None)
+            .insert_one(doc! { "x": 1 })
             .await
             .unwrap();
     }
@@ -316,6 +318,7 @@ async fn create_index_options_defaults_not_specified() {
 }
 
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let db = client.database(name);
 
@@ -325,7 +328,8 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
         .unwrap();
     db.drop().await.unwrap();
 
-    let events = client.get_command_started_events(&["create"]);
+    #[allow(deprecated)]
+    let events = client.events.get_command_started_events(&["create"]);
     assert_eq!(events.len(), 1);
 
     let event_defaults = match events[0].command.get_document("indexOptionDefaults") {

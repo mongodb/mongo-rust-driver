@@ -17,10 +17,13 @@ use crate::{
     Collection,
 };
 
-use super::{get_client_options, log_uncaptured, EventClient, TestClient};
+#[allow(deprecated)]
+use super::EventClient;
+use super::{get_client_options, log_uncaptured, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+#[allow(deprecated)]
 async fn init_stream(
     coll_name: &str,
     direct_connection: bool,
@@ -73,19 +76,23 @@ async fn tracks_resume_token() -> Result<()> {
         tokens.push(token.parsed()?);
     }
     for _ in 0..3 {
-        coll.insert_one(doc! {}, None).await?;
+        coll.insert_one(doc! {}).await?;
         stream.next().await.transpose()?;
         tokens.push(stream.resume_token().unwrap().parsed()?);
     }
 
-    let events: Vec<_> = client
-        .get_command_events(&["aggregate", "getMore"])
-        .into_iter()
-        .filter_map(|ev| match ev {
-            CommandEvent::Succeeded(s) => Some(s),
-            _ => None,
-        })
-        .collect();
+    #[allow(deprecated)]
+    let events: Vec<_> = {
+        let mut events = client.events.clone();
+        events
+            .get_command_events(&["aggregate", "getMore"])
+            .into_iter()
+            .filter_map(|ev| match ev {
+                CommandEvent::Succeeded(s) => Some(s),
+                _ => None,
+            })
+            .collect()
+    };
     let mut expected = vec![];
     // Token from `aggregate`
     if let Some(initial) = events[0]
@@ -140,7 +147,7 @@ async fn errors_on_missing_token() -> Result<()> {
         .watch()
         .pipeline(vec![doc! { "$project": { "_id": 0 } }])
         .await?;
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     assert!(stream.next().await.transpose().is_err());
 
     Ok(())
@@ -155,7 +162,7 @@ async fn resumes_on_error() -> Result<()> {
         None => return Ok(()),
     };
 
-    coll.insert_one(doc! { "_id": 1 }, None).await?;
+    coll.insert_one(doc! { "_id": 1 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
@@ -167,7 +174,7 @@ async fn resumes_on_error() -> Result<()> {
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.configure_fail_point(fail_point).await?;
 
-    coll.insert_one(doc! { "_id": 2 }, None).await?;
+    coll.insert_one(doc! { "_id": 2 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
@@ -177,7 +184,8 @@ async fn resumes_on_error() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    let events = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let events = client.events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
     Ok(())
@@ -217,10 +225,14 @@ async fn empty_batch_not_closed() -> Result<()> {
 
     assert!(stream.next_if_any().await?.is_none());
 
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
 
-    let events = client.get_command_events(&["aggregate", "getMore"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["aggregate", "getMore"])
+    };
     let cursor_id = match &events[1] {
         CommandEvent::Succeeded(CommandSucceededEvent { reply, .. }) => {
             reply.get_document("cursor")?.get_i64("id")?
@@ -246,7 +258,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
             None => return Ok(()),
         };
 
-    coll.insert_one(doc! { "_id": 1 }, None).await?;
+    coll.insert_one(doc! { "_id": 1 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
@@ -259,7 +271,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
         FailPoint::new(&["getMore", "killCursors"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.configure_fail_point(fail_point).await?;
 
-    coll.insert_one(doc! { "_id": 2 }, None).await?;
+    coll.insert_one(doc! { "_id": 2 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
@@ -269,7 +281,8 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    let events = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let events = client.events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
     Ok(())
@@ -299,10 +312,14 @@ async fn resume_start_at_operation_time() -> Result<()> {
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.configure_fail_point(fail_point).await?;
 
-    coll.insert_one(doc! { "_id": 2 }, None).await?;
+    coll.insert_one(doc! { "_id": 2 }).await?;
     stream.next().await.transpose()?;
 
-    let events = client.get_command_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["aggregate"])
+    };
     assert_eq!(events.len(), 4);
 
     fn has_saot(command: &Document) -> Result<bool> {
@@ -345,7 +362,11 @@ async fn batch_end_resume_token() -> Result<()> {
 
     assert_eq!(stream.next_if_any().await?, None);
     let token = stream.resume_token().unwrap().parsed()?;
-    let commands = client.get_command_events(&["aggregate", "getMore"]);
+    #[allow(deprecated)]
+    let commands = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["aggregate", "getMore"])
+    };
     assert!(matches!(commands.last(), Some(
         CommandEvent::Succeeded(CommandSucceededEvent {
             reply,
@@ -380,7 +401,7 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
     assert_eq!(stream.resume_token(), None);
 
     // Case: end of batch
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     let expected_id = stream.next_if_any().await?.unwrap().id;
     assert_eq!(stream.next_if_any().await?, None);
     assert_eq!(stream.resume_token().as_ref(), Some(&expected_id));
@@ -411,7 +432,7 @@ async fn batch_mid_resume_token() -> Result<()> {
             }
             // If we're out of events, make some more.
             None => {
-                coll.insert_many((0..3).map(|_| doc! {}), None).await?;
+                coll.insert_many((0..3).map(|_| doc! {})).await?;
             }
         };
 
@@ -451,13 +472,13 @@ async fn aggregate_batch() -> Result<()> {
     }
 
     // Synthesize a resume token for the new stream to start at.
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     stream.next().await;
     let token = stream.resume_token().unwrap();
 
     // Populate the initial batch of the new stream.
-    coll.insert_one(doc! {}, None).await?;
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
+    coll.insert_one(doc! {}).await?;
 
     // Case: `start_after` is given
     let stream = coll.watch().start_after(token.clone()).await?;
@@ -491,19 +512,20 @@ async fn resume_uses_start_after() -> Result<()> {
         return Ok(());
     }
 
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
     let mut stream = coll.watch().start_after(token.clone()).await?;
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.configure_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
-    let commands = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let commands = client.events.get_command_started_events(&["aggregate"]);
     fn has_start_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -542,23 +564,24 @@ async fn resume_uses_resume_after() -> Result<()> {
         return Ok(());
     }
 
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
     let mut stream = coll.watch().start_after(token.clone()).await?;
 
     // Create an event and read it.
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
-    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}).await?;
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.configure_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
-    let commands = client.get_command_started_events(&["aggregate"]);
+    #[allow(deprecated)]
+    let commands = client.events.get_command_started_events(&["aggregate"]);
     fn has_resume_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -629,7 +652,7 @@ async fn split_large_event() -> Result<()> {
         .await?;
 
     let coll = db.collection::<Document>("split_large_event");
-    coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) }, None)
+    coll.insert_one(doc! { "value": "q".repeat(10 * 1024 * 1024) })
         .await?;
     let stream = coll
         .watch()

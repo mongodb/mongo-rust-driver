@@ -13,12 +13,16 @@ use crate::{
     IndexModel,
 };
 
-use super::{action_impl, option_setters, CollRef, Multiple, Single};
+use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Creates the given index on this collection.
     ///
-    /// `await` will return `Result<CreateIndexResult>`.
+    /// `await` will return d[`Result<CreateIndexResult>`].
+    #[deeplink]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         CreateIndex {
             coll: CollRef::new(self),
@@ -31,7 +35,8 @@ impl<T> Collection<T> {
 
     /// Creates the given indexes on this collection.
     ///
-    /// `await` will return `Result<CreateIndexesResult>`.
+    /// `await` will return d[`Result<CreateIndexesResult>`].
+    #[deeplink]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -46,18 +51,23 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Creates the given index on this collection.
     ///
-    /// [`run`](CreateIndex::run) will return `Result<CreateIndexResult>`.
+    /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
+    #[deeplink]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         self.async_collection.create_index(index)
     }
 
     /// Creates the given indexes on this collection.
     ///
-    /// [`run`](CreateIndex::run) will return `Result<CreateIndexesResult>`.
+    /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexesResult>`].
+    #[deeplink]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -85,40 +95,38 @@ impl<'a, M> CreateIndex<'a, M> {
         comment: Bson,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
 }
 
-action_impl! {
-    impl<'a> Action for CreateIndex<'a, Single> {
-        type Future = CreateIndexFuture;
+#[action_impl]
+impl<'a> Action for CreateIndex<'a, Single> {
+    type Future = CreateIndexFuture;
 
-        async fn execute(self) -> Result<CreateIndexResult> {
-            let inner: CreateIndex<'a, Multiple> = CreateIndex {
-                coll: self.coll,
-                indexes: self.indexes,
-                options: self.options,
-                session: self.session,
-                _mode: PhantomData,
-            };
-            let response = inner.await?;
-            Ok(response.into_create_index_result())
-        }
+    async fn execute(self) -> Result<CreateIndexResult> {
+        let inner: CreateIndex<'a, Multiple> = CreateIndex {
+            coll: self.coll,
+            indexes: self.indexes,
+            options: self.options,
+            session: self.session,
+            _mode: PhantomData,
+        };
+        let response = inner.await?;
+        Ok(response.into_create_index_result())
     }
 }
 
-action_impl! {
-    impl<'a> Action for CreateIndex<'a, Multiple> {
-        type Future = CreateIndexesFuture;
+#[action_impl]
+impl<'a> Action for CreateIndex<'a, Multiple> {
+    type Future = CreateIndexesFuture;
 
-        async fn execute(mut self) -> Result<CreateIndexesResult> {
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<CreateIndexesResult> {
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            let op = Op::new(self.coll.namespace(), self.indexes, self.options);
-            self.coll.client().execute_operation(op, self.session).await
-        }
+        let op = Op::new(self.coll.namespace(), self.indexes, self.options);
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

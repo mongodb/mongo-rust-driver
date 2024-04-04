@@ -45,14 +45,13 @@ async fn search_index_create_list() {
                 .name(String::from("test-search-index"))
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
-            None,
         )
         .await
         .unwrap();
     assert_eq!(name, "test-search-index");
 
     let found = 'outer: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
                 break 'outer d;
@@ -87,19 +86,16 @@ async fn search_index_create_multiple() {
     let coll0 = db.collection::<Document>(&coll_name);
 
     let names = coll0
-        .create_search_indexes(
-            [
-                SearchIndexModel::builder()
-                    .name(String::from("test-search-index-1"))
-                    .definition(doc! { "mappings": { "dynamic": false } })
-                    .build(),
-                SearchIndexModel::builder()
-                    .name(String::from("test-search-index-2"))
-                    .definition(doc! { "mappings": { "dynamic": false } })
-                    .build(),
-            ],
-            None,
-        )
+        .create_search_indexes([
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-1"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-2"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+        ])
         .await
         .unwrap();
     assert_eq!(names, ["test-search-index-1", "test-search-index-2"]);
@@ -107,7 +103,7 @@ async fn search_index_create_multiple() {
     let mut index1 = None;
     let mut index2 = None;
     loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index-1") && d.get_bool("queryable") == Ok(true)
             {
@@ -159,14 +155,13 @@ async fn search_index_drop() {
                 .name(String::from("test-search-index"))
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
-            None,
         )
         .await
         .unwrap();
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
                 break 'outer;
@@ -178,13 +173,10 @@ async fn search_index_drop() {
         }
     }
 
-    coll0
-        .drop_search_index("test-search-index", None)
-        .await
-        .unwrap();
+    coll0.drop_search_index("test-search-index").await.unwrap();
 
     loop {
-        let cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let cursor = coll0.list_search_indexes().await.unwrap();
         if !cursor.has_next() {
             break;
         }
@@ -217,14 +209,13 @@ async fn search_index_update() {
                 .name(String::from("test-search-index"))
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
-            None,
         )
         .await
         .unwrap();
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
                 break 'outer;
@@ -240,13 +231,12 @@ async fn search_index_update() {
         .update_search_index(
             "test-search-index",
             doc! { "mappings": { "dynamic": true } },
-            None,
         )
         .await
         .unwrap();
 
     let found = 'find: loop {
-        let mut cursor = coll0.list_search_indexes(None, None, None).await.unwrap();
+        let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
             if d.get_str("name") == Ok("test-search-index")
                 && d.get_bool("queryable") == Ok(true)
@@ -280,8 +270,5 @@ async fn search_index_drop_not_found() {
         .database("search_index_test")
         .collection::<Document>(&coll_name);
 
-    coll0
-        .drop_search_index("test-search-index", None)
-        .await
-        .unwrap();
+    coll0.drop_search_index("test-search-index").await.unwrap();
 }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document, Timestamp};
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -41,9 +41,10 @@ impl Client {
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
     ///
-    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
-    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
+    #[deeplink]
     pub fn watch(&self) -> Watch {
         Watch::new_cluster(self)
     }
@@ -68,9 +69,10 @@ impl Database {
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
     ///
-    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
-    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
+    #[deeplink]
     pub fn watch(&self) -> Watch {
         Watch::new(
             self.client(),
@@ -79,7 +81,10 @@ impl Database {
     }
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in this collection. A
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
@@ -91,9 +96,10 @@ impl<T> Collection<T> {
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
     ///
-    /// `await` will return `Result<`[`ChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` or
-    /// `Result<`[`SessionChangeStream`]`<`[`ChangeStreamEvent`]`<Document>>>` if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
+    #[deeplink]
     pub fn watch(&self) -> Watch {
         Watch::new(self.client(), self.namespace().into())
     }
@@ -133,7 +139,10 @@ impl crate::sync::Database {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in this collection. A
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
@@ -243,65 +252,51 @@ impl<'a> Watch<'a, ImplicitSession> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for Watch<'a, ImplicitSession> {
-        type Future = WatchFuture;
+#[action_impl(sync = crate::sync::ChangeStream<ChangeStreamEvent<Document>>)]
+impl<'a> Action for Watch<'a, ImplicitSession> {
+    type Future = WatchFuture;
 
-        async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-            resolve_options!(
-                self.client,
-                self.options,
-                [read_concern, selection_criteria]
-            );
-            if self.cluster {
-                self.options
-                    .get_or_insert_with(Default::default)
-                    .all_changes_for_cluster = Some(true);
-            }
-            self.client
-                .execute_watch(self.pipeline, self.options, self.target, None)
-                .await
+    async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        resolve_options!(
+            self.client,
+            self.options,
+            [read_concern, selection_criteria]
+        );
+        if self.cluster {
+            self.options
+                .get_or_insert_with(Default::default)
+                .all_changes_for_cluster = Some(true);
         }
-
-        fn sync_wrap(out) -> Result<crate::sync::ChangeStream<ChangeStreamEvent<Document>>> {
-            out.map(crate::sync::ChangeStream::new)
-        }
+        self.client
+            .execute_watch(self.pipeline, self.options, self.target, None)
+            .await
     }
 }
 
-action_impl! {
-    impl<'a> Action for Watch<'a, ExplicitSession<'a>> {
-        type Future = WatchSessionFuture;
+#[action_impl(sync = crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>)]
+impl<'a> Action for Watch<'a, ExplicitSession<'a>> {
+    type Future = WatchSessionFuture;
 
-        async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-            resolve_read_concern_with_session!(
-                self.client,
-                self.options,
-                Some(&mut *self.session.0)
-            )?;
-            resolve_selection_criteria_with_session!(
-                self.client,
-                self.options,
-                Some(&mut *self.session.0)
-            )?;
-            if self.cluster {
-                self.options
-                    .get_or_insert_with(Default::default)
-                    .all_changes_for_cluster = Some(true);
-            }
-            self.client
-                .execute_watch_with_session(
-                    self.pipeline,
-                    self.options,
-                    self.target,
-                    None,
-                    self.session.0,
-                )
-                .await
+    async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+        resolve_read_concern_with_session!(self.client, self.options, Some(&mut *self.session.0))?;
+        resolve_selection_criteria_with_session!(
+            self.client,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
+        if self.cluster {
+            self.options
+                .get_or_insert_with(Default::default)
+                .all_changes_for_cluster = Some(true);
         }
-
-        fn sync_wrap(out) -> Result<crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>> {
-            out.map(crate::sync::SessionChangeStream::new)
-        }
+        self.client
+            .execute_watch_with_session(
+                self.pipeline,
+                self.options,
+                self.target,
+                None,
+                self.session.0,
+            )
+            .await
     }
 }

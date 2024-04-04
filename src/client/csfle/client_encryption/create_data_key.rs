@@ -11,25 +11,26 @@ use crate::{
 
 use super::{ClientEncryption, MasterKey};
 
-action_impl! {
-    impl<'a> Action for CreateDataKey<'a> {
-        type Future = CreateDataKeyFuture;
+#[action_impl]
+impl<'a> Action for CreateDataKey<'a> {
+    type Future = CreateDataKeyFuture;
 
-        async fn execute(self) -> Result<Binary> {
-            #[allow(unused_mut)]
-            let mut provider = self.master_key.provider();
-            #[cfg(test)]
-            if let Some(tp) = self.test_kms_provider {
-                provider = tp;
-            }
-            let ctx = self.client_enc.create_data_key_ctx(provider, self.master_key, self.options)?;
-            let data_key = self.client_enc.exec.run_ctx(ctx, None).await?;
-            self.client_enc.key_vault.insert_one(&data_key, None).await?;
-            let bin_ref = data_key
-                .get_binary("_id")
-                .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
-            Ok(bin_ref.to_binary())
+    async fn execute(self) -> Result<Binary> {
+        #[allow(unused_mut)]
+        let mut provider = self.master_key.provider();
+        #[cfg(test)]
+        if let Some(tp) = self.test_kms_provider {
+            provider = tp;
         }
+        let ctx = self
+            .client_enc
+            .create_data_key_ctx(provider, self.master_key, self.options)?;
+        let data_key = self.client_enc.exec.run_ctx(ctx, None).await?;
+        self.client_enc.key_vault.insert_one(&data_key).await?;
+        let bin_ref = data_key
+            .get_binary("_id")
+            .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
+        Ok(bin_ref.to_binary())
     }
 }
 

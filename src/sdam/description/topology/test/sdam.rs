@@ -5,6 +5,8 @@ use serde::Deserialize;
 
 use super::TestSdamEvent;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
@@ -28,9 +30,8 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
+        util::event_buffer::EventBuffer,
         Event,
-        EventClient,
-        EventHandler,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -273,11 +274,12 @@ async fn run_test(test_file: TestFile) {
         .await
         .expect(test_description);
 
-    let handler = Arc::new(EventHandler::new());
-    options.sdam_event_handler = Some(handler.clone().into());
+    let buffer = EventBuffer::new();
+    options.sdam_event_handler = Some(buffer.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
-    let mut event_subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut event_subscriber = buffer.subscribe();
     let mut topology = Topology::new(options.clone()).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
@@ -589,20 +591,22 @@ async fn load_balanced() {
 #[tokio::test]
 #[function_name::named]
 async fn topology_closed_event_last() {
-    let event_handler = EventHandler::new();
-    let mut subscriber = event_handler.subscribe();
+    let event_buffer = EventBuffer::new();
+    #[allow(deprecated)]
     let client = EventClient::with_additional_options(
         None,
         Some(Duration::from_millis(50)),
         None,
-        event_handler.clone(),
+        event_buffer.clone(),
     )
     .await;
+    #[allow(deprecated)]
+    let mut subscriber = event_buffer.subscribe_all();
 
     client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! { "x": 1 }, None)
+        .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
     drop(client);
@@ -634,16 +638,18 @@ async fn heartbeat_events() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
 
-    let event_handler = EventHandler::new();
-    let mut subscriber = event_handler.subscribe();
-
+    let event_buffer = EventBuffer::new();
+    #[allow(deprecated)]
     let client = EventClient::with_additional_options(
         Some(options.clone()),
         Some(Duration::from_millis(50)),
         None,
-        event_handler.clone(),
+        event_buffer.clone(),
     )
     .await;
+
+    #[allow(deprecated)]
+    let mut subscriber = event_buffer.subscribe_all();
 
     if client.is_load_balanced() {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
@@ -715,7 +721,7 @@ async fn direct_connection() {
     direct_false_client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection=false on secondary");
 
@@ -726,7 +732,7 @@ async fn direct_connection() {
     let error = direct_true_client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .expect_err("write should fail with directConnection=true on secondary");
     assert!(error.is_notwritableprimary());
@@ -736,7 +742,7 @@ async fn direct_connection() {
     client
         .database(function_name!())
         .collection(function_name!())
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection unspecified");
 }

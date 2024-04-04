@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
-use super::super::option_setters;
+use super::super::{deeplink, option_setters};
 use crate::client_encryption::ClientEncryption;
 
 impl ClientEncryption {
@@ -14,7 +14,8 @@ impl ClientEncryption {
     /// `AutoEncryptionOptions`. `AutoEncryptionOptions.bypass_query_analysis` may be true.
     /// `AutoEncryptionOptions.bypass_auto_encryption` must be false.
     ///
-    /// `await` will return a `Result<Binary>` (subtype 6) containing the encrypted value.
+    /// `await` will return a d[`Result<Binary>`] (subtype 6) containing the encrypted value.
+    #[deeplink]
     pub fn encrypt(
         &self,
         value: impl Into<bson::RawBson>,
@@ -39,7 +40,8 @@ impl ClientEncryption {
     /// The expression will be encrypted using the [`Algorithm::RangePreview`] algorithm and the
     /// "rangePreview" query type.
     ///
-    /// `await` returns a `Result<Document>` containing the encrypted expression.
+    /// `await` will return a d[`Result<Document>`] containing the encrypted expression.
+    #[deeplink]
     pub fn encrypt_expression(
         &self,
         expression: RawDocumentBuf,

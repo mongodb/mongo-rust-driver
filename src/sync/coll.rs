@@ -1,26 +1,5 @@
-use std::{borrow::Borrow, fmt::Debug};
-
-use serde::{de::DeserializeOwned, Serialize};
-
-use super::{ClientSession, Cursor, SessionCursor};
 use crate::{
-    bson::Document,
-    error::Result,
-    options::{
-        FindOneAndDeleteOptions,
-        FindOneAndReplaceOptions,
-        FindOneAndUpdateOptions,
-        FindOneOptions,
-        FindOptions,
-        InsertManyOptions,
-        InsertOneOptions,
-        ReadConcern,
-        ReplaceOptions,
-        SelectionCriteria,
-        UpdateModifications,
-        WriteConcern,
-    },
-    results::{InsertManyResult, InsertOneResult, UpdateResult},
+    options::{ReadConcern, SelectionCriteria, WriteConcern},
     Collection as AsyncCollection,
     Namespace,
 };
@@ -50,7 +29,7 @@ use crate::{
 ///
 ///     std::thread::spawn(move || {
 ///         // Perform operations with `coll_ref`. For example:
-///         coll_ref.insert_one(doc! { "x": i }, None);
+///         coll_ref.insert_one(doc! { "x": i });
 ///     });
 /// }
 /// #
@@ -62,17 +41,23 @@ use crate::{
 /// ```
 
 #[derive(Clone, Debug)]
-pub struct Collection<T> {
+pub struct Collection<T>
+where
+    T: Send + Sync,
+{
     pub(crate) async_collection: AsyncCollection<T>,
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
     }
 
     /// Gets a clone of the `Collection` with a different type `U`.
-    pub fn clone_with_type<U>(&self) -> Collection<U> {
+    pub fn clone_with_type<U: Send + Sync>(&self) -> Collection<U> {
         Collection::new(self.async_collection.clone_with_type())
     }
 
@@ -104,316 +89,5 @@ impl<T> Collection<T> {
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.async_collection.write_concern()
-    }
-
-    /// Finds the documents in the collection matching `filter`.
-    pub fn find(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-    ) -> Result<Cursor<T>> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_collection.find(filter.into(), options.into()))
-            .map(Cursor::new)
-    }
-
-    /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.
-    pub fn find_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<T>> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_collection.find_with_session(
-                filter.into(),
-                options.into(),
-                &mut session.async_client_session,
-            ))
-            .map(SessionCursor::new)
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
-    /// Finds a single document in the collection matching `filter`.
-    pub fn find_one(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection
-                .find_one(filter.into(), options.into()),
-        )
-    }
-
-    /// Finds a single document in the collection matching `filter` using the provided
-    /// `ClientSession`.
-    pub fn find_one_with_session(
-        &self,
-        filter: impl Into<Option<Document>>,
-        options: impl Into<Option<FindOneOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_with_session(
-            filter.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: DeserializeOwned,
-{
-    /// Atomically finds up to one document in the collection matching `filter` and deletes it.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_delete(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection
-                .find_one_and_delete(filter, options.into()),
-        )
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and deletes it using
-    /// the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_delete_with_session(
-        &self,
-        filter: Document,
-        options: impl Into<Option<FindOneAndDeleteOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
-            filter,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and updates it.
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_update(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update(
-            filter,
-            update.into(),
-            options.into(),
-        ))
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and updates it using
-    /// the provided `ClientSession`. Both `Document` and `Vec<Document>` implement
-    /// `Into<UpdateModifications>`, so either can be passed in place of constructing the enum
-    /// case. Note: pipeline updates are only supported in MongoDB 4.2+.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_update_with_session(
-        &self,
-        filter: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<FindOneAndUpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
-            filter,
-            update.into(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: Serialize + DeserializeOwned,
-{
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_replace(
-        &self,
-        filter: Document,
-        replacement: T,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_replace(
-            filter,
-            replacement,
-            options.into(),
-        ))
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn find_one_and_replace_with_session(
-        &self,
-        filter: Document,
-        replacement: T,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection.find_one_and_replace_with_session(
-                filter,
-                replacement,
-                options.into(),
-                &mut session.async_client_session,
-            ),
-        )
-    }
-}
-
-impl<T> Collection<T>
-where
-    T: Serialize,
-{
-    /// Inserts the documents in `docs` into the collection.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_many(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-    ) -> Result<InsertManyResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
-    }
-
-    /// Inserts the documents in `docs` into the collection using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_many_with_session(
-        &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
-        options: impl Into<Option<InsertManyOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<InsertManyResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_many_with_session(
-            docs,
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Inserts `doc` into the collection.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_one(
-        &self,
-        doc: impl Borrow<T>,
-        options: impl Into<Option<InsertOneOptions>>,
-    ) -> Result<InsertOneResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(
-            self.async_collection
-                .insert_one(doc.borrow(), options.into()),
-        )
-    }
-
-    /// Inserts `doc` into the collection using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn insert_one_with_session(
-        &self,
-        doc: impl Borrow<T>,
-        options: impl Into<Option<InsertOneOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<InsertOneResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.insert_one_with_session(
-            doc.borrow(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
-    }
-
-    /// Replaces up to one document matching `query` in the collection with `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn replace_one(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-    ) -> Result<UpdateResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one(
-            query,
-            replacement.borrow(),
-            options.into(),
-        ))
-    }
-
-    /// Replaces up to one document matching `query` in the collection with `replacement` using the
-    /// provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub fn replace_one_with_session(
-        &self,
-        query: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<ReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_collection.replace_one_with_session(
-            query,
-            replacement.borrow(),
-            options.into(),
-            &mut session.async_client_session,
-        ))
     }
 }

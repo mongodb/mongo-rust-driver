@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{future::IntoFuture, time::Duration};
 
 use bson::doc;
 
@@ -8,14 +8,13 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    runtime,
-    runtime::AsyncJoinHandle,
+    runtime::{self, AsyncJoinHandle},
     test::{
         get_client_options,
         log_uncaptured,
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
+        util::event_buffer::EventBuffer,
         Event,
-        EventHandler,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -51,27 +50,30 @@ async fn retry_releases_connection() {
     let collection = client
         .database("retry_releases_connection")
         .collection("retry_releases_connection");
-    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1)).close_connection(true);
     let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
-    runtime::timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
-        .await
-        .expect("operation should not time out")
-        .expect("find should succeed");
+    runtime::timeout(
+        Duration::from_secs(1),
+        collection.find_one(doc! {}).into_future(),
+    )
+    .await
+    .expect("operation should not time out")
+    .expect("find should succeed");
 }
 
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_pool_cleared() {
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone().into());
-    client_options.command_event_handler = Some(handler.clone().into());
+    client_options.cmap_event_handler = Some(buffer.handler());
+    client_options.command_event_handler = Some(buffer.handler());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -92,19 +94,20 @@ async fn retry_read_pool_cleared() {
     let collection = client
         .database("retry_read_pool_cleared")
         .collection("retry_read_pool_cleared");
-    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
         .error_code(91)
         .block_connection(Duration::from_secs(1));
     let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = runtime::spawn(async move { coll.find_one(doc! {}, None).await });
+        let task = runtime::spawn(async move { coll.find_one(doc! {}).await });
         tasks.push(task);
     }
 
@@ -148,7 +151,7 @@ async fn retry_read_pool_cleared() {
         );
     }
 
-    assert_eq!(handler.get_command_started_events(&["find"]).len(), 3);
+    assert_eq!(buffer.get_command_started_events(&["find"]).len(), 3);
 }
 
 // Retryable Reads Are Retried on a Different mongos if One is Available
@@ -182,6 +185,7 @@ async fn retry_read_different_mongos() {
         guards.push(client.configure_fail_point(fail_point).await.unwrap());
     }
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -190,10 +194,14 @@ async fn retry_read_different_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_read_different_mongos")
-        .find(doc! {}, None)
+        .find(doc! {})
         .await;
     assert!(result.is_err());
-    let events = client.get_command_events(&["find"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["find"])
+    };
     assert!(
         matches!(
             &events[..],
@@ -238,6 +246,7 @@ async fn retry_read_same_mongos() {
         client.configure_fail_point(fail_point).await.unwrap()
     };
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -246,10 +255,14 @@ async fn retry_read_same_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_read_same_mongos")
-        .find(doc! {}, None)
+        .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let events = client.get_command_events(&["find"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["find"])
+    };
     assert!(
         matches!(
             &events[..],

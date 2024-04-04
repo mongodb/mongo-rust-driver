@@ -66,8 +66,8 @@ impl SelectionCriteria {
         S: serde::Serializer,
     {
         match selection_criteria {
-            Some(SelectionCriteria::ReadPreference(pref)) => {
-                ReadPreference::serialize_for_client_options(pref, serializer)
+            Some(SelectionCriteria::ReadPreference(read_preference)) => {
+                read_preference.serialize(serializer)
             }
             _ => serializer.serialize_none(),
         }
@@ -98,64 +98,53 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 /// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference) for more details.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,
 
     /// Only route this operation to a secondary.
-    Secondary { options: ReadPreferenceOptions },
+    Secondary {
+        options: Option<ReadPreferenceOptions>,
+    },
 
     /// Route this operation to the primary if it's available, but fall back to the secondaries if
     /// not.
-    PrimaryPreferred { options: ReadPreferenceOptions },
+    PrimaryPreferred {
+        options: Option<ReadPreferenceOptions>,
+    },
 
     /// Route this operation to a secondary if one is available, but fall back to the primary if
     /// not.
-    SecondaryPreferred { options: ReadPreferenceOptions },
+    SecondaryPreferred {
+        options: Option<ReadPreferenceOptions>,
+    },
 
     /// Route this operation to the node with the least network latency regardless of whether it's
     /// the primary or a secondary.
-    Nearest { options: ReadPreferenceOptions },
+    Nearest {
+        options: Option<ReadPreferenceOptions>,
+    },
 }
 
 impl std::fmt::Display for ReadPreference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{ Mode: ")?;
-        let opts_ref = match self {
-            ReadPreference::Primary => {
-                write!(f, "Primary")?;
-                None
+        let mut mode = self.mode().to_string();
+        mode[0..1].make_ascii_uppercase();
+        write!(f, "{{ Mode: {}", mode)?;
+
+        if let Some(options) = self.options() {
+            if let Some(ref tag_sets) = options.tag_sets {
+                write!(f, ", Tag Sets: {:?}", tag_sets)?;
             }
-            ReadPreference::Secondary { options } => {
-                write!(f, "Secondary")?;
-                Some(options)
+            if let Some(ref max_staleness) = options.max_staleness {
+                write!(f, ", Max Staleness: {:?}", max_staleness)?;
             }
-            ReadPreference::PrimaryPreferred { options } => {
-                write!(f, "PrimaryPreferred")?;
-                Some(options)
-            }
-            ReadPreference::SecondaryPreferred { options } => {
-                write!(f, "SecondaryPreferred")?;
-                Some(options)
-            }
-            ReadPreference::Nearest { options } => {
-                write!(f, "Nearest")?;
-                Some(options)
-            }
-        };
-        if let Some(opts) = opts_ref {
-            if !opts.is_default() {
-                if let Some(ref tag_sets) = opts.tag_sets {
-                    write!(f, ", Tag Sets: {:?}", tag_sets)?;
-                }
-                if let Some(ref max_staleness) = opts.max_staleness {
-                    write!(f, ", Max Staleness: {:?}", max_staleness)?;
-                }
-                if let Some(ref hedge) = opts.hedge {
-                    write!(f, ", Hedge: {}", hedge.enabled)?;
-                }
+            if let Some(ref hedge) = options.hedge {
+                write!(f, ", Hedge: {}", hedge.enabled)?;
             }
         }
+
         write!(f, " }}")
     }
 }
@@ -172,29 +161,28 @@ impl<'de> Deserialize<'de> for ReadPreference {
             #[serde(flatten)]
             options: ReadPreferenceOptions,
         }
-        let preference = ReadPreferenceHelper::deserialize(deserializer)?;
-        match preference.mode.to_ascii_lowercase().as_str() {
+        let helper = ReadPreferenceHelper::deserialize(deserializer)?;
+        match helper.mode.to_ascii_lowercase().as_str() {
             "primary" => {
-                if !preference.options.is_default() {
-                    return Err(D::Error::custom(&format!(
-                        "no options can be specified with read preference mode = primary, but got \
-                         {:?}",
-                        preference.options
+                if !helper.options.is_default() {
+                    return Err(D::Error::custom(format!(
+                        "cannot specify options for primary read preference, got {:?}",
+                        helper.options
                     )));
                 }
                 Ok(ReadPreference::Primary)
             }
             "secondary" => Ok(ReadPreference::Secondary {
-                options: preference.options,
+                options: Some(helper.options),
             }),
             "primarypreferred" => Ok(ReadPreference::PrimaryPreferred {
-                options: preference.options,
+                options: Some(helper.options),
             }),
             "secondarypreferred" => Ok(ReadPreference::SecondaryPreferred {
-                options: preference.options,
+                options: Some(helper.options),
             }),
             "nearest" => Ok(ReadPreference::Nearest {
-                options: preference.options,
+                options: Some(helper.options),
             }),
             other => Err(D::Error::custom(format!(
                 "Unknown read preference mode: {}",
@@ -211,35 +199,17 @@ impl Serialize for ReadPreference {
     {
         #[serde_with::skip_serializing_none]
         #[derive(Serialize)]
-        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        #[serde(rename_all = "camelCase")]
         struct ReadPreferenceHelper<'a> {
             mode: &'static str,
             #[serde(flatten)]
             options: Option<&'a ReadPreferenceOptions>,
         }
-        let helper = match self {
-            ReadPreference::Primary => ReadPreferenceHelper {
-                mode: "primary",
-                options: None,
-            },
-            ReadPreference::PrimaryPreferred { options } => ReadPreferenceHelper {
-                mode: "primaryPreferred",
-                options: Some(options),
-            },
-            ReadPreference::Secondary { options } => ReadPreferenceHelper {
-                mode: "secondary",
-                options: Some(options),
-            },
-            ReadPreference::SecondaryPreferred { options } => ReadPreferenceHelper {
-                mode: "secondaryPreferred",
-                options: Some(options),
-            },
-            ReadPreference::Nearest { options } => ReadPreferenceHelper {
-                mode: "nearest",
-                options: Some(options),
-            },
-        };
 
+        let helper = ReadPreferenceHelper {
+            mode: self.mode(),
+            options: self.options(),
+        };
         helper.serialize(serializer)
     }
 }
@@ -253,6 +223,7 @@ impl Serialize for ReadPreference {
 pub struct ReadPreferenceOptions {
     /// Specifies which replica set members should be considered for operations. Each tag set will
     /// be checked in order until one or more servers is found with each tag in the set.
+    #[serde(alias = "tag_sets")]
     pub tag_sets: Option<Vec<TagSet>>,
 
     /// Specifies the maximum amount of lag behind the primary that a secondary can be to be
@@ -308,19 +279,37 @@ impl HedgedReadOptions {
 }
 
 impl ReadPreference {
-    pub(crate) fn max_staleness(&self) -> Option<Duration> {
+    pub(crate) fn mode(&self) -> &'static str {
         match self {
-            ReadPreference::Primary => None,
-            ReadPreference::Secondary { ref options }
-            | ReadPreference::PrimaryPreferred { ref options }
-            | ReadPreference::SecondaryPreferred { ref options }
-            | ReadPreference::Nearest { ref options } => options.max_staleness,
+            Self::Primary => "primary",
+            Self::Secondary { .. } => "secondary",
+            Self::PrimaryPreferred { .. } => "primaryPreferred",
+            Self::SecondaryPreferred { .. } => "secondaryPreferred",
+            Self::Nearest { .. } => "nearest",
         }
+    }
+
+    pub(crate) fn options(&self) -> Option<&ReadPreferenceOptions> {
+        match self {
+            Self::Primary => None,
+            Self::Secondary { options }
+            | Self::PrimaryPreferred { options }
+            | Self::SecondaryPreferred { options }
+            | Self::Nearest { options } => options.as_ref(),
+        }
+    }
+
+    pub(crate) fn max_staleness(&self) -> Option<Duration> {
+        self.options().and_then(|options| options.max_staleness)
+    }
+
+    pub(crate) fn tag_sets(&self) -> Option<&Vec<TagSet>> {
+        self.options().and_then(|options| options.tag_sets.as_ref())
     }
 
     pub(crate) fn with_tags(mut self, tag_sets: Vec<TagSet>) -> Result<Self> {
         let options = match self {
-            ReadPreference::Primary => {
+            Self::Primary => {
                 return Err(ErrorKind::InvalidArgument {
                     message: "read preference tags can only be specified when a non-primary mode \
                               is specified"
@@ -328,13 +317,13 @@ impl ReadPreference {
                 }
                 .into());
             }
-            ReadPreference::Secondary { ref mut options } => options,
-            ReadPreference::PrimaryPreferred { ref mut options } => options,
-            ReadPreference::SecondaryPreferred { ref mut options } => options,
-            ReadPreference::Nearest { ref mut options } => options,
+            Self::Secondary { ref mut options } => options,
+            Self::PrimaryPreferred { ref mut options } => options,
+            Self::SecondaryPreferred { ref mut options } => options,
+            Self::Nearest { ref mut options } => options,
         };
 
-        options.tag_sets = Some(tag_sets);
+        options.get_or_insert_with(Default::default).tag_sets = Some(tag_sets);
 
         Ok(self)
     }
@@ -355,58 +344,9 @@ impl ReadPreference {
             ReadPreference::Nearest { ref mut options } => options,
         };
 
-        options.max_staleness = Some(max_staleness);
+        options.get_or_insert_with(Default::default).max_staleness = Some(max_staleness);
 
         Ok(self)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn serialize_for_client_options<S>(
-        read_preference: &ReadPreference,
-        serializer: S,
-    ) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        #[derive(serde::Serialize)]
-        struct ReadPreferenceHelper<'a> {
-            readpreference: &'a str,
-
-            readpreferencetags: Option<&'a Vec<HashMap<String, String>>>,
-
-            #[serde(serialize_with = "serde_util::duration_option_as_int_seconds::serialize")]
-            maxstalenessseconds: Option<Duration>,
-        }
-
-        let state = match read_preference {
-            ReadPreference::Primary => ReadPreferenceHelper {
-                readpreference: "primary",
-                readpreferencetags: None,
-                maxstalenessseconds: None,
-            },
-            ReadPreference::PrimaryPreferred { options } => ReadPreferenceHelper {
-                readpreference: "primaryPreferred",
-                readpreferencetags: options.tag_sets.as_ref(),
-                maxstalenessseconds: options.max_staleness,
-            },
-            ReadPreference::Secondary { options } => ReadPreferenceHelper {
-                readpreference: "secondary",
-                readpreferencetags: options.tag_sets.as_ref(),
-                maxstalenessseconds: options.max_staleness,
-            },
-            ReadPreference::SecondaryPreferred { options } => ReadPreferenceHelper {
-                readpreference: "secondaryPreferred",
-                readpreferencetags: options.tag_sets.as_ref(),
-                maxstalenessseconds: options.max_staleness,
-            },
-            ReadPreference::Nearest { options } => ReadPreferenceHelper {
-                readpreference: "nearest",
-                readpreferencetags: options.tag_sets.as_ref(),
-                maxstalenessseconds: options.max_staleness,
-            },
-        };
-
-        state.serialize(serializer)
     }
 }
 
@@ -420,9 +360,11 @@ mod test {
 
     #[test]
     fn hedged_read_included_in_document() {
-        let options = ReadPreferenceOptions::builder()
-            .hedge(HedgedReadOptions { enabled: true })
-            .build();
+        let options = Some(
+            ReadPreferenceOptions::builder()
+                .hedge(HedgedReadOptions { enabled: true })
+                .build(),
+        );
 
         let read_pref = ReadPreference::Secondary { options };
         let doc = bson::to_document(&read_pref).unwrap();

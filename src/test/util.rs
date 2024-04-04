@@ -1,15 +1,16 @@
 mod event;
+pub(crate) mod event_buffer;
 mod failpoint;
 mod matchable;
-mod subscriber;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
+#[allow(deprecated)]
+pub(crate) use self::event::EventClient;
 pub(crate) use self::{
-    event::{Event, EventClient, EventHandler},
+    event::Event,
     failpoint::{FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
-    subscriber::EventSubscriber,
 };
 
 #[cfg(feature = "tracing-unstable")]
@@ -20,8 +21,7 @@ pub(crate) use self::trace::{
     TracingHandler,
 };
 
-use std::{fmt::Debug, sync::Arc, time::Duration};
-
+use self::event_buffer::EventBuffer;
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
 use crate::{
@@ -32,10 +32,11 @@ use crate::{
 use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Serialize};
+use std::{fmt::Debug, time::Duration};
 
 use super::get_client_options;
 use crate::{
-    error::{CommandError, ErrorKind, Result},
+    error::Result,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     test::{
         update_options_for_testing,
@@ -68,7 +69,7 @@ impl Client {
     pub(crate) fn test_builder() -> TestClientBuilder {
         TestClientBuilder {
             options: None,
-            handler: None,
+            buffer: None,
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption-unstable")]
             encrypted: None,
@@ -78,7 +79,7 @@ impl Client {
 
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
-    handler: Option<Arc<EventHandler>>,
+    buffer: Option<EventBuffer>,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
@@ -106,10 +107,10 @@ impl TestClientBuilder {
         self
     }
 
-    pub(crate) fn event_handler(mut self, handler: impl Into<Option<Arc<EventHandler>>>) -> Self {
-        let handler = handler.into();
-        assert!(self.handler.is_none() || handler.is_none());
-        self.handler = handler;
+    pub(crate) fn event_buffer(mut self, buffer: impl Into<Option<EventBuffer>>) -> Self {
+        let buffer = buffer.into();
+        assert!(self.buffer.is_none() || buffer.is_none());
+        self.buffer = buffer;
         self
     }
 
@@ -139,10 +140,8 @@ impl TestClientBuilder {
             None => get_client_options().await.clone(),
         };
 
-        if let Some(handler) = self.handler {
-            options.command_event_handler = Some(handler.clone().into());
-            options.cmap_event_handler = Some(handler.clone().into());
-            options.sdam_event_handler = Some(handler.clone().into());
+        if let Some(handler) = self.buffer {
+            handler.register(&mut options);
         }
 
         if let Some(freq) = self.min_heartbeat_freq {
@@ -163,8 +162,8 @@ impl TestClientBuilder {
         TestClient::from_client(client).await
     }
 
-    pub(crate) fn handler(&self) -> Option<&Arc<EventHandler>> {
-        self.handler.as_ref()
+    pub(crate) fn buffer(&self) -> Option<&EventBuffer> {
+        self.buffer.as_ref()
     }
 }
 
@@ -175,18 +174,7 @@ impl TestClient {
     }
 
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Self::with_handler(None, options).await
-    }
-
-    pub(crate) async fn with_handler(
-        event_handler: Option<Arc<EventHandler>>,
-        options: impl Into<Option<ClientOptions>>,
-    ) -> Self {
-        Client::test_builder()
-            .options(options)
-            .event_handler(event_handler)
-            .build()
-            .await
+        Client::test_builder().options(options).build().await
     }
 
     async fn from_client(client: Client) -> Self {
@@ -268,7 +256,7 @@ impl TestClient {
         coll_name: &str,
     ) -> Collection<Document> {
         let coll = self.get_coll(db_name, coll_name);
-        drop_collection(&coll).await;
+        coll.drop().await.unwrap();
         coll
     }
 
@@ -278,10 +266,10 @@ impl TestClient {
         coll_name: &str,
     ) -> Collection<T>
     where
-        T: Serialize + DeserializeOwned + Unpin + Debug,
+        T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         let coll = self.database(db_name).collection(coll_name);
-        drop_collection(&coll).await;
+        coll.drop().await.unwrap();
         coll
     }
 
@@ -293,17 +281,6 @@ impl TestClient {
     ) -> Collection<Document> {
         self.database(db_name)
             .collection_with_options(coll_name, options)
-    }
-
-    pub(crate) async fn init_db_and_coll_with_options(
-        &self,
-        db_name: &str,
-        coll_name: &str,
-        options: CollectionOptions,
-    ) -> Collection<Document> {
-        let coll = self.get_coll_with_options(db_name, coll_name, options);
-        drop_collection(&coll).await;
-        coll
     }
 
     pub(crate) async fn create_fresh_collection(
@@ -413,7 +390,7 @@ impl TestClient {
 
     pub(crate) async fn drop_collection(&self, db_name: &str, coll_name: &str) {
         let coll = self.get_coll(db_name, coll_name);
-        drop_collection(&coll).await;
+        coll.drop().await.unwrap();
     }
 
     /// Returns the `Topology' that can be determined without a server query, i.e. all except
@@ -491,18 +468,6 @@ impl TestClient {
     pub(crate) fn into_client(self) -> Client {
         self.client
     }
-}
-
-pub(crate) async fn drop_collection<T>(coll: &Collection<T>)
-where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
-{
-    match coll.drop().await.map_err(|e| *e.kind) {
-        Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}
-        e @ Err(_) => {
-            e.unwrap();
-        }
-    };
 }
 
 pub(crate) fn get_default_name(description: &str) -> String {

@@ -7,6 +7,8 @@ use std::{
 use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
@@ -18,7 +20,6 @@ use crate::{
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
         util::Event,
-        EventClient,
         TestClient,
     },
     Client,
@@ -74,7 +75,8 @@ async fn explicit_session_created_on_same_client() {
         .database(function_name!())
         .collection(function_name!());
     let err = coll
-        .insert_one_with_session(doc! {}, None, &mut session0)
+        .insert_one(doc! {})
+        .session(&mut session0)
         .await
         .unwrap_err();
     match *err.kind {
@@ -124,7 +126,12 @@ async fn implicit_session_after_connection() {
         fn ignore_val<T>(r: Result<T>) -> Result<()> {
             r.map(|_| ())
         }
-        ops.push(coll.insert_one(doc! {}, None).map(ignore_val).boxed());
+        ops.push(
+            coll.insert_one(doc! {})
+                .into_future()
+                .map(ignore_val)
+                .boxed(),
+        );
         ops.push(
             coll.delete_one(doc! {})
                 .into_future()
@@ -138,23 +145,26 @@ async fn implicit_session_after_connection() {
                 .boxed(),
         );
         ops.push(
-            coll.find_one_and_delete(doc! {}, None)
+            coll.find_one_and_delete(doc! {})
+                .into_future()
                 .map(ignore_val)
                 .boxed(),
         );
         ops.push(
-            coll.find_one_and_update(doc! {}, doc! { "$set": { "a": 1 } }, None)
+            coll.find_one_and_update(doc! {}, doc! { "$set": { "a": 1 } })
+                .into_future()
                 .map(ignore_val)
                 .boxed(),
         );
         ops.push(
-            coll.find_one_and_replace(doc! {}, doc! { "a": 1 }, None)
+            coll.find_one_and_replace(doc! {}, doc! { "a": 1 })
+                .into_future()
                 .map(ignore_val)
                 .boxed(),
         );
         ops.push(
             async {
-                let cursor = coll.find(doc! {}, None).await.unwrap();
+                let cursor = coll.find(doc! {}).await.unwrap();
                 let r: Result<Vec<_>> = cursor.try_collect().await;
                 r.map(|_| ())
             }
@@ -195,6 +205,7 @@ async fn implicit_session_after_connection() {
     );
 }
 
+#[allow(deprecated)]
 async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let util_client = TestClient::new().await;
     if util_client.server_version_lt(4, 2) {
@@ -217,6 +228,7 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let options = ClientOptions::parse("mongodb://localhost:47017")
         .await
         .unwrap();
+    #[allow(deprecated)]
     let client = EventClient::with_options(options).await;
     assert!(client.server_info.logical_session_timeout_minutes.is_none());
 
@@ -238,10 +250,11 @@ async fn sessions_not_supported_implicit_session_ignored() {
         return;
     };
 
-    let mut subscriber = client.handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = client.events.subscribe();
     let coll = client.database(name).collection(name);
 
-    let _ = coll.find(doc! {}, None).await;
+    let _ = coll.find(doc! {}).await;
     let event = subscriber
         .filter_map_event(Duration::from_millis(500), |event| match event {
             Event::Command(CommandEvent::Started(command_started_event))
@@ -255,7 +268,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
         .expect("Did not observe a command started event for find operation");
     assert!(!event.command.contains_key("lsid"));
 
-    let _ = coll.insert_one(doc! { "x": 1 }, None).await;
+    let _ = coll.insert_one(doc! { "x": 1 }).await;
     let event = subscriber
         .filter_map_event(Duration::from_millis(500), |event| match event {
             Event::Command(CommandEvent::Started(command_started_event))
@@ -285,13 +298,15 @@ async fn sessions_not_supported_explicit_session_error() {
     let coll = client.database(name).collection(name);
 
     let error = coll
-        .find_one_with_session(doc! {}, None, &mut session)
+        .find_one(doc! {})
+        .session(&mut session)
         .await
         .unwrap_err();
     assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));
 
     let error = coll
-        .insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .insert_one(doc! { "x": 1 })
+        .session(&mut session)
         .await
         .unwrap_err();
     assert!(matches!(*error.kind, ErrorKind::SessionsNotSupported));

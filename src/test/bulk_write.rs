@@ -1,19 +1,17 @@
-use std::{sync::Arc, time::Duration};
-
 use rand::{
     distributions::{Alphanumeric, DistString},
     thread_rng,
 };
 
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     error::ErrorKind,
     options::WriteModel,
     test::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        EventHandler,
+        util::event_buffer::EventBuffer,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -29,12 +27,11 @@ async fn run_unified() {
 
 #[tokio::test]
 async fn max_write_batch_size_batching() {
-    let handler = Arc::new(EventHandler::new());
+    let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
-        .event_handler(handler.clone())
+        .event_buffer(event_buffer.clone())
         .build()
         .await;
-    let mut subscriber = handler.subscribe();
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
@@ -52,29 +49,28 @@ async fn max_write_batch_size_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count as usize, max_write_batch_size + 1);
 
-    let (first_started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
-        .await
-        .expect("no events observed");
-    let first_len = first_started.command.get_array("ops").unwrap().len();
+    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+
+    let first_event = command_started_events
+        .get(0)
+        .expect("no first event observed");
+    let first_len = first_event.command.get_array("ops").unwrap().len();
     assert_eq!(first_len, max_write_batch_size);
 
-    let (second_started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
-        .await
-        .expect("no events observed");
-    let second_len = second_started.command.get_array("ops").unwrap().len();
+    let second_event = command_started_events
+        .get(1)
+        .expect("no second event observed");
+    let second_len = second_event.command.get_array("ops").unwrap().len();
     assert_eq!(second_len, 1);
 }
 
 #[tokio::test]
 async fn max_message_size_bytes_batching() {
-    let handler = Arc::new(EventHandler::new());
+    let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
-        .event_handler(handler.clone())
+        .event_buffer(event_buffer.clone())
         .build()
         .await;
-    let mut subscriber = handler.subscribe();
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping max_message_size_bytes_batching: bulkWrite requires 8.0+");
@@ -95,18 +91,18 @@ async fn max_message_size_bytes_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count as usize, num_models);
 
-    let (first_started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
-        .await
-        .expect("no events observed");
-    let first_len = first_started.command.get_array("ops").unwrap().len();
+    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+
+    let first_event = command_started_events
+        .get(0)
+        .expect("no first event observed");
+    let first_len = first_event.command.get_array("ops").unwrap().len();
     assert_eq!(first_len, num_models - 1);
 
-    let (second_started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
-        .await
-        .expect("no events observed");
-    let second_len = second_started.command.get_array("ops").unwrap().len();
+    let second_event = command_started_events
+        .get(1)
+        .expect("no second event observed");
+    let second_len = second_event.command.get_array("ops").unwrap().len();
     assert_eq!(second_len, 1);
 }
 
@@ -115,13 +111,12 @@ async fn write_concern_error_batches() {
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
 
-    let handler = Arc::new(EventHandler::new());
+    let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
         .options(options)
-        .event_handler(handler.clone())
+        .event_buffer(event_buffer.clone())
         .build()
         .await;
-    let mut subscriber = handler.subscribe();
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping write_concern_error_batches: bulkWrite requires 8.0+");
@@ -158,7 +153,11 @@ async fn write_concern_error_batches() {
 
 #[tokio::test]
 async fn write_error_batches() {
-    let client = TestClient::new().await;
+    let mut event_buffer = EventBuffer::new();
+    let client = Client::test_builder()
+        .event_buffer(event_buffer.clone())
+        .build()
+        .await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
@@ -170,7 +169,7 @@ async fn write_error_batches() {
     let document = doc! { "_id": 1 };
     let collection = client.database("db").collection("coll");
     collection.drop().await.unwrap();
-    collection.insert_one(document.clone(), None).await.unwrap();
+    collection.insert_one(document.clone()).await.unwrap();
 
     let models = vec![
         WriteModel::InsertOne {
@@ -195,23 +194,30 @@ async fn write_error_batches() {
         max_write_batch_size + 1
     );
 
-    let error = client.bulk_write(models).await.unwrap_err();
+    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(command_started_events.len(), 2);
+
+    event_buffer.clear_cached_events();
+
+    let error = client.bulk_write(models).ordered(true).await.unwrap_err();
 
     let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
         panic!("Expected bulk write error, got {:?}", error);
     };
 
     assert_eq!(bulk_write_error.write_errors.len(), 1);
+
+    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(command_started_events.len(), 1);
 }
 
 #[tokio::test]
 async fn cursor_iteration() {
-    let handler = Arc::new(EventHandler::new());
+    let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
-        .event_handler(handler.clone())
+        .event_buffer(event_buffer.clone())
         .build()
         .await;
-    let mut subscriber = handler.subscribe();
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
     let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
@@ -220,8 +226,8 @@ async fn cursor_iteration() {
     let document = doc! { "_id": Alphanumeric.sample_string(&mut thread_rng(), id_size) };
     client
         .database("bulk")
-        .collection::<Document>("write")
-        .insert_one(&document, None)
+        .collection("write")
+        .insert_one(document.clone())
         .await
         .unwrap();
 
@@ -234,19 +240,13 @@ async fn cursor_iteration() {
     ];
     let error = client.bulk_write(models).ordered(false).await.unwrap_err();
 
-    assert!(error.source.is_none());
-
     let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
         panic!("Expected bulk write error, got {:?}", error);
     };
 
-    assert!(bulk_write_error.write_concern_errors.is_empty());
-
     let write_errors = bulk_write_error.write_errors;
     assert_eq!(write_errors.len(), max_write_batch_size);
 
-    subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "getMore")
-        .await
-        .expect("no getMore observed");
+    let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
+    assert!(!command_started_events.is_empty());
 }

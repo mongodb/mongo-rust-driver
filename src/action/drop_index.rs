@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::Bson;
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 use crate::{
     coll::options::DropIndexOptions,
     error::{ErrorKind, Result},
@@ -12,10 +12,14 @@ use crate::{
     Collection,
 };
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the index specified by `name` from this collection.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -27,7 +31,8 @@ impl<T> Collection<T> {
 
     /// Drops all indexes associated with this collection.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_indexes(&self) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -38,18 +43,23 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the index specified by `name` from this collection.
     ///
-    /// [`run`](DropIndex::run) will return `Result<()>`.
+    /// [`run`](DropIndex::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         self.async_collection.drop_index(name)
     }
 
     /// Drops all indexes associated with this collection.
     ///
-    /// [`run`](DropIndex::run) will return `Result<()>`.
+    /// [`run`](DropIndex::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop_indexes(&self) -> DropIndex {
         self.async_collection.drop_indexes()
     }
@@ -72,33 +82,32 @@ impl<'a> DropIndex<'a> {
         comment: Bson,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
 }
 
-action_impl! {
-    impl<'a> Action for DropIndex<'a> {
-        type Future = DropIndexFuture;
+#[action_impl]
+impl<'a> Action for DropIndex<'a> {
+    type Future = DropIndexFuture;
 
-        async fn execute(mut self) -> Result<()> {
-            if matches!(self.name.as_deref(), Some("*")) {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "Cannot pass name \"*\" to drop_index since more than one index would be \
-                              dropped."
-                        .to_string(),
-                }
-                .into());
+    async fn execute(mut self) -> Result<()> {
+        if matches!(self.name.as_deref(), Some("*")) {
+            return Err(ErrorKind::InvalidArgument {
+                message: "Cannot pass name \"*\" to drop_index since more than one index would be \
+                          dropped."
+                    .to_string(),
             }
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-
-            // If there is no provided name, that means we should drop all indexes.
-            let index_name = self.name.unwrap_or_else(|| "*".to_string());
-
-            let op = Op::new(self.coll.namespace(), index_name, self.options);
-            self.coll.client().execute_operation(op, self.session).await
+            .into());
         }
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+
+        // If there is no provided name, that means we should drop all indexes.
+        let index_name = self.name.unwrap_or_else(|| "*".to_string());
+
+        let op = Op::new(self.coll.namespace(), index_name, self.options);
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

@@ -24,12 +24,17 @@ use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use crate::options::Compressor;
 #[cfg(test)]
 use crate::srv::LookupHosts;
 use crate::{
     bson::{doc, Bson, Document},
     client::auth::{AuthMechanism, Credential},
-    compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
     event::EventHandler,
@@ -249,25 +254,6 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn into_document(self) -> Document {
-        match self {
-            Self::Tcp { host, port } => {
-                doc! {
-                    "host": host,
-                    "port": port.map(|i| Bson::Int32(i.into())).unwrap_or(Bson::Null)
-                }
-            }
-            #[cfg(unix)]
-            Self::Unix { path } => {
-                doc! {
-                    "host": path.to_string_lossy().as_ref(),
-                    "port": Bson::Null,
-                }
-            }
-        }
-    }
-
     pub(crate) fn host(&self) -> Cow<'_, str> {
         match self {
             Self::Tcp { host, .. } => Cow::Borrowed(host.as_str()),
@@ -391,10 +377,15 @@ pub struct ClientOptions {
     #[builder(default)]
     pub app_name: Option<String>,
 
-    /// The compressors that the Client is willing to use in the order they are specified
-    /// in the configuration.  The Client sends this list of compressors to the server.
-    /// The server responds with the intersection of its supported list of compressors.
-    /// The order of compressors indicates preference of compressors.
+    /// The allowed compressors to use to compress messages sent to and decompress messages
+    /// received from the server. This list should be specified in priority order, as the
+    /// compressor used for messages will be the first compressor in this list that is also
+    /// supported by the server selected for operations.
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     #[builder(default)]
     #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
@@ -742,7 +733,11 @@ impl Serialize for ClientOptions {
             writeconcern: &self.write_concern,
             loadbalanced: &self.load_balanced,
             zlibcompressionlevel: &None,
-            srvmaxhosts: self.srv_max_hosts.map(|v| v as i32),
+            srvmaxhosts: self
+                .srv_max_hosts
+                .map(|v| v.try_into())
+                .transpose()
+                .map_err(serde::ser::Error::custom)?,
         };
 
         client_options.serialize(serializer)
@@ -834,6 +829,11 @@ pub struct ConnectionString {
     /// By default, connections will not be closed due to being idle.
     pub max_idle_time: Option<Duration>,
 
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     /// The compressors that the Client is willing to use in the order they are specified
     /// in the configuration.  The Client sends this list of compressors to the server.
     /// The server responds with the intersection of its supported list of compressors.
@@ -1342,6 +1342,11 @@ impl ClientOptions {
             max_idle_time: conn_str.max_idle_time,
             max_connecting: conn_str.max_connecting,
             server_selection_timeout: conn_str.server_selection_timeout,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             compressors: conn_str.compressors,
             connect_timeout: conn_str.connect_timeout,
             retry_reads: conn_str.retry_reads,
@@ -1413,6 +1418,11 @@ impl ClientOptions {
             }
         }
 
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
         if let Some(ref compressors) = self.compressors {
             for compressor in compressors {
                 compressor.validate()?;
@@ -1481,12 +1491,19 @@ impl ClientOptions {
         if self.hosts.is_empty() {
             self.hosts = other.hosts;
         }
+
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        merge_options!(other, self, [compressors]);
+
         merge_options!(
             other,
             self,
             [
                 app_name,
-                compressors,
                 cmap_event_handler,
                 command_event_handler,
                 connect_timeout,
@@ -1937,14 +1954,22 @@ impl ConnectionString {
             }
         }
 
-        // If zlib and zlib_compression_level are specified then write zlib_compression_level into
-        // zlib enum
-        if let (Some(compressors), Some(zlib_compression_level)) =
-            (self.compressors.as_mut(), parts.zlib_compression)
-        {
-            for compressor in compressors {
-                compressor.write_zlib_level(zlib_compression_level)
+        #[cfg(feature = "zlib-compression")]
+        if let Some(zlib_compression_level) = parts.zlib_compression {
+            if let Some(compressors) = self.compressors.as_mut() {
+                for compressor in compressors {
+                    compressor.write_zlib_level(zlib_compression_level)?;
+                }
             }
+        }
+        #[cfg(not(feature = "zlib-compression"))]
+        if parts.zlib_compression.is_some() {
+            return Err(ErrorKind::InvalidArgument {
+                message: "zlibCompressionLevel may not be specified without the zlib-compression \
+                          feature flag enabled"
+                    .into(),
+            }
+            .into());
         }
 
         Ok(parts)
@@ -2047,10 +2072,26 @@ impl ConnectionString {
                         Some(index) => {
                             let (k, v) = exclusive_split_at(kvp, index);
                             let key = k.ok_or_else(err_func)?;
-                            if key == "ALLOWED_HOSTS" {
-                                return Err(Error::invalid_argument(
-                                    "ALLOWED_HOSTS must only be specified through client options",
-                                ));
+                            match key {
+                                "ALLOWED_HOSTS" => {
+                                    return Err(Error::invalid_argument(
+                                        "ALLOWED_HOSTS must only be specified through client \
+                                         options",
+                                    ));
+                                }
+                                "OIDC_CALLBACK" => {
+                                    return Err(Error::invalid_argument(
+                                        "OIDC_CALLBACK must only be specified through client \
+                                         options",
+                                    ));
+                                }
+                                "OIDC_HUMAN_CALLBACK" => {
+                                    return Err(Error::invalid_argument(
+                                        "OIDC_HUMAN_CALLBACK must only be specified through \
+                                         client options",
+                                    ));
+                                }
+                                _ => {}
                             }
                             let value = v.ok_or_else(err_func)?;
                             doc.insert(key, value);
@@ -2060,16 +2101,20 @@ impl ConnectionString {
                 }
                 parts.auth_mechanism_properties = Some(doc);
             }
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             "compressors" => {
-                let compressors = value
-                    .split(',')
-                    .filter_map(|x| Compressor::parse_str(x).ok())
-                    .collect::<Vec<Compressor>>();
-                self.compressors = if compressors.is_empty() {
-                    None
-                } else {
-                    Some(compressors)
+                let mut compressors: Option<Vec<Compressor>> = None;
+                for compressor in value.split(',') {
+                    let compressor = Compressor::from_str(compressor)?;
+                    compressors
+                        .get_or_insert_with(Default::default)
+                        .push(compressor);
                 }
+                self.compressors = compressors;
             }
             k @ "connecttimeoutms" => {
                 self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
@@ -2775,18 +2820,20 @@ mod tests {
                 ],
                 selection_criteria: Some(
                     ReadPreference::SecondaryPreferred {
-                        options: ReadPreferenceOptions::builder()
-                            .tag_sets(vec![
-                                tag_set! {
-                                    "dc" => "ny",
-                                    "rack" => "1"
-                                },
-                                tag_set! {
-                                    "dc" => "ny"
-                                },
-                                tag_set! {},
-                            ])
-                            .build()
+                        options: Some(
+                            ReadPreferenceOptions::builder()
+                                .tag_sets(vec![
+                                    tag_set! {
+                                        "dc" => "ny",
+                                        "rack" => "1"
+                                    },
+                                    tag_set! {
+                                        "dc" => "ny"
+                                    },
+                                    tag_set! {},
+                                ])
+                                .build()
+                        )
                     }
                     .into()
                 ),

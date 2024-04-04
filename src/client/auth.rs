@@ -194,6 +194,8 @@ impl AuthMechanism {
                          authentication",
                     ));
                 }
+                // TODO RUST-1660: Handle specific provider validation, perhaps also do Azure as
+                // part of this ticket. Specific providers will add predefined oidc_callback here
                 if credential
                     .source
                     .as_ref()
@@ -207,6 +209,15 @@ impl AuthMechanism {
                     return Err(Error::invalid_argument(
                         "password must not be set for MONGODB-OIDC authentication",
                     ));
+                }
+                if let Some(allowed_hosts) = credential
+                    .mechanism_properties
+                    .as_ref()
+                    .and_then(|p| p.get("ALLOWED_HOSTS"))
+                {
+                    allowed_hosts
+                        .as_array()
+                        .ok_or_else(|| Error::invalid_argument("ALLOWED_HOSTS must be an array"))?;
                 }
                 Ok(())
             }
@@ -267,7 +278,9 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
-            Self::MongoDbOidc => Ok(None),
+            Self::MongoDbOidc => Ok(Some(ClientFirst::Oidc(Box::new(
+                oidc::build_speculative_client_first(credential),
+            )))),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
@@ -320,7 +333,45 @@ impl AuthMechanism {
             }
             .into()),
             AuthMechanism::MongoDbOidc => {
-                oidc::authenticate_stream(stream, credential, server_api).await
+                oidc::authenticate_stream(stream, credential, server_api, None).await
+            }
+            _ => Err(ErrorKind::Authentication {
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
+            }
+            .into()),
+        }
+    }
+
+    pub(crate) async fn reauthenticate_stream(
+        &self,
+        stream: &mut Connection,
+        credential: &Credential,
+        server_api: Option<&ServerApi>,
+    ) -> Result<()> {
+        self.validate_credential(credential)?;
+
+        match self {
+            AuthMechanism::ScramSha1
+            | AuthMechanism::ScramSha256
+            | AuthMechanism::MongoDbX509
+            | AuthMechanism::Plain
+            | AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
+                message: format!(
+                    "Reauthentication for authentication mechanism {:?} is not supported.",
+                    self
+                ),
+            }
+            .into()),
+            #[cfg(feature = "aws-auth")]
+            AuthMechanism::MongoDbAws => Err(ErrorKind::Authentication {
+                message: format!(
+                    "Reauthentication for authentication mechanism {:?} is not supported.",
+                    self
+                ),
+            }
+            .into()),
+            AuthMechanism::MongoDbOidc => {
+                oidc::reauthenticate_stream(stream, credential, server_api).await
             }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
@@ -342,7 +393,6 @@ impl FromStr for AuthMechanism {
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
             MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
-
             #[cfg(feature = "aws-auth")]
             MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
             #[cfg(not(feature = "aws-auth"))]
@@ -389,11 +439,15 @@ pub struct Credential {
     /// Additional properties for the given mechanism.
     pub mechanism_properties: Option<Document>,
 
-    /// The token callbacks for OIDC authentication.
-    /// TODO RUST-1497: make this `pub`
+    /// The token callback for OIDC authentication.
+    // TODO RUST-1497: make this `pub`
+    // Credential::builder().oidc_callback(oidc::Callback::human(...)).build()
+    // the name of the field here does not well encompass what this field actually is since
+    // it contains all the OIDC state information, not just the callback, but it conforms
+    // to how a user would interact with it.
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub(crate) oidc_callbacks: Option<oidc::Callbacks>,
+    pub(crate) oidc_callback: Option<oidc::State>,
 }
 
 impl Credential {
@@ -415,7 +469,7 @@ impl Credential {
         }
     }
 
-    /// Attempts to authenticate a stream according this credential, returning an error
+    /// Attempts to authenticate a stream according to this credential, returning an error
     /// result on failure. A mechanism may be negotiated if one is not provided as part of the
     /// credential.
     pub(crate) async fn authenticate_stream(
@@ -443,6 +497,9 @@ impl Credential {
                 }
                 FirstRound::X509(server_first) => {
                     x509::authenticate_stream(conn, self, server_api, server_first).await
+                }
+                FirstRound::Oidc(server_first) => {
+                    oidc::authenticate_stream(conn, self, server_api, server_first).await
                 }
             };
         }
@@ -502,6 +559,7 @@ impl Debug for Credential {
 pub(crate) enum ClientFirst {
     Scram(ScramVersion, scram::ClientFirst),
     X509(Box<Command>),
+    Oidc(Box<Command>),
 }
 
 impl ClientFirst {
@@ -509,6 +567,7 @@ impl ClientFirst {
         match self {
             Self::Scram(version, client_first) => client_first.to_command(version).body,
             Self::X509(command) => command.body.clone(),
+            Self::Oidc(command) => command.body.clone(),
         }
     }
 
@@ -522,6 +581,7 @@ impl ClientFirst {
                 },
             ),
             Self::X509(..) => FirstRound::X509(server_first),
+            Self::Oidc(..) => FirstRound::Oidc(server_first),
         }
     }
 }
@@ -532,6 +592,7 @@ impl ClientFirst {
 pub(crate) enum FirstRound {
     Scram(ScramVersion, scram::FirstRound),
     X509(Document),
+    Oidc(Document),
 }
 
 pub(crate) fn generate_nonce_bytes() -> [u8; 32] {

@@ -12,8 +12,16 @@ if [ "$OPENSSL" = true ]; then
   FEATURE_FLAGS+=("openssl-tls")
 fi
 
-if [ "$COMPRESSION" = true ]; then
-  FEATURE_FLAGS+=("snappy-compression", "zlib-compression", "zstd-compression")
+if [ "$ZSTD" = true ]; then
+  FEATURE_FLAGS+=("zstd-compression")
+fi
+
+if [ "$ZLIB" = true ]; then
+  FEATURE_FLAGS+=("zlib-compression")
+fi
+
+if [ "$SNAPPY" = true ]; then
+  FEATURE_FLAGS+=("snappy-compression")
 fi
 
 export SESSION_TEST_REQUIRE_MONGOCRYPTD=true

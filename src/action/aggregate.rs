@@ -16,7 +16,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, CollRef, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, CollRef, ExplicitSession, ImplicitSession};
 
 impl Database {
     /// Runs an aggregation operation.
@@ -24,8 +24,9 @@ impl Database {
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// `await` will return `Result<`[`Cursor`]`<Document>>` or `Result<SessionCursor<Document>>` if
+    /// `await` will return d[`Result<Cursor<Document>>`] or d[`Result<SessionCursor<Document>>`] if
     /// a `ClientSession` is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Database(self),
@@ -36,14 +37,18 @@ impl Database {
     }
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// `await` will return `Result<Cursor<Document>>` or `Result<SessionCursor<Document>>` if
-    /// a `ClientSession` is provided.
+    /// `await` will return d[`Result<Cursor<Document>>`] or d[`Result<SessionCursor<Document>>`] if
+    /// a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Collection(CollRef::new(self)),
@@ -61,28 +66,33 @@ impl crate::sync::Database {
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return `Result<`[`Cursor`]`<Document>>` or
-    /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
+    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return `Result<Cursor<Document>>` or
-    /// `Result<SessionCursor<Document>>` if a `ClientSession` is provided.
+    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a `ClientSession` is provided.
+    #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_collection.aggregate(pipeline)
     }
 }
 
-/// Run an aggregation operation.  Create by calling [`Database::aggregate`] or
+/// Run an aggregation operation.  Construct with [`Database::aggregate`] or
 /// [`Collection::aggregate`].
 #[must_use]
 pub struct Aggregate<'a, Session = ImplicitSession> {
@@ -110,7 +120,7 @@ impl<'a, Session> Aggregate<'a, Session> {
 }
 
 impl<'a> Aggregate<'a, ImplicitSession> {
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(
         self,
         value: impl Into<&'a mut ClientSession>,
@@ -124,45 +134,49 @@ impl<'a> Aggregate<'a, ImplicitSession> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for Aggregate<'a, ImplicitSession> {
-        type Future = AggregateFuture;
+#[action_impl(sync = crate::sync::Cursor<Document>)]
+impl<'a> Action for Aggregate<'a, ImplicitSession> {
+    type Future = AggregateFuture;
 
-        async fn execute(mut self) -> Result<Cursor<Document>> {
-            resolve_options!(
-                self.target,
-                self.options,
-                [read_concern, write_concern, selection_criteria]
-            );
+    async fn execute(mut self) -> Result<Cursor<Document>> {
+        resolve_options!(
+            self.target,
+            self.options,
+            [read_concern, write_concern, selection_criteria]
+        );
 
-            let aggregate = crate::operation::aggregate::Aggregate::new(self.target.target(), self.pipeline, self.options);
-            let client = self.target.client();
-            client.execute_cursor_operation(aggregate).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<Document>> {
-            out.map(crate::sync::Cursor::new)
-        }
+        let aggregate = crate::operation::aggregate::Aggregate::new(
+            self.target.target(),
+            self.pipeline,
+            self.options,
+        );
+        let client = self.target.client();
+        client.execute_cursor_operation(aggregate).await
     }
 }
 
-action_impl! {
-    impl<'a> Action for Aggregate<'a, ExplicitSession<'a>> {
-        type Future = AggregateSessionFuture;
+#[action_impl(sync = crate::sync::SessionCursor<Document>)]
+impl<'a> Action for Aggregate<'a, ExplicitSession<'a>> {
+    type Future = AggregateSessionFuture;
 
-        async fn execute(mut self) -> Result<SessionCursor<Document>> {
-            resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-            resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-            resolve_selection_criteria_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+    async fn execute(mut self) -> Result<SessionCursor<Document>> {
+        resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+        resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+        resolve_selection_criteria_with_session!(
+            self.target,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
 
-            let aggregate = crate::operation::aggregate::Aggregate::new(self.target.target(), self.pipeline, self.options);
-            let client = self.target.client();
-            client.execute_session_cursor_operation(aggregate, self.session.0).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::SessionCursor<Document>> {
-            out.map(crate::sync::SessionCursor::new)
-        }
+        let aggregate = crate::operation::aggregate::Aggregate::new(
+            self.target.target(),
+            self.pipeline,
+            self.options,
+        );
+        let client = self.target.client();
+        client
+            .execute_session_cursor_operation(aggregate, self.session.0)
+            .await
     }
 }
 

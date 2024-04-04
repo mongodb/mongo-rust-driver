@@ -70,7 +70,10 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
         }
 
         if let Some(ref max_time) = self.max_time {
-            body.insert("maxTimeMS", max_time.as_millis() as i32);
+            body.insert(
+                "maxTimeMS",
+                max_time.as_millis().try_into().unwrap_or(i32::MAX),
+            );
         }
 
         if let Some(ref comment) = self.comment {

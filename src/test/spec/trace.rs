@@ -3,7 +3,6 @@ use std::{collections::HashMap, iter, sync::Arc, time::Duration};
 use crate::{
     bson::{doc, Document},
     client::options::ServerAddress,
-    coll::options::FindOptions,
     error::{
         BulkWriteError,
         BulkWriteFailure,
@@ -88,7 +87,7 @@ async fn command_logging_truncation_default_limit() {
     let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
 
     let docs = iter::repeat(doc! { "x": "y" }).take(100);
-    coll.insert_many(docs, None)
+    coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
@@ -105,7 +104,7 @@ async fn command_logging_truncation_default_limit() {
     let reply = succeeded.get_value_as_string("reply");
     assert!(reply.len() <= DEFAULT_MAX_DOCUMENT_LENGTH_BYTES + 3); // +3 for trailing "..."
 
-    coll.find(None, None).await.expect("find should succeed");
+    coll.find(doc! {}).await.expect("find should succeed");
     let succeeded = tracing_subscriber
         .wait_for_event(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
@@ -179,7 +178,7 @@ async fn command_logging_truncation_mid_codepoint() {
     let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
 
     let docs = iter::repeat(doc! { "🤔": "🤔🤔🤔🤔🤔🤔" }).take(10);
-    coll.insert_many(docs, None)
+    coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
@@ -196,10 +195,8 @@ async fn command_logging_truncation_mid_codepoint() {
     // trailing "..."
     assert_eq!(command.len(), 221);
 
-    let find_options = FindOptions::builder()
+    coll.find(doc! {})
         .projection(doc! { "_id": 0, "🤔": 1 })
-        .build();
-    coll.find(None, find_options)
         .await
         .expect("find should succeed");
     let succeeded = tracing_subscriber
@@ -363,7 +360,7 @@ fn selection_criteria_tracing_representation() {
 
     // non-primary read preferences with empty options - options should be omitted from
     // representation.
-    let empty_opts = ReadPreferenceOptions::builder().build();
+    let empty_opts = Some(ReadPreferenceOptions::builder().build());
 
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
@@ -396,9 +393,11 @@ fn selection_criteria_tracing_representation() {
 
     let mut tag_set = HashMap::new();
     tag_set.insert("a".to_string(), "b".to_string());
-    let opts_with_tag_sets = ReadPreferenceOptions::builder()
-        .tag_sets(vec![tag_set.clone()])
-        .build();
+    let opts_with_tag_sets = Some(
+        ReadPreferenceOptions::builder()
+            .tag_sets(vec![tag_set.clone()])
+            .build(),
+    );
 
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
@@ -408,9 +407,11 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Tag Sets: [{\"a\": \"b\"}] }"
     );
 
-    let opts_with_max_staleness = ReadPreferenceOptions::builder()
-        .max_staleness(Duration::from_millis(200))
-        .build();
+    let opts_with_max_staleness = Some(
+        ReadPreferenceOptions::builder()
+            .max_staleness(Duration::from_millis(200))
+            .build(),
+    );
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
             options: opts_with_max_staleness
@@ -419,9 +420,11 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Max Staleness: 200ms }"
     );
 
-    let opts_with_hedge = ReadPreferenceOptions::builder()
-        .hedge(HedgedReadOptions::with_enabled(true))
-        .build();
+    let opts_with_hedge = Some(
+        ReadPreferenceOptions::builder()
+            .hedge(HedgedReadOptions::with_enabled(true))
+            .build(),
+    );
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
             options: opts_with_hedge
@@ -430,10 +433,12 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Hedge: true }"
     );
 
-    let opts_with_multiple_options = ReadPreferenceOptions::builder()
-        .max_staleness(Duration::from_millis(200))
-        .tag_sets(vec![tag_set])
-        .build();
+    let opts_with_multiple_options = Some(
+        ReadPreferenceOptions::builder()
+            .max_staleness(Duration::from_millis(200))
+            .tag_sets(vec![tag_set])
+            .build(),
+    );
     assert_eq!(
         SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
             options: opts_with_multiple_options

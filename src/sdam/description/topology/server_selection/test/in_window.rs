@@ -7,7 +7,6 @@ use serde::Deserialize;
 
 use crate::{
     cmap::DEFAULT_MAX_POOL_SIZE,
-    coll::options::FindOptions,
     error::Result,
     event::cmap::CmapEvent,
     options::ServerAddress,
@@ -19,12 +18,13 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
+        util::event_buffer::EventBuffer,
         Event,
-        EventHandler,
         FailPoint,
         FailPointMode,
         TestClient,
     },
+    Client,
     ServerInfo,
 };
 
@@ -155,7 +155,7 @@ async fn load_balancing_test() {
     setup_client
         .database("load_balancing_test")
         .collection("load_balancing_test")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await
         .unwrap();
 
@@ -163,7 +163,7 @@ async fn load_balancing_test() {
     /// was selected. max_share is the upper bound.
     async fn do_test(
         client: &TestClient,
-        handler: &mut EventHandler,
+        handler: &mut EventBuffer,
         min_share: f64,
         max_share: f64,
         iterations: usize,
@@ -177,7 +177,7 @@ async fn load_balancing_test() {
                 .collection::<Document>("load_balancing_test");
             handles.push(runtime::spawn(async move {
                 for _ in 0..iterations {
-                    collection.find_one(None, None).await?;
+                    collection.find_one(doc! {}).await?;
                 }
                 Ok(())
             }))
@@ -197,28 +197,36 @@ async fn load_balancing_test() {
         counts.sort();
 
         let share_of_selections = (*counts[0] as f64) / ((*counts[0] + *counts[1]) as f64);
-        assert!(
-            share_of_selections <= max_share,
-            "expected no more than {}% of selections, instead got {}%",
-            (max_share * 100.0) as u32,
-            (share_of_selections * 100.0) as u32
-        );
-        assert!(
-            share_of_selections >= min_share,
-            "expected at least {}% of selections, instead got {}%",
-            (min_share * 100.0) as u32,
-            (share_of_selections * 100.0) as u32
-        );
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            assert!(
+                share_of_selections <= max_share,
+                "expected no more than {}% of selections, instead got {}%",
+                (max_share * 100.0) as u32,
+                (share_of_selections * 100.0) as u32
+            );
+            assert!(
+                share_of_selections >= min_share,
+                "expected at least {}% of selections, instead got {}%",
+                (min_share * 100.0) as u32,
+                (share_of_selections * 100.0) as u32
+            );
+        }
     }
 
-    let mut handler = EventHandler::new();
-    let mut subscriber = handler.subscribe();
+    let mut buffer = EventBuffer::new();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
     options.min_pool_size = Some(max_pool_size);
-    let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
+    let client = Client::test_builder()
+        .options(options)
+        .event_buffer(buffer.clone())
+        .build()
+        .await;
 
     // wait for both servers pools to be saturated.
     for address in hosts {
@@ -227,13 +235,11 @@ async fn load_balancing_test() {
             let client = client.clone();
             let selector = selector.clone();
             runtime::spawn(async move {
-                let options = FindOptions::builder()
-                    .selection_criteria(SelectionCriteria::Predicate(selector))
-                    .build();
                 client
                     .database("load_balancing_test")
                     .collection::<Document>("load_balancing_test")
-                    .find(doc! { "$where": "sleep(500) && true" }, options)
+                    .find(doc! { "$where": "sleep(500) && true" })
+                    .selection_criteria(SelectionCriteria::Predicate(selector))
                     .await
                     .unwrap();
             });
@@ -249,7 +255,6 @@ async fn load_balancing_test() {
             .expect("timed out waiting for both pools to be saturated");
         conns += 1;
     }
-    drop(subscriber);
 
     // enable a failpoint on one of the mongoses to slow it down
     let slow_host = get_client_options().await.hosts[0].clone();
@@ -261,9 +266,9 @@ async fn load_balancing_test() {
     let guard = setup_client.configure_fail_point(fail_point).await.unwrap();
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
-    do_test(&client, &mut handler, 0.05, 0.25, 10).await;
+    do_test(&client, &mut buffer, 0.05, 0.25, 10).await;
 
     // disable failpoint and rerun, should be back to even split
     drop(guard);
-    do_test(&client, &mut handler, 0.40, 0.50, 100).await;
+    do_test(&client, &mut buffer, 0.40, 0.50, 100).await;
 }

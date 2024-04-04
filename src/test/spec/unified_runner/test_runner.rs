@@ -7,16 +7,9 @@ use tokio::sync::{mpsc, RwLock};
 use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
-    concern::{Acknowledgment, WriteConcern},
+    concern::WriteConcern,
     gridfs::GridFsBucket,
-    options::{
-        CollectionOptions,
-        CreateCollectionOptions,
-        FindOptions,
-        ReadConcern,
-        ReadPreference,
-        SelectionCriteria,
-    },
+    options::{CollectionOptions, ReadConcern, ReadPreference, SelectionCriteria},
     runtime,
     sdam::{TopologyDescription, MIN_HEARTBEAT_FREQUENCY},
     test::{
@@ -29,7 +22,6 @@ use crate::{
         },
         update_options_for_testing,
         util::FailPointGuard,
-        EventHandler,
         TestClient,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
@@ -37,6 +29,8 @@ use crate::{
         SERVERLESS,
         SERVER_API,
     },
+    ClientSession,
+    ClusterTime,
     Collection,
     Database,
 };
@@ -84,6 +78,7 @@ pub(crate) struct TestRunner {
     pub(crate) internal_client: TestClient,
     pub(crate) entities: Arc<RwLock<EntityMap>>,
     pub(crate) fail_point_guards: Arc<RwLock<Vec<FailPointGuard>>>,
+    pub(crate) cluster_time: Arc<RwLock<Option<ClusterTime>>>,
 }
 
 impl TestRunner {
@@ -92,6 +87,7 @@ impl TestRunner {
             internal_client: TestClient::new().await,
             entities: Default::default(),
             fail_point_guards: Default::default(),
+            cluster_time: Default::default(),
         }
     }
 
@@ -101,6 +97,7 @@ impl TestRunner {
             internal_client: TestClient::with_options(Some(options)).await,
             entities: Arc::new(RwLock::new(EntityMap::new())),
             fail_point_guards: Arc::new(RwLock::new(Vec::new())),
+            cluster_time: Default::default(),
         }
     }
 
@@ -207,9 +204,11 @@ impl TestRunner {
             log_uncaptured(format!("Executing {:?}", &test_case.description));
 
             if let Some(ref initial_data) = test_file.initial_data {
+                let mut session = self.internal_client.start_session().await.unwrap();
                 for data in initial_data {
-                    self.insert_initial_data(data).await;
+                    self.insert_initial_data(data, &mut session).await;
                 }
+                *self.cluster_time.write().await = session.cluster_time().cloned();
             }
 
             self.entities.write().await.clear();
@@ -357,9 +356,9 @@ impl TestRunner {
                         .internal_client
                         .get_coll_with_options(db_name, coll_name, options);
 
-                    let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
                     let actual_data: Vec<Document> = collection
-                        .find(doc! {}, options)
+                        .find(doc! {})
+                        .sort(doc! { "_id": 1 })
                         .await
                         .unwrap()
                         .try_collect()
@@ -372,35 +371,37 @@ impl TestRunner {
         }
     }
 
-    pub(crate) async fn insert_initial_data(&self, data: &CollectionData) {
-        let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
-
+    pub(crate) async fn insert_initial_data(
+        &self,
+        data: &CollectionData,
+        session: &mut ClientSession,
+    ) {
         if !data.documents.is_empty() {
             let collection_options = CollectionOptions::builder()
-                .write_concern(write_concern)
+                .write_concern(WriteConcern::majority())
                 .build();
-            let coll = self
-                .internal_client
-                .init_db_and_coll_with_options(
-                    &data.database_name,
-                    &data.collection_name,
-                    collection_options,
-                )
-                .await;
-            coll.insert_many(data.documents.clone(), None)
+            let coll = self.internal_client.get_coll_with_options(
+                &data.database_name,
+                &data.collection_name,
+                collection_options,
+            );
+            coll.drop().session(&mut *session).await.unwrap();
+            coll.insert_many(data.documents.clone())
+                .session(session)
                 .await
                 .unwrap();
         } else {
-            let collection_options = CreateCollectionOptions::builder()
-                .write_concern(write_concern)
-                .build();
+            let coll = self
+                .internal_client
+                .get_coll(&data.database_name, &data.collection_name);
+            coll.drop().session(&mut *session).await.unwrap();
             self.internal_client
-                .create_fresh_collection(
-                    &data.database_name,
-                    &data.collection_name,
-                    collection_options,
-                )
-                .await;
+                .database(&data.database_name)
+                .create_collection(&data.collection_name)
+                .session(&mut *session)
+                .write_concern(WriteConcern::majority())
+                .await
+                .unwrap();
         }
     }
 
@@ -461,10 +462,6 @@ impl TestRunner {
                                 )
                             });
                     update_options_for_testing(&mut options);
-                    let handler = Arc::new(EventHandler::new());
-                    options.command_event_handler = Some(handler.clone().command_sender().into());
-                    options.cmap_event_handler = Some(handler.clone().cmap_sender().into());
-                    options.sdam_event_handler = Some(handler.clone().sdam_sender().into());
 
                     options.server_api = server_api;
 
@@ -503,7 +500,6 @@ impl TestRunner {
                         id,
                         Entity::Client(ClientEntity::new(
                             options,
-                            handler,
                             observe_events,
                             ignore_command_names,
                             observe_sensitive_commands,
@@ -535,11 +531,14 @@ impl TestRunner {
                 TestFileEntity::Session(session) => {
                     let id = session.id.clone();
                     let client = self.get_client(&session.client).await;
-                    let client_session = client
+                    let mut client_session = client
                         .start_session()
                         .with_options(session.session_options.clone())
                         .await
                         .unwrap();
+                    if let Some(time) = &*self.cluster_time.read().await {
+                        client_session.advance_cluster_time(time);
+                    }
                     (id, Entity::Session(SessionEntity::new(client_session)))
                 }
                 TestFileEntity::Bucket(bucket) => {

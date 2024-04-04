@@ -9,12 +9,13 @@ use crate::{
     Database,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop(&self) -> DropDatabase {
         DropDatabase {
             db: self,
@@ -28,13 +29,14 @@ impl Database {
 impl crate::sync::Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
     ///
-    /// [`run`](DropDatabase::run) will return `Result<()>`.
+    /// [`run`](DropDatabase::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop(&self) -> DropDatabase {
         self.async_database.drop()
     }
 }
 
-/// Drops the database, deleting all data, collections, and indexes stored in it.  Create by calling
+/// Drops the database, deleting all data, collections, and indexes stored in it.  Construct with
 /// [`Database::drop`].
 #[must_use]
 pub struct DropDatabase<'a> {
@@ -55,24 +57,25 @@ impl<'a> DropDatabase<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for DropDatabase<'a> {
-        type Future = DropDatabaseFuture;
+#[action_impl]
+impl<'a> Action for DropDatabase<'a> {
+    type Future = DropDatabaseFuture;
 
-        async fn execute(mut self) -> Result<()> {
-            resolve_options!(self.db, self.options, [write_concern]);
-            let op = drop_database::DropDatabase::new(self.db.name().to_string(), self.options);
-            self.db.client()
-                .execute_operation(op, self.session)
-                .await
-        }
+    async fn execute(mut self) -> Result<()> {
+        resolve_options!(self.db, self.options, [write_concern]);
+        let op = drop_database::DropDatabase::new(self.db.name().to_string(), self.options);
+        self.db.client().execute_operation(op, self.session).await
     }
 }
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
-    /// `await` will return `Result<()>`.
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop(&self) -> DropCollection {
         DropCollection {
             cr: CollRef::new(self),
@@ -83,16 +86,20 @@ impl<T> Collection<T> {
 }
 
 #[cfg(feature = "sync")]
-impl<T> crate::sync::Collection<T> {
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Drops the collection, deleting all data and indexes stored in it.
     ///
-    /// [`run`](DropCollection::run) will return `Result<()>`.
+    /// [`run`](DropCollection::run) will return d[`Result<()>`].
+    #[deeplink]
     pub fn drop(&self) -> DropCollection {
         self.async_collection.drop()
     }
 }
 
-/// Drops the collection, deleting all data and indexes stored in it.  Create by calling
+/// Drops the collection, deleting all data and indexes stored in it.  Construct with
 /// [`Collection::drop`].
 #[must_use]
 pub struct DropCollection<'a> {

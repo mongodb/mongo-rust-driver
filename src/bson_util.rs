@@ -14,12 +14,14 @@ use crate::{
         RawBsonRef,
         RawDocumentBuf,
     },
+    checked::Checked,
     error::{ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn get_int(val: &Bson) -> Option<i64> {
     match *val {
         Bson::Int32(i) => Some(i64::from(i)),
@@ -42,6 +44,7 @@ pub(crate) fn get_int_raw(val: RawBsonRef<'_>) -> Option<i64> {
 
 /// Coerce numeric types into an `u64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
     match *val {
         Bson::Int32(i) => u64::try_from(i).ok(),
@@ -88,13 +91,13 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
 }
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
-pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> usize {
+pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> Result<usize> {
     //   * type (1 byte)
     //   * number of decimal digits in key
     //   * null terminator for the key (1 byte)
     //   * size of value
 
-    1 + num_decimal_digits(index) + 1 + doc_len
+    (Checked::new(1) + num_decimal_digits(index) + 1 + doc_len).get()
 }
 
 pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> RawArrayBuf {

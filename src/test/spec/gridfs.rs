@@ -38,12 +38,14 @@ async fn download_stream_across_buffers() {
     bucket.drop().await.unwrap();
 
     let data: Vec<u8> = (0..20).collect();
-    let id = bucket
-        .upload_from_futures_0_3_reader("test", &data[..], None)
-        .await
-        .unwrap();
+    let id = {
+        let mut stream = bucket.open_upload_stream("test").await.unwrap();
+        stream.write_all(&data[..]).await.unwrap();
+        stream.close().await.unwrap();
+        stream.id().clone()
+    };
 
-    let mut download_stream = bucket.open_download_stream(id.into()).await.unwrap();
+    let mut download_stream = bucket.open_download_stream(id).await.unwrap();
     let mut buf = vec![0u8; 12];
 
     // read in a partial chunk
@@ -104,19 +106,26 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
         data.len(),
         if options.is_some() { "with" } else { "without" }
     );
-    let mut upload_stream = bucket.open_upload_stream(&filename, options.clone());
+    let mut upload_stream = bucket
+        .open_upload_stream(&filename)
+        .with_options(options.clone())
+        .await
+        .unwrap();
     upload_stream.write_all(data).await.unwrap();
     upload_stream.close().await.unwrap();
 
     let mut uploaded = Vec::new();
     bucket
-        .download_to_futures_0_3_writer(upload_stream.id().clone(), &mut uploaded)
+        .open_download_stream(upload_stream.id().clone())
+        .await
+        .unwrap()
+        .read_to_end(&mut uploaded)
         .await
         .unwrap();
     assert_eq!(data, &uploaded);
 
     let file = bucket
-        .find_one(doc! { "_id": upload_stream.id() }, None)
+        .find_one(doc! { "_id": upload_stream.id() })
         .await
         .unwrap()
         .unwrap();
@@ -133,7 +142,10 @@ async fn upload_stream_multiple_buffers() {
         .gridfs_bucket(bucket_options);
     bucket.drop().await.unwrap();
 
-    let mut upload_stream = bucket.open_upload_stream("upload_stream_multiple_buffers", None);
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_multiple_buffers")
+        .await
+        .unwrap();
 
     let data: Vec<u8> = (0..20).collect();
 
@@ -169,7 +181,10 @@ async fn upload_stream_multiple_buffers() {
 
     let mut uploaded = Vec::new();
     bucket
-        .download_to_futures_0_3_writer(upload_stream.id().clone(), &mut uploaded)
+        .open_download_stream(upload_stream.id().clone())
+        .await
+        .unwrap()
+        .read_to_end(&mut uploaded)
         .await
         .unwrap();
     assert_eq!(uploaded, data);
@@ -190,12 +205,18 @@ async fn upload_stream_errors() {
     bucket.drop().await.unwrap();
 
     // Error attempting to write to stream after closing.
-    let mut upload_stream = bucket.open_upload_stream("upload_stream_errors", None);
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_errors")
+        .await
+        .unwrap();
     upload_stream.close().await.unwrap();
     assert_closed(&bucket, upload_stream).await;
 
     // Error attempting to write to stream after abort.
-    let mut upload_stream = bucket.open_upload_stream("upload_stream_errors", None);
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_errors")
+        .await
+        .unwrap();
     upload_stream.abort().await.unwrap();
     assert_closed(&bucket, upload_stream).await;
 
@@ -204,10 +225,11 @@ async fn upload_stream_errors() {
     }
 
     // Error attempting to write to stream after write failure.
-    let mut upload_stream = bucket.open_upload_stream(
-        "upload_stream_errors",
-        GridFsUploadOptions::builder().chunk_size_bytes(1).build(),
-    );
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_errors")
+        .chunk_size_bytes(1)
+        .await
+        .unwrap();
 
     let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1)).error_code(1234);
     let _guard = client.configure_fail_point(fail_point).await.unwrap();
@@ -218,10 +240,11 @@ async fn upload_stream_errors() {
     assert_closed(&bucket, upload_stream).await;
 
     // Error attempting to write to stream after close failure.
-    let mut upload_stream = bucket.open_upload_stream(
-        "upload_stream_errors",
-        GridFsUploadOptions::builder().chunk_size_bytes(1).build(),
-    );
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_errors")
+        .chunk_size_bytes(1)
+        .await
+        .unwrap();
 
     upload_stream.write_all(&[11]).await.unwrap();
 
@@ -240,7 +263,10 @@ async fn drop_aborts() {
     let bucket = client.database("upload_stream_abort").gridfs_bucket(None);
     bucket.drop().await.unwrap();
 
-    let mut upload_stream = bucket.open_upload_stream("upload_stream_abort", None);
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_abort")
+        .await
+        .unwrap();
     let id = upload_stream.id().clone();
     upload_stream.write_all(&[11]).await.unwrap();
     drop(upload_stream);
@@ -256,7 +282,10 @@ async fn write_future_dropped() {
         .gridfs_bucket(GridFsBucketOptions::builder().chunk_size_bytes(1).build());
     bucket.drop().await.unwrap();
 
-    let mut upload_stream = bucket.open_upload_stream("upload_stream_abort", None);
+    let mut upload_stream = bucket
+        .open_upload_stream("upload_stream_abort")
+        .await
+        .unwrap();
     let chunks = vec![0u8; 100_000];
 
     assert!(
@@ -306,7 +335,7 @@ async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
     assert!(bucket
         .chunks()
         .clone_with_type::<Document>()
-        .find_one(doc! { "files_id": id }, None)
+        .find_one(doc! { "files_id": id })
         .await
         .unwrap()
         .is_none());
@@ -321,12 +350,12 @@ async fn test_gridfs_bucket_find_one() {
     let bucket = client.database("gridfs_find_one").gridfs_bucket(options);
 
     let filename = String::from("somefile");
-    let mut upload_stream = bucket.open_upload_stream(&filename, None);
+    let mut upload_stream = bucket.open_upload_stream(&filename).await.unwrap();
     upload_stream.write_all(data).await.unwrap();
     upload_stream.close().await.unwrap();
 
     let found = bucket
-        .find_one(doc! { "_id": upload_stream.id() }, None)
+        .find_one(doc! { "_id": upload_stream.id() })
         .await
         .unwrap()
         .unwrap();

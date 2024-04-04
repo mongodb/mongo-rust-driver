@@ -15,7 +15,6 @@ use tokio::{
 
 use crate::{
     client::{options::ServerAddress, WeakClient},
-    coll::options::FindOptions,
     error::{Error, Result},
     operation::{run_command::RunCommand, RawOutput},
     options::ReadConcern,
@@ -164,12 +163,8 @@ impl CryptExecutor {
                         .database(&kv_ns.db)
                         .collection::<RawDocumentBuf>(&kv_ns.coll);
                     let mut cursor = kv_coll
-                        .find(
-                            filter,
-                            FindOptions::builder()
-                                .read_concern(ReadConcern::majority())
-                                .build(),
-                        )
+                        .find(filter)
+                        .read_concern(ReadConcern::majority())
                         .await?;
                     while cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;

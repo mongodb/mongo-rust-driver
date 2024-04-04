@@ -1,3 +1,6 @@
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
 #[cfg(feature = "aws-auth")]
@@ -6,6 +9,12 @@ mod bulk_write;
 mod change_stream;
 mod client;
 mod coll;
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+mod compression;
 #[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
 mod cursor;
@@ -19,6 +28,8 @@ pub(crate) mod util;
 
 #[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
+#[allow(deprecated)]
+pub(crate) use self::util::EventClient;
 pub(crate) use self::{
     spec::{run_spec_test, RunOn, Serverless, Topology},
     util::{
@@ -27,8 +38,6 @@ pub(crate) use self::{
         file_level_log,
         log_uncaptured,
         Event,
-        EventClient,
-        EventHandler,
         FailPoint,
         FailPointMode,
         MatchErrExt,
@@ -48,7 +57,7 @@ use crate::{
         auth::Credential,
         options::{ServerApi, ServerApiVersion},
     },
-    options::{ClientOptions, Compressor},
+    options::ClientOptions,
 };
 use std::{fs::read_to_string, str::FromStr};
 
@@ -79,12 +88,6 @@ pub(crate) static LOAD_BALANCED_SINGLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
 pub(crate) static LOAD_BALANCED_MULTIPLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
-pub(crate) static ZSTD_COMPRESSION_ENABLED: Lazy<bool> =
-    Lazy::new(|| matches!(std::env::var("ZSTD_COMPRESSION_ENABLED"), Ok(s) if s == "true"));
-pub(crate) static ZLIB_COMPRESSION_ENABLED: Lazy<bool> =
-    Lazy::new(|| matches!(std::env::var("ZLIB_COMPRESSION_ENABLED"), Ok(s) if s == "true"));
-pub(crate) static SNAPPY_COMPRESSION_ENABLED: Lazy<bool> =
-    Lazy::new(|| matches!(std::env::var("SNAPPY_COMPRESSION_ENABLED"), Ok(s) if s == "true"));
 pub(crate) static SERVERLESS_ATLAS_USER: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SERVERLESS_ATLAS_USER").ok());
 pub(crate) static SERVERLESS_ATLAS_PASSWORD: Lazy<Option<String>> =
@@ -112,9 +115,14 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     if options.server_api.is_none() {
         options.server_api = SERVER_API.clone();
     }
-    if options.compressors.is_none() {
-        options.compressors = get_compressors();
-    }
+
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
+    set_compressor(options);
+
     if options.credential.is_none() && SERVERLESS_ATLAS_USER.is_some() {
         options.credential = Some(
             Credential::builder()
@@ -122,35 +130,6 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
                 .password(SERVERLESS_ATLAS_PASSWORD.clone())
                 .build(),
         );
-    }
-}
-
-fn get_compressors() -> Option<Vec<Compressor>> {
-    #[allow(unused_mut)]
-    let mut compressors = vec![];
-
-    if *SNAPPY_COMPRESSION_ENABLED {
-        #[cfg(feature = "snappy-compression")]
-        compressors.push(Compressor::Snappy);
-        #[cfg(not(feature = "snappy-compression"))]
-        panic!("To use snappy compression, the \"snappy-compression\" feature flag must be set.");
-    }
-    if *ZLIB_COMPRESSION_ENABLED {
-        #[cfg(feature = "zlib-compression")]
-        compressors.push(Compressor::Zlib { level: None });
-        #[cfg(not(feature = "zlib-compression"))]
-        panic!("To use zlib compression, the \"zlib-compression\" feature flag must be set.");
-    }
-    if *ZSTD_COMPRESSION_ENABLED {
-        #[cfg(feature = "zstd-compression")]
-        compressors.push(Compressor::Zstd { level: None });
-        #[cfg(not(feature = "zstd-compression"))]
-        panic!("To use zstd compression, the \"zstd-compression\" feature flag must be set.");
-    }
-    if compressors.is_empty() {
-        None
-    } else {
-        Some(compressors)
     }
 }
 
@@ -170,4 +149,26 @@ fn get_default_uri() -> String {
         }
     }
     "mongodb://localhost:27017".to_string()
+}
+
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+fn set_compressor(options: &mut ClientOptions) {
+    use crate::options::Compressor;
+
+    #[cfg(feature = "zstd-compression")]
+    {
+        options.compressors = Some(vec![Compressor::Zstd { level: None }]);
+    }
+    #[cfg(feature = "zlib-compression")]
+    {
+        options.compressors = Some(vec![Compressor::Zlib { level: None }]);
+    }
+    #[cfg(feature = "snappy-compression")]
+    {
+        options.compressors = Some(vec![Compressor::Snappy]);
+    }
 }

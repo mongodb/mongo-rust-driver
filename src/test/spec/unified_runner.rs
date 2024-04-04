@@ -1,6 +1,5 @@
 pub(crate) mod entity;
 pub(crate) mod matcher;
-pub(crate) mod observer;
 pub(crate) mod operation;
 pub(crate) mod test_event;
 pub(crate) mod test_file;

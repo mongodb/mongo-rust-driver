@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
 
     // Insert a document.
     let coll = client.database("test").collection("test_coll");
-    coll.insert_one(doc! { "x" : 1 }, None).await?;
+    coll.insert_one(doc! { "x" : 1 }).await?;
 
     Ok(())
 }
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
 
     // Insert a document.
     let coll = client.database("test").collection("test_coll");
-    coll.insert_one(doc! { "x" : 1 }, None).await?;
+    coll.insert_one(doc! { "x" : 1 }).await?;
 
     Ok(())
 }

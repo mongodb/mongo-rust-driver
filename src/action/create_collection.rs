@@ -2,7 +2,7 @@ use bson::Document;
 
 use crate::{options::CreateCollectionOptions, ClientSession, Database};
 
-use crate::action::option_setters;
+use crate::action::{deeplink, option_setters};
 
 impl Database {
     /// Creates a new collection in the database with the given `name`.
@@ -10,11 +10,12 @@ impl Database {
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
     ///
-    /// `await` will return `Result<()>`.
-    pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
+    /// `await` will return d[`Result<()>`].
+    #[deeplink]
+    pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         CreateCollection {
             db: self,
-            name: name.as_ref().to_owned(),
+            name: name.into(),
             options: None,
             session: None,
         }
@@ -28,13 +29,14 @@ impl crate::sync::Database {
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
     ///
-    /// [`run`](CreateCollection::run) will return `Result<()>`.
-    pub fn create_collection(&self, name: impl AsRef<str>) -> CreateCollection {
+    /// [`run`](CreateCollection::run) will return d[`Result<()>`].
+    #[deeplink]
+    pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         self.async_database.create_collection(name)
     }
 }
 
-/// Creates a new collection.  Create by calling [`Database::create_collection`].
+/// Creates a new collection.  Construct with [`Database::create_collection`].
 #[must_use]
 pub struct CreateCollection<'a> {
     pub(crate) db: &'a Database,
@@ -66,7 +68,7 @@ impl<'a> CreateCollection<'a> {
         encrypted_fields: Document,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self

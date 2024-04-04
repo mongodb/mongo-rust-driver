@@ -39,23 +39,23 @@ use crate::{
         Credential,
         FindOptions,
         IndexOptions,
-        InsertOneOptions,
         ReadConcern,
         TlsOptions,
         WriteConcern,
     },
     runtime,
-    test::{Event, EventHandler},
+    test::{util::event_buffer::EventBuffer, Event},
     Client,
     Collection,
     IndexModel,
     Namespace,
 };
 
+#[allow(deprecated)]
+use super::EventClient;
 use super::{
     get_client_options,
     log_uncaptured,
-    EventClient,
     FailCommandOptions,
     FailPoint,
     FailPointMode,
@@ -64,6 +64,7 @@ use super::{
 
 type Result<T> = anyhow::Result<T>;
 
+#[allow(deprecated)]
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = EventClient::new().await;
     let datakeys = client
@@ -212,13 +213,13 @@ async fn custom_key_material() -> Result<()> {
         .key_material(key)
         .await?;
     let mut key_doc = datakeys
-        .find_one(doc! { "_id": id.clone() }, None)
+        .find_one(doc! { "_id": id.clone() })
         .await?
         .unwrap();
     datakeys.delete_one(doc! { "_id": id}).await?;
     let new_key_id = bson::Binary::from_uuid(bson::Uuid::from_bytes([0; 16]));
     key_doc.insert("_id", new_key_id.clone());
-    datakeys.insert_one(key_doc, None).await?;
+    datakeys.insert_one(key_doc).await?;
 
     let encrypted = enc
         .encrypt(
@@ -282,7 +283,8 @@ async fn data_key_double_encryption() -> Result<()> {
     )?;
 
     // Testing each provider:
-    let mut events = client.subscribe_to_events();
+    #[allow(deprecated)]
+    let mut events = client.events.subscribe();
     let provider_keys = [
         (
             KmsProvider::Aws,
@@ -331,7 +333,7 @@ async fn data_key_double_encryption() -> Result<()> {
         let docs: Vec<_> = client
             .database("keyvault")
             .collection::<Document>("datakeys")
-            .find(doc! { "_id": datakey_id.clone() }, None)
+            .find(doc! { "_id": datakey_id.clone() })
             .await?
             .try_collect()
             .await?;
@@ -364,7 +366,7 @@ async fn data_key_double_encryption() -> Result<()> {
                 }),
             )
             .await;
-        assert!(found.is_some(), "no valid event found in {:?}", events);
+        assert!(found.is_some(), "no valid event found");
 
         // Manually encrypt a value and automatically decrypt it.
         let encrypted = client_encryption
@@ -378,12 +380,9 @@ async fn data_key_double_encryption() -> Result<()> {
         let coll = client_encrypted
             .database("db")
             .collection::<Document>("coll");
-        coll.insert_one(
-            doc! { "_id": provider.name(), "value": encrypted.clone() },
-            None,
-        )
-        .await?;
-        let found = coll.find_one(doc! { "_id": provider.name() }, None).await?;
+        coll.insert_one(doc! { "_id": provider.name(), "value": encrypted.clone() })
+            .await?;
+        let found = coll.find_one(doc! { "_id": provider.name() }).await?;
         assert_eq!(
             found.as_ref().and_then(|doc| doc.get("value")),
             Some(&Bson::String(format!("hello {}", provider.name()))),
@@ -402,7 +401,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
         // Attempt to auto-encrypt an already encrypted field.
         let result = coll
-            .insert_one(doc! { "encrypted_placeholder": encrypted }, None)
+            .insert_one(doc! { "encrypted_placeholder": encrypted })
             .await;
         let err = result.unwrap_err();
         assert!(
@@ -438,7 +437,7 @@ async fn external_key_vault() -> Result<()> {
         // Setup: initialize db.
         let (client, datakeys) = init_client().await?;
         datakeys
-            .insert_one(load_testdata("external/external-key.json")?, None)
+            .insert_one(load_testdata("external/external-key.json")?)
             .await?;
 
         // Setup: test options.
@@ -478,7 +477,7 @@ async fn external_key_vault() -> Result<()> {
         let result = client_encrypted
             .database("db")
             .collection::<Document>("coll")
-            .insert_one(doc! { "encrypted": "test" }, None)
+            .insert_one(doc! { "encrypted": "test" })
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
@@ -543,14 +542,15 @@ async fn bson_size_limits() -> Result<()> {
         .validator(doc! { "$jsonSchema": load_testdata("limits/limits-schema.json")? })
         .await?;
     datakeys
-        .insert_one(load_testdata("limits/limits-key.json")?, None)
+        .insert_one(load_testdata("limits/limits-key.json")?)
         .await?;
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let handler = Arc::new(EventHandler::new());
-    let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.clone().into());
+    let buffer = EventBuffer::<Event>::new();
+    #[allow(deprecated)]
+    let mut events = buffer.subscribe();
+    opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
             .extra_options(EXTRA_OPTIONS.clone())
@@ -563,37 +563,31 @@ async fn bson_size_limits() -> Result<()> {
 
     // Tests
     // Test operation 1
-    coll.insert_one(
-        doc! {
-            "_id": "over_2mib_under_16mib",
-            "unencrypted": "a".repeat(2097152),
-        },
-        None,
-    )
+    coll.insert_one(doc! {
+        "_id": "over_2mib_under_16mib",
+        "unencrypted": "a".repeat(2097152),
+    })
     .await?;
 
     // Test operation 2
     let mut doc: Document = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
     doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
-    coll.insert_one(doc, None).await?;
+    coll.insert_one(doc).await?;
 
     // Test operation 3
     let value = "a".repeat(2_097_152);
     events.clear_events(Duration::from_millis(500)).await;
-    coll.insert_many(
-        vec![
-            doc! {
-                "_id": "over_2mib_1",
-                "unencrypted": value.clone(),
-            },
-            doc! {
-                "_id": "over_2mib_2",
-                "unencrypted": value,
-            },
-        ],
-        None,
-    )
+    coll.insert_many(vec![
+        doc! {
+            "_id": "over_2mib_1",
+            "unencrypted": value.clone(),
+        },
+        doc! {
+            "_id": "over_2mib_2",
+            "unencrypted": value,
+        },
+    ])
     .await?;
     let inserts = events
         .collect_events(Duration::from_millis(500), |ev| {
@@ -613,7 +607,7 @@ async fn bson_size_limits() -> Result<()> {
     let mut doc2 = doc.clone();
     doc2.insert("_id", "encryption_exceeds_2mib_2");
     events.clear_events(Duration::from_millis(500)).await;
-    coll.insert_many(vec![doc, doc2], None).await?;
+    coll.insert_many(vec![doc, doc2]).await?;
     let inserts = events
         .collect_events(Duration::from_millis(500), |ev| {
             let ev = match ev.as_command_started_event() {
@@ -630,13 +624,13 @@ async fn bson_size_limits() -> Result<()> {
         "_id": "under_16mib",
         "unencrypted": "a".repeat(16_777_216 - 2_000),
     };
-    coll.insert_one(doc, None).await?;
+    coll.insert_one(doc).await?;
 
     // Test operation 6
     let mut doc: Document = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_16mib");
     doc.insert("unencrypted", "a".repeat(16_777_216 - 2_000));
-    let result = coll.insert_one(doc, None).await;
+    let result = coll.insert_one(doc).await;
     let err = result.unwrap_err();
     assert!(
         matches!(*err.kind, ErrorKind::Write(_)),
@@ -682,7 +676,7 @@ async fn views_prohibited() -> Result<()> {
     let result = client_encrypted
         .database("db")
         .collection::<Document>("view")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     let err = result.unwrap_err();
     assert!(
@@ -759,7 +753,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         "corpus/corpus-key-gcp.json",
         "corpus/corpus-key-kmip.json",
     ] {
-        datakeys.insert_one(load_testdata(f)?, None).await?;
+        datakeys.insert_one(load_testdata(f)?).await?;
     }
 
     // Setup: encrypted client and manual encryption.
@@ -856,9 +850,9 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     let coll = client_encrypted
         .database("db")
         .collection::<Document>("coll");
-    let id = coll.insert_one(corpus_copied, None).await?.inserted_id;
+    let id = coll.insert_one(corpus_copied).await?.inserted_id;
     let corpus_decrypted = coll
-        .find_one(doc! { "_id": id.clone() }, None)
+        .find_one(doc! { "_id": id.clone() })
         .await?
         .expect("document lookup failed");
     assert_eq!(corpus, corpus_decrypted);
@@ -868,7 +862,7 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
     let corpus_encrypted_actual = client
         .database("db")
         .collection::<Document>("coll")
-        .find_one(doc! { "_id": id }, None)
+        .find_one(doc! { "_id": id })
         .await?
         .expect("encrypted document lookup failed");
     for (name, field) in &corpus_encrypted_expected {
@@ -1281,7 +1275,7 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
     client_encrypted
         .database("db")
         .collection::<Document>("coll")
-        .insert_one(doc! { "unencrypted": "test" }, None)
+        .insert_one(doc! { "unencrypted": "test" })
         .await?;
     // Test: mongocryptd not spawned.
     assert!(!client_encrypted.mongocryptd_spawned().await);
@@ -1322,7 +1316,7 @@ async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
     let err = client_encrypted
         .database("db")
         .collection::<Document>("coll")
-        .insert_one(doc! { "encrypted": "test" }, None)
+        .insert_one(doc! { "encrypted": "test" })
         .await
         .unwrap_err();
     assert!(err.is_server_selection_error(), "unexpected error: {}", err);
@@ -1357,7 +1351,7 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
     client_encrypted
         .database("db")
         .collection::<Document>("coll")
-        .insert_one(doc! { "unencrypted": "test" }, None)
+        .insert_one(doc! { "unencrypted": "test" })
         .await?;
     // Test: mongocryptd not spawned.
     assert!(!client_encrypted.mongocryptd_spawned().await);
@@ -1508,13 +1502,15 @@ impl DeadlockTestCase {
     async fn run(&self) -> Result<()> {
         // Setup
         let client_test = TestClient::new().await;
+        #[allow(deprecated)]
         let client_keyvault = EventClient::with_options({
             let mut opts = get_client_options().await.clone();
             opts.max_pool_size = Some(1);
             opts
         })
         .await;
-        let mut keyvault_events = client_keyvault.subscribe_to_events();
+        #[allow(deprecated)]
+        let mut keyvault_events = client_keyvault.events.subscribe();
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1528,12 +1524,8 @@ impl DeadlockTestCase {
         client_keyvault
             .database("keyvault")
             .collection::<Document>("datakeys")
-            .insert_one(
-                load_testdata("external/external-key.json")?,
-                InsertOneOptions::builder()
-                    .write_concern(WriteConcern::majority())
-                    .build(),
-            )
+            .insert_one(load_testdata("external/external-key.json")?)
+            .write_concern(WriteConcern::majority())
             .await?;
         client_test
             .database("db")
@@ -1554,12 +1546,13 @@ impl DeadlockTestCase {
             .await?;
 
         // Run test case
-        let event_handler = Arc::new(EventHandler::new());
-        let mut encrypted_events = event_handler.subscribe();
+        let event_buffer = EventBuffer::new();
+        #[allow(deprecated)]
+        let mut encrypted_events = event_buffer.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
-        opts.command_event_handler = Some(event_handler.clone().into());
-        opts.sdam_event_handler = Some(event_handler.clone().into());
+        opts.command_event_handler = Some(event_buffer.handler());
+        opts.sdam_event_handler = Some(event_buffer.handler());
         let client_encrypted =
             Client::encrypted_builder(opts, KV_NAMESPACE.clone(), LOCAL_KMS.clone())?
                 .bypass_auto_encryption(self.bypass_auto_encryption)
@@ -1579,20 +1572,20 @@ impl DeadlockTestCase {
             client_test
                 .database("db")
                 .collection::<Document>("coll")
-                .insert_one(doc! { "_id": 0, "encrypted": ciphertext }, None)
+                .insert_one(doc! { "_id": 0, "encrypted": ciphertext })
                 .await?;
         } else {
             client_encrypted
                 .database("db")
                 .collection::<Document>("coll")
-                .insert_one(doc! { "_id": 0, "encrypted": "string0" }, None)
+                .insert_one(doc! { "_id": 0, "encrypted": "string0" })
                 .await?;
         }
 
         let found = client_encrypted
             .database("db")
             .collection::<Document>("coll")
-            .find_one(doc! { "_id": 0 }, None)
+            .find_one(doc! { "_id": 0 })
             .await?;
         assert_eq!(found, Some(doc! { "_id": 0, "encrypted": "string0" }));
 
@@ -2005,7 +1998,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
         .contention_factor(0)
         .await?;
     enc_coll
-        .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
+        .insert_one(doc! { "encryptedIndexed": insert_payload })
         .await?;
 
     let find_payload = testdata
@@ -2019,7 +2012,7 @@ async fn explicit_encryption_case_1() -> Result<()> {
         .contention_factor(0)
         .await?;
     let found: Vec<_> = enc_coll
-        .find(doc! { "encryptedIndexed": find_payload }, None)
+        .find(doc! { "encryptedIndexed": find_payload })
         .await?
         .try_collect()
         .await?;
@@ -2063,7 +2056,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
             .contention_factor(10)
             .await?;
         enc_coll
-            .insert_one(doc! { "encryptedIndexed": insert_payload }, None)
+            .insert_one(doc! { "encryptedIndexed": insert_payload })
             .await?;
     }
 
@@ -2078,7 +2071,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
         .contention_factor(0)
         .await?;
     let found: Vec<_> = enc_coll
-        .find(doc! { "encryptedIndexed": find_payload }, None)
+        .find(doc! { "encryptedIndexed": find_payload })
         .await?
         .try_collect()
         .await?;
@@ -2098,7 +2091,7 @@ async fn explicit_encryption_case_2() -> Result<()> {
         .contention_factor(10)
         .await?;
     let found: Vec<_> = enc_coll
-        .find(doc! { "encryptedIndexed": find_payload2 }, None)
+        .find(doc! { "encryptedIndexed": find_payload2 })
         .await?
         .try_collect()
         .await?;
@@ -2138,14 +2131,11 @@ async fn explicit_encryption_case_3() -> Result<()> {
         )
         .await?;
     enc_coll
-        .insert_one(
-            doc! { "_id": 1, "encryptedUnindexed": insert_payload },
-            None,
-        )
+        .insert_one(doc! { "_id": 1, "encryptedUnindexed": insert_payload })
         .await?;
 
     let found: Vec<_> = enc_coll
-        .find(doc! { "_id": 1 }, None)
+        .find(doc! { "_id": 1 })
         .await?
         .try_collect()
         .await?;
@@ -2262,12 +2252,8 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
     keyvault.create_collection("datakeys").await?;
     keyvault
         .collection::<Document>("datakeys")
-        .insert_one(
-            key1_document,
-            InsertOneOptions::builder()
-                .write_concern(WriteConcern::majority())
-                .build(),
-        )
+        .insert_one(key1_document)
+        .write_concern(WriteConcern::majority())
         .await?;
 
     let client_encryption = ClientEncryption::new(
@@ -2489,7 +2475,7 @@ async fn decryption_events_decrypt_error() -> Result<()> {
         None => return Ok(()),
     };
     td.decryption_events
-        .insert_one(doc! { "encrypted": td.malformed_ciphertext }, None)
+        .insert_one(doc! { "encrypted": td.malformed_ciphertext })
         .await?;
     let err = td.decryption_events.aggregate(vec![]).await.unwrap_err();
     assert!(err.is_csfle_error());
@@ -2520,7 +2506,7 @@ async fn decryption_events_decrypt_success() -> Result<()> {
         None => return Ok(()),
     };
     td.decryption_events
-        .insert_one(doc! { "encrypted": td.ciphertext }, None)
+        .insert_one(doc! { "encrypted": td.ciphertext })
         .await?;
     td.decryption_events.aggregate(vec![]).await?;
     let guard = td.ev_handler.succeeded.lock().unwrap();
@@ -2862,7 +2848,7 @@ async fn bypass_mongocryptd_client() -> Result<()> {
     client_encrypted
         .database("db")
         .collection::<Document>("coll")
-        .insert_one(doc! { "unencrypted": "test" }, None)
+        .insert_one(doc! { "unencrypted": "test" })
         .await?;
 
     assert!(!client_encrypted.has_mongocryptd_client().await);
@@ -2929,7 +2915,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         .await
         .1?;
     let coll = db.collection::<Document>("case_1");
-    let result = coll.insert_one(doc! { "ssn": "123-45-6789" }, None).await;
+    let result = coll.insert_one(doc! { "ssn": "123-45-6789" }).await;
     assert!(
         result.as_ref().unwrap_err().code() == Some(121),
         "Expected error 121 (failed validation), got {:?}",
@@ -2988,8 +2974,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
     };
     let encrypted_payload = ce.encrypt("123-45-6789", key, Algorithm::Unindexed).await?;
     let coll = db.collection::<Document>("case_1");
-    coll.insert_one(doc! { "ssn": encrypted_payload }, None)
-        .await?;
+    coll.insert_one(doc! { "ssn": encrypted_payload }).await?;
 
     Ok(())
 }
@@ -3001,7 +2986,7 @@ async fn range_explicit_encryption() -> Result<()> {
         return Ok(());
     }
     let client = TestClient::new().await;
-    if client.server_version_lt(6, 2) || client.is_standalone() {
+    if client.server_version_lt(6, 2) || client.server_version_gte(8, 0) || client.is_standalone() {
         log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
         return Ok(());
     }
@@ -3106,12 +3091,8 @@ async fn range_explicit_encryption_test(
         .await?;
 
     datakeys_collection
-        .insert_one(
-            key1_document,
-            InsertOneOptions::builder()
-                .write_concern(WriteConcern::majority())
-                .build(),
-        )
+        .insert_one(key1_document)
+        .write_concern(WriteConcern::majority())
         .await?;
 
     let key_vault_client = TestClient::new().await;
@@ -3152,13 +3133,10 @@ async fn range_explicit_encryption_test(
             .await?;
 
         explicit_encryption_collection
-            .insert_one(
-                doc! {
-                    &key: encrypted_value,
-                    "_id": id as i32,
-                },
-                None,
-            )
+            .insert_one(doc! {
+                &key: encrypted_value,
+                "_id": id as i32,
+            })
             .await?;
     }
 
@@ -3206,7 +3184,8 @@ async fn range_explicit_encryption_test(
         .await?;
 
     let docs: Vec<RawDocumentBuf> = explicit_encryption_collection
-        .find(find_payload, find_options.clone())
+        .find(find_payload)
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3228,7 +3207,8 @@ async fn range_explicit_encryption_test(
     let docs: Vec<RawDocumentBuf> = encrypted_client
         .database("db")
         .collection("explicit_encryption")
-        .find(find_payload, find_options.clone())
+        .find(find_payload)
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3249,7 +3229,8 @@ async fn range_explicit_encryption_test(
     let docs: Vec<RawDocumentBuf> = encrypted_client
         .database("db")
         .collection("explicit_encryption")
-        .find(find_payload, find_options.clone())
+        .find(find_payload)
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3266,7 +3247,8 @@ async fn range_explicit_encryption_test(
     let docs: Vec<RawDocumentBuf> = encrypted_client
         .database("db")
         .collection("explicit_encryption")
-        .find(doc! { "$expr": find_payload }, find_options.clone())
+        .find(doc! { "$expr": find_payload })
+        .with_options(find_options.clone())
         .await?
         .try_collect()
         .await?;
@@ -3426,24 +3408,18 @@ async fn fle2_example() -> Result<()> {
 
     // Encrypt an insert.
     encrypted_coll
-        .insert_one(
-            doc! {
-                "_id":                1,
-                "encryptedIndexed":   "indexedValue",
-                "encryptedUnindexed": "unindexedValue",
-            },
-            None,
-        )
+        .insert_one(doc! {
+            "_id":                1,
+            "encryptedIndexed":   "indexedValue",
+            "encryptedUnindexed": "unindexedValue",
+        })
         .await?;
 
     // Encrypt a find.
     let found = encrypted_coll
-        .find_one(
-            doc! {
-                "encryptedIndexed": "indexedValue",
-            },
-            None,
-        )
+        .find_one(doc! {
+            "encryptedIndexed": "indexedValue",
+        })
         .await?
         .unwrap();
     assert_eq!("indexedValue", found.get_str("encryptedIndexed")?);
@@ -3453,10 +3429,7 @@ async fn fle2_example() -> Result<()> {
     let unencrypted_coll = test_client
         .database("docsExamples")
         .collection::<Document>("encrypted");
-    let found = unencrypted_coll
-        .find_one(doc! { "_id": 1 }, None)
-        .await?
-        .unwrap();
+    let found = unencrypted_coll.find_one(doc! { "_id": 1 }).await?.unwrap();
     assert_eq!(
         Some(ElementType::Binary),
         found.get("encryptedIndexed").map(Bson::element_type)

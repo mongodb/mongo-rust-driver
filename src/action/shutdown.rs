@@ -15,9 +15,10 @@ impl Client {
     ///
     /// ```rust
     /// # use mongodb::{Client, GridFsBucket, error::Result};
-    /// async fn upload_data(bucket: &GridFsBucket) {
-    ///   let stream = bucket.open_upload_stream("test", None);
+    /// async fn upload_data(bucket: &GridFsBucket) -> Result<()> {
+    ///   let stream = bucket.open_upload_stream("test").await?;
     ///    // .. write to the stream ..
+    /// # Ok(())
     /// }
     ///
     /// # async fn run() -> Result<()> {
@@ -37,7 +38,7 @@ impl Client {
     /// # async fn run() -> Result<()> {
     /// let client = Client::with_uri_str("mongodb://example.com").await?;
     /// let bucket = client.database("test").gridfs_bucket(None);
-    /// let stream = bucket.open_upload_stream("test", None);
+    /// let stream = bucket.open_upload_stream("test").await?;
     /// // .. write to the stream ..
     /// drop(stream);
     /// client.shutdown().await;
@@ -77,15 +78,16 @@ impl crate::sync::Client {
     ///
     /// ```rust
     /// # use mongodb::{sync::{Client, gridfs::GridFsBucket}, error::Result};
-    /// fn upload_data(bucket: &GridFsBucket) {
-    ///   let stream = bucket.open_upload_stream("test", None);
+    /// fn upload_data(bucket: &GridFsBucket) -> Result<()> {
+    ///   let stream = bucket.open_upload_stream("test").run()?;
     ///    // .. write to the stream ..
+    /// # Ok(())
     /// }
     ///
     /// # fn run() -> Result<()> {
     /// let client = Client::with_uri_str("mongodb://example.com")?;
     /// let bucket = client.database("test").gridfs_bucket(None);
-    /// upload_data(&bucket);
+    /// upload_data(&bucket)?;
     /// client.shutdown();
     /// // Background cleanup work from `upload_data` is guaranteed to have run.
     /// # Ok(())
@@ -99,7 +101,7 @@ impl crate::sync::Client {
     /// # fn run() -> Result<()> {
     /// let client = Client::with_uri_str("mongodb://example.com")?;
     /// let bucket = client.database("test").gridfs_bucket(None);
-    /// let stream = bucket.open_upload_stream("test", None);
+    /// let stream = bucket.open_upload_stream("test").run()?;
     /// // .. write to the stream ..
     /// drop(stream);
     /// client.shutdown();

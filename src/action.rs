@@ -11,17 +11,25 @@ mod delete;
 mod distinct;
 mod drop;
 mod drop_index;
+mod find;
+mod find_and_modify;
+pub mod gridfs;
+mod insert_many;
+mod insert_one;
 mod list_collections;
 mod list_databases;
 mod list_indexes;
 mod perf;
+mod replace_one;
 mod run_command;
+mod search_index;
 mod session;
 mod shutdown;
+pub(crate) mod transaction;
 mod update;
 mod watch;
 
-use std::{marker::PhantomData, ops::Deref};
+use std::{future::IntoFuture, marker::PhantomData, ops::Deref};
 
 use crate::bson::Document;
 
@@ -34,13 +42,20 @@ pub use delete::Delete;
 pub use distinct::Distinct;
 pub use drop::{DropCollection, DropDatabase};
 pub use drop_index::DropIndex;
+pub use find::{Find, FindOne};
+pub use find_and_modify::{FindOneAndDelete, FindOneAndReplace, FindOneAndUpdate};
+pub use insert_many::InsertMany;
+pub use insert_one::InsertOne;
 pub use list_collections::ListCollections;
 pub use list_databases::ListDatabases;
 pub use list_indexes::ListIndexes;
 pub use perf::WarmConnectionPool;
+pub use replace_one::ReplaceOne;
 pub use run_command::{RunCommand, RunCursorCommand};
+pub use search_index::{CreateSearchIndex, DropSearchIndex, ListSearchIndexes, UpdateSearchIndex};
 pub use session::StartSession;
 pub use shutdown::Shutdown;
+pub use transaction::{AbortTransaction, CommitTransaction, StartTransaction};
 pub use update::Update;
 pub use watch::Watch;
 
@@ -60,6 +75,7 @@ pub struct Single;
 pub struct Multiple;
 
 macro_rules! option_setters {
+    // Include options aggregate accessors.
     (
         $opt_field:ident: $opt_field_ty:ty;
         $(
@@ -67,16 +83,32 @@ macro_rules! option_setters {
             $opt_name:ident: $opt_ty:ty,
         )*
     ) => {
+        #[allow(unused)]
         fn options(&mut self) -> &mut $opt_field_ty {
             self.$opt_field.get_or_insert_with(<$opt_field_ty>::default)
         }
 
         /// Set all options.  Note that this will replace all previous values set.
         pub fn with_options(mut self, value: impl Into<Option<$opt_field_ty>>) -> Self {
-            self.options = value.into();
+            self.$opt_field = value.into();
             self
         }
 
+        crate::action::option_setters!($opt_field_ty;
+            $(
+                $(#[$($attrss)*])*
+                $opt_name: $opt_ty,
+            )*
+        );
+    };
+    // Just generate field setters.
+    (
+        $opt_field_ty:ty;
+        $(
+            $(#[$($attrss:tt)*])*
+            $opt_name:ident: $opt_ty:ty,
+        )*
+    ) => {
         $(
             #[doc = concat!("Set the [`", stringify!($opt_field_ty), "::", stringify!($opt_name), "`] option.")]
             $(#[$($attrss)*])*
@@ -89,12 +121,13 @@ macro_rules! option_setters {
 }
 use option_setters;
 
+pub(crate) mod private {
+    pub trait Sealed {}
+}
+
 /// A pending action to execute on the server.  The action can be configured via chained methods and
 /// executed via `await` (or `run` if using the sync client).
-pub trait Action {
-    /// The type of the value produced by execution.
-    type Output;
-
+pub trait Action: private::Sealed + IntoFuture {
     /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
     /// updates with values that need to be set conditionally.  For example:
     /// ```rust
@@ -119,83 +152,7 @@ pub trait Action {
     }
 }
 
-/// Generates:
-/// * an `IntoFuture` executing the given method body
-/// * an opaque wrapper type for the future in case we want to do something more fancy than
-///   BoxFuture.
-/// * a `run` method for sync execution, optionally with a wrapper function
-macro_rules! action_impl {
-    // Generate with no sync type conversion
-    (
-        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty {
-            type Future = $f_ty:ident;
-            async fn execute($($args:ident)+) -> $out:ty $code:block
-        }
-    ) => {
-        crate::action::action_impl! {
-            impl$(<$lt $(, $($at),+)?>)? Action for $action {
-                type Future = $f_ty;
-                async fn execute($($args)+) -> $out $code
-                fn sync_wrap(out) -> $out { out }
-            }
-        }
-    };
-    // Generate with a sync type conversion
-    (
-        impl$(<$lt:lifetime $(, $($at:ident),+)?>)? Action for $action:ty {
-            type Future = $f_ty:ident;
-            async fn execute($($args:ident)+) -> $out:ty $code:block
-            fn sync_wrap($($wrap_args:ident)+) -> $sync_out:ty $wrap_code:block
-        }
-    ) => {
-        impl$(<$lt $(, $($at),+)?>)? std::future::IntoFuture for $action {
-            type Output = $out;
-            type IntoFuture = $f_ty$(<$lt>)?;
-
-            fn into_future($($args)+) -> Self::IntoFuture {
-                $f_ty(Box::pin(async move {
-                    $code
-                }))
-            }
-        }
-
-        impl$(<$lt $(, $($at),+)?>)? crate::action::Action for $action {
-            type Output = $out;
-        }
-
-        crate::action::action_impl_future_wrapper!($($lt)?, $f_ty, $out);
-
-        impl$(<$lt>)? std::future::Future for $f_ty$(<$lt>)? {
-            type Output = $out;
-
-            fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-                self.0.as_mut().poll(cx)
-            }
-        }
-
-        #[cfg(feature = "sync")]
-        impl$(<$lt $(, $($at),+)?>)? $action {
-            /// Synchronously execute this action.
-            pub fn run(self) -> $sync_out {
-                let $($wrap_args)+ = crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self));
-                return $wrap_code
-            }
-        }
-    }
-}
-pub(crate) use action_impl;
-
-macro_rules! action_impl_future_wrapper {
-    (, $f_ty:ident, $out:ty) => {
-        /// Opaque future type for action execution.
-        pub struct $f_ty(crate::BoxFuture<'static, $out>);
-    };
-    ($lt:lifetime, $f_ty:ident, $out:ty) => {
-        /// Opaque future type for action execution.
-        pub struct $f_ty<$lt>(crate::BoxFuture<$lt, $out>);
-    };
-}
-pub(crate) use action_impl_future_wrapper;
+pub(crate) use action_macro::{action_impl, deeplink};
 
 use crate::Collection;
 
@@ -205,7 +162,7 @@ pub(crate) struct CollRef<'a> {
 }
 
 impl<'a> CollRef<'a> {
-    fn new<T>(coll: &'a Collection<T>) -> Self {
+    fn new<T: Send + Sync>(coll: &'a Collection<T>) -> Self {
         Self {
             inner: coll.clone_with_type(),
             _ref: PhantomData,

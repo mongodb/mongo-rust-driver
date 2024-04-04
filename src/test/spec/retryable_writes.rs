@@ -9,6 +9,8 @@ use tokio::sync::Mutex;
 
 use test_file::{TestFile, TestResult};
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
@@ -16,7 +18,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::{ClientOptions, FindOptions, InsertManyOptions},
+    options::ClientOptions,
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     sdam::MIN_HEARTBEAT_FREQUENCY,
@@ -26,10 +28,8 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         spec::unified_runner::run_unified_tests,
-        util::get_default_name,
+        util::{event_buffer::EventBuffer, get_default_name},
         Event,
-        EventClient,
-        EventHandler,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -55,6 +55,7 @@ async fn run_legacy() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
 
+            #[allow(deprecated)]
             let client = EventClient::with_additional_options(
                 options,
                 Some(Duration::from_millis(50)),
@@ -77,7 +78,7 @@ async fn run_legacy() {
             let coll = client.init_db_and_coll(&db_name, coll_name).await;
 
             if !test_file.data.is_empty() {
-                coll.insert_many(test_file.data.clone(), None)
+                coll.insert_many(test_file.data.clone())
                     .await
                     .expect(&test_case.description);
             }
@@ -162,9 +163,9 @@ async fn run_legacy() {
             };
 
             let coll = client.get_coll(&db_name, &coll_name);
-            let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
-                .find(None, options)
+                .find(doc! {})
+                .sort(doc! { "_id": 1 })
                 .await
                 .unwrap()
                 .try_collect()
@@ -182,6 +183,7 @@ async fn run_legacy() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -191,8 +193,11 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let excludes_txn_number = |command_name: &str| -> bool {
-        let (started, _) = client.get_successful_command_execution(command_name);
+    #[allow(deprecated)]
+    let mut events = client.events.clone();
+    let mut excludes_txn_number = move |command_name: &str| -> bool {
+        #[allow(deprecated)]
+        let (started, _) = events.get_successful_command_execution(command_name);
         !started.command.contains_key("txnNumber")
     };
 
@@ -227,6 +232,7 @@ async fn transaction_ids_excluded() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -236,12 +242,15 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let includes_txn_number = |command_name: &str| -> bool {
-        let (started, _) = client.get_successful_command_execution(command_name);
+    #[allow(deprecated)]
+    let mut events = client.events.clone();
+    let mut includes_txn_number = move |command_name: &str| -> bool {
+        #[allow(deprecated)]
+        let (started, _) = events.get_successful_command_execution(command_name);
         started.command.contains_key("txnNumber")
     };
 
-    coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    coll.insert_one(doc! { "x": 1 }).await.unwrap();
     assert!(includes_txn_number("insert"));
 
     coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } })
@@ -249,35 +258,33 @@ async fn transaction_ids_included() {
         .unwrap();
     assert!(includes_txn_number("update"));
 
-    coll.replace_one(doc! {}, doc! { "x": 1 }, None)
-        .await
-        .unwrap();
+    coll.replace_one(doc! {}, doc! { "x": 1 }).await.unwrap();
     assert!(includes_txn_number("update"));
 
     coll.delete_one(doc! {}).await.unwrap();
     assert!(includes_txn_number("delete"));
 
-    coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    coll.find_one_and_delete(doc! {}).await.unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    coll.find_one_and_replace(doc! {}, doc! { "x": 1 }, None)
+    coll.find_one_and_replace(doc! {}, doc! { "x": 1 })
         .await
         .unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+    coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } })
         .await
         .unwrap();
     assert!(includes_txn_number("findAndModify"));
 
-    let options = InsertManyOptions::builder().ordered(true).build();
-    coll.insert_many(vec![doc! { "x": 1 }], options)
+    coll.insert_many(vec![doc! { "x": 1 }])
+        .ordered(true)
         .await
         .unwrap();
     assert!(includes_txn_number("insert"));
 
-    let options = InsertManyOptions::builder().ordered(false).build();
-    coll.insert_many(vec![doc! { "x": 1 }], options)
+    coll.insert_many(vec![doc! { "x": 1 }])
+        .ordered(false)
         .await
         .unwrap();
     assert!(includes_txn_number("insert"));
@@ -311,7 +318,7 @@ async fn mmapv1_error_raised() {
         return;
     }
 
-    let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
+    let err = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
     match *err.kind {
         ErrorKind::Command(err) => {
             assert_eq!(
@@ -372,7 +379,7 @@ async fn label_not_added(retry_reads: bool) {
         .await
         .unwrap();
 
-    let err = coll.find(doc! {}, None).await.unwrap_err();
+    let err = coll.find(doc! {}).await.unwrap_err();
 
     assert!(!err.contains_label("RetryableWriteError"));
 }
@@ -380,13 +387,13 @@ async fn label_not_added(retry_reads: bool) {
 /// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
-    let handler = Arc::new(EventHandler::new());
+    let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
-    client_options.cmap_event_handler = Some(handler.clone().into());
-    client_options.command_event_handler = Some(handler.clone().into());
+    client_options.cmap_event_handler = Some(buffer.handler());
+    client_options.command_event_handler = Some(buffer.handler());
     // on sharded clusters, ensure only a single mongos is used
     if client_options.repl_set_name.is_none() {
         client_options.hosts.drain(1..);
@@ -420,12 +427,13 @@ async fn retry_write_pool_cleared() {
         .error_labels(vec![RETRYABLE_WRITE_ERROR]);
     let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = runtime::spawn(async move { coll.insert_one(doc! {}, None).await });
+        let task = runtime::spawn(async move { coll.insert_one(doc! {}).await });
         tasks.push(task);
     }
 
@@ -469,7 +477,7 @@ async fn retry_write_pool_cleared() {
         );
     }
 
-    assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
+    assert_eq!(buffer.get_command_started_events(&["insert"]).len(), 3);
 }
 
 /// Prose test from retryable writes spec verifying that the original error is returned after
@@ -545,7 +553,7 @@ async fn retry_write_retryable_write_error() {
     let result = client
         .database("test")
         .collection::<Document>("test")
-        .insert_one(doc! { "hello": "there" }, None)
+        .insert_one(doc! { "hello": "there" })
         .await;
     assert_eq!(result.unwrap_err().code(), Some(91));
 
@@ -585,6 +593,7 @@ async fn retry_write_different_mongos() {
         guards.push(client.configure_fail_point(fail_point).await.unwrap());
     }
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -593,10 +602,14 @@ async fn retry_write_different_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_write_different_mongos")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     assert!(result.is_err());
-    let events = client.get_command_events(&["insert"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["insert"])
+    };
     assert!(
         matches!(
             &events[..],
@@ -642,6 +655,7 @@ async fn retry_write_same_mongos() {
         client.configure_fail_point(fail_point).await.unwrap()
     };
 
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
         .event_client()
@@ -650,10 +664,14 @@ async fn retry_write_same_mongos() {
     let result = client
         .database("test")
         .collection::<bson::Document>("retry_write_same_mongos")
-        .insert_one(doc! {}, None)
+        .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    let events = client.get_command_events(&["insert"]);
+    #[allow(deprecated)]
+    let events = {
+        let mut events = client.events.clone();
+        events.get_command_events(&["insert"])
+    };
     assert!(
         matches!(
             &events[..],

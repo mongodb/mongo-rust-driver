@@ -14,12 +14,18 @@ use tokio::{
     sync::{mpsc, Mutex},
 };
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use crate::options::Compressor;
+
 use self::wire::{Message, MessageFlags};
 use super::manager::PoolManager;
 use crate::{
     bson::oid::ObjectId,
     cmap::PoolGeneration,
-    compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventEmitter,
@@ -46,14 +52,7 @@ pub struct ConnectionInfo {
 
     /// A server-generated identifier that uniquely identifies the connection. Available on server
     /// versions 4.2+. This may be used to correlate driver connections with server logs.
-    /// If the connection ID sent by the server is too large for an i32, this will be a truncated
-    /// value.
-    pub server_id: Option<i32>,
-
-    /// A server-generated identifier that uniquely identifies the connection. Available on server
-    /// versions 4.2+. This may be used to correlate driver connections with server logs. This
-    /// value will not be truncated and should be used rather than `server_id`.
-    pub server_id_i64: Option<i64>,
+    pub server_id: Option<i64>,
 
     /// The address that the connection is connected to.
     pub address: ServerAddress,
@@ -104,12 +103,13 @@ pub(crate) struct Connection {
 
     stream: BufStream<AsyncStream>,
 
-    /// Compressor that the client will use before sending messages.
-    /// This compressor does not get used to decompress server messages.
-    /// The client will decompress server messages using whichever compressor
-    /// the server indicates in its message.  This compressor is the first
-    /// compressor in the client's compressor list that also appears in the
-    /// server's compressor list.
+    /// Compressor to use to compress outgoing messages. This compressor is not used to decompress
+    /// incoming messages from the server.
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     pub(super) compressor: Option<Compressor>,
 
     /// If the connection is pinned to a cursor or transaction, the channel sender to return this
@@ -120,6 +120,10 @@ pub(crate) struct Connection {
     /// monitoring connections as we do not emit events for those.
     #[derivative(Debug = "ignore")]
     event_emitter: Option<CmapEventEmitter>,
+
+    /// The token callback for OIDC authentication.
+    #[derivative(Debug = "ignore")]
+    pub(crate) oidc_token_gen_id: std::sync::RwLock<u32>,
 }
 
 impl Connection {
@@ -144,8 +148,14 @@ impl Connection {
             stream_description: None,
             error: None,
             pinned_sender: None,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             compressor: None,
             more_to_come: false,
+            oidc_token_gen_id: std::sync::RwLock::new(0),
         }
     }
 
@@ -183,8 +193,7 @@ impl Connection {
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
-            server_id: self.server_id.map(|value| value as i32),
-            server_id_i64: self.server_id,
+            server_id: self.server_id,
             address: self.address.clone(),
         }
     }
@@ -275,7 +284,8 @@ impl Connection {
     pub(crate) async fn send_message(
         &mut self,
         message: Message,
-        to_compress: bool,
+        // This value is only read if a compression feature flag is enabled.
+        #[allow(unused_variables)] can_compress: bool,
     ) -> Result<RawCommandResponse> {
         if self.more_to_come {
             return Err(Error::internal(format!(
@@ -286,16 +296,25 @@ impl Connection {
 
         self.command_executing = true;
 
-        // If the client has agreed on a compressor with the server, and the command
-        // is the right type of command, then compress the message.
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
         let write_result = match self.compressor {
-            Some(ref compressor) if to_compress => {
+            Some(ref compressor) if can_compress => {
                 message
-                    .write_compressed_to(&mut self.stream, compressor)
+                    .write_op_compressed_to(&mut self.stream, compressor)
                     .await
             }
-            _ => message.write_to(&mut self.stream).await,
+            _ => message.write_op_msg_to(&mut self.stream).await,
         };
+        #[cfg(all(
+            not(feature = "zstd-compression"),
+            not(feature = "zlib-compression"),
+            not(feature = "snappy-compression")
+        ))]
+        let write_result = message.write_op_msg_to(&mut self.stream).await;
 
         if let Err(ref err) = write_result {
             self.error = Some(err.clone());
@@ -433,8 +452,14 @@ impl Connection {
             pool_manager: None,
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             compressor: self.compressor.clone(),
             more_to_come: false,
+            oidc_token_gen_id: std::sync::RwLock::new(0),
         }
     }
 

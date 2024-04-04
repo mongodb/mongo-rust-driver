@@ -2,16 +2,19 @@ use std::{future::Future, time::Duration};
 
 use futures::stream::StreamExt;
 
+#[allow(deprecated)]
+use crate::test::util::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{Acknowledgment, ClientOptions, FindOptions, InsertManyOptions, WriteConcern},
+    options::{Acknowledgment, ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, util::EventClient},
+    test::{get_client_options, log_uncaptured},
     Collection,
     Database,
 };
 
+#[allow(deprecated)]
 async fn run_test<F: Future>(
     name: &str,
     test: impl Fn(EventClient, Database, Collection<Document>) -> F,
@@ -49,6 +52,7 @@ async fn run_test<F: Future>(
 
 #[tokio::test]
 async fn get_more() {
+    #[allow(deprecated)]
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
@@ -57,21 +61,12 @@ async fn get_more() {
         }
 
         let docs = vec![doc! { "x": 1 }; 5];
-        coll.insert_many(
-            docs,
-            Some(
-                InsertManyOptions::builder()
-                    .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-                    .build(),
-            ),
-        )
-        .await
-        .unwrap();
-
-        let mut cursor = coll
-            .find(None, Some(FindOptions::builder().batch_size(2).build()))
+        coll.insert_many(docs)
+            .write_concern(WriteConcern::majority())
             .await
             .unwrap();
+
+        let mut cursor = coll.find(doc! {}).batch_size(2).await.unwrap();
 
         let db = client.database("admin");
 
@@ -99,7 +94,7 @@ async fn get_more() {
         }
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 0);
+        assert_eq!(client.events.count_pool_cleared_events(), 0);
     }
 
     run_test("get_more", get_more_test).await;
@@ -107,6 +102,7 @@ async fn get_more() {
 
 #[tokio::test]
 async fn notwritableprimary_keep_pool() {
+    #[allow(deprecated)]
     async fn notwritableprimary_keep_pool_test(
         client: EventClient,
         _db: Database,
@@ -131,7 +127,7 @@ async fn notwritableprimary_keep_pool() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -140,12 +136,12 @@ async fn notwritableprimary_keep_pool() {
             "insert should have failed"
         );
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 0);
+        assert_eq!(client.events.count_pool_cleared_events(), 0);
     }
 
     run_test(
@@ -157,6 +153,7 @@ async fn notwritableprimary_keep_pool() {
 
 #[tokio::test]
 async fn notwritableprimary_reset_pool() {
+    #[allow(deprecated)]
     async fn notwritableprimary_reset_pool_test(
         client: EventClient,
         _db: Database,
@@ -183,7 +180,7 @@ async fn notwritableprimary_reset_pool() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -193,9 +190,9 @@ async fn notwritableprimary_reset_pool() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 1);
+        assert_eq!(client.events.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
     }
@@ -209,6 +206,7 @@ async fn notwritableprimary_reset_pool() {
 
 #[tokio::test]
 async fn shutdown_in_progress() {
+    #[allow(deprecated)]
     async fn shutdown_in_progress_test(
         client: EventClient,
         _db: Database,
@@ -232,7 +230,7 @@ async fn shutdown_in_progress() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -242,9 +240,9 @@ async fn shutdown_in_progress() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 1);
+        assert_eq!(client.events.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
     }
@@ -254,6 +252,7 @@ async fn shutdown_in_progress() {
 
 #[tokio::test]
 async fn interrupted_at_shutdown() {
+    #[allow(deprecated)]
     async fn interrupted_at_shutdown_test(
         client: EventClient,
         _db: Database,
@@ -277,7 +276,7 @@ async fn interrupted_at_shutdown() {
             .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None).await;
+        let result = coll.insert_one(doc! { "test": 1 }).await;
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
@@ -287,9 +286,9 @@ async fn interrupted_at_shutdown() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.count_pool_cleared_events(), 1);
+        assert_eq!(client.events.count_pool_cleared_events(), 1);
 
-        coll.insert_one(doc! { "test": 1 }, None)
+        coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 

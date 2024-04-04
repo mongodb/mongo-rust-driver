@@ -27,7 +27,7 @@ use crate::{
         WriteConcern,
     },
     serde_util,
-    test::{Serverless, TestClient, DEFAULT_URI},
+    test::{Event, Serverless, TestClient, DEFAULT_URI},
 };
 
 #[derive(Debug, Deserialize)]
@@ -426,6 +426,22 @@ pub(crate) enum ExpectedEventType {
     Sdam,
 }
 
+impl ExpectedEventType {
+    pub(crate) fn matches(&self, event: &Event) -> bool {
+        match (self, event) {
+            (ExpectedEventType::Cmap, Event::Cmap(_)) => true,
+            (
+                ExpectedEventType::CmapWithoutConnectionReady,
+                Event::Cmap(crate::event::cmap::CmapEvent::ConnectionReady(_)),
+            ) => false,
+            (ExpectedEventType::CmapWithoutConnectionReady, Event::Cmap(_)) => true,
+            (ExpectedEventType::Command, Event::Command(_)) => true,
+            (ExpectedEventType::Sdam, Event::Sdam(_)) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum EventMatch {
@@ -668,11 +684,16 @@ fn deserialize_selection_criteria() {
 
     match selection_criteria {
         SelectionCriteria::ReadPreference(read_preference) => match read_preference {
-            ReadPreference::SecondaryPreferred { options } => {
+            ReadPreference::SecondaryPreferred {
+                options: Some(options),
+            } => {
                 assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
                 assert_eq!(options.hedge, Some(HedgedReadOptions::with_enabled(true)));
             }
-            other => panic!("Expected mode SecondaryPreferred, got {:?}", other),
+            other => panic!(
+                "Expected mode SecondaryPreferred with options, got {:?}",
+                other
+            ),
         },
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }

@@ -13,12 +13,16 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
-    /// `await` will return `Result<Vec<Bson>>`.
+    /// `await` will return d[`Result<Vec<Bson>>`].
+    #[deeplink]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         Distinct {
             coll: CollRef::new(self),
@@ -30,11 +34,15 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     ///
-    /// [`run`](Distinct::run) will return `Result<Vec<Bson>>`.
+    /// [`run`](Distinct::run) will return d[`Result<Vec<Bson>>`].
+    #[deeplink]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         self.async_collection.distinct(field_name, filter)
     }
@@ -59,28 +67,27 @@ impl<'a> Distinct<'a> {
         comment: Bson,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
 }
 
-action_impl! {
-    impl<'a> Action for Distinct<'a> {
-        type Future = DistinctFuture;
+#[action_impl]
+impl<'a> Action for Distinct<'a> {
+    type Future = DistinctFuture;
 
-        async fn execute(mut self) -> Result<Vec<Bson>> {
-            resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-            resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<Vec<Bson>> {
+        resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+        resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            let op = Op::new(
-                self.coll.namespace(),
-                self.field_name,
-                self.filter,
-                self.options,
-            );
-            self.coll.client().execute_operation(op, self.session).await
-        }
+        let op = Op::new(
+            self.coll.namespace(),
+            self.field_name,
+            self.filter,
+            self.options,
+        );
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

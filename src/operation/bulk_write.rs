@@ -219,9 +219,9 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
 
             let mut split = false;
             if self.encrypted && i != 0 {
-                let model_entry_size = array_entry_size_bytes(i, operation_size);
+                let model_entry_size = array_entry_size_bytes(i, operation_size)?;
                 let namespace_entry_size = if namespace_size > 0 {
-                    array_entry_size_bytes(namespace_index, namespace_size)
+                    array_entry_size_bytes(namespace_index, namespace_size)?
                 } else {
                     0
                 };

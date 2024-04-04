@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{event::TestEventHandler, EVENT_TIMEOUT};
+use super::EVENT_TIMEOUT;
 use crate::{
     bson::{doc, Document},
     cmap::{
@@ -15,10 +15,17 @@ use crate::{
     runtime,
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
-    test::{get_client_options, log_uncaptured, FailPoint, FailPointMode, TestClient},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        util::event_buffer::EventBuffer,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+    },
 };
 use semver::VersionReq;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 #[derive(Debug, Deserialize)]
 struct ListDatabasesResponse {
@@ -105,10 +112,10 @@ async fn concurrent_connections() {
         .await
         .expect("failpoint should succeed");
 
-    let handler = Arc::new(TestEventHandler::new());
+    let buffer = EventBuffer::<CmapEvent>::new();
     let client_options = get_client_options().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
-    options.cmap_event_handler = Some(handler.clone().into());
+    options.cmap_event_handler = Some(buffer.handler());
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
@@ -130,7 +137,7 @@ async fn concurrent_connections() {
 
     {
         // ensure all three ConnectionCreatedEvents were emitted before one ConnectionReadyEvent.
-        let events = handler.events.read().unwrap();
+        let events = buffer.all();
         let mut consecutive_creations = 0;
         for event in events.iter() {
             match event {
@@ -192,12 +199,13 @@ async fn connection_error_during_establishment() {
         .await
         .unwrap();
 
-    let handler = Arc::new(TestEventHandler::new());
-    let mut subscriber = handler.subscribe();
+    let buffer = EventBuffer::<CmapEvent>::new();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
-    options.cmap_event_handler = Some(handler.clone().into());
+    options.cmap_event_handler = Some(buffer.handler());
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
@@ -225,8 +233,8 @@ async fn connection_error_during_establishment() {
 
 async fn connection_error_during_operation() {
     let mut options = get_client_options().await.clone();
-    let handler = Arc::new(TestEventHandler::new());
-    options.cmap_event_handler = Some(handler.clone().into());
+    let buffer = EventBuffer::<CmapEvent>::new();
+    options.cmap_event_handler = Some(buffer.handler());
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 
@@ -246,7 +254,8 @@ async fn connection_error_during_operation() {
         .await
         .unwrap();
 
-    let mut subscriber = handler.subscribe();
+    #[allow(deprecated)]
+    let mut subscriber = buffer.subscribe();
 
     client
         .database("test")

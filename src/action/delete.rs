@@ -11,9 +11,12 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Deletes up to one document found matching `query`.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -21,7 +24,8 @@ impl<T> Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<DeleteResult>`.
+    /// `await` will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_one(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
@@ -34,7 +38,8 @@ impl<T> Collection<T> {
 
     /// Deletes all documents stored in the collection matching `query`.
     ///
-    /// `await` will return `Result<DeleteResult>`.
+    /// `await` will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_many(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
@@ -46,8 +51,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Deletes up to one document found matching `query`.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -55,14 +63,16 @@ impl<T> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](Delete::run) will return `Result<DeleteResult>`.
+    /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_one(&self, query: Document) -> Delete {
         self.async_collection.delete_one(query)
     }
 
     /// Deletes all documents stored in the collection matching `query`.
     ///
-    /// [`run`](Delete::run) will return `Result<DeleteResult>`.
+    /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
+    #[deeplink]
     pub fn delete_many(&self, query: Document) -> Delete {
         self.async_collection.delete_many(query)
     }
@@ -88,22 +98,21 @@ impl<'a> Delete<'a> {
         comment: Bson,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
 }
 
-action_impl! {
-    impl<'a> Action for Delete<'a> {
-        type Future = DeleteFuture;
+#[action_impl]
+impl<'a> Action for Delete<'a> {
+    type Future = DeleteFuture;
 
-        async fn execute(mut self) -> Result<DeleteResult> {
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+    async fn execute(mut self) -> Result<DeleteResult> {
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-            let op = Op::new(self.coll.namespace(), self.query, self.limit, self.options);
-            self.coll.client().execute_operation(op, self.session).await
-        }
+        let op = Op::new(self.coll.namespace(), self.query, self.limit, self.options);
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

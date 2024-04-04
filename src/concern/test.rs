@@ -1,22 +1,13 @@
 use std::time::Duration;
 
+#[allow(deprecated)]
+use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
-    options::{
-        Acknowledgment,
-        FindOneAndDeleteOptions,
-        FindOneAndReplaceOptions,
-        FindOneAndUpdateOptions,
-        FindOneOptions,
-        InsertManyOptions,
-        InsertOneOptions,
-        ReadConcern,
-        ReplaceOptions,
-        TransactionOptions,
-        WriteConcern,
-    },
-    test::{EventClient, TestClient},
+    options::{Acknowledgment, ReadConcern, WriteConcern},
+    test::TestClient,
+    Client,
     Collection,
 };
 
@@ -112,9 +103,9 @@ async fn inconsistent_write_concern_rejected() {
         journal: true.into(),
         w_timeout: None,
     };
-    let options = InsertOneOptions::builder().write_concern(wc).build();
     let error = coll
-        .insert_one(doc! {}, options)
+        .insert_one(doc! {})
+        .write_concern(wc)
         .await
         .expect_err("insert should fail");
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
@@ -131,9 +122,9 @@ async fn unacknowledged_write_concern_rejected() {
         journal: false.into(),
         w_timeout: None,
     };
-    let options = InsertOneOptions::builder().write_concern(wc).build();
     let error = coll
-        .insert_one(doc! {}, options)
+        .insert_one(doc! {})
+        .write_concern(wc)
         .await
         .expect_err("insert should fail");
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
@@ -142,6 +133,7 @@ async fn unacknowledged_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     // snapshot read concern was introduced in 4.0
     if client.server_version_lt(4, 0) {
@@ -154,21 +146,20 @@ async fn snapshot_read_concern() {
 
     if client.supports_transactions() {
         let mut session = client.start_session().await.unwrap();
-        let options = TransactionOptions::builder()
+        session
+            .start_transaction()
             .read_concern(ReadConcern::snapshot())
-            .build();
-        session.start_transaction(options).await.unwrap();
-        let result = coll.find_one_with_session(None, None, &mut session).await;
+            .await
+            .unwrap();
+        let result = coll.find_one(doc! {}).session(&mut session).await;
         assert!(result.is_ok());
         assert_event_contains_read_concern(&client).await;
     }
 
     if client.server_version_lt(4, 9) {
-        let options = FindOneOptions::builder()
-            .read_concern(ReadConcern::snapshot())
-            .build();
         let error = coll
-            .find_one(None, options)
+            .find_one(doc! {})
+            .read_concern(ReadConcern::snapshot())
             .await
             .expect_err("non-transaction find one with snapshot read concern should fail");
         // ensure that an error from the server is returned
@@ -177,8 +168,10 @@ async fn snapshot_read_concern() {
     }
 }
 
+#[allow(deprecated)]
 async fn assert_event_contains_read_concern(client: &EventClient) {
     let event = client
+        .events
         .get_command_started_events(&["find"])
         .into_iter()
         .next()
@@ -197,36 +190,29 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(
-        doc! { "foo": "bar" },
-        InsertOneOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.insert_one(
-        doc! { "foo": "bar" },
-        InsertOneOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.insert_one(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "insert"),
@@ -246,36 +232,29 @@ async fn command_contains_write_concern_insert_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(
-        &[doc! { "foo": "bar" }],
-        InsertManyOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.insert_many(
-        &[doc! { "foo": "bar" }],
-        InsertManyOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_many(&[doc! { "foo": "bar" }])
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.insert_many(&[doc! { "foo": "bar" }])
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "insert"),
@@ -295,11 +274,12 @@ async fn command_contains_write_concern_insert_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.update_one(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
         .write_concern(
             WriteConcern::builder()
@@ -337,11 +317,12 @@ async fn command_contains_write_concern_update_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.update_many(doc! { "foo": "bar" }, doc! { "$set": { "foo": "baz" } })
@@ -381,39 +362,30 @@ async fn command_contains_write_concern_update_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_replace_one() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
-    coll.replace_one(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        ReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.replace_one(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        ReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
+    coll.replace_one(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.replace_one(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "update"),
@@ -433,11 +405,12 @@ async fn command_contains_write_concern_replace_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_one() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_one(doc! { "foo": "bar" })
@@ -477,11 +450,12 @@ async fn command_contains_write_concern_delete_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_many() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_many(doc! { "foo": "bar" })
@@ -493,7 +467,7 @@ async fn command_contains_write_concern_delete_many() {
         )
         .await
         .unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
     coll.delete_many(doc! { "foo": "bar" })
@@ -524,39 +498,32 @@ async fn command_contains_write_concern_delete_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
-    coll.find_one_and_delete(
-        doc! { "foo": "bar" },
-        FindOneAndDeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_delete(
-        doc! { "foo": "bar" },
-        FindOneAndDeleteOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_delete(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_delete(doc! { "foo": "bar" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),
@@ -576,41 +543,32 @@ async fn command_contains_write_concern_find_one_and_delete() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
-    coll.find_one_and_replace(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        FindOneAndReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_replace(
-        doc! { "foo": "bar" },
-        doc! { "baz": "fun" },
-        FindOneAndReplaceOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_replace(doc! { "foo": "bar" }, doc! { "baz": "fun" })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),
@@ -630,41 +588,32 @@ async fn command_contains_write_concern_find_one_and_replace() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
         .await
         .unwrap();
-    coll.find_one_and_update(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "fun" } },
-        FindOneAndUpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(true)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
-    coll.find_one_and_update(
-        doc! { "foo": "bar" },
-        doc! { "$set": { "foo": "fun" } },
-        FindOneAndUpdateOptions::builder()
-            .write_concern(
-                WriteConcern::builder()
-                    .w(Acknowledgment::Nodes(1))
-                    .journal(false)
-                    .build(),
-            )
-            .build(),
-    )
-    .await
-    .unwrap();
+    coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(true)
+                .build(),
+        )
+        .await
+        .unwrap();
+    coll.find_one_and_update(doc! { "foo": "bar" }, doc! { "$set": { "foo": "fun" } })
+        .write_concern(
+            WriteConcern::builder()
+                .w(Acknowledgment::Nodes(1))
+                .journal(false)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(
         command_write_concerns(&client, "findAndModify"),
@@ -684,11 +633,12 @@ async fn command_contains_write_concern_find_one_and_update() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_aggregate() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.aggregate(vec![
         doc! { "$match": { "foo": "bar" } },
         doc! { "$addFields": { "foo": "baz" } },
@@ -734,12 +684,15 @@ async fn command_contains_write_concern_aggregate() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
-    let client = EventClient::new().await;
+    #[allow(deprecated)]
+    let client = Client::test_builder().event_client().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
-    client.clear_cached_events();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    #[allow(deprecated)]
+    let mut events = client.events.clone();
+    events.clear_cached_events();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.drop()
         .write_concern(
             WriteConcern::builder()
@@ -749,7 +702,7 @@ async fn command_contains_write_concern_drop() {
         )
         .await
         .unwrap();
-    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.drop()
         .write_concern(
             WriteConcern::builder()
@@ -778,6 +731,7 @@ async fn command_contains_write_concern_drop() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_create_collection() {
+    #[allow(deprecated)]
     let client = EventClient::new().await;
     let db = client.database("test");
     let coll: Collection<Document> = db.collection(function_name!());
@@ -818,8 +772,10 @@ async fn command_contains_write_concern_create_collection() {
     );
 }
 
+#[allow(deprecated)]
 fn command_write_concerns(client: &EventClient, key: &str) -> Vec<Document> {
     client
+        .events
         .get_command_started_events(&[key])
         .into_iter()
         .map(|d| d.command.get_document("writeConcern").unwrap().clone())

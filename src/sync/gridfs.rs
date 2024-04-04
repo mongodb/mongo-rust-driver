@@ -4,23 +4,15 @@ use std::io::{Read, Write};
 
 use futures_util::{AsyncReadExt, AsyncWriteExt};
 
-use super::Cursor;
 use crate::{
-    bson::{Bson, Document},
+    bson::Bson,
     error::Result,
     gridfs::{
         GridFsBucket as AsyncGridFsBucket,
         GridFsDownloadStream as AsyncGridFsDownloadStream,
         GridFsUploadStream as AsyncGridFsUploadStream,
     },
-    options::{
-        GridFsDownloadByNameOptions,
-        GridFsFindOptions,
-        GridFsUploadOptions,
-        ReadConcern,
-        SelectionCriteria,
-        WriteConcern,
-    },
+    options::{ReadConcern, SelectionCriteria, WriteConcern},
 };
 
 pub use crate::gridfs::FilesCollectionDocument;
@@ -35,7 +27,7 @@ pub use crate::gridfs::FilesCollectionDocument;
 /// `GridFsBucket` uses [`std::sync::Arc`] internally, so it can be shared safely across threads or
 /// async tasks.
 pub struct GridFsBucket {
-    async_bucket: AsyncGridFsBucket,
+    pub(crate) async_bucket: AsyncGridFsBucket,
 }
 
 impl GridFsBucket {
@@ -57,35 +49,6 @@ impl GridFsBucket {
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.async_bucket.selection_criteria()
     }
-
-    /// Deletes the [`FilesCollectionDocument`] with the given `id` and its associated chunks from
-    /// this bucket. This method returns an error if the `id` does not match any files in the
-    /// bucket.
-    pub fn delete(&self, id: Bson) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.delete(id))
-    }
-
-    /// Finds the [`FilesCollectionDocument`]s in the bucket matching the given `filter`.
-    pub fn find(
-        &self,
-        filter: Document,
-        options: impl Into<Option<GridFsFindOptions>>,
-    ) -> Result<Cursor<FilesCollectionDocument>> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_bucket.find(filter, options))
-            .map(Cursor::new)
-    }
-
-    /// Renames the file with the given `id` to `new_filename`. This method returns an error if the
-    /// `id` does not match any files in the bucket.
-    pub fn rename(&self, id: Bson, new_filename: impl AsRef<str>) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.rename(id, new_filename))
-    }
-
-    /// Removes all of the files and their associated chunks from this bucket.
-    pub fn drop(&self) -> Result<()> {
-        crate::sync::TOKIO_RUNTIME.block_on(self.async_bucket.drop())
-    }
 }
 
 /// A stream from which a file stored in a GridFS bucket can be downloaded.
@@ -99,11 +62,14 @@ impl GridFsBucket {
 /// use std::io::Read;
 ///
 /// let mut buf = Vec::new();
-/// let mut download_stream = bucket.open_download_stream(id)?;
+/// let mut download_stream = bucket.open_download_stream(id).run()?;
 /// download_stream.read_to_end(&mut buf)?;
 /// # Ok(())
 /// # }
 /// ```
+///
+/// If the destination is a local file (or other `Write` byte sink), the contents of the stream
+/// can be efficiently written to it with [`std::io::copy`].
 pub struct GridFsDownloadStream {
     async_stream: AsyncGridFsDownloadStream,
 }
@@ -115,39 +81,8 @@ impl Read for GridFsDownloadStream {
 }
 
 impl GridFsDownloadStream {
-    fn new(async_stream: AsyncGridFsDownloadStream) -> Self {
+    pub(crate) fn new(async_stream: AsyncGridFsDownloadStream) -> Self {
         Self { async_stream }
-    }
-}
-
-// Download API
-impl GridFsBucket {
-    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `id`.
-    pub fn open_download_stream(&self, id: Bson) -> Result<GridFsDownloadStream> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(self.async_bucket.open_download_stream(id))
-            .map(GridFsDownloadStream::new)
-    }
-
-    /// Opens and returns a [`GridFsDownloadStream`] from which the application can read
-    /// the contents of the stored file specified by `filename`.
-    ///
-    /// If there are multiple files in the bucket with the given filename, the `revision` in the
-    /// options provided is used to determine which one to download. See the documentation for
-    /// [`GridFsDownloadByNameOptions`] for details on how to specify a revision. If no revision is
-    /// provided, the file with `filename` most recently uploaded will be downloaded.
-    pub fn open_download_stream_by_name(
-        &self,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsDownloadByNameOptions>>,
-    ) -> Result<GridFsDownloadStream> {
-        crate::sync::TOKIO_RUNTIME
-            .block_on(
-                self.async_bucket
-                    .open_download_stream_by_name(filename, options),
-            )
-            .map(GridFsDownloadStream::new)
     }
 }
 
@@ -167,12 +102,15 @@ impl GridFsBucket {
 /// use std::io::Write;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").run()?;
 /// upload_stream.write_all(&bytes[..])?;
 /// upload_stream.close()?;
 /// # Ok(())
 /// # }
 /// ```
+///
+/// If the data is a local file (or other `Read` byte source), its contents can be efficiently
+/// written to the stream with [`std::io::copy`].
 ///
 /// # Aborting the Stream
 /// A stream can be aborted by calling the `abort` method. This will remove any chunks associated
@@ -185,7 +123,7 @@ impl GridFsBucket {
 /// use std::io::Write;
 ///
 /// let bytes = vec![0u8; 100];
-/// let mut upload_stream = bucket.open_upload_stream("example_file", None);
+/// let mut upload_stream = bucket.open_upload_stream("example_file").run()?;
 /// upload_stream.write_all(&bytes[..])?;
 /// upload_stream.abort()?;
 /// # Ok(())
@@ -210,6 +148,10 @@ pub struct GridFsUploadStream {
 }
 
 impl GridFsUploadStream {
+    pub(crate) fn new(async_stream: AsyncGridFsUploadStream) -> Self {
+        Self { async_stream }
+    }
+
     /// Gets the stream's unique [`Bson`] identifier. This value will be the `id` field for the
     /// [`FilesCollectionDocument`] uploaded to the files collection when the stream is closed.
     pub fn id(&self) -> &Bson {
@@ -239,36 +181,5 @@ impl Write for GridFsUploadStream {
 
     fn flush(&mut self) -> std::io::Result<()> {
         crate::sync::TOKIO_RUNTIME.block_on(self.async_stream.flush())
-    }
-}
-
-// Upload API
-impl GridFsBucket {
-    /// Creates and returns a [`GridFsUploadStream`] that the application can write the contents of
-    /// the file to. This method generates a unique [`ObjectId`](crate::bson::oid::ObjectId) for the
-    /// corresponding [`FilesCollectionDocument`]'s `id` field that can be accessed via the
-    /// stream's `id` method.
-    pub fn open_upload_stream(
-        &self,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> GridFsUploadStream {
-        let async_stream = self.async_bucket.open_upload_stream(filename, options);
-        GridFsUploadStream { async_stream }
-    }
-
-    /// Opens a [`GridFsUploadStream`] that the application can write the contents of the file to.
-    /// The provided `id` will be used for the corresponding [`FilesCollectionDocument`]'s `id`
-    /// field.
-    pub fn open_upload_stream_with_id(
-        &self,
-        id: Bson,
-        filename: impl AsRef<str>,
-        options: impl Into<Option<GridFsUploadOptions>>,
-    ) -> GridFsUploadStream {
-        let async_stream = self
-            .async_bucket
-            .open_upload_stream_with_id(id, filename, options);
-        GridFsUploadStream { async_stream }
     }
 }

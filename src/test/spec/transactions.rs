@@ -77,15 +77,15 @@ async fn deserialize_recovery_token() {
     let coll = client
         .database(function_name!())
         .collection(function_name!());
-    coll.insert_one(A { num: 4 }, None).await.unwrap();
+    coll.insert_one(A { num: 4 }).await.unwrap();
 
     // Attempt to execute Find on a document with schema B.
     let coll: Collection<B> = client
         .database(function_name!())
         .collection(function_name!());
-    session.start_transaction(None).await.unwrap();
+    session.start_transaction().await.unwrap();
     assert!(session.transaction.recovery_token.is_none());
-    let result = coll.find_one_with_session(None, None, &mut session).await;
+    let result = coll.find_one(doc! {}).session(&mut session).await;
     assert!(result.is_err()); // Assert that the deserialization failed.
 
     // Nevertheless, the recovery token should have been retrieved from the ok: 1 response.
@@ -94,6 +94,7 @@ async fn deserialize_recovery_token() {
 
 #[tokio::test]
 async fn convenient_api_custom_error() {
+    #[allow(deprecated)]
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
@@ -106,28 +107,27 @@ async fn convenient_api_custom_error() {
 
     struct MyErr;
     let result: Result<()> = session
-        .with_transaction(
-            coll,
-            |session, coll| {
-                async move {
-                    coll.find_one_with_session(None, None, session).await?;
-                    Err(Error::custom(MyErr))
-                }
-                .boxed()
-            },
-            None,
-        )
+        .start_transaction()
+        .and_run(coll, |session, coll| {
+            async move {
+                coll.find_one(doc! {}).session(session).await?;
+                Err(Error::custom(MyErr))
+            }
+            .boxed()
+        })
         .await;
 
     assert!(result.is_err());
     assert!(result.unwrap_err().get_custom::<MyErr>().is_some());
-    let events = client.get_all_command_started_events();
+    #[allow(deprecated)]
+    let events = client.events.get_all_command_started_events();
     let commands: Vec<_> = events.iter().map(|ev| &ev.command_name).collect();
     assert_eq!(&["find", "abortTransaction"], &commands[..]);
 }
 
 #[tokio::test]
 async fn convenient_api_returned_value() {
+    #[allow(deprecated)]
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
@@ -139,17 +139,14 @@ async fn convenient_api_returned_value() {
         .collection::<Document>("test_convenient");
 
     let value = session
-        .with_transaction(
-            coll,
-            |session, coll| {
-                async move {
-                    coll.find_one_with_session(None, None, session).await?;
-                    Ok(42)
-                }
-                .boxed()
-            },
-            None,
-        )
+        .start_transaction()
+        .and_run(coll, |session, coll| {
+            async move {
+                coll.find_one(doc! {}).session(session).await?;
+                Ok(42)
+            }
+            .boxed()
+        })
         .await
         .unwrap();
 
@@ -158,6 +155,7 @@ async fn convenient_api_returned_value() {
 
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
+    #[allow(deprecated)]
     let client = Client::test_builder().event_client().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
@@ -170,19 +168,16 @@ async fn convenient_api_retry_timeout_callback() {
         .collection::<Document>("test_convenient");
 
     let result: Result<()> = session
-        .with_transaction(
-            coll,
-            |session, coll| {
-                async move {
-                    coll.find_one_with_session(None, None, session).await?;
-                    let mut err = Error::custom(42);
-                    err.add_label(TRANSIENT_TRANSACTION_ERROR);
-                    Err(err)
-                }
-                .boxed()
-            },
-            None,
-        )
+        .start_transaction()
+        .and_run(coll, |session, coll| {
+            async move {
+                coll.find_one(doc! {}).session(session).await?;
+                let mut err = Error::custom(42);
+                err.add_label(TRANSIENT_TRANSACTION_ERROR);
+                Err(err)
+            }
+            .boxed()
+        })
         .await;
 
     let err = result.unwrap_err();
@@ -197,6 +192,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(options)
         .event_client()
@@ -220,17 +216,14 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let result = session
-        .with_transaction(
-            coll,
-            |session, coll| {
-                async move {
-                    coll.find_one_with_session(None, None, session).await?;
-                    Ok(())
-                }
-                .boxed()
-            },
-            None,
-        )
+        .start_transaction()
+        .and_run(coll, |session, coll| {
+            async move {
+                coll.find_one(doc! {}).session(session).await?;
+                Ok(())
+            }
+            .boxed()
+        })
         .await;
 
     let err = result.unwrap_err();
@@ -244,6 +237,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
+    #[allow(deprecated)]
     let client = Client::test_builder()
         .options(options)
         .event_client()
@@ -267,17 +261,14 @@ async fn convenient_api_retry_timeout_commit_transient() {
     let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let result = session
-        .with_transaction(
-            coll,
-            |session, coll| {
-                async move {
-                    coll.find_one_with_session(None, None, session).await?;
-                    Ok(())
-                }
-                .boxed()
-            },
-            None,
-        )
+        .start_transaction()
+        .and_run(coll, |session, coll| {
+            async move {
+                coll.find_one(doc! {}).session(session).await?;
+                Ok(())
+            }
+            .boxed()
+        })
         .await;
 
     let err = result.unwrap_err();

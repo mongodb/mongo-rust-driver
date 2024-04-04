@@ -30,7 +30,7 @@ async fn run_distinct_test(test_file: TestFile) {
         let coll = client
             .init_db_and_coll(function_name!(), &test_case.description)
             .await;
-        coll.insert_many(data.clone(), None)
+        coll.insert_many(data.clone())
             .await
             .expect(&test_case.description);
 

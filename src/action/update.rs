@@ -11,9 +11,12 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, option_setters, CollRef};
+use super::{action_impl, deeplink, option_setters, CollRef};
 
-impl<T> Collection<T> {
+impl<T> Collection<T>
+where
+    T: Send + Sync,
+{
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
@@ -21,7 +24,8 @@ impl<T> Collection<T> {
     /// in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
-    /// `await` will return `Result<UpdateResult>`.
+    /// `await` will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
@@ -45,7 +49,8 @@ impl<T> Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return `Result<UpdateResult>`.
+    /// `await` will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
@@ -58,8 +63,11 @@ impl<T> Collection<T> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "tokio-sync"))]
-impl<T> crate::sync::Collection<T> {
+#[cfg(feature = "sync")]
+impl<T> crate::sync::Collection<T>
+where
+    T: Send + Sync,
+{
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
@@ -67,7 +75,8 @@ impl<T> crate::sync::Collection<T> {
     /// in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
-    /// [`run`](Update::run) will return `Result<UpdateResult>`.
+    /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         self.async_collection.update_many(query, update)
     }
@@ -84,7 +93,8 @@ impl<T> crate::sync::Collection<T> {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](Update::run) will return `Result<UpdateResult>`.
+    /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
+    #[deeplink]
     pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         self.async_collection.update_one(query, update)
     }
@@ -114,32 +124,30 @@ impl<'a> Update<'a> {
         comment: Bson,
     );
 
-    /// Runs the operation using the provided session.
+    /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
         self
     }
 }
 
-action_impl! {
-    impl<'a> Action for Update<'a> {
-        type Future = UpdateFuture;
+#[action_impl]
+impl<'a> Action for Update<'a> {
+    type Future = UpdateFuture;
 
-        async fn execute(mut self) -> Result<UpdateResult> {
-            if let UpdateModifications::Document(d) = &self.update {
-                crate::bson_util::update_document_check(d)?;
-            }
-            resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
-
-            let op = Op::with_update(
-                self.coll.namespace(),
-                self.query,
-                self.update,
-                self.multi,
-                self.options,
-                self.coll.human_readable_serialization(),
-            );
-            self.coll.client().execute_operation(op, self.session).await
+    async fn execute(mut self) -> Result<UpdateResult> {
+        if let UpdateModifications::Document(d) = &self.update {
+            crate::bson_util::update_document_check(d)?;
         }
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+
+        let op = Op::with_update(
+            self.coll.namespace(),
+            self.query,
+            self.update,
+            self.multi,
+            self.options,
+        );
+        self.coll.client().execute_operation(op, self.session).await
     }
 }

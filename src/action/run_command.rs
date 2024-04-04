@@ -12,7 +12,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
 
 impl Database {
     /// Runs a database-level command.
@@ -23,7 +23,8 @@ impl Database {
     /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
     /// command document.
     ///
-    /// `await` will return `Result<Document>`.
+    /// `await` will return d[`Result<Document>`].
+    #[deeplink]
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
             db: self,
@@ -35,8 +36,9 @@ impl Database {
 
     /// Runs a database-level command and returns a cursor to the response.
     ///
-    /// `await` will return `Result<`[`Cursor`]`<Document>>` or a
-    /// `Result<`[`SessionCursor`]`<Document>>` if a [`ClientSession`] is provided.
+    /// `await` will return d[`Result<Cursor<Document>>`] or a
+    /// d[`Result<SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         RunCursorCommand {
             db: self,
@@ -57,15 +59,17 @@ impl crate::sync::Database {
     /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
     /// command document.
     ///
-    /// [`run`](RunCommand::run) will return `Result<Document>`.
+    /// [`run`](RunCommand::run) will return d[`Result<Document>`].
+    #[deeplink]
     pub fn run_command(&self, command: Document) -> RunCommand {
         self.async_database.run_command(command)
     }
 
     /// Runs a database-level command and returns a cursor to the response.
     ///
-    /// [`run`](RunCursorCommand::run) will return `Result<`[`Cursor`]`<Document>>` or a
-    /// `Result<`[`SessionCursor`]`<Document>>` if a [`ClientSession`] is provided.
+    /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         self.async_database.run_cursor_command(command)
     }
@@ -92,44 +96,46 @@ impl<'a> RunCommand<'a> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for RunCommand<'a> {
-        type Future = RunCommandFuture;
+#[action_impl]
+impl<'a> Action for RunCommand<'a> {
+    type Future = RunCommandFuture;
 
-        async fn execute(self) -> Result<Document> {
-            let mut selection_criteria = self.options.and_then(|o| o.selection_criteria);
-            if let Some(session) = &self.session {
-                match session.transaction.state {
-                    TransactionState::Starting | TransactionState::InProgress => {
-                        if self.command.contains_key("readConcern") {
-                            return Err(ErrorKind::InvalidArgument {
-                                message: "Cannot set read concern after starting a transaction".into(),
-                            }
-                            .into());
+    async fn execute(self) -> Result<Document> {
+        let mut selection_criteria = self.options.and_then(|o| o.selection_criteria);
+        if let Some(session) = &self.session {
+            match session.transaction.state {
+                TransactionState::Starting | TransactionState::InProgress => {
+                    if self.command.contains_key("readConcern") {
+                        return Err(ErrorKind::InvalidArgument {
+                            message: "Cannot set read concern after starting a transaction".into(),
                         }
-                        selection_criteria = match selection_criteria {
-                            Some(selection_criteria) => Some(selection_criteria),
-                            None => {
-                                if let Some(ref options) = session.transaction.options {
-                                    options.selection_criteria.clone()
-                                } else {
-                                    None
-                                }
-                            }
-                        };
+                        .into());
                     }
-                    _ => {}
+                    selection_criteria = match selection_criteria {
+                        Some(selection_criteria) => Some(selection_criteria),
+                        None => {
+                            if let Some(ref options) = session.transaction.options {
+                                options.selection_criteria.clone()
+                            } else {
+                                None
+                            }
+                        }
+                    };
                 }
+                _ => {}
             }
-
-            let operation = run_command::RunCommand::new(
-                self.db.name().into(),
-                self.command,
-                selection_criteria,
-                None,
-            )?;
-            self.db.client().execute_operation(operation, self.session).await
         }
+
+        let operation = run_command::RunCommand::new(
+            self.db.name().into(),
+            self.command,
+            selection_criteria,
+            None,
+        )?;
+        self.db
+            .client()
+            .execute_operation(operation, self.session)
+            .await
     }
 }
 
@@ -168,50 +174,51 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
     }
 }
 
-action_impl! {
-    impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
-        type Future = RunCursorCommandFuture;
+#[action_impl(sync = crate::sync::Cursor<Document>)]
+impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
+    type Future = RunCursorCommandFuture;
 
-        async fn execute(self) -> Result<Cursor<Document>> {
-            let selection_criteria = self.options
-                .as_ref()
-                .and_then(|options| options.selection_criteria.clone());
-            let rcc = run_command::RunCommand::new(
-                self.db.name().to_string(),
-                self.command,
-                selection_criteria,
-                None,
-            )?;
-            let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
-            let client = self.db.client();
-            client.execute_cursor_operation(rc_command).await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::Cursor<Document>> {
-            out.map(crate::sync::Cursor::new)
-        }
+    async fn execute(self) -> Result<Cursor<Document>> {
+        let selection_criteria = self
+            .options
+            .as_ref()
+            .and_then(|options| options.selection_criteria.clone());
+        let rcc = run_command::RunCommand::new(
+            self.db.name().to_string(),
+            self.command,
+            selection_criteria,
+            None,
+        )?;
+        let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
+        let client = self.db.client();
+        client.execute_cursor_operation(rc_command).await
     }
 }
 
-action_impl! {
-    impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
-        type Future = RunCursorCommandSessionFuture;
+#[action_impl(sync = crate::sync::SessionCursor<Document>)]
+impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
+    type Future = RunCursorCommandSessionFuture;
 
-        async fn execute(mut self) -> Result<SessionCursor<Document>> {
-            resolve_selection_criteria_with_session!(self.db, self.options, Some(&mut *self.session.0))?;
-            let selection_criteria = self.options
-                .as_ref()
-                .and_then(|options| options.selection_criteria.clone());
-            let rcc = run_command::RunCommand::new(self.db.name().to_string(), self.command, selection_criteria, None)?;
-            let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
-            let client = self.db.client();
-            client
-                .execute_session_cursor_operation(rc_command, self.session.0)
-                .await
-        }
-
-        fn sync_wrap(out) -> Result<crate::sync::SessionCursor<Document>> {
-            out.map(crate::sync::SessionCursor::new)
-        }
+    async fn execute(mut self) -> Result<SessionCursor<Document>> {
+        resolve_selection_criteria_with_session!(
+            self.db,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
+        let selection_criteria = self
+            .options
+            .as_ref()
+            .and_then(|options| options.selection_criteria.clone());
+        let rcc = run_command::RunCommand::new(
+            self.db.name().to_string(),
+            self.command,
+            selection_criteria,
+            None,
+        )?;
+        let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
+        let client = self.db.client();
+        client
+            .execute_session_cursor_operation(rc_command, self.session.0)
+            .await
     }
 }
