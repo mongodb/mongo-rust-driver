@@ -293,11 +293,33 @@ buildvariants:
     tasks:
       - serverless-task-group
 
-  - name: oidc
-    display_name: OIDC
+  - name: oidc-linux
+    display_name: "OIDC Linux"
     patchable: true
     run_on:
       - ubuntu2204-large
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - testoidc_task_group
+
+  - name: oidc-macos
+    display_name: "OIDC Macos"
+    patchable: true
+    run_on:
+      - macos-1100
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - testoidc_task_group
+
+  - name: oidc-windows
+    display_name: "OIDC Windows"
+    patchable: true
+    run_on:
+      - windows-64-vsMulti-small
     expansions:
       AUTH: auth
       SSL: ssl
