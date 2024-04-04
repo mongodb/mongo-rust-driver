@@ -357,8 +357,8 @@ async fn do_shared_flow(
     callback: Arc<CallbackInner>,
     timeout: Duration,
 ) -> Result<()> {
-    // If the idpinfo is cached, we use that instead of doing two_step. It seems the spec does not allow
-    // idpinfo to change on invalidations.
+    // If the idpinfo is cached, we use that instead of doing two_step. It seems the spec does not
+    // allow idpinfo to change on invalidations.
     if cred_cache.idp_server_info.is_some() {
         let idp_response = {
             let cb_context = CallbackContext {

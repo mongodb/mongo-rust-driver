@@ -4,8 +4,11 @@ use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    action::Action, error::Result, operation::append_options,
-    selection_criteria::SelectionCriteria, Client,
+    action::Action,
+    error::Result,
+    operation::append_options,
+    selection_criteria::SelectionCriteria,
+    Client,
 };
 
 // If you write a tokio test that uses this, make sure to annotate it with

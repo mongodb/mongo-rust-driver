@@ -821,7 +821,10 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
     use crate::{
         event::command::{
-            CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
+            CommandEvent,
+            CommandFailedEvent,
+            CommandStartedEvent,
+            CommandSucceededEvent,
         },
         test::{Event, EventHandler},
     };
