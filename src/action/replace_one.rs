@@ -10,7 +10,6 @@ use crate::{
     operation::Update as Op,
     options::WriteConcern,
     results::UpdateResult,
-    serde_util,
     ClientSession,
     Collection,
 };
@@ -31,10 +30,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
         ReplaceOne {
             coll: CollRef::new(self),
             query,
-            replacement: serde_util::to_raw_document_buf_with_options(
-                replacement.borrow(),
-                self.human_readable_serialization(),
-            ),
+            replacement: bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
             options: None,
             session: None,
         }

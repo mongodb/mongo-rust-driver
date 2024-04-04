@@ -9,7 +9,6 @@ use crate::{
     operation::Insert as Op,
     options::WriteConcern,
     results::InsertManyResult,
-    serde_util,
     ClientSession,
     Collection,
 };
@@ -30,12 +29,11 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// `await` will return d[`Result<InsertManyResult>`].
     #[deeplink]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
-        let human_readable = self.human_readable_serialization();
         InsertMany {
             coll: CollRef::new(self),
             docs: docs
                 .into_iter()
-                .map(|v| serde_util::to_raw_document_buf_with_options(v.borrow(), human_readable))
+                .map(|v| bson::to_raw_document_buf(v.borrow()).map_err(Into::into))
                 .collect(),
             options: None,
             session: None,
