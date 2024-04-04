@@ -44,7 +44,7 @@ macro_rules! token_dir {
 
 macro_rules! no_user_token_file {
     () => {
-        std::env::var("OIDC_TOKEN_FILE").unwrap(),
+        std::env::var("OIDC_TOKEN_FILE").unwrap()
     };
 }
 
