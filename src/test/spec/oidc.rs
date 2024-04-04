@@ -14,26 +14,33 @@ use std::{
 };
 use tokio::sync::Mutex;
 
+macro_rules! get_env_or_skip {
+    ( $env_var: literal ) => {
+        match std::env::var($env_var) {
+            Ok(val) => val,
+            Err(_) => {
+                log_uncaptured(&format!("Skipping test, {} not set", $env_var));
+                return Ok(());
+            }
+        }
+    };
+}
+
 macro_rules! mongodb_uri_admin {
     () => {
-        std::env::var("MONGODB_URI").unwrap()
+        get_env_or_skip!("MONGODB_URI")
     };
 }
 
 macro_rules! mongodb_uri_single {
     () => {
-        std::env::var("MONGODB_URI_SINGLE").unwrap()
+        get_env_or_skip!("MONGODB_URI_SINGLE")
     };
 }
 
 macro_rules! mongodb_uri_multi {
     () => {
-        if let Ok(uri) = std::env::var("MONGODB_URI_MULTI") {
-            uri
-        } else {
-            log_uncaptured("Skipping Multi IDP test, MONGODB_URI_MULTI not set");
-            return Ok(());
-        }
+        get_env_or_skip!("MONGODB_URI_MULTI")
     };
 }
 
@@ -59,9 +66,11 @@ macro_rules! explicit_user {
     };
 }
 
-async fn admin_client() -> Client {
-    let opts = ClientOptions::parse(mongodb_uri_admin!()).await.unwrap();
-    Client::with_options(opts).unwrap()
+macro_rules! admin_client {
+    () => {{
+        let opts = ClientOptions::parse(mongodb_uri_admin!()).await.unwrap();
+        Client::with_options(opts).unwrap()
+    }};
 }
 
 // Machine Callback tests
@@ -335,7 +344,7 @@ async fn machine_3_2_auth_failures_without_cached_tokens_returns_an_error() -> a
 
 #[tokio::test(flavor = "multi_thread")]
 async fn machine_4_reauthentication() -> anyhow::Result<()> {
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // Now set a failpoint for find with 391 error code
     let options = FailCommandOptions::builder().error_code(391).build();
@@ -702,7 +711,7 @@ async fn human_2_2_callback_returns_missing_data() -> anyhow::Result<()> {
 async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() -> anyhow::Result<()>
 {
     // get an admin_client for setting failpoints
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
@@ -771,7 +780,7 @@ async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() 
 async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached_token(
 ) -> anyhow::Result<()> {
     // get an admin_client for setting failpoints
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // Now set a failpoint for find
     let options = FailCommandOptions::builder().error_code(20).build();
@@ -824,7 +833,7 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
         test::{Event, EventHandler},
     };
 
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
@@ -937,7 +946,7 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
@@ -989,7 +998,7 @@ async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
@@ -1043,7 +1052,7 @@ async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_4_fails() -> anyhow::Result<()> {
-    let admin_client = admin_client().await;
+    let admin_client = admin_client!();
 
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
