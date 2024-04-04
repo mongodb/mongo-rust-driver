@@ -383,6 +383,97 @@
           ]
         }
       ]
+    },
+    {
+      "description": "client bulkWrite bypassDocumentValidation: false is sent",
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": "crud-tests.coll0",
+                  "document": {
+                    "_id": 3,
+                    "x": 33
+                  }
+                }
+              }
+            ],
+            "bypassDocumentValidation": false,
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 1,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 0,
+            "insertResults": {
+              "0": {
+                "insertedId": 3
+              }
+            },
+            "updateResults": {},
+            "deleteResults": {}
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
+                "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
+                  "bypassDocumentValidation": false,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 3,
+                        "x": 33
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "crud-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            },
+            {
+              "_id": 3,
+              "x": 33
+            }
+          ]
+        }
+      ]
     }
   ]
 }
