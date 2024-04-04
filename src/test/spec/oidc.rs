@@ -279,8 +279,7 @@ async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth
         .build()
         .into();
     // poison the cache with a bad token, authentication should still work.
-    (*opts
-        .credential
+    opts.credential
         .as_mut()
         .unwrap()
         .oidc_callback
@@ -288,7 +287,7 @@ async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth
         .unwrap()
         .cache
         .lock()
-        .await)
+        .await
         .access_token = Some("random happy sunshine token".to_string());
     let client = Client::with_options(opts)?;
     client
@@ -729,8 +728,7 @@ async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() 
         .into();
 
     // put the test_user1 token in the cache
-    (*opts
-        .credential
+    opts.credential
         .as_mut()
         .unwrap()
         .oidc_callback
@@ -738,7 +736,7 @@ async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() 
         .unwrap()
         .cache
         .lock()
-        .await)
+        .await
         .access_token = tokio::fs::read_to_string(token_dir!("test_user1"))
         .await
         .ok();
@@ -821,10 +819,7 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
     use crate::{
         event::command::{
-            CommandEvent,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
+            CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
         },
         test::{Event, EventHandler},
     };
@@ -882,7 +877,7 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
     assert_eq!(2, *(*call_count).lock().await);
     let events = events
         .collect_events(Duration::from_secs(1), |e| {
-            if let Some(ref e) = e.as_command_event() {
+            if let Some(e) = e.as_command_event() {
                 e.command_name() == "find"
             } else {
                 false
@@ -891,7 +886,7 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
         .await;
     // assert the first command is find
     assert!(matches!(
-        events.get(0).unwrap(),
+        events.first().unwrap(),
         Event::Command(CommandEvent::Started(CommandStartedEvent {
             command_name,
             ..
@@ -1130,8 +1125,7 @@ async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
         .into();
 
     // put a fake refresh token in the cache
-    (*opts
-        .credential
+    opts.credential
         .as_mut()
         .unwrap()
         .oidc_callback
@@ -1139,7 +1133,7 @@ async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
         .unwrap()
         .cache
         .lock()
-        .await)
+        .await
         .refresh_token = Some("some fake refresh token".to_string());
 
     let client = Client::with_options(opts)?;

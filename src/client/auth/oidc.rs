@@ -200,9 +200,7 @@ pub(crate) async fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Option<Command> {
-    if credential.oidc_callback.is_none() {
-        return None;
-    }
+    credential.oidc_callback.as_ref()?;
     if let Some(ref access_token) = credential
         .oidc_callback
         .as_ref()
@@ -470,7 +468,7 @@ async fn authenticate_human(
     source: &str,
     conn: &mut Connection,
     credential: &Credential,
-    mut cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut MutexGuard<'_, Cache>,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
@@ -495,7 +493,7 @@ async fn authenticate_human(
                 return Ok(());
             }
         }
-        invalidate_caches(conn, &mut cred_cache, false).await;
+        invalidate_caches(conn, cred_cache, false).await;
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
@@ -520,7 +518,7 @@ async fn authenticate_human(
             if response.done {
                 // Update the credential and connection caches with the access token and the
                 // credential cache with the refresh token and token_gen_id
-                update_cred_cache(&mut cred_cache, &idp_response, None).await;
+                update_cred_cache(cred_cache, &idp_response, None).await;
                 return Ok(());
             }
             // It should really not be possible for this to occur, we would get an error, if the
@@ -530,14 +528,14 @@ async fn authenticate_human(
             // since this is an error, we will go ahead and invalidate the caches so we do not
             // try to use them again and waste time. We should fall through so that we can
             // do the shared flow from the beginning
-            invalidate_caches(conn, &mut cred_cache, false).await;
+            invalidate_caches(conn, cred_cache, false).await;
         }
     }
 
     do_shared_flow(
         source,
         conn,
-        &mut cred_cache,
+        cred_cache,
         credential,
         server_api,
         callback,
@@ -550,7 +548,7 @@ async fn authenticate_machine(
     source: &str,
     conn: &mut Connection,
     credential: &Credential,
-    mut cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut MutexGuard<'_, Cache>,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
@@ -570,14 +568,14 @@ async fn authenticate_machine(
                 return Ok(());
             }
         }
-        invalidate_caches(conn, &mut cred_cache, false).await;
+        invalidate_caches(conn, cred_cache, false).await;
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
     do_shared_flow(
         source,
         conn,
-        &mut cred_cache,
+        cred_cache,
         credential,
         server_api,
         callback,
