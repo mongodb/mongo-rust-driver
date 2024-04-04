@@ -77,21 +77,21 @@ impl<'a> BulkWrite<'a> {
         let result = &mut error.partial_result;
 
         while let Some(response) = stream.try_next().await? {
+            let index = response.index + self.offset;
             match response.result {
                 SingleOperationResult::Success {
                     n,
                     n_modified,
                     upserted,
                 } => {
-                    let result_index = response.index + self.offset;
                     let model = self.get_model(response.index)?;
                     match model.operation_type() {
                         OperationType::Insert => {
-                            let inserted_id = self.get_inserted_id(result_index)?;
+                            let inserted_id = self.get_inserted_id(index)?;
                             let insert_result = InsertOneResult { inserted_id };
                             result
                                 .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                                .add_insert_result(result_index, insert_result);
+                                .add_insert_result(index, insert_result);
                         }
                         OperationType::Update => {
                             let modified_count =
@@ -107,18 +107,18 @@ impl<'a> BulkWrite<'a> {
                             };
                             result
                                 .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                                .add_update_result(result_index, update_result);
+                                .add_update_result(index, update_result);
                         }
                         OperationType::Delete => {
                             let delete_result = DeleteResult { deleted_count: n };
                             result
                                 .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                                .add_delete_result(result_index, delete_result);
+                                .add_delete_result(index, delete_result);
                         }
                     }
                 }
                 SingleOperationResult::Error(write_error) => {
-                    error.write_errors.insert(response.index, write_error);
+                    error.write_errors.insert(index, write_error);
                 }
             }
         }

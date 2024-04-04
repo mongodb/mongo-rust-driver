@@ -191,10 +191,13 @@ impl ExecutionStatus {
             Self::Error(ref error) => {
                 match *error.kind {
                     ErrorKind::ClientBulkWrite(ref bulk_write_error) => {
-                        // A top-level error is always fatal. If an individual operation fails
-                        // during an ordered bulk write, no more batches should be executed.
-                        !(error.source.is_some()
-                            || (ordered && !bulk_write_error.write_errors.is_empty()))
+                        // A top-level error is always fatal.
+                        let top_level_error_occurred = error.source.is_some();
+                        // A write error occurring during an ordered bulk write is fatal.
+                        let terminal_write_error_occurred =
+                            ordered && !bulk_write_error.write_errors.is_empty();
+
+                        !top_level_error_occurred && !terminal_write_error_occurred
                     }
                     // A top-level error is always fatal.
                     _ => false,
