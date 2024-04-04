@@ -3,7 +3,7 @@ use serde::Deserialize;
 use crate::{bson::Bson, error::WriteError, operation::CursorInfo, results::BulkWriteResult};
 
 /// The top-level response to the bulkWrite command.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Response {
     pub(super) cursor: CursorInfo,
@@ -12,7 +12,7 @@ pub(super) struct Response {
 }
 
 /// The summary information contained within the top-level response to the bulkWrite command.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct SummaryInfo {
     pub(super) n_errors: i64,

@@ -5,7 +5,9 @@
     {
       "minServerVersion": "8.0",
       "topologies": [
-        "replicaset"
+        "replicaset",
+        "sharded",
+        "load-balanced"
       ]
     }
   ],
@@ -147,12 +149,16 @@
               "1": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "2": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               }
             },
             "deleteResults": {
@@ -217,7 +223,13 @@
                     {
                       "ns": "retryable-writes-tests.coll0"
                     }
-                  ]
+                  ],
+                  "lsid": {
+                    "$$exists": true
+                  },
+                  "txnNumber": {
+                    "$$exists": true
+                  }
                 }
               }
             },
@@ -271,7 +283,13 @@
                     {
                       "ns": "retryable-writes-tests.coll0"
                     }
-                  ]
+                  ],
+                  "lsid": {
+                    "$$exists": true
+                  },
+                  "txnNumber": {
+                    "$$exists": true
+                  }
                 }
               }
             }
@@ -497,12 +515,16 @@
               "1": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "2": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               }
             },
             "deleteResults": {
@@ -567,7 +589,13 @@
                     {
                       "ns": "retryable-writes-tests.coll0"
                     }
-                  ]
+                  ],
+                  "lsid": {
+                    "$$exists": true
+                  },
+                  "txnNumber": {
+                    "$$exists": true
+                  }
                 }
               }
             },
@@ -621,7 +649,13 @@
                     {
                       "ns": "retryable-writes-tests.coll0"
                     }
-                  ]
+                  ],
+                  "lsid": {
+                    "$$exists": true
+                  },
+                  "txnNumber": {
+                    "$$exists": true
+                  }
                 }
               }
             }
@@ -689,7 +723,7 @@
             "writeConcernErrors": [
               {
                 "code": 91,
-                "errmsg": "Replication is being shut down"
+                "message": "Replication is being shut down"
               }
             ]
           }

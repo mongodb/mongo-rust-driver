@@ -16,7 +16,6 @@ use crate::{
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
         Event,
         EventHandler,
-        FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -54,11 +53,8 @@ async fn retry_releases_connection() {
         .collection("retry_releases_connection");
     collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
 
-    // Use a connection error to ensure streaming monitor checks get cancelled. Otherwise, we'd have
-    // to wait for the entire heartbeatFrequencyMS before the find succeeds.
-    let options = FailCommandOptions::builder().close_connection(true).build();
-    let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+    let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1)).close_connection(true);
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     runtime::timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
         .await
@@ -98,12 +94,10 @@ async fn retry_read_pool_cleared() {
         .collection("retry_read_pool_cleared");
     collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
 
-    let options = FailCommandOptions::builder()
+    let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
         .error_code(91)
-        .block_connection(Duration::from_secs(1))
-        .build();
-    let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+        .block_connection(Duration::from_secs(1));
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let mut subscriber = handler.subscribe();
 
@@ -181,12 +175,11 @@ async fn retry_read_different_mongos() {
             log_uncaptured("skipping retry_read_different_mongos: requires failCommand");
             return;
         }
-        let fail_opts = FailCommandOptions::builder()
+
+        let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
             .error_code(6)
-            .close_connection(true)
-            .build();
-        let fp = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(fail_opts));
-        guards.push(client.enable_failpoint(fp, None).await.unwrap());
+            .close_connection(true);
+        guards.push(client.configure_fail_point(fail_point).await.unwrap());
     }
 
     let client = Client::test_builder()
@@ -238,12 +231,11 @@ async fn retry_read_same_mongos() {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
         let client = Client::test_builder().options(client_options).build().await;
-        let fail_opts = FailCommandOptions::builder()
+
+        let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
             .error_code(6)
-            .close_connection(true)
-            .build();
-        let fp = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(fail_opts));
-        client.enable_failpoint(fp, None).await.unwrap()
+            .close_connection(true);
+        client.configure_fail_point(fail_point).await.unwrap()
     };
 
     let client = Client::test_builder()

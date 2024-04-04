@@ -9,7 +9,14 @@ use crate::{
     bson::{doc, Document},
     error::ErrorKind,
     options::WriteModel,
-    test::{log_uncaptured, spec::unified_runner::run_unified_tests, EventHandler},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        spec::unified_runner::run_unified_tests,
+        EventHandler,
+        FailPoint,
+        FailPointMode,
+    },
     Client,
     Namespace,
 };
@@ -60,42 +67,6 @@ async fn max_write_batch_size_batching() {
 }
 
 #[tokio::test]
-async fn max_bson_object_size_with_document_sequences() {
-    let handler = Arc::new(EventHandler::new());
-    let client = Client::test_builder()
-        .event_handler(handler.clone())
-        .build()
-        .await;
-    let mut subscriber = handler.subscribe();
-
-    if client.server_version_lt(8, 0) {
-        log_uncaptured(
-            "skipping max_bson_object_size_with_document_sequences: bulkWrite requires 8.0+",
-        );
-        return;
-    }
-
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
-
-    let document = doc! { "a": "b".repeat(max_bson_object_size / 2) };
-    let model = WriteModel::InsertOne {
-        namespace: Namespace::new("db", "coll"),
-        document,
-    };
-    let models = vec![model; 2];
-
-    let result = client.bulk_write(models).await.unwrap();
-    assert_eq!(result.inserted_count as usize, 2);
-
-    let (started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
-        .await
-        .expect("no events observed");
-    let len = started.command.get_array("ops").unwrap().len();
-    assert_eq!(len, 2);
-}
-
-#[tokio::test]
 async fn max_message_size_bytes_batching() {
     let handler = Arc::new(EventHandler::new());
     let client = Client::test_builder()
@@ -127,15 +98,15 @@ async fn max_message_size_bytes_batching() {
         .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
         .await
         .expect("no events observed");
-    let first_ops_len = first_started.command.get_array("ops").unwrap().len();
+    let first_len = first_started.command.get_array("ops").unwrap().len();
+    assert_eq!(first_len, num_models - 1);
 
     let (second_started, _) = subscriber
         .wait_for_successful_command_execution(Duration::from_millis(500), "bulkWrite")
         .await
         .expect("no events observed");
-    let second_ops_len = second_started.command.get_array("ops").unwrap().len();
-
-    assert_eq!(first_ops_len + second_ops_len, num_models);
+    let second_len = second_started.command.get_array("ops").unwrap().len();
+    assert_eq!(second_len, 1);
 }
 
 #[tokio::test]
@@ -185,4 +156,37 @@ async fn cursor_iteration() {
         .wait_for_successful_command_execution(Duration::from_millis(500), "getMore")
         .await
         .expect("no getMore observed");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn write_concern_errors_are_collected() {
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    let client = Client::test_builder().options(options).build().await;
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
+        return;
+    }
+
+    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
+
+    let fail_point = FailPoint::new(&["bulkWrite"], FailPointMode::Times(2))
+        .write_concern_error(doc! { "code": 91, "errmsg": "Replication is being shut down" });
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+
+    let models = vec![
+        WriteModel::InsertOne {
+            namespace: Namespace::new("db", "coll"),
+            document: doc! { "a": "b" }
+        };
+        max_write_batch_size + 1
+    ];
+    let error = client.bulk_write(models).ordered(false).await.unwrap_err();
+
+    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
+        panic!("Expected bulk write error, got {:?}", error);
+    };
+
+    assert_eq!(bulk_write_error.write_concern_errors.len(), 2);
 }

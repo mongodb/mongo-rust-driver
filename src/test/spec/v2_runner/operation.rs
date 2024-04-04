@@ -5,7 +5,7 @@ use serde::{de::Deserializer, Deserialize};
 
 use crate::{
     action::Action,
-    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
+    bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
     db::options::ListCollectionsOptions,
     error::Result,
@@ -942,7 +942,11 @@ pub(super) struct TargetedFailPoint {
 
 impl TestOperation for TargetedFailPoint {
     fn execute_on_client<'a>(&'a self, _client: &'a TestClient) -> BoxFuture<Result<Option<Bson>>> {
-        async move { Ok(Some(to_bson(&self.fail_point)?)) }.boxed()
+        async move {
+            let command_document = bson::to_document(&self.fail_point).unwrap();
+            Ok(Some(command_document.into()))
+        }
+        .boxed()
     }
 }
 

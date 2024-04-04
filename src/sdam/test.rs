@@ -20,7 +20,6 @@ use crate::{
         Event,
         EventClient,
         EventHandler,
-        FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -48,20 +47,17 @@ async fn min_heartbeat_frequency() {
         return;
     }
 
-    let fp_options = FailCommandOptions::builder()
-        .app_name("SDAMMinHeartbeatFrequencyTest".to_string())
-        .error_code(1234)
-        .build();
-    let failpoint = FailPoint::fail_command(
-        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(5),
-        fp_options,
-    );
-
-    let _fp_guard = setup_client
-        .enable_failpoint(failpoint, None)
+    let _guard = setup_client
+        .configure_fail_point(
+            FailPoint::new(
+                &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+                FailPointMode::Times(5),
+            )
+            .app_name("SDAMMinHeartbeatFrequencyTest")
+            .error_code(1234),
+        )
         .await
-        .expect("enabling failpoint should succeed");
+        .unwrap();
 
     let mut options = setup_client_options;
     options.app_name = Some("SDAMMinHeartbeatFrequencyTest".to_string());
@@ -135,20 +131,17 @@ async fn sdam_pool_management() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    let fp_options = FailCommandOptions::builder()
-        .app_name("SDAMPoolManagementTest".to_string())
-        .error_code(1234)
-        .build();
-    let failpoint = FailPoint::fail_command(
-        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(4),
-        fp_options,
-    );
-
-    let _fp_guard = client
-        .enable_failpoint(failpoint, None)
+    let _guard = client
+        .configure_fail_point(
+            FailPoint::new(
+                &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+                FailPointMode::Times(4),
+            )
+            .app_name("SDAMPoolManagementTest")
+            .error_code(1234),
+        )
         .await
-        .expect("enabling failpoint should succeed");
+        .unwrap();
 
     // Since there is no deterministic ordering, simply collect all the events and check for their
     // presence.

@@ -4,7 +4,7 @@ pub(crate) mod operation;
 pub(crate) mod test_event;
 pub(crate) mod test_file;
 
-use std::{future::IntoFuture, ops::Deref, sync::Arc, time::Duration};
+use std::{future::IntoFuture, sync::Arc, time::Duration};
 
 use futures::{future::BoxFuture, FutureExt};
 use semver::VersionReq;
@@ -23,6 +23,7 @@ use crate::{
         spec::deserialize_spec_tests,
         util::{get_default_name, FailPointGuard},
         EventClient,
+        FailPoint,
         TestClient,
         SERVERLESS,
     },
@@ -228,8 +229,12 @@ impl TestContext {
 
         // Persist fail point guards so they disable post-test.
         let mut fail_point_guards: Vec<FailPointGuard> = Vec::new();
-        if let Some(fail_point) = &test.fail_point {
-            fail_point_guards.push(fail_point.enable(client.deref(), None).await.unwrap());
+        if let Some(ref fail_point) = test.fail_point {
+            let guard = client
+                .configure_fail_point(fail_point.clone())
+                .await
+                .unwrap();
+            fail_point_guards.push(guard);
         }
 
         // Start the test sessions
@@ -392,7 +397,7 @@ impl<'a> OpRunner<'a> {
                             .unwrap();
                     }
                     "targetedFailPoint" => {
-                        let fail_point = from_bson(
+                        let fail_point: FailPoint = from_bson(
                             operation
                                 .execute_on_client(&self.internal_client)
                                 .await
@@ -408,13 +413,12 @@ impl<'a> OpRunner<'a> {
                             .cloned()
                             .unwrap_or_else(|| panic!("ClientSession is not pinned"));
 
-                        self.fail_point_guards.push(
-                            self.client
-                                .deref()
-                                .enable_failpoint(fail_point, Some(selection_criteria))
-                                .await
-                                .unwrap(),
-                        );
+                        let guard = self
+                            .client
+                            .configure_fail_point(fail_point.selection_criteria(selection_criteria))
+                            .await
+                            .unwrap();
+                        self.fail_point_guards.push(guard);
                     }
                     other => panic!("unknown operation: {}", other),
                 }

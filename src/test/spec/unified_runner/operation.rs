@@ -73,7 +73,6 @@ use crate::{
         UpdateOptions,
     },
     runtime,
-    selection_criteria::ReadPreference,
     serde_util,
     test::FailPoint,
     Collection,
@@ -1381,9 +1380,8 @@ impl TestOperation for FailPointCommand {
     ) -> BoxFuture<'a, ()> {
         async move {
             let client = test_runner.get_client(&self.client).await;
-            let guard = self
-                .fail_point
-                .enable(&client, Some(ReadPreference::Primary.into()))
+            let guard = client
+                .configure_fail_point(self.fail_point.clone())
                 .await
                 .unwrap();
             test_runner.fail_point_guards.write().await.push(guard);
@@ -1414,16 +1412,16 @@ impl TestOperation for TargetedFailPoint {
                         .unwrap_or_else(|| panic!("ClientSession not pinned"))
                 })
                 .await;
-            let fail_point_guard = test_runner
+            let guard = test_runner
                 .internal_client
-                .enable_failpoint(self.fail_point.clone(), Some(selection_criteria))
+                .configure_fail_point(
+                    self.fail_point
+                        .clone()
+                        .selection_criteria(selection_criteria),
+                )
                 .await
                 .unwrap();
-            test_runner
-                .fail_point_guards
-                .write()
-                .await
-                .push(fail_point_guard);
+            test_runner.fail_point_guards.write().await.push(guard);
         }
         .boxed()
     }

@@ -11,7 +11,6 @@ use crate::{
     test::{
         get_client_options,
         spec::unified_runner::run_unified_tests,
-        FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -210,14 +209,8 @@ async fn upload_stream_errors() {
         GridFsUploadOptions::builder().chunk_size_bytes(1).build(),
     );
 
-    let _fp_guard = FailPoint::fail_command(
-        &["insert"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(1234).build(),
-    )
-    .enable(&client, None)
-    .await
-    .unwrap();
+    let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1)).error_code(1234);
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let error = get_mongo_error(upload_stream.write_all(&[11]).await);
     assert_eq!(error.sdam_code(), Some(1234));
@@ -232,14 +225,8 @@ async fn upload_stream_errors() {
 
     upload_stream.write_all(&[11]).await.unwrap();
 
-    let _fp_guard = FailPoint::fail_command(
-        &["insert"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(1234).build(),
-    )
-    .enable(&client, None)
-    .await
-    .unwrap();
+    let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1)).error_code(1234);
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let error = get_mongo_error(upload_stream.close().await);
     assert_eq!(error.sdam_code(), Some(1234));

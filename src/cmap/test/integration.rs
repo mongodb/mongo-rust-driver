@@ -15,14 +15,7 @@ use crate::{
     runtime,
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
-    test::{
-        get_client_options,
-        log_uncaptured,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
-    },
+    test::{get_client_options, log_uncaptured, FailPoint, FailPointMode, TestClient},
 };
 use semver::VersionReq;
 use std::{sync::Arc, time::Duration};
@@ -188,13 +181,16 @@ async fn connection_error_during_establishment() {
         return;
     }
 
-    let options = FailCommandOptions::builder().error_code(1234).build();
-    let failpoint = FailPoint::fail_command(
-        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-        FailPointMode::Times(10),
-        Some(options),
-    );
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+    let _guard = client
+        .configure_fail_point(
+            FailPoint::new(
+                &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+                FailPointMode::Times(10),
+            )
+            .error_code(1234),
+        )
+        .await
+        .unwrap();
 
     let handler = Arc::new(TestEventHandler::new());
     let mut subscriber = handler.subscribe();
@@ -243,9 +239,12 @@ async fn connection_error_during_operation() {
         return;
     }
 
-    let options = FailCommandOptions::builder().close_connection(true).build();
-    let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(10), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+    let _guard = client
+        .configure_fail_point(
+            FailPoint::new(&["ping"], FailPointMode::Times(10)).close_connection(true),
+        )
+        .await
+        .unwrap();
 
     let mut subscriber = handler.subscribe();
 

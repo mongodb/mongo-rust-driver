@@ -29,7 +29,6 @@ pub(crate) use self::{
         Event,
         EventClient,
         EventHandler,
-        FailCommandOptions,
         FailPoint,
         FailPointMode,
         MatchErrExt,

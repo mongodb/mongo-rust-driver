@@ -21,7 +21,6 @@ use crate::{
         run_spec_test,
         Event,
         EventHandler,
-        FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -253,22 +252,18 @@ async fn load_balancing_test() {
     drop(subscriber);
 
     // enable a failpoint on one of the mongoses to slow it down
-    let options = FailCommandOptions::builder()
-        .block_connection(Duration::from_millis(500))
-        .build();
-    let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
-
     let slow_host = get_client_options().await.hosts[0].clone();
-    let criteria = SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
-    let fp_guard = setup_client
-        .enable_failpoint(failpoint, criteria)
-        .await
-        .expect("enabling failpoint should succeed");
+    let slow_host_criteria =
+        SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
+    let fail_point = FailPoint::new(&["find"], FailPointMode::AlwaysOn)
+        .block_connection(Duration::from_millis(500))
+        .selection_criteria(slow_host_criteria);
+    let guard = setup_client.configure_fail_point(fail_point).await.unwrap();
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
     do_test(&client, &mut handler, 0.05, 0.25, 10).await;
 
     // disable failpoint and rerun, should be back to even split
-    drop(fp_guard);
+    drop(guard);
     do_test(&client, &mut handler, 0.40, 0.50, 100).await;
 }

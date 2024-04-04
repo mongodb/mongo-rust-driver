@@ -30,7 +30,6 @@ use crate::{
         Event,
         EventClient,
         EventHandler,
-        FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
@@ -46,7 +45,7 @@ async fn run_unified() {
 #[tokio::test(flavor = "multi_thread")]
 async fn run_legacy() {
     async fn run_test(test_file: TestFile) {
-        for mut test_case in test_file.tests {
+        for test_case in test_file.tests {
             if test_case.operation.name == "bulkWrite" {
                 continue;
             }
@@ -83,13 +82,13 @@ async fn run_legacy() {
                     .expect(&test_case.description);
             }
 
-            let _fp_guard = if let Some(ref mut fail_point) = test_case.fail_point {
-                Some(fail_point.enable(&client, None).await.unwrap_or_else(|e| {
-                    panic!(
-                        "{}: error enabling failpoint: {:#?}",
-                        test_case.description, e
-                    )
-                }))
+            let guard = if let Some(fail_point) = test_case.fail_point {
+                Some(
+                    client
+                        .configure_fail_point(fail_point)
+                        .await
+                        .expect(&test_case.description),
+                )
             } else {
                 None
             };
@@ -98,7 +97,7 @@ async fn run_legacy() {
             let result = test_case.operation.execute_on_collection(&coll, None).await;
 
             // Disable the failpoint, if any.
-            drop(_fp_guard);
+            drop(guard);
 
             if let Some(error) = test_case.outcome.error {
                 assert_eq!(
@@ -415,13 +414,11 @@ async fn retry_write_pool_cleared() {
         .database("retry_write_pool_cleared")
         .collection("retry_write_pool_cleared");
 
-    let options = FailCommandOptions::builder()
+    let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1))
         .error_code(91)
         .block_connection(Duration::from_secs(1))
-        .error_labels(vec![RETRYABLE_WRITE_ERROR.to_string()])
-        .build();
-    let failpoint = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+        .error_labels(vec![RETRYABLE_WRITE_ERROR]);
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let mut subscriber = handler.subscribe();
 
@@ -504,20 +501,19 @@ async fn retry_write_retryable_write_error() {
                                 // Enable the failpoint.
                                 let fp_guard = {
                                     let client = client.lock().await;
-                                    FailPoint::fail_command(
-                                        &["insert"],
-                                        FailPointMode::Times(1),
-                                        FailCommandOptions::builder()
+                                    let fail_point =
+                                        FailPoint::new(&["insert"], FailPointMode::Times(1))
                                             .error_code(10107)
                                             .error_labels(vec![
-                                                "RetryableWriteError".to_string(),
-                                                "NoWritesPerformed".to_string(),
-                                            ])
-                                            .build(),
-                                    )
-                                    .enable(client.as_ref().unwrap(), None)
-                                    .await
-                                    .unwrap()
+                                                "RetryableWriteError",
+                                                "NoWritesPerformed",
+                                            ]);
+                                    client
+                                        .as_ref()
+                                        .unwrap()
+                                        .configure_fail_point(fail_point)
+                                        .await
+                                        .unwrap()
                                 };
                                 fp_tx.send(fp_guard).unwrap();
                                 // Defer acknowledging the message until the failpoint has been set
@@ -539,19 +535,12 @@ async fn retry_write_retryable_write_error() {
         return;
     }
 
-    let _fp_guard = FailPoint::fail_command(
-        &["insert"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder()
-            .write_concern_error(doc! {
-                "code": 91,
-                "errorLabels": ["RetryableWriteError"],
-            })
-            .build(),
-    )
-    .enable(&client, None)
-    .await
-    .unwrap();
+    let fail_point =
+        FailPoint::new(&["insert"], FailPointMode::Times(1)).write_concern_error(doc! {
+            "code": 91,
+            "errorLabels": ["RetryableWriteError"],
+        });
+    let _guard = client.configure_fail_point(fail_point).await.unwrap();
 
     let result = client
         .database("test")
@@ -588,13 +577,12 @@ async fn retry_write_different_mongos() {
             log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
             return;
         }
-        let fail_opts = FailCommandOptions::builder()
+
+        let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec!["RetryableWriteError".to_string()])
-            .close_connection(true)
-            .build();
-        let fp = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(fail_opts));
-        guards.push(client.enable_failpoint(fp, None).await.unwrap());
+            .error_labels(vec![RETRYABLE_WRITE_ERROR])
+            .close_connection(true);
+        guards.push(client.configure_fail_point(fail_point).await.unwrap());
     }
 
     let client = Client::test_builder()
@@ -646,13 +634,12 @@ async fn retry_write_same_mongos() {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
         let client = Client::test_builder().options(client_options).build().await;
-        let fail_opts = FailCommandOptions::builder()
+
+        let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec!["RetryableWriteError".to_string()])
-            .close_connection(true)
-            .build();
-        let fp = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(fail_opts));
-        client.enable_failpoint(fp, None).await.unwrap()
+            .error_labels(vec![RETRYABLE_WRITE_ERROR])
+            .close_connection(true);
+        client.configure_fail_point(fail_point).await.unwrap()
     };
 
     let client = Client::test_builder()
