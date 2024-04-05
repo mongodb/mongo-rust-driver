@@ -70,21 +70,58 @@ pub(crate) fn first_key(document: &Document) -> Option<&str> {
     document.keys().next().map(String::as_str)
 }
 
-pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
-    match replacement.iter().next().transpose()? {
-        Some((key, _)) if !key.starts_with('$') => Ok(()),
-        _ => Err(ErrorKind::InvalidArgument {
-            message: "replace document must have first key not starting with '$'".to_string(),
+pub(crate) fn update_document_check(update: &Document) -> Result<()> {
+    match first_key(update) {
+        Some(key) => {
+            if !key.starts_with('$') {
+                Err(ErrorKind::InvalidArgument {
+                    message: "update document must only contain update modifiers".to_string(),
+                }
+                .into())
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(ErrorKind::InvalidArgument {
+            message: "update document must not be empty".to_string(),
         }
         .into()),
     }
 }
 
-pub(crate) fn update_document_check(update: &Document) -> Result<()> {
-    match first_key(update) {
-        Some(s) if s.starts_with('$') => Ok(()),
-        _ => Err(ErrorKind::InvalidArgument {
-            message: "update document must have first key starting with '$".to_string(),
+pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
+    match first_key(replacement) {
+        Some(key) => {
+            if key.starts_with('$') {
+                Err(ErrorKind::InvalidArgument {
+                    message: "replacement document must not contain update modifiers".to_string(),
+                }
+                .into())
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(ErrorKind::InvalidArgument {
+            message: "replacement document must not be empty".to_string(),
+        }
+        .into()),
+    }
+}
+
+pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
+    match replacement.iter().next().transpose()? {
+        Some((key, _)) => {
+            if key.starts_with('$') {
+                Err(ErrorKind::InvalidArgument {
+                    message: "replacement document must not contain update modifiers".to_string(),
+                }
+                .into())
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(ErrorKind::InvalidArgument {
+            message: "replacement document must not be empty".to_string(),
         }
         .into()),
     }

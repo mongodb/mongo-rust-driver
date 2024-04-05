@@ -5,7 +5,7 @@ use serde_with::skip_serializing_none;
 
 use crate::{
     bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
-    bson_util::get_or_prepend_id_field,
+    bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
     options::UpdateModifications,
     Namespace,
@@ -181,6 +181,20 @@ impl WriteModel {
     /// Returns the operation-specific fields that should be included in this model's entry in the
     /// ops array. Also returns an inserted ID if this is an insert operation.
     pub(crate) fn get_ops_document_contents(&self) -> Result<(RawDocumentBuf, Option<Bson>)> {
+        if let Self::UpdateOne {
+            update: UpdateModifications::Document(update_document),
+            ..
+        }
+        | Self::UpdateMany {
+            update: UpdateModifications::Document(update_document),
+            ..
+        } = self
+        {
+            update_document_check(update_document)?;
+        } else if let Self::ReplaceOne { replacement, .. } = self {
+            replacement_document_check(replacement)?;
+        }
+
         let (mut model_document, inserted_id) = match self {
             Self::InsertOne { document, .. } => {
                 let mut insert_document = RawDocumentBuf::from_document(document)?;
