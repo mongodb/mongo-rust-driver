@@ -1,6 +1,5 @@
 extern crate proc_macro;
 
-use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -10,7 +9,7 @@ use syn::{
     parse_quote,
     parse_quote_spanned,
     spanned::Spanned,
-    visit_mut::VisitMut,
+    Attribute,
     Block,
     Error,
     Expr,
@@ -20,7 +19,6 @@ use syn::{
     Lifetime,
     Lit,
     Meta,
-    PathArguments,
     Token,
     Type,
 };
@@ -55,23 +53,10 @@ pub fn action_impl(
     }
 
     let sync_run = if let Some(sync_type) = sync_type {
-        // In expression position, the type needs to be of the form Foo::<Bar>, not Foo<Bar>
-        let mut formal = sync_type.clone();
-        struct Visitor;
-        impl VisitMut for Visitor {
-            fn visit_path_segment_mut(&mut self, segment: &mut syn::PathSegment) {
-                if let PathArguments::AngleBracketed(args) = &mut segment.arguments {
-                    if args.colon2_token.is_none() {
-                        args.colon2_token = Some(Token![::](Span::call_site()));
-                    }
-                }
-            }
-        }
-        syn::visit_mut::visit_type_mut(&mut Visitor, &mut formal);
         quote! {
             /// Synchronously execute this action.
             pub fn run(self) -> Result<#sync_type> {
-                crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self)).map(#formal::new)
+                crate::sync::TOKIO_RUNTIME.block_on(std::future::IntoFuture::into_future(self)).map(<#sync_type>::new)
             }
         }
     } else {
@@ -323,4 +308,98 @@ fn text_link(text: &str) -> String {
         }
     }
     out.concat()
+}
+
+#[proc_macro]
+pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let OptionSettersList {
+        opt_field_name,
+        opt_field_type,
+        setters,
+    } = parse_macro_input!(input as OptionSettersList);
+
+    let extras = opt_field_name.map(|name| {
+        quote! {
+            #[allow(unused)]
+            fn options(&mut self) -> &mut #opt_field_type {
+                self.#name.get_or_insert_with(<#opt_field_type>::default)
+            }
+
+            /// Set all options.  Note that this will replace all previous values set.
+            pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
+                self.#name = value.into();
+                self
+            }
+        }
+    });
+
+    let setters: Vec<_> = setters
+        .into_iter()
+        .map(|OptionSetter { attrs, name, type_ }| {
+            let docstr = format!(
+                "Set the [`{}::{}`] option.",
+                opt_field_type.to_token_stream(),
+                name
+            );
+            quote! {
+                #[doc = #docstr]
+                #(#attrs)*
+                pub fn #name(mut self, value: #type_) -> Self {
+                    self.options().#name = Some(value);
+                    self
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        #extras
+        #(#setters)*
+    }
+    .into()
+}
+
+struct OptionSettersList {
+    opt_field_name: Option<Ident>,
+    opt_field_type: Type,
+    setters: Vec<OptionSetter>,
+}
+
+impl Parse for OptionSettersList {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let opt_field_name = if input.peek2(Token![:]) {
+            let val = input.parse()?;
+            input.parse::<Token![:]>()?;
+            Some(val)
+        } else {
+            None
+        };
+        let opt_field_type = input.parse()?;
+        input.parse::<Token![;]>()?;
+        let setters = input
+            .parse_terminated(OptionSetter::parse, Token![,])?
+            .into_iter()
+            .collect();
+        Ok(Self {
+            opt_field_name,
+            opt_field_type,
+            setters,
+        })
+    }
+}
+
+struct OptionSetter {
+    attrs: Vec<Attribute>,
+    name: Ident,
+    type_: Type,
+}
+
+impl Parse for OptionSetter {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let name = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let type_ = input.parse()?;
+        Ok(Self { attrs, name, type_ })
+    }
 }
