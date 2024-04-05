@@ -6,7 +6,7 @@ use crate::{
     Client,
     Namespace,
 };
-use bson::{rawdoc, RawDocumentBuf};
+use bson::{rawdoc, serde_helpers::HumanReadable, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use semver::VersionReq;
@@ -1159,13 +1159,8 @@ async fn configure_human_readable_serialization() {
 
     let client = TestClient::new().await;
 
-    let collection_options = CollectionOptions::builder()
-        .human_readable_serialization(false)
-        .build();
-
-    let non_human_readable_collection: Collection<Data> = client
-        .database("db")
-        .collection_with_options("nonhumanreadable", collection_options);
+    let non_human_readable_collection: Collection<Data> =
+        client.database("db").collection("nonhumanreadable");
     non_human_readable_collection.drop().await.unwrap();
 
     non_human_readable_collection
@@ -1204,20 +1199,15 @@ async fn configure_human_readable_serialization() {
         .unwrap();
     assert!(doc.get_binary_generic("s").is_ok());
 
-    let collection_options = CollectionOptions::builder()
-        .human_readable_serialization(true)
-        .build();
-
-    let human_readable_collection: Collection<Data> = client
-        .database("db")
-        .collection_with_options("humanreadable", collection_options);
+    let human_readable_collection: Collection<HumanReadable<Data>> =
+        client.database("db").collection("humanreadable");
     human_readable_collection.drop().await.unwrap();
 
     human_readable_collection
-        .insert_one(Data {
+        .insert_one(HumanReadable(Data {
             id: 0,
             s: StringOrBytes("human readable!".into()),
-        })
+        }))
         .await
         .unwrap();
 
@@ -1231,10 +1221,10 @@ async fn configure_human_readable_serialization() {
     human_readable_collection
         .replace_one(
             doc! { "id": 0 },
-            Data {
+            HumanReadable(Data {
                 id: 1,
                 s: StringOrBytes("human readable!".into()),
-            },
+            }),
         )
         .await
         .unwrap();

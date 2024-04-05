@@ -17,7 +17,6 @@ use crate::{
 // field or struct doesn't fix it because that annotation isn't propagated by the code generator.
 // This works around that by defining it in a non-pub module and immediately re-exporting that
 // module's contents.
-#[allow(deprecated)]
 mod suppress_warning {
     use super::*;
 
@@ -36,14 +35,6 @@ mod suppress_warning {
 
         /// The default write concern for operations.
         pub write_concern: Option<WriteConcern>,
-
-        /// Sets the [`bson::SerializerOptions::human_readable`] option for the [`Bson`]
-        /// serializer. The default value is `false`.
-        /// Note: Specifying `true` for this value will decrease the performance of insert
-        /// operations.
-        #[deprecated = "This is a workaround for a potential bug related to RUST-1687, and should \
-                        not be used in new code."]
-        pub human_readable_serialization: Option<bool>,
     }
 }
 pub use suppress_warning::*;

@@ -373,13 +373,11 @@ impl CollectionOrDatabaseOptions {
         }
     }
 
-    #[allow(deprecated)]
     pub(crate) fn as_collection_options(&self) -> CollectionOptions {
         CollectionOptions {
             read_concern: self.read_concern.clone(),
             selection_criteria: self.selection_criteria.clone(),
             write_concern: self.write_concern.clone(),
-            human_readable_serialization: None,
         }
     }
 }
