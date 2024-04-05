@@ -68,9 +68,6 @@ in-use-encryption-unstable = ["mongocrypt", "rayon", "num_cpus"]
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
 tracing-unstable = ["tracing", "log"]
 
-[patch.'https://github.com/mongodb/bson-rust']
-bson = { git = "https://github.com/abr-egn/bson-rust", branch = "RUST-1764/human-readable" }
-
 [dependencies]
 action_macro = { path = "action_macro" }
 async-trait = "0.1.42"
