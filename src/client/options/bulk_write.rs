@@ -181,16 +181,10 @@ impl WriteModel {
     /// Returns the operation-specific fields that should be included in this model's entry in the
     /// ops array. Also returns an inserted ID if this is an insert operation.
     pub(crate) fn get_ops_document_contents(&self) -> Result<(RawDocumentBuf, Option<Bson>)> {
-        if let Self::UpdateOne {
-            update: UpdateModifications::Document(update_document),
-            ..
-        }
-        | Self::UpdateMany {
-            update: UpdateModifications::Document(update_document),
-            ..
-        } = self
-        {
-            update_document_check(update_document)?;
+        if let Self::UpdateOne { update, .. } | Self::UpdateMany { update, .. } = self {
+            if let UpdateModifications::Document(update_document) = update {
+                update_document_check(update_document)?;
+            }
         } else if let Self::ReplaceOne { replacement, .. } = self {
             replacement_document_check(replacement)?;
         }
