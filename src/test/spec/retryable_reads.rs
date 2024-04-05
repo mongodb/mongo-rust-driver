@@ -53,7 +53,7 @@ async fn retry_releases_connection() {
     collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
     let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1)).close_connection(true);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     runtime::timeout(
         Duration::from_secs(1),
@@ -99,7 +99,7 @@ async fn retry_read_pool_cleared() {
     let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
         .error_code(91)
         .block_connection(Duration::from_secs(1));
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
@@ -182,7 +182,7 @@ async fn retry_read_different_mongos() {
         let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
             .error_code(6)
             .close_connection(true);
-        guards.push(client.configure_fail_point(fail_point).await.unwrap());
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
     #[allow(deprecated)]
@@ -243,7 +243,7 @@ async fn retry_read_same_mongos() {
         let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
             .error_code(6)
             .close_connection(true);
-        client.configure_fail_point(fail_point).await.unwrap()
+        client.enable_fail_point(fail_point).await.unwrap()
     };
 
     #[allow(deprecated)]

@@ -172,7 +172,7 @@ async fn resumes_on_error() -> Result<()> {
     ));
 
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.configure_fail_point(fail_point).await?;
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
@@ -201,7 +201,7 @@ async fn does_not_resume_aggregate() -> Result<()> {
     };
 
     let fail_point = FailPoint::new(&["aggregate"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.configure_fail_point(fail_point).await?;
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     assert!(coll.watch().await.is_err());
 
@@ -269,7 +269,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 
     let fail_point =
         FailPoint::new(&["getMore", "killCursors"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.configure_fail_point(fail_point).await?;
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
@@ -310,7 +310,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
     }
 
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.configure_fail_point(fail_point).await?;
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
     stream.next().await.transpose()?;
@@ -521,7 +521,7 @@ async fn resume_uses_start_after() -> Result<()> {
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}).await?;
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.configure_fail_point(fail_point).await?;
+    let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
     #[allow(deprecated)]
@@ -577,7 +577,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}).await?;
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.configure_fail_point(fail_point).await?;
+    let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
     #[allow(deprecated)]

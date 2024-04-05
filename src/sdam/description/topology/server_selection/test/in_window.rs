@@ -263,7 +263,7 @@ async fn load_balancing_test() {
     let fail_point = FailPoint::new(&["find"], FailPointMode::AlwaysOn)
         .block_connection(Duration::from_millis(500))
         .selection_criteria(slow_host_criteria);
-    let guard = setup_client.configure_fail_point(fail_point).await.unwrap();
+    let guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
     do_test(&client, &mut buffer, 0.05, 0.25, 10).await;

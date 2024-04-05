@@ -209,7 +209,7 @@ async fn rtt_is_updated() {
     )
     .block_connection(Duration::from_millis(500))
     .app_name(app_name);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let mut watcher = client.topology().watch();
     runtime::timeout(Duration::from_secs(10), async move {

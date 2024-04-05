@@ -189,7 +189,7 @@ async fn connection_error_during_establishment() {
     }
 
     let _guard = client
-        .configure_fail_point(
+        .enable_fail_point(
             FailPoint::new(
                 &[LEGACY_HELLO_COMMAND_NAME, "hello"],
                 FailPointMode::Times(10),
@@ -248,7 +248,7 @@ async fn connection_error_during_operation() {
     }
 
     let _guard = client
-        .configure_fail_point(
+        .enable_fail_point(
             FailPoint::new(&["ping"], FailPointMode::Times(10)).close_connection(true),
         )
         .await

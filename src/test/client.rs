@@ -709,7 +709,7 @@ async fn retry_commit_txn_check_out() {
     // Enable a fail point that clears the connection pools so that commitTransaction will create a
     // new connection during checkout.
     let fail_point = FailPoint::new(&["ping"], FailPointMode::Times(1)).error_code(11600);
-    let _guard = setup_client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
@@ -759,7 +759,7 @@ async fn retry_commit_txn_check_out() {
     )
     .error_code(11600)
     .app_name("retry_commit_txn_check_out");
-    let _guard2 = setup_client.configure_fail_point(fail_point).await.unwrap();
+    let _guard2 = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     // finally, attempt the commit.
     // this should succeed due to retry

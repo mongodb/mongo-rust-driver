@@ -233,10 +233,7 @@ impl TestContext {
         // Persist fail point guards so they disable post-test.
         let mut fail_point_guards: Vec<FailPointGuard> = Vec::new();
         if let Some(ref fail_point) = test.fail_point {
-            let guard = client
-                .configure_fail_point(fail_point.clone())
-                .await
-                .unwrap();
+            let guard = client.enable_fail_point(fail_point.clone()).await.unwrap();
             fail_point_guards.push(guard);
         }
 
@@ -419,7 +416,7 @@ impl<'a> OpRunner<'a> {
 
                         let guard = self
                             .client
-                            .configure_fail_point(fail_point.selection_criteria(selection_criteria))
+                            .enable_fail_point(fail_point.selection_criteria(selection_criteria))
                             .await
                             .unwrap();
                         self.fail_point_guards.push(guard);

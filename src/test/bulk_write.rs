@@ -121,7 +121,7 @@ async fn write_concern_error_batches() {
 
     let fail_point = FailPoint::new(&["bulkWrite"], FailPointMode::Times(2))
         .write_concern_error(doc! { "code": 91, "errmsg": "Replication is being shut down" });
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let models = vec![
         WriteModel::InsertOne {
@@ -206,12 +206,17 @@ async fn write_error_batches() {
 }
 
 #[tokio::test]
-async fn cursor_iteration() {
+async fn successful_cursor_iteration() {
     let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
         .event_buffer(event_buffer.clone())
         .build()
         .await;
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
+        return;
+    }
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
@@ -239,4 +244,48 @@ async fn cursor_iteration() {
 
     let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn failed_cursor_iteration() {
+    let event_buffer = EventBuffer::new();
+    let client = Client::test_builder()
+        .event_buffer(event_buffer.clone())
+        .build()
+        .await;
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");
+        return;
+    }
+
+    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+
+    let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(8);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let document = doc! { "_id": "a".repeat(max_bson_object_size - 500) };
+
+    let collection = client.database("db").collection("coll");
+    collection.drop().await.unwrap();
+    collection.insert_one(document.clone()).await.unwrap();
+
+    let models = vec![
+        WriteModel::InsertOne {
+            namespace: collection.namespace(),
+            document
+        };
+        2
+    ];
+    let error = client.bulk_write(models).ordered(false).await.unwrap_err();
+
+    let Some(ref source) = error.source else {
+        panic!("Expected error to contain source");
+    };
+    assert_eq!(source.code(), Some(8));
+
+    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
+        panic!("Expected bulk write error, got {:?}", error);
+    };
+    assert_eq!(bulk_write_error.write_errors.len(), 1);
 }

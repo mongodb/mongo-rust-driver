@@ -15,10 +15,7 @@ impl Client {
     /// #[tokio::test(flavor = "multi_thread")] test annotation. The guard returned from this
     /// method should remain in scope while the fail point is intended for use. Upon drop, the
     /// guard will disable the fail point on the server.
-    pub(crate) async fn configure_fail_point(
-        &self,
-        fail_point: FailPoint,
-    ) -> Result<FailPointGuard> {
+    pub(crate) async fn enable_fail_point(&self, fail_point: FailPoint) -> Result<FailPointGuard> {
         let command = bson::to_document(&fail_point)?;
         self.database("admin")
             .run_command(command)
@@ -135,6 +132,7 @@ pub(crate) enum FailPointMode {
 }
 
 #[derive(Debug)]
+#[must_use]
 pub(crate) struct FailPointGuard {
     client: Client,
     failure_type: String,

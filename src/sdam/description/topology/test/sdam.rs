@@ -684,7 +684,7 @@ async fn heartbeat_events() {
     )
     .app_name("heartbeat_events")
     .error_code(1234);
-    let _guard = fp_client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = fp_client.enable_fail_point(fail_point).await.unwrap();
 
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {

@@ -232,7 +232,7 @@ async fn upload_stream_errors() {
         .unwrap();
 
     let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1)).error_code(1234);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let error = get_mongo_error(upload_stream.write_all(&[11]).await);
     assert_eq!(error.sdam_code(), Some(1234));
@@ -249,7 +249,7 @@ async fn upload_stream_errors() {
     upload_stream.write_all(&[11]).await.unwrap();
 
     let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1)).error_code(1234);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let error = get_mongo_error(upload_stream.close().await);
     assert_eq!(error.sdam_code(), Some(1234));

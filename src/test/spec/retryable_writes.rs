@@ -86,7 +86,7 @@ async fn run_legacy() {
             let guard = if let Some(fail_point) = test_case.fail_point {
                 Some(
                     client
-                        .configure_fail_point(fail_point)
+                        .enable_fail_point(fail_point)
                         .await
                         .expect(&test_case.description),
                 )
@@ -425,7 +425,7 @@ async fn retry_write_pool_cleared() {
         .error_code(91)
         .block_connection(Duration::from_secs(1))
         .error_labels(vec![RETRYABLE_WRITE_ERROR]);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
@@ -519,7 +519,7 @@ async fn retry_write_retryable_write_error() {
                                     client
                                         .as_ref()
                                         .unwrap()
-                                        .configure_fail_point(fail_point)
+                                        .enable_fail_point(fail_point)
                                         .await
                                         .unwrap()
                                 };
@@ -548,7 +548,7 @@ async fn retry_write_retryable_write_error() {
             "code": 91,
             "errorLabels": ["RetryableWriteError"],
         });
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let result = client
         .database("test")
@@ -590,7 +590,7 @@ async fn retry_write_different_mongos() {
             .error_code(6)
             .error_labels(vec![RETRYABLE_WRITE_ERROR])
             .close_connection(true);
-        guards.push(client.configure_fail_point(fail_point).await.unwrap());
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
     #[allow(deprecated)]
@@ -652,7 +652,7 @@ async fn retry_write_same_mongos() {
             .error_code(6)
             .error_labels(vec![RETRYABLE_WRITE_ERROR])
             .close_connection(true);
-        client.configure_fail_point(fail_point).await.unwrap()
+        client.enable_fail_point(fail_point).await.unwrap()
     };
 
     #[allow(deprecated)]

@@ -1348,7 +1348,7 @@ impl TestOperation for FailPointCommand {
         async move {
             let client = test_runner.get_client(&self.client).await;
             let guard = client
-                .configure_fail_point(self.fail_point.clone())
+                .enable_fail_point(self.fail_point.clone())
                 .await
                 .unwrap();
             test_runner.fail_point_guards.write().await.push(guard);
@@ -1381,7 +1381,7 @@ impl TestOperation for TargetedFailPoint {
                 .await;
             let guard = test_runner
                 .internal_client
-                .configure_fail_point(
+                .enable_fail_point(
                     self.fail_point
                         .clone()
                         .selection_criteria(selection_criteria),

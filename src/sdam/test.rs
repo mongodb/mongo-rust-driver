@@ -48,7 +48,7 @@ async fn min_heartbeat_frequency() {
     }
 
     let _guard = setup_client
-        .configure_fail_point(
+        .enable_fail_point(
             FailPoint::new(
                 &[LEGACY_HELLO_COMMAND_NAME, "hello"],
                 FailPointMode::Times(5),
@@ -134,7 +134,7 @@ async fn sdam_pool_management() {
         .expect("should see server heartbeat succeeded event");
 
     let _guard = client
-        .configure_fail_point(
+        .enable_fail_point(
             FailPoint::new(
                 &[LEGACY_HELLO_COMMAND_NAME, "hello"],
                 FailPointMode::Times(4),

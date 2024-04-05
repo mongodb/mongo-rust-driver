@@ -213,7 +213,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     let fail_point = FailPoint::new(&["commitTransaction"], FailPointMode::Times(1))
         .error_code(251)
         .error_labels(vec![UNKNOWN_TRANSACTION_COMMIT_RESULT]);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let result = session
         .start_transaction()
@@ -258,7 +258,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
     let fail_point = FailPoint::new(&["commitTransaction"], FailPointMode::Times(1))
         .error_code(251)
         .error_labels(vec![TRANSIENT_TRANSACTION_ERROR]);
-    let _guard = client.configure_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let result = session
         .start_transaction()
