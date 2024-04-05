@@ -13,12 +13,16 @@ use syn::{
     Block,
     Error,
     Expr,
+    GenericArgument,
     Generics,
     Ident,
     ImplItemFn,
     Lifetime,
     Lit,
     Meta,
+    Path,
+    PathArguments,
+    PathSegment,
     Token,
     Type,
 };
@@ -341,11 +345,24 @@ pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 opt_field_type.to_token_stream(),
                 name
             );
+            let (accept, value) = if type_.is_ident("String")
+                || type_.is_ident("Bson")
+                || path_eq(&type_, &["bson", "Bson"])
+            {
+                (quote! { impl Into<#type_> }, quote! { value.into() })
+            } else if let Some(t) = vec_arg(&type_) {
+                (
+                    quote! { impl IntoIterator<Item = #t> },
+                    quote! { value.into_iter().collect() },
+                )
+            } else {
+                (quote! { #type_ }, quote! { value })
+            };
             quote! {
                 #[doc = #docstr]
                 #(#attrs)*
-                pub fn #name(mut self, value: #type_) -> Self {
-                    self.options().#name = Some(value);
+                pub fn #name(mut self, value: #accept) -> Self {
+                    self.options().#name = Some(#value);
                     self
                 }
             }
@@ -357,6 +374,44 @@ pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         #(#setters)*
     }
     .into()
+}
+
+fn vec_arg(path: &Path) -> Option<&Type> {
+    if path.segments.len() != 1 {
+        return None;
+    }
+    let PathSegment { ident, arguments } = path.segments.first()?;
+    if ident != "Vec" {
+        return None;
+    }
+    let args = if let PathArguments::AngleBracketed(angle) = arguments {
+        &angle.args
+    } else {
+        return None;
+    };
+    if args.len() != 1 {
+        return None;
+    }
+    if let GenericArgument::Type(t) = args.first()? {
+        return Some(t);
+    }
+
+    None
+}
+
+fn path_eq(path: &Path, segments: &[&str]) -> bool {
+    if path.segments.len() != segments.len() {
+        return false;
+    }
+    for (actual, expected) in path.segments.iter().zip(segments.into_iter()) {
+        if actual.ident != expected {
+            return false;
+        }
+        if !actual.arguments.is_empty() {
+            return false;
+        }
+    }
+    true
 }
 
 struct OptionSettersList {
@@ -391,7 +446,7 @@ impl Parse for OptionSettersList {
 struct OptionSetter {
     attrs: Vec<Attribute>,
     name: Ident,
-    type_: Type,
+    type_: Path,
 }
 
 impl Parse for OptionSetter {
