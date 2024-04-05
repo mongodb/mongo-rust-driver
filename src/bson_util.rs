@@ -90,41 +90,27 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
 }
 
 pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
-    match first_key(replacement) {
-        Some(key) => {
-            if key.starts_with('$') {
-                Err(ErrorKind::InvalidArgument {
-                    message: "replacement document must not contain update modifiers".to_string(),
-                }
-                .into())
-            } else {
-                Ok(())
+    if let Some(key) = first_key(replacement) {
+        if key.starts_with('$') {
+            return Err(ErrorKind::InvalidArgument {
+                message: "replacement document must not contain update modifiers".to_string(),
             }
+            .into());
         }
-        None => Err(ErrorKind::InvalidArgument {
-            message: "replacement document must not be empty".to_string(),
-        }
-        .into()),
     }
+    Ok(())
 }
 
 pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
-    match replacement.iter().next().transpose()? {
-        Some((key, _)) => {
-            if key.starts_with('$') {
-                Err(ErrorKind::InvalidArgument {
-                    message: "replacement document must not contain update modifiers".to_string(),
-                }
-                .into())
-            } else {
-                Ok(())
+    if let Some((key, _)) = replacement.iter().next().transpose()? {
+        if key.starts_with('$') {
+            return Err(ErrorKind::InvalidArgument {
+                message: "replacement document must not contain update modifiers".to_string(),
             }
-        }
-        None => Err(ErrorKind::InvalidArgument {
-            message: "replacement document must not be empty".to_string(),
-        }
-        .into()),
+            .into());
+        };
     }
+    Ok(())
 }
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
