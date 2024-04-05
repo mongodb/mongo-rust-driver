@@ -1,8 +1,3 @@
-use rand::{
-    distributions::{Alphanumeric, DistString},
-    thread_rng,
-};
-
 use crate::{
     bson::doc,
     error::ErrorKind,
@@ -14,7 +9,6 @@ use crate::{
         util::event_buffer::EventBuffer,
         FailPoint,
         FailPointMode,
-        TestClient,
     },
     Client,
     Namespace,
@@ -220,23 +214,19 @@ async fn cursor_iteration() {
         .await;
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
-    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
-    let id_size = max_bson_object_size / max_write_batch_size;
 
-    let document = doc! { "_id": Alphanumeric.sample_string(&mut thread_rng(), id_size) };
-    client
-        .database("bulk")
-        .collection("write")
-        .insert_one(document.clone())
-        .await
-        .unwrap();
+    let document = doc! { "_id": "a".repeat(max_bson_object_size - 500) };
+
+    let collection = client.database("db").collection("coll");
+    collection.drop().await.unwrap();
+    collection.insert_one(document.clone()).await.unwrap();
 
     let models = vec![
         WriteModel::InsertOne {
-            namespace: Namespace::new("bulk", "write"),
+            namespace: collection.namespace(),
             document
         };
-        max_write_batch_size
+        2
     ];
     let error = client.bulk_write(models).ordered(false).await.unwrap_err();
 
@@ -245,8 +235,8 @@ async fn cursor_iteration() {
     };
 
     let write_errors = bulk_write_error.write_errors;
-    assert_eq!(write_errors.len(), max_write_batch_size);
+    assert_eq!(write_errors.len(), 2);
 
     let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
-    assert!(!command_started_events.is_empty());
+    assert_eq!(command_started_events.len(), 1);
 }
