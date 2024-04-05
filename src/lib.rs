@@ -35,10 +35,6 @@
 //! |:-----------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------|
 //! | `sync`                       | Expose the synchronous API (`mongodb::sync`).                                                                                                                           | no      |
 //! | `aws-auth`                   | Enable support for the MONGODB-AWS authentication mechanism.                                                                                                            | no      |
-//! | `bson-uuid-0_8`              | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                                                      | no      |
-//! | `bson-uuid-1`                | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API of the re-exported `bson` crate.                                                      | no      |
-//! | `bson-chrono-0_4`            | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                                                  | no      |
-//! | `bson-serde_with`            | Enable support for the [`serde_with`](docs.rs/serde_with/latest) crate in the public API of the re-exported `bson` crate.                                               | no      |
 //! | `zlib-compression`           | Enable support for compressing messages with [`zlib`](https://zlib.net/).                                                                                               | no      |
 //! | `zstd-compression`           | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/).                                                                                 | no      |
 //! | `snappy-compression`         | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/).                                                                               | no      |
@@ -142,9 +138,9 @@
 //! ```
 //!
 //! ### Finding documents in a collection
-//! Results from queries are generally returned via [`Cursor`](struct.Cursor.html), a struct which streams
-//! the results back from the server as requested. The [`Cursor`](struct.Cursor.html) type implements the
-//! [`Stream`](https://docs.rs/futures/latest/futures/stream/trait.Stream.html) trait from
+//! Results from queries are generally returned via [`Cursor`](struct.Cursor.html), a struct which
+//! streams the results back from the server as requested. The [`Cursor`](struct.Cursor.html) type
+//! implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/trait.Stream.html) trait from
 //! the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming
 //! functionality you need to import at least one of the
 //! [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or
@@ -236,14 +232,14 @@
 //! In async Rust, it is common to implement cancellation and timeouts by dropping a future after a
 //! certain period of time instead of polling it to completion. This is how
 //! [`tokio::time::timeout`](https://docs.rs/tokio/1.10.1/tokio/time/fn.timeout.html) works, for
-//! example. However, doing this with futures returned by the driver can leave the driver's internals in
-//! an inconsistent state, which may lead to unpredictable or incorrect behavior (see RUST-937 for more
-//! details). As such, it is **_highly_** recommended to poll all futures returned from the driver to
-//! completion. In order to still use timeout mechanisms like `tokio::time::timeout` with the driver,
-//! one option is to spawn tasks and time out on their
+//! example. However, doing this with futures returned by the driver can leave the driver's
+//! internals in an inconsistent state, which may lead to unpredictable or incorrect behavior (see
+//! RUST-937 for more details). As such, it is **_highly_** recommended to poll all futures returned
+//! from the driver to completion. In order to still use timeout mechanisms like
+//! `tokio::time::timeout` with the driver, one option is to spawn tasks and time out on their
 //! [`JoinHandle`](https://docs.rs/tokio/1.10.1/tokio/task/struct.JoinHandle.html) futures instead of on
-//! the driver's futures directly. This will ensure the driver's futures will always be completely polled
-//! while also allowing the application to continue in the event of a timeout.
+//! the driver's futures directly. This will ensure the driver's futures will always be completely
+//! polled while also allowing the application to continue in the event of a timeout.
 //!
 //! e.g.
 //! ``` rust
@@ -268,8 +264,8 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.64.0. This will be rarely be increased, and if it ever is,
-//! it will only happen in a minor or major version release.
+//! The MSRV for this crate is currently 1.64.0. This will be rarely be increased, and if it ever
+//! is, it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
@@ -288,7 +284,6 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
 #![doc(html_root_url = "https://docs.rs/mongodb/2.8.0")]
-
 
 #[macro_use]
 pub mod options;
@@ -318,8 +313,8 @@ mod index;
 mod operation;
 pub mod results;
 pub(crate) mod runtime;
-mod search_index;
 mod sdam;
+mod search_index;
 mod selection_criteria;
 mod serde_util;
 mod srv;
@@ -344,7 +339,17 @@ pub use crate::{
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
 
-pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
+pub use client::session::ClusterTime;
+pub use coll::Namespace;
+pub use index::IndexModel;
+pub use sdam::public::*;
+pub use search_index::SearchIndexModel;
 
 /// A boxed future.
 pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+
+#[cfg(not(feature = "compat-3-0-0"))]
+compile_error!(
+    "The feature 'compat-3-0-0' must be enabled to ensure forward compatibility with future \
+     versions of this crate."
+);

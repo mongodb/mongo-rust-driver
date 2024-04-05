@@ -1,6 +1,7 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_possible_wrap)]
 
+#[cfg(feature = "dns-resolver")]
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
 #[cfg(feature = "aws-auth")]
