@@ -603,7 +603,6 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        // Use empty list for ALLOWED_HOSTS
         let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
