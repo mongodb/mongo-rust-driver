@@ -30,8 +30,8 @@ export TEST_AUTH_OIDC=1
 export COVERAGE=1
 export AUTH="auth"
 
-cargo test test::spec::oidc -- --nocapture --test-threads=1 || 0
-#cargo_test test::spec::oidc prose.xml
+#cargo test test::spec::oidc -- --nocapture --test-threads=1 || 0
+cargo_test test::spec::oidc prose.xml
 #junit-report-merger results.xml prose.xml
 
 exit ${CARGO_RESULT}

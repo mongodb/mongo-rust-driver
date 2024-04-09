@@ -218,12 +218,17 @@ async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
         .build()
         .into();
     let client = Client::with_options(opts)?;
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
 }
@@ -244,23 +249,28 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
             async move {
                 *call_count.lock().await += 1;
                 Ok(oidc::IdpServerResponse {
-                    access_token: "bad token".to_string(),
+                    access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
                     expires: None,
                     refresh_token: None,
                 })
             }
             .boxed()
         }))
-        .mechanism_properties(doc! {"PROVIDER_NAME": "aws"})
+        .mechanism_properties(doc! {"ENVIRONMENT": "test"})
         .build()
         .into();
     let client = Client::with_options(opts)?;
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
 }
@@ -335,12 +345,17 @@ async fn machine_3_2_auth_failures_without_cached_tokens_returns_an_error() -> a
         .build()
         .into();
     let client = Client::with_options(opts)?;
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
 }
@@ -550,12 +565,17 @@ async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
         .build()
         .into();
     let client = Client::with_options(opts)?;
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
     assert_eq!(0, *(*call_count).lock().await);
     Ok(())
 }
@@ -589,12 +609,17 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
             .build()
             .into();
         let client = Client::with_options(opts)?;
-        assert!(client
+        let res = client
             .database("test")
             .collection::<Document>("test")
             .find_one(None, None)
-            .await
-            .is_err());
+            .await;
+
+        assert!(res.is_err());
+        assert!(matches!(
+            *res.unwrap_err().kind,
+            crate::error::ErrorKind::Authentication { .. },
+        ));
         // asserting 0 shows that this is a client side error
         assert_eq!(0, *(*call_count).lock().await);
     }
@@ -625,12 +650,17 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
             .build()
             .into();
         let client = Client::with_options(opts)?;
-        assert!(client
+        let res = client
             .database("test")
             .collection::<Document>("test")
             .find_one(None, None)
-            .await
-            .is_err());
+            .await;
+
+        assert!(res.is_err());
+        assert!(matches!(
+            *res.unwrap_err().kind,
+            crate::error::ErrorKind::Authentication { .. },
+        ));
         // asserting 0 shows that this is a client side error
         assert_eq!(0, *(*call_count).lock().await);
     }
@@ -699,12 +729,17 @@ async fn human_2_2_callback_returns_missing_data() -> anyhow::Result<()> {
         .build()
         .into();
     let client = Client::with_options(opts)?;
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
 }
@@ -816,12 +851,17 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
         .into();
     let client = Client::with_options(opts)?;
 
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
 
     assert_eq!(0, *(*call_count).lock().await);
     Ok(())
@@ -831,7 +871,10 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
     use crate::{
         event::command::{
-            CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
+            CommandEvent,
+            CommandFailedEvent,
+            CommandStartedEvent,
+            CommandSucceededEvent,
         },
         test::{Event, EventHandler},
     };
@@ -1097,12 +1140,17 @@ async fn human_4_4_fails() -> anyhow::Result<()> {
     );
     let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
 
-    assert!(client
+    let res = client
         .database("test")
         .collection::<Document>("test")
         .find_one(None, None)
-        .await
-        .is_err());
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
 
     assert_eq!(2, *(*call_count).lock().await);
     Ok(())
