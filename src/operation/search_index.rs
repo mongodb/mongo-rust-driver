@@ -1,15 +1,17 @@
-use bson::{doc, Document};
+use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
+    BoxFuture,
     ClientSession,
     Namespace,
     SearchIndexModel,
 };
 
-use super::{handle_response_sync, OperationResponse, OperationWithDefaults};
+use super::OperationWithDefaults;
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -44,8 +46,8 @@ impl OperationWithDefaults for CreateSearchIndexes {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             #[derive(Debug, Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Response {
@@ -65,7 +67,8 @@ impl OperationWithDefaults for CreateSearchIndexes {
                 .into_iter()
                 .map(|ci| ci.name)
                 .collect())
-        }}
+        }
+        .boxed()
     }
 
     fn supports_sessions(&self) -> bool {
@@ -119,8 +122,8 @@ impl OperationWithDefaults for UpdateSearchIndex {
         _response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{ Ok(()) }}
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move { Ok(()) }.boxed()
     }
 
     fn supports_sessions(&self) -> bool {
@@ -168,8 +171,8 @@ impl OperationWithDefaults for DropSearchIndex {
         _response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{ Ok(()) }}
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move { Ok(()) }.boxed()
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

@@ -1,3 +1,4 @@
+use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
@@ -8,11 +9,10 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
+    BoxFuture,
     ClientSession,
     Namespace,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace {
@@ -165,8 +165,8 @@ impl OperationWithDefaults for Update {
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: WriteResponseBody<UpdateBody> = raw_response.body_utf8_lossy()?;
             response.validate().map_err(convert_bulk_errors)?;
 
@@ -189,7 +189,8 @@ impl OperationWithDefaults for Update {
                 modified_count,
                 upserted_id,
             })
-        }}
+        }
+        .boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

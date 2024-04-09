@@ -1,3 +1,5 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -13,10 +15,9 @@ use crate::{
     },
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
+    BoxFuture,
     ClientSession,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct Delete {
@@ -87,15 +88,16 @@ impl OperationWithDefaults for Delete {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: WriteResponseBody = response.body()?;
             response.validate().map_err(convert_bulk_errors)?;
 
             Ok(DeleteResult {
                 deleted_count: response.n,
             })
-        }}
+        }
+        .boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

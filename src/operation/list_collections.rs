@@ -1,3 +1,5 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -5,10 +7,9 @@ use crate::{
     error::Result,
     operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
+    BoxFuture,
     ClientSession,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
@@ -55,14 +56,14 @@ impl OperationWithDefaults for ListCollections {
         Ok(Command::new(Self::NAME.to_string(), self.db.clone(), body))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
-            let response: CursorBody = raw_response.body()?;
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        description: &'a StreamDescription,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move {
+            let response: CursorBody = response.body()?;
             Ok(CursorSpecification::new(
                 response.cursor,
                 description.server_address.clone(),
@@ -70,7 +71,8 @@ impl OperationWithDefaults for ListCollections {
                 None,
                 None,
             ))
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

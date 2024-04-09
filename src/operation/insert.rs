@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use futures_util::FutureExt;
+
 use crate::{
     bson::{rawdoc, Bson, RawDocument, RawDocumentBuf},
     bson_util::{
@@ -14,16 +16,12 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
+    BoxFuture,
     ClientSession,
     Namespace,
 };
 
-use super::{
-    handle_response_sync,
-    OperationResponse,
-    COMMAND_OVERHEAD_SIZE,
-    MAX_ENCRYPTED_WRITE_SIZE,
-};
+use super::{COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
@@ -127,28 +125,28 @@ impl<'a> OperationWithDefaults for Insert<'a> {
         }
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
-        let response: WriteResponseBody = raw_response.body_utf8_lossy()?;
-        let response_n = Checked::<usize>::try_from(response.n)?;
+    fn handle_response<'b>(
+        &'b self,
+        response: RawCommandResponse,
+        _description: &'b StreamDescription,
+        _session: Option<&'b mut ClientSession>,
+    ) -> BoxFuture<'b, Result<Self::O>> {
+        async move {
+            let response: WriteResponseBody = response.body_utf8_lossy()?;
+            let response_n = Checked::<usize>::try_from(response.n)?;
 
-        let mut map = HashMap::new();
-        if self.options.ordered == Some(true) {
-            // in ordered inserts, only the first n were attempted.
-            for (i, id) in self.inserted_ids.iter().enumerate().take(response_n.get()?) {
-                map.insert(i, id.clone());
-            }
-        } else {
-            // for unordered, add all the attempted ids and then remove the ones that have
-            // associated write errors.
-            for (i, id) in self.inserted_ids.iter().enumerate() {
-                map.insert(i, id.clone());
-            }
+            let mut map = HashMap::new();
+            if self.options.ordered == Some(true) {
+                // in ordered inserts, only the first n were attempted.
+                for (i, id) in self.inserted_ids.iter().enumerate().take(response_n.get()?) {
+                    map.insert(i, id.clone());
+                }
+            } else {
+                // for unordered, add all the attempted ids and then remove the ones that have
+                // associated write errors.
+                for (i, id) in self.inserted_ids.iter().enumerate() {
+                    map.insert(i, id.clone());
+                }
 
                 if let Some(write_errors) = response.write_errors.as_ref() {
                     for err in write_errors {
@@ -169,7 +167,8 @@ impl<'a> OperationWithDefaults for Insert<'a> {
             }
 
             Ok(InsertManyResult { inserted_ids: map })
-        }}
+        }
+        .boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

@@ -1,6 +1,7 @@
-use bson::RawDocumentBuf;
+use futures_util::FutureExt;
 
 use crate::{
+    bson::RawDocumentBuf,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
     cursor::CursorSpecification,
@@ -8,10 +9,9 @@ use crate::{
     operation::{run_command::RunCommand, CursorBody, Operation},
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     ClientSession,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCursorCommand<'conn> {
@@ -88,13 +88,13 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
         self.run_command.name()
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+        description: &'a StreamDescription,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move {
             let cursor_response: CursorBody = response.body()?;
 
             let comment = match &self.options {
@@ -109,6 +109,7 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
                 self.options.as_ref().and_then(|opts| opts.max_time),
                 comment,
             ))
-        }}
+        }
+        .boxed()
     }
 }

@@ -1,17 +1,16 @@
-use bson::Document;
+use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, Result},
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     ClientSession,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -50,11 +49,12 @@ impl OperationWithDefaults for Count {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response_body: ResponseBody = response.body()?;
             Ok(response_body.n)
-        }}
+        }
+        .boxed()
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {

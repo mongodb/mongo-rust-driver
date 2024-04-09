@@ -2,12 +2,12 @@ pub(crate) mod options;
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use bson::{from_slice, RawBson};
+use futures_util::FutureExt;
 use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, rawdoc, Document, RawDocumentBuf},
+    bson::{doc, from_slice, rawdoc, Document, RawBson, RawDocumentBuf},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::UpdateModifications, Namespace},
@@ -20,10 +20,11 @@ use crate::{
         Retryability,
     },
     options::WriteConcern,
+    BoxFuture,
     ClientSession,
 };
 
-use super::{handle_response_sync, OperationResponse, UpdateOrReplace};
+use super::UpdateOrReplace;
 
 pub(crate) struct FindAndModify<T: DeserializeOwned> {
     ns: Namespace,
@@ -102,8 +103,8 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             #[derive(Debug, Deserialize)]
             pub(crate) struct Response {
                 value: RawBson,
@@ -122,7 +123,8 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
                 }
                 .into()),
             }
-        }}
+        }
+        .boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

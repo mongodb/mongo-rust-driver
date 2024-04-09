@@ -1,10 +1,10 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{Document, RawDocumentBuf};
+use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson},
+    bson::{doc, Bson, Document, RawDocumentBuf},
     change_stream::event::ResumeToken,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
@@ -12,11 +12,10 @@ use crate::{
     operation::OperationWithDefaults,
     options::SelectionCriteria,
     results::GetMoreResult,
+    BoxFuture,
     ClientSession,
     Namespace,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {
@@ -92,8 +91,8 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: GetMoreResponseBody = response.body()?;
 
             Ok(GetMoreResult {
@@ -105,7 +104,8 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
                 id: response.cursor.id,
                 ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
             })
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

@@ -1,3 +1,5 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -6,11 +8,12 @@ use crate::{
     operation::{append_options, OperationWithDefaults},
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
+    BoxFuture,
     ClientSession,
     Namespace,
 };
 
-use super::{handle_response_sync, CursorBody, OperationResponse, Retryability};
+use super::{CursorBody, Retryability};
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
@@ -45,14 +48,14 @@ impl OperationWithDefaults for ListIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
-            let response: CursorBody = raw_response.body()?;
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        description: &'a StreamDescription,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move {
+            let response: CursorBody = response.body()?;
             Ok(CursorSpecification::new(
                 response.cursor,
                 description.server_address.clone(),
@@ -60,7 +63,8 @@ impl OperationWithDefaults for ListIndexes {
                 self.options.as_ref().and_then(|o| o.max_time),
                 None,
             ))
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

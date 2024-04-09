@@ -1,17 +1,16 @@
-use bson::RawDocumentBuf;
+use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, Document, RawDocumentBuf},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
+    BoxFuture,
     ClientSession,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -51,11 +50,12 @@ impl OperationWithDefaults for ListDatabases {
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: Response = raw_response.body()?;
             Ok(response.databases)
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

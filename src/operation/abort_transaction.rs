@@ -1,4 +1,5 @@
 use bson::Document;
+use futures_util::FutureExt;
 
 use crate::{
     bson::doc,
@@ -8,10 +9,11 @@ use crate::{
     operation::Retryability,
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     ClientSession,
 };
 
-use super::{handle_response_sync, OperationResponse, OperationWithDefaults, WriteConcernOnlyBody};
+use super::{OperationWithDefaults, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -55,11 +57,12 @@ impl OperationWithDefaults for AbortTransaction {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: WriteConcernOnlyBody = response.body()?;
             response.validate()
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

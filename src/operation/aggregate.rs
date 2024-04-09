@@ -1,5 +1,7 @@
 pub(crate) mod change_stream;
 
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
@@ -8,14 +10,13 @@ use crate::{
     error::Result,
     operation::{append_options, remove_empty_write_concern, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
+    BoxFuture,
     ClientSession,
     Namespace,
 };
 
 use super::{
-    handle_response_sync,
     CursorBody,
-    OperationResponse,
     OperationWithDefaults,
     WriteConcernOnlyBody,
     SERVER_4_2_0_WIRE_VERSION,
@@ -82,13 +83,13 @@ impl OperationWithDefaults for Aggregate {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+        description: &'a StreamDescription,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move {
             let cursor_response: CursorBody = response.body()?;
 
             if self.is_out_or_merge() {
@@ -110,7 +111,8 @@ impl OperationWithDefaults for Aggregate {
                 self.options.as_ref().and_then(|opts| opts.max_await_time),
                 comment,
             ))
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

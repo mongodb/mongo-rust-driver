@@ -1,14 +1,15 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{DropIndexOptions, WriteConcern},
+    BoxFuture,
     ClientSession,
     Namespace,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 pub(crate) struct DropIndexes {
     ns: Namespace,
@@ -48,8 +49,8 @@ impl OperationWithDefaults for DropIndexes {
         _response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{ Ok(()) }}
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move { Ok(()) }.boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

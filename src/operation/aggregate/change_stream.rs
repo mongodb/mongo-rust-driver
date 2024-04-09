@@ -1,3 +1,5 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Document},
     change_stream::{event::ResumeToken, ChangeStreamData, WatchArgs},
@@ -6,10 +8,11 @@ use crate::{
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
+    BoxFuture,
     ClientSession,
 };
 
-use super::{handle_response_sync, Aggregate, OperationResponse};
+use super::Aggregate;
 
 pub(crate) struct ChangeStreamAggregate {
     inner: Aggregate,
@@ -83,13 +86,13 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         self.inner.extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-        session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+        description: &'a StreamDescription,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move {
             let op_time = response
                 .raw_body()
                 .get("operationTime")?
@@ -97,7 +100,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
             let spec = self
                 .inner
                 .handle_response(response, description, session)
-                .as_sync_result()?;
+                .await?;
 
             let mut data = ChangeStreamData {
                 resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
@@ -117,7 +120,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
             }
 
             Ok((spec, data))
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

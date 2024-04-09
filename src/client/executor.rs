@@ -54,7 +54,6 @@ use crate::{
         CommandErrorBody,
         CommitTransaction,
         Operation,
-        OperationResponse,
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
@@ -789,15 +788,14 @@ impl Client {
                     }
                 };
 
-                let response_result = match op.handle_response(
-                    response,
-                    connection.stream_description()?,
-                    session.as_deref_mut(),
-                ) {
-                    OperationResponse::Sync(result) => result,
-                    OperationResponse::Async(future) => future.await,
-                };
-                match response_result {
+                match op
+                    .handle_response(
+                        response,
+                        connection.stream_description()?,
+                        session.as_deref_mut(),
+                    )
+                    .await
+                {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
                         err.add_labels_and_update_pin(

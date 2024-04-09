@@ -1,18 +1,18 @@
 use std::convert::TryInto;
 
-use bson::{RawBsonRef, RawDocumentBuf};
+use futures_util::FutureExt;
 
-use super::{CursorBody, OperationWithDefaults};
 use crate::{
-    bson::Document,
+    bson::{Document, RawBsonRef, RawDocumentBuf},
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     ClientSession,
 };
 
-use super::{handle_response_sync, OperationResponse};
+use super::{CursorBody, OperationWithDefaults};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -99,8 +99,8 @@ impl<'conn> OperationWithDefaults for RunCommand<'conn> {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{ Ok(response.into_raw_document_buf().try_into()?) }}
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move { Ok(response.into_raw_document_buf().try_into()?) }.boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

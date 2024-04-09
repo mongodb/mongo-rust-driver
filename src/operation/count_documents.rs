@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 
+use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
@@ -9,17 +10,12 @@ use crate::{
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
     selection_criteria::SelectionCriteria,
+    BoxFuture,
     ClientSession,
     Namespace,
 };
 
-use super::{
-    handle_response_sync,
-    OperationResponse,
-    OperationWithDefaults,
-    Retryability,
-    SingleCursorResult,
-};
+use super::{OperationWithDefaults, Retryability, SingleCursorResult};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -100,11 +96,12 @@ impl OperationWithDefaults for CountDocuments {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: SingleCursorResult<Body> = response.body()?;
             Ok(response.0.map(|r| r.n).unwrap_or(0))
-        }}
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

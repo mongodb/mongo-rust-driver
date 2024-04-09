@@ -14,6 +14,7 @@ use crate::{
     operation::OperationWithDefaults,
     options::{BulkWriteOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
+    BoxFuture,
     Client,
     ClientSession,
     Cursor,
@@ -21,13 +22,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{
-    OperationResponse,
-    Retryability,
-    WriteResponseBody,
-    COMMAND_OVERHEAD_SIZE,
-    MAX_ENCRYPTED_WRITE_SIZE,
-};
+use super::{Retryability, WriteResponseBody, COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
 
 use server_responses::*;
 
@@ -271,80 +266,78 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
         response: RawCommandResponse,
         description: &'b StreamDescription,
         session: Option<&'b mut ClientSession>,
-    ) -> OperationResponse<'b, Self::O> {
-        OperationResponse::Async(
-            async move {
-                let response: WriteResponseBody<Response> = response.body()?;
+    ) -> BoxFuture<'b, Result<Self::O>> {
+        async move {
+            let response: WriteResponseBody<Response> = response.body()?;
 
-                let mut bulk_write_error = ClientBulkWriteError::default();
+            let mut bulk_write_error = ClientBulkWriteError::default();
 
-                // A partial result with summary info should only be created if one or more
-                // operations were successful.
-                if response.summary.n_errors < self.n_attempted as i64 {
-                    bulk_write_error
-                        .partial_result
-                        .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                        .populate_summary_info(&response.summary);
+            // A partial result with summary info should only be created if one or more
+            // operations were successful.
+            if response.summary.n_errors < self.n_attempted as i64 {
+                bulk_write_error
+                    .partial_result
+                    .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
+                    .populate_summary_info(&response.summary);
+            }
+
+            if let Some(write_concern_error) = response.write_concern_error {
+                bulk_write_error
+                    .write_concern_errors
+                    .push(write_concern_error);
+            }
+
+            let specification = CursorSpecification::new(
+                response.body.cursor,
+                description.server_address.clone(),
+                None,
+                None,
+                self.options.and_then(|options| options.comment.clone()),
+            );
+            let iteration_result = match session {
+                Some(session) => {
+                    let mut session_cursor =
+                        SessionCursor::new(self.client.clone(), specification, None);
+                    self.iterate_results_cursor(
+                        session_cursor.stream(session),
+                        &mut bulk_write_error,
+                    )
+                    .await
                 }
-
-                if let Some(write_concern_error) = response.write_concern_error {
-                    bulk_write_error
-                        .write_concern_errors
-                        .push(write_concern_error);
-                }
-
-                let specification = CursorSpecification::new(
-                    response.body.cursor,
-                    description.server_address.clone(),
-                    None,
-                    None,
-                    self.options.and_then(|options| options.comment.clone()),
-                );
-                let iteration_result = match session {
-                    Some(session) => {
-                        let mut session_cursor =
-                            SessionCursor::new(self.client.clone(), specification, None);
-                        self.iterate_results_cursor(
-                            session_cursor.stream(session),
-                            &mut bulk_write_error,
-                        )
+                None => {
+                    let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                    self.iterate_results_cursor(cursor, &mut bulk_write_error)
                         .await
-                    }
-                    None => {
-                        let cursor = Cursor::new(self.client.clone(), specification, None, None);
-                        self.iterate_results_cursor(cursor, &mut bulk_write_error)
-                            .await
-                    }
-                };
+                }
+            };
 
-                match iteration_result {
-                    Ok(()) => {
-                        if bulk_write_error.write_errors.is_empty()
-                            && bulk_write_error.write_concern_errors.is_empty()
-                        {
-                            Ok(bulk_write_error
-                                .partial_result
-                                .unwrap_or_else(|| BulkWriteResult::new(self.is_verbose())))
-                        } else {
-                            let error = Error::new(
-                                ErrorKind::ClientBulkWrite(bulk_write_error),
-                                response.labels,
-                            );
-                            Err(error)
-                        }
-                    }
-                    Err(error) => {
+            match iteration_result {
+                Ok(()) => {
+                    if bulk_write_error.write_errors.is_empty()
+                        && bulk_write_error.write_concern_errors.is_empty()
+                    {
+                        Ok(bulk_write_error
+                            .partial_result
+                            .unwrap_or_else(|| BulkWriteResult::new(self.is_verbose())))
+                    } else {
                         let error = Error::new(
                             ErrorKind::ClientBulkWrite(bulk_write_error),
                             response.labels,
-                        )
-                        .with_source(error);
+                        );
                         Err(error)
                     }
                 }
+                Err(error) => {
+                    let error = Error::new(
+                        ErrorKind::ClientBulkWrite(bulk_write_error),
+                        response.labels,
+                    )
+                    .with_source(error);
+                    Err(error)
+                }
             }
-            .boxed(),
-        )
+        }
+        .boxed()
     }
 
     fn retryability(&self) -> Retryability {

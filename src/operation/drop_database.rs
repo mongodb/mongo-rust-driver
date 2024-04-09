@@ -1,7 +1,7 @@
-use bson::Document;
+use futures_util::FutureExt;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
@@ -12,10 +12,9 @@ use crate::{
         WriteConcernOnlyBody,
     },
     options::WriteConcern,
+    BoxFuture,
     ClientSession,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
@@ -55,11 +54,12 @@ impl OperationWithDefaults for DropDatabase {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: WriteConcernOnlyBody = response.body()?;
             response.validate()
-        }}
+        }
+        .boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

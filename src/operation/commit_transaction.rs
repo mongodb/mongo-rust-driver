@@ -1,16 +1,18 @@
 use std::time::Duration;
 
 use bson::{doc, Document};
+use futures_util::FutureExt;
 
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
+    BoxFuture,
     ClientSession,
 };
 
-use super::{handle_response_sync, OperationResponse, WriteConcernOnlyBody};
+use super::WriteConcernOnlyBody;
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -48,11 +50,12 @@ impl OperationWithDefaults for CommitTransaction {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move {
             let response: WriteConcernOnlyBody = response.body()?;
             response.validate()
-        }}
+        }
+        .boxed()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

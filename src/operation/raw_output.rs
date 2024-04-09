@@ -1,10 +1,13 @@
+use futures_util::FutureExt;
+
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
+    BoxFuture,
     ClientSession,
 };
 
-use super::{handle_response_sync, Operation, OperationResponse};
+use super::Operation;
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.
@@ -32,8 +35,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         response: RawCommandResponse,
         _description: &StreamDescription,
         _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{ Ok(response) }}
+    ) -> BoxFuture<'static, Result<Self::O>> {
+        async move { Ok(response) }.boxed()
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

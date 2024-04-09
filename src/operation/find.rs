@@ -1,3 +1,5 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -11,11 +13,10 @@ use crate::{
         SERVER_4_4_0_WIRE_VERSION,
     },
     options::{CursorType, FindOptions, SelectionCriteria},
+    BoxFuture,
     ClientSession,
     Namespace,
 };
-
-use super::{handle_response_sync, OperationResponse};
 
 #[derive(Debug)]
 pub(crate) struct Find {
@@ -100,13 +101,13 @@ impl OperationWithDefaults for Find {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> OperationResponse<'static, Self::O> {
-        handle_response_sync! {{
+        description: &'a StreamDescription,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move {
             let response: CursorBody = response.body()?;
 
             // The comment should only be propagated to getMore calls on 4.4+.
@@ -125,7 +126,8 @@ impl OperationWithDefaults for Find {
                 self.options.as_ref().and_then(|opts| opts.max_await_time),
                 comment,
             ))
-        }}
+        }
+        .boxed()
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
