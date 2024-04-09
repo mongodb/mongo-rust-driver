@@ -67,6 +67,12 @@ impl<'a> Action for BulkWrite<'a> {
     type Future = BulkWriteFuture;
 
     async fn execute(mut self) -> Result<BulkWriteResult> {
+        resolve_write_concern_with_session!(
+            self.client,
+            self.options,
+            self.session.as_deref_mut()
+        )?;
+
         let mut total_attempted = 0;
         let mut execution_status = ExecutionStatus::None;
 
