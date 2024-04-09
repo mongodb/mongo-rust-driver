@@ -779,7 +779,7 @@ pub struct FindOptions {
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+.
+    /// For server versions less than 4.4, only a string value may be provided.
     pub comment: Option<Bson>,
 
     /// The type of cursor to return.
