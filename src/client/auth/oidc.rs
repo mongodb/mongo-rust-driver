@@ -40,8 +40,14 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
 #[derive(Clone)]
 pub struct State {
     callback: Callback,
-    // pub(crate) for spec tests
-    pub(crate) cache: Arc<Mutex<Cache>>,
+    cache: Arc<Mutex<Cache>>,
+}
+
+#[cfg(test)]
+impl State {
+    pub(crate) fn cache(&mut self) -> Arc<Mutex<Cache>> {
+        self.cache.clone()
+    }
 }
 
 #[derive(Clone)]
@@ -125,10 +131,8 @@ pub struct CallbackInner {
 #[derive(Debug, Clone)]
 pub struct Cache {
     idp_server_info: Option<IdpServerInfo>,
-    // pub(crate) for spec tests
-    pub(crate) refresh_token: Option<String>,
-    // pub(crate) for spec tests
-    pub(crate) access_token: Option<String>,
+    refresh_token: Option<String>,
+    access_token: Option<String>,
     token_gen_id: u32,
     last_call_time: Instant,
 }
@@ -141,6 +145,47 @@ impl Cache {
             access_token: None,
             token_gen_id: 0,
             last_call_time: Instant::now(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn refresh_token(&mut self) -> &mut Option<String> {
+        &mut self.refresh_token
+    }
+
+    #[cfg(test)]
+    pub(crate) fn access_token(&mut self) -> &mut Option<String> {
+        &mut self.access_token
+    }
+
+    async fn update(
+        &mut self,
+        response: &IdpServerResponse,
+        idp_server_info: Option<IdpServerInfo>,
+    ) {
+        if idp_server_info.is_some() {
+            self.idp_server_info = idp_server_info;
+        }
+        self.access_token = Some(response.access_token.clone());
+        self.refresh_token = response.refresh_token.clone();
+        self.last_call_time = Instant::now();
+        self.token_gen_id += 1;
+    }
+
+    async fn propagate_token_gen_id(&mut self, conn: &Connection) {
+        let mut token_gen_id = conn.oidc_token_gen_id.lock().await;
+        if *token_gen_id < self.token_gen_id {
+            *token_gen_id = self.token_gen_id;
+        }
+    }
+
+    async fn invalidate(&mut self, conn: &Connection, force: bool) {
+        let mut token_gen_id = conn.oidc_token_gen_id.lock().await;
+        // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in
+        // case
+        if force || *token_gen_id >= self.token_gen_id {
+            self.access_token = None;
+            *token_gen_id = 0;
         }
     }
 }
@@ -231,18 +276,15 @@ pub(crate) async fn reauthenticate_stream(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Result<()> {
-    invalidate_caches(
-        conn,
-        &mut credential
-            .oidc_callback
-            .as_ref()
-            .unwrap()
-            .cache
-            .lock()
-            .await,
-        true,
-    )
-    .await;
+    credential
+        .oidc_callback
+        .as_ref()
+        .unwrap()
+        .cache
+        .lock()
+        .await
+        .invalidate(conn, true)
+        .await;
     authenticate_stream(conn, credential, server_api, None).await
 }
 
@@ -263,12 +305,12 @@ pub(crate) async fn authenticate_stream(
         .lock()
         .await;
 
-    propagate_token_gen_id(conn, &cred_cache).await;
+    cred_cache.propagate_token_gen_id(conn).await;
 
     if server_first.into().is_some() {
         // speculative authentication succeeded, no need to authenticate again
         // update the Connection gen_id to be that of the cred_cache
-        propagate_token_gen_id(conn, &cred_cache).await;
+        cred_cache.propagate_token_gen_id(conn).await;
         return Ok(());
     }
     let source = credential.source.as_deref().unwrap_or("$external");
@@ -286,37 +328,6 @@ pub(crate) async fn authenticate_stream(
         CallbackKind::Human => {
             authenticate_human(source, conn, credential, &mut cred_cache, server_api, inner).await
         }
-    }
-}
-
-async fn update_cred_cache(
-    cred_cache: &mut MutexGuard<'_, Cache>,
-    response: &IdpServerResponse,
-    idp_server_info: Option<IdpServerInfo>,
-) {
-    if idp_server_info.is_some() {
-        cred_cache.idp_server_info = idp_server_info;
-    }
-    cred_cache.access_token = Some(response.access_token.clone());
-    cred_cache.refresh_token = response.refresh_token.clone();
-    cred_cache.last_call_time = Instant::now();
-    cred_cache.token_gen_id += 1;
-}
-
-async fn propagate_token_gen_id(conn: &Connection, cred_cache: &MutexGuard<'_, Cache>) {
-    let mut token_gen_id = conn.oidc_token_gen_id.lock().await;
-    if *token_gen_id < cred_cache.token_gen_id {
-        *token_gen_id = cred_cache.token_gen_id;
-    }
-}
-
-async fn invalidate_caches(conn: &Connection, cred_cache: &mut MutexGuard<'_, Cache>, force: bool) {
-    let mut token_gen_id = conn.oidc_token_gen_id.lock().await;
-    // It should be impossible for token_gen_id to be > cache.token_gen_id, but we check just in
-    // case
-    if force || *token_gen_id >= cred_cache.token_gen_id {
-        cred_cache.access_token = None;
-        *token_gen_id = 0;
     }
 }
 
@@ -376,12 +387,8 @@ async fn do_shared_flow(
         )
         .await?;
         if response.done {
-            update_cred_cache(
-                cred_cache,
-                &idp_response,
-                cred_cache.idp_server_info.clone(),
-            )
-            .await;
+            let server_info = cred_cache.idp_server_info.clone();
+            cred_cache.update(&idp_response, server_info).await;
             return Ok(());
         }
         return Err(invalid_auth_response());
@@ -407,7 +414,7 @@ async fn do_shared_flow(
 
     // Update the credential and connection caches with the access token and the credential cache
     // with the refresh token and token_gen_id
-    update_cred_cache(cred_cache, &idp_response, Some(server_info)).await;
+    cred_cache.update(&idp_response, Some(server_info)).await;
 
     let sasl_continue = SaslContinue::new(
         source.to_string(),
@@ -493,7 +500,7 @@ async fn authenticate_human(
                 return Ok(());
             }
         }
-        invalidate_caches(conn, cred_cache, false).await;
+        cred_cache.invalidate(conn, false).await;
     }
 
     // If the cache has a refresh token, we can avoid asking for the server info.
@@ -518,7 +525,7 @@ async fn authenticate_human(
             if response.done {
                 // Update the credential and connection caches with the access token and the
                 // credential cache with the refresh token and token_gen_id
-                update_cred_cache(cred_cache, &idp_response, None).await;
+                cred_cache.update(&idp_response, None).await;
                 return Ok(());
             }
             // It should really not be possible for this to occur, we would get an error, if the
@@ -528,7 +535,7 @@ async fn authenticate_human(
             // since this is an error, we will go ahead and invalidate the caches so we do not
             // try to use them again and waste time. We should fall through so that we can
             // do the shared flow from the beginning
-            invalidate_caches(conn, cred_cache, false).await;
+            cred_cache.invalidate(conn, false).await;
         }
     }
 
@@ -568,7 +575,7 @@ async fn authenticate_machine(
                 return Ok(());
             }
         }
-        invalidate_caches(conn, cred_cache, false).await;
+        cred_cache.invalidate(conn, false).await;
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
