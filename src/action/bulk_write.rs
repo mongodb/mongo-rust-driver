@@ -6,7 +6,7 @@ use crate::{
     bson::{Bson, Document},
     error::{ClientBulkWriteError, Error, ErrorKind, Result},
     operation::bulk_write::BulkWrite as BulkWriteOperation,
-    options::{BulkWriteOptions, WriteModel},
+    options::{BulkWriteOptions, WriteConcern, WriteModel},
     results::BulkWriteResult,
     Client,
     ClientSession,
@@ -53,6 +53,7 @@ impl<'a> BulkWrite<'a> {
         comment: Bson,
         let_vars: Document,
         verbose_results: bool,
+        write_concern: WriteConcern,
     );
 
     pub fn session(mut self, session: &'a mut ClientSession) -> BulkWrite<'a> {

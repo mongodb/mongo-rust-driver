@@ -7,7 +7,7 @@ use crate::{
     bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
     bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
-    options::UpdateModifications,
+    options::{UpdateModifications, WriteConcern},
     Namespace,
 };
 
@@ -22,6 +22,7 @@ pub struct BulkWriteOptions {
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
     pub verbose_results: Option<bool>,
+    pub write_concern: Option<WriteConcern>,
 }
 
 impl Serialize for BulkWriteOptions {
@@ -35,6 +36,7 @@ impl Serialize for BulkWriteOptions {
             comment,
             let_vars,
             verbose_results,
+            write_concern,
         } = self;
 
         let mut map_serializer = serializer.serialize_map(None)?;
@@ -44,7 +46,7 @@ impl Serialize for BulkWriteOptions {
 
         if let Some(bypass_document_validation) = bypass_document_validation {
             map_serializer
-                .serialize_entry("bypassDocumentValidation", &bypass_document_validation)?;
+                .serialize_entry("bypassDocumentValidation", bypass_document_validation)?;
         }
 
         if let Some(ref comment) = comment {
@@ -57,6 +59,10 @@ impl Serialize for BulkWriteOptions {
 
         let errors_only = verbose_results.map(|b| !b).unwrap_or(true);
         map_serializer.serialize_entry("errorsOnly", &errors_only)?;
+
+        if let Some(ref write_concern) = write_concern {
+            map_serializer.serialize_entry("writeConcern", write_concern)?;
+        }
 
         map_serializer.end()
     }
