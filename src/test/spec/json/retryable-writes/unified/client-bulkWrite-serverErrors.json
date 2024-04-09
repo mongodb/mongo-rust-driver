@@ -22,6 +22,18 @@
       }
     },
     {
+      "client": {
+        "id": "clientRetryWritesFalse",
+        "uriOptions": {
+          "retryWrites": false
+        },
+        "observeEvents": [
+          "commandStartedEvent"
+        ],
+        "useMultipleMongoses": false
+      }
+    },
+    {
       "database": {
         "id": "database0",
         "client": "client0",
@@ -760,6 +772,88 @@
                         "_id": 3
                       },
                       "multi": true
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "retryable-writes-tests.coll0"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "client bulkWrite with retryWrites: false does not retry",
+      "operations": [
+        {
+          "object": "testRunner",
+          "name": "failPoint",
+          "arguments": {
+            "client": "clientRetryWritesFalse",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "bulkWrite"
+                ],
+                "errorCode": 189,
+                "errorLabels": [
+                  "RetryableWriteError"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "object": "clientRetryWritesFalse",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": "retryable-writes-tests.coll0",
+                  "document": {
+                    "_id": 4,
+                    "x": 44
+                  }
+                }
+              }
+            ]
+          },
+          "expectError": {
+            "errorCode": 189,
+            "errorLabelsContain": [
+              "RetryableWriteError"
+            ]
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "clientRetryWritesFalse",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
+                "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": true,
+                  "ordered": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 4,
+                        "x": 44
+                      }
                     }
                   ],
                   "nsInfo": [
