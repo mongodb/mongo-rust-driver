@@ -9,8 +9,9 @@ use crate::{
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -45,14 +46,13 @@ impl OperationWithDefaults for ListDatabases {
         ))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
-            let response: Response = raw_response.body()?;
+            let response: Response = response.body()?;
             Ok(response.databases)
         }
         .boxed()

@@ -11,11 +11,10 @@ use crate::{
     options::{AggregateOptions, CountOptions},
     selection_criteria::SelectionCriteria,
     BoxFuture,
-    ClientSession,
     Namespace,
 };
 
-use super::{OperationWithDefaults, Retryability, SingleCursorResult};
+use super::{ExecutionContext, OperationWithDefaults, Retryability, SingleCursorResult};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -91,12 +90,11 @@ impl OperationWithDefaults for CountDocuments {
         self.aggregate.extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: SingleCursorResult<Body> = response.body()?;
             Ok(response.0.map(|r| r.n).unwrap_or(0))

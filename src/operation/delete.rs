@@ -16,8 +16,9 @@ use crate::{
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct Delete {
@@ -83,12 +84,11 @@ impl OperationWithDefaults for Delete {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: WriteResponseBody = response.body()?;
             response.validate().map_err(convert_bulk_errors)?;

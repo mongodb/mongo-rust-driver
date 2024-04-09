@@ -9,10 +9,9 @@ use crate::{
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
     BoxFuture,
-    ClientSession,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -45,12 +44,11 @@ impl OperationWithDefaults for CommitTransaction {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: WriteConcernOnlyBody = response.body()?;
             response.validate()

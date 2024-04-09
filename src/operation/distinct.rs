@@ -9,8 +9,9 @@ use crate::{
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -70,12 +71,11 @@ impl OperationWithDefaults for Distinct {
             .and_then(RawBsonRef::as_timestamp))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: Response = response.body()?;
             Ok(response.values)

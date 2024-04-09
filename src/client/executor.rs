@@ -53,6 +53,7 @@ use crate::{
         AbortTransaction,
         CommandErrorBody,
         CommitTransaction,
+        ExecutionContext,
         Operation,
         Retryability,
     },
@@ -189,7 +190,7 @@ impl Client {
         self.inner.options.load_balanced.unwrap_or(false)
     }
 
-    fn pin_connection_for_cursor(
+    pub(crate) fn pin_connection_for_cursor(
         &self,
         spec: &CursorSpecification,
         conn: &mut Connection,
@@ -788,14 +789,12 @@ impl Client {
                     }
                 };
 
-                match op
-                    .handle_response(
-                        response,
-                        connection.stream_description()?,
-                        session.as_deref_mut(),
-                    )
-                    .await
-                {
+                let context = ExecutionContext {
+                    connection,
+                    session: session.as_deref_mut(),
+                };
+
+                match op.handle_response(response, context).await {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
                         err.add_labels_and_update_pin(

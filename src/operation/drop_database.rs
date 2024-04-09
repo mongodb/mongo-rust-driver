@@ -13,8 +13,9 @@ use crate::{
     },
     options::WriteConcern,
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
@@ -49,12 +50,11 @@ impl OperationWithDefaults for DropDatabase {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: WriteConcernOnlyBody = response.body()?;
             response.validate()

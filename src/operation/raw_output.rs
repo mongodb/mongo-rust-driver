@@ -4,10 +4,9 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     BoxFuture,
-    ClientSession,
 };
 
-use super::Operation;
+use super::{ExecutionContext, Operation};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.
@@ -30,12 +29,11 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move { Ok(response) }.boxed()
     }
 

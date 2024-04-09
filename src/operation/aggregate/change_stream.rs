@@ -6,10 +6,9 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, OperationWithDefaults, Retryability},
+    operation::{append_options, ExecutionContext, OperationWithDefaults, Retryability},
     options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
     BoxFuture,
-    ClientSession,
 };
 
 use super::Aggregate;
@@ -89,18 +88,19 @@ impl OperationWithDefaults for ChangeStreamAggregate {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        session: Option<&'a mut ClientSession>,
+        mut context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let op_time = response
                 .raw_body()
                 .get("operationTime")?
                 .and_then(bson::RawBsonRef::as_timestamp);
-            let spec = self
-                .inner
-                .handle_response(response, description, session)
-                .await?;
+
+            let inner_context = ExecutionContext {
+                connection: context.connection,
+                session: context.session.as_deref_mut(),
+            };
+            let spec = self.inner.handle_response(response, inner_context).await?;
 
             let mut data = ChangeStreamData {
                 resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
@@ -111,6 +111,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
                     && o.resume_after.is_none()
                     && o.start_after.is_none()
             };
+
+            let description = context.stream_description()?;
             if self.args.options.as_ref().map_or(true, has_no_time)
                 && description.max_wire_version.map_or(false, |v| v >= 7)
                 && spec.initial_buffer.is_empty()

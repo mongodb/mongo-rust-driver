@@ -10,8 +10,9 @@ use crate::{
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCursorCommand<'conn> {
@@ -91,8 +92,7 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        _session: Option<&'a mut ClientSession>,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let cursor_response: CursorBody = response.body()?;
@@ -104,7 +104,7 @@ impl<'conn> Operation for RunCursorCommand<'conn> {
 
             Ok(CursorSpecification::new(
                 cursor_response.cursor,
-                description.server_address.clone(),
+                context.stream_description()?.server_address.clone(),
                 self.options.as_ref().and_then(|opts| opts.batch_size),
                 self.options.as_ref().and_then(|opts| opts.max_time),
                 comment,

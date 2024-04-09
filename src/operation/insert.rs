@@ -17,11 +17,10 @@ use crate::{
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     BoxFuture,
-    ClientSession,
     Namespace,
 };
 
-use super::{COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
+use super::{ExecutionContext, COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
@@ -128,8 +127,7 @@ impl<'a> OperationWithDefaults for Insert<'a> {
     fn handle_response<'b>(
         &'b self,
         response: RawCommandResponse,
-        _description: &'b StreamDescription,
-        _session: Option<&'b mut ClientSession>,
+        _context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
             let response: WriteResponseBody = response.body_utf8_lossy()?;

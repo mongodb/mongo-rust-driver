@@ -21,10 +21,9 @@ use crate::{
     },
     options::WriteConcern,
     BoxFuture,
-    ClientSession,
 };
 
-use super::UpdateOrReplace;
+use super::{ExecutionContext, UpdateOrReplace};
 
 pub(crate) struct FindAndModify<T: DeserializeOwned> {
     ns: Namespace,
@@ -98,12 +97,11 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             #[derive(Debug, Deserialize)]
             pub(crate) struct Response {

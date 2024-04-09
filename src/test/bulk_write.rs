@@ -43,16 +43,18 @@ async fn max_write_batch_size_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count as usize, max_write_batch_size + 1);
 
-    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+    let mut command_started_events = event_buffer
+        .get_command_started_events(&["bulkWrite"])
+        .into_iter();
 
     let first_event = command_started_events
-        .get(0)
+        .next()
         .expect("no first event observed");
     let first_len = first_event.command.get_array("ops").unwrap().len();
     assert_eq!(first_len, max_write_batch_size);
 
     let second_event = command_started_events
-        .get(1)
+        .next()
         .expect("no second event observed");
     let second_len = second_event.command.get_array("ops").unwrap().len();
     assert_eq!(second_len, 1);
@@ -85,16 +87,18 @@ async fn max_message_size_bytes_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count as usize, num_models);
 
-    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+    let mut command_started_events = event_buffer
+        .get_command_started_events(&["bulkWrite"])
+        .into_iter();
 
     let first_event = command_started_events
-        .get(0)
+        .next()
         .expect("no first event observed");
     let first_len = first_event.command.get_array("ops").unwrap().len();
     assert_eq!(first_len, num_models - 1);
 
     let second_event = command_started_events
-        .get(1)
+        .next()
         .expect("no second event observed");
     let second_len = second_event.command.get_array("ops").unwrap().len();
     assert_eq!(second_len, 1);

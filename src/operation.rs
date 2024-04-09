@@ -33,7 +33,13 @@ use crate::{
     bson::{self, Bson, Document},
     bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
-    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
+    cmap::{
+        conn::PinnedConnectionHandle,
+        Command,
+        Connection,
+        RawCommandResponse,
+        StreamDescription,
+    },
     error::{
         BulkWriteError,
         BulkWriteFailure,
@@ -75,6 +81,18 @@ const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
 // The amount of overhead bytes to account for when building a document sequence.
 const COMMAND_OVERHEAD_SIZE: usize = 16_000;
 
+/// Context about the execution of the operation.
+pub(crate) struct ExecutionContext<'a> {
+    pub(crate) connection: &'a mut Connection,
+    pub(crate) session: Option<&'a mut ClientSession>,
+}
+
+impl<'a> ExecutionContext<'a> {
+    pub(crate) fn stream_description(&'a self) -> Result<&'a StreamDescription> {
+        self.connection.stream_description()
+    }
+}
+
 /// A trait modeling the behavior of a server side operation.
 ///
 /// No methods in this trait should have default behaviors to ensure that wrapper operations
@@ -101,8 +119,7 @@ pub(crate) trait Operation {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        session: Option<&'a mut ClientSession>,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -415,8 +432,7 @@ pub(crate) trait OperationWithDefaults {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        session: Option<&'a mut ClientSession>,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -482,10 +498,9 @@ impl<T: OperationWithDefaults> Operation for T {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        session: Option<&'a mut ClientSession>,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        self.handle_response(response, description, session)
+        self.handle_response(response, context)
     }
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)

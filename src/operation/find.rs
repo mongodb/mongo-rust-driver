@@ -14,9 +14,10 @@ use crate::{
     },
     options::{CursorType, FindOptions, SelectionCriteria},
     BoxFuture,
-    ClientSession,
     Namespace,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct Find {
@@ -104,11 +105,12 @@ impl OperationWithDefaults for Find {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        _session: Option<&'a mut ClientSession>,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: CursorBody = response.body()?;
+
+            let description = context.stream_description()?;
 
             // The comment should only be propagated to getMore calls on 4.4+.
             let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {

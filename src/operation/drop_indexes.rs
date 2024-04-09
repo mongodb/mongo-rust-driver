@@ -7,9 +7,10 @@ use crate::{
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{DropIndexOptions, WriteConcern},
     BoxFuture,
-    ClientSession,
     Namespace,
 };
+
+use super::ExecutionContext;
 
 pub(crate) struct DropIndexes {
     ns: Namespace,
@@ -44,12 +45,11 @@ impl OperationWithDefaults for DropIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         _response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move { Ok(()) }.boxed()
     }
 

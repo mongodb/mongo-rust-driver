@@ -9,11 +9,10 @@ use crate::{
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
     BoxFuture,
-    ClientSession,
     Namespace,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{ExecutionContext, WriteConcernOnlyBody};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -77,8 +76,7 @@ impl OperationWithDefaults for CreateIndexes {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        _description: &'a StreamDescription,
-        _session: Option<&'a mut ClientSession>,
+        _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: WriteConcernOnlyBody = response.body()?;

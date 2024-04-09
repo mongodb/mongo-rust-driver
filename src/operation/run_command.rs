@@ -9,10 +9,9 @@ use crate::{
     error::{ErrorKind, Result},
     selection_criteria::SelectionCriteria,
     BoxFuture,
-    ClientSession,
 };
 
-use super::{CursorBody, OperationWithDefaults};
+use super::{CursorBody, ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -94,12 +93,11 @@ impl<'conn> OperationWithDefaults for RunCommand<'conn> {
         }
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move { Ok(response.into_raw_document_buf().try_into()?) }.boxed()
     }
 

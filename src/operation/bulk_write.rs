@@ -16,13 +16,18 @@ use crate::{
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
     BoxFuture,
     Client,
-    ClientSession,
     Cursor,
     Namespace,
     SessionCursor,
 };
 
-use super::{Retryability, WriteResponseBody, COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
+use super::{
+    ExecutionContext,
+    Retryability,
+    WriteResponseBody,
+    COMMAND_OVERHEAD_SIZE,
+    MAX_ENCRYPTED_WRITE_SIZE,
+};
 
 use server_responses::*;
 
@@ -264,8 +269,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
     fn handle_response<'b>(
         &'b self,
         response: RawCommandResponse,
-        description: &'b StreamDescription,
-        session: Option<&'b mut ClientSession>,
+        context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
             let response: WriteResponseBody<Response> = response.body()?;
@@ -289,15 +293,18 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
 
             let specification = CursorSpecification::new(
                 response.body.cursor,
-                description.server_address.clone(),
+                context.stream_description()?.server_address.clone(),
                 None,
                 None,
                 self.options.and_then(|options| options.comment.clone()),
             );
-            let iteration_result = match session {
+            let pinned_connection = self
+                .client
+                .pin_connection_for_cursor(&specification, context.connection)?;
+            let iteration_result = match context.session {
                 Some(session) => {
                     let mut session_cursor =
-                        SessionCursor::new(self.client.clone(), specification, None);
+                        SessionCursor::new(self.client.clone(), specification, pinned_connection);
                     self.iterate_results_cursor(
                         session_cursor.stream(session),
                         &mut bulk_write_error,
@@ -305,7 +312,8 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                     .await
                 }
                 None => {
-                    let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                    let cursor =
+                        Cursor::new(self.client.clone(), specification, None, pinned_connection);
                     self.iterate_results_cursor(cursor, &mut bulk_write_error)
                         .await
                 }

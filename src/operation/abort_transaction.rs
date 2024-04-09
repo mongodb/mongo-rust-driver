@@ -10,10 +10,9 @@ use crate::{
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
     BoxFuture,
-    ClientSession,
 };
 
-use super::{OperationWithDefaults, WriteConcernOnlyBody};
+use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -52,12 +51,11 @@ impl OperationWithDefaults for AbortTransaction {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: WriteConcernOnlyBody = response.body()?;
             response.validate()

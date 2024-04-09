@@ -9,8 +9,9 @@ use crate::{
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -44,11 +45,10 @@ impl OperationWithDefaults for Count {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
+        _context: ExecutionContext<'a>,
     ) -> BoxFuture<'static, Result<Self::O>> {
         async move {
             let response_body: ResponseBody = response.body()?;

@@ -10,9 +10,10 @@ use crate::{
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     BoxFuture,
-    ClientSession,
     Namespace,
 };
+
+use super::ExecutionContext;
 
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace {
@@ -160,14 +161,13 @@ impl OperationWithDefaults for Update {
         ))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
-            let response: WriteResponseBody<UpdateBody> = raw_response.body_utf8_lossy()?;
+            let response: WriteResponseBody<UpdateBody> = response.body_utf8_lossy()?;
             response.validate().map_err(convert_bulk_errors)?;
 
             let modified_count = response.n_modified;

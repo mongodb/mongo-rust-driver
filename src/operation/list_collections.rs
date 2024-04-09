@@ -8,8 +8,9 @@ use crate::{
     operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
     BoxFuture,
-    ClientSession,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
@@ -59,14 +60,13 @@ impl OperationWithDefaults for ListCollections {
     fn handle_response<'a>(
         &'a self,
         response: RawCommandResponse,
-        description: &'a StreamDescription,
-        _session: Option<&'a mut ClientSession>,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             let response: CursorBody = response.body()?;
             Ok(CursorSpecification::new(
                 response.cursor,
-                description.server_address.clone(),
+                context.stream_description()?.server_address.clone(),
                 self.options.as_ref().and_then(|opts| opts.batch_size),
                 None,
                 None,

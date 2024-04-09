@@ -3,15 +3,14 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, RawCommandResponse, StreamDescription},
+    cmap::{Command, RawCommandResponse},
     error::Result,
     BoxFuture,
-    ClientSession,
     Namespace,
     SearchIndexModel,
 };
 
-use super::OperationWithDefaults;
+use super::{ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -41,12 +40,11 @@ impl OperationWithDefaults for CreateSearchIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             #[derive(Debug, Deserialize)]
             #[serde(rename_all = "camelCase")]
@@ -117,12 +115,11 @@ impl OperationWithDefaults for UpdateSearchIndex {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         _response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move { Ok(()) }.boxed()
     }
 
@@ -166,12 +163,11 @@ impl OperationWithDefaults for DropSearchIndex {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         _response: RawCommandResponse,
-        _description: &StreamDescription,
-        _session: Option<&mut ClientSession>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move { Ok(()) }.boxed()
     }
 
