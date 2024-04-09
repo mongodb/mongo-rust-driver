@@ -433,6 +433,22 @@
           }
         }
       ]
+    },
+    {
+      "description": "an empty list of write models is a client-side error",
+      "operations": [
+        {
+          "name": "clientBulkWrite",
+          "object": "client0",
+          "arguments": {
+            "models": [],
+            "verboseResults": true
+          },
+          "expectError": {
+            "isClientError": true
+          }
+        }
+      ]
     }
   ]
 }
