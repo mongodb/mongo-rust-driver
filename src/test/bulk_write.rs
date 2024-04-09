@@ -224,7 +224,7 @@ async fn successful_cursor_iteration() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let document = doc! { "_id": "a".repeat(max_bson_object_size - 500) };
+    let document = doc! { "_id": "a".repeat(max_bson_object_size / 2) };
 
     let collection = client.database("db").collection("coll");
     collection.drop().await.unwrap();
@@ -268,7 +268,7 @@ async fn failed_cursor_iteration() {
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let document = doc! { "_id": "a".repeat(max_bson_object_size - 500) };
+    let document = doc! { "_id": "a".repeat(max_bson_object_size / 2) };
 
     let collection = client.database("db").collection("coll");
     collection.drop().await.unwrap();
