@@ -685,7 +685,7 @@ async fn command_contains_write_concern_aggregate() {
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
     #[allow(deprecated)]
-    let client = Client::test_builder().event_client().build().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();

@@ -1,11 +1,6 @@
 use std::{fmt::Debug, time::Duration};
 
-use crate::{
-    event::command::CommandEvent,
-    test::{util::event_buffer::EventBuffer, Event},
-    Client,
-    Namespace,
-};
+use crate::{event::command::CommandEvent, test::Event, Client, Namespace};
 use bson::{rawdoc, serde_helpers::HumanReadable, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
@@ -1245,13 +1240,9 @@ async fn insert_many_document_sequences() {
         return;
     }
 
-    let buffer = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(buffer.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
     #[allow(deprecated)]
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = client.events.subscribe();
 
     let max_object_size = client.server_info.max_bson_object_size;
     let max_message_size = client.server_info.max_message_size_bytes;

@@ -7,24 +7,23 @@ use crate::{
     error::{CommandError, ErrorKind},
     options::{Acknowledgment, ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, util::event_buffer::EventBuffer, TestClient},
+    test::{get_client_options, log_uncaptured, EventClient},
     Collection,
     Database,
 };
 
 async fn run_test<F: Future>(
     name: &str,
-    test: impl Fn(TestClient, EventBuffer, Database, Collection<Document>) -> F,
+    test: impl Fn(EventClient, Database, Collection<Document>) -> F,
 ) {
     let options = ClientOptions::builder()
         .hosts(get_client_options().await.hosts.clone())
         .retry_writes(false)
         .build();
-    let events = EventBuffer::new();
     let client = crate::Client::test_builder()
         .additional_options(options, false)
         .await
-        .event_buffer(events.clone())
+        .monitor_events()
         .build()
         .await;
 
@@ -50,17 +49,12 @@ async fn run_test<F: Future>(
         .await
         .unwrap();
 
-    test(client, events, db, coll).await;
+    test(client, db, coll).await;
 }
 
 #[tokio::test]
 async fn get_more() {
-    async fn get_more_test(
-        client: TestClient,
-        events: EventBuffer,
-        _db: Database,
-        coll: Collection<Document>,
-    ) {
+    async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
             log_uncaptured("skipping get_more due to server version < 4.2");
@@ -101,7 +95,7 @@ async fn get_more() {
         }
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(events.count_pool_cleared_events(), 0);
+        assert_eq!(client.events.count_pool_cleared_events(), 0);
     }
 
     run_test("get_more", get_more_test).await;
@@ -110,8 +104,7 @@ async fn get_more() {
 #[tokio::test]
 async fn notwritableprimary_keep_pool() {
     async fn notwritableprimary_keep_pool_test(
-        client: TestClient,
-        events: EventBuffer,
+        client: EventClient,
         _db: Database,
         coll: Collection<Document>,
     ) {
@@ -148,7 +141,7 @@ async fn notwritableprimary_keep_pool() {
             .expect("insert should have succeeded");
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(events.count_pool_cleared_events(), 0);
+        assert_eq!(client.events.count_pool_cleared_events(), 0);
     }
 
     run_test(
@@ -161,8 +154,7 @@ async fn notwritableprimary_keep_pool() {
 #[tokio::test]
 async fn notwritableprimary_reset_pool() {
     async fn notwritableprimary_reset_pool_test(
-        client: TestClient,
-        events: EventBuffer,
+        client: EventClient,
         _db: Database,
         coll: Collection<Document>,
     ) {
@@ -197,7 +189,7 @@ async fn notwritableprimary_reset_pool() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(events.count_pool_cleared_events(), 1);
+        assert_eq!(client.events.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await
@@ -214,8 +206,7 @@ async fn notwritableprimary_reset_pool() {
 #[tokio::test]
 async fn shutdown_in_progress() {
     async fn shutdown_in_progress_test(
-        client: TestClient,
-        events: EventBuffer,
+        client: EventClient,
         _db: Database,
         coll: Collection<Document>,
     ) {
@@ -247,7 +238,7 @@ async fn shutdown_in_progress() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(events.count_pool_cleared_events(), 1);
+        assert_eq!(client.events.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await
@@ -260,8 +251,7 @@ async fn shutdown_in_progress() {
 #[tokio::test]
 async fn interrupted_at_shutdown() {
     async fn interrupted_at_shutdown_test(
-        client: TestClient,
-        events: EventBuffer,
+        client: EventClient,
         _db: Database,
         coll: Collection<Document>,
     ) {
@@ -293,7 +283,7 @@ async fn interrupted_at_shutdown() {
         );
 
         tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(events.count_pool_cleared_events(), 1);
+        assert_eq!(client.events.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await

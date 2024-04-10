@@ -606,7 +606,7 @@ async fn retry_write_different_mongos() {
     #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
-        .event_client()
+        .monitor_events()
         .build()
         .await;
     let result = client
@@ -669,7 +669,7 @@ async fn retry_write_same_mongos() {
     #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
-        .event_client()
+        .monitor_events()
         .build()
         .await;
     let result = client

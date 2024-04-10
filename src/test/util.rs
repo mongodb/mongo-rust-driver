@@ -21,7 +21,6 @@ pub(crate) use self::trace::{
     TracingHandler,
 };
 
-use self::event_buffer::EventBuffer;
 #[cfg(feature = "in-use-encryption-unstable")]
 use crate::client::EncryptedClientBuilder;
 use crate::{
@@ -70,8 +69,6 @@ impl Client {
     pub(crate) fn test_builder() -> TestClientBuilder {
         TestClientBuilder {
             options: None,
-            buffer: None,
-            retain_startup_events: false,
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption-unstable")]
             encrypted: None,
@@ -81,8 +78,6 @@ impl Client {
 
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
-    buffer: Option<EventBuffer>,
-    retain_startup_events: bool,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
@@ -107,20 +102,6 @@ impl TestClientBuilder {
         assert!(self.options.is_none() || options.is_none());
         self.options =
             Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
-        self
-    }
-
-    pub(crate) fn event_buffer(mut self, buffer: impl Into<Option<EventBuffer>>) -> Self {
-        let buffer = buffer.into();
-        assert!(self.buffer.is_none() || buffer.is_none());
-        self.buffer = buffer;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn retain_startup_events(mut self, value: bool) -> Self {
-        assert!(self.buffer.is_some());
-        self.retain_startup_events = value;
         self
     }
 
@@ -150,10 +131,6 @@ impl TestClientBuilder {
             None => get_client_options().await.clone(),
         };
 
-        if let Some(handler) = &self.buffer {
-            handler.register(&mut options);
-        }
-
         if let Some(freq) = self.min_heartbeat_freq {
             options.test_options_mut().min_heartbeat_freq = Some(freq);
         }
@@ -170,17 +147,7 @@ impl TestClientBuilder {
         let client = Client::with_options(options).unwrap();
 
         let client = TestClient::from_client(client).await;
-        if let Some(mut buffer) = self.buffer {
-            if !self.retain_startup_events {
-                // clear events from commands used to set up client.
-                buffer.retain(|ev| !matches!(ev, Event::Command(_)));
-            }
-        }
         client
-    }
-
-    pub(crate) fn buffer(&self) -> Option<&EventBuffer> {
-        self.buffer.as_ref()
     }
 }
 

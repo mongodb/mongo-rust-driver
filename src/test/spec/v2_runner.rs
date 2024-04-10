@@ -212,7 +212,7 @@ impl TestContext {
         #[cfg(feature = "in-use-encryption-unstable")]
         let builder = csfle::set_auto_enc(builder, test);
         #[allow(deprecated)]
-        let client = builder.event_client().build().await;
+        let client = builder.monitor_events().build().await;
 
         // TODO RUST-900: Remove this extraneous call.
         if internal_client.is_sharded()

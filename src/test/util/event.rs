@@ -9,6 +9,7 @@ use crate::{
         command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
+    test::get_client_options,
     Client,
 };
 
@@ -103,14 +104,12 @@ impl CommandEvent {
     }
 }
 
-#[deprecated = "use EventBuffer directly"]
 #[derive(Clone, Debug)]
 pub(crate) struct EventClient {
     client: TestClient,
     pub(crate) events: EventBuffer,
 }
 
-#[allow(deprecated)]
 impl std::ops::Deref for EventClient {
     type Target = TestClient;
 
@@ -119,7 +118,6 @@ impl std::ops::Deref for EventClient {
     }
 }
 
-#[allow(deprecated)]
 impl std::ops::DerefMut for EventClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.client
@@ -127,42 +125,51 @@ impl std::ops::DerefMut for EventClient {
 }
 
 impl TestClientBuilder {
-    #[deprecated = "use EventBuffer directly"]
-    #[allow(deprecated)]
-    pub(crate) fn event_client(self) -> EventClientBuilder {
-        EventClientBuilder { inner: self }
+    pub(crate) fn monitor_events(self) -> EventClientBuilder {
+        EventClientBuilder {
+            inner: self,
+            retain_startup: false,
+        }
     }
 }
 
-#[deprecated = "use EventBuffer directly"]
 pub(crate) struct EventClientBuilder {
     inner: TestClientBuilder,
+    retain_startup: bool,
 }
 
 #[allow(deprecated)]
 impl EventClientBuilder {
+    pub(crate) fn retain_startup_events(mut self) -> Self {
+        self.retain_startup = true;
+        self
+    }
+
     pub(crate) async fn build(self) -> EventClient {
         let mut inner = self.inner;
-        if inner.buffer.is_none() {
-            inner = inner.event_buffer(EventBuffer::new());
-        }
-        let mut handler = inner.buffer().unwrap().clone();
+        let mut options = match inner.options.take() {
+            Some(options) => options,
+            None => get_client_options().await.clone(),
+        };
+        let mut events = EventBuffer::new();
+        events.register(&mut options);
+        inner.options = Some(options);
+
         let client = inner.build().await;
 
-        // clear events from commands used to set up client.
-        handler.retain(|ev| !matches!(ev, Event::Command(_)));
-
-        EventClient {
-            client,
-            events: handler,
+        if !self.retain_startup {
+            // clear events from commands used to set up client.
+            events.retain(|ev| !matches!(ev, Event::Command(_)));
         }
+
+        EventClient { client, events }
     }
 }
 
-#[allow(deprecated)]
 impl EventClient {
+    #[deprecated = "use TestClientBuilder::monitor_events"]
     pub(crate) async fn new() -> Self {
-        Client::test_builder().event_client().build().await
+        Client::test_builder().monitor_events().build().await
     }
 
     #[allow(dead_code)]
@@ -172,9 +179,8 @@ impl EventClient {
 }
 
 #[tokio::test]
-#[allow(deprecated)]
 async fn command_started_event_count() {
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll = client.database("foo").collection("bar");
 
     for i in 0..10 {

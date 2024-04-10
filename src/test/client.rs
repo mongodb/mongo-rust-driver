@@ -801,11 +801,7 @@ async fn manual_shutdown_with_nothing() {
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
 #[tokio::test]
 async fn manual_shutdown_with_resources() {
-    let events = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(events.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping manual_shutdown_with_resources: no transaction support");
         return;
@@ -839,6 +835,7 @@ async fn manual_shutdown_with_resources() {
         let _stream = bucket.open_upload_stream("test").await.unwrap();
     }
     let is_sharded = client.is_sharded();
+    let events = client.events.clone();
     client.into_client().shutdown().await;
     if !is_sharded {
         // killCursors doesn't always execute on sharded clusters due to connection pinning
@@ -862,11 +859,7 @@ async fn manual_shutdown_immediate_with_nothing() {
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
 #[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
-    let events = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(events.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping manual_shutdown_immediate_with_resources: no transaction support");
         return;
@@ -890,6 +883,7 @@ async fn manual_shutdown_immediate_with_resources() {
         .unwrap();
     let _stream = bucket.open_upload_stream("test").await.unwrap();
 
+    let events = client.events.clone();
     client.into_client().shutdown().immediate(true).await;
 
     assert!(events
