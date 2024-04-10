@@ -544,8 +544,7 @@ pub struct AggregateOptions {
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. Use the `comment` option on
-    /// older server versions.
+    /// For server versions less than 4.4, only a string value may be provided.
     pub comment: Option<Bson>,
 
     /// The index to use for the operation.
@@ -767,22 +766,11 @@ pub struct FindOptions {
     #[serde(serialize_with = "serde_util::serialize_u32_option_as_i32")]
     pub batch_size: Option<u32>,
 
-    /// Tags the query with an arbitrary string to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
-    // TODO RUST-1364: Update this field to be of type Option<Bson>
-    #[serde(skip_serializing)]
-    pub comment: Option<String>,
-
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. Use the `comment` option on
-    /// older server versions.
-    // TODO RUST-1364: Remove this field
-    #[serde(rename(serialize = "comment"))]
-    pub comment_bson: Option<Bson>,
+    /// For server versions less than 4.4, only a string value may be provided.
+    pub comment: Option<Bson>,
 
     /// The type of cursor to return.
     #[serde(skip)]
@@ -878,7 +866,6 @@ impl From<FindOneOptions> for FindOptions {
             allow_partial_results: options.allow_partial_results,
             collation: options.collation,
             comment: options.comment,
-            comment_bson: options.comment_bson,
             hint: options.hint,
             max: options.max,
             max_scan: options.max_scan,
@@ -932,20 +919,11 @@ pub struct FindOneOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
-    /// Tags the query with an arbitrary string value to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
-    // TODO RUST-1364: Update this field to be of type Option<Bson>
-    pub comment: Option<String>,
-
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. Use the `comment` option on
-    /// older server versions.
-    // TODO RUST-1364: Remove this field
-    pub comment_bson: Option<Bson>,
+    /// For server versions less than 4.4, only a string value may be provided.
+    pub comment: Option<Bson>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,

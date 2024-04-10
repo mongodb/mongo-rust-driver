@@ -553,20 +553,13 @@ impl Find {
     ) -> Result<TestCursor> {
         let collection = test_runner.get_collection(id).await;
 
-        let (comment, comment_bson) = match &self.comment {
-            Some(Bson::String(string)) => (Some(string.clone()), None),
-            Some(bson) => (None, Some(bson.clone())),
-            None => (None, None),
-        };
-
         // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
         // compile-time that any new fields added there need to be considered here.
         let options = FindOptions {
             allow_disk_use: self.allow_disk_use,
             allow_partial_results: self.allow_partial_results,
             batch_size: self.batch_size,
-            comment,
-            comment_bson,
+            comment: self.comment.clone(),
             hint: self.hint.clone(),
             limit: self.limit,
             max: self.max.clone(),
@@ -1040,21 +1033,11 @@ impl<'de> Deserialize<'de> for FindOne {
         #[derive(Deserialize)]
         struct Helper {
             filter: Option<Document>,
-            comment: Option<Bson>,
             #[serde(flatten)]
             options: FindOneOptions,
         }
 
-        let mut helper = Helper::deserialize(deserializer)?;
-        match helper.comment {
-            Some(Bson::String(string)) => {
-                helper.options.comment = Some(string);
-            }
-            Some(bson) => {
-                helper.options.comment_bson = Some(bson);
-            }
-            _ => {}
-        }
+        let helper = Helper::deserialize(deserializer)?;
 
         Ok(Self {
             filter: helper.filter,
