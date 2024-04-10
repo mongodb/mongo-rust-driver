@@ -14,6 +14,8 @@ use crate::{
     Namespace,
 };
 
+use super::TestClient;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     run_unified_tests(&["crud", "unified", "new-bulk-write"]).await;
@@ -108,6 +110,9 @@ async fn max_message_size_bytes_batching() {
 async fn write_concern_error_batches() {
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
+    if TestClient::new().await.is_sharded() {
+        options.hosts.drain(1..);
+    }
 
     let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
@@ -252,8 +257,14 @@ async fn successful_cursor_iteration() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
+    let mut options = get_client_options().await.clone();
+    if TestClient::new().await.is_sharded() {
+        options.hosts.drain(1..);
+    }
+
     let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
+        .options(options)
         .event_buffer(event_buffer.clone())
         .build()
         .await;
