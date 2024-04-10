@@ -71,6 +71,7 @@ impl Client {
         TestClientBuilder {
             options: None,
             buffer: None,
+            retain_startup_events: false,
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption-unstable")]
             encrypted: None,
@@ -81,6 +82,7 @@ impl Client {
 pub(crate) struct TestClientBuilder {
     options: Option<ClientOptions>,
     buffer: Option<EventBuffer>,
+    retain_startup_events: bool,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
@@ -115,6 +117,12 @@ impl TestClientBuilder {
         self
     }
 
+    pub(crate) fn retain_startup_events(mut self, value: bool) -> Self {
+        assert!(self.buffer.is_some());
+        self.retain_startup_events = value;
+        self
+    }
+
     #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn encrypted_options(
         mut self,
@@ -141,7 +149,7 @@ impl TestClientBuilder {
             None => get_client_options().await.clone(),
         };
 
-        if let Some(handler) = self.buffer {
+        if let Some(handler) = &self.buffer {
             handler.register(&mut options);
         }
 
@@ -160,7 +168,14 @@ impl TestClientBuilder {
         #[cfg(not(feature = "in-use-encryption-unstable"))]
         let client = Client::with_options(options).unwrap();
 
-        TestClient::from_client(client).await
+        let client = TestClient::from_client(client).await;
+        if let Some(mut buffer) = self.buffer {
+            if !self.retain_startup_events {
+                // clear events from commands used to set up client.
+                buffer.retain(|ev| !matches!(ev, Event::Command(_)));
+            }
+        }
+        client
     }
 
     pub(crate) fn buffer(&self) -> Option<&EventBuffer> {

@@ -168,20 +168,13 @@ impl EventClient {
         EventClient::with_options(None).await
     }
 
-    async fn with_options_and_buffer(
-        options: impl Into<Option<ClientOptions>>,
-        handler: impl Into<Option<EventBuffer>>,
-    ) -> Self {
+    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
         Client::test_builder()
             .options(options)
-            .event_buffer(handler)
+            .event_buffer(None)
             .event_client()
             .build()
             .await
-    }
-
-    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Self::with_options_and_buffer(options, None).await
     }
 
     pub(crate) async fn with_additional_options(
