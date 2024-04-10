@@ -1,12 +1,11 @@
 use futures::stream::TryStreamExt;
 
-#[allow(deprecated)]
-use crate::test::util::EventClient;
 use crate::{
     bson::doc,
     error::ErrorKind,
     options::{CommitQuorum, IndexOptions},
     test::{log_uncaptured, util::TestClient},
+    Client,
     IndexModel,
 };
 
@@ -203,9 +202,8 @@ async fn index_management_drops() {
 // Test that index management commands execute the expected database commands.
 #[tokio::test]
 #[function_name::named]
-#[allow(deprecated)]
 async fn index_management_executes_commands() {
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;

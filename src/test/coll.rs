@@ -7,8 +7,6 @@ use once_cell::sync::Lazy;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
@@ -27,7 +25,7 @@ use crate::{
         WriteConcern,
     },
     results::DeleteResult,
-    test::{get_client_options, log_uncaptured, util::TestClient},
+    test::{get_client_options, log_uncaptured, util::TestClient, EventClient},
     Collection,
     IndexModel,
 };
@@ -238,7 +236,6 @@ async fn aggregate_out() {
         .any(|name| name.as_str() == out_coll.name()));
 }
 
-#[allow(deprecated)]
 fn kill_cursors_sent(client: &EventClient) -> bool {
     !client
         .events
@@ -259,8 +256,7 @@ async fn kill_cursors_on_drop() {
         .await
         .unwrap();
 
-    #[allow(deprecated)]
-    let event_client = EventClient::new().await;
+    let event_client = Client::test_builder().monitor_events().build().await;
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -292,8 +288,7 @@ async fn no_kill_cursors_on_exhausted() {
         .await
         .unwrap();
 
-    #[allow(deprecated)]
-    let event_client = EventClient::new().await;
+    let event_client = Client::test_builder().monitor_events().build().await;
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -521,8 +516,7 @@ async fn find_allow_disk_use_not_specified() {
 
 #[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
-    #[allow(deprecated)]
-    let event_client = EventClient::new().await;
+    let event_client = Client::test_builder().monitor_events().build().await;
     if event_client.server_version_lt(4, 3) {
         log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
         return;
@@ -550,8 +544,7 @@ async fn ns_not_found_suppression() {
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll = client.database(name).collection::<Document>(name);
     let _: Result<DeleteResult> = coll
         .delete_many(doc! {})
@@ -595,8 +588,7 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     let req = VersionReq::parse(">= 4.2").unwrap();
     if options.is_some() && !req.matches(&client.server_version) {
@@ -650,8 +642,7 @@ async fn find_one_and_delete_hint_not_specified() {
 #[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_server_version() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll = client
         .database(function_name!())
         .collection::<Document>("coll");
@@ -677,8 +668,7 @@ async fn find_one_and_delete_hint_server_version() {
 #[tokio::test]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if !client.is_standalone() {
         log_uncaptured("skipping no_read_preference_to_standalone due to test topology");
@@ -901,8 +891,7 @@ async fn count_documents_with_wc() {
 #[tokio::test]
 #[function_name::named]
 async fn collection_options_inherited() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     let read_concern = ReadConcern::majority();
     let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Secondary {
@@ -927,7 +916,6 @@ async fn collection_options_inherited() {
     assert_options_inherited(&client, "aggregate").await;
 }
 
-#[allow(deprecated)]
 async fn assert_options_inherited(client: &EventClient, command_name: &str) {
     let events = client.events.get_command_started_events(&[command_name]);
     let event = events.iter().last().unwrap();

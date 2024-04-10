@@ -389,7 +389,7 @@ async fn session_usage() {
         F: Fn(EventClient) -> G,
         G: Future<Output = ()>,
     {
-        let client = EventClient::new().await;
+        let client = Client::test_builder().monitor_events().build().await;
         operation(client.clone()).await;
         let mut events = client.events.clone();
         #[allow(deprecated)]
@@ -408,8 +408,7 @@ async fn session_usage() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     if client.is_standalone() {
         return;
     }
@@ -453,8 +452,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     if client.is_standalone() {
         return;
     }
@@ -508,8 +506,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     if client.is_standalone() {
         log_uncaptured(
             "skipping find_and_getmore_share_session due to unsupported topology: Standalone",

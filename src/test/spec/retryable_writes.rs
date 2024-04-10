@@ -9,8 +9,6 @@ use tokio::sync::Mutex;
 
 use test_file::{TestFile, TestResult};
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
@@ -182,8 +180,7 @@ async fn run_legacy() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
         log_uncaptured("skipping transaction_ids_excluded due to test topology");
@@ -231,8 +228,7 @@ async fn transaction_ids_excluded() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
         log_uncaptured("skipping transaction_ids_included due to test topology");

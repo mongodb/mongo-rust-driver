@@ -51,11 +51,10 @@ use crate::{
     Namespace,
 };
 
-#[allow(deprecated)]
-use super::EventClient;
 use super::{
     get_client_options,
     log_uncaptured,
+    EventClient,
     FailCommandOptions,
     FailPoint,
     FailPointMode,
@@ -64,9 +63,8 @@ use super::{
 
 type Result<T> = anyhow::Result<T>;
 
-#[allow(deprecated)]
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let datakeys = client
         .database("keyvault")
         .collection_with_options::<Document>(

@@ -1,12 +1,10 @@
 use std::time::Duration;
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
     options::{Acknowledgment, ReadConcern, WriteConcern},
-    test::TestClient,
+    test::{EventClient, TestClient},
     Client,
     Collection,
 };
@@ -133,8 +131,7 @@ async fn unacknowledged_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     // snapshot read concern was introduced in 4.0
     if client.server_version_lt(4, 0) {
         return;
@@ -190,8 +187,7 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -232,8 +228,7 @@ async fn command_contains_write_concern_insert_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -274,8 +269,7 @@ async fn command_contains_write_concern_insert_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -317,8 +311,7 @@ async fn command_contains_write_concern_update_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -362,8 +355,7 @@ async fn command_contains_write_concern_update_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_replace_one() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -405,8 +397,7 @@ async fn command_contains_write_concern_replace_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_one() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -450,8 +441,7 @@ async fn command_contains_write_concern_delete_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_many() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -498,8 +488,7 @@ async fn command_contains_write_concern_delete_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -543,8 +532,7 @@ async fn command_contains_write_concern_find_one_and_delete() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -588,8 +576,7 @@ async fn command_contains_write_concern_find_one_and_replace() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -633,8 +620,7 @@ async fn command_contains_write_concern_find_one_and_update() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_aggregate() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -731,8 +717,7 @@ async fn command_contains_write_concern_drop() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_create_collection() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let db = client.database("test");
     let coll: Collection<Document> = db.collection(function_name!());
 
@@ -772,7 +757,6 @@ async fn command_contains_write_concern_create_collection() {
     );
 }
 
-#[allow(deprecated)]
 fn command_write_concerns(client: &EventClient, key: &str) -> Vec<Document> {
     client
         .events

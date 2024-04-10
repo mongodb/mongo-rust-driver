@@ -167,11 +167,6 @@ impl EventClientBuilder {
 }
 
 impl EventClient {
-    #[deprecated = "use TestClientBuilder::monitor_events"]
-    pub(crate) async fn new() -> Self {
-        Client::test_builder().monitor_events().build().await
-    }
-
     #[allow(dead_code)]
     pub(crate) fn into_client(self) -> crate::Client {
         self.client.into_client()
