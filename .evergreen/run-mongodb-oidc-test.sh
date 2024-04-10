@@ -30,7 +30,7 @@ export TEST_AUTH_OIDC=1
 export COVERAGE=1
 export AUTH="auth"
 
-cargo nextest run test::spec::oidc
-#cargo_test test::spec::oidc prose.xml
-#junit-report-merger results.xml prose.xml
-#exit ${CARGO_RESULT}
+cargo nextest run test::spec::oidc --profile ci
+RESULT=$?
+cp target/nextest/ci/junit.xml results.xml
+exit $RESULT
