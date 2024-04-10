@@ -5,8 +5,6 @@ use serde::Deserialize;
 
 use super::TestSdamEvent;
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
@@ -593,14 +591,13 @@ async fn load_balanced() {
 #[function_name::named]
 async fn topology_closed_event_last() {
     let event_buffer = EventBuffer::new();
-    #[allow(deprecated)]
-    let client = EventClient::with_additional_options(
-        None,
-        Some(Duration::from_millis(50)),
-        None,
-        event_buffer.clone(),
-    )
-    .await;
+    let client = Client::test_builder()
+        .additional_options(None, false)
+        .await
+        .min_heartbeat_freq(Duration::from_millis(50))
+        .event_buffer(event_buffer.clone())
+        .build()
+        .await;
     #[allow(deprecated)]
     let mut subscriber = event_buffer.subscribe_all();
 
@@ -640,14 +637,13 @@ async fn heartbeat_events() {
     options.app_name = "heartbeat_events".to_string().into();
 
     let event_buffer = EventBuffer::new();
-    #[allow(deprecated)]
-    let client = EventClient::with_additional_options(
-        Some(options.clone()),
-        Some(Duration::from_millis(50)),
-        None,
-        event_buffer.clone(),
-    )
-    .await;
+    let client = Client::test_builder()
+        .additional_options(options.clone(), false)
+        .await
+        .min_heartbeat_freq(Duration::from_millis(50))
+        .event_buffer(event_buffer.clone())
+        .build()
+        .await;
 
     #[allow(deprecated)]
     let mut subscriber = event_buffer.subscribe_all();

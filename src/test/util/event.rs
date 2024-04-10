@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use derive_more::From;
 use serde::Serialize;
 
@@ -171,23 +169,6 @@ impl EventClient {
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
         Client::test_builder()
             .options(options)
-            .event_buffer(None)
-            .event_client()
-            .build()
-            .await
-    }
-
-    pub(crate) async fn with_additional_options(
-        options: impl Into<Option<ClientOptions>>,
-        min_heartbeat_freq: Option<Duration>,
-        use_multiple_mongoses: Option<bool>,
-        event_handler: impl Into<Option<EventBuffer>>,
-    ) -> Self {
-        Client::test_builder()
-            .additional_options(options, use_multiple_mongoses.unwrap_or(false))
-            .await
-            .min_heartbeat_freq(min_heartbeat_freq)
-            .event_buffer(event_handler)
             .event_client()
             .build()
             .await

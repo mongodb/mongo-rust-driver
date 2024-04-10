@@ -56,14 +56,12 @@ async fn run_legacy() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
 
-            #[allow(deprecated)]
-            let client = EventClient::with_additional_options(
-                options,
-                Some(Duration::from_millis(50)),
-                test_case.use_multiple_mongoses,
-                None,
-            )
-            .await;
+            let client = Client::test_builder()
+                .additional_options(options, test_case.use_multiple_mongoses.unwrap_or(false))
+                .await
+                .min_heartbeat_freq(Duration::from_millis(50))
+                .build()
+                .await;
 
             if let Some(ref run_on) = test_file.run_on {
                 let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));

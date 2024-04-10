@@ -117,6 +117,7 @@ impl TestClientBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) fn retain_startup_events(mut self, value: bool) -> Self {
         assert!(self.buffer.is_some());
         self.retain_startup_events = value;
