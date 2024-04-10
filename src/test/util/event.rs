@@ -9,7 +9,6 @@ use crate::{
         command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
-    options::ClientOptions,
     Client,
 };
 
@@ -163,15 +162,7 @@ impl EventClientBuilder {
 #[allow(deprecated)]
 impl EventClient {
     pub(crate) async fn new() -> Self {
-        EventClient::with_options(None).await
-    }
-
-    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Client::test_builder()
-            .options(options)
-            .event_client()
-            .build()
-            .await
+        Client::test_builder().event_client().build().await
     }
 
     #[allow(dead_code)]

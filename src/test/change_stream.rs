@@ -17,19 +17,17 @@ use crate::{
     Collection,
 };
 
-#[allow(deprecated)]
-use super::EventClient;
-use super::{get_client_options, log_uncaptured, TestClient};
+use super::{get_client_options, log_uncaptured, util::event_buffer::EventBuffer, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-#[allow(deprecated)]
 async fn init_stream(
     coll_name: &str,
     direct_connection: bool,
 ) -> Result<
     Option<(
-        EventClient,
+        TestClient,
+        EventBuffer,
         Collection<Document>,
         ChangeStream<ChangeStreamEvent<Document>>,
     )>,
@@ -50,7 +48,12 @@ async fn init_stream(
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
-    let client = EventClient::with_options(options).await;
+    let events = EventBuffer::new();
+    let client = Client::test_builder()
+        .options(options)
+        .event_buffer(events.clone())
+        .build()
+        .await;
     let db = client.database("change_stream_tests");
     let coll = db.collection_with_options::<Document>(
         coll_name,
@@ -60,13 +63,13 @@ async fn init_stream(
     );
     coll.drop().await?;
     let stream = coll.watch().await?;
-    Ok(Some((client, coll, stream)))
+    Ok(Some((client, events, coll, stream)))
 }
 
 /// Prose test 1: ChangeStream must continuously track the last seen resumeToken
 #[tokio::test]
 async fn tracks_resume_token() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("track_resume_token", false).await? {
+    let (_, events, coll, mut stream) = match init_stream("track_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -83,7 +86,7 @@ async fn tracks_resume_token() -> Result<()> {
 
     #[allow(deprecated)]
     let events: Vec<_> = {
-        let mut events = client.events.clone();
+        let mut events = events.clone();
         events
             .get_command_events(&["aggregate", "getMore"])
             .into_iter()
@@ -139,7 +142,7 @@ fn expected_tokens(events: &[CommandSucceededEvent]) -> Result<Vec<Bson>> {
 /// token
 #[tokio::test]
 async fn errors_on_missing_token() -> Result<()> {
-    let (_, coll, _) = match init_stream("errors_on_missing_token", false).await? {
+    let (_, _, coll, _) = match init_stream("errors_on_missing_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -157,7 +160,7 @@ async fn errors_on_missing_token() -> Result<()> {
 /// a resumable error
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resumes_on_error() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("resumes_on_error", true).await? {
+    let (client, events, coll, mut stream) = match init_stream("resumes_on_error", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -189,8 +192,7 @@ async fn resumes_on_error() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    #[allow(deprecated)]
-    let events = client.events.get_command_started_events(&["aggregate"]);
+    let events = events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
     Ok(())
@@ -200,7 +202,7 @@ async fn resumes_on_error() -> Result<()> {
 /// an aggregate command
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn does_not_resume_aggregate() -> Result<()> {
-    let (client, coll, _) = match init_stream("does_not_resume_aggregate", true).await? {
+    let (client, _, coll, _) = match init_stream("does_not_resume_aggregate", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -228,7 +230,7 @@ async fn does_not_resume_aggregate() -> Result<()> {
 /// batch is not closed on the driver side
 #[tokio::test]
 async fn empty_batch_not_closed() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("empty_batch_not_closed", false).await? {
+    let (_, events, coll, mut stream) = match init_stream("empty_batch_not_closed", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -240,7 +242,7 @@ async fn empty_batch_not_closed() -> Result<()> {
 
     #[allow(deprecated)]
     let events = {
-        let mut events = client.events.clone();
+        let mut events = events.clone();
         events.get_command_events(&["aggregate", "getMore"])
     };
     let cursor_id = match &events[1] {
@@ -262,7 +264,7 @@ async fn empty_batch_not_closed() -> Result<()> {
 /// throw an exception
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_kill_cursor_error_suppressed() -> Result<()> {
-    let (client, coll, mut stream) =
+    let (client, events, coll, mut stream) =
         match init_stream("resume_kill_cursor_error_suppressed", true).await? {
             Some(t) => t,
             None => return Ok(()),
@@ -295,8 +297,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    #[allow(deprecated)]
-    let events = client.events.get_command_started_events(&["aggregate"]);
+    let events = events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
     Ok(())
@@ -307,7 +308,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 /// stream.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_start_at_operation_time() -> Result<()> {
-    let (client, coll, mut stream) =
+    let (client, events, coll, mut stream) =
         match init_stream("resume_start_at_operation_time", true).await? {
             Some(t) => t,
             None => return Ok(()),
@@ -336,7 +337,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
 
     #[allow(deprecated)]
     let events = {
-        let mut events = client.events.clone();
+        let mut events = events.clone();
         events.get_command_events(&["aggregate"])
     };
     assert_eq!(events.len(), 4);
@@ -364,7 +365,8 @@ async fn resume_start_at_operation_time() -> Result<()> {
 /// the postBatchResumeToken from the current command response
 #[tokio::test]
 async fn batch_end_resume_token() -> Result<()> {
-    let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
+    let (client, events, _, mut stream) = match init_stream("batch_end_resume_token", false).await?
+    {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -383,7 +385,7 @@ async fn batch_end_resume_token() -> Result<()> {
     let token = stream.resume_token().unwrap().parsed()?;
     #[allow(deprecated)]
     let commands = {
-        let mut events = client.events.clone();
+        let mut events = events.clone();
         events.get_command_events(&["aggregate", "getMore"])
     };
     assert!(matches!(commands.last(), Some(
@@ -399,7 +401,7 @@ async fn batch_end_resume_token() -> Result<()> {
 /// Prose test 12: Running against a server <4.0.7, end of batch resume token must follow the spec
 #[tokio::test]
 async fn batch_end_resume_token_legacy() -> Result<()> {
-    let (client, coll, mut stream) =
+    let (client, _, coll, mut stream) =
         match init_stream("batch_end_resume_token_legacy", false).await? {
             Some(t) => t,
             None => return Ok(()),
@@ -436,7 +438,7 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
 /// Prose test 13: Mid-batch resume token must be `_id` of last document returned.
 #[tokio::test]
 async fn batch_mid_resume_token() -> Result<()> {
-    let (_, coll, mut stream) = match init_stream("batch_mid_resume_token", false).await? {
+    let (_, _, coll, mut stream) = match init_stream("batch_mid_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -471,7 +473,7 @@ async fn batch_mid_resume_token() -> Result<()> {
 /// spec.
 #[tokio::test]
 async fn aggregate_batch() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
+    let (client, _, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -516,10 +518,11 @@ async fn aggregate_batch() -> Result<()> {
 /// Prose test 17: Resuming a change stream with no results uses `startAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_start_after() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
-        Some(t) => t,
-        None => return Ok(()),
-    };
+    let (client, events, coll, mut stream) =
+        match init_stream("resume_uses_start_after", true).await? {
+            Some(t) => t,
+            None => return Ok(()),
+        };
     if !VersionReq::parse(">=4.1.1")
         .unwrap()
         .matches(&client.server_version)
@@ -548,8 +551,7 @@ async fn resume_uses_start_after() -> Result<()> {
     .await?;
     stream.next().await.transpose()?;
 
-    #[allow(deprecated)]
-    let commands = client.events.get_command_started_events(&["aggregate"]);
+    let commands = events.get_command_started_events(&["aggregate"]);
     fn has_start_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -573,10 +575,11 @@ async fn resume_uses_start_after() -> Result<()> {
 /// Prose test 18: Resuming a change stream after results uses `resumeAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_resume_after() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
-        Some(t) => t,
-        None => return Ok(()),
-    };
+    let (client, events, coll, mut stream) =
+        match init_stream("resume_uses_resume_after", true).await? {
+            Some(t) => t,
+            None => return Ok(()),
+        };
     if !VersionReq::parse(">=4.1.1")
         .unwrap()
         .matches(&client.server_version)
@@ -609,8 +612,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     .await?;
     stream.next().await.transpose()?;
 
-    #[allow(deprecated)]
-    let commands = client.events.get_command_started_events(&["aggregate"]);
+    let commands = events.get_command_started_events(&["aggregate"]);
     fn has_resume_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()

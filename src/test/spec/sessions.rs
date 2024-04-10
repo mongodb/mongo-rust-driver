@@ -7,8 +7,6 @@ use std::{
 use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     client::options::ClientOptions,
@@ -19,7 +17,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        util::Event,
+        util::{event_buffer::EventBuffer, Event},
         TestClient,
     },
     Client,
@@ -205,8 +203,7 @@ async fn implicit_session_after_connection() {
     );
 }
 
-#[allow(deprecated)]
-async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
+async fn spawn_mongocryptd(name: &str) -> Option<(TestClient, EventBuffer, Process)> {
     let util_client = TestClient::new().await;
     if util_client.server_version_lt(4, 2) {
         log_uncaptured(format!(
@@ -228,11 +225,15 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let options = ClientOptions::parse("mongodb://localhost:47017")
         .await
         .unwrap();
-    #[allow(deprecated)]
-    let client = EventClient::with_options(options).await;
+    let events = EventBuffer::new();
+    let client = Client::test_builder()
+        .options(options)
+        .event_buffer(events.clone())
+        .build()
+        .await;
     assert!(client.server_info.logical_session_timeout_minutes.is_none());
 
-    Some((client, process))
+    Some((client, events, process))
 }
 
 async fn clean_up_mongocryptd(mut process: Process, name: &str) {
@@ -246,12 +247,12 @@ async fn clean_up_mongocryptd(mut process: Process, name: &str) {
 async fn sessions_not_supported_implicit_session_ignored() {
     let name = "sessions_not_supported_implicit_session_ignored";
 
-    let Some((client, process)) = spawn_mongocryptd(name).await else {
+    let Some((client, events, process)) = spawn_mongocryptd(name).await else {
         return;
     };
 
     #[allow(deprecated)]
-    let mut subscriber = client.events.subscribe();
+    let mut subscriber = events.subscribe();
     let coll = client.database(name).collection(name);
 
     let _ = coll.find(doc! {}).await;
@@ -290,7 +291,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
 async fn sessions_not_supported_explicit_session_error() {
     let name = "sessions_not_supported_explicit_session_error";
 
-    let Some((client, process)) = spawn_mongocryptd(name).await else {
+    let Some((client, _, process)) = spawn_mongocryptd(name).await else {
         return;
     };
 
