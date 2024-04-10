@@ -371,13 +371,11 @@ impl CollectionOrDatabaseOptions {
         }
     }
 
-    #[allow(deprecated)]
     pub(crate) fn as_collection_options(&self) -> CollectionOptions {
         CollectionOptions {
             read_concern: self.read_concern.clone(),
             selection_criteria: self.selection_criteria.clone(),
             write_concern: self.write_concern.clone(),
-            human_readable_serialization: None,
         }
     }
 }
@@ -661,7 +659,7 @@ async fn merged_uri_options() {
         "readconcernlevel": "local",
     };
     let uri = merge_uri_options(&DEFAULT_URI, Some(&options), true);
-    let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
+    let options = ClientOptions::parse(&uri).await.unwrap();
 
     assert!(options.tls_options().is_some());
 
@@ -688,7 +686,10 @@ fn deserialize_selection_criteria() {
                 options: Some(options),
             } => {
                 assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
-                assert_eq!(options.hedge, Some(HedgedReadOptions::with_enabled(true)));
+                assert_eq!(
+                    options.hedge,
+                    Some(HedgedReadOptions::builder().enabled(true).build())
+                );
             }
             other => panic!(
                 "Expected mode SecondaryPreferred with options, got {:?}",

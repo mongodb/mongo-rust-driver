@@ -27,15 +27,7 @@ pub(crate) struct Find {
 }
 
 impl Find {
-    pub(crate) fn new(ns: Namespace, filter: Document, mut options: Option<FindOptions>) -> Self {
-        if let Some(ref mut options) = options {
-            if let Some(ref comment) = options.comment {
-                if options.comment_bson.is_none() {
-                    options.comment_bson = Some(comment.clone().into());
-                }
-            }
-        }
-
+    pub(crate) fn new(ns: Namespace, filter: Document, options: Option<FindOptions>) -> Self {
         Self {
             ns,
             filter,
@@ -116,9 +108,7 @@ impl OperationWithDefaults for Find {
             let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
                 None
             } else {
-                self.options
-                    .as_ref()
-                    .and_then(|opts| opts.comment_bson.clone())
+                self.options.as_ref().and_then(|opts| opts.comment.clone())
             };
 
             Ok(CursorSpecification::new(

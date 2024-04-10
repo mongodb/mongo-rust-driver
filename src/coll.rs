@@ -101,7 +101,6 @@ struct CollectionInner {
     selection_criteria: Option<SelectionCriteria>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
-    human_readable_serialization: bool,
 }
 
 impl<T> Collection<T>
@@ -119,8 +118,6 @@ where
         let write_concern = options
             .write_concern
             .or_else(|| db.write_concern().cloned());
-        #[allow(deprecated)]
-        let human_readable_serialization = options.human_readable_serialization.unwrap_or_default();
 
         Self {
             inner: Arc::new(CollectionInner {
@@ -130,7 +127,6 @@ where
                 selection_criteria,
                 read_concern,
                 write_concern,
-                human_readable_serialization,
             }),
             _phantom: Default::default(),
         }
@@ -212,10 +208,6 @@ where
         )?;
         self.client().execute_operation(op, None).await?;
         Ok(())
-    }
-
-    pub(crate) fn human_readable_serialization(&self) -> bool {
-        self.inner.human_readable_serialization
     }
 }
 

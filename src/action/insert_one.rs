@@ -9,7 +9,6 @@ use crate::{
     operation::Insert as Op,
     options::WriteConcern,
     results::InsertOneResult,
-    serde_util,
     ClientSession,
     Collection,
 };
@@ -32,10 +31,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
-            doc: serde_util::to_raw_document_buf_with_options(
-                doc.borrow(),
-                self.human_readable_serialization(),
-            ),
+            doc: bson::to_raw_document_buf(doc.borrow()).map_err(Into::into),
             options: None,
             session: None,
         }

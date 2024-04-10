@@ -10,6 +10,7 @@ mod crud_v1;
 mod faas;
 mod gridfs;
 mod index_management;
+#[cfg(feature = "dns-resolver")]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 mod ocsp;

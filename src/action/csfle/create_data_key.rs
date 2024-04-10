@@ -43,18 +43,9 @@ pub struct DataKeyOptions {
 }
 
 impl<'a> CreateDataKey<'a> {
-    option_setters! { options: DataKeyOptions; }
-
-    /// Set the [`DataKeyOptions::key_alt_names`] option.
-    pub fn key_alt_names(mut self, value: impl IntoIterator<Item = String>) -> Self {
-        self.options().key_alt_names = Some(value.into_iter().collect());
-        self
-    }
-
-    /// Set the [`DataKeyOptions::key_material`] option.
-    pub fn key_material(mut self, value: impl IntoIterator<Item = u8>) -> Self {
-        self.options().key_material = Some(value.into_iter().collect());
-        self
+    option_setters! { options: DataKeyOptions;
+        key_alt_names: Vec<String>,
+        key_material: Vec<u8>,
     }
 
     #[cfg(test)]

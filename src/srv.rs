@@ -1,17 +1,8 @@
 use std::time::Duration;
 
-use trust_dns_proto::rr::RData;
-use trust_dns_resolver::config::ResolverConfig;
-
-use crate::{
-    error::{ErrorKind, Result},
-    options::ServerAddress,
-    runtime::AsyncResolver,
-};
-
-pub(crate) struct SrvResolver {
-    resolver: AsyncResolver,
-}
+#[cfg(feature = "dns-resolver")]
+use crate::error::ErrorKind;
+use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
 
 #[derive(Debug)]
 pub(crate) struct ResolvedConfig {
@@ -35,13 +26,20 @@ pub(crate) struct OriginalSrvInfo {
 }
 
 pub(crate) enum DomainMismatch {
+    #[allow(dead_code)]
     Error,
     Skip,
 }
 
+#[cfg(feature = "dns-resolver")]
+pub(crate) struct SrvResolver {
+    resolver: crate::runtime::AsyncResolver,
+}
+
+#[cfg(feature = "dns-resolver")]
 impl SrvResolver {
     pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
-        let resolver = AsyncResolver::new(config).await?;
+        let resolver = crate::runtime::AsyncResolver::new(config.map(|c| c.inner)).await?;
 
         Ok(Self { resolver })
     }
@@ -69,6 +67,8 @@ impl SrvResolver {
         original_hostname: &str,
         dm: DomainMismatch,
     ) -> Result<LookupHosts> {
+        use trust_dns_proto::rr::RData;
+
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -245,5 +245,37 @@ impl SrvResolver {
         }
 
         Ok(())
+    }
+}
+
+/// Stub implementation when dns resolution isn't enabled.
+#[cfg(not(feature = "dns-resolver"))]
+pub(crate) struct SrvResolver {}
+
+#[cfg(not(feature = "dns-resolver"))]
+impl SrvResolver {
+    pub(crate) async fn new(_config: Option<ResolverConfig>) -> Result<Self> {
+        Ok(Self {})
+    }
+
+    pub(crate) async fn resolve_client_options(
+        &mut self,
+        _hostname: &str,
+    ) -> Result<ResolvedConfig> {
+        Err(crate::error::Error::invalid_argument(
+            "mongodb+srv connection strings cannot be used when the 'dns-resolver' feature is \
+             disabled",
+        ))
+    }
+
+    pub(crate) async fn get_srv_hosts(
+        &self,
+        _original_hostname: &str,
+        _dm: DomainMismatch,
+    ) -> Result<LookupHosts> {
+        return Err(crate::error::Error::invalid_argument(
+            "mongodb+srv connection strings cannot be used when the 'dns-resolver' feature is \
+             disabled",
+        ));
     }
 }

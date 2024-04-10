@@ -160,9 +160,10 @@ pub struct CallbackContext {
 }
 
 #[derive(TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerResponse {
+    #[builder(!default)]
     pub access_token: String,
     pub expires: Option<Instant>,
     pub refresh_token: Option<String>,

@@ -178,6 +178,7 @@ impl Default for ClusteredIndex {
 
 /// Specifies default configuration for indexes created on a collection, including the _id index.
 #[derive(Clone, Debug, TypedBuilder, PartialEq, Serialize, Deserialize)]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IndexOptionDefaults {
@@ -191,7 +192,7 @@ pub struct IndexOptionDefaults {
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TimeseriesOptions {
     /// Name of the top-level field to be used for time. Inserted documents must have this field,

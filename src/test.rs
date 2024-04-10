@@ -1,6 +1,7 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_possible_wrap)]
 
+#[cfg(feature = "dns-resolver")]
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
 #[cfg(feature = "aws-auth")]
@@ -65,7 +66,7 @@ static CLIENT_OPTIONS: OnceCell<ClientOptions> = OnceCell::const_new();
 pub(crate) async fn get_client_options() -> &'static ClientOptions {
     CLIENT_OPTIONS
         .get_or_init(|| async {
-            let mut options = ClientOptions::parse_uri(&*DEFAULT_URI, None).await.unwrap();
+            let mut options = ClientOptions::parse(&*DEFAULT_URI).await.unwrap();
             update_options_for_testing(&mut options);
             options
         })

@@ -3,11 +3,10 @@ use std::{
     time::Duration,
 };
 
-use bson::SerializerOptions;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    bson::{doc, Bson, Document, RawDocumentBuf},
+    bson::{doc, Bson, Document},
     bson_util::get_u64,
     error::{Error, Result},
     options::WriteConcern,
@@ -163,22 +162,6 @@ where
     };
 
     Ok(Some(date_time))
-}
-
-pub(crate) fn to_raw_document_buf_with_options<T: Serialize>(
-    doc: &T,
-    human_readable_serialization: bool,
-) -> Result<RawDocumentBuf> {
-    let raw_doc = if human_readable_serialization {
-        let doc = bson::to_document_with_options(
-            doc,
-            SerializerOptions::builder().human_readable(true).build(),
-        )?;
-        RawDocumentBuf::from_document(&doc)?
-    } else {
-        bson::to_raw_document_buf(doc)?
-    };
-    Ok(raw_doc)
 }
 
 pub(crate) fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {

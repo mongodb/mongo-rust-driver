@@ -20,7 +20,7 @@ async fn get_mongodb_client() -> &'static Client {
         .get_or_init(|| async {
             let uri = std::env::var("MONGODB_URI")
                 .expect("MONGODB_URI must be set to the URI of the MongoDB deployment");
-            let mut options = ClientOptions::parse(uri)
+            let mut options = ClientOptions::parse(&uri)
                 .await
                 .expect("Failed to parse options from URI");
             let credential = Credential::builder()

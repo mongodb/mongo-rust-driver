@@ -13,40 +13,22 @@ use crate::{
     serde_util::{self, write_concern_is_empty},
 };
 
-// Generated code for `Deserialize` or `TypedBuilder` causes a deprecation warning; annotating the
-// field or struct doesn't fix it because that annotation isn't propagated by the code generator.
-// This works around that by defining it in a non-pub module and immediately re-exporting that
-// module's contents.
-#[allow(deprecated)]
-mod suppress_warning {
-    use super::*;
+/// These are the valid options for creating a [`Collection`](crate::Collection) with
+/// [`Database::collection_with_options`](crate::Database::collection_with_options).
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CollectionOptions {
+    /// The default read preference for operations.
+    pub selection_criteria: Option<SelectionCriteria>,
 
-    /// These are the valid options for creating a [`Collection`](crate::Collection) with
-    /// [`Database::collection_with_options`](crate::Database::collection_with_options).
-    #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-    #[builder(field_defaults(default, setter(into)))]
-    #[serde(rename_all = "camelCase")]
-    #[non_exhaustive]
-    pub struct CollectionOptions {
-        /// The default read preference for operations.
-        pub selection_criteria: Option<SelectionCriteria>,
+    /// The default read concern for operations.
+    pub read_concern: Option<ReadConcern>,
 
-        /// The default read concern for operations.
-        pub read_concern: Option<ReadConcern>,
-
-        /// The default write concern for operations.
-        pub write_concern: Option<WriteConcern>,
-
-        /// Sets the [`bson::SerializerOptions::human_readable`] option for the [`Bson`]
-        /// serializer. The default value is `false`.
-        /// Note: Specifying `true` for this value will decrease the performance of insert
-        /// operations.
-        #[deprecated = "This is a workaround for a potential bug related to RUST-1687, and should \
-                        not be used in new code."]
-        pub human_readable_serialization: Option<bool>,
-    }
+    /// The default write concern for operations.
+    pub write_concern: Option<WriteConcern>,
 }
-pub use suppress_warning::*;
 
 /// Specifies whether a
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace) and
@@ -562,8 +544,7 @@ pub struct AggregateOptions {
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. Use the `comment` option on
-    /// older server versions.
+    /// For server versions less than 4.4, only a string value may be provided.
     pub comment: Option<Bson>,
 
     /// The index to use for the operation.
@@ -785,22 +766,11 @@ pub struct FindOptions {
     #[serde(serialize_with = "serde_util::serialize_u32_option_as_i32")]
     pub batch_size: Option<u32>,
 
-    /// Tags the query with an arbitrary string to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
-    // TODO RUST-1364: Update this field to be of type Option<Bson>
-    #[serde(skip_serializing)]
-    pub comment: Option<String>,
-
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. Use the `comment` option on
-    /// older server versions.
-    // TODO RUST-1364: Remove this field
-    #[serde(rename(serialize = "comment"))]
-    pub comment_bson: Option<Bson>,
+    /// For server versions less than 4.4, only a string value may be provided.
+    pub comment: Option<Bson>,
 
     /// The type of cursor to return.
     #[serde(skip)]
@@ -896,7 +866,6 @@ impl From<FindOneOptions> for FindOptions {
             allow_partial_results: options.allow_partial_results,
             collation: options.collation,
             comment: options.comment,
-            comment_bson: options.comment_bson,
             hint: options.hint,
             max: options.max,
             max_scan: options.max_scan,
@@ -950,20 +919,11 @@ pub struct FindOneOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
-    /// Tags the query with an arbitrary string value to help trace the operation through the
-    /// database profiler, currentOp and logs.
-    ///
-    /// If both this option and `comment_bson` are specified, `comment_bson` will take precedence.
-    // TODO RUST-1364: Update this field to be of type Option<Bson>
-    pub comment: Option<String>,
-
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. Use the `comment` option on
-    /// older server versions.
-    // TODO RUST-1364: Remove this field
-    pub comment_bson: Option<Bson>,
+    /// For server versions less than 4.4, only a string value may be provided.
+    pub comment: Option<Bson>,
 
     /// The index to use for the operation.
     pub hint: Option<Hint>,

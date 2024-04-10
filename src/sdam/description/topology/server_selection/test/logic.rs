@@ -130,7 +130,7 @@ async fn run_test(test_file: TestFile) {
         }
 
         let uri_str = format!("mongodb://localhost:27017/?{}", uri_options.join("&"));
-        ClientOptions::parse(uri_str)
+        ClientOptions::parse(&uri_str)
             .await
             .err()
             .unwrap_or_else(|| {

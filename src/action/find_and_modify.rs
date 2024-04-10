@@ -20,7 +20,6 @@ use crate::{
         UpdateOrReplace,
     },
     options::WriteConcern,
-    serde_util,
     ClientSession,
     Collection,
 };
@@ -105,10 +104,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> Collection<T> {
         FindOneAndReplace {
             coll: self,
             filter,
-            replacement: serde_util::to_raw_document_buf_with_options(
-                replacement.borrow(),
-                self.human_readable_serialization(),
-            ),
+            replacement: bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
             options: None,
             session: None,
         }

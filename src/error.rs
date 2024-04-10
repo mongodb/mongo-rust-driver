@@ -277,6 +277,7 @@ impl Error {
         self.labels.insert(label);
     }
 
+    #[cfg(feature = "dns-resolver")]
     pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),
@@ -578,6 +579,12 @@ impl From<std::io::ErrorKind> for ErrorKind {
 impl From<mongocrypt::error::Error> for ErrorKind {
     fn from(err: mongocrypt::error::Error) -> Self {
         Self::Encryption(err)
+    }
+}
+
+impl From<std::convert::Infallible> for ErrorKind {
+    fn from(_err: std::convert::Infallible) -> Self {
+        unreachable!()
     }
 }
 

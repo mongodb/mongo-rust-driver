@@ -2,10 +2,10 @@
 mod test;
 
 mod bulk_write;
+mod parse;
 mod resolver_config;
 
 use std::{
-    borrow::Cow,
     cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
@@ -46,7 +46,10 @@ use crate::{
 };
 
 pub use bulk_write::*;
+#[cfg(feature = "dns-resolver")]
 pub use resolver_config::ResolverConfig;
+#[cfg(not(feature = "dns-resolver"))]
+pub(crate) use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
@@ -254,14 +257,16 @@ impl ServerAddress {
         })
     }
 
-    pub(crate) fn host(&self) -> Cow<'_, str> {
+    #[cfg(feature = "dns-resolver")]
+    pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
-            Self::Tcp { host, .. } => Cow::Borrowed(host.as_str()),
+            Self::Tcp { host, .. } => std::borrow::Cow::Borrowed(host.as_str()),
             #[cfg(unix)]
             Self::Unix { path } => path.to_string_lossy(),
         }
     }
 
+    #[cfg(feature = "dns-resolver")]
     pub(crate) fn port(&self) -> Option<u16> {
         match self {
             Self::Tcp { port, .. } => *port,
@@ -331,30 +336,29 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 /// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct ServerApi {
     /// The declared API version.
     #[serde(rename = "apiVersion")]
+    #[builder(!default)]
     pub version: ServerApiVersion,
 
     /// Whether the MongoDB server should reject all commands that are not part of the
     /// declared API version. This includes command options and aggregation pipeline stages.
-    #[builder(default)]
     #[serde(rename = "apiStrict")]
     pub strict: Option<bool>,
 
     /// Whether the MongoDB server should return command failures when functionality that is
     /// deprecated from the declared API version is used.
     /// Note that at the time of this writing, no deprecations in version 1 exist.
-    #[builder(default)]
     #[serde(rename = "apiDeprecationErrors")]
     pub deprecation_errors: Option<bool>,
 }
 
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[derivative(Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -374,7 +378,6 @@ pub struct ClientOptions {
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
     /// server.
-    #[builder(default)]
     pub app_name: Option<String>,
 
     /// The allowed compressors to use to compress messages sent to and decompress messages
@@ -386,13 +389,12 @@ pub struct ClientOptions {
         feature = "zlib-compression",
         feature = "snappy-compression"
     ))]
-    #[builder(default)]
     #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(setter(strip_option))]
     #[serde(skip)]
     pub cmap_event_handler: Option<EventHandler<crate::event::cmap::CmapEvent>>,
 
@@ -400,7 +402,7 @@ pub struct ClientOptions {
     ///
     /// Note that monitoring command events may incur a performance penalty.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(setter(strip_option))]
     #[serde(skip)]
     pub command_event_handler: Option<EventHandler<crate::event::command::CommandEvent>>,
 
@@ -408,33 +410,28 @@ pub struct ClientOptions {
     /// server.
     ///
     /// The default value is 10 seconds.
-    #[builder(default)]
     pub connect_timeout: Option<Duration>,
 
     /// The credential to use for authenticating connections made by this client.
-    #[builder(default)]
     pub credential: Option<Credential>,
 
     /// Specifies whether the Client should directly connect to a single host rather than
     /// autodiscover all servers in the cluster.
     ///
     /// The default value is false.
-    #[builder(default)]
     pub direct_connection: Option<bool>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the
     /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    #[builder(default)]
     pub driver_info: Option<DriverInfo>,
 
     /// The amount of time each monitoring thread should wait between performing server checks.
     ///
     /// The default value is 10 seconds.
-    #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(rename = "loadbalanced")]
     pub load_balanced: Option<bool>,
 
@@ -449,14 +446,12 @@ pub struct ClientOptions {
     /// lowest average round trip time is eligible.
     ///
     /// The default value is 15 ms.
-    #[builder(default)]
     pub local_threshold: Option<Duration>,
 
     /// The amount of time that a connection can remain idle in a connection pool before being
     /// closed. A value of zero indicates that connections should not be closed due to being idle.
     ///
     /// By default, connections will not be closed due to being idle.
-    #[builder(default)]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum amount of connections that the Client should allow to be created in a
@@ -465,7 +460,6 @@ pub struct ClientOptions {
     /// operation finishes and its connection is checked back into the pool.
     ///
     /// The default value is 10.
-    #[builder(default)]
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that should be available in a server's connection pool at
@@ -473,51 +467,43 @@ pub struct ClientOptions {
     /// be added to the pool in the background until `min_pool_size` is reached.
     ///
     /// The default value is 0.
-    #[builder(default)]
     pub min_pool_size: Option<u32>,
 
     /// The maximum number of new connections that can be created concurrently.
     ///
     /// If specified, this value must be greater than 0. The default is 2.
-    #[builder(default)]
     pub max_connecting: Option<u32>,
 
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
-    #[builder(default)]
     pub repl_set_name: Option<String>,
 
     /// Whether or not the client should retry a read operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default)]
     pub retry_reads: Option<bool>,
 
     /// Whether or not the client should retry a write operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default)]
     pub retry_writes: Option<bool>,
 
     /// Configures which server monitoring protocol to use.
     ///
     /// The default is [`Auto`](ServerMonitoringMode::Auto).
-    #[builder(default)]
     pub server_monitoring_mode: Option<ServerMonitoringMode>,
 
     /// The handler that should process all Server Discovery and Monitoring events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(setter(strip_option))]
     #[serde(skip)]
     pub sdam_event_handler: Option<EventHandler<crate::event::sdam::SdamEvent>>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
-    #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The declared API version for this client.
@@ -531,30 +517,26 @@ pub struct ClientOptions {
     ///
     /// For more information, see the [Stable API](
     /// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
-    #[builder(default)]
     pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
     ///
     /// The default value is 30 seconds.
-    #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
 
     /// Default database for this client.
     ///
     /// By default, no default database is specified.
-    #[builder(default)]
     pub default_database: Option<String>,
 
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) socket_timeout: Option<Duration>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
-    #[builder(default)]
     pub tls: Option<Tls>,
 
     /// The maximum number of bytes that the driver should include in a tracing event
@@ -567,26 +549,23 @@ pub struct ClientOptions {
     ///
     /// The default value is 1000.
     #[cfg(feature = "tracing-unstable")]
-    #[builder(default)]
     pub tracing_max_document_length_bytes: Option<usize>,
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// Limit on the number of mongos connections that may be created for sharded topologies.
-    #[builder(default)]
     pub srv_max_hosts: Option<u32>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
     #[cfg(test)]
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) original_uri: Option<String>,
 
@@ -595,14 +574,15 @@ pub struct ClientOptions {
     ///
     /// On Windows, there is a known performance issue in trust-dns with using the default system
     /// configuration, so a custom configuration is recommended.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
+    #[cfg(feature = "dns-resolver")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
     /// Control test behavior of the client.
     #[cfg(test)]
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     pub(crate) test_options: Option<TestOptions>,
@@ -933,8 +913,7 @@ impl HostInfo {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver =
-                    SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
+                let mut resolver = SrvResolver::new(resolver_config.clone()).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1058,18 +1037,17 @@ impl TlsOptions {
 /// Extra information to append to the driver version in the metadata of the handshake with the
 /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
 #[derive(Clone, Debug, Deserialize, TypedBuilder, PartialEq)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DriverInfo {
     /// The name of the library wrapping the driver.
+    #[builder(!default)]
     pub name: String,
 
     /// The version of the library wrapping the driver.
-    #[builder(default)]
     pub version: Option<String>,
 
     /// Optional platform information for the wrapping driver.
-    #[builder(default)]
     pub platform: Option<String>,
 }
 
@@ -1084,293 +1062,6 @@ impl ClientOptions {
                 min_ttl: Duration::from_secs(60),
             }),
             ..Default::default()
-        }
-    }
-
-    /// Parses a MongoDB connection string into a [`ClientOptions`] struct. If the string is
-    /// malformed or one of the options has an invalid value, an error will be returned.
-    ///
-    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
-    /// part of this method.
-    ///
-    /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
-    ///
-    /// Note that [default_database](ClientOptions::default_database) will be set from
-    /// `/defaultauthdb` in connection string.
-    ///
-    /// The following options are supported in the options query string:
-    ///
-    ///   * `appName`: maps to the `app_name` field
-    ///   * `authMechanism`: maps to the `mechanism` field of the `credential` field
-    ///   * `authSource`: maps to the `source` field of the `credential` field
-    ///   * `authMechanismProperties`: maps to the `mechanism_properties` field of the `credential`
-    ///     field
-    ///   * `compressors`: maps to the `compressors` field
-    ///   * `connectTimeoutMS`: maps to the `connect_timeout` field
-    ///   * `direct`: maps to the `direct` field
-    ///   * `heartbeatFrequencyMS`: maps to the `heartbeat_frequency` field
-    ///   * `journal`: maps to the `journal` field of the `write_concern` field
-    ///   * `localThresholdMS`: maps to the `local_threshold` field
-    ///   * `maxIdleTimeMS`: maps to the `max_idle_time` field
-    ///   * `maxStalenessSeconds`: maps to the `max_staleness` field of the `selection_criteria`
-    ///     field
-    ///   * `maxPoolSize`: maps to the `max_pool_size` field
-    ///   * `minPoolSize`: maps to the `min_pool_size` field
-    ///   * `readConcernLevel`: maps to the `read_concern` field
-    ///   * `readPreferenceField`: maps to the ReadPreference enum variant of the
-    ///     `selection_criteria` field
-    ///   * `readPreferenceTags`: maps to the `tags` field of the `selection_criteria` field. Note
-    ///     that this option can appear more than once; each instance will be mapped to a separate
-    ///     tag set
-    ///   * `replicaSet`: maps to the `repl_set_name` field
-    ///   * `retryWrites`: not yet implemented
-    ///   * `retryReads`: maps to the `retry_reads` field
-    ///   * `serverSelectionTimeoutMS`: maps to the `server_selection_timeout` field
-    ///   * `socketTimeoutMS`: unsupported, does not map to any field
-    ///   * `ssl`: an alias of the `tls` option
-    ///   * `tls`: maps to the TLS variant of the `tls` field`.
-    ///   * `tlsInsecure`: relaxes the TLS constraints on connections being made; currently is just
-    ///     an alias of `tlsAllowInvalidCertificates`, but more behavior may be added to this option
-    ///     in the future
-    ///   * `tlsAllowInvalidCertificates`: maps to the `allow_invalidCertificates` field of the
-    ///     `tls` field
-    ///   * `tlsCAFile`: maps to the `ca_file_path` field of the `tls` field
-    ///   * `tlsCertificateKeyFile`: maps to the `cert_key_file_path` field of the `tls` field
-    ///   * `w`: maps to the `w` field of the `write_concern` field
-    ///   * `waitQueueTimeoutMS`: unsupported, does not map to any field
-    ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
-    ///   * `zlibCompressionLevel`: maps to the `level` field of the `Compressor::Zlib` variant
-    ///     (which requires the `zlib-compression` feature flag) of the [`Compressor`] enum
-    pub async fn parse(s: impl AsRef<str>) -> Result<Self> {
-        Self::parse_uri(s, None).await
-    }
-
-    /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
-    /// [the async version](#method.parse)
-    #[cfg(feature = "sync")]
-    pub fn parse_sync(s: impl AsRef<str>) -> Result<Self> {
-        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
-    }
-
-    /// Parses a MongoDB connection string into a `ClientOptions` struct.
-    /// If the string is malformed or one of the options has an invalid value, an error will be
-    /// returned.
-    ///
-    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
-    /// provided `ResolverConfig` as part of this method.
-    ///
-    /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
-    ///
-    /// See the docstring on `ClientOptions::parse` for information on how the various URI options
-    /// map to fields on `ClientOptions`.
-    pub async fn parse_with_resolver_config(
-        uri: impl AsRef<str>,
-        resolver_config: ResolverConfig,
-    ) -> Result<Self> {
-        Self::parse_uri(uri, Some(resolver_config)).await
-    }
-
-    /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
-    /// [the async version](#method.parse_with_resolver_config)
-    #[cfg(feature = "sync")]
-    pub fn parse_sync_with_resolver_config(
-        uri: &str,
-        resolver_config: ResolverConfig,
-    ) -> Result<Self> {
-        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
-    }
-
-    /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
-    /// DNS lookups.
-    pub(crate) async fn parse_uri(
-        uri: impl AsRef<str>,
-        resolver_config: Option<ResolverConfig>,
-    ) -> Result<Self> {
-        Self::parse_connection_string_internal(ConnectionString::parse(uri)?, resolver_config).await
-    }
-
-    /// Creates a `ClientOptions` from the given `ConnectionString`.
-    ///
-    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
-    /// provided `ResolverConfig` as part of this method.
-    pub async fn parse_connection_string_with_resolver_config(
-        conn_str: ConnectionString,
-        resolver_config: ResolverConfig,
-    ) -> Result<Self> {
-        Self::parse_connection_string_internal(conn_str, Some(resolver_config)).await
-    }
-
-    /// Creates a `ClientOptions` from the given `ConnectionString`.
-    pub async fn parse_connection_string(conn_str: ConnectionString) -> Result<Self> {
-        Self::parse_connection_string_internal(conn_str, None).await
-    }
-
-    async fn parse_connection_string_internal(
-        mut conn_str: ConnectionString,
-        resolver_config: Option<ResolverConfig>,
-    ) -> Result<Self> {
-        let auth_source_present = conn_str
-            .credential
-            .as_ref()
-            .and_then(|cred| cred.source.as_ref())
-            .is_some();
-        let host_info = std::mem::take(&mut conn_str.host_info);
-        let mut options = Self::from_connection_string(conn_str);
-        options.resolver_config = resolver_config.clone();
-
-        let resolved = host_info.resolve(resolver_config).await?;
-        options.hosts = match resolved {
-            ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
-            ResolvedHostInfo::DnsRecord {
-                hostname,
-                mut config,
-            } => {
-                // Save the original SRV info to allow mongos polling.
-                options.original_srv_info = OriginalSrvInfo {
-                    hostname,
-                    min_ttl: config.min_ttl,
-                }
-                .into();
-
-                // Enable TLS unless the user explicitly disabled it.
-                if options.tls.is_none() {
-                    options.tls = Some(Tls::Enabled(Default::default()));
-                }
-
-                // Set the authSource TXT option found during SRV lookup unless the user already set
-                // it. Note that this _does_ override the default database specified
-                // in the URI, since it is supposed to be overriden by authSource.
-                if !auth_source_present {
-                    if let Some(auth_source) = config.auth_source.take() {
-                        if let Some(ref mut credential) = options.credential {
-                            credential.source = Some(auth_source);
-                        }
-                    }
-                }
-
-                // Set the replica set name TXT option found during SRV lookup unless the user
-                // already set it.
-                if options.repl_set_name.is_none() {
-                    if let Some(replica_set) = config.replica_set.take() {
-                        options.repl_set_name = Some(replica_set);
-                    }
-                }
-
-                if options.load_balanced.is_none() {
-                    options.load_balanced = config.load_balanced;
-                }
-
-                if let Some(max) = options.srv_max_hosts {
-                    if max > 0 {
-                        if options.repl_set_name.is_some() {
-                            return Err(Error::invalid_argument(
-                                "srvMaxHosts and replicaSet cannot both be present",
-                            ));
-                        }
-                        if options.load_balanced == Some(true) {
-                            return Err(Error::invalid_argument(
-                                "srvMaxHosts and loadBalanced=true cannot both be present",
-                            ));
-                        }
-                        config.hosts = crate::sdam::choose_n(&config.hosts, max as usize)
-                            .cloned()
-                            .collect();
-                    }
-                }
-
-                // Set the ClientOptions hosts to those found during the SRV lookup.
-                config.hosts
-            }
-        };
-
-        options.validate()?;
-        Ok(options)
-    }
-
-    /// Creates a `ClientOptions` from the given `ConnectionString`.
-    #[cfg(feature = "sync")]
-    pub fn parse_connection_string_sync(conn_str: ConnectionString) -> Result<Self> {
-        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(conn_str, None))
-    }
-
-    /// Creates a `ClientOptions` from the given `ConnectionString`.
-    ///
-    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
-    /// provided `ResolverConfig` as part of this method.
-    #[cfg(feature = "sync")]
-    pub fn parse_connection_string_with_resolver_config_sync(
-        conn_str: ConnectionString,
-        resolver_config: ResolverConfig,
-    ) -> Result<Self> {
-        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_connection_string_internal(
-            conn_str,
-            Some(resolver_config),
-        ))
-    }
-
-    fn from_connection_string(conn_str: ConnectionString) -> Self {
-        let mut credential = conn_str.credential;
-        // Populate default auth source, if needed.
-        let db = &conn_str.default_database;
-        if let Some(credential) = credential.as_mut() {
-            if credential.source.is_none() {
-                credential.source = match &credential.mechanism {
-                    Some(mechanism) => Some(mechanism.default_source(db.as_deref()).into()),
-                    None => {
-                        // If credentials exist (i.e. username is specified) but no mechanism, the
-                        // default source is chosen from the following list in
-                        // order (skipping null ones): authSource option, connection string db,
-                        // SCRAM default (i.e. "admin").
-                        db.clone().or_else(|| Some("admin".into()))
-                    }
-                };
-            }
-        }
-
-        Self {
-            hosts: vec![],
-            app_name: conn_str.app_name,
-            tls: conn_str.tls,
-            heartbeat_freq: conn_str.heartbeat_frequency,
-            local_threshold: conn_str.local_threshold,
-            read_concern: conn_str.read_concern,
-            selection_criteria: conn_str.read_preference.map(Into::into),
-            repl_set_name: conn_str.replica_set,
-            write_concern: conn_str.write_concern,
-            max_pool_size: conn_str.max_pool_size,
-            min_pool_size: conn_str.min_pool_size,
-            max_idle_time: conn_str.max_idle_time,
-            max_connecting: conn_str.max_connecting,
-            server_selection_timeout: conn_str.server_selection_timeout,
-            #[cfg(any(
-                feature = "zstd-compression",
-                feature = "zlib-compression",
-                feature = "snappy-compression"
-            ))]
-            compressors: conn_str.compressors,
-            connect_timeout: conn_str.connect_timeout,
-            retry_reads: conn_str.retry_reads,
-            retry_writes: conn_str.retry_writes,
-            server_monitoring_mode: conn_str.server_monitoring_mode,
-            socket_timeout: conn_str.socket_timeout,
-            direct_connection: conn_str.direct_connection,
-            default_database: conn_str.default_database,
-            driver_info: None,
-            credential,
-            cmap_event_handler: None,
-            command_event_handler: None,
-            original_srv_info: None,
-            #[cfg(test)]
-            original_uri: Some(conn_str.original_uri),
-            resolver_config: None,
-            server_api: None,
-            load_balanced: conn_str.load_balanced,
-            sdam_event_handler: None,
-            #[cfg(test)]
-            test_options: None,
-            #[cfg(feature = "tracing-unstable")]
-            tracing_max_document_length_bytes: None,
-            srv_max_hosts: conn_str.srv_max_hosts,
         }
     }
 
@@ -1552,6 +1243,17 @@ impl ClientOptions {
             MIN_HEARTBEAT_FREQUENCY
         }
     }
+
+    pub(crate) fn resolver_config(&self) -> Option<&ResolverConfig> {
+        #[cfg(feature = "dns-resolver")]
+        {
+            self.resolver_config.as_ref()
+        }
+        #[cfg(not(feature = "dns-resolver"))]
+        {
+            None
+        }
+    }
 }
 
 /// Splits a string into a section before a given index and a section exclusively after the index.
@@ -1598,6 +1300,30 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     Ok(())
 }
 
+impl TryFrom<&str> for ConnectionString {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        Self::parse(value)
+    }
+}
+
+impl TryFrom<&String> for ConnectionString {
+    type Error = Error;
+
+    fn try_from(value: &String) -> Result<Self> {
+        Self::parse(value)
+    }
+}
+
+impl TryFrom<String> for ConnectionString {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self> {
+        Self::parse(value)
+    }
+}
+
 impl ConnectionString {
     /// Parses a MongoDB connection string into a [`ConnectionString`] struct. If the string is
     /// malformed or one of the options has an invalid value, an error will be returned.
@@ -1623,6 +1349,13 @@ impl ConnectionString {
                 .into())
             }
         };
+        #[cfg(not(feature = "dns-resolver"))]
+        if srv {
+            return Err(Error::invalid_argument(
+                "mongodb+srv connection strings cannot be used when the 'dns-resolver' feature is \
+                 disabled",
+            ));
+        }
 
         let after_scheme = &s[end_of_scheme + 3..];
 

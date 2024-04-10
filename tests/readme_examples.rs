@@ -98,7 +98,10 @@ async fn _finding_documents_into_a_collection(
 
     // Query the books in the collection with a filter and an option.
     let filter = doc! { "author": "George Orwell" };
-    let mut cursor = typed_collection.find(filter).sort(doc! { "title": 1 }).await?;
+    let mut cursor = typed_collection
+        .find(filter)
+        .sort(doc! { "title": 1 })
+        .await?;
 
     // Iterate over the results of the cursor.
     while let Some(book) = cursor.try_next().await? {
@@ -142,17 +145,16 @@ async fn _using_the_sync_api() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "dns-resolver")]
 async fn _windows_dns_note() -> Result<()> {
     use mongodb::{
         options::{ClientOptions, ResolverConfig},
         Client,
     };
 
-    let options = ClientOptions::parse_with_resolver_config(
-        "mongodb+srv://my.host.com",
-        ResolverConfig::cloudflare(),
-    )
-    .await?;
+    let options = ClientOptions::parse("mongodb+srv://my.host.com")
+        .resolver_config(ResolverConfig::cloudflare())
+        .await?;
     let client = Client::with_options(options)?;
 
     drop(client);

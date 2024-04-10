@@ -99,6 +99,7 @@ impl RunOn {
 #[serde(untagged)]
 pub(crate) enum TestData {
     Single(Vec<Document>),
+    #[allow(dead_code)]
     Many(HashMap<String, Vec<Document>>),
 }
 
