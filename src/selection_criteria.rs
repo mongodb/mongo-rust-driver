@@ -280,13 +280,6 @@ pub struct HedgedReadOptions {
     pub enabled: bool,
 }
 
-impl HedgedReadOptions {
-    /// Creates a new `HedgedReadOptions` with the given value for `enabled`.
-    pub fn with_enabled(enabled: bool) -> Self {
-        Self { enabled }
-    }
-}
-
 impl ReadPreference {
     pub(crate) fn mode(&self) -> &'static str {
         match self {

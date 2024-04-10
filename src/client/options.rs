@@ -1039,14 +1039,13 @@ impl TlsOptions {
 #[non_exhaustive]
 pub struct DriverInfo {
     /// The name of the library wrapping the driver.
+    #[builder(!default)]
     pub name: String,
 
     /// The version of the library wrapping the driver.
-    #[builder(default)]
     pub version: Option<String>,
 
     /// Optional platform information for the wrapping driver.
-    #[builder(default)]
     pub platform: Option<String>,
 }
 
