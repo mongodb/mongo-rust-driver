@@ -17,6 +17,7 @@ use crate::{
 /// [`ChangeStream`](crate::change_stream::ChangeStream).
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ChangeStreamOptions {
@@ -24,14 +25,12 @@ pub struct ChangeStreamOptions {
     /// Configures how the
     /// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
     /// field will be populated. By default, the field will be empty for updates.
-    #[builder(default)]
     pub full_document: Option<FullDocumentType>,
 
     /// Configures how the
     /// [`ChangeStreamEvent::full_document_before_change`](
     /// crate::change_stream::event::ChangeStreamEvent::full_document_before_change) field will be
     /// populated.  By default, the field will be empty for updates.
-    #[builder(default)]
     pub full_document_before_change: Option<FullDocumentBeforeChangeType>,
 
     /// Specifies the logical starting point for the new change stream. Note that if a watched
@@ -39,13 +38,11 @@ pub struct ChangeStreamOptions {
     /// `resume_after` and `start_after` cannot be set simultaneously.
     ///
     /// For more information on resuming a change stream see the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-after)
-    #[builder(default)]
     pub resume_after: Option<ResumeToken>,
 
     /// The change stream will only provide changes that occurred at or after the specified
     /// timestamp. Any command run against the server will return an operation time that can be
     /// used here.
-    #[builder(default)]
     pub start_at_operation_time: Option<Timestamp>,
 
     /// Takes a resume token and starts a new change stream returning the first notification after
@@ -56,26 +53,22 @@ pub struct ChangeStreamOptions {
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/master/changeStreams/#change-stream-start-after) for more
     /// information.
-    #[builder(default)]
     pub start_after: Option<ResumeToken>,
 
     /// If `true`, the change stream will monitor all changes for the given cluster.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     pub(crate) all_changes_for_cluster: Option<bool>,
 
     /// The maximum amount of time for the server to wait on new documents to satisfy a change
     /// stream query.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub max_await_time: Option<Duration>,
 
     /// The number of documents to return per batch.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub batch_size: Option<u32>,
 
     /// Specifies a collation.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub collation: Option<Collation>,
 
@@ -83,7 +76,6 @@ pub struct ChangeStreamOptions {
     ///
     /// If none is specified, the read concern defined on the object executing this operation will
     /// be used.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
@@ -91,7 +83,6 @@ pub struct ChangeStreamOptions {
     ///
     /// If none is specified, the selection criteria defined on the object executing this operation
     /// will be used.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
@@ -100,7 +91,6 @@ pub struct ChangeStreamOptions {
     ///
     /// The comment can be any [`Bson`] value on server versions 4.4+. On lower server versions,
     /// the comment must be a [`Bson::String`] value.
-    #[builder(default)]
     pub comment: Option<Bson>,
 }
 

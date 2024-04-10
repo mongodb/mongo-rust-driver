@@ -11,46 +11,39 @@ use crate::error::{Error, ErrorKind};
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Collation {
     /// The ICU locale.
     ///
     /// See the list of supported languages and locales [here](https://www.mongodb.com/docs/manual/reference/collation-locales-defaults/#collation-languages-locales).
+    #[builder(!default)]
     pub locale: String,
 
     /// The level of comparison to perform. Corresponds to [ICU Comparison Levels](http://userguide.icu-project.org/collation/concepts#TOC-Comparison-Levels).
-    #[builder(default)]
     pub strength: Option<CollationStrength>,
 
     /// Whether to include a separate level for case differences. See [ICU Collation: CaseLevel](http://userguide.icu-project.org/collation/concepts#TOC-CaseLevel) for more information.
-    #[builder(default)]
     pub case_level: Option<bool>,
 
     /// The sort order of case differences during tertiary level comparisons.
-    #[builder(default)]
     pub case_first: Option<CollationCaseFirst>,
 
     /// Whether to compare numeric strings as numbers or strings.
-    #[builder(default)]
     pub numeric_ordering: Option<bool>,
 
     /// Whether collation should consider whitespace and punctuation as base characters for
     /// purposes of comparison.
-    #[builder(default)]
     pub alternate: Option<CollationAlternate>,
 
     /// Up to which characters are considered ignorable when `alternate` is "shifted". Has no
     /// effect if `alternate` is set to "non-ignorable".
-    #[builder(default)]
     pub max_variable: Option<CollationMaxVariable>,
 
     /// Whether to check if text require normalization and to perform it.
-    #[builder(default)]
     pub normalization: Option<bool>,
 
     /// Whether strings with diacritics sort from the back of the string.
-    #[builder(default)]
     pub backwards: Option<bool>,
 }
 

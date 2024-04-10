@@ -26,49 +26,37 @@ pub(crate) enum Modification {
 
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, TypedBuilder, Serialize, Default)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FindAndModifyOptions {
-    #[builder(default)]
     pub(crate) sort: Option<Document>,
 
-    #[builder(default)]
     pub(crate) new: Option<bool>,
 
-    #[builder(default)]
     pub(crate) upsert: Option<bool>,
 
-    #[builder(default)]
     pub(crate) bypass_document_validation: Option<bool>,
 
-    #[builder(default)]
     pub(crate) write_concern: Option<WriteConcern>,
 
-    #[builder(default)]
     pub(crate) array_filters: Option<Vec<Document>>,
 
     #[serde(
         serialize_with = "serde_util::serialize_duration_option_as_int_millis",
         rename = "maxTimeMS"
     )]
-    #[builder(default)]
     pub(crate) max_time: Option<Duration>,
 
     #[serde(rename = "fields")]
-    #[builder(default)]
     pub(crate) projection: Option<Document>,
 
-    #[builder(default)]
     pub(crate) collation: Option<Collation>,
 
-    #[builder(default)]
     pub(crate) hint: Option<Hint>,
 
-    #[builder(default)]
     #[serde(rename = "let")]
     pub(crate) let_vars: Option<Document>,
 
-    #[builder(default)]
     pub(crate) comment: Option<Bson>,
 }
 

@@ -422,7 +422,7 @@ fn selection_criteria_tracing_representation() {
 
     let opts_with_hedge = Some(
         ReadPreferenceOptions::builder()
-            .hedge(HedgedReadOptions::with_enabled(true))
+            .hedge(HedgedReadOptions::builder().enabled(true).build())
             .build(),
     );
     assert_eq!(
