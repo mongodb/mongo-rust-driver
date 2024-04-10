@@ -334,30 +334,29 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 /// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct ServerApi {
     /// The declared API version.
     #[serde(rename = "apiVersion")]
+    #[builder(!default)]
     pub version: ServerApiVersion,
 
     /// Whether the MongoDB server should reject all commands that are not part of the
     /// declared API version. This includes command options and aggregation pipeline stages.
-    #[builder(default)]
     #[serde(rename = "apiStrict")]
     pub strict: Option<bool>,
 
     /// Whether the MongoDB server should return command failures when functionality that is
     /// deprecated from the declared API version is used.
     /// Note that at the time of this writing, no deprecations in version 1 exist.
-    #[builder(default)]
     #[serde(rename = "apiDeprecationErrors")]
     pub deprecation_errors: Option<bool>,
 }
 
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[derivative(Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -377,7 +376,6 @@ pub struct ClientOptions {
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
     /// server.
-    #[builder(default)]
     pub app_name: Option<String>,
 
     /// The allowed compressors to use to compress messages sent to and decompress messages
@@ -389,13 +387,12 @@ pub struct ClientOptions {
         feature = "zlib-compression",
         feature = "snappy-compression"
     ))]
-    #[builder(default)]
     #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(setter(strip_option))]
     #[serde(skip)]
     pub cmap_event_handler: Option<EventHandler<crate::event::cmap::CmapEvent>>,
 
@@ -403,7 +400,7 @@ pub struct ClientOptions {
     ///
     /// Note that monitoring command events may incur a performance penalty.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(setter(strip_option))]
     #[serde(skip)]
     pub command_event_handler: Option<EventHandler<crate::event::command::CommandEvent>>,
 
@@ -411,33 +408,28 @@ pub struct ClientOptions {
     /// server.
     ///
     /// The default value is 10 seconds.
-    #[builder(default)]
     pub connect_timeout: Option<Duration>,
 
     /// The credential to use for authenticating connections made by this client.
-    #[builder(default)]
     pub credential: Option<Credential>,
 
     /// Specifies whether the Client should directly connect to a single host rather than
     /// autodiscover all servers in the cluster.
     ///
     /// The default value is false.
-    #[builder(default)]
     pub direct_connection: Option<bool>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the
     /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    #[builder(default)]
     pub driver_info: Option<DriverInfo>,
 
     /// The amount of time each monitoring thread should wait between performing server checks.
     ///
     /// The default value is 10 seconds.
-    #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(rename = "loadbalanced")]
     pub load_balanced: Option<bool>,
 
@@ -452,14 +444,12 @@ pub struct ClientOptions {
     /// lowest average round trip time is eligible.
     ///
     /// The default value is 15 ms.
-    #[builder(default)]
     pub local_threshold: Option<Duration>,
 
     /// The amount of time that a connection can remain idle in a connection pool before being
     /// closed. A value of zero indicates that connections should not be closed due to being idle.
     ///
     /// By default, connections will not be closed due to being idle.
-    #[builder(default)]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum amount of connections that the Client should allow to be created in a
@@ -468,7 +458,6 @@ pub struct ClientOptions {
     /// operation finishes and its connection is checked back into the pool.
     ///
     /// The default value is 10.
-    #[builder(default)]
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that should be available in a server's connection pool at
@@ -476,51 +465,43 @@ pub struct ClientOptions {
     /// be added to the pool in the background until `min_pool_size` is reached.
     ///
     /// The default value is 0.
-    #[builder(default)]
     pub min_pool_size: Option<u32>,
 
     /// The maximum number of new connections that can be created concurrently.
     ///
     /// If specified, this value must be greater than 0. The default is 2.
-    #[builder(default)]
     pub max_connecting: Option<u32>,
 
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
-    #[builder(default)]
     pub repl_set_name: Option<String>,
 
     /// Whether or not the client should retry a read operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default)]
     pub retry_reads: Option<bool>,
 
     /// Whether or not the client should retry a write operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default)]
     pub retry_writes: Option<bool>,
 
     /// Configures which server monitoring protocol to use.
     ///
     /// The default is [`Auto`](ServerMonitoringMode::Auto).
-    #[builder(default)]
     pub server_monitoring_mode: Option<ServerMonitoringMode>,
 
     /// The handler that should process all Server Discovery and Monitoring events.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(setter(strip_option))]
     #[serde(skip)]
     pub sdam_event_handler: Option<EventHandler<crate::event::sdam::SdamEvent>>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
-    #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The declared API version for this client.
@@ -534,30 +515,26 @@ pub struct ClientOptions {
     ///
     /// For more information, see the [Stable API](
     /// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
-    #[builder(default)]
     pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
     ///
     /// The default value is 30 seconds.
-    #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
 
     /// Default database for this client.
     ///
     /// By default, no default database is specified.
-    #[builder(default)]
     pub default_database: Option<String>,
 
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) socket_timeout: Option<Duration>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
-    #[builder(default)]
     pub tls: Option<Tls>,
 
     /// The maximum number of bytes that the driver should include in a tracing event
@@ -570,26 +547,23 @@ pub struct ClientOptions {
     ///
     /// The default value is 1000.
     #[cfg(feature = "tracing-unstable")]
-    #[builder(default)]
     pub tracing_max_document_length_bytes: Option<usize>,
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// Limit on the number of mongos connections that may be created for sharded topologies.
-    #[builder(default)]
     pub srv_max_hosts: Option<u32>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
     #[cfg(test)]
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) original_uri: Option<String>,
 
@@ -598,7 +572,7 @@ pub struct ClientOptions {
     ///
     /// On Windows, there is a known performance issue in trust-dns with using the default system
     /// configuration, so a custom configuration is recommended.
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     #[cfg(feature = "dns-resolver")]
@@ -606,7 +580,7 @@ pub struct ClientOptions {
 
     /// Control test behavior of the client.
     #[cfg(test)]
-    #[builder(default, setter(skip))]
+    #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     pub(crate) test_options: Option<TestOptions>,
@@ -1061,7 +1035,7 @@ impl TlsOptions {
 /// Extra information to append to the driver version in the metadata of the handshake with the
 /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
 #[derive(Clone, Debug, Deserialize, TypedBuilder, PartialEq)]
-#[builder(field_defaults(setter(into)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DriverInfo {
     /// The name of the library wrapping the driver.

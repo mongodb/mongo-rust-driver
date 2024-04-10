@@ -271,6 +271,7 @@ impl ReadPreferenceOptions {
 ///
 /// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference-hedge-option/) for more details.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct HedgedReadOptions {
     /// Whether or not to allow reads from a sharded cluster to be "hedged" across two replica
