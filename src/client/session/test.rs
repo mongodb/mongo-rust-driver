@@ -386,12 +386,15 @@ async fn session_usage() {
     #[allow(deprecated)]
     async fn session_usage_test<F, G>(command_name: &str, operation: F)
     where
-        F: Fn(EventClient) -> G,
+        F: Fn(Client) -> G,
         G: Future<Output = ()>,
     {
-        let client = EventClient::new().await;
-        operation(client.clone()).await;
-        let mut events = client.events.clone();
+        let client = Client::test_builder()
+            .monitor_command_events()
+            .build()
+            .await;
+        operation(client.clone().into_client()).await;
+        let mut events = client.event_buffer().clone();
         #[allow(deprecated)]
         let (command_started, _) = events.get_successful_command_execution(command_name);
         assert!(

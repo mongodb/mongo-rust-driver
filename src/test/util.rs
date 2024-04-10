@@ -51,14 +51,20 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub(crate) struct TestClient {
+pub(crate) struct TestClient<T = Uneventful> {
     client: Client,
     pub(crate) server_info: HelloCommandResponse,
     pub(crate) server_version: Version,
     pub(crate) server_parameters: Document,
+    events: T,
 }
 
-impl std::ops::Deref for TestClient {
+pub(crate) type EventClient2 = TestClient<EventBuffer>;
+
+#[derive(Clone, Debug)]
+pub(crate) struct Uneventful;
+
+impl<T> std::ops::Deref for TestClient<T> {
     type Target = Client;
 
     fn deref(&self) -> &Self::Target {
@@ -71,24 +77,30 @@ impl Client {
         TestClientBuilder {
             options: None,
             buffer: None,
-            retain_startup_events: false,
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption-unstable")]
             encrypted: None,
+            events: Uneventful,
         }
     }
 }
 
-pub(crate) struct TestClientBuilder {
+pub(crate) struct TestClientBuilder<T = Uneventful> {
     options: Option<ClientOptions>,
     buffer: Option<EventBuffer>,
-    retain_startup_events: bool,
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption-unstable")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
+    events: T,
 }
 
-impl TestClientBuilder {
+#[derive(Clone, Debug)]
+pub(crate) struct Eventful {
+    buffer: EventBuffer,
+    command_events: bool,
+}
+
+impl<T> TestClientBuilder<T> {
     pub(crate) fn options(mut self, options: impl Into<Option<ClientOptions>>) -> Self {
         let options = options.into();
         assert!(self.options.is_none() || options.is_none());
@@ -107,20 +119,6 @@ impl TestClientBuilder {
         assert!(self.options.is_none() || options.is_none());
         self.options =
             Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
-        self
-    }
-
-    pub(crate) fn event_buffer(mut self, buffer: impl Into<Option<EventBuffer>>) -> Self {
-        let buffer = buffer.into();
-        assert!(self.buffer.is_none() || buffer.is_none());
-        self.buffer = buffer;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn retain_startup_events(mut self, value: bool) -> Self {
-        assert!(self.buffer.is_some());
-        self.retain_startup_events = value;
         self
     }
 
@@ -144,7 +142,37 @@ impl TestClientBuilder {
         self
     }
 
-    pub(crate) async fn build(self) -> TestClient {
+    pub(crate) fn buffer(&self) -> Option<&EventBuffer> {
+        self.buffer.as_ref()
+    }
+}
+
+impl TestClientBuilder<Uneventful> {
+    pub(crate) fn event_buffer(mut self, buffer: EventBuffer) -> Self {
+        assert!(self.buffer.is_none());
+        self.buffer = Some(buffer);
+        self
+    }
+
+    fn monitor(self, command_events: bool) -> TestClientBuilder<Eventful> {
+        TestClientBuilder {
+            options: self.options,
+            buffer: self.buffer,
+            min_heartbeat_freq: self.min_heartbeat_freq,
+            #[cfg(feature = "in-use-encryption-unstable")]
+            encrypted: self.encrypted,
+            events: Eventful {
+                buffer: EventBuffer::new(),
+                command_events,
+            },
+        }
+    }
+
+    pub(crate) fn monitor_command_events(self) -> TestClientBuilder<Eventful> {
+        self.monitor(true)
+    }
+
+    pub(crate) async fn build(self) -> TestClient<Uneventful> {
         let mut options = match self.options {
             Some(options) => options,
             None => get_client_options().await.clone(),
@@ -169,22 +197,50 @@ impl TestClientBuilder {
         #[cfg(not(feature = "in-use-encryption-unstable"))]
         let client = Client::with_options(options).unwrap();
 
-        let client = TestClient::from_client(client).await;
-        if let Some(mut buffer) = self.buffer {
-            if !self.retain_startup_events {
-                // clear events from commands used to set up client.
-                buffer.retain(|ev| !matches!(ev, Event::Command(_)));
-            }
-        }
-        client
-    }
-
-    pub(crate) fn buffer(&self) -> Option<&EventBuffer> {
-        self.buffer.as_ref()
+        TestClient::from_client(client, self.events.into()).await
     }
 }
 
-impl TestClient {
+impl TestClientBuilder<Eventful> {
+    pub(crate) async fn build(self) -> TestClient<EventBuffer> {
+        let mut options = match self.options {
+            Some(options) => options,
+            None => get_client_options().await.clone(),
+        };
+        if self.events.command_events {
+            options.command_event_handler = Some(self.events.buffer.handler());
+        }
+        let inner: TestClientBuilder<Uneventful> = TestClientBuilder {
+            options: Some(options),
+            buffer: self.buffer,
+            min_heartbeat_freq: self.min_heartbeat_freq,
+            #[cfg(feature = "in-use-encryption-unstable")]
+            encrypted: self.encrypted,
+            events: Uneventful,
+        };
+        let TestClient {
+            client,
+            server_info,
+            server_version,
+            server_parameters,
+            events: _,
+        } = inner.build().await;
+
+        // clear events from commands used to set up client.
+        let mut events = self.events.buffer;
+        events.retain(|ev| !matches!(ev, Event::Command(_)));
+
+        TestClient {
+            client,
+            server_info,
+            server_version,
+            server_parameters,
+            events,
+        }
+    }
+}
+
+impl TestClient<Uneventful> {
     // TODO RUST-1449 Remove uses of direct constructors in favor of `TestClientBuilder`.
     pub(crate) async fn new() -> Self {
         Self::with_options(None).await
@@ -194,7 +250,56 @@ impl TestClient {
         Client::test_builder().options(options).build().await
     }
 
-    async fn from_client(client: Client) -> Self {
+    pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
+        Client::test_builder()
+            .additional_options(options, false)
+            .await
+            .build()
+            .await
+    }
+
+    pub(crate) async fn options_for_multiple_mongoses(
+        options: Option<ClientOptions>,
+        use_multiple_mongoses: bool,
+    ) -> ClientOptions {
+        let is_load_balanced = options
+            .as_ref()
+            .and_then(|o| o.load_balanced)
+            .or(get_client_options().await.load_balanced)
+            .unwrap_or(false);
+        let default_options = if is_load_balanced {
+            // for serverless testing, ignore use_multiple_mongoses.
+            let uri = if use_multiple_mongoses && !*SERVERLESS {
+                LOAD_BALANCED_MULTIPLE_URI
+                    .as_ref()
+                    .expect("MULTI_MONGOS_LB_URI is required")
+            } else {
+                LOAD_BALANCED_SINGLE_URI
+                    .as_ref()
+                    .expect("SINGLE_MONGOS_LB_URI is required")
+            };
+            let mut o = ClientOptions::parse(uri).await.unwrap();
+            update_options_for_testing(&mut o);
+            o
+        } else {
+            get_client_options().await.clone()
+        };
+        let mut options = match options {
+            Some(mut options) => {
+                options.merge(default_options);
+                options
+            }
+            None => default_options,
+        };
+        if Self::new().await.is_sharded() && !use_multiple_mongoses {
+            options.hosts = options.hosts.iter().take(1).cloned().collect();
+        }
+        options
+    }
+}
+
+impl<T> TestClient<T> {
+    async fn from_client(client: Client, events: T) -> Self {
         let hello = hello_command(
             client.options().server_api.as_ref(),
             client.options().load_balanced,
@@ -228,15 +333,8 @@ impl TestClient {
             server_info,
             server_version,
             server_parameters,
+            events,
         }
-    }
-
-    pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
-        Client::test_builder()
-            .additional_options(options, false)
-            .await
-            .build()
-            .await
     }
 
     pub(crate) async fn create_user(
@@ -277,13 +375,13 @@ impl TestClient {
         coll
     }
 
-    pub(crate) async fn init_db_and_typed_coll<T>(
+    pub(crate) async fn init_db_and_typed_coll<V>(
         &self,
         db_name: &str,
         coll_name: &str,
-    ) -> Collection<T>
+    ) -> Collection<V>
     where
-        T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+        V: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         let coll = self.database(db_name).collection(coll_name);
         coll.drop().await.unwrap();
@@ -450,48 +548,14 @@ impl TestClient {
             .map(|s| ServerAddress::parse(s).unwrap())
     }
 
-    pub(crate) async fn options_for_multiple_mongoses(
-        options: Option<ClientOptions>,
-        use_multiple_mongoses: bool,
-    ) -> ClientOptions {
-        let is_load_balanced = options
-            .as_ref()
-            .and_then(|o| o.load_balanced)
-            .or(get_client_options().await.load_balanced)
-            .unwrap_or(false);
-        let default_options = if is_load_balanced {
-            // for serverless testing, ignore use_multiple_mongoses.
-            let uri = if use_multiple_mongoses && !*SERVERLESS {
-                LOAD_BALANCED_MULTIPLE_URI
-                    .as_ref()
-                    .expect("MULTI_MONGOS_LB_URI is required")
-            } else {
-                LOAD_BALANCED_SINGLE_URI
-                    .as_ref()
-                    .expect("SINGLE_MONGOS_LB_URI is required")
-            };
-            let mut o = ClientOptions::parse(uri).await.unwrap();
-            update_options_for_testing(&mut o);
-            o
-        } else {
-            get_client_options().await.clone()
-        };
-        let mut options = match options {
-            Some(mut options) => {
-                options.merge(default_options);
-                options
-            }
-            None => default_options,
-        };
-        if Self::new().await.is_sharded() && !use_multiple_mongoses {
-            options.hosts = options.hosts.iter().take(1).cloned().collect();
-        }
-        options
-    }
-
-    #[allow(dead_code)]
     pub(crate) fn into_client(self) -> Client {
         self.client
+    }
+}
+
+impl TestClient<EventBuffer> {
+    pub(crate) fn event_buffer(&self) -> &EventBuffer {
+        &self.events
     }
 }
 
