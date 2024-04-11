@@ -8,6 +8,7 @@ use futures_util::{FutureExt, TryStreamExt};
 use crate::{
     bson::{rawdoc, Bson, RawDocumentBuf},
     bson_util::{self, array_entry_size_bytes, extend_raw_document_buf, vec_to_raw_array_buf},
+    checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ClientBulkWriteError, Error, ErrorKind, Result},
@@ -187,17 +188,20 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
     const NAME: &'static str = "bulkWrite";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
-        let max_operations = description.max_write_batch_size;
-        let max_doc_size = description.max_bson_object_size as usize;
-        let max_message_size = description.max_message_size_bytes as usize - COMMAND_OVERHEAD_SIZE;
+        let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
+        let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
+        let max_message_size = Checked::new(description.max_message_size_bytes)
+            .try_into::<usize>()?
+            - COMMAND_OVERHEAD_SIZE;
 
         let mut namespace_info = NamespaceInfo::new();
         let mut ops = Vec::new();
         let mut size = 0;
-        for (i, model) in self.models.iter().take(max_operations as usize).enumerate() {
+        for (i, model) in self.models.iter().take(max_operations).enumerate() {
             let (namespace_index, namespace_size) = namespace_info.get_index(model.namespace());
 
-            let mut operation = rawdoc! { model.operation_name(): namespace_index as i32 };
+            let operation_namespace_index: i32 = Checked::new(namespace_index).try_into()?;
+            let mut operation = rawdoc! { model.operation_name(): operation_namespace_index };
             let (model_doc, inserted_id) = model.get_ops_document_contents()?;
             extend_raw_document_buf(&mut operation, model_doc)?;
 
@@ -278,7 +282,8 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
 
             // A partial result with summary info should only be created if one or more
             // operations were successful.
-            if response.summary.n_errors < self.n_attempted as i64 {
+            let n_errors: usize = Checked::new(response.summary.n_errors).try_into()?;
+            if n_errors < self.n_attempted {
                 bulk_write_error
                     .partial_result
                     .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))

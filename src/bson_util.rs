@@ -183,8 +183,8 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
             new_bytes.pop();
             new_bytes.extend(&doc.as_bytes()[4..]);
 
-            let new_length = (new_bytes.len() as i32).to_le_bytes();
-            new_bytes[0..4].copy_from_slice(&new_length);
+            let new_length: i32 = Checked::new(new_bytes.len()).try_into()?;
+            new_bytes[0..4].copy_from_slice(&new_length.to_le_bytes());
 
             *doc = RawDocumentBuf::from_bytes(new_bytes)?;
 
