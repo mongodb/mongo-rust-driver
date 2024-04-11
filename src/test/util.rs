@@ -146,8 +146,7 @@ impl TestClientBuilder {
         #[cfg(not(feature = "in-use-encryption-unstable"))]
         let client = Client::with_options(options).unwrap();
 
-        let client = TestClient::from_client(client).await;
-        client
+        TestClient::from_client(client).await
     }
 }
 
