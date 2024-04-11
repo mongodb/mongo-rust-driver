@@ -96,7 +96,7 @@ impl OperationWithDefaults for Aggregate {
                 wc_error_info.validate()?;
             };
 
-            let description = context.stream_description()?;
+            let description = context.connection.stream_description()?;
 
             // The comment should only be propagated to getMore calls on 4.4+.
             let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {

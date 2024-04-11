@@ -66,7 +66,11 @@ impl OperationWithDefaults for ListCollections {
             let response: CursorBody = response.body()?;
             Ok(CursorSpecification::new(
                 response.cursor,
-                context.stream_description()?.server_address.clone(),
+                context
+                    .connection
+                    .stream_description()?
+                    .server_address
+                    .clone(),
                 self.options.as_ref().and_then(|opts| opts.batch_size),
                 None,
                 None,

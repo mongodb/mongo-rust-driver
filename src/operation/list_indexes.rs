@@ -56,7 +56,11 @@ impl OperationWithDefaults for ListIndexes {
             let response: CursorBody = response.body()?;
             Ok(CursorSpecification::new(
                 response.cursor,
-                context.stream_description()?.server_address.clone(),
+                context
+                    .connection
+                    .stream_description()?
+                    .server_address
+                    .clone(),
                 self.options.as_ref().and_then(|o| o.batch_size),
                 self.options.as_ref().and_then(|o| o.max_time),
                 None,

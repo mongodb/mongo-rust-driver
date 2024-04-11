@@ -293,7 +293,11 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
 
             let specification = CursorSpecification::new(
                 response.body.cursor,
-                context.stream_description()?.server_address.clone(),
+                context
+                    .connection
+                    .stream_description()?
+                    .server_address
+                    .clone(),
                 None,
                 None,
                 self.options.and_then(|options| options.comment.clone()),

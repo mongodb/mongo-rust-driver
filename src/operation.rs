@@ -87,12 +87,6 @@ pub(crate) struct ExecutionContext<'a> {
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
-impl<'a> ExecutionContext<'a> {
-    pub(crate) fn stream_description(&'a self) -> Result<&'a StreamDescription> {
-        self.connection.stream_description()
-    }
-}
-
 /// A trait modeling the behavior of a server side operation.
 ///
 /// No methods in this trait should have default behaviors to ensure that wrapper operations
