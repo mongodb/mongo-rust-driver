@@ -9,8 +9,6 @@ use tokio::sync::Mutex;
 
 use test_file::{TestFile, TestResult};
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
@@ -56,14 +54,12 @@ async fn run_legacy() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
 
-            #[allow(deprecated)]
-            let client = EventClient::with_additional_options(
-                options,
-                Some(Duration::from_millis(50)),
-                test_case.use_multiple_mongoses,
-                None,
-            )
-            .await;
+            let client = Client::test_builder()
+                .additional_options(options, test_case.use_multiple_mongoses.unwrap_or(false))
+                .await
+                .min_heartbeat_freq(Duration::from_millis(50))
+                .build()
+                .await;
 
             if let Some(ref run_on) = test_file.run_on {
                 let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
@@ -184,8 +180,7 @@ async fn run_legacy() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
         log_uncaptured("skipping transaction_ids_excluded due to test topology");
@@ -233,8 +228,7 @@ async fn transaction_ids_excluded() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
         log_uncaptured("skipping transaction_ids_included due to test topology");
@@ -608,7 +602,7 @@ async fn retry_write_different_mongos() {
     #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
-        .event_client()
+        .monitor_events()
         .build()
         .await;
     let result = client
@@ -671,7 +665,7 @@ async fn retry_write_same_mongos() {
     #[allow(deprecated)]
     let client = Client::test_builder()
         .options(client_options)
-        .event_client()
+        .monitor_events()
         .build()
         .await;
     let result = client

@@ -3,13 +3,12 @@ use std::time::Duration;
 use futures::{future::Either, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 
-#[allow(deprecated)]
-use crate::test::util::EventClient;
 use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
     test::{log_uncaptured, TestClient, SERVERLESS},
+    Client,
 };
 
 #[tokio::test]
@@ -113,8 +112,7 @@ async fn session_cursor_next() {
 
 #[tokio::test]
 async fn batch_exhaustion() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     let coll = client
         .create_fresh_collection(
@@ -157,8 +155,7 @@ async fn batch_exhaustion() {
 
 #[tokio::test]
 async fn borrowed_deserialization() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Doc<'a> {

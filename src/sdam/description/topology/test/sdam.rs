@@ -5,8 +5,6 @@ use serde::Deserialize;
 
 use super::TestSdamEvent;
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
@@ -592,17 +590,16 @@ async fn load_balanced() {
 #[tokio::test]
 #[function_name::named]
 async fn topology_closed_event_last() {
-    let event_buffer = EventBuffer::new();
+    let client = Client::test_builder()
+        .additional_options(None, false)
+        .await
+        .min_heartbeat_freq(Duration::from_millis(50))
+        .monitor_events()
+        .build()
+        .await;
+    let events = client.events.clone();
     #[allow(deprecated)]
-    let client = EventClient::with_additional_options(
-        None,
-        Some(Duration::from_millis(50)),
-        None,
-        event_buffer.clone(),
-    )
-    .await;
-    #[allow(deprecated)]
-    let mut subscriber = event_buffer.subscribe_all();
+    let mut subscriber = events.subscribe_all();
 
     client
         .database(function_name!())
@@ -639,18 +636,16 @@ async fn heartbeat_events() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
 
-    let event_buffer = EventBuffer::new();
-    #[allow(deprecated)]
-    let client = EventClient::with_additional_options(
-        Some(options.clone()),
-        Some(Duration::from_millis(50)),
-        None,
-        event_buffer.clone(),
-    )
-    .await;
+    let client = Client::test_builder()
+        .additional_options(options.clone(), false)
+        .await
+        .min_heartbeat_freq(Duration::from_millis(50))
+        .monitor_events()
+        .build()
+        .await;
 
     #[allow(deprecated)]
-    let mut subscriber = event_buffer.subscribe_all();
+    let mut subscriber = client.events.subscribe_all();
 
     if client.is_load_balanced() {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");

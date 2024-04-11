@@ -2,8 +2,6 @@ use std::cmp::Ord;
 
 use futures::stream::TryStreamExt;
 
-#[allow(deprecated)]
-use crate::test::util::EventClient;
 use crate::{
     action::Action,
     bson::{doc, Document},
@@ -17,6 +15,7 @@ use crate::{
     },
     results::{CollectionSpecification, CollectionType},
     test::util::TestClient,
+    Client,
     Database,
 };
 
@@ -318,8 +317,7 @@ async fn create_index_options_defaults_not_specified() {
 }
 
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let db = client.database(name);
 
     db.create_collection(name)
