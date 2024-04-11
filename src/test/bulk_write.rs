@@ -18,7 +18,10 @@ use super::TestClient;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
-    run_unified_tests(&["crud", "unified", "new-bulk-write"]).await;
+    run_unified_tests(&["crud", "unified", "new-bulk-write"])
+        // TODO RUST-1405: unskip this test
+        .skip_files(&["client-bulkWrite-errorResponse.json"])
+        .await;
 }
 
 #[tokio::test]

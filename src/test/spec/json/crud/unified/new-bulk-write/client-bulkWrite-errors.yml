@@ -9,7 +9,7 @@ createEntities:
       observeEvents: [ commandStartedEvent ]
       uriOptions:
         retryWrites: false
-      useMultipleMongoses: false
+      useMultipleMongoses: false # Target a single mongos with failpoint
   - database:
       id: &database0 database0
       client: *client0

@@ -348,4 +348,3 @@ tests:
                     document: { _id: 3, x: 33 }
                 nsInfo:
                   - ns: *namespace
-
