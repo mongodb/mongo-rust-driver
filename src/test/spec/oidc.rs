@@ -78,6 +78,7 @@ macro_rules! admin_client {
 // Machine Callback tests
 #[tokio::test]
 async fn machine_1_1_callback_is_called() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -112,6 +113,7 @@ async fn machine_1_1_callback_is_called() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
 async fn machine_1_2_callback_is_called_only_once_for_multiple_connections() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -157,6 +159,7 @@ async fn machine_1_2_callback_is_called_only_once_for_multiple_connections() -> 
 
 #[tokio::test]
 async fn machine_2_1_valid_callback_inputs() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -196,6 +199,7 @@ async fn machine_2_1_valid_callback_inputs() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -237,6 +241,7 @@ async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
 //#[tokio::test]
 #[allow(dead_code)]
 async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -278,6 +283,7 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
 #[tokio::test]
 async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth(
 ) -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -323,6 +329,7 @@ async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth
 
 #[tokio::test]
 async fn machine_3_2_auth_failures_without_cached_tokens_returns_an_error() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -362,6 +369,7 @@ async fn machine_3_2_auth_failures_without_cached_tokens_returns_an_error() -> a
 
 #[tokio::test(flavor = "multi_thread")]
 async fn machine_4_reauthentication() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     let admin_client = admin_client!();
 
     // Now set a failpoint for find with 391 error code
@@ -408,6 +416,7 @@ async fn machine_4_reauthentication() -> anyhow::Result<()> {
 // Human Callback tests
 #[tokio::test]
 async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -441,6 +450,7 @@ async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_1_2_single_principal_explicit_username() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -475,6 +485,7 @@ async fn human_1_2_single_principal_explicit_username() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_1_3_multiple_principal_user_1() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -509,6 +520,7 @@ async fn human_1_3_multiple_principal_user_1() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_1_4_multiple_principal_user_2() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -543,6 +555,7 @@ async fn human_1_4_multiple_principal_user_2() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -582,6 +595,7 @@ async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     {
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
@@ -670,6 +684,7 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_2_1_valid_callback_inputs() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -707,6 +722,7 @@ async fn human_2_1_valid_callback_inputs() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn human_2_2_callback_returns_missing_data() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -747,6 +763,7 @@ async fn human_2_2_callback_returns_missing_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() -> anyhow::Result<()>
 {
+    get_env_or_skip!("OIDC");
     // get an admin_client for setting failpoints
     let admin_client = admin_client!();
 
@@ -817,6 +834,7 @@ async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached_token(
 ) -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // get an admin_client for setting failpoints
     let admin_client = admin_client!();
 
@@ -869,6 +887,7 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     use crate::{
         event::command::{
             CommandEvent,
@@ -992,6 +1011,7 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     let admin_client = admin_client!();
 
     // we need to assert the callback count
@@ -1044,6 +1064,7 @@ async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     let admin_client = admin_client!();
 
     // we need to assert the callback count
@@ -1098,6 +1119,7 @@ async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn human_4_4_fails() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     let admin_client = admin_client!();
 
     // we need to assert the callback count
@@ -1159,6 +1181,7 @@ async fn human_4_4_fails() -> anyhow::Result<()> {
 // This is not in the spec, but the spec has no test that actually tests refresh flow
 #[tokio::test]
 async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();

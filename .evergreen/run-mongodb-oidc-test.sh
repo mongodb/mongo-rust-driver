@@ -29,6 +29,7 @@ fi
 export TEST_AUTH_OIDC=1
 export COVERAGE=1
 export AUTH="auth"
+export OIDC="oidc"
 
 cargo nextest run test::spec::oidc --profile ci
 RESULT=$?
