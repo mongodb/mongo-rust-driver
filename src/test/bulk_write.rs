@@ -259,6 +259,7 @@ async fn successful_cursor_iteration() {
         .await
         .unwrap();
     assert_eq!(result.upserted_count, 2);
+    assert_eq!(result.update_results.unwrap().len(), 2);
 
     let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
@@ -328,6 +329,7 @@ async fn failed_cursor_iteration() {
         );
     };
     assert_eq!(partial_result.upserted_count, 2);
+    assert_eq!(partial_result.update_results.unwrap().len(), 1);
 
     let get_more_events = event_buffer.get_command_started_events(&["getMore"]);
     assert_eq!(get_more_events.len(), 1);
@@ -385,6 +387,7 @@ async fn cursor_iteration_in_a_transaction() {
         .await
         .unwrap();
     assert_eq!(result.upserted_count, 2);
+    assert_eq!(result.update_results.unwrap().len(), 2);
 
     let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
