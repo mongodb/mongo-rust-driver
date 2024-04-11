@@ -1,6 +1,6 @@
 use crate::{
     bson::doc,
-    error::ErrorKind,
+    error::{ClientBulkWriteError, ErrorKind},
     options::WriteModel,
     test::{
         get_client_options,
@@ -229,27 +229,36 @@ async fn successful_cursor_iteration() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let document = doc! { "_id": "a".repeat(max_bson_object_size / 2) };
-
-    let collection = client.database("db").collection("coll");
+    let collection = client.database("db").collection::<bson::Document>("coll");
     collection.drop().await.unwrap();
-    collection.insert_one(document.clone()).await.unwrap();
 
     let models = vec![
-        WriteModel::InsertOne {
+        WriteModel::UpdateOne {
             namespace: collection.namespace(),
-            document
-        };
-        2
+            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+        WriteModel::UpdateOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
     ];
-    let error = client.bulk_write(models).ordered(false).await.unwrap_err();
 
-    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {:?}", error);
-    };
-
-    let write_errors = bulk_write_error.write_errors;
-    assert_eq!(write_errors.len(), 2);
+    let result = client
+        .bulk_write(models)
+        .verbose_results(true)
+        .await
+        .unwrap();
+    assert_eq!(result.upserted_count, 2);
 
     let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
@@ -257,14 +266,8 @@ async fn successful_cursor_iteration() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
-    let mut options = get_client_options().await.clone();
-    if TestClient::new().await.is_sharded() {
-        options.hosts.drain(1..);
-    }
-
     let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
-        .options(options)
         .event_buffer(event_buffer.clone())
         .build()
         .await;
@@ -279,28 +282,110 @@ async fn failed_cursor_iteration() {
     let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let document = doc! { "_id": "a".repeat(max_bson_object_size / 2) };
-
-    let collection = client.database("db").collection("coll");
+    let collection = client.database("db").collection::<bson::Document>("coll");
     collection.drop().await.unwrap();
-    collection.insert_one(document.clone()).await.unwrap();
 
     let models = vec![
-        WriteModel::InsertOne {
+        WriteModel::UpdateOne {
             namespace: collection.namespace(),
-            document
-        };
-        2
+            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+        WriteModel::UpdateOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
     ];
-    let error = client.bulk_write(models).ordered(false).await.unwrap_err();
+
+    let error = client
+        .bulk_write(models)
+        .verbose_results(true)
+        .await
+        .unwrap_err();
 
     let Some(ref source) = error.source else {
         panic!("Expected error to contain source");
     };
     assert_eq!(source.code(), Some(8));
 
-    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {:?}", error);
+    let ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+        partial_result: Some(partial_result),
+        ..
+    }) = *error.kind
+    else {
+        panic!(
+            "Expected bulk write error with partial result, got {:?}",
+            error
+        );
     };
-    assert_eq!(bulk_write_error.write_errors.len(), 1);
+    assert_eq!(partial_result.upserted_count, 2);
+
+    let get_more_events = event_buffer.get_command_started_events(&["getMore"]);
+    assert_eq!(get_more_events.len(), 1);
+
+    let kill_cursors_events = event_buffer.get_command_started_events(&["killCursors"]);
+    assert_eq!(kill_cursors_events.len(), 1);
+}
+
+#[tokio::test]
+async fn cursor_iteration_in_a_transaction() {
+    let event_buffer = EventBuffer::new();
+    let client = Client::test_builder()
+        .event_buffer(event_buffer.clone())
+        .build()
+        .await;
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+");
+        return;
+    }
+
+    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+
+    let collection = client.database("db").collection::<bson::Document>("coll");
+    collection.drop().await.unwrap();
+
+    let mut session = client.start_session().await.unwrap();
+    session.start_transaction().await.unwrap();
+
+    let models = vec![
+        WriteModel::UpdateOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+        WriteModel::UpdateOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+    ];
+
+    let result = client
+        .bulk_write(models)
+        .verbose_results(true)
+        .session(&mut session)
+        .await
+        .unwrap();
+    assert_eq!(result.upserted_count, 2);
+
+    let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
+    assert_eq!(command_started_events.len(), 1);
 }
