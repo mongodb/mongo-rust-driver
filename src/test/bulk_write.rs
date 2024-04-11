@@ -349,8 +349,11 @@ async fn cursor_iteration_in_a_transaction() {
         .build()
         .await;
 
-    if client.server_version_lt(8, 0) {
-        log_uncaptured("skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+");
+    if client.server_version_lt(8, 0) || client.is_standalone() {
+        log_uncaptured(
+            "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
+             require a non-standalone topology",
+        );
         return;
     }
 
