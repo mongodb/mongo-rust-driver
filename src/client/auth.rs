@@ -258,7 +258,7 @@ impl AuthMechanism {
 
     /// Constructs the first message to be sent to the server as part of the authentication
     /// handshake, which can be used for speculative authentication.
-    pub(crate) fn build_speculative_client_first(
+    pub(crate) async fn build_speculative_client_first(
         &self,
         credential: &Credential,
     ) -> Result<Option<ClientFirst>> {
@@ -278,9 +278,9 @@ impl AuthMechanism {
                 x509::build_speculative_client_first(credential),
             )))),
             Self::Plain => Ok(None),
-            Self::MongoDbOidc => Ok(Some(ClientFirst::Oidc(Box::new(
-                oidc::build_speculative_client_first(credential),
-            )))),
+            Self::MongoDbOidc => Ok(oidc::build_speculative_client_first(credential)
+                .await
+                .map(|comm| ClientFirst::Oidc(Box::new(comm)))),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
@@ -556,6 +556,7 @@ impl Debug for Credential {
 }
 
 /// Contains the first client message sent as part of the authentication handshake.
+#[derive(Debug)]
 pub(crate) enum ClientFirst {
     Scram(ScramVersion, scram::ClientFirst),
     X509(Box<Command>),

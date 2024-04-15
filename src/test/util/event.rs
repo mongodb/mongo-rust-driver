@@ -31,6 +31,14 @@ impl Event {
         }
     }
 
+    pub(crate) fn as_command_event(&self) -> Option<&CommandEvent> {
+        if let Event::Command(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
+
     #[cfg(feature = "in-use-encryption-unstable")]
     pub(crate) fn as_command_started_event(&self) -> Option<&CommandStartedEvent> {
         match self {
