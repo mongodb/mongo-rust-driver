@@ -674,11 +674,6 @@ tasks:
     commands:
       - func: "check rustdoc"
 
-  - name: check-manual
-    tags: [lint]
-    commands:
-      - func: "check manual"
-
   - name: test-3.6-standalone
     tags: [3.6, standalone]
     commands:
@@ -1786,17 +1781,6 @@ functions:
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-rustdoc.sh
-
-  "check manual":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/install-dependencies.sh mdbook
-          manual/test.sh
 
   "upload-mo-artifacts":
     - command: shell.exec
