@@ -60,7 +60,6 @@ impl<T> EventBuffer<T> {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn filter_map<R>(&self, f: impl Fn(&T) -> Option<R>) -> Vec<R> {
         self.inner
             .events

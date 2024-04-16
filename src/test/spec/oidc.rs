@@ -1,5 +1,3 @@
-use bson::doc;
-
 use crate::{
     client::{
         auth::{oidc, AuthMechanism, Credential},
@@ -107,7 +105,7 @@ async fn machine_1_1_callback_is_called() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
@@ -146,7 +144,7 @@ async fn machine_1_2_callback_is_called_only_once_for_multiple_connections() -> 
                 client
                     .database("test")
                     .collection::<Document>("test")
-                    .find_one(None, None)
+                    .find_one(doc! {})
                     .await
                     .unwrap();
             }
@@ -227,7 +225,7 @@ async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -270,7 +268,7 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -323,7 +321,7 @@ async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
@@ -357,7 +355,7 @@ async fn machine_3_2_auth_failures_without_cached_tokens_returns_an_error() -> a
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -409,7 +407,7 @@ async fn machine_4_reauthentication() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(2, *(*call_count).lock().await);
     Ok(())
@@ -479,7 +477,7 @@ async fn human_1_2_single_principal_explicit_username() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
@@ -514,7 +512,7 @@ async fn human_1_3_multiple_principal_user_1() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
@@ -549,7 +547,7 @@ async fn human_1_4_multiple_principal_user_2() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
@@ -583,7 +581,7 @@ async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -628,7 +626,7 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
         let res = client
             .database("test")
             .collection::<Document>("test")
-            .find_one(None, None)
+            .find_one(doc! {})
             .await;
 
         assert!(res.is_err());
@@ -669,7 +667,7 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
         let res = client
             .database("test")
             .collection::<Document>("test")
-            .find_one(None, None)
+            .find_one(doc! {})
             .await;
 
         assert!(res.is_err());
@@ -716,7 +714,7 @@ async fn human_2_1_valid_callback_inputs() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
@@ -750,7 +748,7 @@ async fn human_2_2_callback_returns_missing_data() -> anyhow::Result<()> {
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -825,7 +823,7 @@ async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() 
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     // the callback should not have been called at all
@@ -874,7 +872,7 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -891,13 +889,8 @@ async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached
 async fn human_4_1_succeeds() -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
     use crate::{
-        event::command::{
-            CommandEvent,
-            CommandFailedEvent,
-            CommandStartedEvent,
-            CommandSucceededEvent,
-        },
-        test::{Event, EventHandler},
+        event::command::CommandEvent,
+        test::{util::event_buffer::EventBuffer, Event},
     };
 
     let admin_client = admin_client!();
@@ -924,15 +917,14 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
         .build()
         .into();
 
-    let handler = Arc::new(EventHandler::new());
-    let mut events = handler.subscribe();
-    opts.command_event_handler = Some(handler.clone().into());
+    let buffer = EventBuffer::new();
+    opts.command_event_handler = Some(buffer.handler());
     let client = Client::with_options(opts)?;
 
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     // Now set a failpoint for find with 391 error code
@@ -947,67 +939,47 @@ async fn human_4_1_succeeds() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     assert_eq!(2, *(*call_count).lock().await);
-    let events = events
-        .collect_events(Duration::from_secs(1), |e| {
-            if let Some(e) = e.as_command_event() {
-                e.command_name() == "find"
-            } else {
-                false
-            }
-        })
-        .await;
-    // assert the first command is find
+    let find_events = buffer.filter_map(|e: &Event| match e.as_command_event() {
+        Some(command_event) if command_event.command_name() == "find" => {
+            Some(command_event.clone())
+        }
+        _ => None,
+    });
+    // assert the first find started
     assert!(matches!(
-        events.first().unwrap(),
-        Event::Command(CommandEvent::Started(CommandStartedEvent {
-            command_name,
-            ..
-        })) if command_name.as_str() == "find"
+        find_events.first().unwrap(),
+        CommandEvent::Started(_)
     ));
-    // assert the first command is find and succeeded
+    // assert the first find succeeded
     assert!(matches!(
-        events.get(1).unwrap(),
-        Event::Command(CommandEvent::Succeeded(CommandSucceededEvent {
-            command_name,
-            ..
-        })) if command_name.as_str() == "find"
+        find_events.get(1).unwrap(),
+        CommandEvent::Succeeded(_)
     ));
-    // assert the second command is find
+    // assert the second find started
     assert!(matches!(
-        events.get(2).unwrap(),
-        Event::Command(CommandEvent::Started(CommandStartedEvent {
-            command_name,
-            ..
-        })) if command_name.as_str() == "find"
+        find_events.get(2).unwrap(),
+        CommandEvent::Started(_)
     ));
-    // assert the second command is find and failed
+    // assert the second find failed
     assert!(matches!(
-        events.get(3).unwrap(),
-        Event::Command(CommandEvent::Failed(CommandFailedEvent {
-            command_name,
-            ..
-        })) if command_name.as_str() == "find"
+        find_events.get(3).unwrap(),
+        CommandEvent::Failed(_)
     ));
-    // assert the third command is find
+    // assert the first find started
     assert!(matches!(
-        events.get(4).unwrap(),
-        Event::Command(CommandEvent::Started(CommandStartedEvent {
-            command_name,
-            ..
-        })) if command_name.as_str() == "find"
+        find_events.get(4).unwrap(),
+        CommandEvent::Started(_)
     ));
-    // assert the third command is find and succeeded
+    // assert the third find succeeded
     assert!(matches!(
-        events.get(5).unwrap(),
-        Event::Command(CommandEvent::Succeeded(CommandSucceededEvent {
-            command_name,
-            ..
-        })) if command_name.as_str() == "find"
+        find_events.get(5).unwrap(),
+        CommandEvent::Succeeded(_)
     ));
+
     Ok(())
 }
 
@@ -1042,7 +1014,7 @@ async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     // Now set a failpoint for find with 391 error code
@@ -1057,7 +1029,7 @@ async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     assert_eq!(2, *(*call_count).lock().await);
@@ -1095,7 +1067,7 @@ async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     assert_eq!(1, *(*call_count).lock().await);
@@ -1112,7 +1084,7 @@ async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     assert_eq!(3, *(*call_count).lock().await);
@@ -1150,7 +1122,7 @@ async fn human_4_4_fails() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     assert_eq!(1, *(*call_count).lock().await);
@@ -1167,7 +1139,7 @@ async fn human_4_4_fails() -> anyhow::Result<()> {
     let res = client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await;
 
     assert!(res.is_err());
@@ -1229,7 +1201,7 @@ async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
     client
         .database("test")
         .collection::<Document>("test")
-        .find_one(None, None)
+        .find_one(doc! {})
         .await?;
 
     // the callback should have been called once
