@@ -341,16 +341,36 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
 }
 
 #[test]
-fn deserialize_clustered_index_option_from_bool() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let input = serde_json::json!({ "clusteredIndex": true });
-    let options = serde_json::from_value::<CreateCollectionOptions>(input)?;
+fn deserialize_clustered_index_option_from_bool() {
+    let options_doc = doc! { "clusteredIndex": true };
+    let options: CreateCollectionOptions = bson::from_document(options_doc).unwrap();
     let clustered_index = options
         .clustered_index
-        .expect("deserialized options include clustered_index");
-    let default_index = ClusteredIndex::default();
-    assert_eq!(clustered_index.key, default_index.key);
-    assert_eq!(clustered_index.unique, default_index.unique);
-    assert_eq!(clustered_index.name, default_index.name);
-    assert_eq!(clustered_index.v, default_index.v);
-    Ok(())
+        .expect("deserialized options should include clustered_index");
+    assert_eq!(clustered_index, ClusteredIndex::default());
+}
+
+#[tokio::test]
+async fn clustered_index_list_collections() {
+    let client = TestClient::new().await;
+    let database = client.database("db");
+
+    database
+        .create_collection("clustered_index_collection")
+        .clustered_index(ClusteredIndex::default())
+        .await
+        .unwrap();
+
+    let collections = database
+        .list_collections()
+        .await
+        .unwrap()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    let clustered_index_collection = collections
+        .iter()
+        .find(|specification| specification.name == "clustered_index_collection")
+        .unwrap();
+    assert!(clustered_index_collection.options.clustered_index.is_some());
 }

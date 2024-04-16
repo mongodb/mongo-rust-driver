@@ -186,7 +186,7 @@ impl ClusteredIndex {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(Debug, Deserialize)]
         #[serde(untagged)]
         enum ValueUnion {
             Bool(bool),
