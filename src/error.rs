@@ -607,7 +607,6 @@ pub enum ErrorKind {
 
     /// A GridFS error occurred.
     #[error("{0:?}")]
-    #[non_exhaustive]
     GridFs(GridFsErrorKind),
 
     #[error("Internal error: {message}")]
