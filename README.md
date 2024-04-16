@@ -3,7 +3,7 @@
 
 This is the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has a sync API that may be enabled via feature flags.
 
-For more detailed documentation, see <https://www.mongodb.com/docs/drivers/rust/current/>. This documentation includes detailed content about features, runnable examples, troubleshooting resources, and more.
+For more details, including features, runnable examples, troubleshooting resources, and more, please see the [official documentation](https://www.mongodb.com/docs/drivers/rust/current/).
 
 ## Installation
 ### Requirements
@@ -38,7 +38,7 @@ features = ["sync"]
 |:-----------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `dns-resolver`               | Enable DNS resolution to allow `mongodb+srv` URI handling.  **Enabled by default.**                                                                                     |
 | `rustls-tls`                 | Use [`rustls`](https://docs.rs/rustls/latest/rustls/) for TLS connection handling.  **Enabled by default.**                                                             |
-| `openssl-tls`                | Use ['openssl'](https://docs.rs/openssl/latest/openssl/) for TLS connection handling.                                                                                   |
+| `openssl-tls`                | Use [`openssl`](https://docs.rs/openssl/latest/openssl/) for TLS connection handling.                                                                                   |
 | `sync`                       | Expose the synchronous API (`mongodb::sync`).                                                                                                                           |
 | `aws-auth`                   | Enable support for the MONGODB-AWS authentication mechanism.                                                                                                            |
 | `zlib-compression`           | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                                                                |
