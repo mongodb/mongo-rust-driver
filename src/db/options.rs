@@ -104,7 +104,7 @@ pub struct CreateCollectionOptions {
     /// Options for supporting change stream pre- and post-images.
     pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
 
-    /// Options for clustered collections.
+    /// Options for clustered collections. This option is only available on server versions 5.3+.
     #[serde(default, deserialize_with = "ClusteredIndex::deserialize_self_or_true")]
     pub clustered_index: Option<ClusteredIndex>,
 

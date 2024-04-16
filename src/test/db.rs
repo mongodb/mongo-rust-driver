@@ -355,6 +355,10 @@ async fn clustered_index_list_collections() {
     let client = TestClient::new().await;
     let database = client.database("db");
 
+    if client.server_version_lt(5, 3) {
+        return;
+    }
+
     database
         .create_collection("clustered_index_collection")
         .clustered_index(ClusteredIndex::default())
