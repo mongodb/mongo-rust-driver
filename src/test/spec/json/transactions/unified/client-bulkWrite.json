@@ -553,6 +553,40 @@
           ]
         }
       ]
+    },
+    {
+      "description": "client bulkWrite with writeConcern in a transaction causes a transaction error",
+      "operations": [
+        {
+          "object": "session0",
+          "name": "startTransaction"
+        },
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "session": "session0",
+            "writeConcern": {
+              "w": 1
+            },
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": "transaction-tests.coll0",
+                  "document": {
+                    "_id": 8,
+                    "x": 88
+                  }
+                }
+              }
+            ]
+          },
+          "expectError": {
+            "isClientError": true,
+            "errorContains": "Cannot set write concern after starting a transaction"
+          }
+        }
+      ]
     }
   ]
 }

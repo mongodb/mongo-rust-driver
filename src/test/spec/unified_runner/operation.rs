@@ -8,6 +8,7 @@ use std::{
     convert::TryInto,
     fmt::Debug,
     ops::{Deref, DerefMut},
+    panic::{catch_unwind, AssertUnwindSafe},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -226,7 +227,7 @@ impl Operation {
                             "{}: {} should return an error",
                             description, self.name
                         ));
-                        expect_error.verify_result(&error, description).unwrap();
+                        expect_error.verify_result(&error, description);
                     }
                     Expectation::Ignore => (),
                 }
@@ -2444,12 +2445,14 @@ impl TestOperation for Loop {
                             self.report_success(&mut entities);
                         }
                         (Err(error), Expectation::Error(ref expected_error)) => {
-                            match expected_error.verify_result(&error, operation.name.as_str()) {
+                            match catch_unwind(AssertUnwindSafe(|| {
+                                expected_error.verify_result(&error, operation.name.as_str())
+                            })) {
                                 Ok(_) => self.report_success(&mut entities),
-                                Err(e) => report_error_or_failure!(
+                                Err(_) => report_error_or_failure!(
                                     self.store_failures_as_entity,
                                     self.store_errors_as_entity,
-                                    e,
+                                    format!("expected {:?}, got {:?}", expected_error, error),
                                     &mut entities
                                 ),
                             }

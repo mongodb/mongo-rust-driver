@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::Arc, time::Duration};
 
 use percent_encoding::NON_ALPHANUMERIC;
+use pretty_assertions::assert_eq;
 use regex::Regex;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
@@ -493,95 +494,47 @@ pub(crate) struct ExpectError {
 }
 
 impl ExpectError {
-    pub(crate) fn verify_result(
-        &self,
-        error: &Error,
-        description: impl AsRef<str>,
-    ) -> std::result::Result<(), String> {
-        let description = description.as_ref();
+    pub(crate) fn verify_result(&self, error: &Error, description: impl AsRef<str>) {
+        let context = format!(
+            "test description: {}\nerror: {:?}\n",
+            description.as_ref(),
+            error
+        );
 
         if let Some(is_client_error) = self.is_client_error {
-            if is_client_error != !error.is_server_error() {
-                return Err(format!(
-                    "{}: expected client error but got {:?}",
-                    description, error
-                ));
-            }
+            assert_eq!(!error.is_server_error(), is_client_error, "{context}");
         }
 
         if let Some(error_contains) = &self.error_contains {
-            match &error.message() {
-                Some(msg) if msg.contains(error_contains) => (),
-                _ => {
-                    return Err(format!(
-                        "{}: \"{}\" should include message field",
-                        description, error
-                    ))
-                }
-            }
+            let Some(message) = error.message() else {
+                panic!("{context}expected error to have message");
+            };
+            assert!(message.contains(error_contains), "{context}");
         }
 
         if let Some(error_code) = self.error_code {
-            match &error.code() {
-                Some(code) => {
-                    if code != &error_code {
-                        return Err(format!(
-                            "{}: error code {} ({:?}) did not match expected error code {}",
-                            description,
-                            code,
-                            error.code_name(),
-                            error_code
-                        ));
-                    }
-                }
-                None => {
-                    return Err(format!(
-                        "{}: {:?} was expected to include code {} but had no code",
-                        description, error, error_code
-                    ))
-                }
-            }
+            let Some(actual_code) = error.code() else {
+                panic!("{context}expected error to have code");
+            };
+            assert_eq!(actual_code, error_code, "{context}");
         }
 
         if let Some(expected_code_name) = &self.error_code_name {
-            match error.code_name() {
-                Some(name) => {
-                    if name != expected_code_name {
-                        return Err(format!(
-                            "{}: error code name \"{}\" did not match expected error code name \
-                             \"{}\"",
-                            description, name, expected_code_name,
-                        ));
-                    }
-                }
-                None => {
-                    return Err(format!(
-                        "{}: {:?} was expected to include code name \"{}\" but had no code name",
-                        description, error, expected_code_name
-                    ))
-                }
-            }
+            let Some(actual_code_name) = error.code_name() else {
+                panic!("{}: expected error to have code name", context);
+            };
+            assert_eq!(actual_code_name, expected_code_name, "{}", context);
         }
 
         if let Some(error_labels_contain) = &self.error_labels_contain {
             for label in error_labels_contain {
-                if !error.contains_label(label) {
-                    return Err(format!(
-                        "{}: expected {:?} to contain label \"{}\"",
-                        description, error, label
-                    ));
-                }
+                assert!(error.contains_label(label), "{}", context);
             }
         }
 
         if let Some(error_labels_omit) = &self.error_labels_omit {
             for label in error_labels_omit {
-                if error.contains_label(label) {
-                    return Err(format!(
-                        "{}: expected {:?} to omit label \"{}\"",
-                        description, error, label
-                    ));
-                }
+                assert!(!error.contains_label(label), "{}", context);
             }
         }
 
@@ -590,64 +543,56 @@ impl ExpectError {
                 ErrorKind::ClientBulkWrite(ClientBulkWriteError {
                     partial_result: Some(ref partial_result),
                     ..
-                }) => Some(bson::to_bson(partial_result).map_err(|e| e.to_string())?),
+                }) => Some(
+                    bson::to_bson(partial_result)
+                        .map_err(|e| e.to_string())
+                        .unwrap(),
+                ),
                 _ => None,
             };
-            results_match(actual_result.as_ref(), expected_result, false, None)?;
+            results_match(actual_result.as_ref(), expected_result, false, None).expect(&context);
         }
 
         if let Some(ref write_errors) = self.write_errors {
-            let actual_write_errors = match *error.kind {
-                ErrorKind::ClientBulkWrite(ref bulk_write_error) => &bulk_write_error.write_errors,
-                ref other => {
-                    return Err(format!(
-                        "{}: expected bulk write error, got {:?}",
-                        description, other
-                    ))
-                }
+            let ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+                write_errors: ref actual_write_errors,
+                ..
+            }) = *error.kind
+            else {
+                panic!("{context}expected client bulk write error");
             };
 
             for (expected_index, expected_error) in write_errors {
-                let actual_error = actual_write_errors.get(expected_index).ok_or_else(|| {
-                    format!(
-                        "{}: expected error for operation at index {}",
-                        description, expected_index
-                    )
-                })?;
-                let actual_error = bson::to_bson(&actual_error).map_err(|e| e.to_string())?;
-                results_match(Some(&actual_error), expected_error, true, None)?;
+                let actual_error = actual_write_errors.get(expected_index).expect(&context);
+                let actual_error = bson::to_bson(&actual_error)
+                    .map_err(|e| e.to_string())
+                    .expect(&context);
+                results_match(Some(&actual_error), expected_error, true, None).expect(&context);
             }
         }
 
         if let Some(ref write_concern_errors) = self.write_concern_errors {
-            let actual_write_concern_errors = match *error.kind {
-                ErrorKind::ClientBulkWrite(ref bulk_write_error) => {
-                    &bulk_write_error.write_concern_errors
-                }
-                ref other => {
-                    return Err(format!(
-                        "{}: expected bulk write error, got {:?}",
-                        description, other
-                    ))
-                }
+            let ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+                write_concern_errors: ref actual_write_concern_errors,
+                ..
+            }) = *error.kind
+            else {
+                panic!("{context}expected client bulk write error");
             };
 
-            if actual_write_concern_errors.len() != write_concern_errors.len() {
-                return Err(format!(
-                    "{}: got {} write errors, expected {}",
-                    description,
-                    actual_write_concern_errors.len(),
-                    write_concern_errors.len()
-                ));
-            }
+            assert_eq!(
+                actual_write_concern_errors.len(),
+                write_concern_errors.len(),
+                "{context}"
+            );
 
             for (actual, expected) in actual_write_concern_errors.iter().zip(write_concern_errors) {
-                let actual = bson::to_bson(&actual).map_err(|e| e.to_string())?;
-                results_match(Some(&actual), expected, true, None)?;
+                let actual = bson::to_bson(&actual)
+                    .map_err(|e| e.to_string())
+                    .expect(&context);
+                results_match(Some(&actual), expected, true, None).expect(&context);
             }
         }
-
-        Ok(())
     }
 }
 
