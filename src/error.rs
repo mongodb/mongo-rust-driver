@@ -861,6 +861,10 @@ impl BulkWriteFailure {
             inserted_ids: Default::default(),
         }
     }
+
+    pub fn get_inserted_ids(&self) -> &HashMap<usize, Bson> {
+        &self.inserted_ids
+    }
 }
 
 /// An error that occurred when trying to execute a write operation.
