@@ -9,7 +9,7 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
+        spec::unified_runner::run_unified_tests,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
@@ -18,19 +18,6 @@ use crate::{
     Client,
     Collection,
 };
-
-#[tokio::test(flavor = "multi_thread")]
-async fn run_legacy() {
-    run_v2_tests(&["transactions", "legacy"])
-        // TODO RUST-582: unskip this file
-        .skip_files(&["error-labels-blockConnection.json"])
-        .await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn run_legacy_convenient_api() {
-    run_v2_tests(&["transactions-convenient-api"]).await;
-}
 
 // TODO RUST-902: Reduce transactionLifetimeLimitSeconds.
 #[tokio::test(flavor = "multi_thread")]

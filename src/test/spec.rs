@@ -92,7 +92,8 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
                 &path, e
             )
         });
-        let test: T = bson::from_bson(test_bson).unwrap_or_else(|e| {
+        let de = bson::Deserializer::new(test_bson);
+        let test: T = serde_path_to_error::deserialize(de).unwrap_or_else(|e| {
             panic!(
                 "Failed to deserialize test BSON to {} in {:?}: {}",
                 type_name::<T>(),
