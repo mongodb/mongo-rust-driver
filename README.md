@@ -1,35 +1,9 @@
 # MongoDB Rust Driver
-[![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/mongodb/mongo-rust-driver/blob/main/LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has a sync API that may be enabled via feature flags.
+This is the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has a sync API that may be enabled via feature flags.
 
-For more detailed documentation, see https://www.mongodb.com/docs/drivers/rust/current/. This documentation includes detailed content about features, runnable examples, troubleshooting resources, and more.
-
-## Index
-- [Installation](#installation)
-    - [Requirements](#requirements)
-      - [Supported platforms](#supported-platforms)
-    - [Importing](#importing)
-        - [Configuring the async runtime](#configuring-the-async-runtime)
-        - [Enabling the sync API](#enabling-the-sync-api)
-        - [All feature flags](#all-feature-flags)
-- [Example Usage](#example-usage)
-    - [Using the async API](#using-the-async-api)
-        - [Connecting to a MongoDB deployment](#connecting-to-a-mongodb-deployment)
-        - [Getting a handle to a database](#getting-a-handle-to-a-database)
-        - [Inserting documents into a collection](#inserting-documents-into-a-collection)
-        - [Finding documents in a collection](#finding-documents-in-a-collection)
-    - [Using the sync API](#using-the-sync-api)
-- [Web Framework Examples](#web-framework-examples)
-- [Note on connecting to Atlas deployments](#note-on-connecting-to-atlas-deployments)
-- [Windows DNS note](#windows-dns-note)
-- [Warning about timeouts / cancellation](#warning-about-timeouts--cancellation)
-- [Bug Reporting / Feature Requests](#bug-reporting--feature-requests)
-- [Contributing](#contributing)
-- [Running the tests](#running-the-tests)
-- [Continuous Integration](#continuous-integration)
-- [Minimum supported Rust version (MSRV) policy](#minimum-supported-rust-version-msrv-policy)
-- [License](#license)
+For more details, including features, runnable examples, troubleshooting resources, and more, please see the [official documentation](https://www.mongodb.com/docs/drivers/rust/current/).
 
 ## Installation
 ### Requirements
@@ -60,171 +34,18 @@ features = ["sync"]
 
 ### All Feature Flags
 
-| Feature              | Description                                                                                                                           | Extra dependencies              | Default |
-|:---------------------|:--------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------|:--------|
-| `sync`               | Expose the synchronous API (`mongodb::sync`).                                                                                         | n/a                             | no      |
-| `aws-auth`           | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest`                       | no      |
-| `zlib-compression`   | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                              | `flate2`                        | no      |
-| `zstd-compression`   | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/).                                               | `zstd`                          | no      |
-| `snappy-compression` | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/)                                              | `snap`                          | no      |
-| `openssl-tls`        | Switch TLS connection handling to use ['openssl'](https://docs.rs/openssl/0.10.38/).                                                  | `openssl`                       | no      |
-
-## Example Usage
-Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/latest).
-
-### Using the async API
-#### Connecting to a MongoDB deployment
-```rust
-use mongodb::{Client, options::ClientOptions};
-```
-```rust
-// Parse a connection string into an options struct.
-let mut client_options = ClientOptions::parse("mongodb://localhost:27017").await?;
-
-// Manually set an option.
-client_options.app_name = Some("My App".to_string());
-
-// Get a handle to the deployment.
-let client = Client::with_options(client_options)?;
-
-// List the names of the databases in that deployment.
-for db_name in client.list_database_names(None, None).await? {
-    println!("{}", db_name);
-}
-```
-#### Getting a handle to a database
-```rust
-// Get a handle to a database.
-let db = client.database("mydb");
-
-// List the names of the collections in that database.
-for collection_name in db.list_collection_names(None).await? {
-    println!("{}", collection_name);
-}
-```
-#### Inserting documents into a collection
-```rust
-use mongodb::bson::{doc, Document};
-```
-```rust
-// Get a handle to a collection in the database.
-let collection = db.collection::<Document>("books");
-
-let docs = vec![
-    doc! { "title": "1984", "author": "George Orwell" },
-    doc! { "title": "Animal Farm", "author": "George Orwell" },
-    doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
-];
-
-// Insert some documents into the "mydb.books" collection.
-collection.insert_many(docs, None).await?;
-```
-
-A [`Collection`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html) can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate, not just `Document`:
-
-``` toml
-# In Cargo.toml, add the following dependency.
-serde = { version = "1.0", features = ["derive"] }
-```
-
-``` rust
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Book {
-    title: String,
-    author: String,
-}
-```
-
-``` rust
-// Get a handle to a collection of `Book`.
-let typed_collection = db.collection::<Book>("books");
-
-let books = vec![
-    Book {
-        title: "The Grapes of Wrath".to_string(),
-        author: "John Steinbeck".to_string(),
-    },
-    Book {
-        title: "To Kill a Mockingbird".to_string(),
-        author: "Harper Lee".to_string(),
-    },
-];
-
-// Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
-typed_collection.insert_many(books, None).await?;
-```
-
-#### Finding documents in a collection
-Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits.
-
-``` toml
-# In Cargo.toml, add the following dependency.
-futures = "0.3"
-```
-```rust
-// This trait is required to use `try_next()` on the cursor
-use futures::stream::TryStreamExt;
-use mongodb::{bson::doc, options::FindOptions};
-```
-```rust
-// Query the books in the collection with a filter and an option.
-let filter = doc! { "author": "George Orwell" };
-let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-let mut cursor = typed_collection.find(filter, find_options).await?;
-
-// Iterate over the results of the cursor.
-while let Some(book) = cursor.try_next().await? {
-    println!("title: {}", book.title);
-}
-```
-
-### Using the sync API
-The driver also provides a blocking sync API. See the [Installation](#enabling-the-sync-api) section for instructions on how to enable it.
-
-The various sync-specific types are found in the `mongodb::sync` submodule rather than in the crate's top level like in the async API. The sync API calls through to the async API internally though, so it looks and behaves similarly to it.
-```rust
-use mongodb::{
-    bson::doc,
-    sync::Client,
-};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Book {
-    title: String,
-    author: String,
-}
-```
-```rust
-let client = Client::with_uri_str("mongodb://localhost:27017")?;
-let database = client.database("mydb");
-let collection = database.collection::<Book>("books");
-
-let docs = vec![
-    Book {
-        title: "1984".to_string(),
-        author: "George Orwell".to_string(),
-    },
-    Book {
-        title: "Animal Farm".to_string(),
-        author: "George Orwell".to_string(),
-    },
-    Book {
-        title: "The Great Gatsby".to_string(),
-        author: "F. Scott Fitzgerald".to_string(),
-    },
-];
-
-// Insert some books into the "mydb.books" collection.
-collection.insert_many(docs, None)?;
-
-let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
-for result in cursor {
-    println!("title: {}", result?.title);
-}
-```
+| Feature                      | Description                                                                                                                                                             |
+|:-----------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `dns-resolver`               | Enable DNS resolution to allow `mongodb+srv` URI handling.  **Enabled by default.**                                                                                     |
+| `rustls-tls`                 | Use [`rustls`](https://docs.rs/rustls/latest/rustls/) for TLS connection handling.  **Enabled by default.**                                                             |
+| `openssl-tls`                | Use [`openssl`](https://docs.rs/openssl/latest/openssl/) for TLS connection handling.                                                                                   |
+| `sync`                       | Expose the synchronous API (`mongodb::sync`).                                                                                                                           |
+| `aws-auth`                   | Enable support for the MONGODB-AWS authentication mechanism.                                                                                                            |
+| `zlib-compression`           | Enable support for compressing messages with [`zlib`](https://zlib.net/)                                                                                                |
+| `zstd-compression`           | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/).                                                                                 |
+| `snappy-compression`         | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/)                                                                                |
+| `in-use-encryption-unstable` | Enable support for client-side field level encryption and queryable encryption. This API is unstable and may be subject to breaking changes in minor releases.          |
+| `tracing-unstable`           | Enable support for emitting [`tracing`](https://docs.rs/tracing/latest/tracing/) events. This API is unstable and may be subject to breaking changes in minor releases. |
 
 ## Web Framework Examples
 ### Actix
@@ -239,24 +60,7 @@ In order to connect to a pre-4.2 Atlas instance that's M2 or bigger, the `openss
 
 ## Windows DNS note
 
-On Windows, there is a known issue in the `trust-dns-resolver` crate, which the driver uses to perform DNS lookups, that causes severe performance degradation in resolvers that use the system configuration. Since the driver uses the system configuration by default, users are recommended to specify an alternate resolver configuration on Windows until that issue is resolved. This only has an effect when connecting to deployments using a `mongodb+srv` connection string.
-
-e.g.
-
-``` rust
-use mongodb::{
-    options::{ClientOptions, ResolverConfig},
-    Client,
-};
-```
-``` rust
-let options = ClientOptions::parse_with_resolver_config(
-    "mongodb+srv://my.host.com",
-    ResolverConfig::cloudflare(),
-)
-.await?;
-let client = Client::with_options(options)?;
-```
+On Windows, there is a known issue in the `trust-dns-resolver` crate, which the driver uses to perform DNS lookups, that causes severe performance degradation in resolvers that use the system configuration. Since the driver uses the system configuration by default, users are recommended to specify an alternate resolver configuration on Windows (e.g. `ResolverConfig::cloudflare()`) until that issue is resolved. This only has an effect when connecting to deployments using a `mongodb+srv` connection string.
 
 ## Warning about timeouts / cancellation
 
@@ -271,16 +75,6 @@ one option is to spawn tasks and time out on their
 [`JoinHandle`](https://docs.rs/tokio/1.10.1/tokio/task/struct.JoinHandle.html) futures instead of on
 the driver's futures directly. This will ensure the driver's futures will always be completely polled
 while also allowing the application to continue in the event of a timeout.
-
-e.g.
-``` rust
-let collection = client.database("ok").collection("ok");
-let handle = tokio::task::spawn(async move {
-    collection.insert_one(doc! { "x": 1 }, None).await
-});
-
-tokio::time::timeout(Duration::from_secs(5), handle).await???;
-```
 
 ## Bug Reporting / Feature Requests
 To file a bug report or submit a feature request, please open a ticket on our [Jira project](https://jira.mongodb.org/browse/RUST):
@@ -361,4 +155,4 @@ it will only happen in a minor or major version release.
 
 This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/main/LICENSE).
 
-This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/).
+This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (<http://www.openssl.org/>).
