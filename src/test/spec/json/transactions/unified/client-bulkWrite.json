@@ -1,6 +1,6 @@
 {
   "description": "client bulkWrite transactions",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.3",
   "runOnRequirements": [
     {
       "minServerVersion": "8.0",
@@ -38,6 +38,23 @@
       "session": {
         "id": "session0",
         "client": "client0"
+      }
+    },
+    {
+      "client": {
+        "id": "client_with_wmajority",
+        "uriOptions": {
+          "w": "majority"
+        },
+        "observeEvents": [
+          "commandStartedEvent"
+        ]
+      }
+    },
+    {
+      "session": {
+        "id": "session_with_wmajority",
+        "client": "client_with_wmajority"
       }
     }
   ],
@@ -193,12 +210,16 @@
               "1": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "2": {
                 "matchedCount": 2,
                 "modifiedCount": 2,
-                "upsertedId": null
+                "upsertedId": {
+                  "$$exists": false
+                }
               },
               "3": {
                 "matchedCount": 1,
@@ -373,6 +394,157 @@
             {
               "_id": 4,
               "x": 44
+            },
+            {
+              "_id": 8,
+              "x": 88
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "client writeConcern ignored for client bulkWrite in transaction",
+      "operations": [
+        {
+          "object": "session_with_wmajority",
+          "name": "startTransaction",
+          "arguments": {
+            "writeConcern": {
+              "w": 1
+            }
+          }
+        },
+        {
+          "object": "client_with_wmajority",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "session": "session_with_wmajority",
+            "models": [
+              {
+                "insertOne": {
+                  "namespace": "transaction-tests.coll0",
+                  "document": {
+                    "_id": 8,
+                    "x": 88
+                  }
+                }
+              }
+            ]
+          },
+          "expectResult": {
+            "insertedCount": 1,
+            "upsertedCount": 0,
+            "matchedCount": 0,
+            "modifiedCount": 0,
+            "deletedCount": 0,
+            "insertResults": {
+              "$$unsetOrMatches": {}
+            },
+            "updateResults": {
+              "$$unsetOrMatches": {}
+            },
+            "deleteResults": {
+              "$$unsetOrMatches": {}
+            }
+          }
+        },
+        {
+          "object": "session_with_wmajority",
+          "name": "commitTransaction"
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client_with_wmajority",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
+                "command": {
+                  "lsid": {
+                    "$$sessionLsid": "session_with_wmajority"
+                  },
+                  "txnNumber": 1,
+                  "startTransaction": true,
+                  "autocommit": false,
+                  "writeConcern": {
+                    "$$exists": false
+                  },
+                  "bulkWrite": 1,
+                  "errorsOnly": true,
+                  "ordered": true,
+                  "ops": [
+                    {
+                      "insert": 0,
+                      "document": {
+                        "_id": 8,
+                        "x": 88
+                      }
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "transaction-tests.coll0"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "commitTransaction": 1,
+                  "lsid": {
+                    "$$sessionLsid": "session_with_wmajority"
+                  },
+                  "txnNumber": {
+                    "$numberLong": "1"
+                  },
+                  "startTransaction": {
+                    "$$exists": false
+                  },
+                  "autocommit": false,
+                  "writeConcern": {
+                    "w": 1
+                  }
+                },
+                "commandName": "commitTransaction",
+                "databaseName": "admin"
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "collectionName": "coll0",
+          "databaseName": "transaction-tests",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            },
+            {
+              "_id": 3,
+              "x": 33
+            },
+            {
+              "_id": 5,
+              "x": 55
+            },
+            {
+              "_id": 6,
+              "x": 66
+            },
+            {
+              "_id": 7,
+              "x": 77
             },
             {
               "_id": 8,

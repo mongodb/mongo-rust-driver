@@ -44,14 +44,11 @@ use crate::{
     action::Action,
     bson::{doc, to_bson, Bson, Document},
     client::session::TransactionState,
-    coll::options::Hint,
-    collation::Collation,
-    db::options::{ListCollectionsOptions, RunCursorCommandOptions},
     error::{ErrorKind, Result},
-    gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{
         AggregateOptions,
         ChangeStreamOptions,
+        Collation,
         CountOptions,
         CreateCollectionOptions,
         DeleteOptions,
@@ -63,13 +60,19 @@ use crate::{
         FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
+        GridFsDownloadByNameOptions,
+        GridFsUploadOptions,
+        Hint,
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
+        ListCollectionsOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
+        RunCursorCommandOptions,
         SelectionCriteria,
+        TransactionOptions,
         UpdateModifications,
         UpdateOptions,
     },
@@ -1829,7 +1832,10 @@ impl TestOperation for AssertSessionNotDirty {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct StartTransaction {}
+pub(super) struct StartTransaction {
+    #[serde(flatten)]
+    options: TransactionOptions,
+}
 
 impl TestOperation for StartTransaction {
     fn execute_entity_operation<'a>(
@@ -1839,7 +1845,12 @@ impl TestOperation for StartTransaction {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             with_mut_session!(test_runner, id, |session| {
-                async move { session.start_transaction().await }
+                async move {
+                    session
+                        .start_transaction()
+                        .with_options(self.options.clone())
+                        .await
+                }
             })
             .await?;
             Ok(None)
