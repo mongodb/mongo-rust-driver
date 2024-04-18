@@ -18,10 +18,11 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
     Client,
@@ -49,7 +50,7 @@ async fn min_heartbeat_frequency() {
 
     let _guard = setup_client
         .enable_fail_point(
-            FailPoint::new(
+            FailPoint::fail_command(
                 &[LEGACY_HELLO_COMMAND_NAME, "hello"],
                 FailPointMode::Times(5),
             )
@@ -135,7 +136,7 @@ async fn sdam_pool_management() {
 
     let _guard = client
         .enable_fail_point(
-            FailPoint::new(
+            FailPoint::fail_command(
                 &[LEGACY_HELLO_COMMAND_NAME, "hello"],
                 FailPointMode::Times(4),
             )

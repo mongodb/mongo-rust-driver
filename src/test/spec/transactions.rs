@@ -10,8 +10,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
-        FailPoint,
-        FailPointMode,
+        util::fail_point::{FailPoint, FailPointMode},
         TestClient,
     },
     Client,
@@ -210,7 +209,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         .database("test_convenient")
         .collection::<Document>("test_convenient");
 
-    let fail_point = FailPoint::new(&["commitTransaction"], FailPointMode::Times(1))
+    let fail_point = FailPoint::fail_command(&["commitTransaction"], FailPointMode::Times(1))
         .error_code(251)
         .error_labels(vec![UNKNOWN_TRANSACTION_COMMIT_RESULT]);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
@@ -255,7 +254,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
         .database("test_convenient")
         .collection::<Document>("test_convenient");
 
-    let fail_point = FailPoint::new(&["commitTransaction"], FailPointMode::Times(1))
+    let fail_point = FailPoint::fail_command(&["commitTransaction"], FailPointMode::Times(1))
         .error_code(251)
         .error_labels(vec![TRANSIENT_TRANSACTION_ERROR]);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();

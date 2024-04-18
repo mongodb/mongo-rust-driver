@@ -12,7 +12,7 @@ use crate::{
     db::options::ChangeStreamPreAndPostImages,
     event::command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{Acknowledgment, WriteConcern},
-    test::{FailPoint, FailPointMode},
+    test::util::fail_point::{FailPoint, FailPointMode},
     Client,
     Collection,
 };
@@ -171,7 +171,7 @@ async fn resumes_on_error() -> Result<()> {
         }) if key == doc! { "_id": 1 }
     ));
 
-    let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
@@ -200,7 +200,8 @@ async fn does_not_resume_aggregate() -> Result<()> {
         None => return Ok(()),
     };
 
-    let fail_point = FailPoint::new(&["aggregate"], FailPointMode::Times(1)).error_code(43);
+    let fail_point =
+        FailPoint::fail_command(&["aggregate"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
 
     assert!(coll.watch().await.is_err());
@@ -267,8 +268,8 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
         }) if key == doc! { "_id": 1 }
     ));
 
-    let fail_point =
-        FailPoint::new(&["getMore", "killCursors"], FailPointMode::Times(1)).error_code(43);
+    let fail_point = FailPoint::fail_command(&["getMore", "killCursors"], FailPointMode::Times(1))
+        .error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
@@ -309,7 +310,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
         return Ok(());
     }
 
-    let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
@@ -520,7 +521,7 @@ async fn resume_uses_start_after() -> Result<()> {
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}).await?;
-    let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
@@ -576,7 +577,7 @@ async fn resume_uses_resume_after() -> Result<()> {
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}).await?;
-    let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 

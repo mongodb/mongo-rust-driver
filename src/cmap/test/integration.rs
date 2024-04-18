@@ -18,9 +18,10 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::event_buffer::EventBuffer,
-        FailPoint,
-        FailPointMode,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         TestClient,
     },
 };
@@ -190,7 +191,7 @@ async fn connection_error_during_establishment() {
 
     let _guard = client
         .enable_fail_point(
-            FailPoint::new(
+            FailPoint::fail_command(
                 &[LEGACY_HELLO_COMMAND_NAME, "hello"],
                 FailPointMode::Times(10),
             )
@@ -249,7 +250,7 @@ async fn connection_error_during_operation() {
 
     let _guard = client
         .enable_fail_point(
-            FailPoint::new(&["ping"], FailPointMode::Times(10)).close_connection(true),
+            FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true),
         )
         .await
         .unwrap();

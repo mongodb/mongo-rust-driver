@@ -30,10 +30,11 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
 };
@@ -678,7 +679,7 @@ async fn heartbeat_events() {
     options.heartbeat_freq = None;
     let fp_client = TestClient::with_options(Some(options)).await;
 
-    let fail_point = FailPoint::new(
+    let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::AlwaysOn,
     )

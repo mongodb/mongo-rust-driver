@@ -14,10 +14,12 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::{event_buffer::EventBuffer, TestClient},
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+            TestClient,
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         SERVER_API,
     },
     Client,
@@ -708,7 +710,7 @@ async fn retry_commit_txn_check_out() {
 
     // Enable a fail point that clears the connection pools so that commitTransaction will create a
     // new connection during checkout.
-    let fail_point = FailPoint::new(&["ping"], FailPointMode::Times(1)).error_code(11600);
+    let fail_point = FailPoint::fail_command(&["ping"], FailPointMode::Times(1)).error_code(11600);
     let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
@@ -753,7 +755,7 @@ async fn retry_commit_txn_check_out() {
         .await
         .expect("should see mark available event");
 
-    let fail_point = FailPoint::new(
+    let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(1),
     )

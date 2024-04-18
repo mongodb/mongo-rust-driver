@@ -13,10 +13,11 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
     Client,
@@ -52,7 +53,8 @@ async fn retry_releases_connection() {
         .collection("retry_releases_connection");
     collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
-    let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1)).close_connection(true);
+    let fail_point =
+        FailPoint::fail_command(&["find"], FailPointMode::Times(1)).close_connection(true);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     runtime::timeout(
@@ -96,7 +98,7 @@ async fn retry_read_pool_cleared() {
         .collection("retry_read_pool_cleared");
     collection.insert_one(doc! { "x": 1 }).await.unwrap();
 
-    let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
         .error_code(91)
         .block_connection(Duration::from_secs(1));
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
@@ -179,7 +181,7 @@ async fn retry_read_different_mongos() {
             return;
         }
 
-        let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
             .error_code(6)
             .close_connection(true);
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
@@ -240,7 +242,7 @@ async fn retry_read_same_mongos() {
         client_options.direct_connection = Some(true);
         let client = Client::test_builder().options(client_options).build().await;
 
-        let fail_point = FailPoint::new(&["find"], FailPointMode::Times(1))
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
             .error_code(6)
             .close_connection(true);
         client.enable_fail_point(fail_point).await.unwrap()

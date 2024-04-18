@@ -79,7 +79,7 @@ use crate::{
     },
     runtime,
     serde_util,
-    test::FailPoint,
+    test::util::fail_point::FailPoint,
     Collection,
     Database,
     IndexModel,

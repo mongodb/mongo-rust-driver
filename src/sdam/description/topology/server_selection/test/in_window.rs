@@ -18,10 +18,11 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
     Client,
@@ -260,7 +261,7 @@ async fn load_balancing_test() {
     let slow_host = get_client_options().await.hosts[0].clone();
     let slow_host_criteria =
         SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
-    let fail_point = FailPoint::new(&["find"], FailPointMode::AlwaysOn)
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
         .block_connection(Duration::from_millis(500))
         .selection_criteria(slow_host_criteria);
     let guard = setup_client.enable_fail_point(fail_point).await.unwrap();

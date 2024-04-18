@@ -39,8 +39,6 @@ pub(crate) use self::{
         file_level_log,
         log_uncaptured,
         Event,
-        FailPoint,
-        FailPointMode,
         MatchErrExt,
         Matchable,
         TestClient,

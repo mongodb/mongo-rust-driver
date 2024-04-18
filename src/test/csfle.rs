@@ -44,7 +44,13 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{util::event_buffer::EventBuffer, Event},
+    test::{
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
+        Event,
+    },
     Client,
     Collection,
     IndexModel,
@@ -53,7 +59,7 @@ use crate::{
 
 #[allow(deprecated)]
 use super::EventClient;
-use super::{get_client_options, log_uncaptured, FailPoint, FailPointMode, TestClient};
+use super::{get_client_options, log_uncaptured, TestClient};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -2407,7 +2413,8 @@ async fn decryption_events_command_error() -> Result<()> {
         None => return Ok(()),
     };
 
-    let fail_point = FailPoint::new(&["aggregate"], FailPointMode::Times(1)).error_code(123);
+    let fail_point =
+        FailPoint::fail_command(&["aggregate"], FailPointMode::Times(1)).error_code(123);
     let _guard = td.setup_client.enable_fail_point(fail_point).await.unwrap();
     let err = td
         .decryption_events
@@ -2432,7 +2439,7 @@ async fn decryption_events_network_error() -> Result<()> {
         None => return Ok(()),
     };
 
-    let fail_point = FailPoint::new(&["aggregate"], FailPointMode::Times(1))
+    let fail_point = FailPoint::fail_command(&["aggregate"], FailPointMode::Times(1))
         .error_code(123)
         .close_connection(true);
     let _guard = td.setup_client.enable_fail_point(fail_point).await.unwrap();

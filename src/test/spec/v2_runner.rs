@@ -23,8 +23,10 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::deserialize_spec_tests,
-        util::{get_default_name, FailPointGuard},
-        FailPoint,
+        util::{
+            fail_point::{FailPoint, FailPointGuard},
+            get_default_name,
+        },
         TestClient,
         SERVERLESS,
     },

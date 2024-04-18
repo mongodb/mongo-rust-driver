@@ -4,7 +4,7 @@ use super::super::{Operation, RunOn};
 use crate::{
     bson::{Bson, Document},
     options::ClientOptions,
-    test::FailPoint,
+    test::util::fail_point::FailPoint,
 };
 
 #[derive(Debug, Deserialize)]

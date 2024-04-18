@@ -6,9 +6,10 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        util::event_buffer::EventBuffer,
-        FailPoint,
-        FailPointMode,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
     },
     Client,
     Namespace,
@@ -131,7 +132,7 @@ async fn write_concern_error_batches() {
 
     let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
 
-    let fail_point = FailPoint::new(&["bulkWrite"], FailPointMode::Times(2))
+    let fail_point = FailPoint::fail_command(&["bulkWrite"], FailPointMode::Times(2))
         .write_concern_error(doc! { "code": 91, "errmsg": "Replication is being shut down" });
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
@@ -287,7 +288,7 @@ async fn failed_cursor_iteration() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let fail_point = FailPoint::new(&["getMore"], FailPointMode::Times(1)).error_code(8);
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let collection = client.database("db").collection::<bson::Document>("coll");

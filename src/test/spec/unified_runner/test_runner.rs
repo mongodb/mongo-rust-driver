@@ -21,7 +21,7 @@ use crate::{
             test_file::{ExpectedEventType, TestFile},
         },
         update_options_for_testing,
-        util::FailPointGuard,
+        util::fail_point::FailPointGuard,
         TestClient,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,

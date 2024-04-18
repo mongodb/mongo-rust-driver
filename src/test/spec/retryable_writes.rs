@@ -28,10 +28,12 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         spec::unified_runner::run_unified_tests,
-        util::{event_buffer::EventBuffer, get_default_name},
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+            get_default_name,
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
     Client,
@@ -421,7 +423,7 @@ async fn retry_write_pool_cleared() {
         .database("retry_write_pool_cleared")
         .collection("retry_write_pool_cleared");
 
-    let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1))
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
         .error_code(91)
         .block_connection(Duration::from_secs(1))
         .error_labels(vec![RETRYABLE_WRITE_ERROR]);
@@ -509,13 +511,12 @@ async fn retry_write_retryable_write_error() {
                                 // Enable the failpoint.
                                 let fp_guard = {
                                     let client = client.lock().await;
-                                    let fail_point =
-                                        FailPoint::new(&["insert"], FailPointMode::Times(1))
-                                            .error_code(10107)
-                                            .error_labels(vec![
-                                                "RetryableWriteError",
-                                                "NoWritesPerformed",
-                                            ]);
+                                    let fail_point = FailPoint::fail_command(
+                                        &["insert"],
+                                        FailPointMode::Times(1),
+                                    )
+                                    .error_code(10107)
+                                    .error_labels(vec!["RetryableWriteError", "NoWritesPerformed"]);
                                     client
                                         .as_ref()
                                         .unwrap()
@@ -543,8 +544,8 @@ async fn retry_write_retryable_write_error() {
         return;
     }
 
-    let fail_point =
-        FailPoint::new(&["insert"], FailPointMode::Times(1)).write_concern_error(doc! {
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+        .write_concern_error(doc! {
             "code": 91,
             "errorLabels": ["RetryableWriteError"],
         });
@@ -586,7 +587,7 @@ async fn retry_write_different_mongos() {
             return;
         }
 
-        let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1))
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
             .error_labels(vec![RETRYABLE_WRITE_ERROR])
             .close_connection(true);
@@ -648,7 +649,7 @@ async fn retry_write_same_mongos() {
         client_options.direct_connection = Some(true);
         let client = Client::test_builder().options(client_options).build().await;
 
-        let fail_point = FailPoint::new(&["insert"], FailPointMode::Times(1))
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
             .error_labels(vec![RETRYABLE_WRITE_ERROR])
             .close_connection(true);

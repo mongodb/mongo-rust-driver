@@ -36,7 +36,7 @@ use crate::{
         UpdateOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{assert_matches, log_uncaptured, FailPoint, TestClient},
+    test::{assert_matches, log_uncaptured, util::fail_point::FailPoint, TestClient},
     ClientSession,
     Collection,
     Database,

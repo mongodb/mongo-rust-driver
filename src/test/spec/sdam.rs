@@ -10,10 +10,11 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
     Client,
@@ -203,7 +204,7 @@ async fn rtt_is_updated() {
     assert!(events.len() > 2);
 
     // configure a failpoint that blocks hello commands
-    let fail_point = FailPoint::new(
+    let fail_point = FailPoint::fail_command(
         &["hello", LEGACY_HELLO_COMMAND_NAME],
         FailPointMode::Times(1000),
     )
