@@ -543,7 +543,9 @@ impl Client {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
-                        cmd.set_after_cluster_time(session);
+                        if session.causal_consistency() {
+                            cmd.set_after_cluster_time(session);
+                        }
 
                         if let Some(ref options) = session.transaction.options {
                             if let Some(ref read_concern) = options.read_concern {
