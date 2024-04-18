@@ -9,7 +9,7 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     fmt::Debug,
-    ops::{Deref, DerefMut},
+    ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -79,6 +79,7 @@ use crate::{
     selection_criteria::ReadPreference,
     serde_util,
     test::FailPoint,
+    ClientSession,
     Collection,
     Database,
     IndexModel,
@@ -136,21 +137,32 @@ macro_rules! with_mut_session {
     ($test_runner:ident, $id:expr, |$session:ident| $body:expr) => {
         async {
             let id = $id;
-            let mut session_owned = match $test_runner.entities.write().await.remove(id).unwrap() {
-                Entity::Session(session_owned) => session_owned,
+            match $test_runner.entities.write().await.remove(id).unwrap() {
+                Entity::Session(mut session_owned) => {
+                    let $session: &mut ClientSession = &mut session_owned;
+                    let out = $body.await;
+                    $test_runner
+                        .entities
+                        .write()
+                        .await
+                        .insert(id.to_string(), Entity::Session(session_owned));
+                    out
+                }
+                Entity::SessionPtr(ptr) => {
+                    let $session = unsafe { &mut *ptr.0 };
+                    let out = $body.await;
+                    $test_runner
+                        .entities
+                        .write()
+                        .await
+                        .insert(id.to_string(), Entity::SessionPtr(ptr));
+                    out
+                }
                 o => panic!(
                     "expected {} to be a session entity, instead was {:?}",
                     $id, o
                 ),
-            };
-            let $session = &mut session_owned;
-            let out = $body.await;
-            $test_runner
-                .entities
-                .write()
-                .await
-                .insert(id.to_string(), Entity::Session(session_owned));
-            out
+            }
         }
     };
 }
@@ -161,8 +173,7 @@ macro_rules! with_opt_session {
             let act = $act;
             match $id {
                 Some(id) => {
-                    with_mut_session!($test_runner, id, |session| act.session(session.deref_mut()))
-                        .await
+                    with_mut_session!($test_runner, id, |session| act.session(session)).await
                 }
                 None => act.await,
             }
@@ -355,6 +366,7 @@ impl<'de> Deserialize<'de> for Operation {
             "startTransaction" => deserialize_op::<StartTransaction>(definition.arguments),
             "commitTransaction" => deserialize_op::<CommitTransaction>(definition.arguments),
             "abortTransaction" => deserialize_op::<AbortTransaction>(definition.arguments),
+            "withTransaction" => deserialize_op::<WithTransaction>(definition.arguments),
             "createIndex" => deserialize_op::<CreateIndex>(definition.arguments),
             "listIndexes" => deserialize_op::<ListIndexes>(definition.arguments),
             "listIndexNames" => deserialize_op::<ListIndexNames>(definition.arguments),
@@ -599,7 +611,7 @@ impl Find {
         match &self.session {
             Some(session_id) => {
                 let cursor = with_mut_session!(test_runner, session_id, |session| async {
-                    act.session(session.deref_mut()).await
+                    act.session(session).await
                 })
                 .await?;
                 Ok(TestCursor::Session {
@@ -888,13 +900,13 @@ impl TestOperation for Aggregate {
                                 collection
                                     .aggregate(self.pipeline.clone())
                                     .with_options(self.options.clone())
-                                    .session(session.deref_mut())
+                                    .session(&mut *session)
                                     .await?
                             }
                             AggregateEntity::Database(db) => {
                                 db.aggregate(self.pipeline.clone())
                                     .with_options(self.options.clone())
-                                    .session(session.deref_mut())
+                                    .session(&mut *session)
                                     .await?
                             }
                             AggregateEntity::Other(debug) => {
@@ -1144,7 +1156,7 @@ impl TestOperation for ListCollections {
                         let mut cursor = db
                             .list_collections()
                             .with_options(self.options.clone())
-                            .session(session.deref_mut())
+                            .session(&mut *session)
                             .await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
@@ -1559,7 +1571,7 @@ impl TestOperation for RunCursorCommand {
             let result = match &self.session {
                 Some(session_id) => {
                     with_mut_session!(test_runner, session_id, |session| async {
-                        let mut cursor = action.session(session.deref_mut()).await?;
+                        let mut cursor = action.session(&mut *session).await?;
                         cursor.stream(session).try_collect::<Vec<_>>().await
                     })
                     .await?
@@ -1606,7 +1618,7 @@ impl TestOperation for CreateCommandCursor {
                 Some(session_id) => {
                     let mut ses_cursor = None;
                     with_mut_session!(test_runner, session_id, |session| async {
-                        ses_cursor = Some(action.session(session.deref_mut()).await);
+                        ses_cursor = Some(action.session(session).await);
                     })
                     .await;
                     let test_cursor = TestCursor::Session {
@@ -1641,10 +1653,10 @@ impl TestOperation for EndSession {
         test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            with_mut_session!(test_runner, id, |session| async {
-                session.client_session.take();
-            })
-            .await;
+            match test_runner.entities.write().await.get_mut(id) {
+                Some(Entity::Session(session)) => session.client_session.take(),
+                e => panic!("expected session for {:?}, got {:?}", id, e),
+            };
             tokio::time::sleep(Duration::from_secs(1)).await;
             Ok(None)
         }
@@ -1881,8 +1893,50 @@ impl TestOperation for AbortTransaction {
         test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            with_mut_session!(test_runner, id, |session| {
-                async move { session.abort_transaction().await }
+            with_mut_session!(test_runner, id, |session| async move {
+                session.abort_transaction().await
+            })
+            .await?;
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct WithTransaction {
+    callback: Vec<Operation>,
+}
+
+impl TestOperation for WithTransaction {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            with_mut_session!(test_runner, id, |session| async move {
+                session
+                    .start_transaction()
+                    .and_run(
+                        (&self.callback, test_runner),
+                        |session, (callback, test_runner)| {
+                            async move {
+                                test_runner.entities.write().await.insert(
+                                    id.to_string(),
+                                    Entity::SessionPtr(super::entity::SessionPtr(session)),
+                                );
+                                for op in callback.iter() {
+                                    op.execute(test_runner, "???").await;
+                                }
+                                test_runner.entities.write().await.remove(id);
+                                Ok(())
+                            }
+                            .boxed()
+                        },
+                    )
+                    .await
             })
             .await?;
             Ok(None)
@@ -1943,7 +1997,7 @@ impl TestOperation for ListIndexes {
                 Some(ref session) => {
                     with_mut_session!(test_runner, session, |session| {
                         async {
-                            act.session(session.deref_mut())
+                            act.session(&mut *session)
                                 .await?
                                 .stream(session)
                                 .try_collect()
@@ -2067,7 +2121,7 @@ impl TestOperation for IterateUntilDocumentOrError {
                                 .await
                                 .get_mut(session_id)
                                 .unwrap()
-                                .as_mut_session_entity(),
+                                .as_mut_session(),
                         )
                         .await
                 }
@@ -2834,7 +2888,7 @@ impl TestOperation for IterateOnce {
                                 .await
                                 .get_mut(session_id)
                                 .unwrap()
-                                .as_mut_session_entity(),
+                                .as_mut_session(),
                         )
                         .await?;
                 }

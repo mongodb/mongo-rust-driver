@@ -21,13 +21,18 @@ use crate::{
 
 // TODO RUST-902: Reduce transactionLifetimeLimitSeconds.
 #[tokio::test(flavor = "multi_thread")]
-async fn run_unified() {
+async fn run_unified_base_api() {
     run_unified_tests(&["transactions", "unified"])
         // TODO RUST-1656: unskip these files
         .skip_files(&["retryable-abort-handshake.json", "retryable-commit-handshake.json"])
         // The driver doesn't support socketTimeoutMS
         .skip_tests(&["add RetryableWriteError and UnknownTransactionCommitResult labels to connection errors"])
         .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn run_unified_convenient_api() {
+    run_unified_tests(&["transactions-convenient-api", "unified"]).await;
 }
 
 // This test checks that deserializing an operation correctly still retrieves the recovery token.
