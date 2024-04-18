@@ -292,16 +292,38 @@ buildvariants:
     tasks:
       - serverless-task-group
 
-  - name: oidc
-    display_name: OIDC
-    patchable: false
+  - name: oidc-linux
+    display_name: "OIDC Linux"
+    patchable: true
     run_on:
-      - ubuntu2204-small
+      - ubuntu2204-large
     expansions:
       AUTH: auth
       SSL: ssl
     tasks:
-      - test-oidc
+      - testoidc_task_group
+
+  - name: oidc-macos
+    display_name: "OIDC Macos"
+    patchable: true
+    run_on:
+      - macos-1100
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - testoidc_task_group
+
+  - name: oidc-windows
+    display_name: "OIDC Windows"
+    patchable: true
+    run_on:
+      - windows-64-vsMulti-small
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks:
+      - testoidc_task_group
 
   - name: in-use-encryption
     display_name: "In-Use Encryption"
@@ -588,6 +610,35 @@ task_groups:
     tasks:
       - test-aws-lambda-deployed
 
+  - name: testoidc_task_group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - func: assume ec2 role
+      - func: install rust
+      - func: install junit dependencies
+      - command: shell.exec
+        params:
+          shell: bash
+          include_expansions_in_env: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
+          script: |
+            ${PREPARE_SHELL}
+            ${DRIVERS_TOOLS}/.evergreen/auth_oidc/setup.sh
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/teardown.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-latest
+
 #########
 # Tasks #
 #########
@@ -622,11 +673,6 @@ tasks:
     tags: [lint]
     commands:
       - func: "check rustdoc"
-
-  - name: check-manual
-    tags: [lint]
-    commands:
-      - func: "check manual"
 
   - name: test-3.6-standalone
     tags: [3.6, standalone]
@@ -1052,18 +1098,6 @@ tasks:
           TOPOLOGY: replica_set
       - func: "run sync tests"
 
-  - name: test-oidc
-    commands:
-      - func: bootstrap oidc
-      - func: bootstrap mongo-orchestration
-        vars:
-          AUTH: auth
-          ORCHESTRATION_FILE: auth-oidc.json
-          MONGODB_VERSION: latest
-          TOPOLOGY: replica_set
-      - func: setup oidc
-      - func: run oidc tests
-
   - name: test-in-use-encryption-4.2
     tags: [in-use-encryption]
     commands:
@@ -1219,7 +1253,7 @@ tasks:
           LOAD_BALANCER: true
       - func: start load balancer
       - func: run driver test suite
-  
+
   - name: test-aws-lambda-deployed
     commands:
       - command: ec2.assume_role
@@ -1237,6 +1271,10 @@ tasks:
             TEST_LAMBDA_DIRECTORY: ${PROJECT_DIRECTORY}/.evergreen/aws-lambda-test
             AWS_REGION: us-east-1
             SAM_BUILD_ARGS: --beta-features --debug
+
+  - name: "oidc-auth-test-latest"
+    commands:
+    - func: "run oidc auth test with test credentials"
 
 #############
 # Functions #
@@ -1678,45 +1716,21 @@ functions:
             ./test-contents/test-exe on_demand_gcp_credentials --nocapture"
           $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
 
-  "bootstrap oidc":
+  "assume ec2 role":
     - command: ec2.assume_role
       params:
         role_arn: ${aws_test_secrets_role}
-    - command: shell.exec
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
-          set +o xtrace
 
-          export OIDC_TOKEN_DIR=/tmp/tokens
-
-          . ./activate-authoidcvenv.sh
-          python oidc_write_orchestration.py
-          python oidc_get_tokens.py
-
-  "setup oidc":
-    - command: shell.exec
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          cd ${DRIVERS_TOOLS}/.evergreen/auth_oidc
-          mongosh setup_oidc.js
-
-  "run oidc tests":
+  "run oidc auth test with test credentials":
     - command: shell.exec
       type: test
       params:
         working_dir: src
         shell: bash
+        include_expansions_in_env: ["DRIVERS_TOOLS", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
         script: |
           ${PREPARE_SHELL}
-          export OIDC_TOKEN_DIR=/tmp/tokens
-          .evergreen/run-oidc-tests.sh
+          .evergreen/run-mongodb-oidc-test.sh
 
   "compile only":
     - command: shell.exec
@@ -1767,17 +1781,6 @@ functions:
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-rustdoc.sh
-
-  "check manual":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/install-dependencies.sh mdbook
-          manual/test.sh
 
   "upload-mo-artifacts":
     - command: shell.exec

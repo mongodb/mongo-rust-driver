@@ -2,13 +2,12 @@ use std::cmp::Ord;
 
 use futures::stream::TryStreamExt;
 
-#[allow(deprecated)]
-use crate::test::util::EventClient;
 use crate::{
     action::Action,
     bson::{doc, Document},
     error::Result,
     options::{
+        ClusteredIndex,
         Collation,
         CreateCollectionOptions,
         IndexOptionDefaults,
@@ -17,6 +16,7 @@ use crate::{
     },
     results::{CollectionSpecification, CollectionType},
     test::util::TestClient,
+    Client,
     Database,
 };
 
@@ -318,8 +318,7 @@ async fn create_index_options_defaults_not_specified() {
 }
 
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let db = client.database(name);
 
     db.create_collection(name)
@@ -339,4 +338,43 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
         Err(_) => None,
     };
     assert_eq!(event_defaults, defaults);
+}
+
+#[test]
+fn deserialize_clustered_index_option_from_bool() {
+    let options_doc = doc! { "clusteredIndex": true };
+    let options: CreateCollectionOptions = bson::from_document(options_doc).unwrap();
+    let clustered_index = options
+        .clustered_index
+        .expect("deserialized options should include clustered_index");
+    assert_eq!(clustered_index, ClusteredIndex::default());
+}
+
+#[tokio::test]
+async fn clustered_index_list_collections() {
+    let client = TestClient::new().await;
+    let database = client.database("db");
+
+    if client.server_version_lt(5, 3) {
+        return;
+    }
+
+    database
+        .create_collection("clustered_index_collection")
+        .clustered_index(ClusteredIndex::default())
+        .await
+        .unwrap();
+
+    let collections = database
+        .list_collections()
+        .await
+        .unwrap()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    let clustered_index_collection = collections
+        .iter()
+        .find(|specification| specification.name == "clustered_index_collection")
+        .unwrap();
+    assert!(clustered_index_collection.options.clustered_index.is_some());
 }

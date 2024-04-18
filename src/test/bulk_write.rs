@@ -6,10 +6,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        util::{
-            event_buffer::EventBuffer,
-            fail_point::{FailPoint, FailPointMode},
-        },
+        util::fail_point::{FailPoint, FailPointMode},
     },
     Client,
     Namespace,
@@ -27,11 +24,7 @@ async fn run_unified() {
 
 #[tokio::test]
 async fn max_write_batch_size_batching() {
-    let event_buffer = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(event_buffer.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
@@ -49,7 +42,8 @@ async fn max_write_batch_size_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count as usize, max_write_batch_size + 1);
 
-    let mut command_started_events = event_buffer
+    let mut command_started_events = client
+        .events
         .get_command_started_events(&["bulkWrite"])
         .into_iter();
 
@@ -68,11 +62,7 @@ async fn max_write_batch_size_batching() {
 
 #[tokio::test]
 async fn max_message_size_bytes_batching() {
-    let event_buffer = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(event_buffer.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping max_message_size_bytes_batching: bulkWrite requires 8.0+");
@@ -93,7 +83,8 @@ async fn max_message_size_bytes_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count as usize, num_models);
 
-    let mut command_started_events = event_buffer
+    let mut command_started_events = client
+        .events
         .get_command_started_events(&["bulkWrite"])
         .into_iter();
 
@@ -117,11 +108,9 @@ async fn write_concern_error_batches() {
     if TestClient::new().await.is_sharded() {
         options.hosts.drain(1..);
     }
-
-    let event_buffer = EventBuffer::new();
     let client = Client::test_builder()
         .options(options)
-        .event_buffer(event_buffer.clone())
+        .monitor_events()
         .build()
         .await;
 
@@ -156,15 +145,14 @@ async fn write_concern_error_batches() {
         partial_result.inserted_count as usize,
         max_write_batch_size + 1
     );
+
+    let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(command_started_events.len(), 2);
 }
 
 #[tokio::test]
 async fn write_error_batches() {
-    let mut event_buffer = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(event_buffer.clone())
-        .build()
-        .await;
+    let mut client = Client::test_builder().monitor_events().build().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
@@ -201,10 +189,10 @@ async fn write_error_batches() {
         max_write_batch_size + 1
     );
 
-    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+    let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
     assert_eq!(command_started_events.len(), 2);
 
-    event_buffer.clear_cached_events();
+    client.events.clear_cached_events();
 
     let error = client.bulk_write(models).ordered(true).await.unwrap_err();
 
@@ -214,17 +202,13 @@ async fn write_error_batches() {
 
     assert_eq!(bulk_write_error.write_errors.len(), 1);
 
-    let command_started_events = event_buffer.get_command_started_events(&["bulkWrite"]);
+    let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
     assert_eq!(command_started_events.len(), 1);
 }
 
 #[tokio::test]
 async fn successful_cursor_iteration() {
-    let event_buffer = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(event_buffer.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
@@ -265,19 +249,19 @@ async fn successful_cursor_iteration() {
     assert_eq!(result.upserted_count, 2);
     assert_eq!(result.update_results.unwrap().len(), 2);
 
-    let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
+    let command_started_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
-    options.hosts.drain(1..);
-
-    let event_buffer = EventBuffer::new();
+    if TestClient::new().await.is_sharded() {
+        options.hosts.drain(1..);
+    }
     let client = Client::test_builder()
         .options(options)
-        .event_buffer(event_buffer.clone())
+        .monitor_events()
         .build()
         .await;
 
@@ -339,20 +323,16 @@ async fn failed_cursor_iteration() {
     assert_eq!(partial_result.upserted_count, 2);
     assert_eq!(partial_result.update_results.unwrap().len(), 1);
 
-    let get_more_events = event_buffer.get_command_started_events(&["getMore"]);
+    let get_more_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(get_more_events.len(), 1);
 
-    let kill_cursors_events = event_buffer.get_command_started_events(&["killCursors"]);
+    let kill_cursors_events = client.events.get_command_started_events(&["killCursors"]);
     assert_eq!(kill_cursors_events.len(), 1);
 }
 
 #[tokio::test]
 async fn cursor_iteration_in_a_transaction() {
-    let event_buffer = EventBuffer::new();
-    let client = Client::test_builder()
-        .event_buffer(event_buffer.clone())
-        .build()
-        .await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if client.server_version_lt(8, 0) || client.is_standalone() {
         log_uncaptured(
@@ -400,6 +380,6 @@ async fn cursor_iteration_in_a_transaction() {
     assert_eq!(result.upserted_count, 2);
     assert_eq!(result.update_results.unwrap().len(), 2);
 
-    let command_started_events = event_buffer.get_command_started_events(&["getMore"]);
+    let command_started_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
 }

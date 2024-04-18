@@ -27,10 +27,6 @@ for arg; do
 
     source .evergreen/env.sh
     rustup toolchain install nightly -c rustfmt
-  elif [ $arg == "mdbook" ]; then
-    source ${CARGO_HOME}/env
-    # Install the manual rendering tool
-    cargo install mdbook
   elif [ $arg == "junit-dependencies" ]; then
     source ${CARGO_HOME}/env
 

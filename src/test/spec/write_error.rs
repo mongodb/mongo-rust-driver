@@ -1,16 +1,14 @@
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, WriteFailure},
     test::log_uncaptured,
+    Client,
     Collection,
 };
 
 #[tokio::test]
 async fn details() {
-    #[allow(deprecated)]
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
 
     if client.server_version_lt(5, 0) {
         // SERVER-58399

@@ -94,7 +94,7 @@ async fn deserialize_recovery_token() {
 #[tokio::test]
 async fn convenient_api_custom_error() {
     #[allow(deprecated)]
-    let client = Client::test_builder().event_client().build().await;
+    let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
         return;
@@ -127,7 +127,7 @@ async fn convenient_api_custom_error() {
 #[tokio::test]
 async fn convenient_api_returned_value() {
     #[allow(deprecated)]
-    let client = Client::test_builder().event_client().build().await;
+    let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
         return;
@@ -155,7 +155,7 @@ async fn convenient_api_returned_value() {
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
     #[allow(deprecated)]
-    let client = Client::test_builder().event_client().build().await;
+    let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
         return;
@@ -194,7 +194,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     #[allow(deprecated)]
     let client = Client::test_builder()
         .options(options)
-        .event_client()
+        .monitor_events()
         .build()
         .await;
     if !client.supports_transactions() {
@@ -239,7 +239,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
     #[allow(deprecated)]
     let client = Client::test_builder()
         .options(options)
-        .event_client()
+        .monitor_events()
         .build()
         .await;
     if !client.supports_transactions() {

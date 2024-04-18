@@ -6,8 +6,6 @@ use std::{
 use bson::doc;
 use semver::VersionReq;
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
@@ -97,18 +95,15 @@ async fn sdam_pool_management() {
     options.app_name = Some("SDAMPoolManagementTest".to_string());
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
-    let event_buffer = EventBuffer::new();
-
+    let client = Client::test_builder()
+        .additional_options(options, false)
+        .await
+        .min_heartbeat_freq(Duration::from_millis(50))
+        .monitor_events()
+        .build()
+        .await;
     #[allow(deprecated)]
-    let client = EventClient::with_additional_options(
-        Some(options),
-        Some(Duration::from_millis(50)),
-        None,
-        event_buffer.clone(),
-    )
-    .await;
-    #[allow(deprecated)]
-    let mut subscriber = event_buffer.subscribe_all();
+    let mut subscriber = client.events.subscribe_all();
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()

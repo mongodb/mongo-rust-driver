@@ -10,19 +10,16 @@ use crate::{
     error::Result,
     event::cmap::CmapEvent,
     options::ServerAddress,
-    runtime,
-    runtime::AsyncJoinHandle,
+    runtime::{self, AsyncJoinHandle},
     sdam::{description::topology::server_selection, Server},
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
-        util::{
-            event_buffer::EventBuffer,
-            fail_point::{FailPoint, FailPointMode},
-        },
+        util::fail_point::{FailPoint, FailPointMode},
         Event,
+        EventClient,
         TestClient,
     },
     Client,
@@ -162,14 +159,11 @@ async fn load_balancing_test() {
 
     /// min_share is the lower bound for the % of times the the less selected server
     /// was selected. max_share is the upper bound.
-    async fn do_test(
-        client: &TestClient,
-        handler: &mut EventBuffer,
-        min_share: f64,
-        max_share: f64,
-        iterations: usize,
-    ) {
-        handler.clear_cached_events();
+    async fn do_test(client: &EventClient, min_share: f64, max_share: f64, iterations: usize) {
+        {
+            let mut events = client.events.clone();
+            events.clear_cached_events();
+        }
 
         let mut handles: Vec<AsyncJoinHandle<Result<()>>> = Vec::new();
         for _ in 0..10 {
@@ -189,7 +183,7 @@ async fn load_balancing_test() {
         }
 
         let mut tallies: HashMap<ServerAddress, u32> = HashMap::new();
-        for event in handler.get_command_started_events(&["find"]) {
+        for event in client.events.get_command_started_events(&["find"]) {
             *tallies.entry(event.connection.address.clone()).or_insert(0) += 1;
         }
 
@@ -215,9 +209,6 @@ async fn load_balancing_test() {
         }
     }
 
-    let mut buffer = EventBuffer::new();
-    #[allow(deprecated)]
-    let mut subscriber = buffer.subscribe();
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
@@ -225,9 +216,12 @@ async fn load_balancing_test() {
     options.min_pool_size = Some(max_pool_size);
     let client = Client::test_builder()
         .options(options)
-        .event_buffer(buffer.clone())
+        .monitor_events()
+        .retain_startup_events()
         .build()
         .await;
+    #[allow(deprecated)]
+    let mut subscriber = client.events.subscribe_all();
 
     // wait for both servers pools to be saturated.
     for address in hosts {
@@ -267,9 +261,9 @@ async fn load_balancing_test() {
     let guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
-    do_test(&client, &mut buffer, 0.05, 0.25, 10).await;
+    do_test(&client, 0.05, 0.25, 10).await;
 
     // disable failpoint and rerun, should be back to even split
     drop(guard);
-    do_test(&client, &mut buffer, 0.40, 0.50, 100).await;
+    do_test(&client, 0.40, 0.50, 100).await;
 }

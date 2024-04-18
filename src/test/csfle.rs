@@ -57,15 +57,12 @@ use crate::{
     Namespace,
 };
 
-#[allow(deprecated)]
-use super::EventClient;
-use super::{get_client_options, log_uncaptured, TestClient};
+use super::{get_client_options, log_uncaptured, EventClient, TestClient};
 
 type Result<T> = anyhow::Result<T>;
 
-#[allow(deprecated)]
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
-    let client = EventClient::new().await;
+    let client = Client::test_builder().monitor_events().build().await;
     let datakeys = client
         .database("keyvault")
         .collection_with_options::<Document>(
@@ -1501,13 +1498,15 @@ impl DeadlockTestCase {
     async fn run(&self) -> Result<()> {
         // Setup
         let client_test = TestClient::new().await;
-        #[allow(deprecated)]
-        let client_keyvault = EventClient::with_options({
-            let mut opts = get_client_options().await.clone();
-            opts.max_pool_size = Some(1);
-            opts
-        })
-        .await;
+        let client_keyvault = Client::test_builder()
+            .options({
+                let mut opts = get_client_options().await.clone();
+                opts.max_pool_size = Some(1);
+                opts
+            })
+            .monitor_events()
+            .build()
+            .await;
         #[allow(deprecated)]
         let mut keyvault_events = client_keyvault.events.subscribe();
         client_test

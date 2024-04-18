@@ -8,8 +8,6 @@ use tokio::sync::{Mutex, RwLock};
 
 use self::file::{Operation, TestFile, ThreadedOperation};
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     cmap::{
         establish::{ConnectionEstablisher, EstablisherOptions},
@@ -441,8 +439,7 @@ async fn cmap_spec_tests() {
         }
         options.hosts.drain(1..);
         options.direct_connection = Some(true);
-        #[allow(deprecated)]
-        let client = EventClient::with_options(options).await;
+        let client = crate::Client::test_builder().options(options).build().await;
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
             if !can_run_on {

@@ -17,13 +17,10 @@ use crate::{
     Collection,
 };
 
-#[allow(deprecated)]
-use super::EventClient;
-use super::{get_client_options, log_uncaptured, TestClient};
+use super::{get_client_options, log_uncaptured, EventClient, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-#[allow(deprecated)]
 async fn init_stream(
     coll_name: &str,
     direct_connection: bool,
@@ -50,7 +47,11 @@ async fn init_stream(
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
-    let client = EventClient::with_options(options).await;
+    let client = Client::test_builder()
+        .options(options)
+        .monitor_events()
+        .build()
+        .await;
     let db = client.database("change_stream_tests");
     let coll = db.collection_with_options::<Document>(
         coll_name,
@@ -184,7 +185,6 @@ async fn resumes_on_error() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    #[allow(deprecated)]
     let events = client.events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
@@ -282,7 +282,6 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     ));
 
     // Assert that two `aggregate`s were issued, i.e. that a resume happened.
-    #[allow(deprecated)]
     let events = client.events.get_command_started_events(&["aggregate"]);
     assert_eq!(events.len(), 2);
 
@@ -525,7 +524,6 @@ async fn resume_uses_start_after() -> Result<()> {
     let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
-    #[allow(deprecated)]
     let commands = client.events.get_command_started_events(&["aggregate"]);
     fn has_start_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
@@ -581,7 +579,6 @@ async fn resume_uses_resume_after() -> Result<()> {
     let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
-    #[allow(deprecated)]
     let commands = client.events.get_command_started_events(&["aggregate"]);
     fn has_resume_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
