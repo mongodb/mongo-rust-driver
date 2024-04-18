@@ -376,7 +376,7 @@ impl Deref for ClientEntity {
         match &self.client {
             Some(c) => c,
             None => panic!(
-                "Attempted to deference a client entity which was closed via a `close` test \
+                "Attempted to dereference a client entity which was closed via a `close` test \
                  operation"
             ),
         }

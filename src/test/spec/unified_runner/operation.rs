@@ -137,7 +137,8 @@ macro_rules! with_mut_session {
     ($test_runner:ident, $id:expr, |$session:ident| $body:expr) => {
         async {
             let id = $id;
-            match $test_runner.entities.write().await.remove(id).unwrap() {
+            let entity = $test_runner.entities.write().await.remove(id).unwrap();
+            match entity {
                 Entity::Session(mut session_owned) => {
                     let $session: &mut ClientSession = &mut session_owned;
                     let out = $body.await;
@@ -190,13 +191,19 @@ pub(crate) struct Operation {
 }
 
 impl Operation {
-    pub(crate) async fn execute<'a>(&self, test_runner: &TestRunner, description: &str) {
+    pub(crate) async fn execute(&self, test_runner: &TestRunner, description: &str) {
+        let _ = self.execute_fallible(test_runner, description).await;
+    }
+
+    async fn execute_fallible(&self, test_runner: &TestRunner, description: &str) -> Result<()> {
         match self.object {
             OperationObject::TestRunner => {
                 self.execute_test_runner_operation(test_runner).await;
+                Ok(())
             }
             OperationObject::Entity(ref id) => {
                 let result = self.execute_entity_operation(id, test_runner).await;
+                let error = result.as_ref().map_or_else(|e| Err(e.clone()), |_| Ok(()));
 
                 match &self.expectation {
                     Expectation::Result {
@@ -250,6 +257,7 @@ impl Operation {
                     }
                     Expectation::Ignore => (),
                 }
+                error
             }
         }
     }
@@ -1907,6 +1915,8 @@ impl TestOperation for AbortTransaction {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct WithTransaction {
     callback: Vec<Operation>,
+    #[serde(flatten)]
+    options: Option<TransactionOptions>,
 }
 
 impl TestOperation for WithTransaction {
@@ -1919,6 +1929,7 @@ impl TestOperation for WithTransaction {
             with_mut_session!(test_runner, id, |session| async move {
                 session
                     .start_transaction()
+                    .with_options(self.options.clone())
                     .and_run(
                         (&self.callback, test_runner),
                         |session, (callback, test_runner)| {
@@ -1927,11 +1938,17 @@ impl TestOperation for WithTransaction {
                                     id.to_string(),
                                     Entity::SessionPtr(super::entity::SessionPtr(session)),
                                 );
+                                let mut result = Ok(());
                                 for op in callback.iter() {
-                                    op.execute(test_runner, "???").await;
+                                    let r =
+                                        op.execute_fallible(test_runner, "withTransaction").await;
+                                    if r.is_err() {
+                                        result = r;
+                                        break;
+                                    }
                                 }
                                 test_runner.entities.write().await.remove(id);
-                                Ok(())
+                                result
                             }
                             .boxed()
                         },
