@@ -33,7 +33,6 @@ use tokio::sync::Mutex;
 
 use super::{
     results_match,
-    test_runner,
     Entity,
     EntityMap,
     ExpectError,
@@ -1671,7 +1670,7 @@ impl TestOperation for AssertSessionTransactionState {
                     match &session.transaction.state {
                         TransactionState::None => "none",
                         TransactionState::Starting => "starting",
-                        TransactionState::InProgress => "inprogress",
+                        TransactionState::InProgress => "in_progress",
                         TransactionState::Committed { data_committed: _ } => "committed",
                         TransactionState::Aborted => "aborted",
                     }
