@@ -225,10 +225,14 @@ impl TestRunner {
                 && self.internal_client.server_version_lte(4, 2)
                 && test_case.operations.iter().any(|op| op.name == "distinct")
             {
+                self.internal_client.disable_command_events(true);
                 for server_address in self.internal_client.options().hosts.clone() {
                     for (_, entity) in self.entities.read().await.iter() {
                         if let Entity::Collection(coll) = entity {
-                            coll.client().disable_command_events(true);
+                            let coll = self
+                                .internal_client
+                                .database(&coll.namespace().db)
+                                .collection::<Document>(&coll.namespace().coll);
                             let server_address = server_address.clone();
                             coll.distinct("_id", doc! {})
                                 .selection_criteria(SelectionCriteria::Predicate(Arc::new(
@@ -236,10 +240,10 @@ impl TestRunner {
                                 )))
                                 .await
                                 .unwrap();
-                            coll.client().disable_command_events(false);
                         }
                     }
                 }
+                self.internal_client.disable_command_events(false);
             }
 
             #[cfg(feature = "tracing-unstable")]
