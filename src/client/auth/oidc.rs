@@ -104,6 +104,45 @@ impl Callback {
         Self::create_state(callback, CallbackKind::Machine)
     }
 
+    /// Create azure callback.
+    #[cfg(feature = "azure-oidc")]
+    pub(crate) fn azure_callback(resource: &str) -> State {
+        use futures_util::FutureExt;
+        let resource = resource.to_string();
+        Self::machine(move |c| {
+            let mut url = format!(
+                "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
+                resource
+            );
+            if let Some(ref idp_info) = c.idp_info {
+                if let Some(client_id) = idp_info.client_id.as_ref() {
+                    url.push_str(&format!("&client_id={}", client_id));
+                }
+            }
+            async move {
+                let req = reqwest::Client::new()
+                    .get(&url)
+                    .header("Metadata", "true")
+                    .header("Accept", "application/json")
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        Error::authentication_error(
+                            MONGODB_OIDC_STR,
+                            &format!("Failed to send request to Azure metadata service: {}", e),
+                        )
+                    })?;
+                Ok(IdpServerResponse {
+                    // since this test will use the cached token, this callback shouldn't matter
+                    access_token: "".to_string(),
+                    expires: None,
+                    refresh_token: None,
+                })
+            }
+            .boxed()
+        })
+    }
+
     fn create_state<F>(callback: F, kind: CallbackKind) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
@@ -195,7 +234,7 @@ impl Cache {
 #[non_exhaustive]
 pub struct IdpServerInfo {
     pub issuer: String,
-    pub client_id: String,
+    pub client_id: Option<String>,
     pub request_scopes: Option<Vec<String>>,
 }
 

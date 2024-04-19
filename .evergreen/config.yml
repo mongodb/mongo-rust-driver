@@ -315,6 +315,7 @@ buildvariants:
       - testoidc_task_group
 
   - name: oidc-windows
+    disable: true
     display_name: "OIDC Windows"
     patchable: true
     run_on:

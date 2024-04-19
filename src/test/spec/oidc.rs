@@ -171,7 +171,7 @@ async fn machine_2_1_valid_callback_inputs() -> anyhow::Result<()> {
             let call_count = cb_call_count.clone();
             let idp_info = c.idp_info.unwrap();
             assert!(idp_info.issuer.as_str() != "");
-            assert!(idp_info.client_id.as_str() != "");
+            assert!(idp_info.client_id.is_some());
             assert!(c.timeout_seconds.unwrap() <= Instant::now() + Duration::from_secs(60));
             async move {
                 *call_count.lock().await += 1;
@@ -696,7 +696,7 @@ async fn human_2_1_valid_callback_inputs() -> anyhow::Result<()> {
             let call_count = cb_call_count.clone();
             let idp_info = c.idp_info.unwrap();
             assert!(idp_info.issuer.as_str() != "");
-            assert!(idp_info.client_id.as_str() != "");
+            assert!(idp_info.client_id.is_some());
             assert!(c.timeout_seconds.unwrap() <= Instant::now() + Duration::from_secs(60 * 5));
             async move {
                 *call_count.lock().await += 1;

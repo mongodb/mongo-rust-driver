@@ -42,6 +42,9 @@ aws-auth = ["dep:reqwest"]
 # This can only be used with the tokio-runtime feature flag.
 azure-kms = ["dep:reqwest"]
 
+# Enable support for azure OIDC authentication.
+azure-oidc = ["dep:reqwest"]
+
 # Enable support for on-demand GCP KMS credentials.
 # This can only be used with the tokio-runtime feature flag.
 gcp-kms = ["dep:reqwest"]
