@@ -228,6 +228,7 @@ impl TestRunner {
                 for server_address in self.internal_client.options().hosts.clone() {
                     for (_, entity) in self.entities.read().await.iter() {
                         if let Entity::Collection(coll) = entity {
+                            coll.client().disable_command_events(true);
                             let server_address = server_address.clone();
                             coll.distinct("_id", doc! {})
                                 .selection_criteria(SelectionCriteria::Predicate(Arc::new(
@@ -235,6 +236,7 @@ impl TestRunner {
                                 )))
                                 .await
                                 .unwrap();
+                            coll.client().disable_command_events(false);
                         }
                     }
                 }
