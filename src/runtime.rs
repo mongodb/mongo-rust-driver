@@ -1,5 +1,10 @@
 mod acknowledged_message;
-#[cfg(any(feature = "aws-auth", feature = "azure-kms", feature = "gcp-kms"))]
+#[cfg(any(
+    feature = "aws-auth",
+    feature = "azure-kms",
+    feature = "gcp-kms",
+    feature = "azure-oidc"
+))]
 mod http;
 mod join_handle;
 #[cfg(any(feature = "in-use-encryption-unstable", test))]
@@ -27,7 +32,12 @@ pub(crate) use self::{
     worker_handle::{WorkerHandle, WorkerHandleListener},
 };
 use crate::{error::Result, options::ServerAddress};
-#[cfg(any(feature = "aws-auth", feature = "azure-kms", feature = "gcp-kms"))]
+#[cfg(any(
+    feature = "aws-auth",
+    feature = "azure-kms",
+    feature = "gcp-kms",
+    feature = "azure-oidc"
+))]
 pub(crate) use http::HttpClient;
 #[cfg(feature = "openssl-tls")]
 use tls_openssl as tls;

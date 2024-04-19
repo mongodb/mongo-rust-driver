@@ -106,36 +106,49 @@ impl Callback {
 
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
-    pub(crate) fn azure_callback(resource: &str) -> State {
+    pub(crate) fn azure_callback(client_id: Option<&str>, resource: &str) -> State {
         use futures_util::FutureExt;
         let resource = resource.to_string();
-        Self::machine(move |c| {
+        let client_id = client_id.map(|s| s.to_string());
+        Self::machine(move |_| {
             let mut url = format!(
                 "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
                 resource
             );
-            if let Some(ref idp_info) = c.idp_info {
-                if let Some(client_id) = idp_info.client_id.as_ref() {
-                    url.push_str(&format!("&client_id={}", client_id));
-                }
+            if let Some(ref client_id) = client_id {
+                url.push_str(&format!("&client_id={}", client_id));
             }
             async move {
-                let req = reqwest::Client::new()
+                let response = crate::runtime::HttpClient::default()
                     .get(&url)
-                    .header("Metadata", "true")
-                    .header("Accept", "application/json")
-                    .send()
+                    .headers(&[("Metadata", "true"), ("Accept", "application/json")])
+                    .send::<Document>()
                     .await
                     .map_err(|e| {
                         Error::authentication_error(
                             MONGODB_OIDC_STR,
-                            &format!("Failed to send request to Azure metadata service: {}", e),
+                            &format!("Failed to get access token from Azure IDMS: {}", e),
                         )
                     })?;
+                let access_token = response
+                    .get_str("access_token")
+                    .map_err(|e| {
+                        Error::authentication_error(
+                            MONGODB_OIDC_STR,
+                            &format!("Failed to get access token from Azure IDMS: {}", e),
+                        )
+                    })?
+                    .to_string();
+                let expires_in = response.get_i64("expires_in").map_err(|e| {
+                    Error::authentication_error(
+                        MONGODB_OIDC_STR,
+                        &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                    )
+                })?;
+                let expires = Some(Instant::now() + Duration::from_secs(expires_in as u64));
                 Ok(IdpServerResponse {
-                    // since this test will use the cached token, this callback shouldn't matter
-                    access_token: "".to_string(),
-                    expires: None,
+                    access_token,
+                    expires,
                     refresh_token: None,
                 })
             }
