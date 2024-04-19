@@ -4,19 +4,18 @@ mod bulk_write;
 
 use std::collections::{HashMap, VecDeque};
 
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+
 use crate::{
-    bson::{serde_helpers, Bson, Document},
+    bson::{serde_helpers, Binary, Bson, Document, RawDocumentBuf},
     change_stream::event::ResumeToken,
     db::options::CreateCollectionOptions,
     serde_util,
     Namespace,
 };
 
-use bson::{Binary, RawDocumentBuf};
-use serde::{Deserialize, Serialize};
-
 pub use bulk_write::*;
-use serde_with::skip_serializing_none;
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.

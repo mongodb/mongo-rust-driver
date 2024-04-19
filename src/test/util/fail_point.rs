@@ -122,7 +122,6 @@ impl FailPoint {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(unused)]
 pub(crate) enum FailPointMode {
     AlwaysOn,
     Times(i32),
