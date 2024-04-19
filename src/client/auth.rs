@@ -184,18 +184,33 @@ impl AuthMechanism {
                 Ok(())
             }
             AuthMechanism::MongoDbOidc => {
-                let is_automatic = credential
+                let default_document = &Document::new();
+                let environment = credential
                     .mechanism_properties
                     .as_ref()
-                    .map_or(false, |p| p.contains_key("PROVIDER_NAME"));
-                if credential.username.is_some() && is_automatic {
-                    return Err(Error::invalid_argument(
-                        "username and PROVIDER_NAME cannot both be specified for MONGODB-OIDC \
-                         authentication",
-                    ));
+                    .unwrap_or(default_document)
+                    .get_str("ENVIRONMENT")
+                    .unwrap_or("");
+                match environment {
+                    "azure" | "gcp" => {
+                        if credential.oidc_callback.is_user_provided() {
+                            return Err(Error::invalid_argument(
+                                "OIDC callback cannot be set for MONGODB-OIDC authentication, if the `test`, `azure`, or `gcp` ENVIRONMENT is set",
+                            ));
+                        }
+                        if !credential
+                            .mechanism_properties
+                            .as_ref()
+                            .unwrap_or(default_document)
+                            .contains_key("TOKEN_RESOURCE")
+                        {
+                            return Err(Error::invalid_argument(
+                                "TOKEN_RESOURCE must be set for MONGODB-OIDC authentication in the `azure` or `gcp` ENVIRONMENT",
+                            ));
+                        }
+                    }
+                    _ => (),
                 }
-                // TODO RUST-1660: Handle specific provider validation, perhaps also do Azure as
-                // part of this ticket. Specific providers will add predefined oidc_callback here
                 if credential
                     .source
                     .as_ref()
@@ -447,7 +462,8 @@ pub struct Credential {
     // to how a user would interact with it.
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    pub(crate) oidc_callback: Option<oidc::State>,
+    #[builder(default)]
+    pub(crate) oidc_callback: oidc::State,
 }
 
 impl Credential {

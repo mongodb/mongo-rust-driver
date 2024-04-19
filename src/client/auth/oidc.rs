@@ -36,18 +36,31 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "::1",
 ];
 
+#[derive(Clone, Default)]
+pub struct State {
+    inner: Arc<Mutex<Option<StateInner>>>,
+    is_user_provided: bool,
+}
+
+impl State {
+    pub(crate) fn is_user_provided(&self) -> bool {
+        self.is_user_provided
+    }
+}
+
 /// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
-pub struct State {
+pub struct StateInner {
     callback: Callback,
-    cache: Arc<Mutex<Cache>>,
+    cache: Cache,
 }
 
 #[cfg(test)]
 impl State {
-    pub(crate) fn cache(&mut self) -> Arc<Mutex<Cache>> {
-        self.cache.clone()
-    }
+    //going to just need to add a setting method
+    //pub(crate) async fn cache(&mut self) -> &mut Cache {
+    //    self.inner.lock().await.as_mut().unwrap().cache.as_mut()
+    // }
 }
 
 #[derive(Clone)]
@@ -106,54 +119,60 @@ impl Callback {
 
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
-    pub(crate) fn azure_callback(client_id: Option<&str>, resource: &str) -> State {
+    fn azure_callback(client_id: Option<&str>, resource: &str) -> StateInner {
         use futures_util::FutureExt;
         let resource = resource.to_string();
         let client_id = client_id.map(|s| s.to_string());
-        Self::machine(move |_| {
-            let mut url = format!(
+        StateInner {
+            callback: Self::new(
+                move |_| {
+                    let mut url = format!(
                 "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
                 resource
             );
-            if let Some(ref client_id) = client_id {
-                url.push_str(&format!("&client_id={}", client_id));
-            }
-            async move {
-                let response = crate::runtime::HttpClient::default()
-                    .get(&url)
-                    .headers(&[("Metadata", "true"), ("Accept", "application/json")])
-                    .send::<Document>()
-                    .await
-                    .map_err(|e| {
-                        Error::authentication_error(
-                            MONGODB_OIDC_STR,
-                            &format!("Failed to get access token from Azure IDMS: {}", e),
-                        )
-                    })?;
-                let access_token = response
-                    .get_str("access_token")
-                    .map_err(|e| {
-                        Error::authentication_error(
-                            MONGODB_OIDC_STR,
-                            &format!("Failed to get access token from Azure IDMS: {}", e),
-                        )
-                    })?
-                    .to_string();
-                let expires_in = response.get_i64("expires_in").map_err(|e| {
-                    Error::authentication_error(
-                        MONGODB_OIDC_STR,
-                        &format!("Failed to get expires_in from Azure IDMS: {}", e),
-                    )
-                })?;
-                let expires = Some(Instant::now() + Duration::from_secs(expires_in as u64));
-                Ok(IdpServerResponse {
-                    access_token,
-                    expires,
-                    refresh_token: None,
-                })
-            }
-            .boxed()
-        })
+                    if let Some(ref client_id) = client_id {
+                        url.push_str(&format!("&client_id={}", client_id));
+                    }
+                    async move {
+                        let response = crate::runtime::HttpClient::default()
+                            .get(&url)
+                            .headers(&[("Metadata", "true"), ("Accept", "application/json")])
+                            .send::<Document>()
+                            .await
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get access token from Azure IDMS: {}", e),
+                                )
+                            })?;
+                        let access_token = response
+                            .get_str("access_token")
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get access token from Azure IDMS: {}", e),
+                                )
+                            })?
+                            .to_string();
+                        let expires_in = response.get_i64("expires_in").map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                            )
+                        })?;
+                        let expires = Some(Instant::now() + Duration::from_secs(expires_in as u64));
+                        Ok(IdpServerResponse {
+                            access_token,
+                            expires,
+                            refresh_token: None,
+                        })
+                    }
+                    .boxed()
+                },
+                CallbackKind::Machine,
+            ),
+            cache: Cache::new(),
+        }
     }
 
     fn create_state<F>(callback: F, kind: CallbackKind) -> State
@@ -164,8 +183,11 @@ impl Callback {
             + 'static,
     {
         State {
-            callback: Self::new(callback, kind),
-            cache: Arc::new(Mutex::new(Cache::new())),
+            inner: Arc::new(Mutex::new(Some(StateInner {
+                callback: Self::new(callback, kind),
+                cache: Cache::new(),
+            }))),
+            is_user_provided: true,
         }
     }
 }
@@ -298,14 +320,15 @@ pub(crate) async fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Option<Command> {
-    credential.oidc_callback.as_ref()?;
+    credential.oidc_callback.inner.lock().await.as_ref()?;
     if let Some(ref access_token) = credential
         .oidc_callback
+        .inner
+        .lock()
+        .await
         .as_ref()
         .unwrap()
         .cache
-        .lock()
-        .await
         .access_token
     {
         let start_doc = rawdoc! {
@@ -331,14 +354,38 @@ pub(crate) async fn reauthenticate_stream(
 ) -> Result<()> {
     credential
         .oidc_callback
-        .as_ref()
-        .unwrap()
-        .cache
+        .inner
         .lock()
         .await
+        .as_mut()
+        .unwrap()
+        .cache
         .invalidate(conn, true)
         .await;
     authenticate_stream(conn, credential, server_api, None).await
+}
+
+#[cfg(feature = "azure-oidc")]
+async fn setup_automatic_providers(
+    credential: &Credential,
+    guard: &mut MutexGuard<'_, Option<StateInner>>,
+) {
+    // If there is already a callback, there is no need to set up an automatic provider
+    // this could happen in the case of a reauthentication, or if the user has already set up
+    // a callback. A situation where the user has set up a callback and an automatic provider
+    // would already have caused an InvalidArgument error.
+    if guard.is_some() {
+        return;
+    }
+    if let Some(ref p) = credential.mechanism_properties {
+        let environment = p.get_str("ENVIRONMENT").unwrap_or("");
+        let client_id = credential.username.as_deref().unwrap_or("");
+        let resource = p.get_str("TOKEN_RESOURCE").unwrap_or("");
+        match environment {
+            "azure" => **guard = Some(Callback::azure_callback(Some(client_id), resource)),
+            _ => {}
+        }
+    }
 }
 
 pub(crate) async fn authenticate_stream(
@@ -350,13 +397,14 @@ pub(crate) async fn authenticate_stream(
     // We need to hold the lock for the entire function so that multiple callbacks
     // are not called during an authentication race, and so that token_gen_id on the Connection
     // always matches that in the Credential Cache.
-    let mut cred_cache = credential
-        .oidc_callback
-        .as_ref()
+    let mut guard = credential.oidc_callback.inner.lock().await;
+
+    #[cfg(feature = "azure-oidc")]
+    setup_automatic_providers(credential, &mut guard).await;
+    let cred_cache = &mut guard
+        .as_mut()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .cache
-        .lock()
-        .await;
+        .cache;
 
     cred_cache.propagate_token_gen_id(conn).await;
 
@@ -370,16 +418,19 @@ pub(crate) async fn authenticate_stream(
 
     let Callback { inner, kind } = credential
         .oidc_callback
+        .inner
+        .lock()
+        .await
         .as_ref()
         .ok_or_else(|| auth_error("no callbacks supplied"))?
         .callback
         .clone();
     match kind {
         CallbackKind::Machine => {
-            authenticate_machine(source, conn, credential, &mut cred_cache, server_api, inner).await
+            authenticate_machine(source, conn, credential, cred_cache, server_api, inner).await
         }
         CallbackKind::Human => {
-            authenticate_human(source, conn, credential, &mut cred_cache, server_api, inner).await
+            authenticate_human(source, conn, credential, cred_cache, server_api, inner).await
         }
     }
 }
@@ -413,7 +464,7 @@ async fn send_sasl_start_command(
 async fn do_shared_flow(
     source: &str,
     conn: &mut Connection,
-    cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut Cache,
     credential: &Credential,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
@@ -528,7 +579,7 @@ async fn authenticate_human(
     source: &str,
     conn: &mut Connection,
     credential: &Credential,
-    cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
@@ -608,7 +659,7 @@ async fn authenticate_machine(
     source: &str,
     conn: &mut Connection,
     credential: &Credential,
-    cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {

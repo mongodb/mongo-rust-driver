@@ -237,9 +237,7 @@ async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
     Ok(())
 }
 
-// TODO RUST-1660: this test should pass when AWS provider and callback are both provided
-//#[tokio::test]
-#[allow(dead_code)]
+#[tokio::test]
 async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
     // we need to assert the callback count
@@ -261,22 +259,35 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
             }
             .boxed()
         }))
-        .mechanism_properties(doc! {"ENVIRONMENT": "test"})
+        .mechanism_properties(doc! {"ENVIRONMENT": "test", "TOKEN_RESOURCE": "test"})
         .build()
         .into();
-    let client = Client::with_options(opts)?;
-    let res = client
-        .database("test")
-        .collection::<Document>("test")
-        .find_one(doc! {})
-        .await;
-
-    assert!(res.is_err());
+    let client = Client::with_options(opts);
     assert!(matches!(
-        *res.unwrap_err().kind,
-        crate::error::ErrorKind::Authentication { .. },
+        *client.unwrap_err().kind,
+        crate::error::ErrorKind::InvalidArgument { .. },
     ));
-    assert_eq!(1, *(*call_count).lock().await);
+    Ok(())
+}
+
+#[tokio::test]
+async fn machine_2_5_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC");
+    // we need to assert the callback count
+    let call_count = Arc::new(Mutex::new(0));
+    let cb_call_count = call_count.clone();
+
+    let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+    opts.credential = Credential::builder()
+        .mechanism(AuthMechanism::MongoDbOidc)
+        .mechanism_properties(doc! {"ENVIRONMENT": "azure"})
+        .build()
+        .into();
+    let client = Client::with_options(opts);
+    assert!(matches!(
+        *client.unwrap_err().kind,
+        crate::error::ErrorKind::InvalidArgument { .. },
+    ));
     Ok(())
 }
 
