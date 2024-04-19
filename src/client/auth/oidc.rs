@@ -3,7 +3,9 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
+#[cfg(feature = "azure-oidc")]
+use tokio::sync::MutexGuard;
 use typed_builder::TypedBuilder;
 
 use crate::{
