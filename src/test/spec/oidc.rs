@@ -262,9 +262,16 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
         .mechanism_properties(doc! {"ENVIRONMENT": "test", "TOKEN_RESOURCE": "test"})
         .build()
         .into();
-    let client = Client::with_options(opts);
+    let client = Client::with_options(opts)?;
+    let res = client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(doc! {})
+        .await;
+
+    assert!(res.is_err());
     assert!(matches!(
-        *client.unwrap_err().kind,
+        *res.unwrap_err().kind,
         crate::error::ErrorKind::InvalidArgument { .. },
     ));
     Ok(())
@@ -281,9 +288,16 @@ async fn machine_2_5_token_resource_must_be_set_for_azure() -> anyhow::Result<()
         .mechanism_properties(doc! {"ENVIRONMENT": "azure"})
         .build()
         .into();
-    let client = Client::with_options(opts);
+    let client = Client::with_options(opts)?;
+    let res = client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(doc! {})
+        .await;
+
+    assert!(res.is_err());
     assert!(matches!(
-        *client.unwrap_err().kind,
+        *res.unwrap_err().kind,
         crate::error::ErrorKind::InvalidArgument { .. },
     ));
     Ok(())
@@ -425,7 +439,6 @@ async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
 
-    dbg!("!!!");
     let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
     opts.credential = Credential::builder()
         .mechanism(AuthMechanism::MongoDbOidc)
@@ -443,15 +456,10 @@ async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
         }))
         .build()
         .into();
-    dbg!("!!!");
     let client = Client::with_options(opts)?;
-    dbg!("!!!");
     let database = client.database("test");
-    dbg!("!!!");
     let collection = database.collection::<Document>("test");
-    dbg!("!!!");
     collection.find_one(doc! {}).await?;
-    dbg!("!!!");
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
 }
