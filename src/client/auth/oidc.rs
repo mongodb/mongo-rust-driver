@@ -240,16 +240,6 @@ impl Cache {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn refresh_token(&mut self) -> &mut Option<String> {
-        &mut self.refresh_token
-    }
-
-    #[cfg(test)]
-    pub(crate) fn access_token(&mut self) -> &mut Option<String> {
-        &mut self.access_token
-    }
-
     async fn update(
         &mut self,
         response: &IdpServerResponse,
@@ -338,6 +328,7 @@ pub(crate) async fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Option<Command> {
+    dbg!(&credential);
     credential.oidc_callback.inner.lock().await.as_ref()?;
     if let Some(ref access_token) = credential
         .oidc_callback
@@ -412,10 +403,12 @@ pub(crate) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
     server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
+    dbg!(&credential);
     // We need to hold the lock for the entire function so that multiple callbacks
     // are not called during an authentication race, and so that token_gen_id on the Connection
     // always matches that in the Credential Cache.
     let mut guard = credential.oidc_callback.inner.lock().await;
+    dbg!();
 
     #[cfg(feature = "azure-oidc")]
     setup_automatic_providers(credential, &mut guard).await;
@@ -424,7 +417,10 @@ pub(crate) async fn authenticate_stream(
         .ok_or_else(|| auth_error("no callbacks supplied"))?
         .cache;
 
+    dbg!();
     cred_cache.propagate_token_gen_id(conn).await;
+
+    dbg!();
 
     if server_first.into().is_some() {
         // speculative authentication succeeded, no need to authenticate again

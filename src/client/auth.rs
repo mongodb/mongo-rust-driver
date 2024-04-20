@@ -117,6 +117,7 @@ impl AuthMechanism {
     /// Determines if the provided credentials have the required information to perform
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
+        dbg!("VALIDATING CREDENTIAL");
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
                 if credential.username.is_none() {

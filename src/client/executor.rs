@@ -16,10 +16,7 @@ use super::{options::ServerAddress, session::TransactionState, Client, ClientSes
 use crate::{
     bson::Document,
     change_stream::{
-        event::ChangeStreamEvent,
-        session::SessionChangeStream,
-        ChangeStream,
-        ChangeStreamData,
+        event::ChangeStreamEvent, session::SessionChangeStream, ChangeStream, ChangeStreamData,
         WatchArgs,
     },
     cmap::{
@@ -27,33 +24,20 @@ use crate::{
             wire::{next_request_id, Message},
             PinnedConnectionHandle,
         },
-        Connection,
-        ConnectionPool,
-        RawCommandResponse,
+        Connection, ConnectionPool, RawCommandResponse,
     },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
-        Error,
-        ErrorKind,
-        Result,
-        RETRYABLE_WRITE_ERROR,
-        TRANSIENT_TRANSACTION_ERROR,
+        Error, ErrorKind, Result, RETRYABLE_WRITE_ERROR, TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{
-        CommandEvent,
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
+        CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
-        AbortTransaction,
-        CommandErrorBody,
-        CommitTransaction,
-        Operation,
-        Retryability,
+        AbortTransaction, CommandErrorBody, CommitTransaction, Operation, Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
@@ -103,9 +87,11 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
+        dbg!("!!!");
         if self.inner.shutdown.executed.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
         }
+        dbg!("!!!");
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
@@ -115,6 +101,7 @@ impl Client {
                 .into());
             }
             let session = session.into();
+            dbg!("!!!");
             if let Some(session) = &session {
                 if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
                     return Err(ErrorKind::InvalidArgument {
@@ -136,6 +123,7 @@ impl Client {
                     }
                 }
             }
+            dbg!("!!!");
             self.execute_operation_with_retry(op, session).await
         })
         .await
@@ -148,10 +136,13 @@ impl Client {
     where
         Op: Operation<O = CursorSpecification>,
     {
+        dbg!("!!!");
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
+            dbg!("!!!");
             let pinned =
                 self.pin_connection_for_cursor(&details.output, &mut details.connection)?;
+            dbg!("!!!");
             Ok(Cursor::new(
                 self.clone(),
                 details.output,
@@ -300,6 +291,7 @@ impl Client {
                 session.transaction.reset();
             }
         }
+        dbg!("!!!");
 
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
@@ -313,6 +305,7 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
+            dbg!("!!!");
             let server = match self
                 .select_server(
                     selection_criteria,
@@ -329,8 +322,10 @@ impl Client {
                     return Err(err);
                 }
             };
+            dbg!("!!!");
             let server_addr = server.address.clone();
 
+            dbg!("!!!");
             let mut conn = match get_connection(&session, &op, &server.pool).await {
                 Ok(c) => c,
                 Err(mut err) => {
@@ -931,9 +926,11 @@ async fn get_connection<T: Operation>(
     op: &T,
     pool: &ConnectionPool,
 ) -> Result<Connection> {
+    dbg!("!!!");
     let session_pinned = session
         .as_ref()
         .and_then(|s| s.transaction.pinned_connection());
+    dbg!("!!!", &session_pinned);
     match (session_pinned, op.pinned_connection()) {
         (Some(c), None) | (None, Some(c)) => c.take_connection().await,
         (Some(session_handle), Some(op_handle)) => {

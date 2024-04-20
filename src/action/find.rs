@@ -10,10 +10,7 @@ use crate::{
     operation::Find as Op,
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
-    ClientSession,
-    Collection,
-    Cursor,
-    SessionCursor,
+    ClientSession, Collection, Cursor, SessionCursor,
 };
 
 use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
@@ -126,8 +123,10 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
     type Future = FindFuture;
 
     async fn execute(mut self) -> Result<Cursor<T>> {
+        dbg!("!!!");
         resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
 
+        dbg!("!!!");
         let find = Op::new(self.coll.namespace(), self.filter, self.options);
         self.coll.client().execute_cursor_operation(find).await
     }
@@ -195,10 +194,13 @@ impl<'a, T: DeserializeOwned + Send + Sync> Action for FindOne<'a, T> {
     type Future = FindOneFuture;
 
     async fn execute(self) -> Result<Option<T>> {
+        dbg!("!!!");
         use futures_util::stream::StreamExt;
         let mut options: FindOptions = self.options.unwrap_or_default().into();
         options.limit = Some(-1);
+        dbg!("!!!");
         let find = self.coll.find(self.filter).with_options(options);
+        dbg!("!!!");
         if let Some(session) = self.session {
             let mut cursor = find.session(&mut *session).await?;
             let mut stream = cursor.stream(session);

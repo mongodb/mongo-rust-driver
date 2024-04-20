@@ -274,8 +274,6 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
 async fn machine_2_5_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
     // we need to assert the callback count
-    let call_count = Arc::new(Mutex::new(0));
-    let cb_call_count = call_count.clone();
 
     let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
     opts.credential = Credential::builder()
@@ -427,6 +425,7 @@ async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
 
+    dbg!("!!!");
     let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
     opts.credential = Credential::builder()
         .mechanism(AuthMechanism::MongoDbOidc)
@@ -444,12 +443,15 @@ async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
         }))
         .build()
         .into();
+    dbg!("!!!");
     let client = Client::with_options(opts)?;
-    client
-        .database("test")
-        .collection::<Document>("test")
-        .find_one(doc! {})
-        .await?;
+    dbg!("!!!");
+    let database = client.database("test");
+    dbg!("!!!");
+    let collection = database.collection::<Document>("test");
+    dbg!("!!!");
+    collection.find_one(doc! {}).await?;
+    dbg!("!!!");
     assert_eq!(1, *(*call_count).lock().await);
     Ok(())
 }
@@ -1187,7 +1189,8 @@ async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
         .as_mut()
         .unwrap()
         .oidc_callback
-        .set_refresh_token(Some("some fake refresh token".to_string()));
+        .set_refresh_token(Some("some fake refresh token".to_string()))
+        .await;
 
     let client = Client::with_options(opts)?;
 
