@@ -48,6 +48,22 @@ impl State {
     pub(crate) fn is_user_provided(&self) -> bool {
         self.is_user_provided
     }
+
+    #[cfg(test)]
+    pub(crate) async fn set_access_token(&self, access_token: Option<String>) {
+        self.inner.lock().await.as_mut().unwrap().cache.access_token = access_token;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn set_refresh_token(&self, refresh_token: Option<String>) {
+        self.inner
+            .lock()
+            .await
+            .as_mut()
+            .unwrap()
+            .cache
+            .refresh_token = refresh_token;
+    }
 }
 
 /// The user-supplied callbacks for OIDC authentication.

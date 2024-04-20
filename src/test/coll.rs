@@ -11,23 +11,13 @@ use crate::{
     bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
     options::{
-        Acknowledgment,
-        CollectionOptions,
-        DeleteOptions,
-        DropCollectionOptions,
-        FindOneAndDeleteOptions,
-        FindOptions,
-        Hint,
-        IndexOptions,
-        ReadConcern,
-        ReadPreference,
-        SelectionCriteria,
-        WriteConcern,
+        Acknowledgment, CollectionOptions, DeleteOptions, DropCollectionOptions,
+        FindOneAndDeleteOptions, FindOptions, Hint, IndexOptions, ReadConcern, ReadPreference,
+        SelectionCriteria, WriteConcern,
     },
     results::DeleteResult,
     test::{get_client_options, log_uncaptured, util::TestClient, EventClient},
-    Collection,
-    IndexModel,
+    Collection, IndexModel,
 };
 
 #[tokio::test]

@@ -317,17 +317,12 @@ async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth
         .build()
         .into();
     // poison the cache with a bad token, authentication should still work.
-    *opts
-        .credential
+    opts.credential
         .as_mut()
         .unwrap()
         .oidc_callback
-        .as_mut()
-        .unwrap()
-        .cache()
-        .lock()
-        .await
-        .access_token() = Some("random happy sunshine token".to_string());
+        .set_access_token(Some("random happy sunshine token".to_string()))
+        .await;
     let client = Client::with_options(opts)?;
     client
         .database("test")
@@ -802,19 +797,14 @@ async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token() 
         .into();
 
     // put the test_user1 token in the cache
-    *opts
-        .credential
+    opts.credential
         .as_mut()
         .unwrap()
         .oidc_callback
-        .as_mut()
-        .unwrap()
-        .cache()
-        .lock()
-        .await
-        .access_token() = tokio::fs::read_to_string(token_dir!("test_user1"))
-        .await
-        .ok();
+        .set_access_token(Some(
+            tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+        ))
+        .await;
 
     let client = Client::with_options(opts)?;
 
@@ -1193,17 +1183,11 @@ async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
         .into();
 
     // put a fake refresh token in the cache
-    *opts
-        .credential
+    opts.credential
         .as_mut()
         .unwrap()
         .oidc_callback
-        .as_mut()
-        .unwrap()
-        .cache()
-        .lock()
-        .await
-        .refresh_token() = Some("some fake refresh token".to_string());
+        .set_refresh_token(Some("some fake refresh token".to_string()));
 
     let client = Client::with_options(opts)?;
 
