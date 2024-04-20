@@ -1,11 +1,7 @@
 use std::{fmt::Debug, time::Duration};
 
 use crate::{event::command::CommandEvent, test::Event, Client, Namespace};
-use bson::{
-    rawdoc,
-    //serde_helpers::HumanReadable,
-    RawDocumentBuf,
-};
+use bson::{rawdoc, serde_helpers::HumanReadable, RawDocumentBuf};
 use futures::stream::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use semver::VersionReq;
@@ -15,13 +11,23 @@ use crate::{
     bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
     options::{
-        Acknowledgment, CollectionOptions, DeleteOptions, DropCollectionOptions,
-        FindOneAndDeleteOptions, FindOptions, Hint, IndexOptions, ReadConcern, ReadPreference,
-        SelectionCriteria, WriteConcern,
+        Acknowledgment,
+        CollectionOptions,
+        DeleteOptions,
+        DropCollectionOptions,
+        FindOneAndDeleteOptions,
+        FindOptions,
+        Hint,
+        IndexOptions,
+        ReadConcern,
+        ReadPreference,
+        SelectionCriteria,
+        WriteConcern,
     },
     results::DeleteResult,
     test::{get_client_options, log_uncaptured, util::TestClient, EventClient},
-    Collection, IndexModel,
+    Collection,
+    IndexModel,
 };
 
 #[tokio::test]
@@ -1110,107 +1116,107 @@ fn test_namespace_fromstr() {
     assert_eq!(t.coll, "something.else");
 }
 
-//#[tokio::test]
-//async fn configure_human_readable_serialization() {
-//    #[derive(Deserialize)]
-//    struct StringOrBytes(String);
-//
-//    impl Serialize for StringOrBytes {
-//        fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-//        where
-//            S: serde::Serializer,
-//        {
-//            if serializer.is_human_readable() {
-//                serializer.serialize_str(&self.0)
-//            } else {
-//                serializer.serialize_bytes(self.0.as_bytes())
-//            }
-//        }
-//    }
-//
-//    #[derive(Deserialize, Serialize)]
-//    struct Data {
-//        id: u32,
-//        s: StringOrBytes,
-//    }
-//
-//    let client = TestClient::new().await;
-//
-//    let non_human_readable_collection: Collection<Data> =
-//        client.database("db").collection("nonhumanreadable");
-//    non_human_readable_collection.drop().await.unwrap();
-//
-//    non_human_readable_collection
-//        .insert_one(Data {
-//            id: 0,
-//            s: StringOrBytes("non human readable!".into()),
-//        })
-//        .await
-//        .unwrap();
-//
-//    // The inserted bytes will not deserialize to StringOrBytes properly, so find as a document
-//    // instead.
-//    let document_collection = non_human_readable_collection.clone_with_type::<Document>();
-//    let doc = document_collection
-//        .find_one(doc! { "id": 0 })
-//        .await
-//        .unwrap()
-//        .unwrap();
-//    assert!(doc.get_binary_generic("s").is_ok());
-//
-//    non_human_readable_collection
-//        .replace_one(
-//            doc! { "id": 0 },
-//            Data {
-//                id: 1,
-//                s: StringOrBytes("non human readable!".into()),
-//            },
-//        )
-//        .await
-//        .unwrap();
-//
-//    let doc = document_collection
-//        .find_one(doc! { "id": 1 })
-//        .await
-//        .unwrap()
-//        .unwrap();
-//    assert!(doc.get_binary_generic("s").is_ok());
-//
-//    let human_readable_collection: Collection<HumanReadable<Data>> =
-//        client.database("db").collection("humanreadable");
-//    human_readable_collection.drop().await.unwrap();
-//
-//    human_readable_collection
-//        .insert_one(HumanReadable(Data {
-//            id: 0,
-//            s: StringOrBytes("human readable!".into()),
-//        }))
-//        .await
-//        .unwrap();
-//
-//    // Proper deserialization to a string demonstrates that the data was correctly serialized as a
-//    // string.
-//    human_readable_collection
-//        .find_one(doc! { "id": 0 })
-//        .await
-//        .unwrap();
-//
-//    human_readable_collection
-//        .replace_one(
-//            doc! { "id": 0 },
-//            HumanReadable(Data {
-//                id: 1,
-//                s: StringOrBytes("human readable!".into()),
-//            }),
-//        )
-//        .await
-//        .unwrap();
-//
-//    human_readable_collection
-//        .find_one(doc! { "id": 1 })
-//        .await
-//        .unwrap();
-//}
+#[tokio::test]
+async fn configure_human_readable_serialization() {
+    #[derive(Deserialize)]
+    struct StringOrBytes(String);
+
+    impl Serialize for StringOrBytes {
+        fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            if serializer.is_human_readable() {
+                serializer.serialize_str(&self.0)
+            } else {
+                serializer.serialize_bytes(self.0.as_bytes())
+            }
+        }
+    }
+
+    #[derive(Deserialize, Serialize)]
+    struct Data {
+        id: u32,
+        s: StringOrBytes,
+    }
+
+    let client = TestClient::new().await;
+
+    let non_human_readable_collection: Collection<Data> =
+        client.database("db").collection("nonhumanreadable");
+    non_human_readable_collection.drop().await.unwrap();
+
+    non_human_readable_collection
+        .insert_one(Data {
+            id: 0,
+            s: StringOrBytes("non human readable!".into()),
+        })
+        .await
+        .unwrap();
+
+    // The inserted bytes will not deserialize to StringOrBytes properly, so find as a document
+    // instead.
+    let document_collection = non_human_readable_collection.clone_with_type::<Document>();
+    let doc = document_collection
+        .find_one(doc! { "id": 0 })
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(doc.get_binary_generic("s").is_ok());
+
+    non_human_readable_collection
+        .replace_one(
+            doc! { "id": 0 },
+            Data {
+                id: 1,
+                s: StringOrBytes("non human readable!".into()),
+            },
+        )
+        .await
+        .unwrap();
+
+    let doc = document_collection
+        .find_one(doc! { "id": 1 })
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(doc.get_binary_generic("s").is_ok());
+
+    let human_readable_collection: Collection<HumanReadable<Data>> =
+        client.database("db").collection("humanreadable");
+    human_readable_collection.drop().await.unwrap();
+
+    human_readable_collection
+        .insert_one(HumanReadable(Data {
+            id: 0,
+            s: StringOrBytes("human readable!".into()),
+        }))
+        .await
+        .unwrap();
+
+    // Proper deserialization to a string demonstrates that the data was correctly serialized as a
+    // string.
+    human_readable_collection
+        .find_one(doc! { "id": 0 })
+        .await
+        .unwrap();
+
+    human_readable_collection
+        .replace_one(
+            doc! { "id": 0 },
+            HumanReadable(Data {
+                id: 1,
+                s: StringOrBytes("human readable!".into()),
+            }),
+        )
+        .await
+        .unwrap();
+
+    human_readable_collection
+        .find_one(doc! { "id": 1 })
+        .await
+        .unwrap();
+}
 
 #[tokio::test]
 async fn insert_many_document_sequences() {

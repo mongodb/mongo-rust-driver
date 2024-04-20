@@ -31,7 +31,8 @@ export COVERAGE=1
 export AUTH="auth"
 export OIDC="oidc"
 
-cargo nextest run test::spec::oidc --profile ci
-RESULT=$?
-cp target/nextest/ci/junit.xml results.xml
-exit $RESULT
+#cargo nextest run test::spec::oidc --no-capture #--profile ci
+cargo nextest run test::spec::oidc --no-capture
+#RESULT=$?
+#cp target/nextest/ci/junit.xml results.xml
+#exit $RESULT

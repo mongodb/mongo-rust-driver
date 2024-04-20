@@ -19,8 +19,11 @@ use futures_util::FutureExt;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
-    command::CommandTracingEventEmitter, server_selection::ServerSelectionTracingEventEmitter,
-    trace_or_log_enabled, TracingOrLogLevel, COMMAND_TRACING_EVENT_TARGET,
+    command::CommandTracingEventEmitter,
+    server_selection::ServerSelectionTracingEventEmitter,
+    trace_or_log_enabled,
+    TracingOrLogLevel,
+    COMMAND_TRACING_EVENT_TARGET,
 };
 use crate::{
     concern::{ReadConcern, WriteConcern},
@@ -31,7 +34,8 @@ use crate::{
     options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{server_selection, SelectedServer, Topology},
     tracking_arc::TrackingArc,
-    BoxFuture, ClientSession,
+    BoxFuture,
+    ClientSession,
 };
 
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -395,13 +399,10 @@ impl Client {
         operation_name: &str,
         deprioritized: Option<&ServerAddress>,
     ) -> Result<SelectedServer> {
-        dbg!("!!!");
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
-        dbg!("!!!");
         let start_time = Instant::now();
-        dbg!("!!!");
         let timeout = self
             .inner
             .options
@@ -422,19 +423,16 @@ impl Client {
         #[cfg(feature = "tracing-unstable")]
         let mut emitted_waiting_message = false;
 
-        dbg!("!!!");
         let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.observe_latest();
 
-            dbg!("!!!");
             let result = server_selection::attempt_to_select_server(
                 criteria,
                 &state.description,
                 &state.servers(),
                 deprioritized,
             );
-            dbg!("!!!");
             match result {
                 Err(error) => {
                     #[cfg(feature = "tracing-unstable")]
@@ -443,7 +441,6 @@ impl Client {
                     return Err(error);
                 }
                 Ok(result) => {
-                    dbg!(&result);
                     if let Some(server) = result {
                         #[cfg(feature = "tracing-unstable")]
                         event_emitter.emit_succeeded_event(&state.description, &server);

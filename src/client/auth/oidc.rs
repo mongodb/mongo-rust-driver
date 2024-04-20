@@ -412,39 +412,32 @@ pub(crate) async fn authenticate_stream(
 
     #[cfg(feature = "azure-oidc")]
     setup_automatic_providers(credential, &mut guard).await;
-    let cred_cache = &mut guard
+    let StateInner {
+        cache,
+        callback: Callback { inner, kind },
+    } = &mut guard
         .as_mut()
-        .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .cache;
+        .ok_or_else(|| auth_error("no callbacks supplied"))?;
 
     dbg!();
-    cred_cache.propagate_token_gen_id(conn).await;
+    cache.propagate_token_gen_id(conn).await;
 
     dbg!();
 
     if server_first.into().is_some() {
         // speculative authentication succeeded, no need to authenticate again
         // update the Connection gen_id to be that of the cred_cache
-        cred_cache.propagate_token_gen_id(conn).await;
+        cache.propagate_token_gen_id(conn).await;
         return Ok(());
     }
     let source = credential.source.as_deref().unwrap_or("$external");
 
-    let Callback { inner, kind } = credential
-        .oidc_callback
-        .inner
-        .lock()
-        .await
-        .as_ref()
-        .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .callback
-        .clone();
     match kind {
         CallbackKind::Machine => {
-            authenticate_machine(source, conn, credential, cred_cache, server_api, inner).await
+            authenticate_machine(source, conn, credential, cache, server_api, inner.clone()).await
         }
         CallbackKind::Human => {
-            authenticate_human(source, conn, credential, cred_cache, server_api, inner).await
+            authenticate_human(source, conn, credential, cache, server_api, inner.clone()).await
         }
     }
 }
