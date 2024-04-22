@@ -383,3 +383,56 @@ async fn cursor_iteration_in_a_transaction() {
     let command_started_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
 }
+
+#[tokio::test]
+async fn namespace_batching() {
+    let client = Client::test_builder().monitor_events().build().await;
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping namespace_batching: bulkWrite requires 8.0+");
+        return;
+    }
+
+    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap();
+
+    let mut models = vec![
+        WriteModel::InsertOne {
+            namespace: Namespace::new("db", "coll"),
+            document: doc! { "a": "b" }
+        };
+        max_write_batch_size as usize
+    ];
+    models.push(WriteModel::InsertOne {
+        namespace: Namespace::new("db", "coll1"),
+        document: doc! { "a": "b" },
+    });
+
+    let result = client.bulk_write(models).await.unwrap();
+    assert_eq!(result.inserted_count, max_write_batch_size + 1);
+
+    let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
+
+    let first_ns_info = command_started_events[0]
+        .command
+        .get_array("nsInfo")
+        .unwrap();
+    assert_eq!(first_ns_info.len(), 1);
+    let first_ns = first_ns_info[0]
+        .as_document()
+        .unwrap()
+        .get_str("ns")
+        .unwrap();
+    assert_eq!(first_ns, "db.coll");
+
+    let second_ns_info = command_started_events[1]
+        .command
+        .get_array("nsInfo")
+        .unwrap();
+    assert_eq!(second_ns_info.len(), 1);
+    let second_ns = second_ns_info[0]
+        .as_document()
+        .unwrap()
+        .get_str("ns")
+        .unwrap();
+    assert_eq!(second_ns, "db.coll1");
+}
