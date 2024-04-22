@@ -302,6 +302,7 @@ buildvariants:
       SSL: ssl
     tasks:
       - testoidc_task_group
+      - testazureoidc_task_group
 
   - name: oidc-macos
     display_name: "OIDC Macos"
@@ -313,6 +314,7 @@ buildvariants:
       SSL: ssl
     tasks:
       - testoidc_task_group
+      - testazureoidc_task_group
 
   - name: oidc-windows
     disable: true
@@ -325,6 +327,7 @@ buildvariants:
       SSL: ssl
     tasks:
       - testoidc_task_group
+      - testazureoidc_task_group
 
   - name: in-use-encryption
     display_name: "In-Use Encryption"
@@ -639,6 +642,33 @@ task_groups:
     setup_group_timeout_secs: 1800
     tasks:
       - oidc-auth-test-latest
+
+  - name: testazureoidc_task_group
+    setup_group:
+      - func: fetch source
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: make files executable
+      - func: install rust
+      - func: install junit dependencies
+      - command: shell.exec
+        params:
+          shell: bash
+          env:
+            AZUREOIDC_VMNAME_PREFIX: "RUST_DRIVER"
+          script: |
+            ${PREPARE_SHELL}
+            ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/create-and-setup-vm.sh
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/delete-vm.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-azure-latest
 
 #########
 # Tasks #
@@ -1277,6 +1307,22 @@ tasks:
     commands:
     - func: "run oidc auth test with test credentials"
 
+  - name: "oidc-auth-test-azure-latest"
+    commands:
+    - command: shell.exec
+      params:
+        shell: bash
+        script: |-
+          set -o errexit
+          ${PREPARE_SHELL}
+          cd src
+          git add .
+          git commit -m "add files"
+          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-python-driver.tgz
+          git archive -o $AZUREOIDC_DRIVERS_TAR_FILE HEAD
+          export AZUREOIDC_TEST_CMD="OIDC_AZURE=azure ./.evergreen/run-mongodb-oidc-test.sh"
+          bash $DRIVERS_TOOLS/.evergreen/auth_oidc/azure/run-driver-test.sh
+
 #############
 # Functions #
 #############
@@ -1731,6 +1777,7 @@ functions:
         include_expansions_in_env: ["DRIVERS_TOOLS", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
         script: |
           ${PREPARE_SHELL}
+          export OIDC="oidc"
           .evergreen/run-mongodb-oidc-test.sh
 
   "compile only":

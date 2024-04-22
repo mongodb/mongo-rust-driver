@@ -280,7 +280,7 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
 
 #[tokio::test]
 async fn machine_2_5_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
-    get_env_or_skip!("OIDC");
+    get_env_or_skip!("OIDC_AZURE");
     use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
     // we need to assert the callback count
 
