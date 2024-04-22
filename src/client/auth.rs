@@ -189,15 +189,12 @@ impl AuthMechanism {
                 Ok(())
             }
             AuthMechanism::MongoDbOidc => {
-                dbg!();
                 let default_document = &Document::new();
                 let environment = credential
                     .mechanism_properties
                     .as_ref()
                     .unwrap_or(default_document)
                     .get_str(ENVIRONMENT_PROP_STR);
-                dbg!(&environment);
-                dbg!(credential.oidc_callback.is_user_provided());
                 if environment.is_ok() && credential.oidc_callback.is_user_provided() {
                     return Err(Error::invalid_argument(format!(
                         "OIDC callback cannot be set for {} authentication, if an `{}` is set",
@@ -206,7 +203,6 @@ impl AuthMechanism {
                 }
                 match environment {
                     Ok(AZURE_ENVIRONMENT_VALUE_STR) | Ok(GCP_ENVIRONMENT_VALUE_STR) => {
-                        dbg!(&credential.mechanism_properties);
                         if !credential
                             .mechanism_properties
                             .as_ref()
