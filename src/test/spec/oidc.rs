@@ -240,6 +240,7 @@ async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
 #[tokio::test]
 async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
+    use crate::client::auth::{ENVIRONMENT_PROP_STR, TOKEN_RESOURCE_PROP_STR};
     // we need to assert the callback count
     let call_count = Arc::new(Mutex::new(0));
     let cb_call_count = call_count.clone();
@@ -259,7 +260,7 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
             }
             .boxed()
         }))
-        .mechanism_properties(doc! {"ENVIRONMENT": "test", "TOKEN_RESOURCE": "test"})
+        .mechanism_properties(doc! {ENVIRONMENT_PROP_STR: "test", TOKEN_RESOURCE_PROP_STR: "test"})
         .build()
         .into();
     let client = Client::with_options(opts)?;
@@ -280,12 +281,13 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
 #[tokio::test]
 async fn machine_2_5_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
+    use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
     // we need to assert the callback count
 
     let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
     opts.credential = Credential::builder()
         .mechanism(AuthMechanism::MongoDbOidc)
-        .mechanism_properties(doc! {"ENVIRONMENT": "azure"})
+        .mechanism_properties(doc! {ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR})
         .build()
         .into();
     let client = Client::with_options(opts)?;
@@ -612,6 +614,7 @@ async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
 #[tokio::test]
 async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
+    use crate::client::auth::ALLOWED_HOSTS_PROP_STR;
     {
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
@@ -622,7 +625,7 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .mechanism_properties(bson::doc! {
-                "ALLOWED_HOSTS": [],
+                ALLOWED_HOSTS_PROP_STR: [],
             })
             .oidc_callback(oidc::Callback::human(move |_| {
                 let call_count = cb_call_count.clone();
@@ -663,7 +666,7 @@ async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .mechanism_properties(bson::doc! {
-                "ALLOWED_HOSTS": ["example.com"],
+                ALLOWED_HOSTS_PROP_STR: ["example.com"],
             })
             .oidc_callback(oidc::Callback::human(move |_| {
                 let call_count = cb_call_count.clone();

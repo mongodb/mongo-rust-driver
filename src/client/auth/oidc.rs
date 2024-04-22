@@ -8,11 +8,15 @@ use tokio::sync::Mutex;
 use tokio::sync::MutexGuard;
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "azure-oidc")]
+use crate::client::auth::{
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, TOKEN_RESOURCE_PROP_STR,
+};
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -135,6 +139,22 @@ impl Callback {
         Self::create_state(callback, CallbackKind::Machine)
     }
 
+    fn create_state<F>(callback: F, kind: CallbackKind) -> State
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        State {
+            inner: Arc::new(Mutex::new(Some(StateInner {
+                callback: Self::new(callback, kind),
+                cache: Cache::new(),
+            }))),
+            is_user_provided: true,
+        }
+    }
+
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
     fn azure_callback(client_id: Option<&str>, resource: &str) -> StateInner {
@@ -190,22 +210,6 @@ impl Callback {
                 CallbackKind::Machine,
             ),
             cache: Cache::new(),
-        }
-    }
-
-    fn create_state<F>(callback: F, kind: CallbackKind) -> State
-    where
-        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
-            + Send
-            + Sync
-            + 'static,
-    {
-        State {
-            inner: Arc::new(Mutex::new(Some(StateInner {
-                callback: Self::new(callback, kind),
-                cache: Cache::new(),
-            }))),
-            is_user_provided: true,
         }
     }
 }
@@ -381,16 +385,18 @@ async fn setup_automatic_providers(
     // If there is already a callback, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
     // a callback. A situation where the user has set up a callback and an automatic provider
-    // would already have caused an InvalidArgument error.
+    // would already have caused an InvalidArgument error in `validate_credential`.
     if guard.is_some() {
         return;
     }
     if let Some(ref p) = credential.mechanism_properties {
-        let environment = p.get_str("ENVIRONMENT").unwrap_or("");
+        let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
         let client_id = credential.username.as_deref().unwrap_or("");
-        let resource = p.get_str("TOKEN_RESOURCE").unwrap_or("");
+        let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
         match environment {
-            "azure" => **guard = Some(Callback::azure_callback(Some(client_id), resource)),
+            AZURE_ENVIRONMENT_VALUE_STR => {
+                **guard = Some(Callback::azure_callback(Some(client_id), resource))
+            }
             _ => {}
         }
     }
@@ -541,13 +547,17 @@ fn get_allowed_hosts(mechanism_properties: Option<&Document>) -> Result<Vec<&str
         return Ok(Vec::from(DEFAULT_ALLOWED_HOSTS));
     }
     if let Some(allowed_hosts) =
-        mechanism_properties.and_then(|p| p.get_array("ALLOWED_HOSTS").ok())
+        mechanism_properties.and_then(|p| p.get_array(ALLOWED_HOSTS_PROP_STR).ok())
     {
         return allowed_hosts
             .iter()
             .map(|host| {
-                host.as_str()
-                    .ok_or_else(|| auth_error("ALLOWED_HOSTS must contain only strings"))
+                host.as_str().ok_or_else(|| {
+                    auth_error(format!(
+                        "`{}` must contain only strings",
+                        ALLOWED_HOSTS_PROP_STR
+                    ))
+                })
             })
             .collect::<Result<Vec<_>>>();
     }
