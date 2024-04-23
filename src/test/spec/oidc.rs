@@ -279,33 +279,6 @@ async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Res
 }
 
 #[tokio::test]
-async fn machine_2_5_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
-    get_env_or_skip!("OIDC_AZURE");
-    use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
-    // we need to assert the callback count
-
-    let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
-    opts.credential = Credential::builder()
-        .mechanism(AuthMechanism::MongoDbOidc)
-        .mechanism_properties(doc! {ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR})
-        .build()
-        .into();
-    let client = Client::with_options(opts)?;
-    let res = client
-        .database("test")
-        .collection::<Document>("test")
-        .find_one(doc! {})
-        .await;
-
-    assert!(res.is_err());
-    assert!(matches!(
-        *res.unwrap_err().kind,
-        crate::error::ErrorKind::InvalidArgument { .. },
-    ));
-    Ok(())
-}
-
-#[tokio::test]
 async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth(
 ) -> anyhow::Result<()> {
     get_env_or_skip!("OIDC");
@@ -430,6 +403,82 @@ async fn machine_4_reauthentication() -> anyhow::Result<()> {
         .find_one(doc! {})
         .await?;
     assert_eq!(2, *(*call_count).lock().await);
+    Ok(())
+}
+
+// Azure tests
+async fn machine_5_1_azure_with_no_username() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC_AZURE");
+    use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
+    // we need to assert the callback count
+
+    let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+    opts.credential = Credential::builder()
+        .mechanism(AuthMechanism::MongoDbOidc)
+        .mechanism_properties(doc! {ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR})
+        .build()
+        .into();
+    let client = Client::with_options(opts)?;
+    client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(doc! {})
+        .await?;
+    Ok(())
+}
+
+async fn machine_5_2_azure_with_bad_username() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC_AZURE");
+    use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
+    // we need to assert the callback count
+
+    let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+    opts.credential = Credential::builder()
+        .mechanism(AuthMechanism::MongoDbOidc)
+        .mechanism_properties(doc! {ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR})
+        .build()
+        .into();
+    opts.credential.as_mut().unwrap().username = Some("bad".to_string());
+    let client = Client::with_options(opts)?;
+    let res = client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(doc! {})
+        .await;
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::Authentication { .. },
+    ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn machine_5_3_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
+    get_env_or_skip!("OIDC_AZURE");
+    use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
+    // we need to assert the callback count
+
+    let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+    opts.credential = Credential::builder()
+        .mechanism(AuthMechanism::MongoDbOidc)
+        .build()
+        .into();
+    opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
+        ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR,
+    });
+    let client = Client::with_options(opts)?;
+    let res = client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(doc! {})
+        .await;
+
+    assert!(res.is_err());
+    assert!(matches!(
+        *res.unwrap_err().kind,
+        crate::error::ErrorKind::InvalidArgument { .. },
+    ));
     Ok(())
 }
 

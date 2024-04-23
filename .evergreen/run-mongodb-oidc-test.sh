@@ -9,6 +9,7 @@ source .evergreen/cargo-test.sh
 echo "Running MONGODB-OIDC authentication tests"
 
 OIDC_ENV=${OIDC_ENV:-"test"}
+FEATURES=""
 
 if [ $OIDC_ENV == "test" ]; then
     # Make sure DRIVERS_TOOLS is set.
@@ -20,6 +21,7 @@ if [ $OIDC_ENV == "test" ]; then
 
 elif [ $OIDC_ENV == "azure" ]; then
     source ./env.sh
+    export FEATURES="--features=azure-oidc"
 
 else
     echo "Unrecognized OIDC_ENV $OIDC_ENV"
@@ -30,7 +32,7 @@ export TEST_AUTH_OIDC=1
 export COVERAGE=1
 export AUTH="auth"
 
-cargo nextest run test::spec::oidc --no-capture --profile ci --features=azure-oidc
+cargo nextest run test::spec::oidc --no-capture --profile ci $FEATURES
 RESULT=$?
 cp target/nextest/ci/junit.xml results.xml
 exit $RESULT
