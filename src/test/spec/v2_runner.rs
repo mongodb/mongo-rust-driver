@@ -62,6 +62,7 @@ pub(crate) struct RunV2TestsAction {
 }
 
 impl RunV2TestsAction {
+    #[allow(dead_code)]
     pub(crate) fn skip_files(self, skipped_files: &[&'static str]) -> Self {
         Self {
             skipped_files: Some(skipped_files.to_vec()),

@@ -41,6 +41,7 @@ pub(crate) enum Entity {
     Database(Database),
     Collection(Collection<Document>),
     Session(SessionEntity),
+    SessionPtr(SessionPtr),
     Bucket(GridFsBucket),
     Cursor(TestCursor),
     Bson(Bson),
@@ -51,6 +52,12 @@ pub(crate) enum Entity {
     ClientEncryption(Arc<crate::client_encryption::ClientEncryption>),
     None,
 }
+
+#[derive(Debug)]
+pub(crate) struct SessionPtr(pub(crate) *mut ClientSession);
+
+unsafe impl Send for SessionPtr {}
+unsafe impl Sync for SessionPtr {}
 
 #[cfg(feature = "in-use-encryption-unstable")]
 impl std::fmt::Debug for crate::client_encryption::ClientEncryption {
@@ -369,7 +376,7 @@ impl Deref for ClientEntity {
         match &self.client {
             Some(c) => c,
             None => panic!(
-                "Attempted to deference a client entity which was closed via a `close` test \
+                "Attempted to dereference a client entity which was closed via a `close` test \
                  operation"
             ),
         }
@@ -446,9 +453,10 @@ impl Entity {
         }
     }
 
-    pub fn as_mut_session_entity(&mut self) -> &mut SessionEntity {
+    pub fn as_mut_session(&mut self) -> &mut ClientSession {
         match self {
-            Self::Session(client_session) => client_session,
+            Self::Session(client_session) => &mut *client_session,
+            Self::SessionPtr(ptr) => unsafe { &mut *ptr.0 },
             _ => panic!("Expected mutable client session entity, got {:?}", &self),
         }
     }

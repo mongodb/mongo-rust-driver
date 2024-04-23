@@ -117,7 +117,7 @@ impl<'a> StartTransaction<&'a mut ClientSession> {
     ///
     /// Because the callback can be repeatedly executed and because it returns a future, the rust
     /// closure borrowing rules for captured values can be overly restrictive.  As a
-    /// convenience, `with_transaction` accepts a context argument that will be passed to the
+    /// convenience, `and_run` accepts a context argument that will be passed to the
     /// callback along with the session:
     ///
     /// ```no_run

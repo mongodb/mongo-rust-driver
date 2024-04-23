@@ -157,20 +157,8 @@ impl Matchable for Document {
             if k == "upsertedCount" {
                 continue;
             }
-            // TODO RUST-48: Remove this logic to bypass read concerns with an afterClusterTime
-            // field
-            if k == "afterClusterTime" {
-                continue;
-            }
             if k == "recoveryToken" && v.is_placeholder() && self.get_document(k).is_ok() {
                 continue;
-            }
-            if k == "readConcern" {
-                if let Some(doc) = v.as_document() {
-                    if doc.len() == 1 && doc.get_i32("afterClusterTime") == Ok(42) {
-                        continue;
-                    }
-                }
             }
             match self.get(k) {
                 Some(actual_v) => actual_v.matches(v).prefix(k)?,

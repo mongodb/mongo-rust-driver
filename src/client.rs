@@ -125,6 +125,8 @@ struct ClientInner {
     shutdown: Shutdown,
     #[cfg(feature = "in-use-encryption-unstable")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
+    #[cfg(test)]
+    disable_command_events: AtomicBool,
 }
 
 #[derive(Debug)]
@@ -159,6 +161,8 @@ impl Client {
             },
             #[cfg(feature = "in-use-encryption-unstable")]
             csfle: Default::default(),
+            #[cfg(test)]
+            disable_command_events: AtomicBool::new(false),
         });
         Ok(Self { inner })
     }
@@ -243,6 +247,14 @@ impl Client {
     }
 
     pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+        #[cfg(test)]
+        if self
+            .inner
+            .disable_command_events
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return;
+        }
         #[cfg(feature = "tracing-unstable")]
         let tracing_emitter = if trace_or_log_enabled!(
             target: COMMAND_TRACING_EVENT_TARGET,
@@ -375,6 +387,13 @@ impl Client {
     #[cfg(test)]
     pub(crate) async fn is_session_checked_in(&self, id: &bson::Document) -> bool {
         self.inner.session_pool.contains(id).await
+    }
+
+    #[cfg(test)]
+    pub(crate) fn disable_command_events(&self, disable: bool) {
+        self.inner
+            .disable_command_events
+            .store(disable, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Get the address of the server selected according to the given criteria.
