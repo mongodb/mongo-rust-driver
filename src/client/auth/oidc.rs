@@ -42,10 +42,19 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "::1",
 ];
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct State {
     inner: Arc<Mutex<Option<StateInner>>>,
     is_user_provided: bool,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+            is_user_provided: false,
+        }
+    }
 }
 
 impl State {
@@ -71,7 +80,7 @@ impl State {
 }
 
 /// The user-supplied callbacks for OIDC authentication.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StateInner {
     callback: Callback,
     cache: Cache,
@@ -93,7 +102,7 @@ pub struct Callback {
 }
 
 #[non_exhaustive]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum CallbackKind {
     Human,
     Machine,
@@ -214,9 +223,11 @@ impl Callback {
     }
 }
 
+use std::fmt::Debug;
 impl std::fmt::Debug for Callback {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Callback").finish()
+        f.debug_struct(format!("Callback: {:?}", self.kind).as_str())
+            .finish()
     }
 }
 
@@ -382,6 +393,7 @@ async fn setup_automatic_providers(
     credential: &Credential,
     guard: &mut MutexGuard<'_, Option<StateInner>>,
 ) {
+    dbg!(&guard);
     // If there is already a callback, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
     // a callback. A situation where the user has set up a callback and an automatic provider
