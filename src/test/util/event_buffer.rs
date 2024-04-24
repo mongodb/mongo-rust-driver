@@ -232,10 +232,28 @@ impl EventBuffer<Event> {
             .collect()
     }
 
+    pub(crate) fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
+        self.inner
+            .events
+            .lock()
+            .unwrap()
+            .data
+            .iter()
+            .filter_map(|(event, _)| match event {
+                Event::Command(command_event)
+                    if command_names.contains(&command_event.command_name()) =>
+                {
+                    Some(command_event.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Remove all command events from the buffer, returning those matching any of the command
     /// names.
     #[deprecated = "use immutable methods"]
-    pub(crate) fn get_command_events(&mut self, command_names: &[&str]) -> Vec<CommandEvent> {
+    pub(crate) fn get_command_events_mut(&mut self, command_names: &[&str]) -> Vec<CommandEvent> {
         let mut out = vec![];
         self.retain(|ev| match ev {
             Event::Command(cev) => {

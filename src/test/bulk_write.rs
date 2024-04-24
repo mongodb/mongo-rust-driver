@@ -1,5 +1,5 @@
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     error::{ClientBulkWriteError, ErrorKind},
     options::WriteModel,
     test::{
@@ -91,6 +91,11 @@ async fn max_message_size_bytes_batching() {
     let first_event = command_started_events
         .next()
         .expect("no first event observed");
+
+    let mut command = first_event.command.clone();
+    command.remove("ops");
+    dbg!("{}", command);
+
     let first_len = first_event.command.get_array("ops").unwrap().len();
     assert_eq!(first_len, num_models - 1);
 
@@ -217,7 +222,7 @@ async fn successful_cursor_iteration() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let collection = client.database("db").collection::<bson::Document>("coll");
+    let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
 
     let models = vec![
@@ -256,6 +261,7 @@ async fn successful_cursor_iteration() {
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
     if TestClient::new().await.is_sharded() {
         options.hosts.drain(1..);
     }
@@ -275,7 +281,7 @@ async fn failed_cursor_iteration() {
     let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let collection = client.database("db").collection::<bson::Document>("coll");
+    let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
 
     let models = vec![
@@ -344,7 +350,7 @@ async fn cursor_iteration_in_a_transaction() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let collection = client.database("db").collection::<bson::Document>("coll");
+    let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
 
     let mut session = client.start_session().await.unwrap();
@@ -435,4 +441,93 @@ async fn namespace_batching() {
         .get_str("ns")
         .unwrap();
     assert_eq!(second_ns, "db.coll1");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_more_is_retried() {
+    let mut options = get_client_options().await.clone();
+    if TestClient::new().await.is_sharded() {
+        options.hosts.drain(1..);
+    }
+    let client = Client::test_builder()
+        .options(options)
+        .monitor_events()
+        .build()
+        .await;
+
+    if client.server_version_lt(8, 0) || client.is_standalone() {
+        log_uncaptured(
+            "skipping get_more_is_retried: bulkWrite requires 8.0+, retryable writes require \
+             non-standalone",
+        );
+        return;
+    }
+
+    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(6);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let collection = client.database("db").collection::<Document>("coll");
+    collection.drop().await.unwrap();
+
+    let models = vec![
+        WriteModel::ReplaceOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
+            replacement: doc! { "x": 1 },
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+        WriteModel::ReplaceOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
+            replacement: doc! { "x": 1 },
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+    ];
+
+    let _ = client.bulk_write(models).verbose_results(true).await;
+
+    let mut command_events = client
+        .events
+        .get_command_events(&["bulkWrite", "getMore"])
+        .into_iter();
+
+    let bulk_write_event = command_events.next().unwrap();
+    let started_event = bulk_write_event.as_command_started().unwrap();
+    assert_eq!(started_event.command_name, "bulkWrite");
+
+    let bulk_write_event = command_events.next().unwrap();
+    let succeeded_event = bulk_write_event.as_command_succeeded().unwrap();
+    assert_eq!(succeeded_event.command_name, "bulkWrite");
+
+    let get_more_event = command_events.next().unwrap();
+    let started_event = get_more_event.as_command_started().unwrap();
+    assert_eq!(started_event.command_name, "getMore");
+
+    let get_more_event = command_events.next().unwrap();
+    let failed_event = get_more_event.as_command_failed().unwrap();
+    assert_eq!(failed_event.command_name, "getMore");
+
+    let bulk_write_event = command_events.next().unwrap();
+    let started_event = bulk_write_event.as_command_started().unwrap();
+    assert_eq!(started_event.command_name, "bulkWrite");
+
+    let bulk_write_event = command_events.next().unwrap();
+    let succeeded_event = bulk_write_event.as_command_succeeded().unwrap();
+    assert_eq!(succeeded_event.command_name, "bulkWrite");
+
+    let get_more_event = command_events.next().unwrap();
+    let started_event = get_more_event.as_command_started().unwrap();
+    assert_eq!(started_event.command_name, "getMore");
+
+    let get_more_event = command_events.next().unwrap();
+    let succeeded_event = get_more_event.as_command_succeeded().unwrap();
+    assert_eq!(succeeded_event.command_name, "getMore");
 }

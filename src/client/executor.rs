@@ -1043,7 +1043,7 @@ impl Error {
             }
         }
 
-        if let Some(ref mut session) = session {
+        if let Some(session) = session {
             if self.contains_label(TRANSIENT_TRANSACTION_ERROR)
                 || self.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
             {

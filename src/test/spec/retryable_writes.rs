@@ -603,7 +603,7 @@ async fn retry_write_different_mongos() {
     #[allow(deprecated)]
     let events = {
         let mut events = client.events.clone();
-        events.get_command_events(&["insert"])
+        events.get_command_events_mut(&["insert"])
     };
     assert!(
         matches!(
@@ -665,7 +665,7 @@ async fn retry_write_same_mongos() {
     #[allow(deprecated)]
     let events = {
         let mut events = client.events.clone();
-        events.get_command_events(&["insert"])
+        events.get_command_events_mut(&["insert"])
     };
     assert!(
         matches!(
