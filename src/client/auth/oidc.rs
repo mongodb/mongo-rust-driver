@@ -231,7 +231,7 @@ impl Callback {
                 },
                 CallbackKind::Machine,
             ),
-            cache: Cache::automatic_callback_cache(),
+            cache: Cache::new(),
         }
     }
 }
@@ -261,24 +261,6 @@ impl Cache {
     fn new() -> Self {
         Self {
             idp_server_info: None,
-            refresh_token: None,
-            access_token: None,
-            token_gen_id: 0,
-            last_call_time: Instant::now(),
-        }
-    }
-
-    // The cache for automatic providers should have Some(idp_server_info) so that
-    // we do not attempt a two step authorization flow because the server will not
-    // return valid idp info in many cases.
-    #[cfg(feature = "azure-oidc")]
-    fn automatic_callback_cache() -> Self {
-        Self {
-            idp_server_info: Some(IdpServerInfo {
-                issuer: "".to_string(),
-                client_id: None,
-                request_scopes: None,
-            }),
             refresh_token: None,
             access_token: None,
             token_gen_id: 0,
@@ -512,8 +494,9 @@ async fn send_sasl_start_command(
     send_sasl_command(conn, sasl_start).await
 }
 
-// do_shared_flow is the shared flow for both human and machine
-async fn do_shared_flow(
+// this is shared functionality between the human and machine flow. In the machine flow, the idp
+// info will always be None, but the code is the same so we reuse it.
+async fn do_single_step_callback(
     source: &str,
     conn: &mut Connection,
     cred_cache: &mut Cache,
@@ -522,35 +505,44 @@ async fn do_shared_flow(
     callback: Arc<CallbackInner>,
     timeout: Duration,
 ) -> Result<()> {
-    // If the idpinfo is cached, we use that instead of doing two_step. It seems the spec does not
-    // allow idpinfo to change on invalidations.
-    if cred_cache.idp_server_info.is_some() {
-        let idp_response = {
-            let cb_context = CallbackContext {
-                timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
-                version: API_VERSION,
-                refresh_token: None,
-                idp_info: cred_cache.idp_server_info.clone(),
-            };
-            (callback.f)(cb_context).await?
+    let idp_response = {
+        let cb_context = CallbackContext {
+            timeout_seconds: Some(Instant::now() + timeout),
+            version: API_VERSION,
+            refresh_token: None,
+            idp_info: cred_cache.idp_server_info.clone(),
         };
-        let response = send_sasl_start_command(
-            source,
-            conn,
-            credential,
-            server_api,
-            Some(idp_response.access_token.clone()),
-        )
-        .await?;
-        if response.done {
-            let server_info = cred_cache.idp_server_info.clone();
-            cred_cache.update(&idp_response, server_info).await;
-            return Ok(());
-        }
-        return Err(invalid_auth_response());
+        (callback.f)(cb_context).await?
+    };
+    let response = send_sasl_start_command(
+        source,
+        conn,
+        credential,
+        server_api,
+        Some(idp_response.access_token.clone()),
+    )
+    .await?;
+    if response.done {
+        let server_info = cred_cache.idp_server_info.clone();
+        cred_cache.update(&idp_response, server_info).await;
+        return Ok(());
     }
+    Err(invalid_auth_response())
+}
 
-    // Here we do not have the idpinfo, so we need to do the two step flow.
+// This is currently only used in the human flow, but is abstracted to make the algorithm more
+// clear. The timeout is still passed in, so that the human flow can control the timeout in one
+// place.
+async fn do_two_step_callback(
+    source: &str,
+    conn: &mut Connection,
+    cred_cache: &mut Cache,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    callback: Arc<CallbackInner>,
+    timeout: Duration,
+) -> Result<()> {
+    // Here we do not have the idpinfo, so we need to do the two step sasl conversation.
     let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
     if response.done {
         return Err(invalid_auth_response());
@@ -699,7 +691,22 @@ async fn authenticate_human(
         }
     }
 
-    do_shared_flow(
+    // If the idpinfo is cached, we run the callback and then do a single step sasl conversation.
+    // It seems the spec does not allow idpinfo to change on invalidations.
+    if cred_cache.idp_server_info.is_some() {
+        return do_single_step_callback(
+            source,
+            conn,
+            cred_cache,
+            credential,
+            server_api,
+            callback,
+            HUMAN_CALLBACK_TIMEOUT,
+        )
+        .await;
+    }
+
+    do_two_step_callback(
         source,
         conn,
         cred_cache,
@@ -739,7 +746,7 @@ async fn authenticate_machine(
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
-    do_shared_flow(
+    do_single_step_callback(
         source,
         conn,
         cred_cache,

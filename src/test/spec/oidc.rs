@@ -182,10 +182,9 @@ async fn machine_2_1_valid_callback_inputs() -> anyhow::Result<()> {
         .mechanism(AuthMechanism::MongoDbOidc)
         .oidc_callback(oidc::Callback::machine(move |c| {
             let call_count = cb_call_count.clone();
-            let idp_info = c.idp_info.unwrap();
-            assert!(idp_info.issuer.as_str() != "");
-            assert!(idp_info.client_id.is_some());
-            assert!(c.timeout_seconds.unwrap() <= Instant::now() + Duration::from_secs(60));
+            assert!(c.refresh_token.is_none());
+            // timeout should be in the future
+            assert!(c.timeout_seconds.unwrap() >= Instant::now());
             async move {
                 *call_count.lock().await += 1;
                 Ok(oidc::IdpServerResponse {
