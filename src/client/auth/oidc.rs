@@ -12,6 +12,7 @@ use typed_builder::TypedBuilder;
 use crate::client::auth::{
     AZURE_ENVIRONMENT_VALUE_STR,
     ENVIRONMENT_PROP_STR,
+    GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
@@ -437,6 +438,9 @@ async fn setup_automatic_providers(
         match environment {
             AZURE_ENVIRONMENT_VALUE_STR => {
                 **guard = Some(Callback::azure_callback(client_id, resource))
+            }
+            GCP_ENVIRONMENT_VALUE_STR => {
+                // TODO RUST-1627: Implement GCP automatic provider
             }
             _ => {}
         }
