@@ -81,7 +81,7 @@ impl State {
     }
 }
 
-/// The user-supplied callbacks for OIDC authentication.
+/// The OIDC state containing the cache of necessary OIDC info as well as the callback
 #[derive(Clone, Debug)]
 pub struct StateInner {
     callback: Callback,
@@ -216,7 +216,7 @@ impl Callback {
                                     ),
                                 )
                             })?;
-                        let expires = Some(Instant::now() + Duration::from_secs(expires_in as u64));
+                        let expires = Some(Instant::now() + Duration::from_secs(expires_in));
                         Ok(IdpServerResponse {
                             access_token,
                             expires,
