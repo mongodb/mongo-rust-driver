@@ -78,8 +78,9 @@ const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
 // The maximum number of bytes that may be included in a write payload when auto-encryption is
 // enabled.
 const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
-// The amount of overhead bytes to account for when building a document sequence.
-const COMMAND_OVERHEAD_SIZE: usize = 16_000;
+// The amount of message overhead (OP_MSG bytes and command-agnostic fields) to account for when
+// building a multi-write operation using document sequences.
+const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 
 /// Context about the execution of the operation.
 pub(crate) struct ExecutionContext<'a> {

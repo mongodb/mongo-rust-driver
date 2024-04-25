@@ -20,7 +20,7 @@ use crate::{
     Namespace,
 };
 
-use super::{ExecutionContext, COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
+use super::{ExecutionContext, MAX_ENCRYPTED_WRITE_SIZE, OP_MSG_OVERHEAD_BYTES};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
@@ -60,25 +60,26 @@ impl<'a> OperationWithDefaults for Insert<'a> {
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+        let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
+        let max_message_size: usize =
+            Checked::new(description.max_message_size_bytes).try_into()?;
+        let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
+
+        let mut command_body = rawdoc! { Self::NAME: self.ns.coll.clone() };
+        let options = bson::to_raw_document_buf(&self.options)?;
+        extend_raw_document_buf(&mut command_body, options)?;
+
+        let max_document_sequence_size =
+            max_message_size - OP_MSG_OVERHEAD_BYTES - command_body.as_bytes().len();
+
         let mut docs = Vec::new();
-        let mut size = 0;
-
-        let max_doc_size = Checked::<usize>::try_from(description.max_bson_object_size)?;
-        let max_doc_sequence_size =
-            Checked::<usize>::try_from(description.max_message_size_bytes)? - COMMAND_OVERHEAD_SIZE;
-        let max_write_batch_size = Checked::<usize>::try_from(description.max_write_batch_size)?;
-
-        for (i, document) in self
-            .documents
-            .iter()
-            .take(max_write_batch_size.get()?)
-            .enumerate()
-        {
+        let mut current_size = 0;
+        for (i, document) in self.documents.iter().take(max_operations).enumerate() {
             let mut document = bson::to_raw_document_buf(document)?;
             let id = get_or_prepend_id_field(&mut document)?;
 
             let doc_size = document.as_bytes().len();
-            if doc_size > max_doc_size.get()? {
+            if doc_size > max_doc_size {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
                         "insert document must be within {} bytes, but document provided is {} \
@@ -94,16 +95,16 @@ impl<'a> OperationWithDefaults for Insert<'a> {
             // than `maxBsonObjectSize`) proceed with automatic encryption.
             if self.encrypted && i != 0 {
                 let doc_entry_size = array_entry_size_bytes(i, document.as_bytes().len())?;
-                if (Checked::new(size) + doc_entry_size).get()? >= MAX_ENCRYPTED_WRITE_SIZE {
+                if current_size + doc_entry_size >= MAX_ENCRYPTED_WRITE_SIZE {
                     break;
                 }
-            } else if (Checked::new(size) + doc_size).get()? > max_doc_sequence_size.get()? {
+            } else if current_size + doc_size > max_document_sequence_size {
                 break;
             }
 
             self.inserted_ids.push(id);
             docs.push(document);
-            size += doc_size;
+            current_size += doc_size;
         }
 
         let mut body = rawdoc! {

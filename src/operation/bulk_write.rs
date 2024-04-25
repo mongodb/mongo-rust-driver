@@ -26,8 +26,8 @@ use super::{
     ExecutionContext,
     Retryability,
     WriteResponseBody,
-    COMMAND_OVERHEAD_SIZE,
     MAX_ENCRYPTED_WRITE_SIZE,
+    OP_MSG_OVERHEAD_BYTES,
 };
 
 use server_responses::*;
@@ -188,15 +188,24 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
     const NAME: &'static str = "bulkWrite";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
-        let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
         let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
-        let max_message_size = Checked::new(description.max_message_size_bytes)
-            .try_into::<usize>()?
-            - COMMAND_OVERHEAD_SIZE;
+        let max_message_size: usize =
+            Checked::new(description.max_message_size_bytes).try_into()?;
+        let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
+
+        let mut command_body = rawdoc! { Self::NAME: 1 };
+        let options = match self.options {
+            Some(options) => bson::to_raw_document_buf(options),
+            None => bson::to_raw_document_buf(&BulkWriteOptions::default()),
+        }?;
+        bson_util::extend_raw_document_buf(&mut command_body, options)?;
+
+        let max_document_sequences_size =
+            max_message_size - OP_MSG_OVERHEAD_BYTES - command_body.as_bytes().len();
 
         let mut namespace_info = NamespaceInfo::new();
         let mut ops = Vec::new();
-        let mut size = 0;
+        let mut current_size = 0;
         for (i, model) in self.models.iter().take(max_operations).enumerate() {
             let (namespace_index, namespace_size) = namespace_info.get_index(model.namespace());
 
@@ -217,10 +226,6 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                 .into());
             }
 
-            if let Some(inserted_id) = inserted_id {
-                self.inserted_ids.insert(i, inserted_id);
-            }
-
             let mut split = false;
             if self.encrypted && i != 0 {
                 let model_entry_size = array_entry_size_bytes(i, operation_size)?;
@@ -229,10 +234,11 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                 } else {
                     0
                 };
-                if size + model_entry_size + namespace_entry_size > MAX_ENCRYPTED_WRITE_SIZE {
+                if current_size + namespace_entry_size + model_entry_size > MAX_ENCRYPTED_WRITE_SIZE
+                {
                     split = true;
                 }
-            } else if size + namespace_size + operation_size > max_message_size {
+            } else if current_size + namespace_size + operation_size > max_document_sequences_size {
                 split = true;
             }
 
@@ -243,27 +249,23 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                     namespace_info.namespaces.remove(last_index);
                 }
                 break;
-            } else {
-                size += namespace_size + operation_size;
-                ops.push(operation);
             }
-        }
 
-        let mut body = rawdoc! { Self::NAME: 1 };
-        let options = match self.options {
-            Some(options) => bson::to_raw_document_buf(options),
-            None => bson::to_raw_document_buf(&BulkWriteOptions::default()),
-        }?;
-        bson_util::extend_raw_document_buf(&mut body, options)?;
+            if let Some(inserted_id) = inserted_id {
+                self.inserted_ids.insert(i, inserted_id);
+            }
+            current_size += namespace_size + operation_size;
+            ops.push(operation);
+        }
 
         self.n_attempted = ops.len();
 
         if self.encrypted {
-            body.append("nsInfo", vec_to_raw_array_buf(namespace_info.namespaces));
-            body.append("ops", vec_to_raw_array_buf(ops));
-            Ok(Command::new(Self::NAME, "admin", body))
+            command_body.append("nsInfo", vec_to_raw_array_buf(namespace_info.namespaces));
+            command_body.append("ops", vec_to_raw_array_buf(ops));
+            Ok(Command::new(Self::NAME, "admin", command_body))
         } else {
-            let mut command = Command::new(Self::NAME, "admin", body);
+            let mut command = Command::new(Self::NAME, "admin", command_body);
             command.add_document_sequence("nsInfo", namespace_info.namespaces);
             command.add_document_sequence("ops", ops);
             Ok(command)
