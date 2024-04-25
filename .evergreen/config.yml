@@ -669,6 +669,11 @@ tasks:
     commands:
       - func: "check clippy"
 
+  - name: check-semgrep
+    tags: [lint]
+    commands:
+      - func: "check semgrep"
+
   - name: check-rustdoc
     tags: [lint]
     commands:
@@ -1771,6 +1776,16 @@ functions:
         script: |
           ${PREPARE_SHELL}
           .evergreen/check-clippy.sh
+
+  "check semgrep":
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        add_expansions_to_env: true
+        binary: bash
+        args:
+          - .evergreen/check-semgrep.sh
 
   "check rustdoc":
     - command: shell.exec
