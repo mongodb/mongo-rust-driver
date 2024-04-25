@@ -651,8 +651,6 @@ task_groups:
       - func: fix absolute paths
       - func: init test-results
       - func: make files executable
-      - func: install rust
-      - func: install junit dependencies
       - command: shell.exec
         params:
           shell: bash

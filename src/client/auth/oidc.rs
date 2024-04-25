@@ -62,11 +62,13 @@ impl State {
         self.is_user_provided
     }
 
+    #[cfg(not(feature = "azure-oidc"))]
     #[cfg(test)]
     pub(crate) async fn set_access_token(&self, access_token: Option<String>) {
         self.inner.lock().await.as_mut().unwrap().cache.access_token = access_token;
     }
 
+    #[cfg(not(feature = "azure-oidc"))]
     #[cfg(test)]
     pub(crate) async fn set_refresh_token(&self, refresh_token: Option<String>) {
         self.inner
@@ -84,14 +86,6 @@ impl State {
 pub struct StateInner {
     callback: Callback,
     cache: Cache,
-}
-
-#[cfg(test)]
-impl State {
-    //going to just need to add a setting method
-    //pub(crate) async fn cache(&mut self) -> &mut Cache {
-    //    self.inner.lock().await.as_mut().unwrap().cache.as_mut()
-    // }
 }
 
 #[derive(Clone)]
@@ -170,17 +164,19 @@ impl Callback {
         use futures_util::FutureExt;
         let resource = resource.to_string();
         let client_id = client_id.map(|s| s.to_string());
+        let mut url = format!(
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
+            resource
+        );
+        if let Some(ref client_id) = client_id {
+            url.push_str(&format!("&client_id={}", client_id));
+        }
         StateInner {
             callback: Self::new(
                 move |_| {
-                    let mut url = format!(
-                "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
-                resource
-            );
-                    if let Some(ref client_id) = client_id {
-                        url.push_str(&format!("&client_id={}", client_id));
-                    }
+                    let url = url.clone();
                     async move {
+                        let url = url.clone();
                         let response = crate::runtime::HttpClient::default()
                             .get(&url)
                             .headers(&[("Metadata", "true"), ("Accept", "application/json")])
@@ -191,7 +187,8 @@ impl Callback {
                                     MONGODB_OIDC_STR,
                                     &format!("Failed to get access token from Azure IDMS: {}", e),
                                 )
-                            })?;
+                            });
+                        let response = response?;
                         let access_token = response
                             .get_str("access_token")
                             .map_err(|e| {
@@ -201,12 +198,24 @@ impl Callback {
                                 )
                             })?
                             .to_string();
-                        let expires_in = response.get_i64("expires_in").map_err(|e| {
-                            Error::authentication_error(
-                                MONGODB_OIDC_STR,
-                                &format!("Failed to get expires_in from Azure IDMS: {}", e),
-                            )
-                        })?;
+                        let expires_in = response
+                            .get_str("expires_in")
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                                )
+                            })?
+                            .parse::<u64>()
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!(
+                                        "Failed to parse expires_in from Azure IDMS as u64: {}",
+                                        e
+                                    ),
+                                )
+                            })?;
                         let expires = Some(Instant::now() + Duration::from_secs(expires_in as u64));
                         Ok(IdpServerResponse {
                             access_token,
@@ -218,7 +227,7 @@ impl Callback {
                 },
                 CallbackKind::Machine,
             ),
-            cache: Cache::new(),
+            cache: Cache::automatic_callback_cache(),
         }
     }
 }
@@ -248,6 +257,23 @@ impl Cache {
     fn new() -> Self {
         Self {
             idp_server_info: None,
+            refresh_token: None,
+            access_token: None,
+            token_gen_id: 0,
+            last_call_time: Instant::now(),
+        }
+    }
+
+    // The cache for automatic providers should have Some(idp_server_info) so that
+    // we do not attempt a two step authorization flow.
+    #[cfg(feature = "azure-oidc")]
+    fn automatic_callback_cache() -> Self {
+        Self {
+            idp_server_info: Some(IdpServerInfo {
+                issuer: "".to_string(),
+                client_id: None,
+                request_scopes: None,
+            }),
             refresh_token: None,
             access_token: None,
             token_gen_id: 0,
@@ -393,7 +419,6 @@ async fn setup_automatic_providers(
     credential: &Credential,
     guard: &mut MutexGuard<'_, Option<StateInner>>,
 ) {
-    dbg!(&guard);
     // If there is already a callback, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
     // a callback. A situation where the user has set up a callback and an automatic provider
@@ -403,11 +428,11 @@ async fn setup_automatic_providers(
     }
     if let Some(ref p) = credential.mechanism_properties {
         let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
-        let client_id = credential.username.as_deref().unwrap_or("");
+        let client_id = credential.username.as_deref();
         let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
         match environment {
             AZURE_ENVIRONMENT_VALUE_STR => {
-                **guard = Some(Callback::azure_callback(Some(client_id), resource))
+                **guard = Some(Callback::azure_callback(client_id, resource))
             }
             _ => {}
         }

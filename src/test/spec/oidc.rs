@@ -438,7 +438,7 @@ async fn machine_5_1_azure_with_no_username() -> anyhow::Result<()> {
             .collection::<Document>("test")
             .find_one(doc! {})
             .await
-    );
+    )?;
     Ok(())
 }
 
