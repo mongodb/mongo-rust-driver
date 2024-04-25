@@ -265,7 +265,8 @@ impl Cache {
     }
 
     // The cache for automatic providers should have Some(idp_server_info) so that
-    // we do not attempt a two step authorization flow.
+    // we do not attempt a two step authorization flow because the server will not
+    // return valid idp info in many cases.
     #[cfg(feature = "azure-oidc")]
     fn automatic_callback_cache() -> Self {
         Self {
