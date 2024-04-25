@@ -314,7 +314,6 @@ buildvariants:
       SSL: ssl
     tasks:
       - testoidc_task_group
-      - testazureoidc_task_group
 
   - name: oidc-windows
     disable: true

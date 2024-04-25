@@ -10,13 +10,16 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, TOKEN_RESOURCE_PROP_STR,
+    AZURE_ENVIRONMENT_VALUE_STR,
+    ENVIRONMENT_PROP_STR,
+    TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism,
+            ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
