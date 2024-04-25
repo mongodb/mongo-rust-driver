@@ -1,5 +1,5 @@
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     error::{ClientBulkWriteError, ErrorKind},
     options::WriteModel,
     test::{
@@ -217,7 +217,7 @@ async fn successful_cursor_iteration() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let collection = client.database("db").collection::<bson::Document>("coll");
+    let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
 
     let models = vec![
@@ -275,7 +275,7 @@ async fn failed_cursor_iteration() {
     let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let collection = client.database("db").collection::<bson::Document>("coll");
+    let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
 
     let models = vec![
@@ -344,7 +344,7 @@ async fn cursor_iteration_in_a_transaction() {
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
-    let collection = client.database("db").collection::<bson::Document>("coll");
+    let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
 
     let mut session = client.start_session().await.unwrap();
@@ -384,6 +384,12 @@ async fn cursor_iteration_in_a_transaction() {
     assert_eq!(command_started_events.len(), 1);
 }
 
+fn get_namespace<'a>(command: &'a Document) -> Option<&'a str> {
+    let ns_info = command.get_array("nsInfo").ok()?;
+    let ns_doc = ns_info[0].as_document()?;
+    ns_doc.get_str("ns").ok()
+}
+
 #[tokio::test]
 async fn namespace_batching() {
     let client = Client::test_builder().monitor_events().build().await;
@@ -410,29 +416,51 @@ async fn namespace_batching() {
     let result = client.bulk_write(models).await.unwrap();
     assert_eq!(result.inserted_count, max_write_batch_size + 1);
 
-    let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
+    let mut command_started_events = client
+        .events
+        .get_command_started_events(&["bulkWrite"])
+        .into_iter();
 
-    let first_ns_info = command_started_events[0]
-        .command
-        .get_array("nsInfo")
-        .unwrap();
-    assert_eq!(first_ns_info.len(), 1);
-    let first_ns = first_ns_info[0]
-        .as_document()
-        .unwrap()
-        .get_str("ns")
-        .unwrap();
+    let first_event = command_started_events.next().unwrap();
+    let first_ns = get_namespace(&first_event.command).unwrap();
     assert_eq!(first_ns, "db.coll");
 
-    let second_ns_info = command_started_events[1]
-        .command
-        .get_array("nsInfo")
-        .unwrap();
-    assert_eq!(second_ns_info.len(), 1);
-    let second_ns = second_ns_info[0]
-        .as_document()
-        .unwrap()
-        .get_str("ns")
-        .unwrap();
+    let second_event = command_started_events.next().unwrap();
+    let second_ns = get_namespace(&second_event.command).unwrap();
     assert_eq!(second_ns, "db.coll1");
+}
+
+#[tokio::test]
+async fn namespace_size_batching() {
+    let client = Client::test_builder().monitor_events().build().await;
+
+    let first_namespace = Namespace::new("db", "coll");
+    let mut models = vec![
+        WriteModel::InsertOne {
+            namespace: first_namespace.clone(),
+            document: doc! { "a": "b".repeat(15_999_555) }
+        };
+        3
+    ];
+
+    let second_namespace = Namespace::new("db", "c".repeat(200));
+    models.push(WriteModel::InsertOne {
+        namespace: second_namespace.clone(),
+        document: doc! { "a": "b" },
+    });
+    let result = client.bulk_write(models).await.unwrap();
+    assert_eq!(result.inserted_count, 4);
+
+    let mut command_started_events = client
+        .events
+        .get_command_started_events(&["bulkWrite"])
+        .into_iter();
+
+    let first_event = command_started_events.next().unwrap();
+    let actual_first_ns = get_namespace(&first_event.command).unwrap();
+    assert_eq!(actual_first_ns, &first_namespace.to_string());
+
+    let second_event = command_started_events.next().unwrap();
+    let actual_second_ns = get_namespace(&second_event.command).unwrap();
+    assert_eq!(actual_second_ns, &second_namespace.to_string());
 }
