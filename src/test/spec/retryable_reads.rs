@@ -202,7 +202,7 @@ async fn retry_read_different_mongos() {
     #[allow(deprecated)]
     let events = {
         let mut events = client.events.clone();
-        events.get_command_events_mut(&["find"])
+        events.get_command_events(&["find"])
     };
     assert!(
         matches!(
@@ -263,7 +263,7 @@ async fn retry_read_same_mongos() {
     #[allow(deprecated)]
     let events = {
         let mut events = client.events.clone();
-        events.get_command_events_mut(&["find"])
+        events.get_command_events(&["find"])
     };
     assert!(
         matches!(

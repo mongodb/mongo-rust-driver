@@ -86,7 +86,7 @@ async fn tracks_resume_token() -> Result<()> {
     let events: Vec<_> = {
         let mut events = client.events.clone();
         events
-            .get_command_events_mut(&["aggregate", "getMore"])
+            .get_command_events(&["aggregate", "getMore"])
             .into_iter()
             .filter_map(|ev| match ev {
                 CommandEvent::Succeeded(s) => Some(s),
@@ -232,7 +232,7 @@ async fn empty_batch_not_closed() -> Result<()> {
     #[allow(deprecated)]
     let events = {
         let mut events = client.events.clone();
-        events.get_command_events_mut(&["aggregate", "getMore"])
+        events.get_command_events(&["aggregate", "getMore"])
     };
     let cursor_id = match &events[1] {
         CommandEvent::Succeeded(CommandSucceededEvent { reply, .. }) => {
@@ -318,7 +318,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
     #[allow(deprecated)]
     let events = {
         let mut events = client.events.clone();
-        events.get_command_events_mut(&["aggregate"])
+        events.get_command_events(&["aggregate"])
     };
     assert_eq!(events.len(), 4);
 
@@ -365,7 +365,7 @@ async fn batch_end_resume_token() -> Result<()> {
     #[allow(deprecated)]
     let commands = {
         let mut events = client.events.clone();
-        events.get_command_events_mut(&["aggregate", "getMore"])
+        events.get_command_events(&["aggregate", "getMore"])
     };
     assert!(matches!(commands.last(), Some(
         CommandEvent::Succeeded(CommandSucceededEvent {

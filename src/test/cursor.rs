@@ -142,7 +142,7 @@ async fn batch_exhaustion() {
     let replies: Vec<_> = {
         let mut events = client.events.clone();
         events
-            .get_command_events_mut(&["getMore"])
+            .get_command_events(&["getMore"])
             .into_iter()
             .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
             .collect()

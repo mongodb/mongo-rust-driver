@@ -6,7 +6,7 @@ use crate::{
     bson::doc,
     event::{
         cmap::CmapEvent,
-        command::{CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+        command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
     test::get_client_options,
@@ -107,13 +107,6 @@ impl CommandEvent {
     pub(crate) fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
             CommandEvent::Succeeded(e) => Some(e),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn as_command_failed(&self) -> Option<&CommandFailedEvent> {
-        match self {
-            CommandEvent::Failed(e) => Some(e),
             _ => None,
         }
     }

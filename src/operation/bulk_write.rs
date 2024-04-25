@@ -11,7 +11,7 @@ use crate::{
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{ClientBulkWriteError, Error, ErrorKind, Result, RETRYABLE_WRITE_ERROR},
+    error::{ClientBulkWriteError, Error, ErrorKind, Result},
     operation::OperationWithDefaults,
     options::{BulkWriteOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
@@ -278,7 +278,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
         context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
-            let mut response: WriteResponseBody<Response> = response.body()?;
+            let response: WriteResponseBody<Response> = response.body()?;
 
             let mut bulk_write_error = ClientBulkWriteError::default();
 
@@ -347,13 +347,6 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                     }
                 }
                 Err(error) => {
-                    // Retry the entire bulkWrite command if cursor iteration fails.
-                    let labels = response.labels.get_or_insert_with(Default::default);
-                    let retryable_write_error = RETRYABLE_WRITE_ERROR.to_string();
-                    if !labels.contains(&retryable_write_error) {
-                        labels.push(retryable_write_error);
-                    }
-
                     let error = Error::new(
                         ErrorKind::ClientBulkWrite(bulk_write_error),
                         response.labels,
