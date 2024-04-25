@@ -432,13 +432,11 @@ async fn machine_5_1_azure_with_no_username() -> anyhow::Result<()> {
 
     let opts = ClientOptions::parse(mongodb_uri_single!()).await?;
     let client = Client::with_options(opts)?;
-    dbg!(
-        client
-            .database("test")
-            .collection::<Document>("test")
-            .find_one(doc! {})
-            .await
-    )?;
+    client
+        .database("test")
+        .collection::<Document>("test")
+        .find_one(doc! {})
+        .await?;
     Ok(())
 }
 
