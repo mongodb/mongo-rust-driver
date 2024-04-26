@@ -384,83 +384,69 @@ async fn cursor_iteration_in_a_transaction() {
     assert_eq!(command_started_events.len(), 1);
 }
 
-fn get_namespace<'a>(command: &'a Document) -> Option<&'a str> {
-    let ns_info = command.get_array("nsInfo").ok()?;
-    let ns_doc = ns_info[0].as_document()?;
-    ns_doc.get_str("ns").ok()
-}
-
 #[tokio::test]
-async fn namespace_batching() {
+async fn namespace_batch_splitting() {
     let client = Client::test_builder().monitor_events().build().await;
-
-    if client.server_version_lt(8, 0) {
-        log_uncaptured("skipping namespace_batching: bulkWrite requires 8.0+");
-        return;
-    }
-
-    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap();
-
-    let mut models = vec![
-        WriteModel::InsertOne {
-            namespace: Namespace::new("db", "coll"),
-            document: doc! { "a": "b" }
-        };
-        max_write_batch_size as usize
-    ];
-    models.push(WriteModel::InsertOne {
-        namespace: Namespace::new("db", "coll1"),
-        document: doc! { "a": "b" },
-    });
-
-    let result = client.bulk_write(models).await.unwrap();
-    assert_eq!(result.inserted_count, max_write_batch_size + 1);
-
-    let mut command_started_events = client
-        .events
-        .get_command_started_events(&["bulkWrite"])
-        .into_iter();
-
-    let first_event = command_started_events.next().unwrap();
-    let first_ns = get_namespace(&first_event.command).unwrap();
-    assert_eq!(first_ns, "db.coll");
-
-    let second_event = command_started_events.next().unwrap();
-    let second_ns = get_namespace(&second_event.command).unwrap();
-    assert_eq!(second_ns, "db.coll1");
-}
-
-#[tokio::test]
-async fn namespace_size_batching() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
+    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
     let first_namespace = Namespace::new("db", "coll");
-    let mut models = vec![
-        WriteModel::InsertOne {
-            namespace: first_namespace.clone(),
-            document: doc! { "a": "b".repeat(15_999_555) }
-        };
-        3
-    ];
-
     let second_namespace = Namespace::new("db", "c".repeat(200));
-    models.push(WriteModel::InsertOne {
+
+    let ops_bytes = max_message_size_bytes - 1122;
+
+    let mut num_models = ops_bytes / max_bson_object_size;
+    let first_model = WriteModel::InsertOne {
+        namespace: first_namespace.clone(),
+        document: doc! { "a": "b".repeat(max_bson_object_size - 57) },
+    };
+    let mut models = vec![first_model; num_models];
+
+    let remainder_bytes = ops_bytes % max_bson_object_size;
+    if remainder_bytes >= 217 {
+        models.push(WriteModel::InsertOne {
+            namespace: first_namespace.clone(),
+            document: doc! { "a": "b".repeat(remainder_bytes - 57) },
+        });
+        num_models += 1;
+    }
+
+    let second_model = WriteModel::InsertOne {
         namespace: second_namespace.clone(),
         document: doc! { "a": "b" },
-    });
+    };
+    models.push(second_model);
+
     let result = client.bulk_write(models).await.unwrap();
-    assert_eq!(result.inserted_count, 4);
+    assert_eq!(result.inserted_count as usize, num_models + 1);
 
     let mut command_started_events = client
         .events
         .get_command_started_events(&["bulkWrite"])
         .into_iter();
+    assert_eq!(command_started_events.len(), 2);
 
-    let first_event = command_started_events.next().unwrap();
-    let actual_first_ns = get_namespace(&first_event.command).unwrap();
-    assert_eq!(actual_first_ns, &first_namespace.to_string());
+    let first_command = command_started_events.next().unwrap().command;
+    let first_ns_info = first_command.get_array("nsInfo").unwrap();
+    assert_eq!(first_ns_info.len(), 1);
+    let namespace = first_ns_info[0]
+        .as_document()
+        .unwrap()
+        .get_str("ns")
+        .unwrap();
+    assert_eq!(namespace, &first_namespace.to_string());
+    let first_ops = first_command.get_array("ops").unwrap();
+    assert_eq!(first_ops.len(), num_models);
 
-    let second_event = command_started_events.next().unwrap();
-    let actual_second_ns = get_namespace(&second_event.command).unwrap();
-    assert_eq!(actual_second_ns, &second_namespace.to_string());
+    let second_command = command_started_events.next().unwrap().command;
+    let second_ns_info = second_command.get_array("nsInfo").unwrap();
+    assert_eq!(second_ns_info.len(), 1);
+    let namespace = second_ns_info[0]
+        .as_document()
+        .unwrap()
+        .get_str("ns")
+        .unwrap();
+    assert_eq!(namespace, &second_namespace.to_string());
+    let second_ops = second_command.get_array("ops").unwrap();
+    assert_eq!(second_ops.len(), 1);
 }
