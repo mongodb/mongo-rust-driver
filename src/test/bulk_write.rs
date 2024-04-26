@@ -390,6 +390,11 @@ async fn namespace_batch_splitting() {
     let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping namespace_batch_splitting: bulkWrite requires 8.0+");
+        return;
+    }
+
     let first_namespace = Namespace::new("db", "coll");
     let second_namespace = Namespace::new("db", "c".repeat(200));
 
@@ -455,6 +460,11 @@ async fn namespace_batch_splitting() {
 async fn too_large_client_error() {
     let client = Client::test_builder().monitor_events().build().await;
     let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
+
+    if client.server_version_lt(8, 0) {
+        log_uncaptured("skipping too_large_client_error: bulkWrite requires 8.0+");
+        return;
+    }
 
     let model = WriteModel::InsertOne {
         namespace: Namespace::new("db", "coll"),
