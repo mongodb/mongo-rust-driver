@@ -450,3 +450,17 @@ async fn namespace_batch_splitting() {
     let second_ops = second_command.get_array("ops").unwrap();
     assert_eq!(second_ops.len(), 1);
 }
+
+#[tokio::test]
+async fn too_large_client_error() {
+    let client = Client::test_builder().monitor_events().build().await;
+    let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
+
+    let model = WriteModel::InsertOne {
+        namespace: Namespace::new("db", "coll"),
+        document: doc! { "a": "b".repeat(max_message_size_bytes) },
+    };
+
+    let error = client.bulk_write(vec![model]).await.unwrap_err();
+    assert!(!error.is_server_error());
+}
