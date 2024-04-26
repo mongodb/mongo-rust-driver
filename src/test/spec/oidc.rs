@@ -805,15 +805,16 @@ mod basic {
         let options = FailCommandOptions::builder().error_code(20).build();
         let failpoint = FailPoint::fail_command(
             &["saslStart"],
-            // we use 5 times just because AlwaysOn is dangerous if for some reason we don't run the
-            // cleanup, since we will not be able to auth a new connection to turn off the failpoint.
+            // we use 5 times just because AlwaysOn is dangerous if for some reason we don't run
+            // the cleanup, since we will not be able to auth a new connection to turn
+            // off the failpoint.
             crate::test::FailPointMode::Times(5),
             Some(options),
         );
         let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
 
-        // Now find should succeed even though we have a fail point on saslStart because the spec auth
-        // should succeed.
+        // Now find should succeed even though we have a fail point on saslStart because the spec
+        // auth should succeed.
         client
             .database("test")
             .collection::<Document>("test")
@@ -1185,8 +1186,8 @@ mod basic {
 
         let client = Client::with_options(opts)?;
 
-        // Now find should succeed even though we have a fail point on saslStart because the spec auth
-        // should succeed.
+        // Now find should succeed even though we have a fail point on saslStart because the spec
+        // auth should succeed.
         client
             .database("test")
             .collection::<Document>("test")
