@@ -4,23 +4,18 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
-#[cfg(feature = "azure-oidc")]
-use tokio::sync::MutexGuard;
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -66,13 +61,11 @@ impl State {
         self.is_user_provided
     }
 
-    #[cfg(not(feature = "azure-oidc"))]
     #[cfg(test)]
     pub(crate) async fn set_access_token(&self, access_token: Option<String>) {
         self.inner.lock().await.as_mut().unwrap().cache.access_token = access_token;
     }
 
-    #[cfg(not(feature = "azure-oidc"))]
     #[cfg(test)]
     pub(crate) async fn set_refresh_token(&self, refresh_token: Option<String>) {
         self.inner
@@ -356,14 +349,12 @@ pub(crate) async fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Option<Command> {
-    credential.oidc_callback.inner.lock().await.as_ref()?;
     if let Some(ref access_token) = credential
         .oidc_callback
         .inner
         .lock()
         .await
-        .as_ref()
-        .unwrap()
+        .as_ref()?
         .cache
         .access_token
     {
@@ -402,15 +393,12 @@ pub(crate) async fn reauthenticate_stream(
 }
 
 #[cfg(feature = "azure-oidc")]
-async fn setup_automatic_providers(
-    credential: &Credential,
-    guard: &mut MutexGuard<'_, Option<StateInner>>,
-) {
+async fn setup_automatic_providers(credential: &Credential, state: &mut Option<StateInner>) {
     // If there is already a callback, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
     // a callback. A situation where the user has set up a callback and an automatic provider
     // would already have caused an InvalidArgument error in `validate_credential`.
-    if guard.is_some() {
+    if state.is_some() {
         return;
     }
     if let Some(ref p) = credential.mechanism_properties {
@@ -419,7 +407,7 @@ async fn setup_automatic_providers(
         let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
         match environment {
             AZURE_ENVIRONMENT_VALUE_STR => {
-                **guard = Some(Callback::azure_callback(client_id, resource))
+                *state = Some(Callback::azure_callback(client_id, resource))
             }
             GCP_ENVIRONMENT_VALUE_STR => {
                 // TODO RUST-1627: Implement GCP automatic provider
