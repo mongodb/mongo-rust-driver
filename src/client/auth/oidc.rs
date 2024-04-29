@@ -250,7 +250,7 @@ impl Callback {
                             .map_err(|e| {
                                 Error::authentication_error(
                                     MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from Azure IDMS: {}", e),
+                                    &format!("Failed to get access token from GCP IDMS: {}", e),
                                 )
                             });
                         let access_token = response?;
