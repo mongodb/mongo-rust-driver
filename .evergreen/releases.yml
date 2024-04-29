@@ -47,6 +47,15 @@ functions:
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh rust
 
+  "fetch tag":
+    command: subprocess.exec
+    params:
+      working_dir: "src"
+      add_expansions_to_env: true
+      binary: bash
+      args:
+        - .evergreen/release-fetch-tag.sh
+
   "publish release":
     - command: shell.exec
       type: test
@@ -57,6 +66,7 @@ functions:
 
           TAG=${GIT_TAG}           \
           TOKEN=${CRATES_IO_TOKEN} \
+          DRY_RUN=${DRY_RUN}       \
           PROJECT_DIRECTORY="$(pwd)" \
             bash .evergreen/release-danger-do-not-run-manually.sh
 
@@ -65,9 +75,10 @@ tasks:
     commands:
       - func: "fetch source"
       - func: "install dependencies"
-      - func: "publish release"
+      - func: "fetch tag"
         vars:
           GIT_TAG: ${triggered_by_git_tag}
+      - func: "publish release"
 
 axes:
   - id: "os"
