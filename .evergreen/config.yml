@@ -669,6 +669,30 @@ task_groups:
     tasks:
       - oidc-auth-test-azure-latest
 
+    - name: testgcpoidc_task_group
+      setup_group:
+        - func: fetch source
+        - func: prepare resources
+        - func: fix absolute paths
+        - func: make files executable
+        - command: subprocess.exec
+          params:
+            binary: bash
+            env:
+              GCPOIDC_VMNAME_PREFIX: "RUST_DRIVER"
+            args:
+              - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
+      teardown_task:
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/teardown.sh
+      setup_group_can_fail_task: true
+      setup_group_timeout_secs: 1800
+      tasks:
+        - oidc-auth-test-gcp-latest
+
 #########
 # Tasks #
 #########
@@ -1324,10 +1348,34 @@ tasks:
           git commit -m "add files"
           export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tgz
           git archive -o $AZUREOIDC_DRIVERS_TAR_FILE HEAD
+          # Define the command to run on the azure VM.
+          # Ensure that we source the environment file created for us, set up any other variables we need,
+          # and then run our test suite on the vm.
           export AZUREOIDC_TEST_CMD="PROJECT_DIRECTORY='.' ./.evergreen/install-dependencies.sh rust\
                                      && PROJECT_DIRECTORY='.' .evergreen/install-dependencies.sh junit-dependencies\
                                      && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc  ./.evergreen/run-mongodb-oidc-test.sh"
           bash $DRIVERS_TOOLS/.evergreen/auth_oidc/azure/run-driver-test.sh
+
+  - name: "oidc-auth-test-gcp-latest"
+    commands:
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |-
+          set -o errexit
+          ${PREPARE_SHELL}
+          git add .
+          git commit -m "add files"
+          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tgz
+          git archive -o $AZUREOIDC_DRIVERS_TAR_FILE HEAD
+          # Define the command to run on the gcp VM.
+          # Ensure that we source the environment file created for us, set up any other variables we need,
+          # and then run our test suite on the vm.
+          export AZUREOIDC_TEST_CMD="PROJECT_DIRECTORY='.' ./.evergreen/install-dependencies.sh rust\
+                                     && PROJECT_DIRECTORY='.' .evergreen/install-dependencies.sh junit-dependencies\
+                                     && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc  ./.evergreen/run-mongodb-oidc-test.sh"
+          bash $DRIVERS_TOOLS/.evergreen/auth_oidc/gcp/run-driver-test.sh
 
 #############
 # Functions #

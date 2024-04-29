@@ -29,6 +29,11 @@ elif [ $OIDC_ENV == "azure" ]; then
 
     cargo nextest run test::spec::oidc::azure --no-capture --profile ci --features=azure-oidc
     RESULT=$?
+elif [ $OIDC_ENV == "gcp" ]; then
+    source ./secrets-export.sh
+
+    cargo nextest run test::spec::oidc::gcp --no-capture --profile ci --features=gcp-oidc
+    RESULT=$?
 else
     echo "Unrecognized OIDC_ENV $OIDC_ENV"
     exit 1
