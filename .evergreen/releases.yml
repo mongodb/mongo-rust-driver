@@ -1,3 +1,34 @@
+## Testing changes to this file
+#
+# You'll need to know the git tag of the most recent release; call that ${TAG}.
+#
+# The simplest way is to develop changes as a branch from the most recent release;
+# in that case, a release dry-run can be executed via:
+#
+# evergreen patch --path .evergreen/releases.yml \
+#     -t publish-release -v all \
+#     -p mongo-rust-driver-current \
+#     -u --browse \
+#     --param triggered_by_git_tag=${TAG} \
+#     --param DRY_RUN=yes
+#
+# If the changes need to be developed agains the main branch, more steps are needed:
+#
+# 1. Add dummy version numbers to the Cargo.toml lines for action_macro, bson, and libmongocrypt
+# 2. Comment out the "fetch tag" func call from the "publish-release" task in this file
+# 3. Execute:
+#
+# evergreen patch --path .evergreen/releases.yml \
+#     -t publish-release -v all \
+#     -p mongo-rust-driver \
+#     -u --browse \
+#     --param triggered_by_git_tag=${TAG} \
+#     --param DRY_RUN=yes \
+#     --param PACKAGE_ONLY=yes
+#
+# Make sure to remove the changes from 1 and 2 before merging!
+
+
 exec_timeout_secs: 3600 
 
 functions:
@@ -12,9 +43,12 @@ functions:
         working_dir: "src"
         script: |
            export PROJECT_DIRECTORY="$(pwd)"
+           export DRIVERS_TOOLS="$(pwd)/../drivers-tools"
 
            cat <<EOT > expansion.yml
+           DRIVERS_TOOLS: "$DRIVERS_TOOLS"
            PROJECT_DIRECTORY: "$PROJECT_DIRECTORY"
+           GIT_TAG: "${triggered_by_git_tag}"
            PREPARE_SHELL: |
               set -o errexit
               set -o xtrace
@@ -40,35 +74,72 @@ functions:
           rm expansion.yml
 
   "install dependencies":
-    command: shell.exec
-    params:
-      working_dir: "src"
-      script: |
-        ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh rust
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          .evergreen/install-dependencies.sh rust
+
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+        binary: bash
+        args:
+          - .evergreen/fetch-drivers-tools.sh
+
+  "build papertrail vars":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - DRY_RUN
+          - GIT_TAG
+        binary: bash
+        args:
+          - .evergreen/release-build-papertrail-vars.sh
+
+    - command: expansions.update
+      params:
+        file: src/papertrail-expansion.yml
+
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: rm papertrail-expansion.yml
 
   "fetch tag":
     command: subprocess.exec
     params:
       working_dir: "src"
-      add_expansions_to_env: true
+      include_expansions_in_env:
+        - GIT_TAG
       binary: bash
       args:
         - .evergreen/release-fetch-tag.sh
 
   "publish release":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
         working_dir: "src"
-        script: |
-          set +x
+        add_expansions_to_env: true
+        binary: bash
+        args:
+          - .evergreen/release-danger-do-not-run-manually.sh
 
-          TAG=${GIT_TAG}           \
-          TOKEN=${CRATES_IO_TOKEN} \
-          DRY_RUN=${DRY_RUN}       \
-          PROJECT_DIRECTORY="$(pwd)" \
-            bash .evergreen/release-danger-do-not-run-manually.sh
+  "publish papertrail":
+    - command: papertrail.trace
+      params:
+        key_id: ${PAPERTRAIL_KEY_ID}
+        secret_key: ${PAPERTRAIL_SECRET_KEY}
+        product: ${PAPERTRAIL_PRODUCT}
+        version: ${GIT_TAG}
+        filenames:
+          - src/target/package/mongodb-*.crate
 
 tasks:
   - name: "publish-release"
@@ -76,9 +147,9 @@ tasks:
       - func: "fetch source"
       - func: "install dependencies"
       - func: "fetch tag"
-        vars:
-          GIT_TAG: ${triggered_by_git_tag}
+      - func: "build papertrail vars"
       - func: "publish release"
+      - func: "publish papertrail"
 
 axes:
   - id: "os"
