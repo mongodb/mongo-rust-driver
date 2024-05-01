@@ -5,9 +5,7 @@ use crate::gridfs::FilesCollectionDocument;
 use crate::{
     action::{action_impl, deeplink, option_setters},
     error::Result,
-    gridfs::GridFsUploadOptions,
-    GridFsBucket,
-    GridFsUploadStream,
+    gridfs::{GridFsBucket, GridFsUploadOptions, GridFsUploadStream},
 };
 
 impl GridFsBucket {

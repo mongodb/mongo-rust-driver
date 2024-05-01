@@ -68,7 +68,6 @@ pub use crate::{
         Cursor,
     },
     db::Database,
-    gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
 
 pub use client::session::ClusterTime;

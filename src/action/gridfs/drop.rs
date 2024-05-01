@@ -1,4 +1,4 @@
-use crate::{action::action_impl, error::Result, GridFsBucket};
+use crate::{action::action_impl, error::Result, gridfs::GridFsBucket};
 
 impl GridFsBucket {
     /// Removes all of the files and their associated chunks from this bucket.

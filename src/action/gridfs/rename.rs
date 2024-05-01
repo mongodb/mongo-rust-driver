@@ -1,6 +1,6 @@
 use bson::{doc, Bson};
 
-use crate::{action::action_impl, error::Result, GridFsBucket};
+use crate::{action::action_impl, error::Result, gridfs::GridFsBucket};
 
 impl GridFsBucket {
     /// Renames the file with the given 'id' to the provided `new_filename`. This method returns an
