@@ -42,8 +42,9 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "::1",
 ];
 
+/// State is a struct that contains the callback and cache for OIDC.
 #[derive(Clone)]
-pub(crate) struct State {
+pub struct State {
     inner: Arc<Mutex<Option<StateInner>>>,
     is_user_provided: bool,
 }
@@ -121,7 +122,6 @@ impl Callback {
     /// Create a new human token request callback for OIDC.
     /// The return type is purposefully opaque to users and should only be created using this
     /// function or Callback::machine.
-    #[allow(private_interfaces)]
     pub fn human<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
@@ -135,7 +135,6 @@ impl Callback {
     /// Create a new machine token request callback for OIDC.
     /// The return type is purposefully opaque to users and should only be created using this
     /// function or Callback::human.
-    #[allow(private_interfaces)]
     pub fn machine<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
