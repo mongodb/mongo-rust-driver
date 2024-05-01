@@ -302,6 +302,8 @@ impl Cache {
 /// IdpServerInfo contains the information necessary to locate and authorize with an OIDC server.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerInfo {
     /// issuer is the address of the IdP server.
@@ -326,7 +328,8 @@ pub struct IdpServerInfo {
 ///     }.boxed()
 /// });
 /// ```
-#[derive(Debug)]
+#[derive(Debug, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CallbackContext {
     /// timeout is the time in the future when the callback should return an error if it
