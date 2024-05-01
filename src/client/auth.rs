@@ -482,7 +482,6 @@ pub struct Credential {
     ///     }.boxed()
     /// });
     /// ```
-    #[allow(private_interfaces)]
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
