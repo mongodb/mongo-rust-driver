@@ -110,7 +110,7 @@ impl Callback {
             + Sync
             + 'static,
     {
-        Self::create_function(function, CallbackKind::Human)
+        Self::create_callback(function, CallbackKind::Human)
     }
 
     /// Create a new machine token request function for OIDC.
@@ -123,10 +123,10 @@ impl Callback {
             + Sync
             + 'static,
     {
-        Self::create_function(function, CallbackKind::Machine)
+        Self::create_callback(function, CallbackKind::Machine)
     }
 
-    fn create_function<F>(function: F, kind: CallbackKind) -> Callback
+    fn create_callback<F>(function: F, kind: CallbackKind) -> Callback
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
             + Send
