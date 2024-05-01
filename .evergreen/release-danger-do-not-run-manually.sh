@@ -13,8 +13,8 @@ set +x
 
 set -o errexit
 
-if [[ -z "$TOKEN" ]]; then
-  echo >&2 "\$TOKEN must be set to the crates.io authentication token"
+if [[ -z "$CRATES_IO_TOKEN" ]]; then
+  echo >&2 "\$CRATES_IO_TOKEN must be set to the crates.io authentication token"
   exit 1
 fi
 
@@ -25,4 +25,8 @@ if [[ "${DRY_RUN}" == "yes" ]]; then
   EXTRA="--dry-run"
 fi
 
-cargo publish --token $TOKEN ${EXTRA}
+if [[ "${PACKAGE_ONLY}" == "yes" ]]; then
+  cargo package --no-verify --allow-dirty
+else
+  cargo publish --token $CRATES_IO_TOKEN ${EXTRA}
+fi
