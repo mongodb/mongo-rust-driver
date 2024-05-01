@@ -12,7 +12,7 @@
 #     --param triggered_by_git_tag=${TAG} \
 #     --param DRY_RUN=yes
 #
-# If the changes need to be developed agains the main branch, more steps are needed:
+# If the changes need to be developed against the main branch, more steps are needed:
 #
 # 1. Add dummy version numbers to the Cargo.toml lines for action_macro, bson, and libmongocrypt
 # 2. Comment out the "fetch tag" func call from the "publish-release" task in this file
