@@ -86,22 +86,18 @@ mod basic {
         let cb_call_count = call_count.clone();
 
         let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
-        opts.credential = Credential::builder()
-            .mechanism(AuthMechanism::MongoDbOidc)
-            .oidc_callback(oidc::Callback::machine(move |_| {
+        // test the new public API here.
+        opts.credential.as_mut().unwrap().oidc_callback =
+            crate::options::oidc::Callback::machine(move |_| {
                 let call_count = cb_call_count.clone();
                 async move {
                     *call_count.lock().await += 1;
-                    Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
-                        expires: None,
-                        refresh_token: None,
-                    })
+                    Ok(oidc::IdpServerResponse::builder()
+                        .access_token(tokio::fs::read_to_string(token_dir!("test_user1")).await?)
+                        .build())
                 }
                 .boxed()
-            }))
-            .build()
-            .into();
+            });
         let client = Client::with_options(opts)?;
 
         client
@@ -174,7 +170,7 @@ mod basic {
                 let call_count = cb_call_count.clone();
                 assert!(c.refresh_token.is_none());
                 // timeout should be in the future
-                assert!(c.timeout_seconds.unwrap() >= Instant::now());
+                assert!(c.timeout.unwrap() >= Instant::now());
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
@@ -696,7 +692,7 @@ mod basic {
                 let idp_info = c.idp_info.unwrap();
                 assert!(idp_info.issuer.as_str() != "");
                 assert!(idp_info.client_id.is_some());
-                assert!(c.timeout_seconds.unwrap() <= Instant::now() + Duration::from_secs(60 * 5));
+                assert!(c.timeout.unwrap() <= Instant::now() + Duration::from_secs(60 * 5));
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {

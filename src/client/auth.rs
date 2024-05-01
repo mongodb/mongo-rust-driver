@@ -3,7 +3,8 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
-pub(crate) mod oidc;
+/// Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
+pub mod oidc;
 mod plain;
 mod sasl;
 mod scram;
@@ -470,15 +471,22 @@ pub struct Credential {
     pub mechanism_properties: Option<Document>,
 
     /// The token callback for OIDC authentication.
-    // TODO RUST-1497: make this `pub`
-    // Credential::builder().oidc_callback(oidc::Callback::human(...)).build()
-    // the name of the field here does not well encompass what this field actually is since
-    // it contains all the OIDC state information, not just the callback, but it conforms
-    // to how a user would interact with it.
+    /// ```
+    /// let mut opts =
+    /// ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+    /// opts.credential.as_mut().unwrap().oidc_callback =
+    ///     Callback::human(move |c: CallbackContext| {
+    ///     async move {
+    ///         let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+    ///         Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+    ///     }.boxed()
+    /// });
+    /// ```
+    #[allow(private_interfaces)]
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
-    pub(crate) oidc_callback: oidc::State,
+    pub oidc_callback: oidc::State,
 }
 
 impl Credential {

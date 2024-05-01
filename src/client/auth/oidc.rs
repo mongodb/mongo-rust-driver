@@ -1,3 +1,4 @@
+//! Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
 use serde::Deserialize;
 use std::{
     sync::Arc,
@@ -8,17 +9,14 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -45,7 +43,7 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
 ];
 
 #[derive(Clone)]
-pub struct State {
+pub(crate) struct State {
     inner: Arc<Mutex<Option<StateInner>>>,
     is_user_provided: bool,
 }
@@ -83,11 +81,13 @@ impl State {
 
 /// The OIDC state containing the cache of necessary OIDC info as well as the callback
 #[derive(Clone, Debug)]
-pub struct StateInner {
+struct StateInner {
     callback: Callback,
     cache: Cache,
 }
 
+/// Callback provides an interface for creating human and machine callbacks that return
+/// access tokens for use in human and machine OIDC flows.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Callback {
@@ -102,8 +102,6 @@ enum CallbackKind {
     Machine,
 }
 
-// TODO RUST-1497: These will no longer be dead_code
-#[allow(dead_code)]
 impl Callback {
     fn new<F>(callback: F, kind: CallbackKind) -> Callback
     where
@@ -120,7 +118,10 @@ impl Callback {
         }
     }
 
-    /// Create a new human token request callback.
+    /// Create a new human token request callback for OIDC.
+    /// The return type is purposefully opaque to users and should only be created using this
+    /// function or Callback::machine.
+    #[allow(private_interfaces)]
     pub fn human<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
@@ -131,7 +132,10 @@ impl Callback {
         Self::create_state(callback, CallbackKind::Human)
     }
 
-    /// Create a new machine token request callback.
+    /// Create a new machine token request callback for OIDC.
+    /// The return type is purposefully opaque to users and should only be created using this
+    /// function or Callback::human.
+    #[allow(private_interfaces)]
     pub fn machine<F>(callback: F) -> State
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
@@ -240,12 +244,12 @@ impl std::fmt::Debug for Callback {
     }
 }
 
-pub struct CallbackInner {
+pub(crate) struct CallbackInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Cache {
+pub(crate) struct Cache {
     idp_server_info: Option<IdpServerInfo>,
     refresh_token: Option<String>,
     access_token: Option<String>,
@@ -296,31 +300,72 @@ impl Cache {
     }
 }
 
+/// IdpServerInfo contains the information necessary to locate and authorize with an OIDC server.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IdpServerInfo {
+    /// issuer is the address of the IdP server.
     pub issuer: String,
+    /// client_id is the client id for the application, which must be passed to the IdP in order to
+    /// perform authorization.
     pub client_id: Option<String>,
+    /// request_scopes are the scopes requested by the application, see [`Oauth Scope`](https://oauth.net/2/scope/)
     pub request_scopes: Option<Vec<String>>,
 }
 
+/// CallbackContext contains the information necessary to perform the human or machine flow
+/// in a callback. The driver passes ownership of this struct to the Callback function.
+/// ```
+/// let mut opts =
+/// ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+/// opts.credential.as_mut().unwrap().oidc_callback =
+///     Callback::human(move |c: CallbackContext| {
+///     async move {
+///         let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+///         Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+///     }.boxed()
+/// });
+/// ```
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct CallbackContext {
-    pub timeout_seconds: Option<Instant>,
+    /// timeout is the time in the future when the callback should return an error if it
+    /// it has not completed.
+    pub timeout: Option<Instant>,
+    /// version is the version of the callback API that the driver is using.
     pub version: u32,
+    /// refresh_token is the refresh token that the driver has stored in the cache, which may not
+    /// exist.
     pub refresh_token: Option<String>,
+    /// idp_info is the information necessary to locate and authorize with an OIDC server.
     pub idp_info: Option<IdpServerInfo>,
 }
 
+/// IdpServerResponse is the return type of the callback function. It contains the access token
+/// with optional expiration time and refresh token.
+/// ```
+/// let mut opts =
+/// ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+/// opts.credential.as_mut().unwrap().oidc_callback =
+///     Callback::human(move |c: CallbackContext| {
+///     async move {
+///         let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+///         Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+///     }.boxed()
+/// });
+/// ```
 #[derive(TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerResponse {
     #[builder(!default)]
+    /// access_token is the token that the driver will use to authenticate with the server.
     pub access_token: String,
+    /// expires is the time when the access token expires.
     pub expires: Option<Instant>,
+    /// refresh_token is the token that the driver will use to refresh the access token when the
+    /// access_token expires.
     pub refresh_token: Option<String>,
 }
 
@@ -498,7 +543,7 @@ async fn do_single_step_callback(
 ) -> Result<()> {
     let idp_response = {
         let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + timeout),
+            timeout: Some(Instant::now() + timeout),
             version: API_VERSION,
             refresh_token: None,
             idp_info: cred_cache.idp_server_info.clone(),
@@ -543,7 +588,7 @@ async fn do_two_step_callback(
         bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
     let idp_response = {
         let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + timeout),
+            timeout: Some(Instant::now() + timeout),
             version: API_VERSION,
             refresh_token: None,
             idp_info: Some(server_info.clone()),
@@ -653,7 +698,7 @@ async fn authenticate_human(
     ) {
         let idp_response = {
             let cb_context = CallbackContext {
-                timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
+                timeout: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
                 version: API_VERSION,
                 refresh_token,
                 idp_info,
