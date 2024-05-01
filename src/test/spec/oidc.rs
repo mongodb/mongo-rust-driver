@@ -86,6 +86,7 @@ mod basic {
         let cb_call_count = call_count.clone();
 
         let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        opts.credential.as_mut().unwrap().source = None;
         // test the new public API here.
         opts.credential.as_mut().unwrap().oidc_callback =
             crate::options::oidc::Callback::machine(move |_| {

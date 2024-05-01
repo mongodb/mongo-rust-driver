@@ -228,8 +228,8 @@ impl AuthMechanism {
                     .map_or(false, |s| s != "$external")
                 {
                     return Err(Error::invalid_argument(format!(
-                        "source must be $external for {} authentication",
-                        MONGODB_OIDC_STR
+                        "source must be $external for {} authentication, found: {:?}",
+                        MONGODB_OIDC_STR, credential.source
                     )));
                 }
                 if credential.password.is_some() {
