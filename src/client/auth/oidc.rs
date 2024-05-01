@@ -9,17 +9,14 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -47,6 +44,7 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
 
 /// State is a struct that contains the callback and cache for OIDC.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct State {
     inner: Arc<Mutex<Option<StateInner>>>,
     is_user_provided: bool,
