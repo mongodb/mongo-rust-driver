@@ -331,7 +331,7 @@ pub struct IdpServerInfo {
 ///     }.boxed()
 /// });
 /// ```
-#[derive(Debug, TypedBuilder)]
+#[derive(Clone, Debug, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CallbackContext {
@@ -360,7 +360,7 @@ pub struct CallbackContext {
 ///     }.boxed()
 /// });
 /// ```
-#[derive(TypedBuilder)]
+#[derive(Clone, Debug, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerResponse {
