@@ -485,7 +485,7 @@ pub struct Credential {
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
-    pub oidc_callback: oidc::State,
+    pub oidc_callback: oidc::Callback,
 }
 
 impl Credential {
