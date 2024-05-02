@@ -6,9 +6,8 @@ use crate::{
     action::{action_impl, deeplink, option_setters},
     coll::options::{FindOneOptions, FindOptions},
     error::Result,
-    gridfs::{FilesCollectionDocument, GridFsFindOneOptions, GridFsFindOptions},
+    gridfs::{FilesCollectionDocument, GridFsBucket, GridFsFindOneOptions, GridFsFindOptions},
     Cursor,
-    GridFsBucket,
 };
 
 impl GridFsBucket {

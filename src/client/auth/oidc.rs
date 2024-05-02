@@ -3,14 +3,22 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "azure-oidc")]
+use crate::client::auth::{
+    AZURE_ENVIRONMENT_VALUE_STR,
+    ENVIRONMENT_PROP_STR,
+    GCP_ENVIRONMENT_VALUE_STR,
+    TOKEN_RESOURCE_PROP_STR,
+};
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
             AuthMechanism,
+            ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -36,18 +44,48 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "::1",
 ];
 
-/// The user-supplied callbacks for OIDC authentication.
 #[derive(Clone)]
 pub struct State {
-    callback: Callback,
-    cache: Arc<Mutex<Cache>>,
+    inner: Arc<Mutex<Option<StateInner>>>,
+    is_user_provided: bool,
 }
 
-#[cfg(test)]
-impl State {
-    pub(crate) fn cache(&mut self) -> Arc<Mutex<Cache>> {
-        self.cache.clone()
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+            is_user_provided: false,
+        }
     }
+}
+
+impl State {
+    pub(crate) fn is_user_provided(&self) -> bool {
+        self.is_user_provided
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn set_access_token(&self, access_token: Option<String>) {
+        self.inner.lock().await.as_mut().unwrap().cache.access_token = access_token;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn set_refresh_token(&self, refresh_token: Option<String>) {
+        self.inner
+            .lock()
+            .await
+            .as_mut()
+            .unwrap()
+            .cache
+            .refresh_token = refresh_token;
+    }
+}
+
+/// The OIDC state containing the cache of necessary OIDC info as well as the callback
+#[derive(Clone, Debug)]
+pub struct StateInner {
+    callback: Callback,
+    cache: Cache,
 }
 
 #[derive(Clone)]
@@ -58,7 +96,7 @@ pub struct Callback {
 }
 
 #[non_exhaustive]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum CallbackKind {
     Human,
     Machine,
@@ -112,15 +150,93 @@ impl Callback {
             + 'static,
     {
         State {
-            callback: Self::new(callback, kind),
-            cache: Arc::new(Mutex::new(Cache::new())),
+            inner: Arc::new(Mutex::new(Some(StateInner {
+                callback: Self::new(callback, kind),
+                cache: Cache::new(),
+            }))),
+            is_user_provided: true,
+        }
+    }
+
+    /// Create azure callback.
+    #[cfg(feature = "azure-oidc")]
+    fn azure_callback(client_id: Option<&str>, resource: &str) -> StateInner {
+        use futures_util::FutureExt;
+        let resource = resource.to_string();
+        let client_id = client_id.map(|s| s.to_string());
+        let mut url = format!(
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
+            resource
+        );
+        if let Some(ref client_id) = client_id {
+            url.push_str(&format!("&client_id={}", client_id));
+        }
+        StateInner {
+            callback: Self::new(
+                move |_| {
+                    let url = url.clone();
+                    async move {
+                        let url = url.clone();
+                        let response = crate::runtime::HttpClient::default()
+                            .get(&url)
+                            .headers(&[("Metadata", "true"), ("Accept", "application/json")])
+                            .send::<Document>()
+                            .await
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get access token from Azure IDMS: {}", e),
+                                )
+                            });
+                        let response = response?;
+                        let access_token = response
+                            .get_str("access_token")
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get access token from Azure IDMS: {}", e),
+                                )
+                            })?
+                            .to_string();
+                        let expires_in = response
+                            .get_str("expires_in")
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                                )
+                            })?
+                            .parse::<u64>()
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!(
+                                        "Failed to parse expires_in from Azure IDMS as u64: {}",
+                                        e
+                                    ),
+                                )
+                            })?;
+                        let expires = Some(Instant::now() + Duration::from_secs(expires_in));
+                        Ok(IdpServerResponse {
+                            access_token,
+                            expires,
+                            refresh_token: None,
+                        })
+                    }
+                    .boxed()
+                },
+                CallbackKind::Machine,
+            ),
+            cache: Cache::new(),
         }
     }
 }
 
+use std::fmt::Debug;
 impl std::fmt::Debug for Callback {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Callback").finish()
+        f.debug_struct(format!("Callback: {:?}", self.kind).as_str())
+            .finish()
     }
 }
 
@@ -146,16 +262,6 @@ impl Cache {
             token_gen_id: 0,
             last_call_time: Instant::now(),
         }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn refresh_token(&mut self) -> &mut Option<String> {
-        &mut self.refresh_token
-    }
-
-    #[cfg(test)]
-    pub(crate) fn access_token(&mut self) -> &mut Option<String> {
-        &mut self.access_token
     }
 
     async fn update(
@@ -195,7 +301,7 @@ impl Cache {
 #[non_exhaustive]
 pub struct IdpServerInfo {
     pub issuer: String,
-    pub client_id: String,
+    pub client_id: Option<String>,
     pub request_scopes: Option<Vec<String>>,
 }
 
@@ -246,14 +352,13 @@ pub(crate) async fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Option<Command> {
-    credential.oidc_callback.as_ref()?;
     if let Some(ref access_token) = credential
         .oidc_callback
-        .as_ref()
-        .unwrap()
-        .cache
+        .inner
         .lock()
         .await
+        .as_ref()?
+        .cache
         .access_token
     {
         let start_doc = rawdoc! {
@@ -279,14 +384,40 @@ pub(crate) async fn reauthenticate_stream(
 ) -> Result<()> {
     credential
         .oidc_callback
-        .as_ref()
-        .unwrap()
-        .cache
+        .inner
         .lock()
         .await
+        .as_mut()
+        .unwrap()
+        .cache
         .invalidate(conn, true)
         .await;
     authenticate_stream(conn, credential, server_api, None).await
+}
+
+#[cfg(feature = "azure-oidc")]
+async fn setup_automatic_providers(credential: &Credential, state: &mut Option<StateInner>) {
+    // If there is already a callback, there is no need to set up an automatic provider
+    // this could happen in the case of a reauthentication, or if the user has already set up
+    // a callback. A situation where the user has set up a callback and an automatic provider
+    // would already have caused an InvalidArgument error in `validate_credential`.
+    if state.is_some() {
+        return;
+    }
+    if let Some(ref p) = credential.mechanism_properties {
+        let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
+        let client_id = credential.username.as_deref();
+        let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
+        match environment {
+            AZURE_ENVIRONMENT_VALUE_STR => {
+                *state = Some(Callback::azure_callback(client_id, resource))
+            }
+            GCP_ENVIRONMENT_VALUE_STR => {
+                // TODO RUST-1627: Implement GCP automatic provider
+            }
+            _ => {}
+        }
+    }
 }
 
 pub(crate) async fn authenticate_stream(
@@ -298,36 +429,33 @@ pub(crate) async fn authenticate_stream(
     // We need to hold the lock for the entire function so that multiple callbacks
     // are not called during an authentication race, and so that token_gen_id on the Connection
     // always matches that in the Credential Cache.
-    let mut cred_cache = credential
-        .oidc_callback
-        .as_ref()
-        .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .cache
-        .lock()
-        .await;
+    let mut guard = credential.oidc_callback.inner.lock().await;
 
-    cred_cache.propagate_token_gen_id(conn).await;
+    #[cfg(feature = "azure-oidc")]
+    setup_automatic_providers(credential, &mut guard).await;
+    let StateInner {
+        cache,
+        callback: Callback { inner, kind },
+    } = &mut guard
+        .as_mut()
+        .ok_or_else(|| auth_error("no callbacks supplied"))?;
+
+    cache.propagate_token_gen_id(conn).await;
 
     if server_first.into().is_some() {
         // speculative authentication succeeded, no need to authenticate again
         // update the Connection gen_id to be that of the cred_cache
-        cred_cache.propagate_token_gen_id(conn).await;
+        cache.propagate_token_gen_id(conn).await;
         return Ok(());
     }
     let source = credential.source.as_deref().unwrap_or("$external");
 
-    let Callback { inner, kind } = credential
-        .oidc_callback
-        .as_ref()
-        .ok_or_else(|| auth_error("no callbacks supplied"))?
-        .callback
-        .clone();
     match kind {
         CallbackKind::Machine => {
-            authenticate_machine(source, conn, credential, &mut cred_cache, server_api, inner).await
+            authenticate_machine(source, conn, credential, cache, server_api, inner.clone()).await
         }
         CallbackKind::Human => {
-            authenticate_human(source, conn, credential, &mut cred_cache, server_api, inner).await
+            authenticate_human(source, conn, credential, cache, server_api, inner.clone()).await
         }
     }
 }
@@ -357,45 +485,55 @@ async fn send_sasl_start_command(
     send_sasl_command(conn, sasl_start).await
 }
 
-// do_shared_flow is the shared flow for both human and machine
-async fn do_shared_flow(
+// this is shared functionality between the human and machine flow. In the machine flow, the idp
+// info will always be None, but the code is the same so we reuse it.
+async fn do_single_step_callback(
     source: &str,
     conn: &mut Connection,
-    cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut Cache,
     credential: &Credential,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
     timeout: Duration,
 ) -> Result<()> {
-    // If the idpinfo is cached, we use that instead of doing two_step. It seems the spec does not
-    // allow idpinfo to change on invalidations.
-    if cred_cache.idp_server_info.is_some() {
-        let idp_response = {
-            let cb_context = CallbackContext {
-                timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
-                version: API_VERSION,
-                refresh_token: None,
-                idp_info: cred_cache.idp_server_info.clone(),
-            };
-            (callback.f)(cb_context).await?
+    let idp_response = {
+        let cb_context = CallbackContext {
+            timeout_seconds: Some(Instant::now() + timeout),
+            version: API_VERSION,
+            refresh_token: None,
+            idp_info: cred_cache.idp_server_info.clone(),
         };
-        let response = send_sasl_start_command(
-            source,
-            conn,
-            credential,
-            server_api,
-            Some(idp_response.access_token.clone()),
-        )
-        .await?;
-        if response.done {
-            let server_info = cred_cache.idp_server_info.clone();
-            cred_cache.update(&idp_response, server_info).await;
-            return Ok(());
-        }
-        return Err(invalid_auth_response());
+        (callback.f)(cb_context).await?
+    };
+    let response = send_sasl_start_command(
+        source,
+        conn,
+        credential,
+        server_api,
+        Some(idp_response.access_token.clone()),
+    )
+    .await?;
+    if response.done {
+        let server_info = cred_cache.idp_server_info.clone();
+        cred_cache.update(&idp_response, server_info).await;
+        return Ok(());
     }
+    Err(invalid_auth_response())
+}
 
-    // Here we do not have the idpinfo, so we need to do the two step flow.
+// This is currently only used in the human flow, but is abstracted to make the algorithm more
+// clear. The timeout is still passed in, so that the human flow can control the timeout in one
+// place.
+async fn do_two_step_callback(
+    source: &str,
+    conn: &mut Connection,
+    cred_cache: &mut Cache,
+    credential: &Credential,
+    server_api: Option<&ServerApi>,
+    callback: Arc<CallbackInner>,
+    timeout: Duration,
+) -> Result<()> {
+    // Here we do not have the idpinfo, so we need to do the two step sasl conversation.
     let response = send_sasl_start_command(source, conn, credential, server_api, None).await?;
     if response.done {
         return Err(invalid_auth_response());
@@ -437,13 +575,17 @@ fn get_allowed_hosts(mechanism_properties: Option<&Document>) -> Result<Vec<&str
         return Ok(Vec::from(DEFAULT_ALLOWED_HOSTS));
     }
     if let Some(allowed_hosts) =
-        mechanism_properties.and_then(|p| p.get_array("ALLOWED_HOSTS").ok())
+        mechanism_properties.and_then(|p| p.get_array(ALLOWED_HOSTS_PROP_STR).ok())
     {
         return allowed_hosts
             .iter()
             .map(|host| {
-                host.as_str()
-                    .ok_or_else(|| auth_error("ALLOWED_HOSTS must contain only strings"))
+                host.as_str().ok_or_else(|| {
+                    auth_error(format!(
+                        "`{}` must contain only strings",
+                        ALLOWED_HOSTS_PROP_STR
+                    ))
+                })
             })
             .collect::<Result<Vec<_>>>();
     }
@@ -476,7 +618,7 @@ async fn authenticate_human(
     source: &str,
     conn: &mut Connection,
     credential: &Credential,
-    cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
@@ -540,7 +682,22 @@ async fn authenticate_human(
         }
     }
 
-    do_shared_flow(
+    // If the idpinfo is cached, we run the callback and then do a single step sasl conversation.
+    // It seems the spec does not allow idpinfo to change on invalidations.
+    if cred_cache.idp_server_info.is_some() {
+        return do_single_step_callback(
+            source,
+            conn,
+            cred_cache,
+            credential,
+            server_api,
+            callback,
+            HUMAN_CALLBACK_TIMEOUT,
+        )
+        .await;
+    }
+
+    do_two_step_callback(
         source,
         conn,
         cred_cache,
@@ -556,7 +713,7 @@ async fn authenticate_machine(
     source: &str,
     conn: &mut Connection,
     credential: &Credential,
-    cred_cache: &mut MutexGuard<'_, Cache>,
+    cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
     callback: Arc<CallbackInner>,
 ) -> Result<()> {
@@ -580,7 +737,7 @@ async fn authenticate_machine(
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
-    do_shared_flow(
+    do_single_step_callback(
         source,
         conn,
         cred_cache,

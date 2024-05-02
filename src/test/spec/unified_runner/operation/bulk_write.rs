@@ -8,6 +8,7 @@ use crate::{
     error::Result,
     options::{BulkWriteOptions, WriteModel},
     test::spec::unified_runner::{Entity, TestRunner},
+    ClientSession,
     Namespace,
 };
 

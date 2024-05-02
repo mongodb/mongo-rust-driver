@@ -217,6 +217,35 @@ impl TestRunner {
                     .await;
             }
 
+            // Workaround for SERVER-39704:
+            // test runners MUST execute a non-transactional distinct command on
+            // each mongos server before running any test that might execute distinct within a
+            // transaction.
+            if self.internal_client.is_sharded()
+                && self.internal_client.server_version_lte(4, 2)
+                && test_case.operations.iter().any(|op| op.name == "distinct")
+            {
+                self.internal_client.disable_command_events(true);
+                for server_address in self.internal_client.options().hosts.clone() {
+                    for (_, entity) in self.entities.read().await.iter() {
+                        if let Entity::Collection(coll) = entity {
+                            let coll = self
+                                .internal_client
+                                .database(&coll.namespace().db)
+                                .collection::<Document>(&coll.namespace().coll);
+                            let server_address = server_address.clone();
+                            coll.distinct("_id", doc! {})
+                                .selection_criteria(SelectionCriteria::Predicate(Arc::new(
+                                    move |server_info| *server_info.address() == server_address,
+                                )))
+                                .await
+                                .unwrap();
+                        }
+                    }
+                }
+                self.internal_client.disable_command_events(false);
+            }
+
             #[cfg(feature = "tracing-unstable")]
             let (mut tracing_subscriber, _levels_guard) = {
                 let tracing_levels =

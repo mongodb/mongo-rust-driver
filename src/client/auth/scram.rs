@@ -316,6 +316,7 @@ impl ScramVersion {
     ) -> Result<Vec<u8>> {
         let normalized_password = match self {
             ScramVersion::Sha1 => {
+                // nosemgrep: insecure-hashes
                 let mut md5 = Md5::new();
                 md5.update(format!("{}:mongo:{}", username, password));
                 Cow::Owned(hex::encode(md5.finalize()))
