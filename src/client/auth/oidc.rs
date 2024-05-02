@@ -9,17 +9,14 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -322,15 +319,26 @@ pub struct IdpServerInfo {
 /// CallbackContext contains the information necessary to perform the human or machine flow
 /// in a function. The driver passes ownership of this struct to the Callback function.
 /// ```
-/// let mut opts =
-/// ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
-/// opts.credential.as_mut().unwrap().oidc_callback =
-///     Callback::human(move |c: CallbackContext| {
-///     async move {
-///         let (access_token, expires, refresh_token) = do_human_flow(c).await?;
-///         Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
-///     }.boxed()
-/// });
+/// use mongodb::{error::Error, Client, options::{ClientOptions, oidc::{Callback, CallbackContext, IdpServerResponse}}};
+/// use std::time::{Duration, Instant};
+/// use futures::future::FutureExt;
+/// async fn do_human_flow(c: CallbackContext) -> Result<(String, Option<Instant>, Option<String>), Error> {
+///   // Do the human flow here see: https://auth0.com/docs/authenticate/login/oidc-conformant-authentication/oidc-adoption-auth-code-flow
+///   Ok(("some_access_token".to_string(), Some(Instant::now() + Duration::from_secs(60 * 60 * 12)), Some("some_refresh_token".to_string())))
+/// }
+///
+/// async fn setup_client() -> Result<Client, Error> {
+///     let mut opts =
+///     ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+///     opts.credential.as_mut().unwrap().oidc_callback =
+///         Callback::human(move |c: CallbackContext| {
+///         async move {
+///             let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+///             Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+///         }.boxed()
+///     });
+///     Client::with_options(opts)
+/// }
 /// ```
 #[derive(Clone, Debug, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -351,15 +359,26 @@ pub struct CallbackContext {
 /// IdpServerResponse is the return type of the function function. It contains the access token
 /// with optional expiration time and refresh token.
 /// ```
-/// let mut opts =
-/// ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
-/// opts.credential.as_mut().unwrap().oidc_callback =
-///     Callback::human(move |c: CallbackContext| {
-///     async move {
-///         let (access_token, expires, refresh_token) = do_human_flow(c).await?;
-///         Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
-///     }.boxed()
-/// });
+/// use mongodb::{error::Error, Client, options::{ClientOptions, oidc::{Callback, CallbackContext, IdpServerResponse}}};
+/// use std::time::{Duration, Instant};
+/// use futures::future::FutureExt;
+/// async fn do_human_flow(c: CallbackContext) -> Result<(String, Option<Instant>, Option<String>), Error> {
+///   // Do the human flow here see: https://auth0.com/docs/authenticate/login/oidc-conformant-authentication/oidc-adoption-auth-code-flow
+///   Ok(("some_access_token".to_string(), Some(Instant::now() + Duration::from_secs(60 * 60 * 12)), Some("some_refresh_token".to_string())))
+/// }
+///
+/// async fn setup_client() -> Result<Client, Error> {
+///     let mut opts =
+///     ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+///     opts.credential.as_mut().unwrap().oidc_callback =
+///         Callback::human(move |c: CallbackContext| {
+///         async move {
+///             let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+///             Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+///         }.boxed()
+///     });
+///     Client::with_options(opts)
+/// }
 /// ```
 #[derive(Clone, Debug, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
