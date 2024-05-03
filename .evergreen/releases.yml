@@ -164,7 +164,7 @@ tasks:
     commands:
       - func: "fetch source"
       - func: "install dependencies"
-      #- func: "fetch tag"
+      - func: "fetch tag"
       - func: "build vars"
       - func: "publish release"
       - func: "publish papertrail"
