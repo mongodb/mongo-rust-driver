@@ -505,3 +505,39 @@ async fn too_large_client_error() {
     let error = client.bulk_write(vec![model]).await.unwrap_err();
     assert!(!error.is_server_error());
 }
+
+#[cfg(feature = "in-use-encryption-unstable")]
+#[tokio::test]
+async fn encryption_error() {
+    use crate::{
+        client::csfle::options::{AutoEncryptionOptions, KmsProviders},
+        mongocrypt::ctx::KmsProvider,
+    };
+
+    let kms_providers = KmsProviders::new(vec![(
+        KmsProvider::Aws,
+        doc! { "accessKeyId": "foo", "secretAccessKey": "bar" },
+        None,
+    )])
+    .unwrap();
+    let encrypted_options = AutoEncryptionOptions::new(Namespace::new("db", "coll"), kms_providers);
+    let encrypted_client = Client::test_builder()
+        .encrypted_options(encrypted_options)
+        .build()
+        .await;
+
+    let model = WriteModel::InsertOne {
+        namespace: Namespace::new("db", "coll"),
+        document: doc! { "a": "b" },
+    };
+    let error = encrypted_client.bulk_write(vec![model]).await.unwrap_err();
+
+    let ErrorKind::Encryption(encryption_error) = *error.kind else {
+        panic!("expected encryption error, got {:?}", error);
+    };
+
+    assert_eq!(
+        encryption_error.message,
+        Some("bulkWrite does not currently support automatic encryption".to_string())
+    );
+}
