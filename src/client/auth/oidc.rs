@@ -9,17 +9,14 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -95,7 +92,7 @@ impl Callback {
             + 'static,
     {
         Function {
-            inner: Arc::new(FunctionInner { f: Box::new(func) }),
+            inner: Box::new(FunctionInner { f: Box::new(func) }),
             kind,
         }
     }
@@ -217,7 +214,7 @@ impl Callback {
 }
 
 /// The OIDC state containing the cache of necessary OIDC info as well as the function
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct CallbackInner {
     function: Function,
     cache: Cache,
@@ -225,10 +222,9 @@ struct CallbackInner {
 
 /// Callback provides an interface for creating human and machine functions that return
 /// access tokens for use in human and machine OIDC flows.
-#[derive(Clone)]
 #[non_exhaustive]
 pub struct Function {
-    inner: Arc<FunctionInner>,
+    inner: Box<FunctionInner>,
     kind: CallbackKind,
 }
 
@@ -525,10 +521,10 @@ pub(crate) async fn authenticate_stream(
 
     match kind {
         CallbackKind::Machine => {
-            authenticate_machine(source, conn, credential, cache, server_api, inner.clone()).await
+            authenticate_machine(source, conn, credential, cache, server_api, inner.as_ref()).await
         }
         CallbackKind::Human => {
-            authenticate_human(source, conn, credential, cache, server_api, inner.clone()).await
+            authenticate_human(source, conn, credential, cache, server_api, inner.as_ref()).await
         }
     }
 }
@@ -566,7 +562,7 @@ async fn do_single_step_function(
     cred_cache: &mut Cache,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    function: Arc<FunctionInner>,
+    function: &FunctionInner,
     timeout: Duration,
 ) -> Result<()> {
     let idp_response = {
@@ -603,7 +599,7 @@ async fn do_two_step_function(
     cred_cache: &mut Cache,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    function: Arc<FunctionInner>,
+    function: &FunctionInner,
     timeout: Duration,
 ) -> Result<()> {
     // Here we do not have the idpinfo, so we need to do the two step sasl conversation.
@@ -693,7 +689,7 @@ async fn authenticate_human(
     credential: &Credential,
     cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
-    function: Arc<FunctionInner>,
+    function: &FunctionInner,
 ) -> Result<()> {
     validate_address_with_allowed_hosts(credential.mechanism_properties.as_ref(), &conn.address)?;
 
@@ -788,7 +784,7 @@ async fn authenticate_machine(
     credential: &Credential,
     cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
-    function: Arc<FunctionInner>,
+    function: &FunctionInner,
 ) -> Result<()> {
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
     // the function and sasl_continue
