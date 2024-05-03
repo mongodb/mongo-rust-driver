@@ -7,7 +7,7 @@ use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
     bson::{rawdoc, Bson, RawDocumentBuf},
-    bson_util::{self, array_entry_size_bytes, extend_raw_document_buf, vec_to_raw_array_buf},
+    bson_util::{self, extend_raw_document_buf},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
@@ -22,13 +22,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{
-    ExecutionContext,
-    Retryability,
-    WriteResponseBody,
-    MAX_ENCRYPTED_WRITE_SIZE,
-    OP_MSG_OVERHEAD_BYTES,
-};
+use super::{ExecutionContext, Retryability, WriteResponseBody, OP_MSG_OVERHEAD_BYTES};
 
 use server_responses::*;
 
@@ -37,7 +31,6 @@ pub(crate) struct BulkWrite<'a> {
     models: &'a [WriteModel],
     offset: usize,
     options: Option<&'a BulkWriteOptions>,
-    encrypted: bool,
     /// The _ids of the inserted documents. This value is populated in `build`.
     inserted_ids: HashMap<usize, Bson>,
     /// The number of writes that were sent to the server. This value is populated in `build`.
@@ -51,13 +44,11 @@ impl<'a> BulkWrite<'a> {
         offset: usize,
         options: Option<&'a BulkWriteOptions>,
     ) -> BulkWrite<'a> {
-        let encrypted = client.should_auto_encrypt().await;
         Self {
             client,
             models,
             offset,
             options,
-            encrypted,
             n_attempted: 0,
             inserted_ids: HashMap::new(),
         }
@@ -226,23 +217,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                 .into());
             }
 
-            let mut split = false;
-            if self.encrypted && i != 0 {
-                let model_entry_size = array_entry_size_bytes(i, operation_size)?;
-                let namespace_entry_size = if namespace_size > 0 {
-                    array_entry_size_bytes(namespace_index, namespace_size)?
-                } else {
-                    0
-                };
-                if current_size + namespace_entry_size + model_entry_size > MAX_ENCRYPTED_WRITE_SIZE
-                {
-                    split = true;
-                }
-            } else if current_size + namespace_size + operation_size > max_document_sequences_size {
-                split = true;
-            }
-
-            if split {
+            if current_size + namespace_size + operation_size > max_document_sequences_size {
                 // Remove the namespace doc from the list if one was added for this operation.
                 if namespace_size > 0 {
                     let last_index = namespace_info.namespaces.len() - 1;
@@ -260,16 +235,10 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
 
         self.n_attempted = ops.len();
 
-        if self.encrypted {
-            command_body.append("nsInfo", vec_to_raw_array_buf(namespace_info.namespaces));
-            command_body.append("ops", vec_to_raw_array_buf(ops));
-            Ok(Command::new(Self::NAME, "admin", command_body))
-        } else {
-            let mut command = Command::new(Self::NAME, "admin", command_body);
-            command.add_document_sequence("nsInfo", namespace_info.namespaces);
-            command.add_document_sequence("ops", ops);
-            Ok(command)
-        }
+        let mut command = Command::new(Self::NAME, "admin", command_body);
+        command.add_document_sequence("nsInfo", namespace_info.namespaces);
+        command.add_document_sequence("ops", ops);
+        Ok(command)
     }
 
     fn handle_response<'b>(

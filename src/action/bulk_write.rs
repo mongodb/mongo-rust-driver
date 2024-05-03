@@ -67,6 +67,20 @@ impl<'a> Action for BulkWrite<'a> {
     type Future = BulkWriteFuture;
 
     async fn execute(mut self) -> Result<BulkWriteResult> {
+        #[cfg(feature = "in-use-encryption-unstable")]
+        if self.client.should_auto_encrypt().await {
+            use mongocrypt::error::{Error as EncryptionError, ErrorKind as EncryptionErrorKind};
+
+            let error = EncryptionError {
+                kind: EncryptionErrorKind::Client,
+                code: None,
+                message: Some(
+                    "bulkWrite does not currently support automatic encryption".to_string(),
+                ),
+            };
+            return Err(ErrorKind::Encryption(error).into());
+        }
+
         resolve_write_concern_with_session!(
             self.client,
             self.options,

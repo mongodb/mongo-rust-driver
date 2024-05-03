@@ -103,10 +103,7 @@ impl<'a> Action for InsertMany<'a> {
             .as_ref()
             .and_then(|o| o.ordered)
             .unwrap_or(true);
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.coll.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
+        let encrypted = self.coll.client().should_auto_encrypt().await;
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
         let mut error_labels: HashSet<String> = Default::default();

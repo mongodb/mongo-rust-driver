@@ -87,18 +87,13 @@ impl<'a> Action for InsertOne<'a> {
     async fn execute(mut self) -> Result<InsertOneResult> {
         resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
 
-        #[cfg(feature = "in-use-encryption-unstable")]
-        let encrypted = self.coll.client().auto_encryption_opts().await.is_some();
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
-        let encrypted = false;
-
         let doc = self.doc?;
 
         let insert = Op::new(
             self.coll.namespace(),
             vec![doc.deref()],
             self.options.map(InsertManyOptions::from_insert_one_options),
-            encrypted,
+            self.coll.client().should_auto_encrypt().await,
         );
         self.coll
             .client()
