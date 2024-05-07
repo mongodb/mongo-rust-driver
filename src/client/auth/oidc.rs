@@ -45,7 +45,7 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "::1",
 ];
 
-/// Callback is a struct that contains the function for OIDC.
+/// The callback to use for OIDC authentication.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Callback {
