@@ -387,7 +387,7 @@ pub struct CallbackContext {
 #[non_exhaustive]
 pub struct IdpServerResponse {
     #[builder(!default)]
-    /// access_token is the token that the driver will use to authenticate with the server.
+    /// The token that the driver will use to authenticate with the server.
     pub access_token: String,
     /// expires is the time when the access token expires.
     pub expires: Option<Instant>,
