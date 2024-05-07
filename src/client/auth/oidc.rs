@@ -349,7 +349,7 @@ pub struct CallbackContext {
     /// The time in the future when the function should return an error if it
     /// it has not completed.
     pub timeout: Option<Instant>,
-    /// version is the version of the function API that the driver is using.
+    /// The version of the function API that the driver is using.
     pub version: u32,
     /// refresh_token is the refresh token that the driver has stored in the cache, which may not
     /// exist.
