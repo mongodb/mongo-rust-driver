@@ -351,7 +351,7 @@ pub struct CallbackContext {
     pub timeout: Option<Instant>,
     /// The version of the function API that the driver is using.
     pub version: u32,
-    /// refresh_token is the refresh token that the driver has stored in the cache, which may not
+    /// The refresh token that the driver has stored in the cache, which may not
     /// exist.
     pub refresh_token: Option<String>,
     /// idp_info is the information necessary to locate and authorize with an OIDC server.
