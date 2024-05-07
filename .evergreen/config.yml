@@ -35,7 +35,7 @@ post:
   - func: "cleanup"
 
 # Cause a timeout if a task does not complete within 150 minutes. TODO RUST-1721: reduce this.
-exec_timeout_secs: 9000
+exec_timeout_secs: 21600
 # What to do if the timeout is hit. Post-task functions will still run.
 timeout:
   - command: shell.exec
@@ -674,16 +674,20 @@ task_groups:
   - name: testgcpoidc_task_group
     setup_group:
       - func: fetch source
+      - func: create expansions
       - func: prepare resources
       - func: fix absolute paths
+      - func: init test-results
       - func: make files executable
-      - command: subprocess.exec
+      - func: install rust
+      - command: shell.exec
         params:
-          binary: bash
+          shell: bash
           env:
-            GCPOIDC_VMNAME_PREFIX: "RUST_DRIVER"
-          args:
-            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
+            AZUREOIDC_VMNAME_PREFIX: "RUST_DRIVER"
+          script: |
+            ${PREPARE_SHELL}
+            ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
     teardown_task:
       - command: subprocess.exec
         params:
@@ -1367,15 +1371,18 @@ tasks:
         script: |-
           set -o errexit
           ${PREPARE_SHELL}
-          git add .
-          git commit -m "add files"
+          echo "!!!!!!!!!!"
+          echo "$PATH"
+          # git add .
+          # git commit -m "add files"
           export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tgz
-          git archive -o $GCPOIDC_DRIVERS_TAR_FILE HEAD
+          # git archive -o $GCPOIDC_DRIVERS_TAR_FILE HEAD
+          cargo test test::spec::oidc::gcp --features gcp-oidc --no-run
+          tar -czvf $GCPOIDC_DRIVERS_TAR_FILE ..
           # Define the command to run on the gcp VM.
           # Ensure that we source the environment file created for us, set up any other variables we need,
           # and then run our test suite on the vm.
           export GCPOIDC_TEST_CMD="PROJECT_DIRECTORY='.' ./.evergreen/install-dependencies.sh rust\
-                                     && PROJECT_DIRECTORY='.' .evergreen/install-dependencies.sh junit-dependencies\
                                      && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc  ./.evergreen/run-mongodb-oidc-test.sh"
           bash $DRIVERS_TOOLS/.evergreen/auth_oidc/gcp/run-driver-test.sh
 

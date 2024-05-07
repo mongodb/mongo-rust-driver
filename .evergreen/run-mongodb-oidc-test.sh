@@ -24,11 +24,13 @@ if [ $OIDC_ENV == "test" ]; then
 
     cargo nextest run test::spec::oidc::basic --no-capture --profile ci
     RESULT=$?
+    cp target/nextest/ci/junit.xml results.xml
 elif [ $OIDC_ENV == "azure" ]; then
     source ./env.sh
 
     cargo nextest run test::spec::oidc::azure --no-capture --profile ci --features=azure-oidc
     RESULT=$?
+    cp target/nextest/ci/junit.xml results.xml
 elif [ $OIDC_ENV == "gcp" ]; then
     source ./secrets-export.sh
 
@@ -39,5 +41,4 @@ else
     exit 1
 fi
 
-cp target/nextest/ci/junit.xml results.xml
 exit $RESULT
