@@ -354,7 +354,7 @@ pub struct CallbackContext {
     /// The refresh token that the driver has stored in the cache, which may not
     /// exist.
     pub refresh_token: Option<String>,
-    /// idp_info is the information necessary to locate and authorize with an OIDC server.
+    /// The information necessary to locate and authorize with an OIDC server.
     pub idp_info: Option<IdpServerInfo>,
 }
 
