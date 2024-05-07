@@ -346,7 +346,7 @@ pub struct IdpServerInfo {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CallbackContext {
-    /// timeout is the time in the future when the function should return an error if it
+    /// The time in the future when the function should return an error if it
     /// it has not completed.
     pub timeout: Option<Instant>,
     /// version is the version of the function API that the driver is using.
