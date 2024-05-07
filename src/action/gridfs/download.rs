@@ -3,9 +3,12 @@ use bson::{doc, Bson};
 use crate::{
     action::{action_impl, deeplink, option_setters},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
-    gridfs::{FilesCollectionDocument, GridFsDownloadByNameOptions},
-    GridFsBucket,
-    GridFsDownloadStream,
+    gridfs::{
+        FilesCollectionDocument,
+        GridFsBucket,
+        GridFsDownloadByNameOptions,
+        GridFsDownloadStream,
+    },
 };
 
 impl GridFsBucket {

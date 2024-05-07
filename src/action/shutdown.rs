@@ -14,7 +14,7 @@ impl Client {
     /// see [`immediate`](Shutdown::immediate).  For example:
     ///
     /// ```rust
-    /// # use mongodb::{Client, GridFsBucket, error::Result};
+    /// # use mongodb::{Client, error::Result, gridfs::GridFsBucket};
     /// async fn upload_data(bucket: &GridFsBucket) -> Result<()> {
     ///   let stream = bucket.open_upload_stream("test").await?;
     ///    // .. write to the stream ..

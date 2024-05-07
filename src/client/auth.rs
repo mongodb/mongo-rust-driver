@@ -3,7 +3,8 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
-pub(crate) mod oidc;
+/// Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
+pub mod oidc;
 mod plain;
 mod sasl;
 mod scram;
@@ -227,8 +228,8 @@ impl AuthMechanism {
                     .map_or(false, |s| s != "$external")
                 {
                     return Err(Error::invalid_argument(format!(
-                        "source must be $external for {} authentication",
-                        MONGODB_OIDC_STR
+                        "source must be $external for {} authentication, found: {:?}",
+                        MONGODB_OIDC_STR, credential.source
                     )));
                 }
                 if credential.password.is_some() {
@@ -470,15 +471,32 @@ pub struct Credential {
     pub mechanism_properties: Option<Document>,
 
     /// The token callback for OIDC authentication.
-    // TODO RUST-1497: make this `pub`
-    // Credential::builder().oidc_callback(oidc::Callback::human(...)).build()
-    // the name of the field here does not well encompass what this field actually is since
-    // it contains all the OIDC state information, not just the callback, but it conforms
-    // to how a user would interact with it.
+    /// ```
+    /// use mongodb::{error::Error, Client, options::{ClientOptions, oidc::{Callback, CallbackContext, IdpServerResponse}}};
+    /// use std::time::{Duration, Instant};
+    /// use futures::future::FutureExt;
+    /// async fn do_human_flow(c: CallbackContext) -> Result<(String, Option<Instant>, Option<String>), Error> {
+    ///   // Do the human flow here see: https://auth0.com/docs/authenticate/login/oidc-conformant-authentication/oidc-adoption-auth-code-flow
+    ///   Ok(("some_access_token".to_string(), Some(Instant::now() + Duration::from_secs(60 * 60 * 12)), Some("some_refresh_token".to_string())))
+    /// }
+    ///
+    /// async fn setup_client() -> Result<Client, Error> {
+    ///     let mut opts =
+    ///     ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+    ///     opts.credential.as_mut().unwrap().oidc_callback =
+    ///         Callback::human(move |c: CallbackContext| {
+    ///         async move {
+    ///             let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+    ///             Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+    ///         }.boxed()
+    ///     });
+    ///     Client::with_options(opts)
+    /// }
+    /// ```
     #[serde(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
-    pub(crate) oidc_callback: oidc::State,
+    pub oidc_callback: oidc::Callback,
 }
 
 impl Credential {

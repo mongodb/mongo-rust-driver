@@ -1568,12 +1568,19 @@ functions:
           .evergreen/run-plain-tests.sh
 
   "prepare resources":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+        binary: bash
+        args:
+          - .evergreen/fetch-drivers-tools.sh
+
     - command: shell.exec
       params:
         script: |
           ${PREPARE_SHELL}
-          rm -rf $DRIVERS_TOOLS
-          git clone https://github.com/mongodb-labs/drivers-evergreen-tools.git $DRIVERS_TOOLS
           echo "{ \"releases\": { \"default\": \"$MONGODB_BINARIES\" }}" > $MONGO_ORCHESTRATION_HOME/orchestration.config
 
   "install rust":
