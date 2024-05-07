@@ -358,7 +358,7 @@ pub struct CallbackContext {
     pub idp_info: Option<IdpServerInfo>,
 }
 
-/// IdpServerResponse is the return type of the function function. It contains the access token
+/// The return type of the OIDC authentication function. It contains the access token
 /// with optional expiration time and refresh token.
 /// ```
 /// use mongodb::{error::Error, Client, options::{ClientOptions, oidc::{Callback, CallbackContext, IdpServerResponse}}};
