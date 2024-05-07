@@ -9,17 +9,14 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "azure-oidc")]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -226,7 +223,7 @@ struct CallbackInner {
 /// Callback provides an interface for creating human and machine functions that return
 /// access tokens for use in human and machine OIDC flows.
 #[non_exhaustive]
-pub struct Function {
+struct Function {
     inner: Box<FunctionInner>,
     kind: CallbackKind,
 }
@@ -246,7 +243,7 @@ impl std::fmt::Debug for Function {
     }
 }
 
-pub(crate) struct FunctionInner {
+struct FunctionInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
