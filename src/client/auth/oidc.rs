@@ -391,7 +391,7 @@ pub struct IdpServerResponse {
     pub access_token: String,
     /// The time when the access token expires.
     pub expires: Option<Instant>,
-    /// refresh_token is the token that the driver will use to refresh the access token when the
+    /// The token that the driver will use to refresh the access token when the
     /// access_token expires.
     pub refresh_token: Option<String>,
 }
