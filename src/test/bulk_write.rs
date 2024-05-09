@@ -22,6 +22,7 @@ async fn run_unified() {
         .await;
 }
 
+// CRUD prose test 3
 #[tokio::test]
 async fn max_write_batch_size_batching() {
     let client = Client::test_builder().monitor_events().build().await;
@@ -60,6 +61,7 @@ async fn max_write_batch_size_batching() {
     assert_eq!(second_len, 1);
 }
 
+// CRUD prose test 4
 #[tokio::test]
 async fn max_message_size_bytes_batching() {
     let client = Client::test_builder().monitor_events().build().await;
@@ -101,6 +103,7 @@ async fn max_message_size_bytes_batching() {
     assert_eq!(second_len, 1);
 }
 
+// CRUD prose test 5
 #[tokio::test(flavor = "multi_thread")]
 async fn write_concern_error_batches() {
     let mut options = get_client_options().await.clone();
@@ -150,6 +153,7 @@ async fn write_concern_error_batches() {
     assert_eq!(command_started_events.len(), 2);
 }
 
+// CRUD prose test 6
 #[tokio::test]
 async fn write_error_batches() {
     let mut client = Client::test_builder().monitor_events().build().await;
@@ -206,6 +210,7 @@ async fn write_error_batches() {
     assert_eq!(command_started_events.len(), 1);
 }
 
+// CRUD prose test 7
 #[tokio::test]
 async fn successful_cursor_iteration() {
     let client = Client::test_builder().monitor_events().build().await;
@@ -253,6 +258,62 @@ async fn successful_cursor_iteration() {
     assert_eq!(command_started_events.len(), 1);
 }
 
+// CRUD prose test 8
+#[tokio::test]
+async fn cursor_iteration_in_a_transaction() {
+    let client = Client::test_builder().monitor_events().build().await;
+
+    if client.server_version_lt(8, 0) || client.is_standalone() {
+        log_uncaptured(
+            "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
+             require a non-standalone topology",
+        );
+        return;
+    }
+
+    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+
+    let collection = client.database("db").collection::<Document>("coll");
+    collection.drop().await.unwrap();
+
+    let mut session = client.start_session().await.unwrap();
+    session.start_transaction().await.unwrap();
+
+    let models = vec![
+        WriteModel::UpdateOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+        WriteModel::UpdateOne {
+            namespace: collection.namespace(),
+            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
+            update: doc! { "$set": { "x": 1 } }.into(),
+            array_filters: None,
+            collation: None,
+            hint: None,
+            upsert: Some(true),
+        },
+    ];
+
+    let result = client
+        .bulk_write(models)
+        .verbose_results(true)
+        .session(&mut session)
+        .await
+        .unwrap();
+    assert_eq!(result.upserted_count, 2);
+    assert_eq!(result.update_results.unwrap().len(), 2);
+
+    let command_started_events = client.events.get_command_started_events(&["getMore"]);
+    assert_eq!(command_started_events.len(), 1);
+}
+
+// CRUD prose test 9
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
@@ -330,60 +391,9 @@ async fn failed_cursor_iteration() {
     assert_eq!(kill_cursors_events.len(), 1);
 }
 
-#[tokio::test]
-async fn cursor_iteration_in_a_transaction() {
-    let client = Client::test_builder().monitor_events().build().await;
+// CRUD prose test 10 not implemented. The driver does not support unacknowledged writes.
 
-    if client.server_version_lt(8, 0) || client.is_standalone() {
-        log_uncaptured(
-            "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
-             require a non-standalone topology",
-        );
-        return;
-    }
-
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
-
-    let collection = client.database("db").collection::<Document>("coll");
-    collection.drop().await.unwrap();
-
-    let mut session = client.start_session().await.unwrap();
-    session.start_transaction().await.unwrap();
-
-    let models = vec![
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
-    ];
-
-    let result = client
-        .bulk_write(models)
-        .verbose_results(true)
-        .session(&mut session)
-        .await
-        .unwrap();
-    assert_eq!(result.upserted_count, 2);
-    assert_eq!(result.update_results.unwrap().len(), 2);
-
-    let command_started_events = client.events.get_command_started_events(&["getMore"]);
-    assert_eq!(command_started_events.len(), 1);
-}
-
+// CRUD prose test 11
 #[tokio::test]
 async fn namespace_batch_splitting() {
     let first_namespace = Namespace::new("db", "coll");
@@ -487,6 +497,7 @@ async fn namespace_batch_splitting() {
     assert_eq!(actual_second_namespace, &second_namespace.to_string());
 }
 
+// CRUD prose test 12
 #[tokio::test]
 async fn too_large_client_error() {
     let client = Client::test_builder().monitor_events().build().await;
@@ -497,6 +508,7 @@ async fn too_large_client_error() {
         return;
     }
 
+    // Case 1: document too large
     let model = WriteModel::InsertOne {
         namespace: Namespace::new("db", "coll"),
         document: doc! { "a": "b".repeat(max_message_size_bytes) },
@@ -504,8 +516,18 @@ async fn too_large_client_error() {
 
     let error = client.bulk_write(vec![model]).await.unwrap_err();
     assert!(!error.is_server_error());
+
+    // Case 2: namespace too large
+    let model = WriteModel::InsertOne {
+        namespace: Namespace::new("db", "c".repeat(max_message_size_bytes)),
+        document: doc! { "a": "b" },
+    };
+
+    let error = client.bulk_write(vec![model]).await.unwrap_err();
+    assert!(!error.is_server_error());
 }
 
+// CRUD prose test 13
 #[cfg(feature = "in-use-encryption-unstable")]
 #[tokio::test]
 async fn encryption_error() {

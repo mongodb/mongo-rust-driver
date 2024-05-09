@@ -29,6 +29,20 @@ pub struct BulkWrite<'a> {
 }
 
 impl<'a> BulkWrite<'a> {
+    option_setters!(options: BulkWriteOptions;
+        ordered: bool,
+        bypass_document_validation: bool,
+        comment: Bson,
+        let_vars: Document,
+        verbose_results: bool,
+        write_concern: WriteConcern,
+    );
+
+    pub fn session(mut self, session: &'a mut ClientSession) -> BulkWrite<'a> {
+        self.session = Some(session);
+        self
+    }
+
     fn new(client: &'a Client, models: Vec<WriteModel>) -> Self {
         Self {
             client,
@@ -43,22 +57,6 @@ impl<'a> BulkWrite<'a> {
             .as_ref()
             .and_then(|options| options.ordered)
             .unwrap_or(true)
-    }
-}
-
-impl<'a> BulkWrite<'a> {
-    option_setters!(options: BulkWriteOptions;
-        ordered: bool,
-        bypass_document_validation: bool,
-        comment: Bson,
-        let_vars: Document,
-        verbose_results: bool,
-        write_concern: WriteConcern,
-    );
-
-    pub fn session(mut self, session: &'a mut ClientSession) -> BulkWrite<'a> {
-        self.session = Some(session);
-        self
     }
 }
 

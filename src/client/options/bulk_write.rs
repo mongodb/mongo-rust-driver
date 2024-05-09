@@ -113,7 +113,6 @@ pub enum WriteModel {
         filter: Document,
         #[serde(rename = "updateMods")]
         replacement: Document,
-        array_filters: Option<Array>,
         collation: Option<Document>,
         hint: Option<Bson>,
         upsert: Option<bool>,

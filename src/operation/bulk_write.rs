@@ -141,8 +141,8 @@ impl<'a> BulkWrite<'a> {
 /// A helper struct for tracking namespace information.
 struct NamespaceInfo<'a> {
     namespaces: Vec<RawDocumentBuf>,
-    /// Cache the namespaces and their indexes to avoid traversing the namespaces array each time a
-    /// namespace is looked up or added.
+    // Cache the namespaces and their indexes to avoid traversing the namespaces array each time a
+    // namespace is looked up or added.
     cache: HashMap<&'a Namespace, usize>,
 }
 
@@ -179,7 +179,6 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
     const NAME: &'static str = "bulkWrite";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
-        let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
         let max_message_size: usize =
             Checked::new(description.max_message_size_bytes).try_into()?;
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
@@ -191,12 +190,14 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
         }?;
         bson_util::extend_raw_document_buf(&mut command_body, options)?;
 
-        let max_document_sequences_size =
-            max_message_size - OP_MSG_OVERHEAD_BYTES - command_body.as_bytes().len();
+        let max_document_sequences_size: usize = (Checked::new(max_message_size)
+            - OP_MSG_OVERHEAD_BYTES
+            - command_body.as_bytes().len())
+        .try_into()?;
 
         let mut namespace_info = NamespaceInfo::new();
         let mut ops = Vec::new();
-        let mut current_size = 0;
+        let mut current_size = Checked::new(0);
         for (i, model) in self.models.iter().take(max_operations).enumerate() {
             let (namespace_index, namespace_size) = namespace_info.get_index(model.namespace());
 
@@ -206,18 +207,9 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
             extend_raw_document_buf(&mut operation, model_doc)?;
 
             let operation_size = operation.as_bytes().len();
-            if operation_size > max_doc_size {
-                return Err(ErrorKind::InvalidArgument {
-                    message: format!(
-                        "bulk write operations must be within {} bytes, but document provided is \
-                         {} bytes",
-                        max_doc_size, operation_size
-                    ),
-                }
-                .into());
-            }
 
-            if current_size + namespace_size + operation_size > max_document_sequences_size {
+            current_size += namespace_size + operation_size;
+            if current_size.get()? > max_document_sequences_size {
                 // Remove the namespace doc from the list if one was added for this operation.
                 if namespace_size > 0 {
                     let last_index = namespace_info.namespaces.len() - 1;
@@ -229,8 +221,17 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
             if let Some(inserted_id) = inserted_id {
                 self.inserted_ids.insert(i, inserted_id);
             }
-            current_size += namespace_size + operation_size;
             ops.push(operation);
+        }
+
+        if ops.is_empty() {
+            return Err(ErrorKind::InvalidArgument {
+                message: format!(
+                    "operation at index {} exceeds the maximum message size ({} bytes)",
+                    self.offset, max_message_size
+                ),
+            }
+            .into());
         }
 
         self.n_attempted = ops.len();

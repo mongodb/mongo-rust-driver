@@ -189,16 +189,12 @@ async fn connection_error_during_establishment() {
         return;
     }
 
-    let _guard = client
-        .enable_fail_point(
-            FailPoint::fail_command(
-                &[LEGACY_HELLO_COMMAND_NAME, "hello"],
-                FailPointMode::Times(10),
-            )
-            .error_code(1234),
-        )
-        .await
-        .unwrap();
+    let fail_point = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(10),
+    )
+    .error_code(1234);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let buffer = EventBuffer::<CmapEvent>::new();
     #[allow(deprecated)]
@@ -248,12 +244,9 @@ async fn connection_error_during_operation() {
         return;
     }
 
-    let _guard = client
-        .enable_fail_point(
-            FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true),
-        )
-        .await
-        .unwrap();
+    let fail_point =
+        FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();

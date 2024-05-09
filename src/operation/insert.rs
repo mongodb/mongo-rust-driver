@@ -69,11 +69,13 @@ impl<'a> OperationWithDefaults for Insert<'a> {
         let options = bson::to_raw_document_buf(&self.options)?;
         extend_raw_document_buf(&mut command_body, options)?;
 
-        let max_document_sequence_size =
-            max_message_size - OP_MSG_OVERHEAD_BYTES - command_body.as_bytes().len();
+        let max_document_sequence_size: usize = (Checked::new(max_message_size)
+            - OP_MSG_OVERHEAD_BYTES
+            - command_body.as_bytes().len())
+        .try_into()?;
 
         let mut docs = Vec::new();
-        let mut current_size = 0;
+        let mut current_size = Checked::new(0);
         for (i, document) in self.documents.iter().take(max_operations).enumerate() {
             let mut document = bson::to_raw_document_buf(document)?;
             let id = get_or_prepend_id_field(&mut document)?;
@@ -93,18 +95,21 @@ impl<'a> OperationWithDefaults for Insert<'a> {
             // From the spec: Drivers MUST not reduce the size limits for a single write before
             // automatic encryption. I.e. if a single document has size larger than 2MiB (but less
             // than `maxBsonObjectSize`) proceed with automatic encryption.
-            if self.encrypted && i != 0 {
+            if self.encrypted {
                 let doc_entry_size = array_entry_size_bytes(i, document.as_bytes().len())?;
-                if current_size + doc_entry_size >= MAX_ENCRYPTED_WRITE_SIZE {
+                current_size += doc_entry_size;
+                if i != 0 && current_size.get()? >= MAX_ENCRYPTED_WRITE_SIZE {
                     break;
                 }
-            } else if current_size + doc_size > max_document_sequence_size {
-                break;
+            } else {
+                current_size += doc_size;
+                if current_size.get()? > max_document_sequence_size {
+                    break;
+                }
             }
 
             self.inserted_ids.push(id);
             docs.push(document);
-            current_size += doc_size;
         }
 
         let mut body = rawdoc! {
