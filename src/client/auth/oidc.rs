@@ -214,14 +214,14 @@ impl Callback {
 
     /// Create gcp callback.
     #[cfg(feature = "gcp-oidc")]
-    fn gcp_callback(resource: &str) -> StateInner {
+    fn gcp_callback(resource: &str) -> CallbackInner {
         use futures_util::FutureExt;
         let url = format!(
             "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={}",
             resource
         );
-        StateInner {
-            callback: Self::new(
+        CallbackInner {
+            function: Self::new_function(
                 move |_| {
                     let url = url.clone();
                     async move {
