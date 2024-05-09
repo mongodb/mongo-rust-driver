@@ -1268,7 +1268,8 @@ mod gcp {
     async fn machine_5_4_gcp_with_no_username() -> anyhow::Result<()> {
         get_env_or_skip!("OIDC");
 
-        let opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        opts.credential.as_mut().unwrap().source = None;
         let client = Client::with_options(opts)?;
         client
             .database("test")
@@ -1284,6 +1285,7 @@ mod gcp {
         use crate::client::auth::{ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR};
 
         let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        opts.credential.as_mut().unwrap().source = None;
         opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
             ENVIRONMENT_PROP_STR: GCP_ENVIRONMENT_VALUE_STR,
         });
