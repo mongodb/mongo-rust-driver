@@ -36,7 +36,7 @@ elif [ $OIDC_ENV == "azure" ]; then
 elif [ $OIDC_ENV == "gcp" ]; then
     source ./secrets-export.sh
 
-    ./target/debug/deps/mongodb-*  test::spec::oidc::gcp --nocapture
+    ./target/x86_64-unknown-linux-gnu/debug/deps/mongodb-* test::spec::oidc::gcp --nocapture
     RESULT=$?
 else
     echo "Unrecognized OIDC_ENV $OIDC_ENV"

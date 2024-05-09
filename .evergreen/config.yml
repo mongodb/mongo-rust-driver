@@ -1374,17 +1374,20 @@ tasks:
           source .cargo/env
           # git add .
           # git commit -m "add files"
-          export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tgz
+          export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
           # git archive -o $GCPOIDC_DRIVERS_TAR_FILE HEAD
           rustup default stable
-          cargo test test::spec::oidc::gcp --features gcp-oidc --no-run
-          rm ../target/debug/deps/*.d
-          tar -czf $GCPOIDC_DRIVERS_TAR_FILE ../target/debug/deps/mongodb-*
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          cargo test test::spec::oidc::gcp --features gcp-oidc --no-run --target x86_64-unknown-linux-gnu
+          rm ./target/x86_64-unknown-linux-gnu/debug/deps/*.d
+          tar -cf $GCPOIDC_DRIVERS_TAR_FILE ./target/x86_64-unknown-linux-gnu/debug/deps/mongodb-*
+          tar -uf $GCPOIDC_DRIVERS_TAR_FILE ./.evergreen
+          gzip $GCPOIDC_DRIVERS_TAR_FILE
+          export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar.gz
           # Define the command to run on the gcp VM.
           # Ensure that we source the environment file created for us, set up any other variables we need,
           # and then run our test suite on the vm.
-          export GCPOIDC_TEST_CMD="ls -la . \
-                                   && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc ./src/.evergreen/run-mongodb-oidc-test.sh"
+          export GCPOIDC_TEST_CMD="ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc ./.evergreen/run-mongodb-oidc-test.sh"
           bash $DRIVERS_TOOLS/.evergreen/auth_oidc/gcp/run-driver-test.sh
 
 #############
