@@ -26,13 +26,10 @@ if [ $OIDC_ENV == "test" ]; then
     RESULT=$?
     cp target/nextest/ci/junit.xml results.xml
 elif [ $OIDC_ENV == "azure" ]; then
-    source .evergreen/env.sh
-    source .evergreen/cargo-test.sh
     source ./env.sh
 
-    cargo nextest run test::spec::oidc::azure --no-capture --profile ci --features=azure-oidc
+    ./target/x86_64-unknown-linux-gnu/debug/deps/mongodb-* test::spec::oidc::azure --nocapture
     RESULT=$?
-    cp target/nextest/ci/junit.xml results.xml
 elif [ $OIDC_ENV == "gcp" ]; then
     source ./secrets-export.sh
 

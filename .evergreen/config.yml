@@ -1349,17 +1349,24 @@ tasks:
         script: |-
           set -o errexit
           ${PREPARE_SHELL}
-          git add .
-          git commit -m "add files"
-          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tgz
-          git archive -o $AZUREOIDC_DRIVERS_TAR_FILE HEAD
+           ./.evergreen/install-dependencies.sh rust
+          source .cargo/env
+          # git add .
+          # git commit -m "add files"
+          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
+          # git archive -o $AZUREOIDC_DRIVERS_TAR_FILE HEAD
+          rustup default stable
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          cargo test test::spec::oidc::azure --features azure-oidc --no-run --target x86_64-unknown-linux-gnu
+          rm ./target/x86_64-unknown-linux-gnu/debug/deps/*.d
+          tar -cf $AZUREOIDC_DRIVERS_TAR_FILE ./target/x86_64-unknown-linux-gnu/debug/deps/mongodb-*
+          tar -uf $AZUREOIDC_DRIVERS_TAR_FILE ./.evergreen
+          gzip $AZUREOIDC_DRIVERS_TAR_FILE
+          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar.gz
           # Define the command to run on the azure VM.
           # Ensure that we source the environment file created for us, set up any other variables we need,
           # and then run our test suite on the vm.
-          export AZUREOIDC_TEST_CMD="PROJECT_DIRECTORY='.' ./.evergreen/install-dependencies.sh rust\
-                                     && PROJECT_DIRECTORY='.' .evergreen/install-dependencies.sh junit-dependencies\
-                                     && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc  ./.evergreen/run-mongodb-oidc-test.sh"
-          bash $DRIVERS_TOOLS/.evergreen/auth_oidc/azure/run-driver-test.sh
+          export AZUREOIDC_TEST_CMD="PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc ./.evergreen/run-mongodb-oidc-test.sh"
 
   - name: "oidc-auth-test-gcp-latest"
     commands:
