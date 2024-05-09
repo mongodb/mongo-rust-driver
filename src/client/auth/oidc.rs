@@ -9,14 +9,17 @@ use typed_builder::TypedBuilder;
 
 #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
 use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR,
+    AZURE_ENVIRONMENT_VALUE_STR,
+    ENVIRONMENT_PROP_STR,
+    GCP_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
-            AuthMechanism, ALLOWED_HOSTS_PROP_STR,
+            AuthMechanism,
+            ALLOWED_HOSTS_PROP_STR,
         },
         options::{ServerAddress, ServerApi},
     },
