@@ -229,7 +229,7 @@ impl Callback {
                         let response = crate::runtime::HttpClient::default()
                             .get(&url)
                             .headers(&[("Metadata-Flavor", "Google")])
-                            .send::<String>()
+                            .send_and_get_string()
                             .await
                             .map_err(|e| {
                                 Error::authentication_error(
