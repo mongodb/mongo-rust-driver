@@ -1351,10 +1351,7 @@ tasks:
           ${PREPARE_SHELL}
            ./.evergreen/install-dependencies.sh rust
           source .cargo/env
-          # git add .
-          # git commit -m "add files"
           export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
-          # git archive -o $AZUREOIDC_DRIVERS_TAR_FILE HEAD
           rustup default stable
           export RUSTFLAGS="-C target-feature=+crt-static"
           cargo test test::spec::oidc::azure --features azure-oidc --no-run --target x86_64-unknown-linux-gnu
@@ -1379,10 +1376,7 @@ tasks:
           ${PREPARE_SHELL}
           ./.evergreen/install-dependencies.sh rust
           source .cargo/env
-          # git add .
-          # git commit -m "add files"
           export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
-          # git archive -o $GCPOIDC_DRIVERS_TAR_FILE HEAD
           rustup default stable
           export RUSTFLAGS="-C target-feature=+crt-static"
           cargo test test::spec::oidc::gcp --features gcp-oidc --no-run --target x86_64-unknown-linux-gnu
