@@ -35,7 +35,7 @@ post:
   - func: "cleanup"
 
 # Cause a timeout if a task does not complete within 150 minutes. TODO RUST-1721: reduce this.
-exec_timeout_secs: 21600
+exec_timeout_secs: 9000
 # What to do if the timeout is hit. Post-task functions will still run.
 timeout:
   - command: shell.exec
