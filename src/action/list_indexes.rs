@@ -102,12 +102,12 @@ impl<'a, Mode> ListIndexes<'a, Mode, ImplicitSession> {
     /// Use the provided session when running the operation.
     pub fn session(
         self,
-        value: impl Into<&'a mut ClientSession>,
+        value: &'a mut ClientSession,
     ) -> ListIndexes<'a, Mode, ExplicitSession<'a>> {
         ListIndexes {
             coll: self.coll,
             options: self.options,
-            session: ExplicitSession(value.into()),
+            session: ExplicitSession(value),
             _mode: PhantomData,
         }
     }

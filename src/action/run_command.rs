@@ -90,8 +90,8 @@ impl<'a> RunCommand<'a> {
     );
 
     /// Run the command using the provided [`ClientSession`].
-    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
-        self.session = Some(value.into());
+    pub fn session(mut self, value: &'a mut ClientSession) -> Self {
+        self.session = Some(value);
         self
     }
 }
@@ -163,13 +163,13 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
     /// Run the command using the provided [`ClientSession`].
     pub fn session(
         self,
-        value: impl Into<&'a mut ClientSession>,
+        value: &'a mut ClientSession,
     ) -> RunCursorCommand<'a, ExplicitSession<'a>> {
         RunCursorCommand {
             db: self.db,
             command: self.command,
             options: self.options,
-            session: ExplicitSession(value.into()),
+            session: ExplicitSession(value),
         }
     }
 }

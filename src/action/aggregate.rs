@@ -123,13 +123,13 @@ impl<'a> Aggregate<'a, ImplicitSession> {
     /// Use the provided session when running the operation.
     pub fn session(
         self,
-        value: impl Into<&'a mut ClientSession>,
+        value: &'a mut ClientSession,
     ) -> Aggregate<'a, ExplicitSession<'a>> {
         Aggregate {
             target: self.target,
             pipeline: self.pipeline,
             options: self.options,
-            session: ExplicitSession(value.into()),
+            session: ExplicitSession(value),
         }
     }
 }

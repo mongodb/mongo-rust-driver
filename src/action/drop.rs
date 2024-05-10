@@ -51,8 +51,8 @@ impl<'a> DropDatabase<'a> {
     );
 
     /// Runs the drop using the provided session.
-    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
-        self.session = Some(value.into());
+    pub fn session(mut self, value: &'a mut ClientSession) -> Self {
+        self.session = Some(value);
         self
     }
 }
@@ -116,8 +116,8 @@ impl<'a> DropCollection<'a> {
     );
 
     /// Runs the drop using the provided session.
-    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
-        self.session = Some(value.into());
+    pub fn session(mut self, value: &'a mut ClientSession) -> Self {
+        self.session = Some(value);
         self
     }
 }

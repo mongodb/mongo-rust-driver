@@ -95,13 +95,13 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     /// Use the provided session when running the operation.
     pub fn session<'s>(
         self,
-        value: impl Into<&'s mut ClientSession>,
+        value: &'s mut ClientSession,
     ) -> ListCollections<'a, M, ExplicitSession<'s>> {
         ListCollections {
             db: self.db,
             options: self.options,
             mode: PhantomData,
-            session: ExplicitSession(value.into()),
+            session: ExplicitSession(value),
         }
     }
 }

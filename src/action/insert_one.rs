@@ -74,8 +74,8 @@ impl<'a> InsertOne<'a> {
     }
 
     /// Use the provided session when running the operation.
-    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
-        self.session = Some(value.into());
+    pub fn session(mut self, value: &'a mut ClientSession) -> Self {
+        self.session = Some(value);
         self
     }
 }
