@@ -393,6 +393,13 @@ async fn aggregate_with_generics() {
     let client = TestClient::new().await;
     let database = client.database("aggregate_with_generics");
 
+    if client.server_version_lt(5, 1) {
+        log_uncaptured(
+            "skipping aggregate_with_generics: $documents agg stage only available on 5.1+",
+        );
+        return;
+    }
+
     // The cursor returned will contain these documents
     let basic_pipeline = vec![doc! { "$documents": [ { "str": "hi" } ] }];
 
