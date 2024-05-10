@@ -279,7 +279,7 @@ impl Cache {
             self.idp_server_info = idp_server_info;
         }
         self.access_token = Some(response.access_token.clone());
-        self.refresh_token.clone_from(&response.refresh_token);
+        self.refresh_token = response.refresh_token.clone();
         self.last_call_time = Instant::now();
         self.token_gen_id += 1;
     }

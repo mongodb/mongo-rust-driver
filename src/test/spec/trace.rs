@@ -49,27 +49,27 @@ fn tracing_truncation() {
     assert_eq!(s, String::from("..."));
 
     // we should "round up" to the end of the first emoji
-    s.clone_from(&two_emoji);
+    s = two_emoji.clone();
     truncate_on_char_boundary(&mut s, 1);
     assert_eq!(s, String::from("🤔..."));
 
     // 4 is a boundary, so we should truncate there
-    s.clone_from(&two_emoji);
+    s = two_emoji.clone();
     truncate_on_char_boundary(&mut s, 4);
     assert_eq!(s, String::from("🤔..."));
 
     // we should round up to the full string
-    s.clone_from(&two_emoji);
+    s = two_emoji.clone();
     truncate_on_char_boundary(&mut s, 5);
     assert_eq!(s, two_emoji);
 
     // end of string is a boundary, so we should truncate there
-    s.clone_from(&two_emoji);
+    s = two_emoji.clone();
     truncate_on_char_boundary(&mut s, 8);
     assert_eq!(s, two_emoji);
 
     // we should get the full string back if the new length is longer than the original
-    s.clone_from(&two_emoji);
+    s = two_emoji.clone();
     truncate_on_char_boundary(&mut s, 10);
     assert_eq!(s, two_emoji);
 }

@@ -135,9 +135,7 @@ async fn run_test(mut test_file: TestFile) {
     } else {
         let mut options_with_tls = options.clone();
         if requires_tls {
-            options_with_tls
-                .tls
-                .clone_from(&get_client_options().await.tls);
+            options_with_tls.tls = get_client_options().await.tls.clone();
         }
 
         let client = Client::with_options(options_with_tls).unwrap();

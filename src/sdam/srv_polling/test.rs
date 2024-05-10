@@ -43,7 +43,7 @@ async fn run_test_extra(
     new_hosts: Result<Vec<ServerAddress>>,
 ) -> HashSet<ServerAddress> {
     let mut options = ClientOptions::new_srv();
-    options.hosts.clone_from(&DEFAULT_HOSTS);
+    options.hosts = DEFAULT_HOSTS.clone();
     options.test_options_mut().disable_monitoring_threads = true;
     options.srv_max_hosts = max_hosts;
     let mut topology = Topology::new(options.clone()).unwrap();
@@ -132,7 +132,7 @@ async fn load_balanced_no_srv_polling() {
     let hosts = vec![localhost_test_build_10gen(27017)];
     let mut options = ClientOptions::new_srv();
     let rescan_interval = options.original_srv_info.as_ref().cloned().unwrap().min_ttl;
-    options.hosts.clone_from(&hosts);
+    options.hosts = hosts.clone();
     options.load_balanced = Some(true);
     options.test_options_mut().mock_lookup_hosts = Some(make_lookup_hosts(vec![
         localhost_test_build_10gen(27017),

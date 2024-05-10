@@ -500,7 +500,7 @@ impl ExpectError {
         let description = description.as_ref();
 
         if let Some(is_client_error) = self.is_client_error {
-            if is_client_error == error.is_server_error() {
+            if is_client_error != !error.is_server_error() {
                 return Err(format!(
                     "{}: expected client error but got {:?}",
                     description, error
