@@ -138,9 +138,8 @@ async fn retry_read_pool_cleared() {
         .expect("pool clear should occur");
 
     let next_cmap_events = subscriber
-        .collect_events(Duration::from_millis(1000), |event| match event {
-            Event::Cmap(_) => true,
-            _ => false,
+        .collect_events(Duration::from_millis(1000), |event| {
+            matches!(event, Event::Cmap(_))
         })
         .await;
 

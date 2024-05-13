@@ -21,7 +21,7 @@ impl Action for ParseConnectionString {
         let mut options = ClientOptions::from_connection_string(conn_str);
         #[cfg(feature = "dns-resolver")]
         {
-            options.resolver_config = self.resolver_config.clone();
+            options.resolver_config.clone_from(&self.resolver_config);
         }
 
         let resolved = host_info.resolve(self.resolver_config).await?;

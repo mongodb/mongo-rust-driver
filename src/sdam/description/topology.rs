@@ -175,7 +175,7 @@ impl TopologyDescription {
         }
 
         self.single_seed = self.servers.len() == 1;
-        self.set_name = options.repl_set_name.clone();
+        self.set_name.clone_from(&options.repl_set_name);
         self.local_threshold = options.local_threshold;
         self.heartbeat_freq = options.heartbeat_freq;
         self.srv_max_hosts = options.srv_max_hosts;
