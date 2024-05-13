@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use bson::Document;
 
@@ -24,8 +24,9 @@ impl Database {
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// `await` will return d[`Result<Cursor<Document>>`] or d[`Result<SessionCursor<Document>>`] if
-    /// a `ClientSession` is provided.
+    /// `await` will return d[`Result<Cursor<Document>>`]. If a [`ClientSession`] was provided, the
+    /// returned cursor will be a [`SessionCursor`]. If [`with_type`](Aggregate::with_type) was
+    /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
@@ -33,6 +34,7 @@ impl Database {
             pipeline: pipeline.into_iter().collect(),
             options: None,
             session: ImplicitSession,
+            _phantom: PhantomData,
         }
     }
 }
@@ -46,8 +48,9 @@ where
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// `await` will return d[`Result<Cursor<Document>>`] or d[`Result<SessionCursor<Document>>`] if
-    /// a [`ClientSession`] is provided.
+    /// `await` will return d[`Result<Cursor<Document>>`]. If a [`ClientSession`] was provided, the
+    /// returned cursor will be a [`SessionCursor`]. If [`with_type`](Aggregate::with_type) was
+    /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
@@ -55,6 +58,7 @@ where
             pipeline: pipeline.into_iter().collect(),
             options: None,
             session: ImplicitSession,
+            _phantom: PhantomData,
         }
     }
 }
@@ -66,8 +70,10 @@ impl crate::sync::Database {
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
-    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    /// [`run`](Aggregate::run) will return d[Result<crate::sync::Cursor<Document>>`]. If a
+    /// [`crate::sync::ClientSession`] was provided, the returned cursor will be a
+    /// [`crate::sync::SessionCursor`]. If [`with_type`](Aggregate::with_type) was called, the
+    /// returned cursor will be generic over the `T` specified.
     #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
@@ -84,8 +90,10 @@ where
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`] or
-    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a `ClientSession` is provided.
+    /// [`run`](Aggregate::run) will return d[Result<crate::sync::Cursor<Document>>`]. If a
+    /// `crate::sync::ClientSession` was provided, the returned cursor will be a
+    /// `crate::sync::SessionCursor`. If [`with_type`](Aggregate::with_type) was called, the
+    /// returned cursor will be generic over the `T` specified.
     #[deeplink]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_collection.aggregate(pipeline)
@@ -95,14 +103,15 @@ where
 /// Run an aggregation operation.  Construct with [`Database::aggregate`] or
 /// [`Collection::aggregate`].
 #[must_use]
-pub struct Aggregate<'a, Session = ImplicitSession> {
+pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     target: AggregateTargetRef<'a>,
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
     session: Session,
+    _phantom: PhantomData<T>,
 }
 
-impl<'a, Session> Aggregate<'a, Session> {
+impl<'a, Session, T> Aggregate<'a, Session, T> {
     option_setters!(options: AggregateOptions;
         allow_disk_use: bool,
         batch_size: u32,
@@ -130,15 +139,50 @@ impl<'a> Aggregate<'a, ImplicitSession> {
             pipeline: self.pipeline,
             options: self.options,
             session: ExplicitSession(value.into()),
+            _phantom: PhantomData,
         }
     }
 }
 
-#[action_impl(sync = crate::sync::Cursor<Document>)]
-impl<'a> Action for Aggregate<'a, ImplicitSession> {
+impl<'a, Session> Aggregate<'a, Session, Document> {
+    /// Use the provided type for the returned cursor.
+    ///
+    /// ```rust
+    /// # use futures_util::TryStreamExt;
+    /// # use mongodb::{bson::Document, error::Result, Cursor, Database};
+    /// # use serde::Deserialize;
+    /// # async fn run() -> Result<()> {
+    /// # let database: Database = todo!();
+    /// # let pipeline: Vec<Document> = todo!();
+    /// #[derive(Deserialize)]
+    /// struct PipelineOutput {
+    ///     len: usize,
+    /// }
+    ///
+    /// let aggregate_cursor = database
+    ///     .aggregate(pipeline)
+    ///     .with_type::<PipelineOutput>()
+    ///     .await?;
+    /// let aggregate_results: Vec<PipelineOutput> = aggregate_cursor.try_collect().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_type<T>(self) -> Aggregate<'a, Session, T> {
+        Aggregate {
+            target: self.target,
+            pipeline: self.pipeline,
+            options: self.options,
+            session: self.session,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+#[action_impl(sync = crate::sync::Cursor<T>)]
+impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     type Future = AggregateFuture;
 
-    async fn execute(mut self) -> Result<Cursor<Document>> {
+    async fn execute(mut self) -> Result<Cursor<T>> {
         resolve_options!(
             self.target,
             self.options,
