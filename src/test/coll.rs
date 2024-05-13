@@ -1320,8 +1320,6 @@ async fn aggregate_with_generics() {
         len: i32,
     }
 
-    fn assert_document_cursor(_: Cursor<Document>) {}
-
     let client = TestClient::new().await;
     let collection = client
         .database("aggregate_with_generics")
@@ -1335,8 +1333,7 @@ async fn aggregate_with_generics() {
 
     // Assert at compile-time that the default cursor returned is a Cursor<Document>
     let basic_pipeline = vec![doc! { "$match": { "a": 1 } }];
-    let cursor = collection.aggregate(basic_pipeline.clone()).await.unwrap();
-    assert_document_cursor(cursor);
+    let _: Cursor<Document> = collection.aggregate(basic_pipeline).await.unwrap();
 
     // Assert that data is properly deserialized when using with_type
     let project_pipeline = vec![doc! { "$project": {
