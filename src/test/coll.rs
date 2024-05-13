@@ -27,6 +27,7 @@ use crate::{
     results::DeleteResult,
     test::{get_client_options, log_uncaptured, util::TestClient, EventClient},
     Collection,
+    Cursor,
     IndexModel,
 };
 
@@ -1305,4 +1306,46 @@ async fn insert_many_document_sequences() {
         .expect("did not observe command started event for insert");
     let second_batch_len = second_event.command.get_array("documents").unwrap().len();
     assert_eq!(first_batch_len + second_batch_len, total_docs);
+}
+
+#[tokio::test]
+async fn aggregate_with_generics() {
+    #[derive(Serialize)]
+    struct A {
+        str: String,
+    }
+
+    #[derive(Deserialize)]
+    struct B {
+        len: i32,
+    }
+
+    let client = TestClient::new().await;
+    let collection = client
+        .database("aggregate_with_generics")
+        .collection::<A>("aggregate_with_generics");
+
+    let a = A {
+        str: "hi".to_string(),
+    };
+    let len = a.str.len();
+    collection.insert_one(&a).await.unwrap();
+
+    // Assert at compile-time that the default cursor returned is a Cursor<Document>
+    let basic_pipeline = vec![doc! { "$match": { "a": 1 } }];
+    let _: Cursor<Document> = collection.aggregate(basic_pipeline).await.unwrap();
+
+    // Assert that data is properly deserialized when using with_type
+    let project_pipeline = vec![doc! { "$project": {
+            "str": 1,
+            "len": { "$strLenBytes": "$str" }
+        }
+    }];
+    let cursor = collection
+        .aggregate(project_pipeline)
+        .with_type::<B>()
+        .await
+        .unwrap();
+    let lens: Vec<B> = cursor.try_collect().await.unwrap();
+    assert_eq!(lens[0].len as usize, len);
 }
