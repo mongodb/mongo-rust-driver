@@ -1,11 +1,9 @@
-use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse},
     error::Result,
-    BoxFuture,
     Namespace,
     SearchIndexModel,
 };
@@ -44,29 +42,26 @@ impl OperationWithDefaults for CreateSearchIndexes {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            #[derive(Debug, Deserialize)]
-            #[serde(rename_all = "camelCase")]
-            struct Response {
-                indexes_created: Vec<CreatedIndex>,
-            }
-
-            #[derive(Debug, Deserialize)]
-            struct CreatedIndex {
-                #[allow(unused)]
-                id: String,
-                name: String,
-            }
-
-            let response: Response = response.body()?;
-            Ok(response
-                .indexes_created
-                .into_iter()
-                .map(|ci| ci.name)
-                .collect())
+    ) -> Result<Self::O> {
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Response {
+            indexes_created: Vec<CreatedIndex>,
         }
-        .boxed()
+
+        #[derive(Debug, Deserialize)]
+        struct CreatedIndex {
+            #[allow(unused)]
+            id: String,
+            name: String,
+        }
+
+        let response: Response = response.body()?;
+        Ok(response
+            .indexes_created
+            .into_iter()
+            .map(|ci| ci.name)
+            .collect())
     }
 
     fn supports_sessions(&self) -> bool {
@@ -119,8 +114,8 @@ impl OperationWithDefaults for UpdateSearchIndex {
         &'a self,
         _response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(()) }.boxed()
+    ) -> Result<Self::O> {
+        Ok(())
     }
 
     fn supports_sessions(&self) -> bool {
@@ -167,8 +162,8 @@ impl OperationWithDefaults for DropSearchIndex {
         &'a self,
         _response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(()) }.boxed()
+    ) -> Result<Self::O> {
+        Ok(())
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

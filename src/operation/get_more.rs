@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, time::Duration};
 
-use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
@@ -12,7 +11,6 @@ use crate::{
     operation::OperationWithDefaults,
     options::SelectionCriteria,
     results::GetMoreResult,
-    BoxFuture,
     Namespace,
 };
 
@@ -91,21 +89,16 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: GetMoreResponseBody = response.body()?;
+    ) -> Result<Self::O> {
+        let response: GetMoreResponseBody = response.body()?;
 
-            Ok(GetMoreResult {
-                batch: response.cursor.next_batch,
-                exhausted: response.cursor.id == 0,
-                post_batch_resume_token: ResumeToken::from_raw(
-                    response.cursor.post_batch_resume_token,
-                ),
-                id: response.cursor.id,
-                ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
-            })
-        }
-        .boxed()
+        Ok(GetMoreResult {
+            batch: response.cursor.next_batch,
+            exhausted: response.cursor.id == 0,
+            post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token),
+            id: response.cursor.id,
+            ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
+        })
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

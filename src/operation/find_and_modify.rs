@@ -2,7 +2,6 @@ pub(crate) mod options;
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use futures_util::FutureExt;
 use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
@@ -20,7 +19,6 @@ use crate::{
         Retryability,
     },
     options::WriteConcern,
-    BoxFuture,
 };
 
 use super::{ExecutionContext, UpdateOrReplace};
@@ -101,28 +99,25 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            #[derive(Debug, Deserialize)]
-            pub(crate) struct Response {
-                value: RawBson,
-            }
-            let response: Response = response.body()?;
-
-            match response.value {
-                RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
-                RawBson::Null => Ok(None),
-                other => Err(ErrorKind::InvalidResponse {
-                    message: format!(
-                        "expected document for value field of findAndModify response, but instead \
-                         got {:?}",
-                        other
-                    ),
-                }
-                .into()),
-            }
+    ) -> Result<Self::O> {
+        #[derive(Debug, Deserialize)]
+        pub(crate) struct Response {
+            value: RawBson,
         }
-        .boxed()
+        let response: Response = response.body()?;
+
+        match response.value {
+            RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
+            RawBson::Null => Ok(None),
+            other => Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "expected document for value field of findAndModify response, but instead got \
+                     {:?}",
+                    other
+                ),
+            }
+            .into()),
+        }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

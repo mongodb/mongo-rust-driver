@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -13,7 +11,6 @@ use crate::{
         SERVER_4_4_0_WIRE_VERSION,
     },
     options::{CursorType, FindOptions, SelectionCriteria},
-    BoxFuture,
     Namespace,
 };
 
@@ -98,28 +95,25 @@ impl OperationWithDefaults for Find {
         &'a self,
         response: RawCommandResponse,
         context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: CursorBody = response.body()?;
+    ) -> Result<Self::O> {
+        let response: CursorBody = response.body()?;
 
-            let description = context.connection.stream_description()?;
+        let description = context.connection.stream_description()?;
 
-            // The comment should only be propagated to getMore calls on 4.4+.
-            let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-                None
-            } else {
-                self.options.as_ref().and_then(|opts| opts.comment.clone())
-            };
+        // The comment should only be propagated to getMore calls on 4.4+.
+        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+            None
+        } else {
+            self.options.as_ref().and_then(|opts| opts.comment.clone())
+        };
 
-            Ok(CursorSpecification::new(
-                response.cursor,
-                description.server_address.clone(),
-                self.options.as_ref().and_then(|opts| opts.batch_size),
-                self.options.as_ref().and_then(|opts| opts.max_await_time),
-                comment,
-            ))
-        }
-        .boxed()
+        Ok(CursorSpecification::new(
+            response.cursor,
+            description.server_address.clone(),
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            self.options.as_ref().and_then(|opts| opts.max_await_time),
+            comment,
+        ))
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

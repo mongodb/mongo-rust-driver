@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -7,7 +5,6 @@ use crate::{
     error::Result,
     operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
-    BoxFuture,
 };
 
 use super::ExecutionContext;
@@ -61,22 +58,19 @@ impl OperationWithDefaults for ListCollections {
         &'a self,
         response: RawCommandResponse,
         context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: CursorBody = response.body()?;
-            Ok(CursorSpecification::new(
-                response.cursor,
-                context
-                    .connection
-                    .stream_description()?
-                    .server_address
-                    .clone(),
-                self.options.as_ref().and_then(|opts| opts.batch_size),
-                None,
-                None,
-            ))
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response: CursorBody = response.body()?;
+        Ok(CursorSpecification::new(
+            response.cursor,
+            context
+                .connection
+                .stream_description()?
+                .server_address
+                .clone(),
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            None,
+            None,
+        ))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

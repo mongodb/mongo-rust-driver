@@ -1,7 +1,5 @@
 pub(crate) mod change_stream;
 
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
@@ -10,7 +8,6 @@ use crate::{
     error::Result,
     operation::{append_options, remove_empty_write_concern, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
-    BoxFuture,
     Namespace,
 };
 
@@ -87,33 +84,30 @@ impl OperationWithDefaults for Aggregate {
         &'a self,
         response: RawCommandResponse,
         context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let cursor_response: CursorBody = response.body()?;
+    ) -> Result<Self::O> {
+        let cursor_response: CursorBody = response.body()?;
 
-            if self.is_out_or_merge() {
-                let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
-                wc_error_info.validate()?;
-            };
+        if self.is_out_or_merge() {
+            let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
+            wc_error_info.validate()?;
+        };
 
-            let description = context.connection.stream_description()?;
+        let description = context.connection.stream_description()?;
 
-            // The comment should only be propagated to getMore calls on 4.4+.
-            let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-                None
-            } else {
-                self.options.as_ref().and_then(|opts| opts.comment.clone())
-            };
+        // The comment should only be propagated to getMore calls on 4.4+.
+        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+            None
+        } else {
+            self.options.as_ref().and_then(|opts| opts.comment.clone())
+        };
 
-            Ok(CursorSpecification::new(
-                cursor_response.cursor,
-                description.server_address.clone(),
-                self.options.as_ref().and_then(|opts| opts.batch_size),
-                self.options.as_ref().and_then(|opts| opts.max_await_time),
-                comment,
-            ))
-        }
-        .boxed()
+        Ok(CursorSpecification::new(
+            cursor_response.cursor,
+            description.server_address.clone(),
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            self.options.as_ref().and_then(|opts| opts.max_await_time),
+            comment,
+        ))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

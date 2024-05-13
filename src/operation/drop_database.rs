@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -12,7 +10,6 @@ use crate::{
         WriteConcernOnlyBody,
     },
     options::WriteConcern,
-    BoxFuture,
 };
 
 use super::ExecutionContext;
@@ -54,12 +51,9 @@ impl OperationWithDefaults for DropDatabase {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: WriteConcernOnlyBody = response.body()?;
-            response.validate()
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
+        response.validate()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

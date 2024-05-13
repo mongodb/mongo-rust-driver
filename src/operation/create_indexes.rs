@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -8,7 +6,6 @@ use crate::{
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
-    BoxFuture,
     Namespace,
 };
 
@@ -77,14 +74,11 @@ impl OperationWithDefaults for CreateIndexes {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: WriteConcernOnlyBody = response.body()?;
-            response.validate()?;
-            let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
-            Ok(CreateIndexesResult { index_names })
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
+        response.validate()?;
+        let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
+        Ok(CreateIndexesResult { index_names })
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

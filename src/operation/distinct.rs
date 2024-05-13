@@ -1,4 +1,3 @@
-use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
@@ -8,7 +7,6 @@ use crate::{
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
-    BoxFuture,
 };
 
 use super::ExecutionContext;
@@ -75,12 +73,9 @@ impl OperationWithDefaults for Distinct {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: Response = response.body()?;
-            Ok(response.values)
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response: Response = response.body()?;
+        Ok(response.values)
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

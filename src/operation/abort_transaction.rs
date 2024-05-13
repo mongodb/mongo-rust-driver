@@ -1,15 +1,11 @@
-use bson::Document;
-use futures_util::FutureExt;
-
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     client::session::TransactionPin,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::Retryability,
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
-    BoxFuture,
 };
 
 use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
@@ -55,12 +51,9 @@ impl OperationWithDefaults for AbortTransaction {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: WriteConcernOnlyBody = response.body()?;
-            response.validate()
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
+        response.validate()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

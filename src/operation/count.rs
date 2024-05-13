@@ -1,4 +1,3 @@
-use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
@@ -8,7 +7,6 @@ use crate::{
     error::{Error, Result},
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
-    BoxFuture,
 };
 
 use super::ExecutionContext;
@@ -49,12 +47,9 @@ impl OperationWithDefaults for Count {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'static, Result<Self::O>> {
-        async move {
-            let response_body: ResponseBody = response.body()?;
-            Ok(response_body.n)
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response_body: ResponseBody = response.body()?;
+        Ok(response_body.n)
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {

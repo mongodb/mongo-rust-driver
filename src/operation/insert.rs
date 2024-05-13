@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use futures_util::FutureExt;
-
 use crate::{
     bson::{rawdoc, Bson, RawDocument, RawDocumentBuf},
     bson_util::{
@@ -16,7 +14,6 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
-    BoxFuture,
     Namespace,
 };
 
@@ -134,45 +131,42 @@ impl<'a> OperationWithDefaults for Insert<'a> {
         &'b self,
         response: RawCommandResponse,
         _context: ExecutionContext<'b>,
-    ) -> BoxFuture<'b, Result<Self::O>> {
-        async move {
-            let response: WriteResponseBody = response.body_utf8_lossy()?;
-            let response_n = Checked::<usize>::try_from(response.n)?;
+    ) -> Result<Self::O> {
+        let response: WriteResponseBody = response.body_utf8_lossy()?;
+        let response_n = Checked::<usize>::try_from(response.n)?;
 
-            let mut map = HashMap::new();
-            if self.options.ordered == Some(true) {
-                // in ordered inserts, only the first n were attempted.
-                for (i, id) in self.inserted_ids.iter().enumerate().take(response_n.get()?) {
-                    map.insert(i, id.clone());
-                }
-            } else {
-                // for unordered, add all the attempted ids and then remove the ones that have
-                // associated write errors.
-                for (i, id) in self.inserted_ids.iter().enumerate() {
-                    map.insert(i, id.clone());
-                }
-
-                if let Some(write_errors) = response.write_errors.as_ref() {
-                    for err in write_errors {
-                        map.remove(&err.index);
-                    }
-                }
+        let mut map = HashMap::new();
+        if self.options.ordered == Some(true) {
+            // in ordered inserts, only the first n were attempted.
+            for (i, id) in self.inserted_ids.iter().enumerate().take(response_n.get()?) {
+                map.insert(i, id.clone());
+            }
+        } else {
+            // for unordered, add all the attempted ids and then remove the ones that have
+            // associated write errors.
+            for (i, id) in self.inserted_ids.iter().enumerate() {
+                map.insert(i, id.clone());
             }
 
-            if response.write_errors.is_some() || response.write_concern_error.is_some() {
-                return Err(Error::new(
-                    ErrorKind::BulkWrite(BulkWriteFailure {
-                        write_errors: response.write_errors,
-                        write_concern_error: response.write_concern_error,
-                        inserted_ids: map,
-                    }),
-                    response.labels,
-                ));
+            if let Some(write_errors) = response.write_errors.as_ref() {
+                for err in write_errors {
+                    map.remove(&err.index);
+                }
             }
-
-            Ok(InsertManyResult { inserted_ids: map })
         }
-        .boxed()
+
+        if response.write_errors.is_some() || response.write_concern_error.is_some() {
+            return Err(Error::new(
+                ErrorKind::BulkWrite(BulkWriteFailure {
+                    write_errors: response.write_errors,
+                    write_concern_error: response.write_concern_error,
+                    inserted_ids: map,
+                }),
+                response.labels,
+            ));
+        }
+
+        Ok(InsertManyResult { inserted_ids: map })
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

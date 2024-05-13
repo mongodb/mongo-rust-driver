@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use serde::Deserialize;
 
 use crate::{
@@ -10,7 +8,6 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
-    BoxFuture,
     Namespace,
 };
 
@@ -166,32 +163,29 @@ impl OperationWithDefaults for Update {
         &'a self,
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: WriteResponseBody<UpdateBody> = response.body_utf8_lossy()?;
-            response.validate().map_err(convert_bulk_errors)?;
+    ) -> Result<Self::O> {
+        let response: WriteResponseBody<UpdateBody> = response.body_utf8_lossy()?;
+        response.validate().map_err(convert_bulk_errors)?;
 
-            let modified_count = response.n_modified;
-            let upserted_id = response
-                .upserted
-                .as_ref()
-                .and_then(|v| v.first())
-                .and_then(|doc| doc.get("_id"))
-                .cloned();
+        let modified_count = response.n_modified;
+        let upserted_id = response
+            .upserted
+            .as_ref()
+            .and_then(|v| v.first())
+            .and_then(|doc| doc.get("_id"))
+            .cloned();
 
-            let matched_count = if upserted_id.is_some() {
-                0
-            } else {
-                response.body.n
-            };
+        let matched_count = if upserted_id.is_some() {
+            0
+        } else {
+            response.body.n
+        };
 
-            Ok(UpdateResult {
-                matched_count,
-                modified_count,
-                upserted_id,
-            })
-        }
-        .boxed()
+        Ok(UpdateResult {
+            matched_count,
+            modified_count,
+            upserted_id,
+        })
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

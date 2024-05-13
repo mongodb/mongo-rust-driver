@@ -242,7 +242,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
         Ok(command)
     }
 
-    fn handle_response<'b>(
+    fn handle_response_async<'b>(
         &'b self,
         response: RawCommandResponse,
         context: ExecutionContext<'b>,

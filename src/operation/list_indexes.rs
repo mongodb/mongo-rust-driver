@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -8,7 +6,6 @@ use crate::{
     operation::{append_options, OperationWithDefaults},
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    BoxFuture,
     Namespace,
 };
 
@@ -51,22 +48,19 @@ impl OperationWithDefaults for ListIndexes {
         &'a self,
         response: RawCommandResponse,
         context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move {
-            let response: CursorBody = response.body()?;
-            Ok(CursorSpecification::new(
-                response.cursor,
-                context
-                    .connection
-                    .stream_description()?
-                    .server_address
-                    .clone(),
-                self.options.as_ref().and_then(|o| o.batch_size),
-                self.options.as_ref().and_then(|o| o.max_time),
-                None,
-            ))
-        }
-        .boxed()
+    ) -> Result<Self::O> {
+        let response: CursorBody = response.body()?;
+        Ok(CursorSpecification::new(
+            response.cursor,
+            context
+                .connection
+                .stream_description()?
+                .server_address
+                .clone(),
+            self.options.as_ref().and_then(|o| o.batch_size),
+            self.options.as_ref().and_then(|o| o.max_time),
+            None,
+        ))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

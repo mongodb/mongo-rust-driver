@@ -1,12 +1,9 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
     options::{DropIndexOptions, WriteConcern},
-    BoxFuture,
     Namespace,
 };
 
@@ -49,8 +46,8 @@ impl OperationWithDefaults for DropIndexes {
         &'a self,
         _response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(()) }.boxed()
+    ) -> Result<Self::O> {
+        Ok(())
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
