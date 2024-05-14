@@ -830,7 +830,7 @@ impl WriteError {
 /// [`insert_many`](crate::Collection::insert_many) operation.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
-pub struct InsertError {
+pub struct IndexedWriteError {
     /// Index into the list of operations that this error corresponds to.
     #[serde(default)]
     pub index: usize,
@@ -855,7 +855,7 @@ pub struct InsertError {
     pub details: Option<Document>,
 }
 
-impl InsertError {
+impl IndexedWriteError {
     // If any new fields are added to InsertError, this implementation must be updated to redact
     // them per the CLAM spec.
     fn redact(&mut self) {
@@ -871,7 +871,7 @@ impl InsertError {
 #[non_exhaustive]
 pub struct InsertManyError {
     /// The error(s) that occurred on account of a non write concern failure.
-    pub write_errors: Option<Vec<InsertError>>,
+    pub write_errors: Option<Vec<IndexedWriteError>>,
 
     /// The error that occurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,

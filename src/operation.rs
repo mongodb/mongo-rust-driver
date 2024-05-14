@@ -45,7 +45,7 @@ use crate::{
         CommandError,
         Error,
         ErrorKind,
-        InsertError,
+        IndexedWriteError,
         InsertManyError,
         Result,
         WriteConcernError,
@@ -441,7 +441,7 @@ pub(crate) struct WriteResponseBody<T = SingleWriteBody> {
     body: T,
 
     #[serde(rename = "writeErrors")]
-    write_errors: Option<Vec<InsertError>>,
+    write_errors: Option<Vec<IndexedWriteError>>,
 
     #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,

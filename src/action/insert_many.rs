@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     coll::options::InsertManyOptions,
-    error::{Error, ErrorKind, InsertError, InsertManyError, Result},
+    error::{Error, ErrorKind, IndexedWriteError, InsertManyError, Result},
     operation::Insert as Op,
     options::WriteConcern,
     results::InsertManyResult,
@@ -154,7 +154,7 @@ impl<'a> Action for InsertMany<'a> {
                                     failure_ref
                                         .write_errors
                                         .get_or_insert_with(Default::default)
-                                        .push(InsertError { index, ..err });
+                                        .push(IndexedWriteError { index, ..err });
                                 }
                             }
 

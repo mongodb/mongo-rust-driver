@@ -7,7 +7,7 @@ use crate::{
         CommandError,
         Error,
         ErrorKind,
-        InsertError,
+        IndexedWriteError,
         InsertManyError,
         WriteConcernError,
         WriteError,
@@ -265,7 +265,7 @@ fn error_redaction() {
                 ..
             }) => {
                 if let Some(write_errors) = write_errors {
-                    for InsertError {
+                    for IndexedWriteError {
                         code,
                         code_name,
                         message,
@@ -335,7 +335,7 @@ fn error_redaction() {
 
     let mut bulk_write_error = Error::new(
         ErrorKind::InsertMany(InsertManyError {
-            write_errors: Some(vec![InsertError {
+            write_errors: Some(vec![IndexedWriteError {
                 index: 0,
                 code: 123,
                 code_name: Some("CodeName".to_string()),
